@@ -44,13 +44,16 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
@@ -441,29 +444,31 @@ fun TransactionEditDialog(
                                                 deletedAttributeIds.add(originalExcludedAttr.id)
                                         }
 
-                                        // Use the atomic method to update transfer and attributes together.
-                                        // updateTransfer records the provenance source itself.
-                                        importEngine.updateTransfer(
-                                            transfer = updatedTransfer,
-                                            deletedAttributeIds = deletedAttributeIds,
-                                            updatedAttributes = updatedAttributes,
-                                            newAttributes = newAttributes,
-                                            transactionId = transaction.id,
-                                            source = Source.Manual,
+                                        // One UPDATE intent: transfer fields + attribute deltas, applied
+                                        // atomically (one revision bump) by the engine.
+                                        importEngine.import(
+                                            ImportBatch.manualEdits(
+                                                transfers =
+                                                    listOf(
+                                                        ImportTransfer(
+                                                            source = Source.Manual,
+                                                            operation = ImportOperation.UPDATE,
+                                                            existingId = transaction.id,
+                                                            // Null when only attributes changed (no transfer-field update).
+                                                            fromAccount = updatedTransfer?.let { AccountRef.Existing(it.sourceAccountId) },
+                                                            toAccount = updatedTransfer?.let { AccountRef.Existing(it.targetAccountId) },
+                                                            timestamp = updatedTransfer?.timestamp,
+                                                            description = updatedTransfer?.description ?: "",
+                                                            amount = updatedTransfer?.amount,
+                                                            deletedAttributeIds = deletedAttributeIds,
+                                                            updatedAttributes = updatedAttributes,
+                                                            attributes = newAttributes,
+                                                        ),
+                                                    ),
+                                            ),
                                         )
                                     } else {
-                                        // CREATE MODE: Create new transaction
-                                        val transfer =
-                                            Transfer(
-                                                id = TransferId(0L),
-                                                timestamp = timestamp,
-                                                description = description.trim(),
-                                                sourceAccountId = sourceAccountId!!,
-                                                targetAccountId = targetAccountId!!,
-                                                amount = Money.fromDisplayValue(parsedAmount, currency),
-                                            )
-
-                                        // Build attributes to save (only non-blank ones)
+                                        // CREATE MODE: build attributes to save (only non-blank ones).
                                         val attributesToSave =
                                             editableAttributes
                                                 .filter { (_, pair) -> pair.first.isNotBlank() && pair.second.isNotBlank() }
@@ -476,10 +481,21 @@ fun TransactionEditDialog(
                                             attributesToSave.add(NewAttribute(AttributeTypeId(-1), excludeReason))
                                         }
 
-                                        importEngine.createTransfers(
-                                            transfers = listOf(transfer),
-                                            newAttributes = mapOf(transfer.id to attributesToSave),
-                                            sources = listOf(Source.Manual),
+                                        importEngine.import(
+                                            ImportBatch.manualEdits(
+                                                transfers =
+                                                    listOf(
+                                                        ImportTransfer(
+                                                            source = Source.Manual,
+                                                            fromAccount = AccountRef.Existing(sourceAccountId!!),
+                                                            toAccount = AccountRef.Existing(targetAccountId!!),
+                                                            timestamp = timestamp,
+                                                            description = description.trim(),
+                                                            amount = Money.fromDisplayValue(parsedAmount, currency),
+                                                            attributes = attributesToSave,
+                                                        ),
+                                                    ),
+                                            ),
                                         )
                                     }
 

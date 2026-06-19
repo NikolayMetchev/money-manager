@@ -74,6 +74,10 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportCategoryIntent
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.ErrorMessageText
 import com.moneymanager.ui.components.LoadingTextButton
@@ -316,9 +320,19 @@ fun CategoriesScreen(
                                         if (draggedCategory.parentId != newParentId) {
                                             scope.launch {
                                                 try {
-                                                    importEngine.updateCategory(
-                                                        draggedCategory.copy(parentId = newParentId),
-                                                        Source.Manual,
+                                                    importEngine.import(
+                                                        ImportBatch.manualEdits(
+                                                            categories =
+                                                                listOf(
+                                                                    ImportCategoryIntent(
+                                                                        key = LocalCategoryKey("update"),
+                                                                        source = Source.Manual,
+                                                                        operation = ImportOperation.UPDATE,
+                                                                        existingId = draggedCategory.id,
+                                                                        category = draggedCategory.copy(parentId = newParentId),
+                                                                    ),
+                                                                ),
+                                                        ),
                                                     )
                                                 } catch (expected: Exception) {
                                                     logger.error(expected) {
@@ -703,12 +717,19 @@ fun EditCategoryDialog(
                         setError = { errorMessage = it },
                         onSuccess = onDismiss,
                     ) { trimmedName ->
-                        importEngine.updateCategory(
-                            category.copy(
-                                name = trimmedName,
-                                parentId = selectedParentId,
+                        importEngine.import(
+                            ImportBatch.manualEdits(
+                                categories =
+                                    listOf(
+                                        ImportCategoryIntent(
+                                            key = LocalCategoryKey("update"),
+                                            source = Source.Manual,
+                                            operation = ImportOperation.UPDATE,
+                                            existingId = category.id,
+                                            category = category.copy(name = trimmedName, parentId = selectedParentId),
+                                        ),
+                                    ),
                             ),
-                            Source.Manual,
                         )
                     }
                 },
@@ -881,7 +902,19 @@ fun DeleteCategoryDialog(
                     errorMessage = null
                     scope.launch {
                         try {
-                            importEngine.deleteCategory(category.id)
+                            importEngine.import(
+                                ImportBatch.manualEdits(
+                                    categories =
+                                        listOf(
+                                            ImportCategoryIntent(
+                                                key = LocalCategoryKey("delete"),
+                                                source = Source.Manual,
+                                                operation = ImportOperation.DELETE,
+                                                existingId = category.id,
+                                            ),
+                                        ),
+                                ),
+                            )
                             onDeleted()
                         } catch (expected: Exception) {
                             logger.error(expected) { "Failed to delete category: ${expected.message}" }

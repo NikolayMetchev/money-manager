@@ -170,7 +170,7 @@ class ImportDeduper(
         if (transfer.amount != existing.amount) return false
         if (transfer.fromAccount.requireId() != existing.sourceAccountId) return false
         if (transfer.toAccount.requireId() != existing.targetAccountId) return false
-        val delta = (transfer.timestamp - existing.timestamp).absoluteValue
+        val delta = (requireNotNull(transfer.timestamp) - existing.timestamp).absoluteValue
         return delta <= window
     }
 
@@ -188,11 +188,11 @@ class ImportDeduper(
     private fun ImportTransfer.toComparableTransfer(id: TransferId): Transfer =
         Transfer(
             id = id,
-            timestamp = timestamp,
+            timestamp = requireNotNull(timestamp),
             description = description,
             sourceAccountId = fromAccount.requireId(),
             targetAccountId = toAccount.requireId(),
-            amount = amount,
+            amount = requireNotNull(amount),
         )
 
     private fun classifyByUniqueId(transfer: ImportTransfer): Classified {
@@ -268,15 +268,17 @@ class ImportDeduper(
                 transfer.toAccount.requireId() == existing.targetAccountId
         if (!sharesAccount) return false
         val withinDateTolerance =
-            (transfer.timestamp - existing.timestamp).absoluteValue <= policy.dateTolerance
+            (requireNotNull(transfer.timestamp) - existing.timestamp).absoluteValue <= policy.dateTolerance
         if (!withinDateTolerance) return false
         return StringSimilarity.similarity(transfer.description, existing.description) >= policy.similarityThreshold
     }
 
-    private fun AccountRef.requireId(): AccountId =
+    // Dedupe runs on resolved CREATE transfers, whose fields are present; null indicates a builder error.
+    private fun AccountRef?.requireId(): AccountId =
         when (this) {
             is AccountRef.Existing -> id
             is AccountRef.Local ->
                 error("ImportDeduper requires resolved account references; got unresolved $key")
+            null -> error("ImportDeduper requires a resolved account reference; got null")
         }
 }

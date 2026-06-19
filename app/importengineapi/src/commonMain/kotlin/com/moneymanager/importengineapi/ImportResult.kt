@@ -1,6 +1,7 @@
 package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
 
@@ -23,6 +24,8 @@ data class RowOutcome(
  * @property rowOutcomes Per-row classification + resulting transfer id for every non-error transfer row.
  * @property createdAccountIds Real ids of accounts created (or matched/reused) for each
  *   [LocalAccountKey] in the batch's `accountsToCreate`.
+ * @property createdCategoryIds Real ids of categories created for each [LocalCategoryKey] in `categories`.
+ * @property createdPersonIds Real ids of people created (or matched) for each [LocalPersonKey] in `peopleToCreate`.
  */
 data class ImportResult(
     val accountsCreated: Int = 0,
@@ -39,6 +42,8 @@ data class ImportResult(
     // keyed rowOutcomes) when row keys are not unique per transfer (e.g. API pages, QIF splits).
     val orderedRowOutcomes: List<RowOutcome> = emptyList(),
     val createdAccountIds: Map<LocalAccountKey, AccountId> = emptyMap(),
+    val createdCategoryIds: Map<LocalCategoryKey, Long> = emptyMap(),
+    val createdPersonIds: Map<LocalPersonKey, PersonId> = emptyMap(),
 )
 
 /**

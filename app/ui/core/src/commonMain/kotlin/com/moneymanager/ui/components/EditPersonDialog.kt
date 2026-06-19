@@ -28,6 +28,10 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.ImportPersonIntent
+import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.transactions.EditableAttributesSection
@@ -170,42 +174,50 @@ fun EditPersonDialog(
                                 }
                                 val newPersonId =
                                     if (personToEdit != null) {
-                                        importEngine.updatePersonWithAttributes(
-                                            person =
-                                                personToEdit.copy(
-                                                    firstName = firstName.trim(),
-                                                    middleName = middleName.trim().ifBlank { null },
-                                                    lastName = lastName.trim().ifBlank { null },
-                                                ),
-                                            personId = personToEdit.id,
-                                            deletedAttributeIds = deletedAttributeIds,
-                                            updatedAttributes = updatedAttributes,
-                                            newAttributes = newAttributes,
-                                            source = Source.Manual,
+                                        importEngine.import(
+                                            ImportBatch.manualEdits(
+                                                people =
+                                                    listOf(
+                                                        ImportPersonIntent(
+                                                            key = LocalPersonKey("edit"),
+                                                            source = Source.Manual,
+                                                            operation = ImportOperation.UPDATE,
+                                                            existingId = personToEdit.id,
+                                                            person =
+                                                                personToEdit.copy(
+                                                                    firstName = firstName.trim(),
+                                                                    middleName = middleName.trim().ifBlank { null },
+                                                                    lastName = lastName.trim().ifBlank { null },
+                                                                ),
+                                                            deletedAttributeIds = deletedAttributeIds,
+                                                            updatedAttributes = updatedAttributes,
+                                                            attributes = newAttributes,
+                                                        ),
+                                                    ),
+                                            ),
                                         )
                                         null
                                     } else {
-                                        val createdId =
-                                            importEngine.createPerson(
-                                                Person(
-                                                    id = PersonId(0),
-                                                    firstName = firstName.trim(),
-                                                    middleName = middleName.trim().ifBlank { null },
-                                                    lastName = lastName.trim().ifBlank { null },
+                                        // CREATE carries its attributes, so the engine creates the row and
+                                        // its attributes in one go (no follow-up update needed).
+                                        val key = LocalPersonKey("new-person")
+                                        val result =
+                                            importEngine.import(
+                                                ImportBatch.manualEdits(
+                                                    people =
+                                                        listOf(
+                                                            ImportPersonIntent(
+                                                                key = key,
+                                                                source = Source.Manual,
+                                                                firstName = firstName.trim(),
+                                                                middleName = middleName.trim().ifBlank { null },
+                                                                lastName = lastName.trim().ifBlank { null },
+                                                                attributes = newAttributes,
+                                                            ),
+                                                        ),
                                                 ),
-                                                Source.Manual,
                                             )
-                                        if (newAttributes.isNotEmpty()) {
-                                            importEngine.updatePersonWithAttributes(
-                                                person = null,
-                                                personId = createdId,
-                                                deletedAttributeIds = emptySet(),
-                                                updatedAttributes = emptyMap(),
-                                                newAttributes = newAttributes,
-                                                source = Source.Manual,
-                                            )
-                                        }
-                                        createdId
+                                        result.createdPersonIds.getValue(key)
                                     }
                                 // Only announce the new person once the full save (row + attributes)
                                 // has succeeded, so the parent never selects a half-saved person.

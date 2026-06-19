@@ -33,6 +33,13 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importengineapi.AccountMergeRequest
+import com.moneymanager.importengineapi.ImportAccountIntent
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportCategoryIntent
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.components.EditAccountDialog
@@ -597,13 +604,32 @@ fun DeleteAccountDialog(
                     scope.launch {
                         try {
                             if (hasTransactions) {
-                                importEngine.mergeAccounts(
-                                    deletedAccount = account.id,
-                                    survivingAccount = selectedTargetAccount!!.id,
+                                importEngine.import(
+                                    ImportBatch.manualEdits(
+                                        accountMerges =
+                                            listOf(
+                                                AccountMergeRequest(
+                                                    deletedId = account.id,
+                                                    survivingId = selectedTargetAccount!!.id,
+                                                ),
+                                            ),
+                                    ),
                                 )
                                 maintenance.fullRefreshMaterializedViews()
                             } else {
-                                importEngine.deleteAccount(account.id)
+                                importEngine.import(
+                                    ImportBatch.manualEdits(
+                                        accounts =
+                                            listOf(
+                                                ImportAccountIntent(
+                                                    key = LocalAccountKey("delete"),
+                                                    source = Source.Manual,
+                                                    operation = ImportOperation.DELETE,
+                                                    existingId = account.id,
+                                                ),
+                                            ),
+                                    ),
+                                )
                             }
                             onDismiss()
                         } catch (expected: Exception) {
@@ -685,7 +711,7 @@ fun UnmergeAccountDialog(
                     errorMessage = null
                     scope.launch {
                         try {
-                            importEngine.unmergeAccount(merge.id)
+                            importEngine.import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
                             maintenance.fullRefreshMaterializedViews()
                             onDismiss()
                         } catch (expected: Exception) {
@@ -786,13 +812,22 @@ fun CreateCategoryDialog(
                         errorMessage = null
                         scope.launch {
                             try {
-                                val newCategory =
-                                    Category(
-                                        name = name.trim(),
-                                        parentId = selectedParentId,
+                                val key = LocalCategoryKey("create")
+                                val result =
+                                    importEngine.import(
+                                        ImportBatch.manualEdits(
+                                            categories =
+                                                listOf(
+                                                    ImportCategoryIntent(
+                                                        key = key,
+                                                        source = source,
+                                                        name = name.trim(),
+                                                        parentId = selectedParentId,
+                                                    ),
+                                                ),
+                                        ),
                                     )
-                                val categoryId = importEngine.createCategory(newCategory, source)
-                                onCategoryCreated(categoryId, name.trim())
+                                onCategoryCreated(result.createdCategoryIds.getValue(key), name.trim())
                             } catch (expected: Exception) {
                                 logger.error(expected) { "Failed to create category: ${expected.message}" }
                                 errorMessage = "Failed to create category: ${expected.message}"

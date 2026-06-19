@@ -6,7 +6,6 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
@@ -31,14 +30,18 @@ import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportResult
+import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.RowOutcome
+import com.moneymanager.importengineapi.WriteIntent
 import com.moneymanager.importengineapi.bankKeyFromExternalId
 import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
@@ -70,28 +73,207 @@ class ImportEngineImpl(
         batchSize: Int,
     ): ImportResult {
         editGate.ensureWritable()
+        validate(batch)
+
+        // ----- CREATE phase (first, so batch-local keys resolve for dependents) -----
+        val createdCategoryIds = mutableMapOf<LocalCategoryKey, Long>()
+        for (intent in batch.categories.creates()) {
+            createdCategoryIds[intent.key] =
+                categoryRepository.createCategory(
+                    Category(name = requireNotNull(intent.name), parentId = intent.parentId),
+                    intent.source,
+                )
+        }
+
         onProgress?.invoke(ImportProgress("Resolving accounts"))
-        val accountResolution = resolveAccounts(batch)
+        val accountResolution = resolveAccounts(batch.copy(accountsToCreate = batch.accountsToCreate.creates()))
 
         onProgress?.invoke(ImportProgress("Resolving people"))
-        val personKeyToId = resolvePeople(batch)
+        val personResolution = resolvePeople(batch.copy(peopleToCreate = batch.peopleToCreate.creates()))
 
         onProgress?.invoke(ImportProgress("Linking ownerships"))
-        val ownershipsCreated = createOwnerships(batch, personKeyToId, accountResolution.keyToId)
+        val ownershipsCreated =
+            createOwnerships(
+                batch.copy(ownerships = batch.ownerships.creates()),
+                personResolution,
+                accountResolution.keyToId,
+            )
 
-        // Resolve every transfer's account references to real ids, including a fee's own source/target
-        // (an API fee pays from the own account into the consolidated fee account, both of which may be
-        // batch-local accounts created in this same import).
+        val transfers = importTransferCreates(batch.transfers.creates(), batch, accountResolution.keyToId, batchSize, onProgress)
+
+        // ----- UPDATE phase -----
+        for (intent in batch.transfers.updates()) {
+            transactionRepository.updateTransfer(
+                transfer = intent.toUpdatedTransfer(),
+                deletedAttributeIds = intent.deletedAttributeIds,
+                updatedAttributes = intent.updatedAttributes,
+                newAttributes = intent.attributes,
+                transactionId = requireNotNull(intent.existingId),
+                source = intent.source,
+            )
+        }
+        for (intent in batch.accountsToCreate.updates()) {
+            accountRepository.updateAccountWithAttributes(
+                account = intent.account,
+                accountId = requireNotNull(intent.existingId),
+                deletedAttributeIds = intent.deletedAttributeIds,
+                updatedAttributes = intent.updatedAttributes,
+                newAttributes = intent.attributes,
+                source = intent.source,
+            )
+        }
+        for (intent in batch.categories.updates()) {
+            categoryRepository.updateCategory(requireNotNull(intent.category), intent.source)
+        }
+        for (intent in batch.peopleToCreate.updates()) {
+            personRepository.updatePersonWithAttributes(
+                person = intent.person,
+                personId = requireNotNull(intent.existingId),
+                deletedAttributeIds = intent.deletedAttributeIds,
+                updatedAttributes = intent.updatedAttributes,
+                newAttributes = intent.attributes,
+                source = intent.source,
+            )
+        }
+
+        // ----- MERGE / UNMERGE (before deletes: a merge already removes the absorbed account) -----
+        batch.accountMerges.forEach { accountRepository.mergeAccounts(it.deletedId, it.survivingId) }
+        batch.accountUnmerges.forEach { accountRepository.unmergeAccount(it) }
+
+        // ----- DELETE phase (dependents first) -----
+        batch.ownerships.deletes().forEach { ownershipRepository.deleteOwnership(requireNotNull(it.existingId)) }
+        batch.transfers.deletes().forEach { transactionRepository.deleteTransaction(requireNotNull(it.existingId).id) }
+        batch.accountsToCreate.deletes().forEach { accountRepository.deleteAccount(requireNotNull(it.existingId)) }
+        batch.categories.deletes().forEach { categoryRepository.deleteCategory(requireNotNull(it.existingId)) }
+        batch.peopleToCreate.deletes().forEach { personRepository.deletePerson(requireNotNull(it.existingId)) }
+
+        return ImportResult(
+            accountsCreated = accountResolution.created,
+            peopleCreated = personResolution.createdCount,
+            ownershipsCreated = ownershipsCreated,
+            transfersImported = transfers.imported,
+            duplicates = transfers.duplicates,
+            updated = transfers.updated,
+            excluded = transfers.excluded,
+            createdTransferIds = transfers.createdTransferIds,
+            rowOutcomes = transfers.rowOutcomes,
+            orderedRowOutcomes = transfers.orderedRowOutcomes,
+            createdAccountIds = accountResolution.keyToId,
+            createdCategoryIds = createdCategoryIds,
+            createdPersonIds = personResolution.keyToId,
+        )
+    }
+
+    // region Operation dispatch
+
+    private fun <T : WriteIntent> List<T>.creates() = filter { it.operation == ImportOperation.CREATE }
+
+    private fun <T : WriteIntent> List<T>.updates() = filter { it.operation == ImportOperation.UPDATE }
+
+    private fun <T : WriteIntent> List<T>.deletes() = filter { it.operation == ImportOperation.DELETE }
+
+    /** Fails loudly when an intent omits the fields its [ImportOperation] requires (nullable-by-design). */
+    private fun validate(batch: ImportBatch) {
+        batch.transfers.forEach {
+            when (it.operation) {
+                ImportOperation.CREATE ->
+                    require(it.fromAccount != null && it.toAccount != null && it.timestamp != null && it.amount != null) {
+                        "CREATE transfer requires fromAccount/toAccount/timestamp/amount"
+                    }
+                ImportOperation.UPDATE, ImportOperation.DELETE ->
+                    require(it.existingId != null) { "${it.operation} transfer requires existingId" }
+            }
+        }
+        batch.accountsToCreate.forEach {
+            when (it.operation) {
+                ImportOperation.CREATE ->
+                    require(it.name != null && it.openingDate != null) { "CREATE account requires name/openingDate" }
+                ImportOperation.UPDATE, ImportOperation.DELETE ->
+                    require(it.existingId != null) { "${it.operation} account requires existingId" }
+            }
+        }
+        batch.categories.forEach {
+            when (it.operation) {
+                ImportOperation.CREATE -> require(it.name != null) { "CREATE category requires name" }
+                ImportOperation.UPDATE ->
+                    require(it.existingId != null && it.category != null) { "UPDATE category requires existingId and category" }
+                ImportOperation.DELETE -> require(it.existingId != null) { "DELETE category requires existingId" }
+            }
+        }
+        batch.peopleToCreate.forEach {
+            when (it.operation) {
+                ImportOperation.CREATE -> require(it.firstName != null) { "CREATE person requires firstName" }
+                ImportOperation.UPDATE, ImportOperation.DELETE ->
+                    require(it.existingId != null) { "${it.operation} person requires existingId" }
+            }
+        }
+        batch.ownerships.forEach {
+            when (it.operation) {
+                ImportOperation.CREATE ->
+                    require((it.personKey != null || it.existingPersonId != null) && it.account != null) {
+                        "CREATE ownership requires a person and an account"
+                    }
+                ImportOperation.DELETE -> require(it.existingId != null) { "DELETE ownership requires existingId" }
+                ImportOperation.UPDATE -> error("Ownerships have no UPDATE operation")
+            }
+        }
+    }
+
+    /** Builds the [Transfer] for an UPDATE intent, or null for an attribute-only update. */
+    private fun ImportTransfer.toUpdatedTransfer(): Transfer? =
+        if (fromAccount == null && toAccount == null && amount == null && timestamp == null) {
+            null
+        } else {
+            Transfer(
+                id = requireNotNull(existingId),
+                timestamp = requireNotNull(timestamp),
+                description = description,
+                sourceAccountId = requireId(fromAccount),
+                targetAccountId = requireId(toAccount),
+                amount = requireNotNull(amount),
+            )
+        }
+
+    // endregion
+
+    // region Transfer creates
+
+    /** The transfer-related portion of an [ImportResult], produced by [importTransferCreates]. */
+    private class TransferOutcome(
+        val imported: Int,
+        val duplicates: Int,
+        val updated: Int,
+        val excluded: Int,
+        val createdTransferIds: Map<ImportRowKey, TransferId>,
+        val rowOutcomes: Map<ImportRowKey, RowOutcome>,
+        val orderedRowOutcomes: List<RowOutcome>,
+    )
+
+    /**
+     * Runs the existing dedupe + write path over the CREATE transfers, resolving account references and
+     * synthesising a [ImportRowKey.Manual] for manually-entered transfers that carry no source row.
+     */
+    private suspend fun importTransferCreates(
+        creates: List<ImportTransfer>,
+        batch: ImportBatch,
+        accountKeyToId: Map<LocalAccountKey, AccountId>,
+        batchSize: Int,
+        onProgress: (suspend (ImportProgress) -> Unit)?,
+    ): TransferOutcome {
+        if (creates.isEmpty()) return TransferOutcome(0, 0, 0, 0, emptyMap(), emptyMap(), emptyList())
+
+        var manualRowIndex = 0L
         val resolvedTransfers =
-            batch.transfers.map { transfer ->
+            creates.map { transfer ->
                 val fee = transfer.fee
                 transfer.copy(
-                    fromAccount = resolveRef(transfer.fromAccount, accountResolution.keyToId),
-                    toAccount = resolveRef(transfer.toAccount, accountResolution.keyToId),
+                    rowKey = transfer.rowKey ?: ImportRowKey.Manual(manualRowIndex++),
+                    fromAccount = resolveRef(requireNotNull(transfer.fromAccount), accountKeyToId),
+                    toAccount = resolveRef(requireNotNull(transfer.toAccount), accountKeyToId),
                     fee =
                         fee?.copy(
-                            source = resolveRef(fee.source, accountResolution.keyToId),
-                            target = resolveRef(fee.target, accountResolution.keyToId),
+                            source = resolveRef(fee.source, accountKeyToId),
+                            target = resolveRef(fee.target, accountKeyToId),
                         ),
                 )
             }
@@ -108,7 +290,7 @@ class ImportEngineImpl(
         onProgress?.invoke(ImportProgress("Importing transactions", fraction = 0f, processed = 0, total = toImport.size))
         val createdIds = writeTransfers(toImport, toUpdate, batchSize, onProgress)
 
-        val createdTransferIds = toImport.zip(createdIds).associate { (classified, id) -> classified.transfer.rowKey to id }
+        val createdTransferIds = toImport.zip(createdIds).associate { (c, id) -> requireNotNull(c.transfer.rowKey) to id }
 
         // Build per-transfer outcomes in input order; IMPORTED rows pull their created id in turn.
         val createdIdByIndex = mutableMapOf<Int, TransferId>()
@@ -126,127 +308,19 @@ class ImportEngineImpl(
                     else -> RowOutcome(c.status, c.existing ?: c.inBatchMatchIndex?.let { createdIdByIndex[it] })
                 }
             }
-        val rowOutcomes = classified.zip(orderedRowOutcomes).associate { (c, outcome) -> c.transfer.rowKey to outcome }
+        val rowOutcomes =
+            classified.zip(orderedRowOutcomes).associate { (c, outcome) -> requireNotNull(c.transfer.rowKey) to outcome }
 
-        return ImportResult(
-            accountsCreated = accountResolution.created,
-            peopleCreated = personKeyToId.createdCount,
-            ownershipsCreated = ownershipsCreated,
-            transfersImported = toImport.size,
+        return TransferOutcome(
+            imported = toImport.size,
             duplicates = duplicates,
             updated = toUpdate.size,
             excluded = excluded,
             createdTransferIds = createdTransferIds,
             rowOutcomes = rowOutcomes,
             orderedRowOutcomes = orderedRowOutcomes,
-            createdAccountIds = accountResolution.keyToId,
         )
     }
-
-    // region Manual edits — every method is gated, then delegates to the matching repository.
-
-    private inline fun <T> gated(block: () -> T): T {
-        editGate.ensureWritable()
-        return block()
-    }
-
-    override suspend fun createTransfers(
-        transfers: List<Transfer>,
-        newAttributes: Map<TransferId, List<NewAttribute>>,
-        sources: List<Source>,
-    ): List<TransferId> = gated { transactionRepository.createTransfers(transfers, newAttributes, sources) }
-
-    override suspend fun updateTransfer(
-        transfer: Transfer?,
-        deletedAttributeIds: Set<Long>,
-        updatedAttributes: Map<Long, NewAttribute>,
-        newAttributes: List<NewAttribute>,
-        transactionId: TransferId,
-        source: Source,
-    ) = gated {
-        transactionRepository.updateTransfer(transfer, deletedAttributeIds, updatedAttributes, newAttributes, transactionId, source)
-    }
-
-    override suspend fun deleteTransaction(id: Long) = gated { transactionRepository.deleteTransaction(id) }
-
-    override suspend fun createAccount(
-        account: Account,
-        source: Source,
-    ): AccountId = gated { accountRepository.createAccount(account, source) }
-
-    override suspend fun updateAccountWithAttributes(
-        account: Account?,
-        accountId: AccountId,
-        deletedAttributeIds: Set<Long>,
-        updatedAttributes: Map<Long, NewAttribute>,
-        newAttributes: List<NewAttribute>,
-        source: Source,
-    ): Long =
-        gated {
-            accountRepository.updateAccountWithAttributes(
-                account,
-                accountId,
-                deletedAttributeIds,
-                updatedAttributes,
-                newAttributes,
-                source,
-            )
-        }
-
-    override suspend fun deleteAccount(id: AccountId) = gated { accountRepository.deleteAccount(id) }
-
-    override suspend fun mergeAccounts(
-        deletedAccount: AccountId,
-        survivingAccount: AccountId,
-    ): MergeId = gated { accountRepository.mergeAccounts(deletedAccount, survivingAccount) }
-
-    override suspend fun unmergeAccount(mergeId: MergeId) = gated { accountRepository.unmergeAccount(mergeId) }
-
-    override suspend fun createCategory(
-        category: Category,
-        source: Source,
-    ): Long = gated { categoryRepository.createCategory(category, source) }
-
-    override suspend fun updateCategory(
-        category: Category,
-        source: Source,
-    ) = gated { categoryRepository.updateCategory(category, source) }
-
-    override suspend fun deleteCategory(id: Long) = gated { categoryRepository.deleteCategory(id) }
-
-    override suspend fun createPerson(
-        person: Person,
-        source: Source,
-    ): PersonId = gated { personRepository.createPerson(person, source) }
-
-    override suspend fun updatePersonWithAttributes(
-        person: Person?,
-        personId: PersonId,
-        deletedAttributeIds: Set<Long>,
-        updatedAttributes: Map<Long, NewAttribute>,
-        newAttributes: List<NewAttribute>,
-        source: Source,
-    ): Long =
-        gated {
-            personRepository.updatePersonWithAttributes(
-                person,
-                personId,
-                deletedAttributeIds,
-                updatedAttributes,
-                newAttributes,
-                source,
-            )
-        }
-
-    override suspend fun deletePerson(id: PersonId) = gated { personRepository.deletePerson(id) }
-
-    override suspend fun createOwnership(
-        personId: PersonId,
-        accountId: AccountId,
-        source: Source,
-    ): Long = gated { ownershipRepository.createOwnership(personId, accountId, source) }
-
-    override suspend fun deleteOwnership(id: Long) = gated { ownershipRepository.deleteOwnership(id) }
 
     // endregion
 
@@ -328,9 +402,10 @@ class ImportEngineImpl(
         byAttr: MutableMap<Pair<AttributeTypeId, String>, AccountId>,
     ) {
         val existing = accountRepository.getAccountById(id).first() ?: return
-        if (existing.name != intent.name) {
-            accountRepository.updateAccount(existing.copy(name = intent.name), intent.source)
-            byName.getOrPut(intent.name) { id }
+        val intentName = requireNotNull(intent.name)
+        if (existing.name != intentName) {
+            accountRepository.updateAccount(existing.copy(name = intentName), intent.source)
+            byName.getOrPut(intentName) { id }
         }
         val currentAttrs = accountAttributeRepository.getByAccount(id).first()
         for (attr in intent.attributes) {
@@ -356,8 +431,8 @@ class ImportEngineImpl(
             accountRepository.createAccount(
                 Account(
                     id = AccountId(0),
-                    name = intent.name,
-                    openingDate = intent.openingDate,
+                    name = requireNotNull(intent.name),
+                    openingDate = requireNotNull(intent.openingDate),
                     categoryId = intent.categoryId,
                 ),
                 intent.source,
@@ -375,7 +450,7 @@ class ImportEngineImpl(
         byAttr: MutableMap<Pair<AttributeTypeId, String>, AccountId>,
         byPersonalKey: MutableMap<String, AccountId>,
     ) {
-        byName.getOrPut(intent.name) { id }
+        byName.getOrPut(requireNotNull(intent.name)) { id }
         intent.attributes.forEach { attr -> byAttr.getOrPut(attr.typeId to attr.value) { id } }
         when (val match = intent.match) {
             is AccountMatchKey.ByPersonalCounterparty -> byPersonalKey.getOrPut(match.key) { id }
@@ -499,11 +574,12 @@ class ImportEngineImpl(
                 keyToId[intent.key] = existingId
                 continue
             }
+            val firstName = requireNotNull(intent.firstName)
             val newId =
                 personRepository.createPerson(
                     Person(
                         id = PersonId(0),
-                        firstName = intent.firstName,
+                        firstName = firstName,
                         middleName = intent.middleName,
                         lastName = intent.lastName,
                     ),
@@ -515,7 +591,7 @@ class ImportEngineImpl(
             created++
             keyToId[intent.key] = newId
             byNameKey.getOrPut(
-                normalizeNameKey(personFullName(intent.firstName, intent.middleName, intent.lastName)),
+                normalizeNameKey(personFullName(firstName, intent.middleName, intent.lastName)),
             ) { newId }
             when (match) {
                 is PersonMatchKey.ByExternalId -> {
@@ -571,11 +647,12 @@ class ImportEngineImpl(
         accountKeyToId: Map<LocalAccountKey, AccountId>,
         seen: MutableSet<Pair<PersonId, AccountId>>,
     ): Boolean {
-        val personId = personKeyToId[intent.personKey] ?: return false
+        val personId = intent.existingPersonId ?: intent.personKey?.let { personKeyToId[it] } ?: return false
         val accountId =
             when (val ref = intent.account) {
                 is AccountRef.Existing -> ref.id
                 is AccountRef.Local -> accountKeyToId[ref.key] ?: return false
+                null -> return false
             }
         if (!seen.add(personId to accountId)) return false
         val alreadyLinked =
@@ -603,8 +680,8 @@ class ImportEngineImpl(
         val rawTransfers =
             when (batch.dedupePolicy) {
                 is DedupePolicy.FuzzyAllFields -> {
-                    val minTs = transfers.minOf { it.timestamp }
-                    val maxTs = transfers.maxOf { it.timestamp }
+                    val minTs = transfers.minOf { requireNotNull(it.timestamp) }
+                    val maxTs = transfers.maxOf { requireNotNull(it.timestamp) }
                     accountIds
                         .flatMap {
                             transactionRepository.getTransactionsByAccountAndDateRange(it, minTs, maxTs).first()
@@ -743,24 +820,25 @@ class ImportEngineImpl(
                 } else {
                     t.relationships
                 }
+            val rowKey = requireNotNull(t.rowKey)
             mainResultIndices += transfersToCreate.size
             transfersToCreate +=
                 Transfer(
                     id = mainTempId,
-                    timestamp = t.timestamp,
+                    timestamp = requireNotNull(t.timestamp),
                     description = t.description,
                     sourceAccountId = requireId(t.fromAccount),
                     targetAccountId = requireId(t.toAccount),
-                    amount = t.amount,
+                    amount = requireNotNull(t.amount),
                 )
             if (t.attributes.isNotEmpty()) newAttributes[mainTempId] = t.attributes
             if (relationships.isNotEmpty()) newRelationships[mainTempId] = relationships
-            orderedSources += t.source.forRow(t.rowKey)
+            orderedSources += t.source.forRow(rowKey)
             if (fee != null && feeTempId != null) {
                 transfersToCreate +=
                     Transfer(
                         id = feeTempId,
-                        timestamp = t.timestamp,
+                        timestamp = requireNotNull(t.timestamp),
                         description = fee.description,
                         sourceAccountId = requireId(fee.source),
                         targetAccountId = requireId(fee.target),
@@ -768,7 +846,7 @@ class ImportEngineImpl(
                     )
                 // The fee inherits the main transfer's provenance source, resolved against its own row
                 // key when provided (so the audit trail points at the fee's source node), else the main's.
-                orderedSources += t.source.forRow(fee.rowKey ?: t.rowKey)
+                orderedSources += t.source.forRow(fee.rowKey ?: rowKey)
             }
         }
         return CreatePayload(transfersToCreate, newAttributes, newRelationships, orderedSources, mainResultIndices)
@@ -785,15 +863,15 @@ class ImportEngineImpl(
                     transfer =
                         Transfer(
                             id = existingId,
-                            timestamp = t.timestamp,
+                            timestamp = requireNotNull(t.timestamp),
                             description = t.description,
                             sourceAccountId = requireId(t.fromAccount),
                             targetAccountId = requireId(t.toAccount),
-                            amount = t.amount,
+                            amount = requireNotNull(t.amount),
                         ),
                     newAttributes = t.attributes,
                 )
-            orderedUpdateSources += t.source.forRow(t.rowKey)
+            orderedUpdateSources += t.source.forRow(requireNotNull(t.rowKey))
         }
         return updates to orderedUpdateSources
     }
@@ -812,10 +890,11 @@ class ImportEngineImpl(
                 )
         }
 
-    private fun requireId(ref: AccountRef): AccountId =
+    private fun requireId(ref: AccountRef?): AccountId =
         when (ref) {
             is AccountRef.Existing -> ref.id
             is AccountRef.Local -> error("Unresolved account reference: ${ref.key}")
+            null -> error("Missing account reference")
         }
 
     private fun personFullName(

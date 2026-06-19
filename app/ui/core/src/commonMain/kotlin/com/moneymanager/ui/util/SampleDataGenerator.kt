@@ -16,12 +16,14 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.normalizeNameKey
@@ -114,7 +116,23 @@ suspend fun generateSampleData(
     var categoriesCreated = 0
 
     for (parent in categoryHierarchy) {
-        val parentId = importEngine.createCategory(parent.category, sampleSource)
+        val parentKey = LocalCategoryKey("parent")
+        val parentId =
+            importEngine
+                .import(
+                    ImportBatch.manualEdits(
+                        categories =
+                            listOf(
+                                ImportCategoryIntent(
+                                    key = parentKey,
+                                    source = sampleSource,
+                                    name = parent.category.name,
+                                    parentId = parent.category.parentId,
+                                ),
+                            ),
+                    ),
+                ).createdCategoryIds
+                .getValue(parentKey)
         categoryIds.add(parentId)
         categoriesCreated++
 
@@ -127,11 +145,23 @@ suspend fun generateSampleData(
         )
 
         for (child in parent.children) {
+            val childKey = LocalCategoryKey("child")
             val childId =
-                importEngine.createCategory(
-                    child.copy(parentId = parentId),
-                    sampleSource,
-                )
+                importEngine
+                    .import(
+                        ImportBatch.manualEdits(
+                            categories =
+                                listOf(
+                                    ImportCategoryIntent(
+                                        key = childKey,
+                                        source = sampleSource,
+                                        name = child.name,
+                                        parentId = parentId,
+                                    ),
+                                ),
+                        ),
+                    ).createdCategoryIds
+                    .getValue(childKey)
             categoryIds.add(childId)
             categoriesCreated++
 
