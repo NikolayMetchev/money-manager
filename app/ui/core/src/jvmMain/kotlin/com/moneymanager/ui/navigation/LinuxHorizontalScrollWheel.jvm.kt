@@ -14,11 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import kotlinx.coroutines.launch
 import java.awt.AWTEvent
 import java.awt.Toolkit
 import java.awt.event.AWTEventListener
 import java.awt.event.MouseEvent
-import kotlinx.coroutines.launch
 
 private val isLinux: Boolean =
     System.getProperty("os.name").orEmpty().contains("linux", ignoreCase = true)
