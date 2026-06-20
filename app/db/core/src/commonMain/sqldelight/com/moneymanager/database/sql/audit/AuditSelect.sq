@@ -1,0 +1,508 @@
+-- Queries to retrieve audit history for each table
+
+selectAuditHistoryForTransfer:
+SELECT
+    transfer_audit.id,
+    transfer_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    transfer_audit.transfer_id,
+    transfer_audit.revision_id,
+    transfer_audit.timestamp,
+    transfer_audit.description,
+    transfer_audit.source_account_id,
+    transfer_audit.target_account_id,
+    transfer_audit.currency_id,
+    transfer_audit.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor,
+    -- Source information (transfers are entity_type_id = 7 in entity_source)
+    entity_source.id AS source_id,
+    entity_source.device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type,
+    csv_entity_source.csv_import_id AS source_csv_import_id,
+    csv_entity_source.csv_row_index AS source_csv_row_index,
+    csv_import_metadata.original_file_name AS source_csv_file_name,
+    qif_entity_source.qif_import_id AS source_qif_import_id,
+    qif_entity_source.qif_record_index AS source_qif_record_index,
+    qif_import_metadata.original_file_name AS source_qif_file_name,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM transfer_audit
+JOIN audit_type ON transfer_audit.audit_type_id = audit_type.id
+JOIN currency ON transfer_audit.currency_id = currency.id
+LEFT JOIN entity_source ON transfer_audit.transfer_id = entity_source.entity_id
+    AND transfer_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 7
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE transfer_audit.transfer_id = ?
+ORDER BY transfer_audit.audit_timestamp DESC, transfer_audit.id DESC;
+
+-- Get all attribute audit records for a transfer
+selectAttributeAuditByTransfer:
+SELECT
+    transfer_attribute_audit.id,
+    transfer_attribute_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    transfer_attribute_audit.transfer_id,
+    transfer_attribute_audit.revision_id,
+    transfer_attribute_audit.attribute_type_id,
+    transfer_attribute_audit.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM transfer_attribute_audit
+JOIN audit_type ON transfer_attribute_audit.audit_type_id = audit_type.id
+JOIN attribute_type ON transfer_attribute_audit.attribute_type_id = attribute_type.id
+WHERE transfer_attribute_audit.transfer_id = ?
+ORDER BY transfer_attribute_audit.revision_id DESC, attribute_type.name;
+
+-- Get all attribute audit records for an account
+selectAttributeAuditByAccount:
+SELECT
+    account_attribute_audit.id,
+    account_attribute_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    account_attribute_audit.account_id,
+    account_attribute_audit.revision_id,
+    account_attribute_audit.attribute_type_id,
+    account_attribute_audit.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM account_attribute_audit
+JOIN audit_type ON account_attribute_audit.audit_type_id = audit_type.id
+JOIN attribute_type ON account_attribute_audit.attribute_type_id = attribute_type.id
+WHERE account_attribute_audit.account_id = ?
+ORDER BY account_attribute_audit.revision_id DESC, attribute_type.name;
+
+-- Get all attribute audit records for a person
+selectAttributeAuditByPerson:
+SELECT
+    person_attribute_audit.id,
+    person_attribute_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_attribute_audit.person_id,
+    person_attribute_audit.revision_id,
+    person_attribute_audit.attribute_type_id,
+    person_attribute_audit.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM person_attribute_audit
+JOIN audit_type ON person_attribute_audit.audit_type_id = audit_type.id
+JOIN attribute_type ON person_attribute_audit.attribute_type_id = attribute_type.id
+WHERE person_attribute_audit.person_id = ?
+ORDER BY person_attribute_audit.revision_id DESC, attribute_type.name;
+
+-- Get audit history for a person account ownership
+-- entity_type_id = 4 for PERSON_ACCOUNT_OWNERSHIP
+selectAuditHistoryForPersonAccountOwnership:
+SELECT
+    person_account_ownership_audit.id,
+    person_account_ownership_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_account_ownership_audit.person_account_ownership_id,
+    person_account_ownership_audit.revision_id,
+    person_account_ownership_audit.person_id,
+    person_account_ownership_audit.account_id,
+    person.first_name AS person_first_name,
+    person.middle_name AS person_middle_name,
+    person.last_name AS person_last_name,
+    account.name AS account_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path,
+    csv_entity_source.csv_import_id AS source_csv_import_id,
+    csv_entity_source.csv_row_index AS source_csv_row_index,
+    csv_import_metadata.original_file_name AS source_csv_file_name,
+    qif_entity_source.qif_import_id AS source_qif_import_id,
+    qif_entity_source.qif_record_index AS source_qif_record_index,
+    qif_import_metadata.original_file_name AS source_qif_file_name
+FROM person_account_ownership_audit
+JOIN audit_type ON person_account_ownership_audit.audit_type_id = audit_type.id
+LEFT JOIN person ON person_account_ownership_audit.person_id = person.id
+LEFT JOIN account ON person_account_ownership_audit.account_id = account.id
+LEFT JOIN entity_source ON person_account_ownership_audit.person_account_ownership_id = entity_source.entity_id
+    AND person_account_ownership_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 4
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+WHERE person_account_ownership_audit.person_account_ownership_id = ?
+ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.id DESC;
+
+-- The person ids whose ownership of this account was removed in the most recent deletion of the
+-- account (e.g. a merge's cascade delete). Used by unmerge to restore the account's owners without
+-- a dedicated snapshot table — the cascade delete records each ownership as a DELETE here. Anchored to
+-- the account's own delete timestamp (the cascade fires in the same transaction, so they share it) so
+-- that a most-recent delete with no owners doesn't fall back to an older, unrelated delete's owners.
+selectDeletedOwnershipPersonIds:
+SELECT person_id
+FROM person_account_ownership_audit
+WHERE account_id = :accountId
+  AND audit_type_id = 3
+  AND audit_timestamp = (
+      SELECT MAX(audit_timestamp)
+      FROM account_audit
+      WHERE account_id = :accountId AND audit_type_id = 3
+  );
+
+-- The attribute (type, value) pairs that were removed in the most recent deletion of this account
+-- (e.g. a merge's cascade delete). Used by unmerge to restore the account's attributes without a
+-- dedicated snapshot table — the delete trigger records each cascade-deleted attribute as a DELETE
+-- here using the attribute's own stamped revision_id, so it fires even after the parent account row
+-- is gone. Anchored to the account's own delete timestamp (see selectDeletedOwnershipPersonIds) so a
+-- most-recent delete with no attributes doesn't fall back to an older, unrelated delete's attributes.
+selectDeletedAttributesForAccount:
+SELECT attribute_type_id, attribute_value
+FROM account_attribute_audit
+WHERE account_id = :accountId
+  AND audit_type_id = 3
+  AND audit_timestamp = (
+      SELECT MAX(audit_timestamp)
+      FROM account_audit
+      WHERE account_id = :accountId AND audit_type_id = 3
+  );
+
+-- Get ownership audit history for a specific account
+-- entity_type_id = 4 for PERSON_ACCOUNT_OWNERSHIP
+selectOwnershipAuditHistoryForAccount:
+SELECT
+    person_account_ownership_audit.id,
+    person_account_ownership_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_account_ownership_audit.person_account_ownership_id,
+    person_account_ownership_audit.revision_id,
+    person_account_ownership_audit.person_id,
+    person_account_ownership_audit.account_id,
+    person.first_name AS person_first_name,
+    person.middle_name AS person_middle_name,
+    person.last_name AS person_last_name,
+    account.name AS account_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path,
+    csv_entity_source.csv_import_id AS source_csv_import_id,
+    csv_entity_source.csv_row_index AS source_csv_row_index,
+    csv_import_metadata.original_file_name AS source_csv_file_name,
+    qif_entity_source.qif_import_id AS source_qif_import_id,
+    qif_entity_source.qif_record_index AS source_qif_record_index,
+    qif_import_metadata.original_file_name AS source_qif_file_name
+FROM person_account_ownership_audit
+JOIN audit_type ON person_account_ownership_audit.audit_type_id = audit_type.id
+LEFT JOIN person ON person_account_ownership_audit.person_id = person.id
+LEFT JOIN account ON person_account_ownership_audit.account_id = account.id
+LEFT JOIN entity_source ON person_account_ownership_audit.person_account_ownership_id = entity_source.entity_id
+    AND person_account_ownership_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 4
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+WHERE person_account_ownership_audit.account_id = ?
+ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.id DESC;
+
+-- Get audit history for an account
+-- entity_type_id = 1 for ACCOUNT
+selectAuditHistoryForAccount:
+SELECT
+    account_audit.id,
+    account_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    account_audit.account_id,
+    account_audit.revision_id,
+    account_audit.name,
+    account_audit.opening_date,
+    account_audit.category_id,
+    category.name AS category_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path,
+    csv_entity_source.csv_import_id AS source_csv_import_id,
+    csv_entity_source.csv_row_index AS source_csv_row_index,
+    csv_import_metadata.original_file_name AS source_csv_file_name,
+    qif_entity_source.qif_import_id AS source_qif_import_id,
+    qif_entity_source.qif_record_index AS source_qif_record_index,
+    qif_import_metadata.original_file_name AS source_qif_file_name
+FROM account_audit
+JOIN audit_type ON account_audit.audit_type_id = audit_type.id
+LEFT JOIN category ON account_audit.category_id = category.id
+LEFT JOIN entity_source ON account_audit.account_id = entity_source.entity_id
+    AND account_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 1
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+WHERE account_audit.account_id = ?
+ORDER BY account_audit.audit_timestamp DESC, account_audit.id DESC;
+
+-- Last-known name for every account that has audit history, keyed by account id.
+-- Used to label accounts (e.g. merged-away/deleted ones) that no longer exist in the account table.
+-- The highest audit id per account is its most recent audit row, whose name is the latest known name.
+selectLatestAuditedAccountNames:
+SELECT account_id, name
+FROM account_audit
+WHERE id IN (SELECT MAX(id) FROM account_audit GROUP BY account_id);
+
+-- Get audit history for a person
+-- entity_type_id = 2 for PERSON
+selectAuditHistoryForPerson:
+SELECT
+    person_audit.id,
+    person_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_audit.person_id,
+    person_audit.revision_id,
+    person_audit.first_name,
+    person_audit.middle_name,
+    person_audit.last_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path,
+    csv_entity_source.csv_import_id AS source_csv_import_id,
+    csv_entity_source.csv_row_index AS source_csv_row_index,
+    csv_import_metadata.original_file_name AS source_csv_file_name,
+    qif_entity_source.qif_import_id AS source_qif_import_id,
+    qif_entity_source.qif_record_index AS source_qif_record_index,
+    qif_import_metadata.original_file_name AS source_qif_file_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM person_audit
+JOIN audit_type ON person_audit.audit_type_id = audit_type.id
+LEFT JOIN entity_source ON person_audit.person_id = entity_source.entity_id
+    AND person_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 2
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+WHERE person_audit.person_id = ?
+ORDER BY person_audit.audit_timestamp DESC, person_audit.id DESC;
+
+-- Get audit history for a currency
+-- entity_type_id = 3 for CURRENCY
+selectAuditHistoryForCurrency:
+SELECT
+    currency_audit.id,
+    currency_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    currency_audit.currency_id,
+    currency_audit.revision_id,
+    currency_audit.code,
+    currency_audit.name,
+    currency_audit.scale_factor,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path,
+    csv_entity_source.csv_import_id AS source_csv_import_id,
+    csv_entity_source.csv_row_index AS source_csv_row_index,
+    csv_import_metadata.original_file_name AS source_csv_file_name,
+    qif_entity_source.qif_import_id AS source_qif_import_id,
+    qif_entity_source.qif_record_index AS source_qif_record_index,
+    qif_import_metadata.original_file_name AS source_qif_file_name
+FROM currency_audit
+JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
+LEFT JOIN entity_source ON currency_audit.currency_id = entity_source.entity_id
+    AND currency_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 3
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+WHERE currency_audit.currency_id = ?
+ORDER BY currency_audit.audit_timestamp DESC, currency_audit.id DESC;
+
+-- Get audit history for a category
+-- entity_type_id = 5 for CATEGORY
+selectAuditHistoryForCategory:
+SELECT
+    category_audit.id,
+    category_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    category_audit.category_id,
+    category_audit.revision_id,
+    category_audit.name,
+    category_audit.parent_id,
+    category_audit.parent_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path,
+    csv_entity_source.csv_import_id AS source_csv_import_id,
+    csv_entity_source.csv_row_index AS source_csv_row_index,
+    csv_import_metadata.original_file_name AS source_csv_file_name,
+    qif_entity_source.qif_import_id AS source_qif_import_id,
+    qif_entity_source.qif_record_index AS source_qif_record_index,
+    qif_import_metadata.original_file_name AS source_qif_file_name
+FROM category_audit
+JOIN audit_type ON category_audit.audit_type_id = audit_type.id
+LEFT JOIN entity_source ON category_audit.category_id = entity_source.entity_id
+    AND category_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 5
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+WHERE category_audit.category_id = ?
+ORDER BY category_audit.audit_timestamp DESC, category_audit.id DESC;
+
+-- Get audit history for an api import strategy
+selectAuditHistoryForApiImportStrategy:
+SELECT
+    api_import_strategy_audit.id,
+    api_import_strategy_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    api_import_strategy_audit.api_import_strategy_id,
+    api_import_strategy_audit.revision_id,
+    api_import_strategy_audit.name,
+    api_import_strategy_audit.config_json,
+    api_import_strategy_audit.created_at,
+    api_import_strategy_audit.updated_at,
+    -- Source information
+    api_import_strategy_source.id AS source_id,
+    api_import_strategy_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    api_import_strategy_source.created_at AS source_created_at
+FROM api_import_strategy_audit
+JOIN audit_type ON api_import_strategy_audit.audit_type_id = audit_type.id
+LEFT JOIN api_import_strategy_source ON api_import_strategy_audit.api_import_strategy_id = api_import_strategy_source.strategy_id
+    AND api_import_strategy_audit.revision_id = api_import_strategy_source.revision_id
+LEFT JOIN source_type ON api_import_strategy_source.source_type_id = source_type.id
+LEFT JOIN device_view ON api_import_strategy_source.device_id = device_view.id
+WHERE api_import_strategy_audit.api_import_strategy_id = ?
+ORDER BY api_import_strategy_audit.audit_timestamp DESC, api_import_strategy_audit.id DESC;
+
+-- Get audit history for a csv import strategy
+selectAuditHistoryForCsvImportStrategy:
+SELECT
+    csv_import_strategy_audit.id,
+    csv_import_strategy_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    csv_import_strategy_audit.csv_import_strategy_id,
+    csv_import_strategy_audit.revision_id,
+    csv_import_strategy_audit.name,
+    csv_import_strategy_audit.identification_columns_json,
+    csv_import_strategy_audit.field_mappings_json,
+    csv_import_strategy_audit.attribute_mappings_json,
+    csv_import_strategy_audit.row_rules_json,
+    csv_import_strategy_audit.companion_rules_json,
+    csv_import_strategy_audit.created_at,
+    csv_import_strategy_audit.updated_at,
+    -- Source information
+    csv_import_strategy_source.id AS source_id,
+    csv_import_strategy_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    csv_import_strategy_source.created_at AS source_created_at
+FROM csv_import_strategy_audit
+JOIN audit_type ON csv_import_strategy_audit.audit_type_id = audit_type.id
+LEFT JOIN csv_import_strategy_source ON csv_import_strategy_audit.csv_import_strategy_id = csv_import_strategy_source.strategy_id
+    AND csv_import_strategy_audit.revision_id = csv_import_strategy_source.revision_id
+LEFT JOIN source_type ON csv_import_strategy_source.source_type_id = source_type.id
+LEFT JOIN device_view ON csv_import_strategy_source.device_id = device_view.id
+WHERE csv_import_strategy_audit.csv_import_strategy_id = ?
+ORDER BY csv_import_strategy_audit.audit_timestamp DESC, csv_import_strategy_audit.id DESC;

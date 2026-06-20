@@ -1,0 +1,25 @@
+insertImport:
+INSERT INTO csv_import_metadata (id, table_name, original_file_name, import_timestamp, row_count, column_count, device_id, file_checksum, file_last_modified)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteImport:
+DELETE FROM csv_import_metadata WHERE id = ?;
+
+insertColumn:
+INSERT INTO csv_column_metadata (id, import_id, column_index, original_name)
+VALUES (?, ?, ?, ?);
+
+deleteColumnsByImportId:
+DELETE FROM csv_column_metadata WHERE import_id = ?;
+
+insertApplication:
+INSERT INTO csv_import_application (id, csv_import_id, strategy_id, strategy_name, applied_at)
+VALUES (?, ?, ?, ?, ?);
+
+-- csv_import_error queries
+insertOrReplaceError:
+INSERT OR REPLACE INTO csv_import_error (csv_import_id, row_index, error_message, error_timestamp)
+VALUES (?, ?, ?, ?);
+
+deleteError:
+DELETE FROM csv_import_error WHERE csv_import_id = ? AND row_index = ?;

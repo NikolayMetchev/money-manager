@@ -3,31 +3,30 @@ package com.moneymanager.di.database
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.service.CsvStrategyExportService
-import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.ApiImportStrategyRepository
-import com.moneymanager.domain.repository.ApiSessionRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.AuditRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.domain.repository.CsvImportStrategyRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.DeviceRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonAttributeRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.QifImportRepository
-import com.moneymanager.domain.repository.RelationshipTypeRepository
-import com.moneymanager.domain.repository.SettingsRepository
-import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferAttributeRepository
-import com.moneymanager.domain.repository.TransferRelationshipRepository
-import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
+import com.moneymanager.domain.repository.ApiSessionWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AuditReadRepository
+import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.DeviceWriteRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
+import com.moneymanager.domain.repository.PersonAttributeWriteRepository
+import com.moneymanager.domain.repository.PersonWriteRepository
+import com.moneymanager.domain.repository.QifImportWriteRepository
+import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
+import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.TransactionWriteRepository
+import com.moneymanager.domain.repository.TransferAttributeWriteRepository
+import com.moneymanager.domain.repository.TransferRelationshipWriteRepository
+import com.moneymanager.domain.repository.TransferSourceWriteRepository
 import com.moneymanager.importengineapi.ImportEngine
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
@@ -35,34 +34,38 @@ import dev.zacsweers.metro.Provides
 /**
  * DI component for database-dependent dependencies.
  * Created after a database is opened, providing repositories and device information.
+ *
+ * Repository accessors expose the **write** interface (which extends the read interface), so test
+ * setup and the read-facing groupings can both pull from here; the read-only [AuditReadRepository]
+ * has no write variant. App-facing groupings ([com.moneymanager.database.Application]) narrow the
+ * entity repositories to their read interfaces so the UI cannot mutate them outside the ImportEngine.
  */
 @DependencyGraph(DatabaseScope::class)
 interface DatabaseComponent {
-    val accountAttributeRepository: AccountAttributeRepository
-    val accountRepository: AccountRepository
-    val apiImportStrategyRepository: ApiImportStrategyRepository
-    val apiSessionRepository: ApiSessionRepository
-    val attributeTypeRepository: AttributeTypeRepository
-    val auditRepository: AuditRepository
-    val categoryRepository: CategoryRepository
-    val csvAccountMappingRepository: CsvAccountMappingRepository
-    val csvImportRepository: CsvImportRepository
-    val csvImportStrategyRepository: CsvImportStrategyRepository
+    val accountAttributeRepository: AccountAttributeWriteRepository
+    val accountRepository: AccountWriteRepository
+    val apiImportStrategyRepository: ApiImportStrategyWriteRepository
+    val apiSessionRepository: ApiSessionWriteRepository
+    val attributeTypeRepository: AttributeTypeWriteRepository
+    val auditRepository: AuditReadRepository
+    val categoryRepository: CategoryWriteRepository
+    val csvAccountMappingRepository: CsvAccountMappingWriteRepository
+    val csvImportRepository: CsvImportWriteRepository
+    val csvImportStrategyRepository: CsvImportStrategyWriteRepository
     val csvStrategyExportService: CsvStrategyExportService
-    val currencyRepository: CurrencyRepository
-    val deviceRepository: DeviceRepository
+    val currencyRepository: CurrencyWriteRepository
+    val deviceRepository: DeviceWriteRepository
     val maintenanceService: DatabaseMaintenanceService
-    val personAccountOwnershipRepository: PersonAccountOwnershipRepository
-    val personAttributeRepository: PersonAttributeRepository
-    val personRepository: PersonRepository
-    val qifImportRepository: QifImportRepository
-    val relationshipTypeRepository: RelationshipTypeRepository
-    val settingsRepository: SettingsRepository
-    val transactionRepository: TransactionRepository
-    val transferAttributeRepository: TransferAttributeRepository
-    val transferRelationshipRepository: TransferRelationshipRepository
-    val transferSourceRepository: TransferSourceRepository
-    val entitySourceQueries: EntitySourceQueries
+    val personAccountOwnershipRepository: PersonAccountOwnershipWriteRepository
+    val personAttributeRepository: PersonAttributeWriteRepository
+    val personRepository: PersonWriteRepository
+    val qifImportRepository: QifImportWriteRepository
+    val relationshipTypeRepository: RelationshipTypeWriteRepository
+    val settingsRepository: SettingsWriteRepository
+    val transactionRepository: TransactionWriteRepository
+    val transferAttributeRepository: TransferAttributeWriteRepository
+    val transferRelationshipRepository: TransferRelationshipWriteRepository
+    val transferSourceRepository: TransferSourceWriteRepository
     val deviceId: DeviceId
     val importEngine: ImportEngine
 

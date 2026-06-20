@@ -1,0 +1,15 @@
+insert:
+INSERT INTO currency(code, name, scale_factor)
+VALUES (?, ?, ?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+update:
+UPDATE currency
+SET revision_id = revision_id + 1,
+    code = ?, name = ?, scale_factor = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM currency WHERE id = ?;

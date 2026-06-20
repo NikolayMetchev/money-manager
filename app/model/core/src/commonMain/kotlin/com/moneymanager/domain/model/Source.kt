@@ -23,10 +23,10 @@ sealed interface Source {
     /** System-generated (e.g. seeded currencies/categories). */
     data object System : Source
 
-    /** Deleted/reassigned by merging an account into another (see AccountRepository.mergeAccounts). */
+    /** Deleted/reassigned by merging an account into another (see AccountWriteRepository.mergeAccounts). */
     data object Merge : Source
 
-    /** Recreated/reassigned by undoing an account merge (see AccountRepository.unmergeAccount). */
+    /** Recreated/reassigned by undoing an account merge (see AccountWriteRepository.unmergeAccount). */
     data object Unmerge : Source
 
     /** Created during a CSV import; [rowIndex] is the originating row when known. */

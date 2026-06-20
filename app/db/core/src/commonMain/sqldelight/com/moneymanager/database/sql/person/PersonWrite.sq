@@ -1,0 +1,34 @@
+insert:
+INSERT INTO person(first_name, middle_name, last_name)
+VALUES (?, ?, ?);
+
+update:
+UPDATE person
+SET revision_id = revision_id + 1,
+    first_name = ?, middle_name = ?, last_name = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM person WHERE id = ?;
+
+bumpRevisionOnly:
+UPDATE person SET revision_id = revision_id + 1 WHERE id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+ownershipInsert:
+INSERT INTO person_account_ownership(person_id, account_id)
+VALUES (?, ?);
+
+ownershipDelete:
+DELETE FROM person_account_ownership WHERE id = ?;
+
+ownershipDeleteByPerson:
+DELETE FROM person_account_ownership WHERE person_id = ?;
+
+ownershipDeleteByAccount:
+DELETE FROM person_account_ownership WHERE account_id = ?;
+
+ownershipLastInsertRowId:
+SELECT last_insert_rowid();

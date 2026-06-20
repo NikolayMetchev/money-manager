@@ -10,8 +10,8 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.SourceRecord
-import com.moneymanager.domain.repository.AuditRepository
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.AuditReadRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
@@ -25,8 +25,8 @@ import kotlin.time.Instant
 @Composable
 fun CurrencyAuditScreen(
     currencyId: CurrencyId,
-    auditRepository: AuditRepository,
-    currencyRepository: CurrencyRepository,
+    auditRepository: AuditReadRepository,
+    currencyRepository: CurrencyWriteRepository,
     onBack: () -> Unit,
 ) {
     AuditScreen(

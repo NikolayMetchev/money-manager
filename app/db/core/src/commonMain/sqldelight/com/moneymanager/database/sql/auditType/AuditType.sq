@@ -1,0 +1,5 @@
+-- audit_type lookup table for audit operations
+CREATE TABLE audit_type (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);

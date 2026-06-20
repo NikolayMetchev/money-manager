@@ -15,13 +15,13 @@ import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
+import com.moneymanager.domain.repository.PersonWriteRepository
+import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode
@@ -440,7 +440,7 @@ class AccountsScreenTest {
             onNodeWithText("Account 3").assertIsDisplayed()
         }
 
-    private fun createAccountRepository(accounts: List<Account>): AccountRepository =
+    private fun createAccountRepository(accounts: List<Account>): AccountWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAllAccounts() } returns flowOf(accounts)
             every { getAccountById(any()) } returns flowOf(null)
@@ -452,7 +452,7 @@ class AccountsScreenTest {
             everySuspend { getTransfersBetweenAccounts(any(), any()) } returns emptyList()
         }
 
-    private fun createTransactionRepository(): TransactionRepository =
+    private fun createTransactionRepository(): TransactionWriteRepository =
         mock(MockMode.autoUnit) {
             every { getTransactionById(any()) } returns flowOf(null)
             every { getTransactionsByAccount(any()) } returns flowOf(emptyList())
@@ -467,7 +467,7 @@ class AccountsScreenTest {
                 PageWithTargetIndex(emptyList(), -1, PagingInfo(null, null, false), false)
         }
 
-    private fun createCategoryRepository(): CategoryRepository =
+    private fun createCategoryRepository(): CategoryWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAllCategories() } returns flowOf(emptyList())
             every { getCategoryBalances() } returns flowOf(emptyList())
@@ -477,14 +477,14 @@ class AccountsScreenTest {
             everySuspend { createCategory(any(), any()) } returns 0L
         }
 
-    private fun createPersonRepository(people: List<Person> = emptyList()): PersonRepository =
+    private fun createPersonRepository(people: List<Person> = emptyList()): PersonWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAllPeople() } returns flowOf(people)
             every { getPersonById(any()) } returns flowOf(null)
             everySuspend { createPerson(any(), any()) } returns PersonId(0L)
         }
 
-    private fun createPersonAccountOwnershipRepository(): PersonAccountOwnershipRepository =
+    private fun createPersonAccountOwnershipRepository(): PersonAccountOwnershipWriteRepository =
         mock(MockMode.autoUnit) {
             every { getOwnershipsByPerson(any()) } returns flowOf(emptyList())
             every { getOwnershipsByAccount(any()) } returns flowOf(emptyList())
@@ -502,14 +502,14 @@ class AccountsScreenTest {
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
         }
 
-    private fun createAccountAttributeRepository(): AccountAttributeRepository =
+    private fun createAccountAttributeRepository(): AccountAttributeWriteRepository =
         mock(MockMode.autoUnit) {
             every { getByAccount(any()) } returns flowOf(emptyList())
             everySuspend { insert(any(), any(), any()) } returns 0L
             everySuspend { insertInCreationMode(any(), any(), any()) } returns 0L
         }
 
-    private fun createAttributeTypeRepository(): AttributeTypeRepository =
+    private fun createAttributeTypeRepository(): AttributeTypeWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAll() } returns flowOf(emptyList())
             every { getById(any()) } returns flowOf(null)

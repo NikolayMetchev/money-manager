@@ -2,7 +2,7 @@
 
 package com.moneymanager.database
 
-import com.moneymanager.database.sql.EntitySourceQueries
+import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
@@ -17,7 +17,7 @@ import com.moneymanager.domain.model.toSourceType
  * INSIDE their own transaction (it does not open one), immediately after inserting/updating the
  * entity, so source recording is atomic with the change and can never be forgotten.
  */
-internal fun EntitySourceQueries.recordSource(
+internal fun MoneyManagerDatabase.recordSource(
     deviceId: DeviceId,
     entityType: EntityType,
     entityId: Long,
@@ -25,7 +25,7 @@ internal fun EntitySourceQueries.recordSource(
     source: Source,
 ) {
     // INSERT OR IGNORE: a source for this (entity, revision) may already exist (e.g. re-runs); keep it.
-    insertSource(
+    entitySourceWriteQueries.insertSource(
         entity_type_id = entityType.id,
         entity_id = entityId,
         revision_id = revisionId,
@@ -40,9 +40,9 @@ internal fun EntitySourceQueries.recordSource(
         // persisted source type (mirroring the API branch): INSERT OR IGNORE above keeps any pre-existing
         // row for this (entity, revision), so only attach CSV/QIF detail when that row is actually CSV/QIF.
         is Source.Csv -> {
-            val entitySource = selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne()
+            val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne()
             if (entitySource.source_type_id == SourceType.CSV_IMPORT.id.toLong()) {
-                insertCsvSource(
+                entitySourceWriteQueries.insertCsvSource(
                     id = entitySource.id,
                     csv_import_id = source.importId.id.toString(),
                     csv_row_index = source.rowIndex,
@@ -50,9 +50,9 @@ internal fun EntitySourceQueries.recordSource(
             }
         }
         is Source.Qif -> {
-            val entitySource = selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne()
+            val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne()
             if (entitySource.source_type_id == SourceType.QIF_IMPORT.id.toLong()) {
-                insertQifSource(
+                entitySourceWriteQueries.insertQifSource(
                     id = entitySource.id,
                     qif_import_id = source.importId.id.toString(),
                     qif_record_index = source.recordIndex,
@@ -65,11 +65,17 @@ internal fun EntitySourceQueries.recordSource(
             // Attach the clickable request/JSON-path detail only when known, and preserve the existing
             // suppression: only when this revision's source is API and no API detail exists yet.
             if (requestId != null && jsonPath != null) {
-                val entitySource = selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne()
+                val entitySource =
+                    entitySourceSelectQueries
+                        .selectEntitySourceForRevision(
+                            entityType.id,
+                            entityId,
+                            revisionId,
+                        ).executeAsOne()
                 if (entitySource.source_type_id == SourceType.API.id.toLong() &&
-                    selectApiEntitySourceId(entitySource.id).executeAsOneOrNull() == null
+                    entitySourceSelectQueries.selectApiEntitySourceId(entitySource.id).executeAsOneOrNull() == null
                 ) {
-                    insertApiSource(
+                    entitySourceWriteQueries.insertApiSource(
                         id = entitySource.id,
                         api_session_id = source.sessionId.id,
                         api_request_id = requestId.id,

@@ -14,14 +14,14 @@ import androidx.compose.ui.test.performTextInput
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonAttributeRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
+import com.moneymanager.domain.repository.PersonAttributeWriteRepository
+import com.moneymanager.domain.repository.PersonWriteRepository
+import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.ui.LocalImportEngine
@@ -46,18 +46,18 @@ import kotlin.test.Test
 class CategoriesScreenTest {
     // A real engine wrapping the test's category repository: edits route through it (as in production),
     // and because it delegates to [categoryRepository], the existing verifySuspend assertions still hold.
-    private fun importEngineFor(categoryRepository: CategoryRepository): ImportEngine =
+    private fun importEngineFor(categoryRepository: CategoryWriteRepository): ImportEngine =
         ImportEngineImpl(
-            transactionRepository = mock<TransactionRepository>(MockMode.autoUnit),
-            accountRepository = mock<AccountRepository>(MockMode.autoUnit),
-            accountAttributeRepository = mock<AccountAttributeRepository>(MockMode.autoUnit),
-            personRepository = mock<PersonRepository>(MockMode.autoUnit),
-            personAttributeRepository = mock<PersonAttributeRepository>(MockMode.autoUnit),
-            ownershipRepository = mock<PersonAccountOwnershipRepository>(MockMode.autoUnit),
+            transactionRepository = mock<TransactionWriteRepository>(MockMode.autoUnit),
+            accountRepository = mock<AccountWriteRepository>(MockMode.autoUnit),
+            accountAttributeRepository = mock<AccountAttributeWriteRepository>(MockMode.autoUnit),
+            personRepository = mock<PersonWriteRepository>(MockMode.autoUnit),
+            personAttributeRepository = mock<PersonAttributeWriteRepository>(MockMode.autoUnit),
+            ownershipRepository = mock<PersonAccountOwnershipWriteRepository>(MockMode.autoUnit),
             categoryRepository = categoryRepository,
         )
 
-    private val fakeCurrencyRepository: CurrencyRepository =
+    private val fakeCurrencyRepository: CurrencyWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAllCurrencies() } returns flowOf(emptyList())
             every { getCurrencyById(any()) } returns flowOf(null)
@@ -952,7 +952,7 @@ class CategoriesScreenTest {
 
     // endregion
 
-    private fun createCategoryRepository(initialCategories: List<Category>): CategoryRepository {
+    private fun createCategoryRepository(initialCategories: List<Category>): CategoryWriteRepository {
         val flow = MutableStateFlow(initialCategories)
         return mock(MockMode.autoUnit) {
             every { getAllCategories() } returns flow

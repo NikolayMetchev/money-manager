@@ -1,0 +1,19 @@
+-- Insert source for an entity
+insertSource:
+INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
+VALUES (?, ?, ?, ?, ?);
+
+-- Insert API-specific details for an entity source (must be called after insertSource)
+insertApiSource:
+INSERT INTO api_entity_source (id, api_session_id, api_request_id, json_path)
+VALUES (?, ?, ?, ?);
+
+-- Insert CSV-specific details for an entity source (must be called after insertSource)
+insertCsvSource:
+INSERT OR IGNORE INTO csv_entity_source (id, csv_import_id, csv_row_index)
+VALUES (?, ?, ?);
+
+-- Insert QIF-specific details for an entity source (must be called after insertSource)
+insertQifSource:
+INSERT OR IGNORE INTO qif_entity_source (id, qif_import_id, qif_record_index)
+VALUES (?, ?, ?);

@@ -1,0 +1,5 @@
+insert:
+INSERT INTO relationship_type (name) VALUES (?);
+
+insertWithId:
+INSERT INTO relationship_type (id, name) VALUES (?, ?);

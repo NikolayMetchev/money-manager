@@ -17,7 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 
 /**
@@ -42,7 +42,7 @@ fun CurrencyPicker(
     selectedCurrencyId: CurrencyId?,
     onCurrencySelected: (CurrencyId) -> Unit,
     label: String,
-    currencyRepository: CurrencyRepository,
+    currencyRepository: CurrencyWriteRepository,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     placeholder: String = "Type to search...",

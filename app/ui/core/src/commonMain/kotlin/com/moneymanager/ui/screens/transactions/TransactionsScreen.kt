@@ -50,14 +50,14 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.AccountAttributeReadRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -107,14 +107,14 @@ private fun verticalMatrixScrollTarget(
 @Composable
 fun AccountTransactionsScreen(
     accountId: AccountId,
-    transactionRepository: TransactionRepository,
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    currencyRepository: CurrencyRepository,
-    accountAttributeRepository: AccountAttributeRepository,
-    attributeTypeRepository: AttributeTypeRepository,
-    personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    transactionRepository: TransactionReadRepository,
+    accountRepository: AccountWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyWriteRepository,
+    accountAttributeRepository: AccountAttributeReadRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
+    personRepository: PersonReadRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     maintenance: Maintenance,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},

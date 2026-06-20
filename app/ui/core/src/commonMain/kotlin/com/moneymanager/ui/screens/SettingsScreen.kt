@@ -37,9 +37,9 @@ import androidx.compose.ui.unit.sp
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.SettingsRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.SettingsWriteRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.DatabasePickerMode
@@ -151,10 +151,10 @@ private fun DatabaseCard(
 
 @Composable
 fun SettingsScreen(
-    currencyRepository: CurrencyRepository,
-    attributeTypeRepository: AttributeTypeRepository,
+    currencyRepository: CurrencyWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
     importEngine: ImportEngine,
-    settingsRepository: SettingsRepository,
+    settingsRepository: SettingsWriteRepository,
     maintenance: Maintenance,
     currentDatabaseLocation: DbLocation,
     onRequestSwitchDatabase: (DbLocation) -> Unit,

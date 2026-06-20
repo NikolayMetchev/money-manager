@@ -1,0 +1,95 @@
+-- Queries to manually refresh materialized views
+
+refreshAccountBalances:
+DELETE FROM account_balance_materialized_view;
+
+populateAccountBalances:
+INSERT INTO account_balance_materialized_view (account_id, currency_id, balance)
+SELECT account_id, currency_id, balance FROM account_balance_view;
+
+refreshRunningBalances:
+DELETE FROM running_balance_materialized_view;
+
+populateRunningBalances:
+INSERT INTO running_balance_materialized_view (id, timestamp, description, account_id, currency_id, transaction_amount, running_balance, is_excluded)
+SELECT id, timestamp, description, account_id, currency_id, transaction_amount, running_balance, is_excluded
+FROM running_balance_view;
+
+-- Incremental refresh queries
+
+incrementalRefreshAccountBalances:
+DELETE FROM account_balance_materialized_view
+WHERE (account_id, currency_id) IN (
+    SELECT account_id, currency_id FROM pending_materialized_view_changes
+);
+
+incrementalPopulateAccountBalances:
+INSERT INTO account_balance_materialized_view (account_id, currency_id, balance)
+SELECT
+    v.account_id,
+    v.currency_id,
+    v.balance
+FROM account_balance_view v
+INNER JOIN pending_materialized_view_changes p
+    ON v.account_id = p.account_id AND v.currency_id = p.currency_id;
+
+incrementalRefreshRunningBalances:
+DELETE FROM running_balance_materialized_view
+WHERE (account_id, currency_id) IN (
+    SELECT account_id, currency_id FROM pending_materialized_view_changes
+)
+AND timestamp >= (
+    SELECT min_timestamp
+    FROM pending_materialized_view_changes p
+    WHERE p.account_id = running_balance_materialized_view.account_id
+      AND p.currency_id = running_balance_materialized_view.currency_id
+);
+
+incrementalPopulateRunningBalances:
+INSERT INTO running_balance_materialized_view (id, timestamp, description, account_id, currency_id, transaction_amount, running_balance, is_excluded)
+SELECT v.id, v.timestamp, v.description, v.account_id, v.currency_id, v.transaction_amount, v.running_balance, v.is_excluded
+FROM running_balance_view v
+INNER JOIN pending_materialized_view_changes p
+    ON v.account_id = p.account_id AND v.currency_id = p.currency_id
+WHERE v.timestamp >= p.min_timestamp;
+
+clearPendingChanges:
+DELETE FROM pending_materialized_view_changes;
+
+insert:
+INSERT INTO transfer(id, revision_id, timestamp, description, source_account_id, target_account_id, currency_id, amount)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE transfer
+SET revision_id = revision_id + 1, timestamp = ?, description = ?, source_account_id = ?, target_account_id = ?, currency_id = ?, amount = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM transfer WHERE id = ?;
+
+bumpRevisionOnly:
+UPDATE transfer
+SET revision_id = revision_id + 1
+WHERE id = ?;
+
+moveTransfersSourceAccount:
+UPDATE transfer
+SET revision_id = revision_id + 1, source_account_id = :targetAccount
+WHERE source_account_id = :accountToDelete;
+
+moveTransfersTargetAccount:
+UPDATE transfer
+SET revision_id = revision_id + 1, target_account_id = :targetAccount
+WHERE target_account_id = :accountToDelete;
+
+-- Point a single transfer's source/target back at a given account (used by unmerge).
+setTransferSourceAccount:
+UPDATE transfer
+SET revision_id = revision_id + 1, source_account_id = :sourceAccount
+WHERE id = :id;
+
+setTransferTargetAccount:
+UPDATE transfer
+SET revision_id = revision_id + 1, target_account_id = :targetAccount
+WHERE id = :id;

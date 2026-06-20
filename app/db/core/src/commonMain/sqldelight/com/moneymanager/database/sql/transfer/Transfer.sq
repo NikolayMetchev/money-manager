@@ -1,0 +1,166 @@
+CREATE TABLE transfer (
+    id INTEGER PRIMARY KEY NOT NULL,
+    revision_id INTEGER NOT NULL DEFAULT 1,
+    timestamp INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    source_account_id INTEGER NOT NULL,
+    target_account_id INTEGER NOT NULL,
+    currency_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    CHECK (source_account_id != target_account_id),
+    FOREIGN KEY (id) REFERENCES transaction_id(id) ON DELETE RESTRICT,
+    FOREIGN KEY (source_account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (currency_id) REFERENCES currency(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfer_src_account ON transfer(source_account_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_target_account ON transfer(target_account_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_currency ON transfer(currency_id);
+
+-- Materialized table for account balances (manually refreshed)
+CREATE TABLE account_balance_materialized_view (
+    account_id INTEGER NOT NULL,
+    currency_id INTEGER NOT NULL,
+    balance INTEGER NOT NULL,
+    PRIMARY KEY (account_id, currency_id),
+    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (currency_id) REFERENCES currency(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_balance_mv_account ON account_balance_materialized_view(account_id);
+CREATE INDEX IF NOT EXISTS idx_account_balance_mv_currency ON account_balance_materialized_view(currency_id);
+
+-- Materialized table for running balances (manually refreshed)
+CREATE TABLE running_balance_materialized_view (
+    id INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    account_id INTEGER NOT NULL,
+    currency_id INTEGER NOT NULL,
+    transaction_amount INTEGER NOT NULL,
+    running_balance INTEGER NOT NULL,
+    is_excluded INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (id, account_id),
+    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (currency_id) REFERENCES currency(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account ON running_balance_materialized_view(account_id);
+CREATE INDEX IF NOT EXISTS idx_running_balance_mv_timestamp ON running_balance_materialized_view(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account_timestamp ON running_balance_materialized_view(account_id, timestamp DESC);
+
+-- Views for computing balances (used for incremental refresh)
+-- Excluded transactions (those with the well-known "excluded" attribute, attribute_type_id = -1)
+-- are excluded from all balance calculations but remain visible in the running balance view.
+CREATE VIEW account_balance_view AS
+SELECT
+    account_id,
+    currency_id,
+    SUM(COALESCE(incoming, 0) - COALESCE(outgoing, 0)) AS balance
+FROM (
+    SELECT
+        target_account_id AS account_id,
+        currency_id,
+        SUM(amount) AS incoming,
+        0 AS outgoing
+    FROM transfer
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM transfer_attribute ta
+        WHERE ta.transaction_id = transfer.id AND ta.attribute_type_id = -1
+    )
+    GROUP BY target_account_id, currency_id
+
+    UNION ALL
+
+    SELECT
+        source_account_id AS account_id,
+        currency_id,
+        0 AS incoming,
+        SUM(amount) AS outgoing
+    FROM transfer
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM transfer_attribute ta
+        WHERE ta.transaction_id = transfer.id AND ta.attribute_type_id = -1
+    )
+    GROUP BY source_account_id, currency_id
+)
+GROUP BY account_id, currency_id;
+
+-- running_balance_view includes ALL transactions with an is_excluded flag.
+-- The running_balance subquery only sums non-excluded transactions, so excluded rows
+-- show the balance as if they were never there.
+CREATE VIEW running_balance_view AS
+SELECT
+    m.id,
+    m.timestamp,
+    m.description,
+    m.account_id,
+    m.currency_id,
+    m.transaction_amount,
+    m.is_excluded,
+    COALESCE((
+        SELECT SUM(m2.transaction_amount)
+        FROM (
+            SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
+            FROM transfer tr
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM transfer_attribute ta
+                WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+            )
+            UNION ALL
+            SELECT tr.id, tr.timestamp, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
+            FROM transfer tr
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM transfer_attribute ta
+                WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+            )
+        ) m2
+        WHERE m2.account_id = m.account_id
+          AND m2.currency_id = m.currency_id
+          AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.id <= m.id))
+    ), 0) AS running_balance
+FROM (
+    SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount,
+           CASE
+               WHEN EXISTS (
+                   SELECT 1
+                   FROM transfer_attribute ta
+                   WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+               ) THEN 1
+               ELSE 0
+           END AS is_excluded
+    FROM transfer tr
+    UNION ALL
+    SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount,
+           CASE
+               WHEN EXISTS (
+                   SELECT 1
+                   FROM transfer_attribute ta
+                   WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+               ) THEN 1
+               ELSE 0
+           END AS is_excluded
+    FROM transfer tr
+) m;
+
+-- Table to track pending changes for incremental refresh
+CREATE TABLE pending_materialized_view_changes (
+    account_id INTEGER NOT NULL,
+    currency_id INTEGER NOT NULL,
+    min_timestamp INTEGER NOT NULL,
+    PRIMARY KEY (account_id, currency_id),
+    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (currency_id) REFERENCES currency(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_changes_account ON pending_materialized_view_changes(account_id);
+CREATE INDEX IF NOT EXISTS idx_pending_changes_currency ON pending_materialized_view_changes(currency_id);
+CREATE INDEX IF NOT EXISTS idx_pending_changes_timestamp ON pending_materialized_view_changes(min_timestamp);
+
+-- NOTE: Triggers are created at runtime via DatabaseConfig.createIncrementalRefreshTriggers()
+-- SQLDelight 2.2.1 has limited trigger support, so we create them dynamically

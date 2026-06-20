@@ -1,6 +1,6 @@
 package com.moneymanager.database.mapper
 
-import com.moneymanager.database.sql.SelectAllBalances
+import com.moneymanager.database.sql.transfer.SelectAllBalances
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId

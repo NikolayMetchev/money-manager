@@ -40,20 +40,20 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonAttributeRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
+import com.moneymanager.domain.repository.PersonAttributeReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.components.DeletePersonConfirmationDialog
 import com.moneymanager.ui.components.EditPersonDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 
 @Composable
 fun PeopleScreen(
-    personRepository: PersonRepository,
-    personAttributeRepository: PersonAttributeRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    attributeTypeRepository: AttributeTypeRepository,
+    personRepository: PersonReadRepository,
+    personAttributeRepository: PersonAttributeReadRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
     scrollToPersonId: PersonId? = null,
     onAuditClick: (Person) -> Unit = {},
 ) {

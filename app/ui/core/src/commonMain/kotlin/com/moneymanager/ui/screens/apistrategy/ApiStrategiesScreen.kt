@@ -37,13 +37,13 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
-import com.moneymanager.domain.repository.ApiImportStrategyRepository
+import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 
 @Composable
 fun ApiStrategiesScreen(
-    apiImportStrategyRepository: ApiImportStrategyRepository,
+    apiImportStrategyRepository: ApiImportStrategyWriteRepository,
     onBack: () -> Unit = {},
     onCreateStrategy: () -> Unit = {},
     onEditStrategy: (ApiImportStrategyId) -> Unit = {},

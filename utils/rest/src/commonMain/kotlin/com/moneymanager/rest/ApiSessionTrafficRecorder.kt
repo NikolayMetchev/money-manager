@@ -2,11 +2,11 @@ package com.moneymanager.rest
 
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.repository.ApiSessionRepository
+import com.moneymanager.domain.repository.ApiSessionWriteRepository
 
 class ApiSessionTrafficRecorder(
     private val sessionId: ApiSessionId,
-    private val apiSessionRepository: ApiSessionRepository,
+    private val apiSessionRepository: ApiSessionWriteRepository,
 ) : ApiTrafficRecorder {
     override suspend fun recordRequest(
         method: String,

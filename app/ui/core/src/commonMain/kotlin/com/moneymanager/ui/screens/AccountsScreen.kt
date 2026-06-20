@@ -26,13 +26,13 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.AccountAttributeReadRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.AccountMergeRequest
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
@@ -53,13 +53,13 @@ private val logger = logging()
 
 @Composable
 fun AccountsScreen(
-    accountRepository: AccountRepository,
-    accountAttributeRepository: AccountAttributeRepository,
-    attributeTypeRepository: AttributeTypeRepository,
-    categoryRepository: CategoryRepository,
-    transactionRepository: TransactionRepository,
-    personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    accountRepository: AccountWriteRepository,
+    accountAttributeRepository: AccountAttributeReadRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    transactionRepository: TransactionReadRepository,
+    personRepository: PersonReadRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     maintenance: Maintenance,
     scrollToAccountId: AccountId?,
     onAccountClick: (Account) -> Unit,
@@ -305,9 +305,9 @@ fun AccountCard(
     account: Account,
     category: Category?,
     balances: List<AccountBalance>,
-    accountRepository: AccountRepository,
-    personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    accountRepository: AccountWriteRepository,
+    personRepository: PersonReadRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     maintenance: Maintenance,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
@@ -442,7 +442,7 @@ fun AccountCard(
 @Composable
 fun DeleteAccountDialog(
     account: Account,
-    accountRepository: AccountRepository,
+    accountRepository: AccountWriteRepository,
     maintenance: Maintenance,
     onDismiss: () -> Unit,
 ) {
@@ -746,7 +746,7 @@ fun UnmergeAccountDialog(
 
 @Composable
 fun CreateCategoryDialog(
-    categoryRepository: CategoryRepository,
+    categoryRepository: CategoryReadRepository,
     onCategoryCreated: (id: Long, name: String) -> Unit,
     onDismiss: () -> Unit,
 ) {

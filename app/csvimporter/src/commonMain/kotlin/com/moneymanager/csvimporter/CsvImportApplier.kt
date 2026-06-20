@@ -21,10 +21,10 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
@@ -62,10 +62,10 @@ suspend fun bulkApplyCsv(
     sourceAccountOverride: AccountId?,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
-    accountRepository: AccountRepository,
-    csvImportRepository: CsvImportRepository,
-    attributeTypeRepository: AttributeTypeRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    accountRepository: AccountWriteRepository,
+    csvImportRepository: CsvImportWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit,
@@ -185,7 +185,7 @@ fun buildCsvMapper(
  * one bad mapping doesn't block the rest. [kind] just labels log messages ("selected"/"auto-captured").
  */
 private suspend fun persistMappingsWithFallback(
-    csvAccountMappingRepository: CsvAccountMappingRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
     mappings: List<CsvAccountMapping>,
     kind: String,
 ) {
@@ -216,7 +216,7 @@ private suspend fun persistMappingsWithFallback(
  * created. Failures are skipped — transfers referencing a missing account fail later.
  */
 private suspend fun createNewAccounts(
-    accountRepository: AccountRepository,
+    accountRepository: AccountWriteRepository,
     accountsToCreate: List<NewAccount>,
     csvImportId: CsvImportId,
     firstRowByAccountName: Map<String, Long>,
@@ -349,10 +349,10 @@ suspend fun runCsvImport(
     selectedNewAccountNames: Map<String, String>,
     selectedSourceAccountId: AccountId?,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
-    accountRepository: AccountRepository,
-    csvImportRepository: CsvImportRepository,
-    attributeTypeRepository: AttributeTypeRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    accountRepository: AccountWriteRepository,
+    csvImportRepository: CsvImportWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,

@@ -35,9 +35,9 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.qif.QifImportId
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AuditRepository
-import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AuditReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
@@ -56,9 +56,9 @@ import kotlinx.datetime.toLocalDateTime
 @Composable
 fun AccountAuditScreen(
     accountId: AccountId,
-    auditRepository: AuditRepository,
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
+    auditRepository: AuditReadRepository,
+    accountRepository: AccountWriteRepository,
+    categoryRepository: CategoryReadRepository,
     maintenance: Maintenance,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },

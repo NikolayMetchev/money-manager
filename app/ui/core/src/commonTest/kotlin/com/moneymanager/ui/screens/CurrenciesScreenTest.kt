@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode
@@ -22,7 +22,7 @@ import kotlin.test.Test
 
 @OptIn(ExperimentalTestApi::class)
 class CurrenciesScreenTest {
-    private fun createCurrencyRepository(currencies: List<Currency>): CurrencyRepository =
+    private fun createCurrencyRepository(currencies: List<Currency>): CurrencyWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAllCurrencies() } returns flowOf(currencies)
             every { getCurrencyById(any()) } returns flowOf(null)

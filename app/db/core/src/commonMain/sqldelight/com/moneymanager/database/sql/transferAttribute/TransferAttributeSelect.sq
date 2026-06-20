@@ -1,0 +1,37 @@
+selectByTransaction:
+SELECT
+    transfer_attribute.id,
+    transfer_attribute.transaction_id,
+    transfer_attribute.attribute_type_id,
+    transfer_attribute.attribute_value,
+    attribute_type.id AS attribute_type_id,
+    attribute_type.name AS attribute_type_name
+FROM transfer_attribute
+JOIN attribute_type ON transfer_attribute.attribute_type_id = attribute_type.id
+WHERE transfer_attribute.transaction_id = ?
+ORDER BY attribute_type.name;
+
+selectById:
+SELECT
+    transfer_attribute.id,
+    transfer_attribute.transaction_id,
+    transfer_attribute.attribute_type_id,
+    transfer_attribute.attribute_value,
+    attribute_type.id AS attribute_type_id,
+    attribute_type.name AS attribute_type_name
+FROM transfer_attribute
+JOIN attribute_type ON transfer_attribute.attribute_type_id = attribute_type.id
+WHERE transfer_attribute.id = ?;
+
+selectByTransactionIds:
+SELECT
+    transfer_attribute.id,
+    transfer_attribute.transaction_id,
+    transfer_attribute.attribute_type_id,
+    transfer_attribute.attribute_value,
+    attribute_type.id AS attribute_type_id,
+    attribute_type.name AS attribute_type_name
+FROM transfer_attribute
+JOIN attribute_type ON transfer_attribute.attribute_type_id = attribute_type.id
+WHERE transfer_attribute.transaction_id IN ?
+ORDER BY transfer_attribute.transaction_id, attribute_type.name;

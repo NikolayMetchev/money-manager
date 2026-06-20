@@ -42,9 +42,9 @@ import com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport
 import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.TemplateAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.TimezoneLookupExport
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -127,9 +127,9 @@ private data class StrategyReferenceData(
  * Service for converting between domain models and portable export format.
  */
 class CsvStrategyExportService(
-    private val accountRepository: AccountRepository,
-    private val currencyRepository: CurrencyRepository,
-    private val categoryRepository: CategoryRepository,
+    private val accountRepository: AccountWriteRepository,
+    private val currencyRepository: CurrencyWriteRepository,
+    private val categoryRepository: CategoryWriteRepository,
 ) {
     // Entities created while importing a strategy are a manual user action on this device.
     private val source = Source.Manual

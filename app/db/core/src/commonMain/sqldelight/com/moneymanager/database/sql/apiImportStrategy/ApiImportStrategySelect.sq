@@ -1,0 +1,11 @@
+-- Select all strategies ordered by name
+selectAll:
+SELECT * FROM api_import_strategy ORDER BY name;
+
+-- Select a strategy by ID
+selectById:
+SELECT * FROM api_import_strategy WHERE id = ?;
+
+-- Select a strategy by name
+selectByName:
+SELECT * FROM api_import_strategy WHERE name = ?;

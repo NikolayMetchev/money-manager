@@ -8,11 +8,11 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
+import com.moneymanager.domain.repository.PersonWriteRepository
 
 /**
  * Test-only convenience: production repository create/update methods require a [Source] so it can
@@ -26,13 +26,16 @@ private val TEST_SOURCE: Source = Source.SampleGenerator
 /** A default [Source] for tests that don't care about provenance. */
 val testSource: Source = TEST_SOURCE
 
-suspend fun AccountRepository.createAccount(account: Account): AccountId = createAccount(account, TEST_SOURCE)
+suspend fun AccountWriteRepository.createAccount(account: Account): AccountId = createAccount(account, TEST_SOURCE)
 
-suspend fun AccountRepository.createAccountsBatch(accounts: List<Account>): List<AccountId> = createAccountsBatch(accounts) { TEST_SOURCE }
+suspend fun AccountWriteRepository.createAccountsBatch(accounts: List<Account>): List<AccountId> =
+    createAccountsBatch(accounts) {
+        TEST_SOURCE
+    }
 
-suspend fun AccountRepository.updateAccount(account: Account): Long = updateAccount(account, TEST_SOURCE)
+suspend fun AccountWriteRepository.updateAccount(account: Account): Long = updateAccount(account, TEST_SOURCE)
 
-suspend fun AccountRepository.updateAccountWithAttributes(
+suspend fun AccountWriteRepository.updateAccountWithAttributes(
     account: Account?,
     accountId: AccountId,
     deletedAttributeIds: Set<Long>,
@@ -40,18 +43,18 @@ suspend fun AccountRepository.updateAccountWithAttributes(
     newAttributes: List<NewAttribute>,
 ): Long = updateAccountWithAttributes(account, accountId, deletedAttributeIds, updatedAttributes, newAttributes, TEST_SOURCE)
 
-suspend fun PersonRepository.createPerson(person: Person): PersonId = createPerson(person, TEST_SOURCE)
+suspend fun PersonWriteRepository.createPerson(person: Person): PersonId = createPerson(person, TEST_SOURCE)
 
-suspend fun PersonAccountOwnershipRepository.createOwnership(
+suspend fun PersonAccountOwnershipWriteRepository.createOwnership(
     personId: PersonId,
     accountId: AccountId,
 ): Long = createOwnership(personId, accountId, TEST_SOURCE)
 
-suspend fun CategoryRepository.createCategory(category: Category): Long = createCategory(category, TEST_SOURCE)
+suspend fun CategoryWriteRepository.createCategory(category: Category): Long = createCategory(category, TEST_SOURCE)
 
-suspend fun CategoryRepository.updateCategory(category: Category): Unit = updateCategory(category, TEST_SOURCE)
+suspend fun CategoryWriteRepository.updateCategory(category: Category): Unit = updateCategory(category, TEST_SOURCE)
 
-suspend fun CurrencyRepository.upsertCurrencyByCode(
+suspend fun CurrencyWriteRepository.upsertCurrencyByCode(
     code: String,
     name: String,
 ): CurrencyId = upsertCurrencyByCode(code, name, TEST_SOURCE)

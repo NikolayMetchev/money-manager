@@ -24,8 +24,8 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.qif.QifImportId
-import com.moneymanager.domain.repository.AuditRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.AuditReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
@@ -39,8 +39,8 @@ import kotlin.time.Instant
 @Composable
 fun PersonAuditScreen(
     personId: PersonId,
-    auditRepository: AuditRepository,
-    personRepository: PersonRepository,
+    auditRepository: AuditReadRepository,
+    personRepository: PersonReadRepository,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },

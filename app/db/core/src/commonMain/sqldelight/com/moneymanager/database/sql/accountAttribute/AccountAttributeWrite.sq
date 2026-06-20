@@ -1,0 +1,16 @@
+insert:
+-- Seed revision_id from the parent account's current revision so it is correct even on the import path
+-- (where triggers are skipped); the insert trigger refreshes it to the post-bump revision otherwise.
+INSERT INTO account_attribute (account_id, attribute_type_id, attribute_value, revision_id)
+VALUES (:account_id, :attribute_type_id, :attribute_value, (SELECT revision_id FROM account WHERE id = :account_id));
+
+selectLastInsertedId:
+SELECT last_insert_rowid();
+
+updateValue:
+UPDATE account_attribute
+SET attribute_value = ?
+WHERE id = ?;
+
+deleteById:
+DELETE FROM account_attribute WHERE id = ?;

@@ -35,9 +35,9 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.qif.QifImport
-import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.domain.repository.CsvImportStrategyRepository
-import com.moneymanager.domain.repository.QifImportRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.QifImportWriteRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
@@ -49,7 +49,7 @@ import nl.jacobras.humanreadable.HumanReadable
 @Composable
 fun DeleteCsvStrategyDialog(
     strategy: CsvImportStrategy,
-    csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
     onDismiss: () -> Unit,
 ) {
     var isDeleting by remember { mutableStateOf(false) }
@@ -180,7 +180,7 @@ fun ExportAccountMappingsDialog(
  */
 @Composable
 fun SelectCsvImportDialog(
-    csvImportRepository: CsvImportRepository,
+    csvImportRepository: CsvImportWriteRepository,
     onCsvSelected: (CsvImport) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -274,7 +274,7 @@ fun SelectCsvImportDialog(
  */
 @Composable
 fun SelectQifImportDialog(
-    qifImportRepository: QifImportRepository,
+    qifImportRepository: QifImportWriteRepository,
     onQifSelected: (QifImport) -> Unit,
     onDismiss: () -> Unit,
 ) {

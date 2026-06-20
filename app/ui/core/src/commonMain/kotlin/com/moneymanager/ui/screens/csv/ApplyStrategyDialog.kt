@@ -64,14 +64,14 @@ import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.domain.repository.CsvImportStrategyRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
@@ -90,14 +90,14 @@ private val logger = logging()
 fun ApplyStrategyDialog(
     csvImport: CsvImport,
     rows: List<CsvRow>,
-    csvImportStrategyRepository: CsvImportStrategyRepository,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    currencyRepository: CurrencyRepository,
-    personRepository: PersonRepository,
-    csvImportRepository: CsvImportRepository,
-    attributeTypeRepository: AttributeTypeRepository,
+    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    accountRepository: AccountWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyWriteRepository,
+    personRepository: PersonReadRepository,
+    csvImportRepository: CsvImportWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,

@@ -1,0 +1,8 @@
+selectAll:
+SELECT * FROM currency ORDER BY code;
+
+selectById:
+SELECT * FROM currency WHERE id = ?;
+
+selectByCode:
+SELECT * FROM currency WHERE code = ?;

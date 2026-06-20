@@ -1,0 +1,8 @@
+selectAll:
+SELECT * FROM relationship_type ORDER BY name;
+
+selectById:
+SELECT * FROM relationship_type WHERE id = ?;
+
+selectByName:
+SELECT * FROM relationship_type WHERE name = ?;

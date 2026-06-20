@@ -901,34 +901,34 @@ object DatabaseConfig {
     fun seedDatabase(database: MoneyManagerDatabaseWrapper) {
         with(database) {
             // Seed AuditType lookup table
-            auditTypeQueries.insert(id = 1, name = "INSERT")
-            auditTypeQueries.insert(id = 2, name = "UPDATE")
-            auditTypeQueries.insert(id = 3, name = "DELETE")
+            auditTypeWriteQueries.insert(id = 1, name = "INSERT")
+            auditTypeWriteQueries.insert(id = 2, name = "UPDATE")
+            auditTypeWriteQueries.insert(id = 3, name = "DELETE")
 
             // Seed SourceType lookup table
-            sourceTypeQueries.insert(id = 1, name = "MANUAL")
-            sourceTypeQueries.insert(id = 2, name = "CSV_IMPORT")
-            sourceTypeQueries.insert(id = 3, name = "SAMPLE_GENERATOR")
-            sourceTypeQueries.insert(id = 4, name = "SYSTEM")
-            sourceTypeQueries.insert(id = 5, name = "API")
-            sourceTypeQueries.insert(id = 6, name = "QIF_IMPORT")
-            sourceTypeQueries.insert(id = 7, name = "MERGE_UNDO")
-            sourceTypeQueries.insert(id = 8, name = "MERGE")
+            sourceTypeWriteQueries.insert(id = 1, name = "MANUAL")
+            sourceTypeWriteQueries.insert(id = 2, name = "CSV_IMPORT")
+            sourceTypeWriteQueries.insert(id = 3, name = "SAMPLE_GENERATOR")
+            sourceTypeWriteQueries.insert(id = 4, name = "SYSTEM")
+            sourceTypeWriteQueries.insert(id = 5, name = "API")
+            sourceTypeWriteQueries.insert(id = 6, name = "QIF_IMPORT")
+            sourceTypeWriteQueries.insert(id = 7, name = "MERGE_UNDO")
+            sourceTypeWriteQueries.insert(id = 8, name = "MERGE")
 
             // Seed API session type lookup table
-            apiSessionQueries.insertSessionType(id = 1, name = "Monzo")
+            apiSessionWriteQueries.insertSessionType(id = 1, name = "Monzo")
 
             // Seed Platform lookup table
-            platformQueries.insert(id = 0, name = "SYSTEM")
-            platformQueries.insert(id = 1, name = "JVM")
-            platformQueries.insert(id = 2, name = "ANDROID")
+            platformWriteQueries.insert(id = 0, name = "SYSTEM")
+            platformWriteQueries.insert(id = 1, name = "JVM")
+            platformWriteQueries.insert(id = 2, name = "ANDROID")
 
             // Create system device now (before any seeded entities that need source attribution).
             // Platform 0 = SYSTEM must already exist above.
-            deviceQueries.insertSystemDevice(platform_id = 0)
+            deviceWriteQueries.insertSystemDevice(platform_id = 0)
             val systemDeviceId =
-                deviceQueries.selectSystemDevice(platform_id = 0).executeAsOneOrNull()
-                    ?: deviceQueries.lastInsertRowId().executeAsOne()
+                deviceSelectQueries.selectSystemDevice(platform_id = 0).executeAsOneOrNull()
+                    ?: deviceWriteQueries.lastInsertRowId().executeAsOne()
 
             // Create triggers for incremental materialized view refresh
             createIncrementalRefreshTriggers()
@@ -962,12 +962,12 @@ object DatabaseConfig {
             createAuditTriggers()
 
             // Seed default "Uncategorized" category
-            categoryQueries.insertWithId(
+            categoryWriteQueries.insertWithId(
                 id = -1,
                 name = "Uncategorized",
                 parent_id = null,
             )
-            entitySourceQueries.insertSource(
+            entitySourceWriteQueries.insertSource(
                 entity_type_id = EntityType.CATEGORY.id,
                 entity_id = -1L,
                 revision_id = 1,
@@ -977,16 +977,16 @@ object DatabaseConfig {
 
             // Seed well-known attribute types with stable negative IDs so importers can
             // reference them without a DB lookup.
-            attributeTypeQueries.insertWithId(id = EXCLUDED_ATTR_TYPE_ID, name = "excluded")
-            attributeTypeQueries.insertWithId(id = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, name = "account-external-id")
-            attributeTypeQueries.insertWithId(id = BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID, name = "built-in type")
-            attributeTypeQueries.insertWithId(id = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, name = "account-sort-code")
-            attributeTypeQueries.insertWithId(id = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, name = "account-account-number")
+            attributeTypeWriteQueries.insertWithId(id = EXCLUDED_ATTR_TYPE_ID, name = "excluded")
+            attributeTypeWriteQueries.insertWithId(id = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, name = "account-external-id")
+            attributeTypeWriteQueries.insertWithId(id = BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID, name = "built-in type")
+            attributeTypeWriteQueries.insertWithId(id = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, name = "account-sort-code")
+            attributeTypeWriteQueries.insertWithId(id = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, name = "account-account-number")
 
             // Seed well-known relationship types with stable IDs so importers can reference them
             // without a DB lookup.
-            relationshipTypeQueries.insertWithId(id = RECONCILED_RELATIONSHIP_TYPE_ID, name = "reconciled")
-            relationshipTypeQueries.insertWithId(id = FEE_RELATIONSHIP_TYPE_ID, name = "fee")
+            relationshipTypeWriteQueries.insertWithId(id = RECONCILED_RELATIONSHIP_TYPE_ID, name = "reconciled")
+            relationshipTypeWriteQueries.insertWithId(id = FEE_RELATIONSHIP_TYPE_ID, name = "fee")
 
             // Seed the built-in Monzo, Wise and Starling API import strategies (after triggers and
             // system device are created so the INSERT trigger records the initial audit entry/source)
@@ -998,11 +998,11 @@ object DatabaseConfig {
             // so the SYSTEM device is preserved; this runs before the app's current device is known.
             allCurrencies.forEach { currency ->
                 val scaleFactor = CurrencyScaleFactors.getScaleFactor(currency.code)
-                currencyQueries.insert(currency.code, currency.displayName, scaleFactor.toLong())
+                currencyWriteQueries.insert(currency.code, currency.displayName, scaleFactor.toLong())
                 // Fetch the id by code rather than last_insert_rowid(): the currency INSERT fires an audit
                 // trigger that also inserts a row, so the rowid is not reliably the currency's own.
-                val currencyId = currencyQueries.selectByCode(currency.code).executeAsOne().id
-                entitySourceQueries.recordSource(
+                val currencyId = currencySelectQueries.selectByCode(currency.code).executeAsOne().id
+                recordSource(
                     DeviceId(systemDeviceId),
                     EntityType.CURRENCY,
                     currencyId,
@@ -1066,12 +1066,12 @@ object DatabaseConfig {
                 builtInCounterpartyRules = monzoAtmRules,
                 personExternalIdAttribute = "monzo-external-id",
             )
-        apiImportStrategyQueries.insert(
+        apiImportStrategyWriteQueries.insert(
             id = monzoStrategyId.toString(),
             name = "Monzo",
             config_json = ApiStrategyJsonCodec.encode(config),
         )
-        apiImportStrategyQueries.insertSource(
+        apiImportStrategyWriteQueries.insertSource(
             strategy_id = monzoStrategyId.toString(),
             revision_id = 1,
             source_type_id = SourceType.SYSTEM.id.toLong(),
@@ -1195,12 +1195,12 @@ object DatabaseConfig {
                     ),
                 personExternalIdAttribute = "wise-external-id",
             )
-        apiImportStrategyQueries.insert(
+        apiImportStrategyWriteQueries.insert(
             id = wiseStrategyId.toString(),
             name = "Wise",
             config_json = ApiStrategyJsonCodec.encode(config),
         )
-        apiImportStrategyQueries.insertSource(
+        apiImportStrategyWriteQueries.insertSource(
             strategy_id = wiseStrategyId.toString(),
             revision_id = 1,
             source_type_id = SourceType.SYSTEM.id.toLong(),
@@ -1317,12 +1317,12 @@ object DatabaseConfig {
                     ),
                 personExternalIdAttribute = "starling-external-id",
             )
-        apiImportStrategyQueries.insert(
+        apiImportStrategyWriteQueries.insert(
             id = starlingStrategyId.toString(),
             name = "Starling",
             config_json = ApiStrategyJsonCodec.encode(config),
         )
-        apiImportStrategyQueries.insertSource(
+        apiImportStrategyWriteQueries.insertSource(
             strategy_id = starlingStrategyId.toString(),
             revision_id = 1,
             source_type_id = SourceType.SYSTEM.id.toLong(),
@@ -1958,10 +1958,10 @@ object DatabaseConfig {
         val now = Clock.System.now()
         // QIF carries no currency, so the built-in QIF strategies default to GBP (resolved now that
         // currencies are seeded); the QIF import dialog pre-selects this and the user can change it.
-        val qifCurrencyId = CurrencyId(currencyQueries.selectByCode("GBP").executeAsOne().id)
+        val qifCurrencyId = CurrencyId(currencySelectQueries.selectByCode("GBP").executeAsOne().id)
         for (strategy in builtInCsvStrategies(now, qifCurrencyId)) {
-            csvImportStrategyQueries.insertStrategy(strategy)
-            csvImportStrategyQueries.insertSource(
+            csvImportStrategyWriteQueries.insertStrategy(strategy)
+            csvImportStrategyWriteQueries.insertSource(
                 strategy_id = strategy.id.id.toString(),
                 revision_id = 1,
                 source_type_id = SourceType.SYSTEM.id.toLong(),

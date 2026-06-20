@@ -1,0 +1,7 @@
+insert:
+INSERT INTO transfer_relationship (id1, id2, relationship_type_id)
+VALUES (?, ?, ?);
+
+delete:
+DELETE FROM transfer_relationship
+WHERE id1 = ? AND id2 = ? AND relationship_type_id = ?;

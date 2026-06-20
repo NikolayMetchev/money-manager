@@ -1,0 +1,31 @@
+insertImport:
+INSERT INTO qif_import_metadata (id, original_file_name, import_timestamp, record_count, unsupported_count, account_type, device_id, file_checksum, file_last_modified)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteImport:
+DELETE FROM qif_import_metadata WHERE id = ?;
+
+-- qif_record queries
+insertRecord:
+INSERT INTO qif_record (
+    import_id, record_index, section_type, account_name, supported, raw_text,
+    field_date, field_amount, field_payee, field_memo, field_category,
+    field_transfer_account, field_check_number, field_cleared, splits_json
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateRecordStatus:
+UPDATE qif_record SET import_status = ?, transaction_id = ? WHERE import_id = ? AND record_index = ?;
+
+-- qif_import_application queries
+insertApplication:
+INSERT INTO qif_import_application (id, qif_import_id, strategy_id, strategy_name, applied_at)
+VALUES (?, ?, ?, ?, ?);
+
+-- qif_import_error queries
+insertOrReplaceError:
+INSERT OR REPLACE INTO qif_import_error (qif_import_id, record_index, error_message, error_timestamp)
+VALUES (?, ?, ?, ?);
+
+deleteError:
+DELETE FROM qif_import_error WHERE qif_import_id = ? AND record_index = ?;

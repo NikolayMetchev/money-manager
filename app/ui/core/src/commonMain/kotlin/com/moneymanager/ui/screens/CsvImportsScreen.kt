@@ -38,14 +38,14 @@ import com.moneymanager.csv.CsvParser
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.domain.repository.CsvImportStrategyRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -59,14 +59,14 @@ import kotlin.time.Clock
 @Suppress("LongParameterList", "DuplicatedCode")
 @Composable
 fun CsvImportsScreen(
-    csvImportRepository: CsvImportRepository,
-    csvImportStrategyRepository: CsvImportStrategyRepository,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    currencyRepository: CurrencyRepository,
-    personRepository: PersonRepository,
-    attributeTypeRepository: AttributeTypeRepository,
+    csvImportRepository: CsvImportWriteRepository,
+    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    accountRepository: AccountWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyWriteRepository,
+    personRepository: PersonReadRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onImportClick: (CsvImportId) -> Unit,

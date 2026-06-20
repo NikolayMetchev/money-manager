@@ -1,0 +1,27 @@
+package com.moneymanager.database.repository
+
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.repository.SettingsReadRepository
+import com.moneymanager.domain.repository.SettingsWriteRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+class SettingsWriteRepositoryImpl(
+    database: MoneyManagerDatabaseWrapper,
+    reader: SettingsReadRepository,
+) : SettingsWriteRepository,
+    SettingsReadRepository by reader {
+    private val writeQueries = database.settingsWriteQueries
+
+    override suspend fun setDefaultCurrencyId(currencyId: CurrencyId): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.upsertDefaultCurrency(currencyId.id)
+        }
+
+    override suspend fun setLastQifAccountId(accountId: AccountId): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.upsertLastQifAccount(accountId.id)
+        }
+}

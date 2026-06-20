@@ -1,0 +1,18 @@
+-- Insert a new strategy. created_at/updated_at are filled by their column DEFAULTs (current time).
+insert:
+INSERT INTO api_import_strategy (id, name, config_json)
+VALUES (?, ?, ?);
+
+-- Update an existing strategy
+update:
+UPDATE api_import_strategy
+SET revision_id = revision_id + 1, name = ?, config_json = ?, updated_at = ?
+WHERE id = ?;
+
+-- Delete a strategy by ID
+deleteById:
+DELETE FROM api_import_strategy WHERE id = ?;
+
+insertSource:
+INSERT OR IGNORE INTO api_import_strategy_source (strategy_id, revision_id, source_type_id, device_id)
+VALUES (?, ?, ?, ?);

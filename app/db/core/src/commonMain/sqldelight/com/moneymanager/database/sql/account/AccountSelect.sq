@@ -1,0 +1,8 @@
+selectAll:
+SELECT * FROM account ORDER BY name;
+
+selectById:
+SELECT * FROM account WHERE id = ?;
+
+selectRevisionById:
+SELECT revision_id FROM account WHERE id = ?;

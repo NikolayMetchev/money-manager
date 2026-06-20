@@ -33,9 +33,9 @@ import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.qif.QifImportId
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AuditRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AuditReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.ui.audit.AttributeChange
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditEntryDiff
@@ -58,9 +58,9 @@ private val LABEL_WIDTH = 80.dp
 @Composable
 fun TransactionAuditScreen(
     transferId: TransferId,
-    auditRepository: AuditRepository,
-    accountRepository: AccountRepository,
-    transactionRepository: TransactionRepository,
+    auditRepository: AuditReadRepository,
+    accountRepository: AccountWriteRepository,
+    transactionRepository: TransactionReadRepository,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },

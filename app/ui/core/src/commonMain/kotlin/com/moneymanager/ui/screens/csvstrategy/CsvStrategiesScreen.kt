@@ -50,14 +50,14 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.qif.QifImportId
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.domain.repository.CsvImportStrategyRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.QifImportRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.QifImportWriteRepository
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.flow.first
@@ -66,14 +66,14 @@ import nl.jacobras.humanreadable.HumanReadable
 
 @Composable
 fun CsvStrategiesScreen(
-    csvImportStrategyRepository: CsvImportStrategyRepository,
-    csvImportRepository: CsvImportRepository,
-    qifImportRepository: QifImportRepository,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    currencyRepository: CurrencyRepository,
-    personRepository: PersonRepository,
+    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+    csvImportRepository: CsvImportWriteRepository,
+    qifImportRepository: QifImportWriteRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    accountRepository: AccountWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyWriteRepository,
+    personRepository: PersonReadRepository,
     csvStrategyImportExport: CsvStrategyImportExport,
     appVersion: AppVersion,
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
@@ -349,7 +349,7 @@ fun CsvStrategiesScreen(
 @Composable
 fun CsvStrategyCard(
     strategy: CsvImportStrategy,
-    csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
     onEditClick: () -> Unit,
     onExportClick: () -> Unit,
     onAuditClick: () -> Unit = {},

@@ -2,7 +2,7 @@
 
 package com.moneymanager.database.mapper
 
-import com.moneymanager.database.sql.SelectOwnershipAuditHistoryForAccount
+import com.moneymanager.database.sql.audit.SelectOwnershipAuditHistoryForAccount
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.SourceRecord

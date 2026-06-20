@@ -1,0 +1,6 @@
+-- transaction_id: Permanent transaction ID table
+-- This table is NEVER deleted from. When a transfer is deleted, the transaction_id remains.
+-- This ensures we always have a valid ID to reference in source tracking and audit history.
+CREATE TABLE transaction_id (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+);

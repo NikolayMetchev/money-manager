@@ -90,7 +90,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
         // Query both materialized views and views
         val materializedBalances =
-            database.transferQueries
+            database.transferSelectQueries
                 .selectAllBalances()
                 .executeAsList()
                 .sortedWith(compareBy({ it.account_id }, { it.currency_id }))
@@ -498,7 +498,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Verify materialized view has entries
-            val balancesBeforeDelete = database.transferQueries.selectAllBalances().executeAsList()
+            val balancesBeforeDelete = database.transferSelectQueries.selectAllBalances().executeAsList()
             assertTrue(
                 balancesBeforeDelete.isNotEmpty(),
                 "Should have balances before delete",
@@ -511,7 +511,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             verifyMaterializedViewsMatchViews()
 
             // Verify materialized view is now empty
-            val balancesAfterDelete = database.transferQueries.selectAllBalances().executeAsList()
+            val balancesAfterDelete = database.transferSelectQueries.selectAllBalances().executeAsList()
             assertEquals(
                 0,
                 balancesAfterDelete.size,
@@ -573,7 +573,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             verifyMaterializedViewsMatchViews()
 
             // Verify the new account appears in balances
-            val balances = database.transferQueries.selectAllBalances().executeAsList()
+            val balances = database.transferSelectQueries.selectAllBalances().executeAsList()
             assertTrue(
                 balances.any { it.account_id == account3Id.id },
                 "New account should appear in materialized view",
@@ -621,7 +621,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             verifyMaterializedViewsMatchViews()
 
             // Verify the new currency appears in balances
-            val balances = database.transferQueries.selectAllBalances().executeAsList()
+            val balances = database.transferSelectQueries.selectAllBalances().executeAsList()
             assertTrue(
                 balances.any { it.currency_id == eurId.id },
                 "New currency should appear in materialized view",
@@ -734,7 +734,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             // Do incremental refresh
             repositories.maintenanceService.refreshMaterializedViews()
             val incrementalBalances =
-                database.transferQueries
+                database.transferSelectQueries
                     .selectAllBalances()
                     .executeAsList()
                     .sortedBy { "${it.account_id}-${it.currency_id}" }
@@ -742,7 +742,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             // Do full refresh
             repositories.maintenanceService.fullRefreshMaterializedViews()
             val fullBalances =
-                database.transferQueries
+                database.transferSelectQueries
                     .selectAllBalances()
                     .executeAsList()
                     .sortedBy { "${it.account_id}-${it.currency_id}" }

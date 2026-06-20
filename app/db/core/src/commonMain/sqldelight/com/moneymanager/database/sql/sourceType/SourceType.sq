@@ -1,0 +1,6 @@
+-- source_type lookup table for transfer source types
+-- Tracks how each transfer audit entry was initiated
+CREATE TABLE source_type (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);

@@ -1,0 +1,2 @@
+insert:
+INSERT OR IGNORE INTO platform (id, name) VALUES (?, ?);
