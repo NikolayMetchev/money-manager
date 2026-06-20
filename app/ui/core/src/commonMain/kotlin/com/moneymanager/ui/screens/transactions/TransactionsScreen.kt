@@ -61,6 +61,7 @@ import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -434,6 +435,7 @@ fun AccountTransactionsScreen(
                                 modifier =
                                     Modifier
                                         .weight(1f)
+                                        .linuxHorizontalScrollWheel(horizontalScrollState)
                                         .horizontalScroll(horizontalScrollState),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
@@ -536,6 +538,7 @@ fun AccountTransactionsScreen(
                                     modifier =
                                         Modifier
                                             .weight(1f)
+                                            .linuxHorizontalScrollWheel(horizontalScrollState)
                                             .verticalScroll(verticalScrollState)
                                             .horizontalScroll(horizontalScrollState),
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
