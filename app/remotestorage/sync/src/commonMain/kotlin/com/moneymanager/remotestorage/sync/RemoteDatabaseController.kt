@@ -187,12 +187,22 @@ class RemoteDatabaseController(
         onProgress: (SyncProgress) -> Unit = {},
     ): DbLocation {
         val provider = resolve(providerId, config)
-        val initial = RemoteDatabaseBinding(providerId, remoteFile.id, remoteFile.name, localCachePath.toString(), config)
+        // Seed the baseline from the picked file so detection still works if hydrate can't fetch a revision.
+        val initial =
+            RemoteDatabaseBinding(
+                providerId = providerId,
+                remoteFileId = remoteFile.id,
+                remoteName = remoteFile.name,
+                localCachePath = localCachePath.toString(),
+                providerConfig = config,
+                syncedRevision = remoteFile.revisionId,
+            )
         val result = syncService.hydrate(provider, initial, password, onProgress)
-        val binding = initial.copy(syncedRevision = result.revisionId)
+        val revision = result.revisionId ?: remoteFile.revisionId
+        val binding = initial.copy(syncedRevision = revision)
         syncService.bind(binding)
         session = Session(provider, binding, password)
-        syncedRevision = result.revisionId
+        syncedRevision = revision
         publish(localDirty = false, remoteChanged = false)
         return result.location
     }
@@ -208,10 +218,12 @@ class RemoteDatabaseController(
     ): DbLocation {
         val provider = resolve(binding.providerId, binding.providerConfig)
         val result = syncService.hydrate(provider, binding, password, onProgress)
-        val updated = binding.copy(syncedRevision = result.revisionId)
+        // Keep the persisted baseline if this run couldn't fetch a revision.
+        val revision = result.revisionId ?: binding.syncedRevision
+        val updated = binding.copy(syncedRevision = revision)
         syncService.bind(updated)
         session = Session(provider, updated, password)
-        syncedRevision = result.revisionId
+        syncedRevision = revision
         publish(localDirty = false, remoteChanged = false)
         return result.location
     }
@@ -233,9 +245,13 @@ class RemoteDatabaseController(
     /**
      * Pushes the open [database] to the bound remote file. Returns [SyncResult.NO_SESSION] when not
      * remote-backed. Unless [force] is true, it first re-checks the remote and returns
-     * [SyncResult.BLOCKED] (without uploading) if another device pushed since the last sync, so an
-     * upload can never silently clobber remote changes. Set [rebuildViews] false on close (the local
-     * copy is about to be discarded) to skip the materialized-view rebuild.
+     * [SyncResult.BLOCKED] (without uploading) if another device pushed since the last sync.
+     *
+     * Note this is a best-effort guard, not an atomic conditional write: the Google Drive REST API v3 has
+     * no If-Match/ETag/revision precondition, so a push that lands between this check and the upload is
+     * still last-writer-wins. The check shrinks the window to near-zero for human-paced multi-device use;
+     * it does not eliminate it. Set [rebuildViews] false on close (the local copy is about to be
+     * discarded) to skip the materialized-view rebuild.
      */
     suspend fun syncNow(
         database: MoneyManagerDatabaseWrapper,
@@ -269,11 +285,16 @@ class RemoteDatabaseController(
         return result.location
     }
 
-    /** Updates the in-memory + persisted remote-revision baseline after a successful upload/download. */
+    /**
+     * Updates the in-memory + persisted remote-revision baseline after a successful upload/download.
+     * A null [revisionId] (provider didn't return one this run) keeps the previous baseline rather than
+     * wiping it, so remote-change detection isn't disabled by a missing revision.
+     */
     private fun recordSyncedRevision(revisionId: String?) {
-        syncedRevision = revisionId
+        val effective = revisionId ?: syncedRevision ?: return
+        syncedRevision = effective
         val current = session ?: return
-        val updated = current.binding.copy(syncedRevision = revisionId)
+        val updated = current.binding.copy(syncedRevision = effective)
         session = current.copy(binding = updated)
         syncService.bind(updated)
     }

@@ -41,7 +41,10 @@ class InMemoryStorageProvider(
 
     override suspend fun stat(fileId: String): RemoteFile? = files[fileId]?.toRemoteFile(fileId)
 
-    override suspend fun download(fileId: String): ByteArray = files[fileId]?.bytes ?: throw RemoteStorageException("No such file: $fileId")
+    // Copy on the way in/out so a caller mutating its array can't silently change stored content (which
+    // would otherwise alter a file without bumping its revision and break the sync tests).
+    override suspend fun download(fileId: String): ByteArray =
+        files[fileId]?.bytes?.copyOf() ?: throw RemoteStorageException("No such file: $fileId")
 
     override suspend fun upload(
         fileId: String?,
@@ -49,7 +52,7 @@ class InMemoryStorageProvider(
         bytes: ByteArray,
     ): RemoteFile {
         val id = fileId ?: "file-${counter++}"
-        val entry = Entry(name, bytes, revisionCounter++)
+        val entry = Entry(name, bytes.copyOf(), revisionCounter++)
         files[id] = entry
         return entry.toRemoteFile(id)
     }
@@ -64,7 +67,7 @@ class InMemoryStorageProvider(
         bytes: ByteArray,
     ) {
         val existing = files[fileId] ?: error("No such file to externally push: $fileId")
-        files[fileId] = existing.copy(bytes = bytes, revision = revisionCounter++)
+        files[fileId] = existing.copy(bytes = bytes.copyOf(), revision = revisionCounter++)
     }
 
     private fun Entry.toRemoteFile(id: String) = RemoteFile(id, name, bytes.size.toLong(), revisionId = "rev-$revision")

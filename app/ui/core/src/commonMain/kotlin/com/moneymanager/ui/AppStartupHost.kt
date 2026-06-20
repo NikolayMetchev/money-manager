@@ -156,10 +156,12 @@ fun AppStartupHost(
                             val loaded = databaseState as? AppDatabaseState.Loaded ?: return@launch
                             databaseState =
                                 AppDatabaseState.Loading(DatabaseInitializationProgress("Downloading from cloud…", 0, 100))
-                            // Release the file lock so restore can overwrite the working copy.
-                            runCatching { loaded.database.close() }
                             onDatabaseReady(null, null)
                             try {
+                                // Release the file lock so restore can overwrite the working copy. If the
+                                // close fails we must NOT proceed — restoring over a still-open handle is the
+                                // file-busy case this flow exists to avoid — so let it abort into the catch.
+                                loaded.database.close()
                                 val location =
                                     controller.download { progress ->
                                         databaseState =

@@ -455,6 +455,10 @@ fun TransactionEditDialog(
                                                             operation = ImportOperation.UPDATE,
                                                             existingId = transaction.id,
                                                             // Null when only attributes changed (no transfer-field update).
+                                                            // When fields didn't change, updatedTransfer is null so
+                                                            // from/to/timestamp/amount are all null; the engine's
+                                                            // toUpdatedTransfer() then returns null (attribute-only
+                                                            // update) and this "" description is never written.
                                                             fromAccount = updatedTransfer?.let { AccountRef.Existing(it.sourceAccountId) },
                                                             toAccount = updatedTransfer?.let { AccountRef.Existing(it.targetAccountId) },
                                                             timestamp = updatedTransfer?.timestamp,

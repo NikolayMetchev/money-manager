@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -20,6 +21,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -109,6 +111,7 @@ fun MoneyManagerApp(
         // Multi-device sync state: when the remote is ahead, editing is locked until the user downloads.
         val syncState by (remoteController?.syncState ?: remember { MutableStateFlow(SyncState()) }).collectAsState()
         val editingLocked = syncState.editingLocked
+        var showConflictDownloadConfirm by remember { mutableStateOf(false) }
 
         var defaultCurrencyLoaded by remember { mutableStateOf(false) }
         val defaultCurrencyId by services.settings.settingsRepository
@@ -281,7 +284,15 @@ fun MoneyManagerApp(
                             EditingLockedBanner(
                                 conflict = syncState.status == SyncStatus.CONFLICT,
                                 enabled = !syncState.busy,
-                                onDownload = onReloadFromRemote,
+                                // In a conflict, downloading discards local edits — confirm first (matching
+                                // the Settings sync UI). Otherwise the remote is simply ahead: download directly.
+                                onDownload = {
+                                    if (syncState.status == SyncStatus.CONFLICT) {
+                                        showConflictDownloadConfirm = true
+                                    } else {
+                                        onReloadFromRemote()
+                                    }
+                                },
                             )
                         }
                         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -809,6 +820,28 @@ fun MoneyManagerApp(
                         },
                         onSaved = {
                             transactionRefreshTrigger++
+                        },
+                    )
+                }
+
+                if (showConflictDownloadConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { showConflictDownloadConfirm = false },
+                        title = { Text("Discard local changes?") },
+                        text = {
+                            Text(
+                                "Another device changed this database since your last sync. Downloading now will " +
+                                    "discard your local unsynced changes. This can't be undone.",
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showConflictDownloadConfirm = false
+                                onReloadFromRemote()
+                            }) { Text("Discard local") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showConflictDownloadConfirm = false }) { Text("Cancel") }
                         },
                     )
                 }
