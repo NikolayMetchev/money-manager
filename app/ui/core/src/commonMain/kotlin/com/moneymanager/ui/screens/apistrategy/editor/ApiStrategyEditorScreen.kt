@@ -34,8 +34,8 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
-import com.moneymanager.domain.repository.ApiImportStrategyRepository
-import com.moneymanager.domain.repository.ApiSessionRepository
+import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
+import com.moneymanager.domain.repository.ApiSessionWriteRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
@@ -55,8 +55,8 @@ import kotlin.uuid.Uuid
 @Composable
 fun ApiStrategyEditorScreen(
     strategyId: ApiImportStrategyId?,
-    apiImportStrategyRepository: ApiImportStrategyRepository,
-    apiSessionRepository: ApiSessionRepository,
+    apiImportStrategyRepository: ApiImportStrategyWriteRepository,
+    apiSessionRepository: ApiSessionWriteRepository,
     onBack: () -> Unit,
 ) {
     val isEditMode = strategyId != null

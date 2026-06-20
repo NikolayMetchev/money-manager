@@ -15,13 +15,13 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonAttributeRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
+import com.moneymanager.domain.repository.PersonAttributeWriteRepository
+import com.moneymanager.domain.repository.PersonWriteRepository
+import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.domain.repository.TransferUpdate
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
@@ -58,13 +58,13 @@ import kotlinx.coroutines.flow.first
  * importers build an [ImportBatch] and call [import]; all shared import logic lives here.
  */
 class ImportEngineImpl(
-    private val transactionRepository: TransactionRepository,
-    private val accountRepository: AccountRepository,
-    private val accountAttributeRepository: AccountAttributeRepository,
-    private val personRepository: PersonRepository,
-    private val personAttributeRepository: PersonAttributeRepository,
-    private val ownershipRepository: PersonAccountOwnershipRepository,
-    private val categoryRepository: CategoryRepository,
+    private val transactionRepository: TransactionWriteRepository,
+    private val accountRepository: AccountWriteRepository,
+    private val accountAttributeRepository: AccountAttributeWriteRepository,
+    private val personRepository: PersonWriteRepository,
+    private val personAttributeRepository: PersonAttributeWriteRepository,
+    private val ownershipRepository: PersonAccountOwnershipWriteRepository,
+    private val categoryRepository: CategoryWriteRepository,
     private val editGate: EditGate = EditGate.AlwaysWritable,
 ) : ImportEngine {
     override suspend fun import(

@@ -8,8 +8,8 @@ import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.SourceRecord
-import com.moneymanager.domain.repository.AuditRepository
-import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.AuditReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
@@ -26,8 +26,8 @@ import kotlin.time.Instant
 @Composable
 fun CategoryAuditScreen(
     categoryId: Long,
-    auditRepository: AuditRepository,
-    categoryRepository: CategoryRepository,
+    auditRepository: AuditReadRepository,
+    categoryRepository: CategoryReadRepository,
     onBack: () -> Unit,
 ) {
     AuditScreen(

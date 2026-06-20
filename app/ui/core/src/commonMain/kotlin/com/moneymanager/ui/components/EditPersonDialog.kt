@@ -26,8 +26,8 @@ import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.PersonAttributeRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportPersonIntent
@@ -46,8 +46,8 @@ fun EditPersonDialog(
     personToEdit: Person?,
     onDismiss: () -> Unit,
     onPersonCreated: ((PersonId) -> Unit)? = null,
-    personAttributeRepository: PersonAttributeRepository? = null,
-    attributeTypeRepository: AttributeTypeRepository? = null,
+    personAttributeRepository: PersonAttributeReadRepository? = null,
+    attributeTypeRepository: AttributeTypeWriteRepository? = null,
 ) {
     var firstName by remember { mutableStateOf(personToEdit?.firstName.orEmpty()) }
     var middleName by remember { mutableStateOf(personToEdit?.middleName.orEmpty()) }

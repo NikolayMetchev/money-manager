@@ -39,14 +39,14 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
+import com.moneymanager.domain.repository.PersonWriteRepository
+import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
@@ -1024,7 +1024,7 @@ class AccountTransactionsScreenTest {
         }
     }
 
-    private fun createAccountRepository(accounts: List<Account>): AccountRepository =
+    private fun createAccountRepository(accounts: List<Account>): AccountWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAllAccounts() } returns flowOf(accounts)
             every { getAccountById(any()) } calls { (id: AccountId) -> flowOf(accounts.find { it.id == id }) }
@@ -1039,7 +1039,7 @@ class AccountTransactionsScreenTest {
     private fun createTransactionRepository(
         transfers: List<Transfer>,
         feeLinks: Map<Long, Long> = emptyMap(),
-    ): TransactionRepository =
+    ): TransactionWriteRepository =
         mock(MockMode.autoUnit) {
             every { getTransactionById(any()) } calls { (id: Long) -> flowOf(transfers.find { it.id.id == id }) }
             every { getTransactionsByAccount(any()) } calls { (accountId: AccountId) ->
@@ -1122,7 +1122,7 @@ class AccountTransactionsScreenTest {
             }.filter { it.accountId == accountId }
             .sortedByDescending { it.timestamp }
 
-    private fun createCurrencyRepository(currencies: List<Currency>): CurrencyRepository =
+    private fun createCurrencyRepository(currencies: List<Currency>): CurrencyWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAllCurrencies() } returns flowOf(currencies)
             every { getCurrencyById(any()) } calls { (id: CurrencyId) -> flowOf(currencies.find { it.id == id }) }
@@ -1130,7 +1130,7 @@ class AccountTransactionsScreenTest {
             everySuspend { upsertCurrencyByCode(any(), any(), any()) } returns CurrencyId(1L)
         }
 
-    private fun createCategoryRepository(): CategoryRepository =
+    private fun createCategoryRepository(): CategoryWriteRepository =
         mock(MockMode.autoUnit) {
             val categories =
                 listOf(
@@ -1146,7 +1146,7 @@ class AccountTransactionsScreenTest {
             everySuspend { createCategory(any(), any()) } returns 0L
         }
 
-    private fun createAttributeTypeRepository(): AttributeTypeRepository =
+    private fun createAttributeTypeRepository(): AttributeTypeWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAll() } returns flowOf(emptyList())
             every { getById(any()) } returns flowOf(null)
@@ -1154,21 +1154,21 @@ class AccountTransactionsScreenTest {
             everySuspend { getOrCreate(any()) } returns AttributeTypeId(0L)
         }
 
-    private fun createAccountAttributeRepository(): AccountAttributeRepository =
+    private fun createAccountAttributeRepository(): AccountAttributeWriteRepository =
         mock(MockMode.autoUnit) {
             every { getByAccount(any()) } returns flowOf(emptyList())
             everySuspend { insert(any(), any(), any()) } returns 0L
             everySuspend { insertInCreationMode(any(), any(), any()) } returns 0L
         }
 
-    private fun createPersonRepository(): PersonRepository =
+    private fun createPersonRepository(): PersonWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAllPeople() } returns flowOf(emptyList())
             every { getPersonById(any()) } returns flowOf(null)
             everySuspend { createPerson(any(), any()) } returns PersonId(0L)
         }
 
-    private fun createPersonAccountOwnershipRepository(): PersonAccountOwnershipRepository =
+    private fun createPersonAccountOwnershipRepository(): PersonAccountOwnershipWriteRepository =
         mock(MockMode.autoUnit) {
             every { getOwnershipsByPerson(any()) } returns flowOf(emptyList())
             every { getOwnershipsByAccount(any()) } returns flowOf(emptyList())

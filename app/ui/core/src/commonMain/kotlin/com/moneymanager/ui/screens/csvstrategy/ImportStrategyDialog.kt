@@ -57,12 +57,12 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.CsvImportStrategyRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -76,13 +76,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun ImportStrategyDialog(
     parseResult: CsvImportParseResult,
-    csvImportStrategyRepository: CsvImportStrategyRepository,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
+    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
     csvStrategyImportExport: CsvStrategyImportExport,
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    currencyRepository: CurrencyRepository,
-    personRepository: PersonRepository,
+    accountRepository: AccountWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyWriteRepository,
+    personRepository: PersonReadRepository,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
 ) {
@@ -341,8 +341,8 @@ private fun ReferenceResolutionRow(
     accounts: List<Account>,
     categories: List<Category>,
     currencies: List<Currency>,
-    categoryRepository: CategoryRepository,
-    personRepository: PersonRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
     enabled: Boolean,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -800,7 +800,7 @@ internal fun AccountMappingEditorDialog(
     existingMapping: CsvAccountMapping?,
     strategyId: CsvImportStrategyId,
     accounts: List<Account>,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
     onDismiss: () -> Unit,
 ) {
     val isEditMode = existingMapping != null

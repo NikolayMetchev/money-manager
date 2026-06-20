@@ -9,8 +9,8 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
@@ -49,8 +49,8 @@ private const val ACCOUNT_COUNT = 100
  * and then referenced by id from the batch.
  */
 suspend fun generateSampleData(
-    currencyRepository: CurrencyRepository,
-    attributeTypeRepository: AttributeTypeRepository,
+    currencyRepository: CurrencyWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
     importEngine: ImportEngine,
     maintenance: Maintenance,
     progressFlow: MutableStateFlow<GenerationProgress>,

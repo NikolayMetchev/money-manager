@@ -4,27 +4,27 @@ import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.ApiImportStrategyRepository
-import com.moneymanager.domain.repository.ApiSessionRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.AuditRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.domain.repository.CsvImportStrategyRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.DeviceRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonAttributeRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.QifImportRepository
-import com.moneymanager.domain.repository.RelationshipTypeRepository
-import com.moneymanager.domain.repository.SettingsRepository
-import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferRelationshipRepository
-import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
+import com.moneymanager.domain.repository.ApiSessionWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AuditReadRepository
+import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.DeviceReadRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
+import com.moneymanager.domain.repository.PersonAttributeWriteRepository
+import com.moneymanager.domain.repository.PersonWriteRepository
+import com.moneymanager.domain.repository.QifImportWriteRepository
+import com.moneymanager.domain.repository.RelationshipTypeReadRepository
+import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.TransactionWriteRepository
+import com.moneymanager.domain.repository.TransferRelationshipReadRepository
+import com.moneymanager.domain.repository.TransferSourceReadRepository
 
 data class Application(
     val accounts: Accounts,
@@ -37,43 +37,43 @@ data class Application(
 )
 
 data class Accounts(
-    val accountRepository: AccountRepository,
-    val accountAttributeRepository: AccountAttributeRepository,
-    val categoryRepository: CategoryRepository,
-    val currencyRepository: CurrencyRepository,
+    val accountRepository: AccountWriteRepository,
+    val accountAttributeRepository: AccountAttributeWriteRepository,
+    val categoryRepository: CategoryWriteRepository,
+    val currencyRepository: CurrencyWriteRepository,
 )
 
 data class Imports(
-    val apiImportStrategyRepository: ApiImportStrategyRepository,
-    val apiSessionRepository: ApiSessionRepository,
-    val csvAccountMappingRepository: CsvAccountMappingRepository,
-    val csvImportRepository: CsvImportRepository,
-    val csvImportStrategyRepository: CsvImportStrategyRepository,
+    val apiImportStrategyRepository: ApiImportStrategyWriteRepository,
+    val apiSessionRepository: ApiSessionWriteRepository,
+    val csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    val csvImportRepository: CsvImportWriteRepository,
+    val csvImportStrategyRepository: CsvImportStrategyWriteRepository,
     val csvStrategyExportService: CsvStrategyExportService,
     val csvStrategyImportExport: CsvStrategyImportExport,
-    val qifImportRepository: QifImportRepository,
+    val qifImportRepository: QifImportWriteRepository,
     val maintenance: Maintenance,
 )
 
 data class Transactions(
-    val transactionRepository: TransactionRepository,
-    val transferSourceRepository: TransferSourceRepository,
-    val attributeTypeRepository: AttributeTypeRepository,
-    val relationshipTypeRepository: RelationshipTypeRepository,
-    val transferRelationshipRepository: TransferRelationshipRepository,
+    val transactionRepository: TransactionWriteRepository,
+    val transferSourceRepository: TransferSourceReadRepository,
+    val attributeTypeRepository: AttributeTypeWriteRepository,
+    val relationshipTypeRepository: RelationshipTypeReadRepository,
+    val transferRelationshipRepository: TransferRelationshipReadRepository,
 )
 
 data class People(
-    val personRepository: PersonRepository,
-    val personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    val personAttributeRepository: PersonAttributeRepository,
+    val personRepository: PersonWriteRepository,
+    val personAccountOwnershipRepository: PersonAccountOwnershipWriteRepository,
+    val personAttributeRepository: PersonAttributeWriteRepository,
 )
 
 data class Settings(
-    val settingsRepository: SettingsRepository,
-    val deviceRepository: DeviceRepository,
+    val settingsRepository: SettingsWriteRepository,
+    val deviceRepository: DeviceReadRepository,
 )
 
 data class Audit(
-    val auditRepository: AuditRepository,
+    val auditRepository: AuditReadRepository,
 )

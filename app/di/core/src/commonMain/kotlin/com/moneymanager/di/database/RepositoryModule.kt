@@ -3,53 +3,95 @@ package com.moneymanager.di.database
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.DatabaseMaintenanceServiceImpl
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
-import com.moneymanager.database.repository.AccountAttributeRepositoryImpl
-import com.moneymanager.database.repository.AccountRepositoryImpl
-import com.moneymanager.database.repository.ApiImportStrategyRepositoryImpl
-import com.moneymanager.database.repository.ApiSessionRepositoryImpl
-import com.moneymanager.database.repository.AttributeTypeRepositoryImpl
-import com.moneymanager.database.repository.AuditRepositoryImpl
-import com.moneymanager.database.repository.CategoryRepositoryImpl
-import com.moneymanager.database.repository.CsvAccountMappingRepositoryImpl
-import com.moneymanager.database.repository.CsvImportRepositoryImpl
-import com.moneymanager.database.repository.CsvImportStrategyRepositoryImpl
-import com.moneymanager.database.repository.CurrencyRepositoryImpl
-import com.moneymanager.database.repository.DeviceRepositoryImpl
-import com.moneymanager.database.repository.PersonAccountOwnershipRepositoryImpl
-import com.moneymanager.database.repository.PersonAttributeRepositoryImpl
-import com.moneymanager.database.repository.PersonRepositoryImpl
-import com.moneymanager.database.repository.QifImportRepositoryImpl
-import com.moneymanager.database.repository.RelationshipTypeRepositoryImpl
-import com.moneymanager.database.repository.SettingsRepositoryImpl
-import com.moneymanager.database.repository.TransactionRepositoryImpl
-import com.moneymanager.database.repository.TransferAttributeRepositoryImpl
-import com.moneymanager.database.repository.TransferRelationshipRepositoryImpl
-import com.moneymanager.database.repository.TransferSourceRepositoryImpl
+import com.moneymanager.database.repository.AccountAttributeReadRepositoryImpl
+import com.moneymanager.database.repository.AccountAttributeWriteRepositoryImpl
+import com.moneymanager.database.repository.AccountReadRepositoryImpl
+import com.moneymanager.database.repository.AccountWriteRepositoryImpl
+import com.moneymanager.database.repository.ApiImportStrategyReadRepositoryImpl
+import com.moneymanager.database.repository.ApiImportStrategyWriteRepositoryImpl
+import com.moneymanager.database.repository.ApiSessionReadRepositoryImpl
+import com.moneymanager.database.repository.ApiSessionWriteRepositoryImpl
+import com.moneymanager.database.repository.AttributeTypeReadRepositoryImpl
+import com.moneymanager.database.repository.AttributeTypeWriteRepositoryImpl
+import com.moneymanager.database.repository.AuditReadRepositoryImpl
+import com.moneymanager.database.repository.CategoryReadRepositoryImpl
+import com.moneymanager.database.repository.CategoryWriteRepositoryImpl
+import com.moneymanager.database.repository.CsvAccountMappingReadRepositoryImpl
+import com.moneymanager.database.repository.CsvAccountMappingWriteRepositoryImpl
+import com.moneymanager.database.repository.CsvImportReadRepositoryImpl
+import com.moneymanager.database.repository.CsvImportStrategyReadRepositoryImpl
+import com.moneymanager.database.repository.CsvImportStrategyWriteRepositoryImpl
+import com.moneymanager.database.repository.CsvImportWriteRepositoryImpl
+import com.moneymanager.database.repository.CurrencyReadRepositoryImpl
+import com.moneymanager.database.repository.CurrencyWriteRepositoryImpl
+import com.moneymanager.database.repository.DeviceReadRepositoryImpl
+import com.moneymanager.database.repository.DeviceWriteRepositoryImpl
+import com.moneymanager.database.repository.PersonAccountOwnershipReadRepositoryImpl
+import com.moneymanager.database.repository.PersonAccountOwnershipWriteRepositoryImpl
+import com.moneymanager.database.repository.PersonAttributeReadRepositoryImpl
+import com.moneymanager.database.repository.PersonAttributeWriteRepositoryImpl
+import com.moneymanager.database.repository.PersonReadRepositoryImpl
+import com.moneymanager.database.repository.PersonWriteRepositoryImpl
+import com.moneymanager.database.repository.QifImportReadRepositoryImpl
+import com.moneymanager.database.repository.QifImportWriteRepositoryImpl
+import com.moneymanager.database.repository.RelationshipTypeReadRepositoryImpl
+import com.moneymanager.database.repository.RelationshipTypeWriteRepositoryImpl
+import com.moneymanager.database.repository.SettingsReadRepositoryImpl
+import com.moneymanager.database.repository.SettingsWriteRepositoryImpl
+import com.moneymanager.database.repository.TransactionReadRepositoryImpl
+import com.moneymanager.database.repository.TransactionWriteRepositoryImpl
+import com.moneymanager.database.repository.TransferAttributeReadRepositoryImpl
+import com.moneymanager.database.repository.TransferAttributeWriteRepositoryImpl
+import com.moneymanager.database.repository.TransferRelationshipReadRepositoryImpl
+import com.moneymanager.database.repository.TransferRelationshipWriteRepositoryImpl
+import com.moneymanager.database.repository.TransferSourceReadRepositoryImpl
+import com.moneymanager.database.repository.TransferSourceWriteRepositoryImpl
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.ApiImportStrategyRepository
-import com.moneymanager.domain.repository.ApiSessionRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.AuditRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.domain.repository.CsvImportStrategyRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.DeviceRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonAttributeRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.QifImportRepository
-import com.moneymanager.domain.repository.RelationshipTypeRepository
-import com.moneymanager.domain.repository.SettingsRepository
-import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferAttributeRepository
-import com.moneymanager.domain.repository.TransferRelationshipRepository
-import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.domain.repository.AccountAttributeReadRepository
+import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
+import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
+import com.moneymanager.domain.repository.ApiSessionReadRepository
+import com.moneymanager.domain.repository.ApiSessionWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AuditReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.DeviceReadRepository
+import com.moneymanager.domain.repository.DeviceWriteRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
+import com.moneymanager.domain.repository.PersonAttributeReadRepository
+import com.moneymanager.domain.repository.PersonAttributeWriteRepository
+import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.PersonWriteRepository
+import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.domain.repository.QifImportWriteRepository
+import com.moneymanager.domain.repository.RelationshipTypeReadRepository
+import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
+import com.moneymanager.domain.repository.SettingsReadRepository
+import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.domain.repository.TransactionWriteRepository
+import com.moneymanager.domain.repository.TransferAttributeReadRepository
+import com.moneymanager.domain.repository.TransferAttributeWriteRepository
+import com.moneymanager.domain.repository.TransferRelationshipReadRepository
+import com.moneymanager.domain.repository.TransferRelationshipWriteRepository
+import com.moneymanager.domain.repository.TransferSourceReadRepository
+import com.moneymanager.domain.repository.TransferSourceWriteRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importer.ImportEngineImpl
 import dev.zacsweers.metro.ContributesTo
@@ -57,104 +99,221 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 
 /**
- * Module that provides all repository implementations.
+ * Module that provides all repository implementations as read + write pairs. The write impl delegates
+ * its read methods to the (shared, singleton) read impl, so a single underlying instance backs both.
  */
 @ContributesTo(DatabaseScope::class)
 interface RepositoryModule {
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideAccountAttributeRepository(database: MoneyManagerDatabaseWrapper): AccountAttributeRepository =
-        AccountAttributeRepositoryImpl(database)
+    fun provideAccountAttributeReadRepository(database: MoneyManagerDatabaseWrapper): AccountAttributeReadRepository =
+        AccountAttributeReadRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideAccountRepository(
+    fun provideAccountAttributeWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: AccountAttributeReadRepository,
+    ): AccountAttributeWriteRepository = AccountAttributeWriteRepositoryImpl(database, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideAccountReadRepository(database: MoneyManagerDatabaseWrapper): AccountReadRepository = AccountReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideAccountWriteRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): AccountRepository = AccountRepositoryImpl(database, deviceId)
+        reader: AccountReadRepository,
+    ): AccountWriteRepository = AccountWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideApiImportStrategyRepository(
+    fun provideApiImportStrategyReadRepository(database: MoneyManagerDatabaseWrapper): ApiImportStrategyReadRepository =
+        ApiImportStrategyReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideApiImportStrategyWriteRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): ApiImportStrategyRepository = ApiImportStrategyRepositoryImpl(database, deviceId)
+        reader: ApiImportStrategyReadRepository,
+    ): ApiImportStrategyWriteRepository = ApiImportStrategyWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideApiSessionRepository(database: MoneyManagerDatabaseWrapper): ApiSessionRepository = ApiSessionRepositoryImpl(database)
+    fun provideApiSessionReadRepository(database: MoneyManagerDatabaseWrapper): ApiSessionReadRepository =
+        ApiSessionReadRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideAttributeTypeRepository(database: MoneyManagerDatabaseWrapper): AttributeTypeRepository =
-        AttributeTypeRepositoryImpl(database)
+    fun provideApiSessionWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: ApiSessionReadRepository,
+    ): ApiSessionWriteRepository = ApiSessionWriteRepositoryImpl(database, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideAuditRepository(database: MoneyManagerDatabaseWrapper): AuditRepository = AuditRepositoryImpl(database)
+    fun provideAttributeTypeReadRepository(database: MoneyManagerDatabaseWrapper): AttributeTypeReadRepository =
+        AttributeTypeReadRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideCategoryRepository(
+    fun provideAttributeTypeWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: AttributeTypeReadRepository,
+    ): AttributeTypeWriteRepository = AttributeTypeWriteRepositoryImpl(database, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideAuditRepository(database: MoneyManagerDatabaseWrapper): AuditReadRepository = AuditReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideCategoryReadRepository(database: MoneyManagerDatabaseWrapper): CategoryReadRepository = CategoryReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideCategoryWriteRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): CategoryRepository = CategoryRepositoryImpl(database, deviceId)
+        reader: CategoryReadRepository,
+    ): CategoryWriteRepository = CategoryWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideDeviceRepository(database: MoneyManagerDatabaseWrapper): DeviceRepository = DeviceRepositoryImpl(database)
+    fun provideCsvAccountMappingReadRepository(database: MoneyManagerDatabaseWrapper): CsvAccountMappingReadRepository =
+        CsvAccountMappingReadRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun providePersonAttributeRepository(database: MoneyManagerDatabaseWrapper): PersonAttributeRepository =
-        PersonAttributeRepositoryImpl(database)
+    fun provideCsvAccountMappingWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: CsvAccountMappingReadRepository,
+    ): CsvAccountMappingWriteRepository = CsvAccountMappingWriteRepositoryImpl(database, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun providePersonRepository(
+    fun provideCsvImportReadRepository(database: MoneyManagerDatabaseWrapper): CsvImportReadRepository =
+        CsvImportReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideCsvImportWriteRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): PersonRepository = PersonRepositoryImpl(database, deviceId)
+        reader: CsvImportReadRepository,
+    ): CsvImportWriteRepository = CsvImportWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun providePersonAccountOwnershipRepository(
+    fun provideCsvImportStrategyReadRepository(database: MoneyManagerDatabaseWrapper): CsvImportStrategyReadRepository =
+        CsvImportStrategyReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideCsvImportStrategyWriteRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): PersonAccountOwnershipRepository = PersonAccountOwnershipRepositoryImpl(database, deviceId)
+        reader: CsvImportStrategyReadRepository,
+    ): CsvImportStrategyWriteRepository = CsvImportStrategyWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideCsvImportRepository(
+    fun provideCurrencyReadRepository(database: MoneyManagerDatabaseWrapper): CurrencyReadRepository = CurrencyReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideCurrencyWriteRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): CsvImportRepository = CsvImportRepositoryImpl(database, deviceId)
+        reader: CurrencyReadRepository,
+    ): CurrencyWriteRepository = CurrencyWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideQifImportRepository(
+    fun provideDeviceReadRepository(database: MoneyManagerDatabaseWrapper): DeviceReadRepository = DeviceReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideDeviceWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: DeviceReadRepository,
+    ): DeviceWriteRepository = DeviceWriteRepositoryImpl(database, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun providePersonAttributeReadRepository(database: MoneyManagerDatabaseWrapper): PersonAttributeReadRepository =
+        PersonAttributeReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun providePersonAttributeWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: PersonAttributeReadRepository,
+    ): PersonAttributeWriteRepository = PersonAttributeWriteRepositoryImpl(database, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun providePersonReadRepository(database: MoneyManagerDatabaseWrapper): PersonReadRepository = PersonReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun providePersonWriteRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): QifImportRepository = QifImportRepositoryImpl(database, deviceId)
+        reader: PersonReadRepository,
+    ): PersonWriteRepository = PersonWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideCsvAccountMappingRepository(database: MoneyManagerDatabaseWrapper): CsvAccountMappingRepository =
-        CsvAccountMappingRepositoryImpl(database)
+    fun providePersonAccountOwnershipReadRepository(database: MoneyManagerDatabaseWrapper): PersonAccountOwnershipReadRepository =
+        PersonAccountOwnershipReadRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideCsvImportStrategyRepository(
+    fun providePersonAccountOwnershipWriteRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): CsvImportStrategyRepository = CsvImportStrategyRepositoryImpl(database, deviceId)
+        reader: PersonAccountOwnershipReadRepository,
+    ): PersonAccountOwnershipWriteRepository = PersonAccountOwnershipWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideCurrencyRepository(
+    fun provideQifImportReadRepository(database: MoneyManagerDatabaseWrapper): QifImportReadRepository =
+        QifImportReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideQifImportWriteRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): CurrencyRepository = CurrencyRepositoryImpl(database, deviceId)
+        reader: QifImportReadRepository,
+    ): QifImportWriteRepository = QifImportWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideRelationshipTypeReadRepository(database: MoneyManagerDatabaseWrapper): RelationshipTypeReadRepository =
+        RelationshipTypeReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideRelationshipTypeWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: RelationshipTypeReadRepository,
+    ): RelationshipTypeWriteRepository = RelationshipTypeWriteRepositoryImpl(database, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideSettingsReadRepository(database: MoneyManagerDatabaseWrapper): SettingsReadRepository = SettingsReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideSettingsWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: SettingsReadRepository,
+    ): SettingsWriteRepository = SettingsWriteRepositoryImpl(database, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -164,54 +323,71 @@ interface RepositoryModule {
     @Provides
     @SingleIn(DatabaseScope::class)
     fun provideCsvStrategyExportService(
-        accountRepository: AccountRepository,
-        currencyRepository: CurrencyRepository,
-        categoryRepository: CategoryRepository,
+        accountRepository: AccountWriteRepository,
+        currencyRepository: CurrencyWriteRepository,
+        categoryRepository: CategoryWriteRepository,
     ): CsvStrategyExportService = CsvStrategyExportService(accountRepository, currencyRepository, categoryRepository)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideTransactionRepository(
+    fun provideTransactionReadRepository(database: MoneyManagerDatabaseWrapper): TransactionReadRepository =
+        TransactionReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideTransactionWriteRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): TransactionRepository = TransactionRepositoryImpl(database, deviceId)
+        reader: TransactionReadRepository,
+    ): TransactionWriteRepository = TransactionWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideTransferAttributeRepository(database: MoneyManagerDatabaseWrapper): TransferAttributeRepository =
-        TransferAttributeRepositoryImpl(database)
+    fun provideTransferAttributeReadRepository(database: MoneyManagerDatabaseWrapper): TransferAttributeReadRepository =
+        TransferAttributeReadRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideRelationshipTypeRepository(database: MoneyManagerDatabaseWrapper): RelationshipTypeRepository =
-        RelationshipTypeRepositoryImpl(database)
-
-    @Provides
-    @SingleIn(DatabaseScope::class)
-    fun provideTransferRelationshipRepository(database: MoneyManagerDatabaseWrapper): TransferRelationshipRepository =
-        TransferRelationshipRepositoryImpl(database)
-
-    @Provides
-    @SingleIn(DatabaseScope::class)
-    fun provideSettingsRepository(database: MoneyManagerDatabaseWrapper): SettingsRepository = SettingsRepositoryImpl(database)
-
-    @Provides
-    @SingleIn(DatabaseScope::class)
-    fun provideTransferSourceRepository(
+    fun provideTransferAttributeWriteRepository(
         database: MoneyManagerDatabaseWrapper,
-        deviceRepository: DeviceRepository,
-    ): TransferSourceRepository = TransferSourceRepositoryImpl(database, deviceRepository)
+        reader: TransferAttributeReadRepository,
+    ): TransferAttributeWriteRepository = TransferAttributeWriteRepositoryImpl(database, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideTransferRelationshipReadRepository(database: MoneyManagerDatabaseWrapper): TransferRelationshipReadRepository =
+        TransferRelationshipReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideTransferRelationshipWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: TransferRelationshipReadRepository,
+    ): TransferRelationshipWriteRepository = TransferRelationshipWriteRepositoryImpl(database, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideTransferSourceReadRepository(database: MoneyManagerDatabaseWrapper): TransferSourceReadRepository =
+        TransferSourceReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideTransferSourceWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceRepository: DeviceWriteRepository,
+        reader: TransferSourceReadRepository,
+    ): TransferSourceWriteRepository = TransferSourceWriteRepositoryImpl(database, deviceRepository, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
     fun provideImportEngine(
-        transactionRepository: TransactionRepository,
-        accountRepository: AccountRepository,
-        accountAttributeRepository: AccountAttributeRepository,
-        personRepository: PersonRepository,
-        personAttributeRepository: PersonAttributeRepository,
-        ownershipRepository: PersonAccountOwnershipRepository,
-        categoryRepository: CategoryRepository,
+        transactionRepository: TransactionWriteRepository,
+        accountRepository: AccountWriteRepository,
+        accountAttributeRepository: AccountAttributeWriteRepository,
+        personRepository: PersonWriteRepository,
+        personAttributeRepository: PersonAttributeWriteRepository,
+        ownershipRepository: PersonAccountOwnershipWriteRepository,
+        categoryRepository: CategoryWriteRepository,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,

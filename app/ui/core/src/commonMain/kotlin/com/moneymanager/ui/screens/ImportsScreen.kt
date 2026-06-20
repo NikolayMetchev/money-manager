@@ -12,20 +12,20 @@ import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.qif.QifImportId
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.ApiImportStrategyRepository
-import com.moneymanager.domain.repository.ApiSessionRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.domain.repository.CsvImportStrategyRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.QifImportRepository
-import com.moneymanager.domain.repository.SettingsRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.AccountAttributeReadRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
+import com.moneymanager.domain.repository.ApiSessionWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.QifImportWriteRepository
+import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.navigation.ImportTab
 
@@ -33,21 +33,21 @@ import com.moneymanager.ui.navigation.ImportTab
 fun ImportsScreen(
     selectedTab: ImportTab,
     onTabSelected: (ImportTab) -> Unit,
-    csvImportRepository: CsvImportRepository,
-    csvImportStrategyRepository: CsvImportStrategyRepository,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
-    qifImportRepository: QifImportRepository,
-    categoryRepository: CategoryRepository,
-    settingsRepository: SettingsRepository,
-    apiSessionRepository: ApiSessionRepository,
-    apiImportStrategyRepository: ApiImportStrategyRepository,
-    attributeTypeRepository: AttributeTypeRepository,
-    accountAttributeRepository: AccountAttributeRepository,
-    accountRepository: AccountRepository,
-    currencyRepository: CurrencyRepository,
-    transactionRepository: TransactionRepository,
+    csvImportRepository: CsvImportWriteRepository,
+    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    qifImportRepository: QifImportWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    settingsRepository: SettingsWriteRepository,
+    apiSessionRepository: ApiSessionWriteRepository,
+    apiImportStrategyRepository: ApiImportStrategyWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
+    accountAttributeRepository: AccountAttributeReadRepository,
+    accountRepository: AccountWriteRepository,
+    currencyRepository: CurrencyWriteRepository,
+    transactionRepository: TransactionReadRepository,
     maintenance: Maintenance,
-    personRepository: PersonRepository,
+    personRepository: PersonReadRepository,
     importEngine: ImportEngine,
     deviceId: DeviceId,
     onCsvImportClick: (CsvImportId) -> Unit,

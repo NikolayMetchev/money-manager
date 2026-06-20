@@ -44,11 +44,11 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
@@ -71,11 +71,11 @@ import kotlin.time.Instant
 @Composable
 fun TransactionEditDialog(
     transaction: Transfer? = null,
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    currencyRepository: CurrencyRepository,
-    attributeTypeRepository: AttributeTypeRepository,
-    personRepository: PersonRepository,
+    accountRepository: AccountWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
+    personRepository: PersonReadRepository,
     maintenance: Maintenance,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,

@@ -14,15 +14,15 @@ import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.qif.QifImportId
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.domain.repository.CsvImportStrategyRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.QifImportRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.QifImportWriteRepository
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 
@@ -35,15 +35,15 @@ import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 fun QifStrategyEditorScreen(
     qifImportId: QifImportId,
     strategyId: CsvImportStrategyId?,
-    qifImportRepository: QifImportRepository,
-    csvImportRepository: CsvImportRepository,
-    csvImportStrategyRepository: CsvImportStrategyRepository,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    currencyRepository: CurrencyRepository,
-    attributeTypeRepository: AttributeTypeRepository,
-    personRepository: PersonRepository,
+    qifImportRepository: QifImportWriteRepository,
+    csvImportRepository: CsvImportWriteRepository,
+    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    accountRepository: AccountWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
+    personRepository: PersonReadRepository,
     onBack: () -> Unit,
 ) {
     var sampleRows by remember { mutableStateOf<List<CsvRow>?>(null) }

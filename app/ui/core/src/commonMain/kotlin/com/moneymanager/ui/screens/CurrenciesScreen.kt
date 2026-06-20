@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.ui.components.CreateCurrencyDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -24,7 +24,7 @@ private val logger = logging()
 
 @Composable
 fun CurrenciesScreen(
-    currencyRepository: CurrencyRepository,
+    currencyRepository: CurrencyWriteRepository,
     onAuditClick: (Currency) -> Unit = {},
 ) {
     val currencies by currencyRepository
@@ -102,7 +102,7 @@ fun CurrenciesScreen(
 @Composable
 fun CurrencyCard(
     currency: Currency,
-    currencyRepository: CurrencyRepository,
+    currencyRepository: CurrencyWriteRepository,
     onAuditClick: () -> Unit = {},
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -161,7 +161,7 @@ fun CurrencyCard(
 @Composable
 fun DeleteCurrencyDialog(
     currency: Currency,
-    currencyRepository: CurrencyRepository,
+    currencyRepository: CurrencyWriteRepository,
     onDismiss: () -> Unit,
 ) {
     var isDeleting by remember { mutableStateOf(false) }

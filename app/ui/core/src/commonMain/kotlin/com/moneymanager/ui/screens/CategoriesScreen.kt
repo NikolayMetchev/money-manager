@@ -72,8 +72,8 @@ import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.ImportOperation
@@ -100,8 +100,8 @@ private val HIERARCHY_COLUMN_WIDTH = 250.dp
 
 @Composable
 fun CategoriesScreen(
-    categoryRepository: CategoryRepository,
-    currencyRepository: CurrencyRepository,
+    categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyWriteRepository,
     onAuditClick: (Category) -> Unit = {},
 ) {
     val categories by categoryRepository
@@ -625,7 +625,7 @@ fun CategoryTreeItem(
 
 @Composable
 fun CreateCategoryDialogInCategories(
-    categoryRepository: CategoryRepository,
+    categoryRepository: CategoryReadRepository,
     onDismiss: () -> Unit,
 ) = CreateCategoryDialog(
     categoryRepository = categoryRepository,

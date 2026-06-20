@@ -26,10 +26,10 @@ import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.PersonAttributeRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.PersonAttributeReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
@@ -51,10 +51,10 @@ private val logger = logging()
  */
 @Composable
 fun CreateAccountDialog(
-    categoryRepository: CategoryRepository,
-    personRepository: PersonRepository,
-    personAttributeRepository: PersonAttributeRepository? = null,
-    attributeTypeRepository: AttributeTypeRepository? = null,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
+    personAttributeRepository: PersonAttributeReadRepository? = null,
+    attributeTypeRepository: AttributeTypeWriteRepository? = null,
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
     initialName: String = "",

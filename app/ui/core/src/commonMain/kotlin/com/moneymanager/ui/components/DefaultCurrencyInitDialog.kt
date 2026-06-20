@@ -16,16 +16,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.currency.Currency
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.SettingsRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.SettingsWriteRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 @Composable
 fun DefaultCurrencyInitDialog(
-    currencyRepository: CurrencyRepository,
-    settingsRepository: SettingsRepository,
+    currencyRepository: CurrencyWriteRepository,
+    settingsRepository: SettingsWriteRepository,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }

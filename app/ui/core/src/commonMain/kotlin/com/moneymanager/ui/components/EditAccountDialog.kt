@@ -27,12 +27,12 @@ import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonAttributeRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.AccountAttributeReadRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
+import com.moneymanager.domain.repository.PersonAttributeReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
@@ -55,12 +55,12 @@ private val logger = logging()
 @Composable
 fun EditAccountDialog(
     account: Account,
-    accountAttributeRepository: AccountAttributeRepository,
-    attributeTypeRepository: AttributeTypeRepository,
-    categoryRepository: CategoryRepository,
-    personRepository: PersonRepository,
-    personAttributeRepository: PersonAttributeRepository? = null,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    accountAttributeRepository: AccountAttributeReadRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
+    personAttributeRepository: PersonAttributeReadRepository? = null,
+    personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     onDismiss: () -> Unit,
 ) {
     val accountState = rememberAccountDialogState(initialName = account.name, initialCategoryId = account.categoryId)

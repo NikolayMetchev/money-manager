@@ -15,9 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.screens.csvstrategy.findRowWithBlankColumn
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
@@ -32,9 +32,9 @@ internal fun AccountsTab(
     rows: List<CsvRow>,
     firstRow: CsvRow?,
     enabled: Boolean,
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    personRepository: PersonRepository,
+    accountRepository: AccountWriteRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)

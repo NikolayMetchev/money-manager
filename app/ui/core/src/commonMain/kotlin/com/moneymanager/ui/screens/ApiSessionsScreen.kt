@@ -78,13 +78,13 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.MonzoCredential
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.ApiImportStrategyRepository
+import com.moneymanager.domain.repository.AccountAttributeReadRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
 import com.moneymanager.domain.repository.ApiSessionImportRevision
-import com.moneymanager.domain.repository.ApiSessionRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.ApiSessionWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.ScaParams
@@ -115,12 +115,12 @@ import kotlin.time.Instant
 
 @Composable
 fun ApiSessionsScreen(
-    apiSessionRepository: ApiSessionRepository,
-    apiImportStrategyRepository: ApiImportStrategyRepository,
-    attributeTypeRepository: AttributeTypeRepository,
-    accountAttributeRepository: AccountAttributeRepository,
-    accountRepository: AccountRepository,
-    currencyRepository: CurrencyRepository,
+    apiSessionRepository: ApiSessionWriteRepository,
+    apiImportStrategyRepository: ApiImportStrategyWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
+    accountAttributeRepository: AccountAttributeReadRepository,
+    accountRepository: AccountWriteRepository,
+    currencyRepository: CurrencyWriteRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     deviceId: DeviceId,
@@ -920,7 +920,7 @@ private fun SessionStatusBadge(isActive: Boolean) {
 
 @Composable
 fun ApiSessionTrafficScreen(
-    apiSessionRepository: ApiSessionRepository,
+    apiSessionRepository: ApiSessionWriteRepository,
     sessionId: ApiSessionId,
     highlightRequestId: ApiRequestId? = null,
     highlightJsonPath: String? = null,

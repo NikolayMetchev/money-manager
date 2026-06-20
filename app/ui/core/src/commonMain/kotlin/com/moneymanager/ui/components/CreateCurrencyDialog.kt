@@ -19,7 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -35,7 +35,7 @@ private val logger = logging()
  */
 @Composable
 fun CreateCurrencyDialog(
-    currencyRepository: CurrencyRepository,
+    currencyRepository: CurrencyWriteRepository,
     onCurrencyCreated: (CurrencyId) -> Unit,
     onDismiss: () -> Unit,
 ) {

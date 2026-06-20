@@ -25,10 +25,10 @@ import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifImport
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CsvAccountMappingRepository
-import com.moneymanager.domain.repository.QifImportRepository
+import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.QifImportWriteRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
@@ -122,10 +122,10 @@ suspend fun bulkApplyQif(
     sourceAccountId: AccountId,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
-    accountRepository: AccountRepository,
-    qifImportRepository: QifImportRepository,
-    attributeTypeRepository: AttributeTypeRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    accountRepository: AccountWriteRepository,
+    qifImportRepository: QifImportWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit,
@@ -238,7 +238,7 @@ fun buildMapper(
 
 /** Records that this strategy was applied to the import (so the import shows as imported). */
 suspend fun recordApplication(
-    qifImportRepository: QifImportRepository,
+    qifImportRepository: QifImportWriteRepository,
     qifImport: QifImport,
     strategy: CsvImportStrategy,
 ) {
@@ -257,10 +257,10 @@ suspend fun runImport(
     selectedNewAccountNames: Map<String, String>,
     selectedSourceAccountId: AccountId?,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingRepository,
-    accountRepository: AccountRepository,
-    qifImportRepository: QifImportRepository,
-    attributeTypeRepository: AttributeTypeRepository,
+    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    accountRepository: AccountWriteRepository,
+    qifImportRepository: QifImportWriteRepository,
+    attributeTypeRepository: AttributeTypeWriteRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,

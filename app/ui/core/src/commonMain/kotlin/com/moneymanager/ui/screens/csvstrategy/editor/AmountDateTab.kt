@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
@@ -30,7 +30,7 @@ internal fun AmountDateTab(
     csvColumns: List<CsvColumn>,
     firstRow: CsvRow?,
     enabled: Boolean,
-    currencyRepository: CurrencyRepository,
+    currencyRepository: CurrencyWriteRepository,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Amount Column", style = MaterialTheme.typography.titleSmall)
