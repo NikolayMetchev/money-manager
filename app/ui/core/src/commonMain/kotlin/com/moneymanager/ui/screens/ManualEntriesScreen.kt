@@ -33,13 +33,17 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferMissingCompanion
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.displayDateTime
@@ -75,6 +79,7 @@ fun ManualEntriesScreen(
     onTransactionsImported: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
     val groupsFlow =
         remember(csvImportStrategyRepository, transactionRepository) {
             csvImportStrategyRepository.getAllStrategies().flatMapLatest { strategies ->
@@ -151,7 +156,7 @@ fun ManualEntriesScreen(
                                         createCompanionTransfers(
                                             rule = group.rule,
                                             entries = entries,
-                                            transactionRepository = transactionRepository,
+                                            importEngine = importEngine,
                                             attributeTypeRepository = attributeTypeRepository,
                                         )
                                         maintenance.refreshMaterializedViews()
@@ -186,32 +191,23 @@ fun ManualEntriesScreen(
 private suspend fun createCompanionTransfers(
     rule: CompanionTransactionRule,
     entries: List<Pair<TransferMissingCompanion, BigDecimal>>,
-    transactionRepository: TransactionRepository,
+    importEngine: ImportEngine,
     attributeTypeRepository: AttributeTypeRepository,
 ) {
     val linkTypeId = attributeTypeRepository.getOrCreate(rule.linkAttributeName)
     val transfers =
-        entries.mapIndexed { index, (matched, amount) ->
-            Transfer(
-                // Distinct placeholder ids: createTransfers keys newAttributes by them.
-                id = TransferId(-(index + 1L)),
+        entries.map { (matched, amount) ->
+            ImportTransfer(
+                source = Source.Manual,
+                fromAccount = AccountRef.Existing(matched.targetAccountId),
+                toAccount = AccountRef.Existing(matched.sourceAccountId),
                 timestamp = matched.timestamp,
                 description = rule.companionDescription,
-                sourceAccountId = matched.targetAccountId,
-                targetAccountId = matched.sourceAccountId,
                 amount = Money.fromDisplayValue(amount, matched.amount.currency),
+                attributes = listOf(NewAttribute(linkTypeId, matched.matchValue)),
             )
         }
-    val newAttributes =
-        transfers
-            .mapIndexed { index, transfer ->
-                transfer.id to listOf(NewAttribute(linkTypeId, entries[index].first.matchValue))
-            }.toMap()
-    transactionRepository.createTransfers(
-        transfers = transfers,
-        newAttributes = newAttributes,
-        sources = List(transfers.size) { Source.Manual },
-    )
+    importEngine.import(ImportBatch.manualEdits(transfers = transfers))
 }
 
 private fun parseAmount(text: String): BigDecimal? {

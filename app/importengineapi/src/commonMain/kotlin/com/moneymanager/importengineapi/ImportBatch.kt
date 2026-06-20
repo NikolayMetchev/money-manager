@@ -2,19 +2,35 @@
 
 package com.moneymanager.importengineapi
 
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Auditable
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
+import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import kotlin.jvm.JvmInline
 import kotlin.time.Instant
+
+/**
+ * The kind of write an intent describes. Defaults to [CREATE] everywhere so the import producers
+ * (CSV/QIF/API), which only ever create, are unaffected; manual edits set [UPDATE]/[DELETE].
+ */
+enum class ImportOperation { CREATE, UPDATE, DELETE }
+
+/** An intent declaring one write on an entity; [operation] selects create/update/delete. */
+interface WriteIntent {
+    val operation: ImportOperation
+}
 
 /**
  * Computes the unique-identifier dedupe key for an existing (database) transfer, so the engine can
@@ -43,6 +59,12 @@ value class LocalAccountKey(
 /** Builder-chosen placeholder identity for a person created in this batch, before DB ids exist. */
 @JvmInline
 value class LocalPersonKey(
+    val value: String,
+)
+
+/** Builder-chosen placeholder identity for a category created in this batch, before DB ids exist. */
+@JvmInline
+value class LocalCategoryKey(
     val value: String,
 )
 
@@ -91,11 +113,11 @@ sealed interface AccountMatchKey {
  */
 data class ImportAccountIntent(
     val key: LocalAccountKey,
-    val match: AccountMatchKey,
-    val name: String,
-    val openingDate: Instant,
-    /** Where this account came from (e.g. the import as a whole, or the API `$.accounts[i]` node). */
+    /** Where this account came from (e.g. the import as a whole, or the API accounts node). */
     override val source: Source,
+    val match: AccountMatchKey = AccountMatchKey.AlwaysCreate,
+    val name: String? = null,
+    val openingDate: Instant? = null,
     val categoryId: Long = Category.UNCATEGORIZED_ID,
     val attributes: List<NewAttribute> = emptyList(),
     /**
@@ -106,7 +128,18 @@ data class ImportAccountIntent(
      * renaming the account they merge into.
      */
     val adoptOnBankMatch: Boolean = false,
-) : Auditable
+    /** [ImportOperation.CREATE] (default), or UPDATE/DELETE of [existingId]. */
+    override val operation: ImportOperation = ImportOperation.CREATE,
+    /** The account to UPDATE/DELETE (required for those operations). */
+    val existingId: AccountId? = null,
+    /** UPDATE: the new account row (null to change only attributes), passed straight to the repository. */
+    val account: Account? = null,
+    /** UPDATE: attribute rows to remove. */
+    val deletedAttributeIds: Set<Long> = emptySet(),
+    /** UPDATE: existing attribute rows to change (id -> new value). */
+    val updatedAttributes: Map<Long, NewAttribute> = emptyMap(),
+) : Auditable,
+    WriteIntent
 
 /** How the engine decides whether a person already exists before creating them. */
 sealed interface PersonMatchKey {
@@ -130,21 +163,63 @@ sealed interface PersonMatchKey {
 
 data class ImportPersonIntent(
     val key: LocalPersonKey,
-    val match: PersonMatchKey,
-    val firstName: String,
     /** Where this person came from (e.g. the import as a whole, or the API node the holder came from). */
     override val source: Source,
+    val match: PersonMatchKey = PersonMatchKey.ByNameKey(""),
+    val firstName: String? = null,
     val middleName: String? = null,
     val lastName: String? = null,
     val attributes: List<NewAttribute> = emptyList(),
-) : Auditable
+    /** [ImportOperation.CREATE] (default), or UPDATE/DELETE of [existingId]. */
+    override val operation: ImportOperation = ImportOperation.CREATE,
+    /** The person to UPDATE/DELETE (required for those operations). */
+    val existingId: PersonId? = null,
+    /** UPDATE: the new person row (null to change only attributes), passed straight to the repository. */
+    val person: Person? = null,
+    /** UPDATE: attribute rows to remove. */
+    val deletedAttributeIds: Set<Long> = emptySet(),
+    /** UPDATE: existing attribute rows to change (id -> new value). */
+    val updatedAttributes: Map<Long, NewAttribute> = emptyMap(),
+) : Auditable,
+    WriteIntent
 
 data class ImportOwnershipIntent(
-    val personKey: LocalPersonKey,
-    val account: AccountRef,
     /** Where this ownership link came from (e.g. the import as a whole, or the API node it came from). */
     override val source: Source,
-) : Auditable
+    /** CREATE: the person, as a batch-local key (resolved against created people). */
+    val personKey: LocalPersonKey? = null,
+    /** CREATE: the person, when already persisted (the UI add-owner case). */
+    val existingPersonId: PersonId? = null,
+    /** CREATE: the account (an existing id, or a batch-local key). */
+    val account: AccountRef? = null,
+    /** [ImportOperation.CREATE] (default) or DELETE of [existingId]. Ownerships have no UPDATE. */
+    override val operation: ImportOperation = ImportOperation.CREATE,
+    /** DELETE: the ownership row id. */
+    val existingId: Long? = null,
+) : Auditable,
+    WriteIntent
+
+/**
+ * A category to create/update/delete. [key] lets a CREATE's generated id be read back from
+ * [ImportResult.createdCategoryIds]; [existingId] targets the row for UPDATE/DELETE.
+ */
+data class ImportCategoryIntent(
+    val key: LocalCategoryKey,
+    override val source: Source,
+    val name: String? = null,
+    val parentId: Long? = null,
+    override val operation: ImportOperation = ImportOperation.CREATE,
+    val existingId: Long? = null,
+    /** UPDATE: the new category row, passed straight to the repository. */
+    val category: Category? = null,
+) : Auditable,
+    WriteIntent
+
+/** A request to merge [deletedId] into [survivingId] (reassign its transfers, then delete it). */
+data class AccountMergeRequest(
+    val deletedId: AccountId,
+    val survivingId: AccountId,
+)
 
 /**
  * A fee charged on a transaction, modelled as its own movement linked to the main transfer via a
@@ -188,13 +263,13 @@ data class ImportFee(
  * @property fee An optional fee charged on this transaction, expanded by the engine into a linked transfer.
  */
 data class ImportTransfer(
-    val rowKey: ImportRowKey,
-    val fromAccount: AccountRef,
-    val toAccount: AccountRef,
     override val source: Source,
-    val timestamp: Instant,
-    val description: String,
-    val amount: Money,
+    val rowKey: ImportRowKey? = null,
+    val fromAccount: AccountRef? = null,
+    val toAccount: AccountRef? = null,
+    val timestamp: Instant? = null,
+    val description: String = "",
+    val amount: Money? = null,
     val attributes: List<NewAttribute> = emptyList(),
     val relationships: List<NewRelationship> = emptyList(),
     val uniqueKey: Map<String, String>? = null,
@@ -202,7 +277,16 @@ data class ImportTransfer(
     val apiId: String? = null,
     val excludedFromBalances: Boolean = false,
     val fee: ImportFee? = null,
-) : Auditable
+    /** [ImportOperation.CREATE] (default), or UPDATE/DELETE of [existingId]. */
+    override val operation: ImportOperation = ImportOperation.CREATE,
+    /** The transfer to UPDATE/DELETE (required for those operations). */
+    val existingId: TransferId? = null,
+    /** UPDATE: attribute rows to remove. */
+    val deletedAttributeIds: Set<Long> = emptySet(),
+    /** UPDATE: existing attribute rows to change (id -> new value). */
+    val updatedAttributes: Map<Long, NewAttribute> = emptyMap(),
+) : Auditable,
+    WriteIntent
 
 /** Opaque per-row provenance + status-writeback key, identifying the source row of a transfer. */
 sealed interface ImportRowKey {
@@ -221,6 +305,11 @@ sealed interface ImportRowKey {
         val requestId: ApiRequestId,
         val jsonPath: String,
     ) : ImportRowKey
+
+    /** Provenance key for a manually-entered transfer (no source row); [index] keeps a batch's keys unique. */
+    data class Manual(
+        val index: Long,
+    ) : ImportRowKey
 }
 
 /**
@@ -228,13 +317,43 @@ sealed interface ImportRowKey {
  * import engine, which creates accounts/people/ownerships, dedupes, and bulk-writes transfers.
  */
 data class ImportBatch(
-    val transfers: List<ImportTransfer>,
-    val dedupePolicy: DedupePolicy,
+    val transfers: List<ImportTransfer> = emptyList(),
+    val dedupePolicy: DedupePolicy = DedupePolicy.None,
     val accountsToCreate: List<ImportAccountIntent> = emptyList(),
     val peopleToCreate: List<ImportPersonIntent> = emptyList(),
     val ownerships: List<ImportOwnershipIntent> = emptyList(),
+    val categories: List<ImportCategoryIntent> = emptyList(),
+    val accountMerges: List<AccountMergeRequest> = emptyList(),
+    val accountUnmerges: List<MergeId> = emptyList(),
     /** Required when [dedupePolicy] is [DedupePolicy.UniqueIdentifier] or [DedupePolicy.ApiMultiKey]. */
     val uniqueKeyExtractor: ExistingUniqueKeyExtractor? = null,
     /** Required when [dedupePolicy] is [DedupePolicy.ApiMultiKey]. */
     val apiIdExtractor: ExistingApiIdExtractor? = null,
-)
+) {
+    companion object {
+        /**
+         * Builds a batch of direct edits (no dedup): the UI describes the exact writes it wants. Each
+         * list may carry create/update/delete intents (per their [ImportOperation]); merges/unmerges are
+         * their own lists.
+         */
+        fun manualEdits(
+            transfers: List<ImportTransfer> = emptyList(),
+            accounts: List<ImportAccountIntent> = emptyList(),
+            people: List<ImportPersonIntent> = emptyList(),
+            ownerships: List<ImportOwnershipIntent> = emptyList(),
+            categories: List<ImportCategoryIntent> = emptyList(),
+            accountMerges: List<AccountMergeRequest> = emptyList(),
+            accountUnmerges: List<MergeId> = emptyList(),
+        ): ImportBatch =
+            ImportBatch(
+                transfers = transfers,
+                dedupePolicy = DedupePolicy.None,
+                accountsToCreate = accounts,
+                peopleToCreate = people,
+                ownerships = ownerships,
+                categories = categories,
+                accountMerges = accountMerges,
+                accountUnmerges = accountUnmerges,
+            )
+    }
+}

@@ -17,7 +17,6 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.screens.csvstrategy.findRowWithBlankColumn
@@ -36,7 +35,6 @@ internal fun AccountsTab(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
@@ -68,7 +66,6 @@ internal fun AccountsTab(
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
-                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                     enabled = enabled,
                 )
             SourceAccountMode.TEMPLATE ->

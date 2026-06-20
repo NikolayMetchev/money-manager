@@ -38,7 +38,6 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.importengineapi.ImportEngine
@@ -153,13 +152,13 @@ private fun DatabaseCard(
 @Composable
 fun SettingsScreen(
     currencyRepository: CurrencyRepository,
-    categoryRepository: CategoryRepository,
     attributeTypeRepository: AttributeTypeRepository,
     importEngine: ImportEngine,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
     currentDatabaseLocation: DbLocation,
     onRequestSwitchDatabase: (DbLocation) -> Unit,
+    onReloadFromRemote: () -> Unit = {},
     remoteController: RemoteDatabaseController? = null,
     database: MoneyManagerDatabaseWrapper? = null,
 ) {
@@ -234,6 +233,7 @@ fun SettingsScreen(
                 database = database,
                 currentDatabaseLocation = currentDatabaseLocation,
                 onRequestSwitchDatabase = onRequestSwitchDatabase,
+                onReloadFromRemote = onReloadFromRemote,
             )
         }
 
@@ -497,7 +497,6 @@ fun SettingsScreen(
                                 // Generate sample data
                                 generateSampleData(
                                     currencyRepository = currencyRepository,
-                                    categoryRepository = categoryRepository,
                                     attributeTypeRepository = attributeTypeRepository,
                                     importEngine = importEngine,
                                     maintenance = maintenance,

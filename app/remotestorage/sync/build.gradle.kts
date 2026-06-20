@@ -19,23 +19,23 @@ kotlin {
         // KMP ABI deps must be re-declared per platform source set for dependency-analysis.
         jvmMain {
             dependencies {
+                // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
+                api(libs.kotlinx.coroutines.core)
                 api(projects.app.db.core)
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
-
-                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
         androidMain {
             dependencies {
+                // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
+                api(libs.kotlinx.coroutines.core)
                 api(projects.app.db.core)
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
-
-                implementation(libs.kotlinx.coroutines.core)
             }
         }
 

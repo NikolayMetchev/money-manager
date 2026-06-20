@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 
@@ -38,7 +37,6 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
  * @param accountRepository Repository to fetch accounts and create new ones
  * @param categoryRepository Repository needed for account creation (accounts have categories)
  * @param personRepository Repository needed for account creation (accounts can have owners)
- * @param personAccountOwnershipRepository Repository needed for account creation (accounts can have owners)
  * @param enabled Whether the picker is enabled
  * @param excludeAccountId Optional account ID to exclude from the list (e.g., the other account in a transfer)
  * @param isError Whether to show error state (red outline)
@@ -51,7 +49,6 @@ fun AccountPicker(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     enabled: Boolean = true,
     excludeAccountId: AccountId? = null,
     isError: Boolean = false,
@@ -144,10 +141,8 @@ fun AccountPicker(
 
     if (showCreateAccountDialog) {
         CreateAccountDialog(
-            accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             personRepository = personRepository,
-            personAccountOwnershipRepository = personAccountOwnershipRepository,
             initialName = createAccountInitialName,
             onDismiss = { showCreateAccountDialog = false },
             onAccountCreated = { accountId ->

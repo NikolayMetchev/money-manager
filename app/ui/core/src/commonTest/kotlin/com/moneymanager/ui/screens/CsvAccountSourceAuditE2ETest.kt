@@ -143,6 +143,7 @@ class CsvAccountSourceAuditE2ETest {
                             personRepository = dc.personRepository,
                             personAttributeRepository = dc.personAttributeRepository,
                             ownershipRepository = dc.personAccountOwnershipRepository,
+                            categoryRepository = dc.categoryRepository,
                         ),
                 )
             }

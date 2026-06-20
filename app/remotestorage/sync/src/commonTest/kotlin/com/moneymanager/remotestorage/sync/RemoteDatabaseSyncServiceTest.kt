@@ -30,9 +30,19 @@ class RemoteDatabaseSyncServiceTest {
                 val binding = sync.createRemote(provider, "test.mmdb", cacheLocation, database, "pw")
                 assertEquals(binding, sync.activeBinding(), "binding should be persisted")
                 assertEquals(1, provider.list().size, "archive should be uploaded")
+                assertEquals(
+                    provider.stat(binding.remoteFileId)?.revisionId,
+                    binding.syncedRevision,
+                    "createRemote should record the uploaded revision as the synced baseline",
+                )
 
                 val hydrated = sync.hydrate(provider, binding.copy(localCachePath = targetLocation.toString()), "pw")
-                val restored = manager.openDatabase(hydrated)
+                assertEquals(
+                    provider.stat(binding.remoteFileId)?.revisionId,
+                    hydrated.revisionId,
+                    "hydrate should report the downloaded revision",
+                )
+                val restored = manager.openDatabase(hydrated.location)
                 try {
                     assertEquals(originalCurrencies, restored.countRows("currency"), "data should survive the round trip")
                 } finally {

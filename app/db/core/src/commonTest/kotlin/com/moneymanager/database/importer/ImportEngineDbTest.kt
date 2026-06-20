@@ -3,19 +3,25 @@
 package com.moneymanager.database.importer
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.importengineapi.AccountMatchKey
+import com.moneymanager.importengineapi.AccountMergeRequest
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportCategoryIntent
+import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importer.ImportEngineImpl
@@ -25,6 +31,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class ImportEngineDbTest : DbTest() {
@@ -38,6 +47,7 @@ class ImportEngineDbTest : DbTest() {
             personRepository = repositories.personRepository,
             personAttributeRepository = repositories.personAttributeRepository,
             ownershipRepository = repositories.personAccountOwnershipRepository,
+            categoryRepository = repositories.categoryRepository,
         )
 
     private suspend fun gbp(): Currency =
@@ -178,8 +188,8 @@ class ImportEngineDbTest : DbTest() {
                         ),
                     ownerships =
                         listOf(
-                            ImportOwnershipIntent(aliceKey, AccountRef.Existing(sourceId), source),
-                            ImportOwnershipIntent(bobKey, AccountRef.Existing(sourceId), source),
+                            ImportOwnershipIntent(personKey = aliceKey, account = AccountRef.Existing(sourceId), source = source),
+                            ImportOwnershipIntent(personKey = bobKey, account = AccountRef.Existing(sourceId), source = source),
                         ),
                 )
 
@@ -192,5 +202,263 @@ class ImportEngineDbTest : DbTest() {
             assertEquals(setOf("Alice Smith", "Bob Jones"), people.map { it.fullName }.toSet())
             val ownerships = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(sourceId).first()
             assertEquals(2, ownerships.size)
+        }
+
+    @Test
+    fun categoryCreateUpdateDeleteViaImport() =
+        runTest {
+            val key = LocalCategoryKey("food")
+            val created =
+                engine().import(
+                    ImportBatch.manualEdits(
+                        categories = listOf(ImportCategoryIntent(key = key, source = Source.Manual, name = "Food")),
+                    ),
+                )
+            val id = created.createdCategoryIds.getValue(key)
+            assertTrue(
+                repositories.categoryRepository
+                    .getAllCategories()
+                    .first()
+                    .any { it.id == id && it.name == "Food" },
+            )
+
+            engine().import(
+                ImportBatch.manualEdits(
+                    categories =
+                        listOf(
+                            ImportCategoryIntent(
+                                key = key,
+                                source = Source.Manual,
+                                operation = ImportOperation.UPDATE,
+                                existingId = id,
+                                category = Category(id = id, name = "Groceries"),
+                            ),
+                        ),
+                ),
+            )
+            assertEquals(
+                "Groceries",
+                repositories.categoryRepository
+                    .getCategoryById(id)
+                    .first()
+                    ?.name,
+            )
+
+            engine().import(
+                ImportBatch.manualEdits(
+                    categories =
+                        listOf(
+                            ImportCategoryIntent(
+                                key = key,
+                                source = Source.Manual,
+                                operation = ImportOperation.DELETE,
+                                existingId = id,
+                            ),
+                        ),
+                ),
+            )
+            assertNull(repositories.categoryRepository.getCategoryById(id).first())
+        }
+
+    @Test
+    fun createAccountThenOwnByLocalKey() =
+        runTest {
+            val accountKey = LocalAccountKey("savings")
+            val personKey = LocalPersonKey("owner")
+            val result =
+                engine().import(
+                    ImportBatch.manualEdits(
+                        accounts =
+                            listOf(
+                                ImportAccountIntent(
+                                    key = accountKey,
+                                    source = Source.Manual,
+                                    name = "Savings",
+                                    openingDate = baseTime,
+                                ),
+                            ),
+                        people =
+                            listOf(
+                                ImportPersonIntent(key = personKey, source = Source.Manual, firstName = "Dana"),
+                            ),
+                        ownerships =
+                            listOf(
+                                ImportOwnershipIntent(
+                                    source = Source.Manual,
+                                    personKey = personKey,
+                                    account = AccountRef.Local(accountKey),
+                                ),
+                            ),
+                    ),
+                )
+            val accountId = result.createdAccountIds.getValue(accountKey)
+            val personId = result.createdPersonIds.getValue(personKey)
+            val ownerships = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(accountId).first()
+            assertEquals(listOf(personId), ownerships.map { it.personId })
+        }
+
+    @Test
+    fun accountUpdateAndDeleteViaImport() =
+        runTest {
+            val key = LocalAccountKey("acct")
+            val accountId =
+                engine()
+                    .import(
+                        ImportBatch.manualEdits(
+                            accounts =
+                                listOf(
+                                    ImportAccountIntent(key = key, source = Source.Manual, name = "Old", openingDate = baseTime),
+                                ),
+                        ),
+                    ).createdAccountIds
+                    .getValue(key)
+
+            engine().import(
+                ImportBatch.manualEdits(
+                    accounts =
+                        listOf(
+                            ImportAccountIntent(
+                                key = key,
+                                source = Source.Manual,
+                                operation = ImportOperation.UPDATE,
+                                existingId = accountId,
+                                account =
+                                    repositories.accountRepository
+                                        .getAccountById(accountId)
+                                        .first()!!
+                                        .copy(name = "New"),
+                            ),
+                        ),
+                ),
+            )
+            assertEquals(
+                "New",
+                repositories.accountRepository
+                    .getAccountById(accountId)
+                    .first()
+                    ?.name,
+            )
+
+            engine().import(
+                ImportBatch.manualEdits(
+                    accounts =
+                        listOf(
+                            ImportAccountIntent(
+                                key = key,
+                                source = Source.Manual,
+                                operation = ImportOperation.DELETE,
+                                existingId = accountId,
+                            ),
+                        ),
+                ),
+            )
+            assertNull(repositories.accountRepository.getAccountById(accountId).first())
+        }
+
+    @Test
+    fun personDeleteViaImport() =
+        runTest {
+            val key = LocalPersonKey("p")
+            val personId: PersonId =
+                engine()
+                    .import(
+                        ImportBatch.manualEdits(
+                            people = listOf(ImportPersonIntent(key = key, source = Source.Manual, firstName = "Temp")),
+                        ),
+                    ).createdPersonIds
+                    .getValue(key)
+            assertTrue(
+                repositories.personRepository
+                    .getAllPeople()
+                    .first()
+                    .any { it.id == personId },
+            )
+
+            engine().import(
+                ImportBatch.manualEdits(
+                    people =
+                        listOf(
+                            ImportPersonIntent(
+                                key = key,
+                                source = Source.Manual,
+                                operation = ImportOperation.DELETE,
+                                existingId = personId,
+                            ),
+                        ),
+                ),
+            )
+            assertTrue(
+                repositories.personRepository
+                    .getAllPeople()
+                    .first()
+                    .none { it.id == personId },
+            )
+        }
+
+    @Test
+    fun accountMergeAndUnmergeViaImport() =
+        runTest {
+            val currency = gbp()
+            val keepKey = LocalAccountKey("keep")
+            val dropKey = LocalAccountKey("drop")
+            val funded = LocalAccountKey("funded")
+            // Create two accounts plus one transfer into the dropped account, so the merge reassigns it.
+            val created =
+                engine().import(
+                    ImportBatch.manualEdits(
+                        accounts =
+                            listOf(
+                                ImportAccountIntent(key = keepKey, source = Source.Manual, name = "Keep", openingDate = baseTime),
+                                ImportAccountIntent(key = dropKey, source = Source.Manual, name = "Drop", openingDate = baseTime),
+                                ImportAccountIntent(key = funded, source = Source.Manual, name = "Funder", openingDate = baseTime),
+                            ),
+                        transfers =
+                            listOf(
+                                ImportTransfer(
+                                    source = Source.Manual,
+                                    fromAccount = AccountRef.Local(funded),
+                                    toAccount = AccountRef.Local(dropKey),
+                                    timestamp = baseTime,
+                                    description = "seed",
+                                    amount = Money.fromDisplayValue("5", currency),
+                                ),
+                            ),
+                    ),
+                )
+            val keepId = created.createdAccountIds.getValue(keepKey)
+            val dropId = created.createdAccountIds.getValue(dropKey)
+
+            engine().import(
+                ImportBatch.manualEdits(accountMerges = listOf(AccountMergeRequest(deletedId = dropId, survivingId = keepId))),
+            )
+            assertNull(repositories.accountRepository.getAccountById(dropId).first())
+
+            val merge =
+                repositories.accountRepository
+                    .getReversibleMerges()
+                    .first()
+                    .first()
+            engine().import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
+            assertTrue(repositories.accountRepository.getAccountById(dropId).first() != null)
+        }
+
+    @Test
+    fun updateWithoutExistingIdFailsValidation() =
+        runTest {
+            assertFailsWith<IllegalArgumentException> {
+                engine().import(
+                    ImportBatch.manualEdits(
+                        categories =
+                            listOf(
+                                ImportCategoryIntent(
+                                    key = LocalCategoryKey("x"),
+                                    source = Source.Manual,
+                                    operation = ImportOperation.UPDATE,
+                                    category = Category(id = 1, name = "X"),
+                                ),
+                            ),
+                    ),
+                )
+            }
         }
 }

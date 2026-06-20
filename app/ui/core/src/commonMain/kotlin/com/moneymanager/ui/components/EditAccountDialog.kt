@@ -28,12 +28,18 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ImportAccountIntent
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.ImportOwnershipIntent
+import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.CreateCategoryDialog
@@ -49,7 +55,6 @@ private val logger = logging()
 @Composable
 fun EditAccountDialog(
     account: Account,
-    accountRepository: AccountRepository,
     accountAttributeRepository: AccountAttributeRepository,
     attributeTypeRepository: AttributeTypeRepository,
     categoryRepository: CategoryRepository,
@@ -103,6 +108,7 @@ fun EditAccountDialog(
     }
 
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
 
     AlertDialog(
         onDismissRequest = { if (!accountState.isSaving) onDismiss() },
@@ -211,35 +217,46 @@ fun EditAccountDialog(
                                     }
                                 }
 
-                                // Atomic update: one revision bump for account + all attribute changes.
-                                // The source for the resulting revision is recorded inside the repository.
-                                accountRepository.updateAccountWithAttributes(
-                                    account = updatedAccount,
-                                    accountId = account.id,
-                                    deletedAttributeIds = deletedAttributeIds,
-                                    updatedAttributes = updatedAttributes,
-                                    newAttributes = newAttributes,
-                                    source = Source.Manual,
-                                )
-
                                 val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
                                 val ownersToAdd = selectedOwnerIds - existingOwnerIds
                                 val ownersToRemove = existingOwnerIds - selectedOwnerIds
 
-                                ownersToRemove.forEach { personId ->
-                                    val ownership = existingOwnerships.find { it.personId.id == personId }
-                                    ownership?.let {
-                                        personAccountOwnershipRepository.deleteOwnership(it.id)
-                                    }
-                                }
-
-                                ownersToAdd.forEach { personId ->
-                                    personAccountOwnershipRepository.createOwnership(
-                                        personId = PersonId(personId),
-                                        accountId = account.id,
-                                        source = Source.Manual,
-                                    )
-                                }
+                                // One atomic batch: the account update (one revision bump for fields +
+                                // attributes) plus the ownership add/remove rows.
+                                importEngine.import(
+                                    ImportBatch.manualEdits(
+                                        accounts =
+                                            listOf(
+                                                ImportAccountIntent(
+                                                    key = LocalAccountKey("edit"),
+                                                    source = Source.Manual,
+                                                    operation = ImportOperation.UPDATE,
+                                                    existingId = account.id,
+                                                    account = updatedAccount,
+                                                    deletedAttributeIds = deletedAttributeIds,
+                                                    updatedAttributes = updatedAttributes,
+                                                    attributes = newAttributes,
+                                                ),
+                                            ),
+                                        ownerships =
+                                            ownersToRemove.mapNotNull { personId ->
+                                                existingOwnerships.find { it.personId.id == personId }?.let {
+                                                    ImportOwnershipIntent(
+                                                        source = Source.Manual,
+                                                        operation = ImportOperation.DELETE,
+                                                        existingId = it.id,
+                                                    )
+                                                }
+                                            } +
+                                                ownersToAdd.map { personId ->
+                                                    ImportOwnershipIntent(
+                                                        source = Source.Manual,
+                                                        existingPersonId = PersonId(personId),
+                                                        account = AccountRef.Existing(account.id),
+                                                    )
+                                                },
+                                    ),
+                                )
 
                                 onDismiss()
                             } catch (expected: Exception) {
@@ -276,7 +293,6 @@ fun EditAccountDialog(
     if (accountState.showCreatePersonDialog) {
         EditPersonDialog(
             personToEdit = null,
-            personRepository = personRepository,
             onDismiss = { accountState.showCreatePersonDialog = false },
             personAttributeRepository = personAttributeRepository,
             attributeTypeRepository = attributeTypeRepository,

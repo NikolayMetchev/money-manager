@@ -34,7 +34,6 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
@@ -57,7 +56,6 @@ fun QifImportDetailScreen(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     attributeTypeRepository: AttributeTypeRepository,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
@@ -148,7 +146,6 @@ fun QifImportDetailScreen(
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             personRepository = personRepository,
-            personAccountOwnershipRepository = personAccountOwnershipRepository,
             qifImportRepository = qifImportRepository,
             attributeTypeRepository = attributeTypeRepository,
             settingsRepository = settingsRepository,

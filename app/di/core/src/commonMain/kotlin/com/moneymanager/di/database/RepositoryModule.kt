@@ -216,6 +216,7 @@ interface RepositoryModule {
         personRepository: PersonRepository,
         personAttributeRepository: PersonAttributeRepository,
         ownershipRepository: PersonAccountOwnershipRepository,
+        categoryRepository: CategoryRepository,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,
@@ -224,5 +225,6 @@ interface RepositoryModule {
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
             ownershipRepository = ownershipRepository,
+            categoryRepository = categoryRepository,
         )
 }

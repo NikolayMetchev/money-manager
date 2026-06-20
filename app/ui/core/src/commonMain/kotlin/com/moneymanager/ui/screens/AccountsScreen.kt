@@ -33,6 +33,14 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importengineapi.AccountMergeRequest
+import com.moneymanager.importengineapi.ImportAccountIntent
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportCategoryIntent
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalCategoryKey
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -194,10 +202,8 @@ fun AccountsScreen(
 
     if (showCreateDialog) {
         CreateAccountDialog(
-            accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             personRepository = personRepository,
-            personAccountOwnershipRepository = personAccountOwnershipRepository,
             onDismiss = { showCreateDialog = false },
         )
     }
@@ -206,7 +212,6 @@ fun AccountsScreen(
     if (currentAccountToEdit != null) {
         EditAccountDialog(
             account = currentAccountToEdit,
-            accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,
             attributeTypeRepository = attributeTypeRepository,
             categoryRepository = categoryRepository,
@@ -449,6 +454,7 @@ fun DeleteAccountDialog(
     var dropdownExpanded by remember { mutableStateOf(false) }
     var targetSearchQuery by remember { mutableStateOf("") }
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
 
     val allAccounts by accountRepository
         .getAllAccounts()
@@ -598,13 +604,32 @@ fun DeleteAccountDialog(
                     scope.launch {
                         try {
                             if (hasTransactions) {
-                                accountRepository.mergeAccounts(
-                                    deletedAccount = account.id,
-                                    survivingAccount = selectedTargetAccount!!.id,
+                                importEngine.import(
+                                    ImportBatch.manualEdits(
+                                        accountMerges =
+                                            listOf(
+                                                AccountMergeRequest(
+                                                    deletedId = account.id,
+                                                    survivingId = selectedTargetAccount!!.id,
+                                                ),
+                                            ),
+                                    ),
                                 )
                                 maintenance.fullRefreshMaterializedViews()
                             } else {
-                                accountRepository.deleteAccount(account.id)
+                                importEngine.import(
+                                    ImportBatch.manualEdits(
+                                        accounts =
+                                            listOf(
+                                                ImportAccountIntent(
+                                                    key = LocalAccountKey("delete"),
+                                                    source = Source.Manual,
+                                                    operation = ImportOperation.DELETE,
+                                                    existingId = account.id,
+                                                ),
+                                            ),
+                                    ),
+                                )
                             }
                             onDismiss()
                         } catch (expected: Exception) {
@@ -645,13 +670,13 @@ fun DeleteAccountDialog(
 fun UnmergeAccountDialog(
     merge: AccountMerge,
     survivingAccountName: String,
-    accountRepository: AccountRepository,
     maintenance: Maintenance,
     onDismiss: () -> Unit,
 ) {
     var isUnmerging by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
 
     AlertDialog(
         onDismissRequest = { if (!isUnmerging) onDismiss() },
@@ -686,7 +711,7 @@ fun UnmergeAccountDialog(
                     errorMessage = null
                     scope.launch {
                         try {
-                            accountRepository.unmergeAccount(merge.id)
+                            importEngine.import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
                             maintenance.fullRefreshMaterializedViews()
                             onDismiss()
                         } catch (expected: Exception) {
@@ -731,6 +756,7 @@ fun CreateCategoryDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     val source = Source.Manual
+    val importEngine = LocalImportEngine.current
 
     val categories by categoryRepository
         .getAllCategories()
@@ -786,13 +812,22 @@ fun CreateCategoryDialog(
                         errorMessage = null
                         scope.launch {
                             try {
-                                val newCategory =
-                                    Category(
-                                        name = name.trim(),
-                                        parentId = selectedParentId,
+                                val key = LocalCategoryKey("create")
+                                val result =
+                                    importEngine.import(
+                                        ImportBatch.manualEdits(
+                                            categories =
+                                                listOf(
+                                                    ImportCategoryIntent(
+                                                        key = key,
+                                                        source = source,
+                                                        name = name.trim(),
+                                                        parentId = selectedParentId,
+                                                    ),
+                                                ),
+                                        ),
                                     )
-                                val categoryId = categoryRepository.createCategory(newCategory, source)
-                                onCategoryCreated(categoryId, name.trim())
+                                onCategoryCreated(result.createdCategoryIds.getValue(key), name.trim())
                             } catch (expected: Exception) {
                                 logger.error(expected) { "Failed to create category: ${expected.message}" }
                                 errorMessage = "Failed to create category: ${expected.message}"

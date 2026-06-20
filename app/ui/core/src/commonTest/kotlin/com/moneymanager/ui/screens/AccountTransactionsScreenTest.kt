@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,7 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.testSource
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.screens.transactions.AccountTransactionCard
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
@@ -518,34 +520,36 @@ class AccountTransactionsScreenTest {
             runMoneyManagerComposeUiTest {
                 // When: Viewing the account transactions screen
                 setContent {
-                    ProvideSchemaAwareScope {
-                        var currentAccountId by remember { mutableStateOf(checkingAccountId) }
-                        var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
+                    CompositionLocalProvider(LocalImportEngine provides repositories.importEngine) {
+                        ProvideSchemaAwareScope {
+                            var currentAccountId by remember { mutableStateOf(checkingAccountId) }
+                            var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
 
-                        if (auditTransferId != null) {
-                            TransactionAuditScreen(
-                                transferId = auditTransferId!!,
-                                auditRepository = repositories.auditRepository,
-                                accountRepository = repositories.accountRepository,
-                                transactionRepository = repositories.transactionRepository,
-                                onBack = { auditTransferId = null },
-                            )
-                        } else {
-                            AccountTransactionsScreen(
-                                accountId = currentAccountId,
-                                transactionRepository = repositories.transactionRepository,
-                                accountRepository = repositories.accountRepository,
-                                accountAttributeRepository = repositories.accountAttributeRepository,
-                                categoryRepository = repositories.categoryRepository,
-                                currencyRepository = repositories.currencyRepository,
-                                attributeTypeRepository = repositories.attributeTypeRepository,
-                                personRepository = repositories.personRepository,
-                                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                maintenance = createDbMaintenance(repositories),
-                                onAccountIdChange = { currentAccountId = it },
-                                onCurrencyIdChange = {},
-                                onAuditClick = { auditTransferId = it },
-                            )
+                            if (auditTransferId != null) {
+                                TransactionAuditScreen(
+                                    transferId = auditTransferId!!,
+                                    auditRepository = repositories.auditRepository,
+                                    accountRepository = repositories.accountRepository,
+                                    transactionRepository = repositories.transactionRepository,
+                                    onBack = { auditTransferId = null },
+                                )
+                            } else {
+                                AccountTransactionsScreen(
+                                    accountId = currentAccountId,
+                                    transactionRepository = repositories.transactionRepository,
+                                    accountRepository = repositories.accountRepository,
+                                    accountAttributeRepository = repositories.accountAttributeRepository,
+                                    categoryRepository = repositories.categoryRepository,
+                                    currencyRepository = repositories.currencyRepository,
+                                    attributeTypeRepository = repositories.attributeTypeRepository,
+                                    personRepository = repositories.personRepository,
+                                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                                    maintenance = createDbMaintenance(repositories),
+                                    onAccountIdChange = { currentAccountId = it },
+                                    onCurrencyIdChange = {},
+                                    onAuditClick = { auditTransferId = it },
+                                )
+                            }
                         }
                     }
                 }
@@ -726,34 +730,36 @@ class AccountTransactionsScreenTest {
             runMoneyManagerComposeUiTest {
                 // When: Viewing the account transactions screen
                 setContent {
-                    ProvideSchemaAwareScope {
-                        var currentAccountId by remember { mutableStateOf(checkingAccountId) }
-                        var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
+                    CompositionLocalProvider(LocalImportEngine provides repositories.importEngine) {
+                        ProvideSchemaAwareScope {
+                            var currentAccountId by remember { mutableStateOf(checkingAccountId) }
+                            var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
 
-                        if (auditTransferId != null) {
-                            TransactionAuditScreen(
-                                transferId = auditTransferId!!,
-                                auditRepository = repositories.auditRepository,
-                                accountRepository = repositories.accountRepository,
-                                transactionRepository = repositories.transactionRepository,
-                                onBack = { auditTransferId = null },
-                            )
-                        } else {
-                            AccountTransactionsScreen(
-                                accountId = currentAccountId,
-                                transactionRepository = repositories.transactionRepository,
-                                accountRepository = repositories.accountRepository,
-                                accountAttributeRepository = repositories.accountAttributeRepository,
-                                categoryRepository = repositories.categoryRepository,
-                                currencyRepository = repositories.currencyRepository,
-                                attributeTypeRepository = repositories.attributeTypeRepository,
-                                personRepository = repositories.personRepository,
-                                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                maintenance = createDbMaintenance(repositories),
-                                onAccountIdChange = { currentAccountId = it },
-                                onCurrencyIdChange = {},
-                                onAuditClick = { auditTransferId = it },
-                            )
+                            if (auditTransferId != null) {
+                                TransactionAuditScreen(
+                                    transferId = auditTransferId!!,
+                                    auditRepository = repositories.auditRepository,
+                                    accountRepository = repositories.accountRepository,
+                                    transactionRepository = repositories.transactionRepository,
+                                    onBack = { auditTransferId = null },
+                                )
+                            } else {
+                                AccountTransactionsScreen(
+                                    accountId = currentAccountId,
+                                    transactionRepository = repositories.transactionRepository,
+                                    accountRepository = repositories.accountRepository,
+                                    accountAttributeRepository = repositories.accountAttributeRepository,
+                                    categoryRepository = repositories.categoryRepository,
+                                    currencyRepository = repositories.currencyRepository,
+                                    attributeTypeRepository = repositories.attributeTypeRepository,
+                                    personRepository = repositories.personRepository,
+                                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                                    maintenance = createDbMaintenance(repositories),
+                                    onAccountIdChange = { currentAccountId = it },
+                                    onCurrencyIdChange = {},
+                                    onAuditClick = { auditTransferId = it },
+                                )
+                            }
                         }
                     }
                 }
@@ -904,34 +910,36 @@ class AccountTransactionsScreenTest {
             runMoneyManagerComposeUiTest {
                 // When: Viewing the account transactions screen
                 setContent {
-                    ProvideSchemaAwareScope {
-                        var currentAccountId by remember { mutableStateOf(checkingAccountId) }
-                        var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
+                    CompositionLocalProvider(LocalImportEngine provides repositories.importEngine) {
+                        ProvideSchemaAwareScope {
+                            var currentAccountId by remember { mutableStateOf(checkingAccountId) }
+                            var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
 
-                        if (auditTransferId != null) {
-                            TransactionAuditScreen(
-                                transferId = auditTransferId!!,
-                                auditRepository = repositories.auditRepository,
-                                accountRepository = repositories.accountRepository,
-                                transactionRepository = repositories.transactionRepository,
-                                onBack = { auditTransferId = null },
-                            )
-                        } else {
-                            AccountTransactionsScreen(
-                                accountId = currentAccountId,
-                                transactionRepository = repositories.transactionRepository,
-                                accountRepository = repositories.accountRepository,
-                                accountAttributeRepository = repositories.accountAttributeRepository,
-                                categoryRepository = repositories.categoryRepository,
-                                currencyRepository = repositories.currencyRepository,
-                                attributeTypeRepository = repositories.attributeTypeRepository,
-                                personRepository = repositories.personRepository,
-                                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                maintenance = createDbMaintenance(repositories),
-                                onAccountIdChange = { currentAccountId = it },
-                                onCurrencyIdChange = {},
-                                onAuditClick = { auditTransferId = it },
-                            )
+                            if (auditTransferId != null) {
+                                TransactionAuditScreen(
+                                    transferId = auditTransferId!!,
+                                    auditRepository = repositories.auditRepository,
+                                    accountRepository = repositories.accountRepository,
+                                    transactionRepository = repositories.transactionRepository,
+                                    onBack = { auditTransferId = null },
+                                )
+                            } else {
+                                AccountTransactionsScreen(
+                                    accountId = currentAccountId,
+                                    transactionRepository = repositories.transactionRepository,
+                                    accountRepository = repositories.accountRepository,
+                                    accountAttributeRepository = repositories.accountAttributeRepository,
+                                    categoryRepository = repositories.categoryRepository,
+                                    currencyRepository = repositories.currencyRepository,
+                                    attributeTypeRepository = repositories.attributeTypeRepository,
+                                    personRepository = repositories.personRepository,
+                                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                                    maintenance = createDbMaintenance(repositories),
+                                    onAccountIdChange = { currentAccountId = it },
+                                    onCurrencyIdChange = {},
+                                    onAuditClick = { auditTransferId = it },
+                                )
+                            }
                         }
                     }
                 }

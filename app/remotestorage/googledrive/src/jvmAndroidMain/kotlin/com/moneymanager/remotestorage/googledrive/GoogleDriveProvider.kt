@@ -179,6 +179,8 @@ class GoogleDriveProvider(
             name = name,
             sizeBytes = size?.toLongOrNull(),
             modifiedAtEpochMs = modifiedTime?.let { runCatching { Instant.parse(it).toEpochMilliseconds() }.getOrNull() },
+            revisionId = headRevisionId,
+            md5 = md5Checksum,
         )
 
     @Serializable
@@ -187,6 +189,8 @@ class GoogleDriveProvider(
         val name: String = "",
         val size: String? = null,
         val modifiedTime: String? = null,
+        val headRevisionId: String? = null,
+        val md5Checksum: String? = null,
     )
 
     @Serializable
@@ -208,7 +212,7 @@ class GoogleDriveProvider(
         const val UPLOAD_ENDPOINT = "https://www.googleapis.com/upload/drive/v3/files"
         const val APP_PROPERTY_KEY = "moneymanagerDb"
         const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
-        const val FILE_FIELDS = "id,name,size,modifiedTime"
+        const val FILE_FIELDS = "id,name,size,modifiedTime,headRevisionId,md5Checksum"
         const val HTTP_NOT_FOUND = 404
         val APP_PROPERTIES = mapOf(APP_PROPERTY_KEY to "true")
         val json = JsonFormat { ignoreUnknownKeys = true }

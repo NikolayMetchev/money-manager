@@ -71,7 +71,6 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
@@ -96,7 +95,6 @@ fun ApplyStrategyDialog(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
@@ -280,7 +278,6 @@ fun ApplyStrategyDialog(
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
-                        personAccountOwnershipRepository = personAccountOwnershipRepository,
                         enabled = !isImporting,
                         isError = selectedSourceAccountId == null,
                     )

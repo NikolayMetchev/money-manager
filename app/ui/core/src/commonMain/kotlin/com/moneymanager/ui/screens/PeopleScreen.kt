@@ -133,7 +133,6 @@ fun PeopleScreen(
     if (showCreateDialog) {
         EditPersonDialog(
             personToEdit = null,
-            personRepository = personRepository,
             onDismiss = { showCreateDialog = false },
             personAttributeRepository = personAttributeRepository,
             attributeTypeRepository = attributeTypeRepository,
@@ -144,7 +143,6 @@ fun PeopleScreen(
     if (currentPersonToEdit != null) {
         EditPersonDialog(
             personToEdit = currentPersonToEdit,
-            personRepository = personRepository,
             onDismiss = { personToEdit = null },
             personAttributeRepository = personAttributeRepository,
             attributeTypeRepository = attributeTypeRepository,
@@ -159,7 +157,6 @@ fun PeopleScreen(
         DeletePersonConfirmationDialog(
             person = currentPersonToDelete,
             accountCount = ownerships.size,
-            personRepository = personRepository,
             onDismiss = { personToDelete = null },
         )
     }

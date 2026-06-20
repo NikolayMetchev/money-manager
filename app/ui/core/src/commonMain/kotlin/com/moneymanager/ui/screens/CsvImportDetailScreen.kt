@@ -41,7 +41,6 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.importengineapi.ImportEngine
@@ -64,7 +63,6 @@ fun CsvImportDetailScreen(
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     maintenance: Maintenance,
     transferSourceRepository: TransferSourceRepository,
     importEngine: ImportEngine,
@@ -405,7 +403,6 @@ fun CsvImportDetailScreen(
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             personRepository = personRepository,
-            personAccountOwnershipRepository = personAccountOwnershipRepository,
             csvImportRepository = csvImportRepository,
             attributeTypeRepository = attributeTypeRepository,
             maintenance = maintenance,

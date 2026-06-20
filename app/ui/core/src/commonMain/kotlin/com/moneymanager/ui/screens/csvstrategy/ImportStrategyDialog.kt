@@ -62,7 +62,6 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -84,7 +83,6 @@ fun ImportStrategyDialog(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
 ) {
@@ -193,10 +191,8 @@ fun ImportStrategyDialog(
                             accounts = accounts,
                             categories = categories,
                             currencies = currencies,
-                            accountRepository = accountRepository,
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
-                            personAccountOwnershipRepository = personAccountOwnershipRepository,
                             enabled = !isImporting,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -345,10 +341,8 @@ private fun ReferenceResolutionRow(
     accounts: List<Account>,
     categories: List<Category>,
     currencies: List<Currency>,
-    accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     enabled: Boolean,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -497,10 +491,8 @@ private fun ReferenceResolutionRow(
 
                     if (showCreateAccountDialog) {
                         CreateAccountDialog(
-                            accountRepository = accountRepository,
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
-                            personAccountOwnershipRepository = personAccountOwnershipRepository,
                             initialName = reference.name,
                             onDismiss = { showCreateAccountDialog = false },
                             onAccountCreated = { accountId ->

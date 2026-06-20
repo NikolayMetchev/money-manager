@@ -21,13 +21,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.ImportPersonIntent
+import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.transactions.EditableAttributesSection
 import kotlinx.coroutines.flow.first
@@ -39,7 +44,6 @@ private val logger = logging()
 @Composable
 fun EditPersonDialog(
     personToEdit: Person?,
-    personRepository: PersonRepository,
     onDismiss: () -> Unit,
     onPersonCreated: ((PersonId) -> Unit)? = null,
     personAttributeRepository: PersonAttributeRepository? = null,
@@ -59,6 +63,7 @@ fun EditPersonDialog(
     var attributesLoaded by remember { mutableStateOf(false) }
 
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
 
     LaunchedEffect(Unit) {
         attributeTypeRepository?.getAll()?.collect { types -> existingAttributeTypes = types }
@@ -137,38 +142,83 @@ fun EditPersonDialog(
                         saveState.errorMessage = null
                         scope.launch {
                             try {
+                                // Build the attribute delta (delete/update/insert) the way the account
+                                // dialog does, so the whole person edit is one gated, atomic engine call.
+                                val deletedAttributeIds = mutableSetOf<Long>()
+                                val updatedAttributes = mutableMapOf<Long, NewAttribute>()
+                                val newAttributes = mutableListOf<NewAttribute>()
+                                if (attributesEditable) {
+                                    val keptIds = editableAttributes.keys.filter { it > 0 }.toSet()
+                                    originalAttributeList
+                                        .map { it.id }
+                                        .toSet()
+                                        .minus(keptIds)
+                                        .forEach { deletedAttributeIds.add(it) }
+                                    editableAttributes.filterKeys { it > 0 }.forEach { (id, pair) ->
+                                        val typeName = pair.first.trim()
+                                        val value = pair.second.trim()
+                                        val original = originalAttributeList.find { it.id == id } ?: return@forEach
+                                        when {
+                                            typeName.isBlank() || value.isBlank() -> deletedAttributeIds.add(id)
+                                            original.attributeType.name != typeName || original.value != value ->
+                                                updatedAttributes[id] = NewAttribute(attributeTypeRepository.getOrCreate(typeName), value)
+                                        }
+                                    }
+                                    editableAttributes.filterKeys { it < 0 }.forEach { (_, pair) ->
+                                        val typeName = pair.first.trim()
+                                        val value = pair.second.trim()
+                                        if (typeName.isNotEmpty() && value.isNotEmpty()) {
+                                            newAttributes.add(NewAttribute(attributeTypeRepository.getOrCreate(typeName), value))
+                                        }
+                                    }
+                                }
                                 val newPersonId =
                                     if (personToEdit != null) {
-                                        personRepository.updatePerson(
-                                            personToEdit.copy(
-                                                firstName = firstName.trim(),
-                                                middleName = middleName.trim().ifBlank { null },
-                                                lastName = lastName.trim().ifBlank { null },
+                                        importEngine.import(
+                                            ImportBatch.manualEdits(
+                                                people =
+                                                    listOf(
+                                                        ImportPersonIntent(
+                                                            key = LocalPersonKey("edit"),
+                                                            source = Source.Manual,
+                                                            operation = ImportOperation.UPDATE,
+                                                            existingId = personToEdit.id,
+                                                            person =
+                                                                personToEdit.copy(
+                                                                    firstName = firstName.trim(),
+                                                                    middleName = middleName.trim().ifBlank { null },
+                                                                    lastName = lastName.trim().ifBlank { null },
+                                                                ),
+                                                            deletedAttributeIds = deletedAttributeIds,
+                                                            updatedAttributes = updatedAttributes,
+                                                            attributes = newAttributes,
+                                                        ),
+                                                    ),
                                             ),
-                                            Source.Manual,
                                         )
                                         null
                                     } else {
-                                        personRepository.createPerson(
-                                            Person(
-                                                id = PersonId(0),
-                                                firstName = firstName.trim(),
-                                                middleName = middleName.trim().ifBlank { null },
-                                                lastName = lastName.trim().ifBlank { null },
-                                            ),
-                                            Source.Manual,
-                                        )
+                                        // CREATE carries its attributes, so the engine creates the row and
+                                        // its attributes in one go (no follow-up update needed).
+                                        val key = LocalPersonKey("new-person")
+                                        val result =
+                                            importEngine.import(
+                                                ImportBatch.manualEdits(
+                                                    people =
+                                                        listOf(
+                                                            ImportPersonIntent(
+                                                                key = key,
+                                                                source = Source.Manual,
+                                                                firstName = firstName.trim(),
+                                                                middleName = middleName.trim().ifBlank { null },
+                                                                lastName = lastName.trim().ifBlank { null },
+                                                                attributes = newAttributes,
+                                                            ),
+                                                        ),
+                                                ),
+                                            )
+                                        result.createdPersonIds.getValue(key)
                                     }
-                                val personId = newPersonId ?: personToEdit!!.id
-                                if (personAttributeRepository != null && attributeTypeRepository != null) {
-                                    savePersonAttributes(
-                                        personId = personId,
-                                        editableAttributes = editableAttributes,
-                                        originalAttributeList = originalAttributeList,
-                                        personAttributeRepository = personAttributeRepository,
-                                        attributeTypeRepository = attributeTypeRepository,
-                                    )
-                                }
                                 // Only announce the new person once the full save (row + attributes)
                                 // has succeeded, so the parent never selects a half-saved person.
                                 if (newPersonId != null) {
@@ -205,42 +255,4 @@ fun EditPersonDialog(
             }
         },
     )
-}
-
-/** Persists the dialog's attribute edits: deletes removed rows, updates changed ones, inserts new ones. */
-private suspend fun savePersonAttributes(
-    personId: PersonId,
-    editableAttributes: Map<Long, Pair<String, String>>,
-    originalAttributeList: List<PersonAttribute>,
-    personAttributeRepository: PersonAttributeRepository,
-    attributeTypeRepository: AttributeTypeRepository,
-) {
-    val keptIds = editableAttributes.keys.filter { it > 0 }.toSet()
-    originalAttributeList
-        .map { it.id }
-        .toSet()
-        .minus(keptIds)
-        .forEach { personAttributeRepository.delete(it) }
-
-    editableAttributes.filterKeys { it > 0 }.forEach { (id, pair) ->
-        val typeName = pair.first.trim()
-        val value = pair.second.trim()
-        val original = originalAttributeList.find { it.id == id } ?: return@forEach
-        when {
-            typeName.isBlank() || value.isBlank() -> personAttributeRepository.delete(id)
-            original.attributeType.name != typeName -> {
-                personAttributeRepository.delete(id)
-                personAttributeRepository.insert(personId, attributeTypeRepository.getOrCreate(typeName), value)
-            }
-            original.value != value -> personAttributeRepository.updateValue(id, value)
-        }
-    }
-
-    editableAttributes.filterKeys { it < 0 }.forEach { (_, pair) ->
-        val typeName = pair.first.trim()
-        val value = pair.second.trim()
-        if (typeName.isNotEmpty() && value.isNotEmpty()) {
-            personAttributeRepository.insert(personId, attributeTypeRepository.getOrCreate(typeName), value)
-        }
-    }
 }

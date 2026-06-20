@@ -19,7 +19,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Person
-import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.model.Source
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.ImportPersonIntent
+import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -30,11 +35,11 @@ private val logger = logging()
 fun DeletePersonConfirmationDialog(
     person: Person,
     accountCount: Int,
-    personRepository: PersonRepository,
     onDismiss: () -> Unit,
 ) {
     var isDeleting by remember { mutableStateOf(false) }
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
 
     AlertDialog(
         onDismissRequest = { if (!isDeleting) onDismiss() },
@@ -56,7 +61,19 @@ fun DeletePersonConfirmationDialog(
                     isDeleting = true
                     scope.launch {
                         try {
-                            personRepository.deletePerson(person.id)
+                            importEngine.import(
+                                ImportBatch.manualEdits(
+                                    people =
+                                        listOf(
+                                            ImportPersonIntent(
+                                                key = LocalPersonKey("delete"),
+                                                source = Source.Manual,
+                                                operation = ImportOperation.DELETE,
+                                                existingId = person.id,
+                                            ),
+                                        ),
+                                ),
+                            )
                             onDismiss()
                         } catch (expected: Exception) {
                             logger.error(expected) { "Failed to delete person: ${expected.message}" }

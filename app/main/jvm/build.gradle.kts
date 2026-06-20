@@ -19,6 +19,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.swing)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
+    implementation(projects.app.importengineapi)
     implementation(projects.app.model.core)
     implementation(projects.app.remotestorage.sync)
     implementation(projects.app.ui.core)

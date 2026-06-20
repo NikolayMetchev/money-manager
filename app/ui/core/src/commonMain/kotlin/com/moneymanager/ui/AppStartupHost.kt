@@ -143,6 +143,54 @@ fun AppStartupHost(
                         )
                     }
                 },
+                // Re-hydrate the bound cloud database in place. Unlike a switch (different file), this
+                // overwrites the *currently open* working copy, so the live connection must be closed
+                // first — otherwise SQLite reports the database as busy/locked (notably on Android).
+                onReloadFromRemote = {
+                    if (remoteController != null) {
+                        // Disable the download/upload actions immediately (before the loading screen takes
+                        // over), so a second click can't kick off a concurrent reload.
+                        remoteController.beginBusy()
+                        scope.launch {
+                            val loaded = databaseState as? AppDatabaseState.Loaded ?: return@launch
+                            databaseState =
+                                AppDatabaseState.Loading(DatabaseInitializationProgress("Downloading from cloud…", 0, 100))
+                            onDatabaseReady(null, null)
+                            try {
+                                // Release the file lock so restore can overwrite the working copy. If the
+                                // close fails we must NOT proceed — restoring over a still-open handle is the
+                                // file-busy case this flow exists to avoid — so let it abort into the catch.
+                                loaded.database.close()
+                                val location =
+                                    remoteController.download { progress ->
+                                        databaseState =
+                                            AppDatabaseState.Loading(
+                                                DatabaseInitializationProgress(
+                                                    progress.message,
+                                                    (progress.fraction * 100).toInt(),
+                                                    100,
+                                                ),
+                                            )
+                                    }
+                                val error =
+                                    openAndLoad(
+                                        location = location,
+                                        databaseManager = databaseManager,
+                                        createAppServices = createAppServices,
+                                        databaseStateUpdater = { databaseState = it },
+                                        onInfoLog = onInfoLog,
+                                        onErrorLog = onErrorLog,
+                                    )
+                                if (error == null) localSettings.putString(KEY_LAST_DATABASE, location.toString())
+                            } catch (expected: CancellationException) {
+                                throw expected
+                            } catch (expected: Exception) {
+                                onErrorLog("Failed to download database from cloud", expected)
+                                databaseState = AppDatabaseState.Error(loaded.location, expected)
+                            }
+                        }
+                    }
+                },
             )
         }
         is AppDatabaseState.Loading -> DatabaseStartupProgressScreen(state.progress)

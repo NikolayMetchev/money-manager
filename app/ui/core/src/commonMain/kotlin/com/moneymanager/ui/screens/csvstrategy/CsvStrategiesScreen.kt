@@ -56,7 +56,6 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.qifimporter.QifCsvAdapter
@@ -75,7 +74,6 @@ fun CsvStrategiesScreen(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     csvStrategyImportExport: CsvStrategyImportExport,
     appVersion: AppVersion,
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
@@ -336,7 +334,6 @@ fun CsvStrategiesScreen(
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             personRepository = personRepository,
-            personAccountOwnershipRepository = personAccountOwnershipRepository,
             onDismiss = {
                 importParseResult = null
                 importError = null

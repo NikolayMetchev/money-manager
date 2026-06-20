@@ -8,6 +8,7 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
 
 /**
@@ -49,7 +50,15 @@ class RemoteDatabaseSyncService(
         onProgress(SyncProgress("Uploading to cloud…", UPLOAD_FRACTION))
         val file = provider.upload(fileId = null, name = remoteName, bytes = archive)
         onProgress(SyncProgress("Done", 1f))
-        val binding = RemoteDatabaseBinding(provider.id, file.id, remoteName, localCachePath.toString(), providerConfig)
+        val binding =
+            RemoteDatabaseBinding(
+                provider.id,
+                file.id,
+                remoteName,
+                localCachePath.toString(),
+                providerConfig,
+                syncedRevision = file.revisionId,
+            )
         bindingStore.save(binding)
         return binding
     }
@@ -92,24 +101,28 @@ class RemoteDatabaseSyncService(
         password: String,
         rebuildAfter: Boolean = true,
         onProgress: (SyncProgress) -> Unit = {},
-    ) {
+    ): RemoteFile {
         val archive = shrinkAndPack(database, password, rebuildAfter, onProgress)
         onProgress(SyncProgress("Uploading to cloud…", UPLOAD_FRACTION))
-        provider.upload(fileId = binding.remoteFileId, name = binding.remoteName, bytes = archive)
+        val file = provider.upload(fileId = binding.remoteFileId, name = binding.remoteName, bytes = archive)
         onProgress(SyncProgress("Done", 1f))
+        return file
     }
 
     /**
      * Downloads and rehydrates the bound database into its local cache path (rebuilding its
-     * materialized views), returning the [DbLocation] to open.
+     * materialized views), returning the [DbLocation] to open and the remote [RemoteFile.revisionId]
+     * that was downloaded (so the caller can record it as the new synced baseline).
      */
     suspend fun hydrate(
         provider: RemoteStorageProvider,
         binding: RemoteDatabaseBinding,
         password: String,
         onProgress: (SyncProgress) -> Unit = {},
-    ): DbLocation {
+    ): HydrateResult {
         onProgress(SyncProgress("Downloading from cloud…", 0.1f))
+        // Capture the head revision we are about to fetch so the caller can baseline against it.
+        val revisionId = provider.stat(binding.remoteFileId)?.revisionId
         val archive = provider.download(binding.remoteFileId)
         onProgress(SyncProgress("Decrypting and decompressing…", 0.45f))
         val databaseBytes = ArchiveCodec.unpack(archive, password)
@@ -126,7 +139,7 @@ class RemoteDatabaseSyncService(
             opened.close()
         }
         onProgress(SyncProgress("Done", 1f))
-        return location
+        return HydrateResult(location, revisionId)
     }
 
     /**
@@ -164,3 +177,12 @@ class RemoteDatabaseSyncService(
         const val UPLOAD_FRACTION = 0.8f
     }
 }
+
+/**
+ * The outcome of [RemoteDatabaseSyncService.hydrate]: where the working copy was written and the
+ * remote revision it was downloaded from (null if the backend doesn't expose revisions).
+ */
+data class HydrateResult(
+    val location: DbLocation,
+    val revisionId: String?,
+)
