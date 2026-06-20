@@ -62,7 +62,6 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -84,7 +83,6 @@ fun ImportStrategyDialog(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
 ) {
@@ -193,10 +191,8 @@ fun ImportStrategyDialog(
                             accounts = accounts,
                             categories = categories,
                             currencies = currencies,
-                            accountRepository = accountRepository,
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
-                            personAccountOwnershipRepository = personAccountOwnershipRepository,
                             enabled = !isImporting,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -336,12 +332,7 @@ private fun accountMappingReference(accountName: String): CsvUnresolvedReference
 
 /**
  * Row for resolving a single unresolved reference.
- *
- * [accountRepository] / [personAccountOwnershipRepository] are retained for call-site symmetry; account
- * creation now writes through the [com.moneymanager.importengineapi.ImportEngine], so this row no longer
- * uses them directly.
  */
-@Suppress("UnusedParameter")
 @Composable
 private fun ReferenceResolutionRow(
     reference: CsvUnresolvedReference,
@@ -350,10 +341,8 @@ private fun ReferenceResolutionRow(
     accounts: List<Account>,
     categories: List<Category>,
     currencies: List<Currency>,
-    accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     enabled: Boolean,
 ) {
     var expanded by remember { mutableStateOf(false) }

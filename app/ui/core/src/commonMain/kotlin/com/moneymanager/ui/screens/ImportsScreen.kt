@@ -22,7 +22,6 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
@@ -49,7 +48,6 @@ fun ImportsScreen(
     transactionRepository: TransactionRepository,
     maintenance: Maintenance,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     importEngine: ImportEngine,
     deviceId: DeviceId,
     onCsvImportClick: (CsvImportId) -> Unit,
@@ -94,7 +92,6 @@ fun ImportsScreen(
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
-                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                     attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
@@ -110,7 +107,6 @@ fun ImportsScreen(
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
-                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                     attributeTypeRepository = attributeTypeRepository,
                     settingsRepository = settingsRepository,
                     maintenance = maintenance,

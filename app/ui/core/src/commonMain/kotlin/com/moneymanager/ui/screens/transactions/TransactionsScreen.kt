@@ -979,7 +979,6 @@ fun AccountTransactionsScreen(
             currencyRepository = currencyRepository,
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
-            personAccountOwnershipRepository = personAccountOwnershipRepository,
             maintenance = maintenance,
             onDismiss = { transactionIdToEdit = null },
             onSaved = { refreshTrigger++ },

@@ -21,7 +21,6 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.qifimporter.QifCsvAdapter
@@ -45,7 +44,6 @@ fun QifStrategyEditorScreen(
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     onBack: () -> Unit,
 ) {
     var sampleRows by remember { mutableStateOf<List<CsvRow>?>(null) }
@@ -76,7 +74,6 @@ fun QifStrategyEditorScreen(
         currencyRepository = currencyRepository,
         attributeTypeRepository = attributeTypeRepository,
         personRepository = personRepository,
-        personAccountOwnershipRepository = personAccountOwnershipRepository,
         onBack = onBack,
     )
 }

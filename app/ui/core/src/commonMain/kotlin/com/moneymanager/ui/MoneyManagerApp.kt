@@ -460,7 +460,6 @@ fun MoneyManagerApp(
                                             transactionRepository = services.transactions.transactionRepository,
                                             maintenance = services.imports.maintenance,
                                             personRepository = services.people.personRepository,
-                                            personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                             importEngine = services.transactions.importEngine,
                                             deviceId = services.deviceId,
                                             onCsvImportClick = { importId ->
@@ -531,7 +530,6 @@ fun MoneyManagerApp(
                                             currencyRepository = services.accounts.currencyRepository,
                                             attributeTypeRepository = services.transactions.attributeTypeRepository,
                                             personRepository = services.people.personRepository,
-                                            personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                             maintenance = services.imports.maintenance,
                                             transferSourceRepository = services.transactions.transferSourceRepository,
                                             importEngine = services.transactions.importEngine,
@@ -557,7 +555,6 @@ fun MoneyManagerApp(
                                             categoryRepository = services.accounts.categoryRepository,
                                             currencyRepository = services.accounts.currencyRepository,
                                             personRepository = services.people.personRepository,
-                                            personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                             attributeTypeRepository = services.transactions.attributeTypeRepository,
                                             settingsRepository = services.settings.settingsRepository,
                                             maintenance = services.imports.maintenance,
@@ -584,7 +581,6 @@ fun MoneyManagerApp(
                                             categoryRepository = services.accounts.categoryRepository,
                                             currencyRepository = services.accounts.currencyRepository,
                                             personRepository = services.people.personRepository,
-                                            personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                             csvStrategyImportExport = services.imports.csvStrategyImportExport,
                                             appVersion = appVersion,
                                             onBack = { navigationHistory.navigateBack() },
@@ -613,7 +609,6 @@ fun MoneyManagerApp(
                                             currencyRepository = services.accounts.currencyRepository,
                                             attributeTypeRepository = services.transactions.attributeTypeRepository,
                                             personRepository = services.people.personRepository,
-                                            personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                             onBack = { navigationHistory.navigateBack() },
                                         )
                                     }
@@ -630,7 +625,6 @@ fun MoneyManagerApp(
                                             currencyRepository = services.accounts.currencyRepository,
                                             attributeTypeRepository = services.transactions.attributeTypeRepository,
                                             personRepository = services.people.personRepository,
-                                            personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                             onBack = { navigationHistory.navigateBack() },
                                         )
                                     }
@@ -809,7 +803,6 @@ fun MoneyManagerApp(
                         currencyRepository = services.accounts.currencyRepository,
                         attributeTypeRepository = services.transactions.attributeTypeRepository,
                         personRepository = services.people.personRepository,
-                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                         maintenance = services.imports.maintenance,
                         preSelectedSourceAccountId = preSelectedAccountId,
                         preSelectedCurrencyId = preSelectedCurrencyId,

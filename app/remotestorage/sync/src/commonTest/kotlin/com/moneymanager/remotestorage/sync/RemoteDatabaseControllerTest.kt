@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -160,7 +161,7 @@ class RemoteDatabaseControllerTest {
 
                 // Forcing overwrites the remote with our copy.
                 assertEquals(SyncResult.UPLOADED, controller.syncNow(database, force = true))
-                assertFalse(externalBytes.toList() == provider.download(binding.remoteFileId).toList())
+                assertNotEquals(externalBytes.toList(), provider.download(binding.remoteFileId).toList())
             }
         }
 

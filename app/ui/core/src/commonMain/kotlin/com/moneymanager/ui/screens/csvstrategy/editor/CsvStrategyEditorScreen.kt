@@ -46,7 +46,6 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -81,7 +80,6 @@ fun CsvStrategyEditorScreen(
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     onBack: () -> Unit,
 ) {
     val isEditMode = strategyId != null
@@ -280,7 +278,6 @@ fun CsvStrategyEditorScreen(
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
-                        personAccountOwnershipRepository = personAccountOwnershipRepository,
                     )
                 EditorTab.AMOUNT_DATE ->
                     AmountDateTab(

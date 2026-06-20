@@ -147,11 +147,10 @@ fun AppStartupHost(
                 // overwrites the *currently open* working copy, so the live connection must be closed
                 // first — otherwise SQLite reports the database as busy/locked (notably on Android).
                 onReloadFromRemote = {
-                    val controller = remoteController
-                    if (controller != null) {
+                    if (remoteController != null) {
                         // Disable the download/upload actions immediately (before the loading screen takes
                         // over), so a second click can't kick off a concurrent reload.
-                        controller.beginBusy()
+                        remoteController.beginBusy()
                         scope.launch {
                             val loaded = databaseState as? AppDatabaseState.Loaded ?: return@launch
                             databaseState =
@@ -163,7 +162,7 @@ fun AppStartupHost(
                                 // file-busy case this flow exists to avoid — so let it abort into the catch.
                                 loaded.database.close()
                                 val location =
-                                    controller.download { progress ->
+                                    remoteController.download { progress ->
                                         databaseState =
                                             AppDatabaseState.Loading(
                                                 DatabaseInitializationProgress(

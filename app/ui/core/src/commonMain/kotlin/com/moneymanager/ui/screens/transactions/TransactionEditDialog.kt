@@ -48,7 +48,6 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
@@ -77,7 +76,6 @@ fun TransactionEditDialog(
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     maintenance: Maintenance,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
@@ -227,7 +225,6 @@ fun TransactionEditDialog(
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
-                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                     enabled = !isSaving,
                     excludeAccountId = targetAccountId,
                 )
@@ -240,7 +237,6 @@ fun TransactionEditDialog(
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
-                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                     enabled = !isSaving,
                     excludeAccountId = sourceAccountId,
                 )

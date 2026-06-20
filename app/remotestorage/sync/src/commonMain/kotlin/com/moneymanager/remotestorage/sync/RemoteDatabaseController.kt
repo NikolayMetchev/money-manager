@@ -198,12 +198,7 @@ class RemoteDatabaseController(
                 syncedRevision = remoteFile.revisionId,
             )
         val result = syncService.hydrate(provider, initial, password, onProgress)
-        val revision = result.revisionId ?: remoteFile.revisionId
-        val binding = initial.copy(syncedRevision = revision)
-        syncService.bind(binding)
-        session = Session(provider, binding, password)
-        syncedRevision = revision
-        publish(localDirty = false, remoteChanged = false)
+        armHydratedSession(provider, initial, password, result.revisionId ?: remoteFile.revisionId)
         return result.location
     }
 
@@ -219,13 +214,25 @@ class RemoteDatabaseController(
         val provider = resolve(binding.providerId, binding.providerConfig)
         val result = syncService.hydrate(provider, binding, password, onProgress)
         // Keep the persisted baseline if this run couldn't fetch a revision.
-        val revision = result.revisionId ?: binding.syncedRevision
-        val updated = binding.copy(syncedRevision = revision)
-        syncService.bind(updated)
-        session = Session(provider, updated, password)
+        armHydratedSession(provider, binding, password, result.revisionId ?: binding.syncedRevision)
+        return result.location
+    }
+
+    /**
+     * Persists [revision] onto [binding], arms the session for [provider]/[password], and publishes the
+     * in-sync state. Shared by [openRemote] and [restore] after a successful hydrate.
+     */
+    private fun armHydratedSession(
+        provider: RemoteStorageProvider,
+        binding: RemoteDatabaseBinding,
+        password: String,
+        revision: String?,
+    ) {
+        val armed = binding.copy(syncedRevision = revision)
+        syncService.bind(armed)
+        session = Session(provider, armed, password)
         syncedRevision = revision
         publish(localDirty = false, remoteChanged = false)
-        return result.location
     }
 
     /**

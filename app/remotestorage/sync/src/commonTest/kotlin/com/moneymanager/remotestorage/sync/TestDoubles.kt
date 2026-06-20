@@ -14,7 +14,8 @@ class InMemoryStorageProvider(
     override val id: String = "in-memory",
     override val displayName: String = "In-Memory",
 ) : RemoteStorageProvider {
-    private data class Entry(
+    // Not a data class: a ByteArray member would need custom equals/hashCode, which we don't rely on.
+    private class Entry(
         val name: String,
         val bytes: ByteArray,
         val revision: Int,
@@ -67,7 +68,7 @@ class InMemoryStorageProvider(
         bytes: ByteArray,
     ) {
         val existing = files[fileId] ?: error("No such file to externally push: $fileId")
-        files[fileId] = existing.copy(bytes = bytes.copyOf(), revision = revisionCounter++)
+        files[fileId] = Entry(existing.name, bytes.copyOf(), revisionCounter++)
     }
 
     private fun Entry.toRemoteFile(id: String) = RemoteFile(id, name, bytes.size.toLong(), revisionId = "rev-$revision")
