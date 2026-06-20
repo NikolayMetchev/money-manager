@@ -19,11 +19,6 @@ exclude:
     paths:
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/MonzoImportAuditE2ETest.kt
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/CsvAccountSourceAuditE2ETest.kt
-  # account_merge tables keep an AUTOINCREMENT PK that is never SELECTed (rows are looked up by other
-  # columns); Qodana flags the unread PK column.
-  - name: UnusedColumn
-    paths:
-      - app/db/core/src/commonMain/sqldelight/com/moneymanager/database/sql/AccountMerge.sq
   - name: UnnecessaryModuleDependencyInspection
   - name: RedundantSuppression
     paths:

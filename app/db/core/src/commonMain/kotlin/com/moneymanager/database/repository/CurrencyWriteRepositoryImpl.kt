@@ -16,14 +16,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class CurrencyWriteRepositoryImpl(
-    database: MoneyManagerDatabase,
+    private val database: MoneyManagerDatabase,
     private val deviceId: DeviceId,
     reader: CurrencyReadRepository,
 ) : CurrencyWriteRepository,
     CurrencyReadRepository by reader {
     private val selectQueries = database.currencySelectQueries
     private val writeQueries = database.currencyWriteQueries
-    private val database = database
 
     override suspend fun upsertCurrencyByCode(
         code: String,

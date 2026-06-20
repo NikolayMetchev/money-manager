@@ -25,7 +25,6 @@ CREATE INDEX idx_account_merge_surviving ON account_merge(surviving_account_id);
 -- The transfers reassigned by the merge and which side (source/target) pointed at the deleted
 -- account, so unmerge moves back exactly those references.
 CREATE TABLE account_merge_transfer (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
     merge_id INTEGER NOT NULL,
     transfer_id INTEGER NOT NULL,
     moved_source INTEGER NOT NULL DEFAULT 0,
