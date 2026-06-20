@@ -41,17 +41,19 @@ class TransactionRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
     private val deviceId: DeviceId,
 ) : TransactionRepository {
-    private val transferQueries = database.transferQueries
-    private val transactionIdQueries = database.transactionIdQueries
-    private val transferAttributeQueries = database.transferAttributeQueries
-    private val transferRelationshipQueries = database.transferRelationshipQueries
-    private val entitySourceQueries = database.entitySourceQueries
+    private val transferSelectQueries = database.transferSelectQueries
+    private val transferWriteQueries = database.transferWriteQueries
+    private val transactionIdWriteQueries = database.transactionIdWriteQueries
+    private val transferAttributeSelectQueries = database.transferAttributeSelectQueries
+    private val transferAttributeWriteQueries = database.transferAttributeWriteQueries
+    private val transferRelationshipSelectQueries = database.transferRelationshipSelectQueries
+    private val transferRelationshipWriteQueries = database.transferRelationshipWriteQueries
 
     private fun loadAttributesForTransfers(transfers: List<Transfer>): List<Transfer> {
         if (transfers.isEmpty()) return transfers
         val ids = transfers.map { it.id.id }
         val attributesByTransferId =
-            transferAttributeQueries
+            transferAttributeSelectQueries
                 .selectByTransactionIds(ids)
                 .executeAsList()
                 .groupBy { TransferId(it.transaction_id) }
@@ -78,14 +80,14 @@ class TransactionRepositoryImpl(
     }
 
     override fun getTransactionById(id: Long): Flow<Transfer?> =
-        transferQueries
+        transferSelectQueries
             .selectById(id, TransferMapper::mapRaw)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { loadAttributesForTransfer(it) }
 
     override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
-        transferQueries
+        transferSelectQueries
             .selectByAccount(accountId.id, accountId.id, TransferMapper::mapRaw)
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -95,7 +97,7 @@ class TransactionRepositoryImpl(
         startDate: Instant,
         endDate: Instant,
     ): Flow<List<Transfer>> =
-        transferQueries
+        transferSelectQueries
             .selectByDateRange(
                 startDate.toEpochMilliseconds(),
                 endDate.toEpochMilliseconds(),
@@ -109,7 +111,7 @@ class TransactionRepositoryImpl(
         startDate: Instant,
         endDate: Instant,
     ): Flow<List<Transfer>> =
-        transferQueries
+        transferSelectQueries
             .selectByAccountAndDateRange(
                 accountId.id,
                 accountId.id,
@@ -125,7 +127,7 @@ class TransactionRepositoryImpl(
         matchValuePattern: String,
         linkAttributeName: String,
     ): Flow<List<TransferMissingCompanion>> =
-        transferQueries
+        transferSelectQueries
             .selectTransfersMissingCompanion(
                 matchAttributeName,
                 matchValuePattern,
@@ -135,7 +137,7 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
 
     override fun getAccountBalances(): Flow<List<AccountBalance>> =
-        transferQueries
+        transferSelectQueries
             .selectAllBalances()
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -148,7 +150,7 @@ class TransactionRepositoryImpl(
     ): PagingResult<AccountRow> =
         withContext(Dispatchers.Default) {
             val items =
-                transferQueries
+                transferSelectQueries
                     .selectRunningBalanceByAccountPaginated(
                         accountId.id,
                         pagingInfo?.lastTimestamp?.toEpochMilliseconds(),
@@ -190,7 +192,7 @@ class TransactionRepositoryImpl(
     ): PagingResult<AccountRow> =
         withContext(Dispatchers.Default) {
             val items =
-                transferQueries
+                transferSelectQueries
                     .selectRunningBalanceByAccountPaginatedBackward(
                         accountId.id,
                         firstTimestamp.toEpochMilliseconds(),
@@ -234,14 +236,14 @@ class TransactionRepositoryImpl(
         withContext(Dispatchers.Default) {
             // First, get the transaction to find its timestamp
             val transaction =
-                transferQueries
+                transferSelectQueries
                     .selectById(transactionId.id, TransferMapper::mapRaw)
                     .executeAsOneOrNull()
                     ?: throw IllegalArgumentException("Transaction not found: $transactionId")
 
             // Get the row position of the transaction (0-indexed, sorted by timestamp DESC)
             val rowPosition =
-                transferQueries
+                transferSelectQueries
                     .getTransactionRowPosition(
                         accountId = accountId.id,
                         targetTimestamp = transaction.timestamp.toEpochMilliseconds(),
@@ -250,7 +252,7 @@ class TransactionRepositoryImpl(
 
             // Get total count to know if there are more items
             val totalCount =
-                transferQueries
+                transferSelectQueries
                     .countTransactionsByAccount(accountId.id)
                     .executeAsOne()
 
@@ -265,7 +267,7 @@ class TransactionRepositoryImpl(
 
             // Load the page
             val items =
-                transferQueries
+                transferSelectQueries
                     .selectRunningBalanceByAccountOffset(
                         accountId = accountId.id,
                         limit = pageSize.toLong(),
@@ -325,7 +327,7 @@ class TransactionRepositoryImpl(
                 val batch = transfers.subList(batchStart, batchEnd)
                 val batchSources = sources.subList(batchStart, batchEnd)
 
-                transferQueries.transaction {
+                transferWriteQueries.transaction {
                     // Enable creation mode so attribute triggers record audit but don't bump revision.
                     // This allows initial attributes to be recorded at revision 1.
                     database.beginCreationMode()
@@ -361,10 +363,10 @@ class TransactionRepositoryImpl(
             // Use transfer.id when available, fall back to transactionId for attribute-only updates
             val effectiveTransactionId = transfer?.id ?: transactionId
 
-            transferQueries.transaction {
+            transferWriteQueries.transaction {
                 // Step 1: Update transfer if provided (bumps revision via trigger)
                 if (transfer != null) {
-                    transferQueries.update(
+                    transferWriteQueries.update(
                         timestamp = transfer.timestamp.toEpochMilliseconds(),
                         description = transfer.description,
                         source_account_id = transfer.sourceAccountId.id,
@@ -375,7 +377,7 @@ class TransactionRepositoryImpl(
                     )
                 } else if (hasAttributeChanges) {
                     // No transfer change but has attribute changes - need to bump revision first
-                    transferQueries.bumpRevisionOnly(effectiveTransactionId.id)
+                    transferWriteQueries.bumpRevisionOnly(effectiveTransactionId.id)
                 }
 
                 // Step 2: Apply attribute changes in creation mode (record audit but don't bump again)
@@ -384,30 +386,30 @@ class TransactionRepositoryImpl(
                     try {
                         // Delete attributes
                         deletedAttributeIds.forEach { id ->
-                            transferAttributeQueries.deleteById(id)
+                            transferAttributeWriteQueries.deleteById(id)
                         }
 
                         // Update attributes
                         updatedAttributes.forEach { (id, attr) ->
                             // Check if type changed (requires delete + insert)
-                            val current = transferAttributeQueries.selectById(id).executeAsOneOrNull()
+                            val current = transferAttributeSelectQueries.selectById(id).executeAsOneOrNull()
                             if (current != null && current.attribute_type_id != attr.typeId.id) {
                                 // Type changed: delete and recreate
-                                transferAttributeQueries.deleteById(id)
-                                transferAttributeQueries.insert(
+                                transferAttributeWriteQueries.deleteById(id)
+                                transferAttributeWriteQueries.insert(
                                     transaction_id = effectiveTransactionId.id,
                                     attribute_type_id = attr.typeId.id,
                                     attribute_value = attr.value,
                                 )
                             } else {
                                 // Only value changed
-                                transferAttributeQueries.updateValue(attr.value, id)
+                                transferAttributeWriteQueries.updateValue(attr.value, id)
                             }
                         }
 
                         // Insert new attributes
                         newAttributes.forEach { attr ->
-                            transferAttributeQueries.insert(
+                            transferAttributeWriteQueries.insert(
                                 transaction_id = effectiveTransactionId.id,
                                 attribute_type_id = attr.typeId.id,
                                 attribute_value = attr.value,
@@ -419,8 +421,8 @@ class TransactionRepositoryImpl(
                 }
 
                 // Record the source against the new revision.
-                val persisted = transferQueries.selectById(effectiveTransactionId.id, TransferMapper::mapRaw).executeAsOne()
-                entitySourceQueries.recordSource(
+                val persisted = transferSelectQueries.selectById(effectiveTransactionId.id, TransferMapper::mapRaw).executeAsOne()
+                database.recordSource(
                     deviceId,
                     EntityType.TRANSFER,
                     persisted.id.id,
@@ -441,7 +443,7 @@ class TransactionRepositoryImpl(
         withContext(Dispatchers.Default) {
             require(sources.size == transfers.size) { "sources must align 1:1 with transfers" }
             require(updateSources.size == updates.size) { "updateSources must align 1:1 with updates" }
-            transferQueries.transactionWithResult {
+            transferWriteQueries.transactionWithResult {
                 val createdIds = mutableListOf<TransferId>()
 
                 // Create new transfers in creation mode so initial attributes don't bump revision.
@@ -458,7 +460,7 @@ class TransactionRepositoryImpl(
                 // creation mode so they don't bump it again.
                 updates.forEachIndexed { index, update ->
                     val updatedTransfer = update.transfer
-                    transferQueries.update(
+                    transferWriteQueries.update(
                         timestamp = updatedTransfer.timestamp.toEpochMilliseconds(),
                         description = updatedTransfer.description,
                         source_account_id = updatedTransfer.sourceAccountId.id,
@@ -471,7 +473,7 @@ class TransactionRepositoryImpl(
                         database.beginCreationMode()
                         try {
                             update.newAttributes.forEach { attr ->
-                                transferAttributeQueries.insert(
+                                transferAttributeWriteQueries.insert(
                                     transaction_id = updatedTransfer.id.id,
                                     attribute_type_id = attr.typeId.id,
                                     attribute_value = attr.value,
@@ -482,8 +484,8 @@ class TransactionRepositoryImpl(
                         }
                     }
                     // Record the source against the new revision.
-                    val persisted = transferQueries.selectById(updatedTransfer.id.id, TransferMapper::mapRaw).executeAsOne()
-                    entitySourceQueries.recordSource(
+                    val persisted = transferSelectQueries.selectById(updatedTransfer.id.id, TransferMapper::mapRaw).executeAsOne()
+                    database.recordSource(
                         deviceId,
                         EntityType.TRANSFER,
                         persisted.id.id,
@@ -511,12 +513,12 @@ class TransactionRepositoryImpl(
         // map so relationships can reference siblings created in the same batch (e.g. a fee transfer).
         val idMap = mutableMapOf<TransferId, TransferId>()
         transfers.forEachIndexed { index, transfer ->
-            transactionIdQueries.insert()
-            val generatedId = transactionIdQueries.lastInsertedId().executeAsOne()
+            transactionIdWriteQueries.insert()
+            val generatedId = transactionIdWriteQueries.lastInsertedId().executeAsOne()
             val realId = TransferId(generatedId)
             createdIds += realId
             idMap[transfer.id] = realId
-            transferQueries.insert(
+            transferWriteQueries.insert(
                 id = generatedId,
                 revision_id = transfer.revisionId,
                 timestamp = transfer.timestamp.toEpochMilliseconds(),
@@ -527,13 +529,13 @@ class TransactionRepositoryImpl(
                 amount = transfer.amount.amount,
             )
             newAttributes[transfer.id].orEmpty().forEach { attr ->
-                transferAttributeQueries.insert(
+                transferAttributeWriteQueries.insert(
                     transaction_id = generatedId,
                     attribute_type_id = attr.typeId.id,
                     attribute_value = attr.value,
                 )
             }
-            entitySourceQueries.recordSource(deviceId, EntityType.TRANSFER, realId.id, transfer.revisionId, sources[index])
+            database.recordSource(deviceId, EntityType.TRANSFER, realId.id, transfer.revisionId, sources[index])
         }
         // Pass 2: insert relationships now that every in-batch transfer has a real id. The owning transfer
         // is id1; the related transfer (id2) may be a pre-existing transfer (reconciliation) or a sibling
@@ -542,7 +544,7 @@ class TransactionRepositoryImpl(
             val id1 = idMap.getValue(transfer.id).id
             newRelationships[transfer.id].orEmpty().forEach { rel ->
                 val id2 = idMap[rel.relatedTransferId]?.id ?: rel.relatedTransferId.id
-                transferRelationshipQueries.insert(
+                transferRelationshipWriteQueries.insert(
                     id1 = id1,
                     id2 = id2,
                     relationship_type_id = rel.typeId.id,
@@ -554,6 +556,6 @@ class TransactionRepositoryImpl(
 
     override suspend fun deleteTransaction(id: Long): Unit =
         withContext(Dispatchers.Default) {
-            transferQueries.delete(id)
+            transferWriteQueries.delete(id)
         }
 }

@@ -1,0 +1,8 @@
+-- Column-preserving upserts: writing one setting must not clear the others.
+upsertDefaultCurrency:
+INSERT INTO settings(id, default_currency_id) VALUES (1, ?)
+ON CONFLICT(id) DO UPDATE SET default_currency_id = excluded.default_currency_id;
+
+upsertLastQifAccount:
+INSERT INTO settings(id, last_qif_account_id) VALUES (1, ?)
+ON CONFLICT(id) DO UPDATE SET last_qif_account_id = excluded.last_qif_account_id;

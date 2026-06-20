@@ -1,0 +1,71 @@
+-- Tracks imported QIF files. Unlike CSV (which creates a dynamic per-import table with
+-- variable columns), QIF records have a fixed field set, so records are stored in a single
+-- fixed-shape qif_record table.
+CREATE TABLE qif_import_metadata (
+    id TEXT PRIMARY KEY NOT NULL,
+    original_file_name TEXT NOT NULL,
+    import_timestamp INTEGER NOT NULL,
+    record_count INTEGER NOT NULL,
+    unsupported_count INTEGER NOT NULL,
+    account_type TEXT NOT NULL,
+    device_id INTEGER NOT NULL,
+    file_checksum TEXT NOT NULL,
+    file_last_modified INTEGER NOT NULL,
+    FOREIGN KEY (device_id) REFERENCES device(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_qif_import_device ON qif_import_metadata(device_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_qif_import_checksum
+ON qif_import_metadata(file_checksum);
+
+-- Parsed records for each imported QIF file. Fixed shape (no dynamic columns).
+CREATE TABLE qif_record (
+    import_id TEXT NOT NULL,
+    record_index INTEGER NOT NULL,
+    section_type TEXT NOT NULL,
+    account_name TEXT,
+    supported INTEGER NOT NULL,
+    raw_text TEXT NOT NULL,
+    field_date TEXT,
+    field_amount TEXT,
+    field_payee TEXT,
+    field_memo TEXT,
+    field_category TEXT,
+    field_transfer_account TEXT,
+    field_check_number TEXT,
+    field_cleared TEXT,
+    splits_json TEXT,
+    transaction_id TEXT,
+    import_status TEXT,
+    PRIMARY KEY (import_id, record_index),
+    FOREIGN KEY (import_id) REFERENCES qif_import_metadata(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_qif_record_import ON qif_record(import_id);
+
+-- Strategy applications for each QIF import
+CREATE TABLE qif_import_application (
+    id TEXT PRIMARY KEY NOT NULL,
+    qif_import_id TEXT NOT NULL,
+    strategy_id TEXT,
+    strategy_name TEXT NOT NULL,
+    applied_at INTEGER NOT NULL,
+    FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id) ON DELETE CASCADE,
+    FOREIGN KEY (strategy_id) REFERENCES csv_import_strategy(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_qif_import_application_import_latest
+ON qif_import_application(qif_import_id, applied_at DESC, id DESC);
+CREATE INDEX idx_qif_import_application_strategy ON qif_import_application(strategy_id);
+
+-- Error tracking for QIF imports
+CREATE TABLE qif_import_error (
+    qif_import_id TEXT NOT NULL,
+    record_index INTEGER NOT NULL,
+    error_message TEXT NOT NULL,
+    error_timestamp INTEGER NOT NULL,
+    PRIMARY KEY (qif_import_id, record_index),
+    FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_qif_import_error_import ON qif_import_error(qif_import_id);

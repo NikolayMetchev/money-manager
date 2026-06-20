@@ -15,10 +15,11 @@ import kotlinx.coroutines.withContext
 class RelationshipTypeRepositoryImpl(
     database: MoneyManagerDatabaseWrapper,
 ) : RelationshipTypeRepository {
-    private val queries = database.relationshipTypeQueries
+    private val selectQueries = database.relationshipTypeSelectQueries
+    private val writeQueries = database.relationshipTypeWriteQueries
 
     override fun getAll(): Flow<List<RelationshipType>> =
-        queries
+        selectQueries
             .selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -32,7 +33,7 @@ class RelationshipTypeRepositoryImpl(
             }
 
     override fun getById(id: RelationshipTypeId): Flow<RelationshipType?> =
-        queries
+        selectQueries
             .selectById(id.id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
@@ -46,7 +47,7 @@ class RelationshipTypeRepositoryImpl(
             }
 
     override fun getByName(name: String): Flow<RelationshipType?> =
-        queries
+        selectQueries
             .selectByName(name)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
@@ -61,12 +62,12 @@ class RelationshipTypeRepositoryImpl(
 
     override suspend fun getOrCreate(name: String): RelationshipTypeId =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                val existing = queries.selectByName(name).executeAsOneOrNull()
+            writeQueries.transactionWithResult {
+                val existing = selectQueries.selectByName(name).executeAsOneOrNull()
                 existing?.let { RelationshipTypeId(it.id) }
                     ?: run {
-                        queries.insert(name)
-                        val newId = queries.selectByName(name).executeAsOne().id
+                        writeQueries.insert(name)
+                        val newId = selectQueries.selectByName(name).executeAsOne().id
                         RelationshipTypeId(newId)
                     }
             }

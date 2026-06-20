@@ -6,7 +6,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
-import com.moneymanager.database.sql.Qif_record
+import com.moneymanager.database.sql.qifImport.Qif_record
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -33,7 +33,8 @@ class QifImportRepositoryImpl(
     private val deviceId: DeviceId,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : QifImportRepository {
-    private val queries = database.qifImportQueries
+    private val selectQueries = database.qifImportSelectQueries
+    private val writeQueries = database.qifImportWriteQueries
 
     override suspend fun createImport(
         fileName: String,
@@ -49,7 +50,7 @@ class QifImportRepositoryImpl(
                 val timestamp = Clock.System.now()
                 val unsupportedCount = records.count { !it.supported }
 
-                queries.insertImport(
+                writeQueries.insertImport(
                     id = importIdString,
                     original_file_name = fileName,
                     import_timestamp = timestamp.toEpochMilliseconds(),
@@ -62,7 +63,7 @@ class QifImportRepositoryImpl(
                 )
 
                 records.forEach { record ->
-                    queries.insertRecord(
+                    writeQueries.insertRecord(
                         import_id = importIdString,
                         record_index = record.recordIndex,
                         section_type = record.sectionType,
@@ -86,13 +87,13 @@ class QifImportRepositoryImpl(
         }
 
     override fun getAllImports(): Flow<List<QifImport>> =
-        queries
+        selectQueries
             .selectAllImports(::toQifImport)
             .asFlow()
             .mapToList(coroutineContext)
 
     override fun getImport(id: QifImportId): Flow<QifImport?> =
-        queries
+        selectQueries
             .selectImportById(id.id.toString(), ::toQifImport)
             .asFlow()
             .mapToOneOrNull(coroutineContext)
@@ -103,7 +104,7 @@ class QifImportRepositoryImpl(
         offset: Int,
     ): List<QifImportRecord> =
         withContext(coroutineContext) {
-            queries
+            selectQueries
                 .selectRecordsByImportId(id.id.toString(), limit.toLong(), offset.toLong())
                 .executeAsList()
                 .map { it.toDomain() }
@@ -111,12 +112,12 @@ class QifImportRepositoryImpl(
 
     override suspend fun countRecords(id: QifImportId): Int =
         withContext(coroutineContext) {
-            queries.countRecords(id.id.toString()).executeAsOne().toInt()
+            selectQueries.countRecords(id.id.toString()).executeAsOne().toInt()
         }
 
     override suspend fun deleteImport(id: QifImportId): Unit =
         withContext(coroutineContext) {
-            queries.deleteImport(id.id.toString())
+            writeQueries.deleteImport(id.id.toString())
         }
 
     override suspend fun updateRecordStatusesBatch(
@@ -129,7 +130,7 @@ class QifImportRepositoryImpl(
             val importIdString = id.id.toString()
             database.transaction {
                 recordTransferMap.forEach { (recordIndex, transferId) ->
-                    queries.updateRecordStatus(
+                    writeQueries.updateRecordStatus(
                         import_status = status,
                         transaction_id = transferId?.id?.toString(),
                         import_id = importIdString,
@@ -145,7 +146,7 @@ class QifImportRepositoryImpl(
         errorMessage: String,
     ): Unit =
         withContext(coroutineContext) {
-            queries.insertOrReplaceError(
+            writeQueries.insertOrReplaceError(
                 qif_import_id = id.id.toString(),
                 record_index = recordIndex,
                 error_message = errorMessage,
@@ -162,7 +163,7 @@ class QifImportRepositoryImpl(
             val importIdString = id.id.toString()
             database.transaction {
                 recordIndexes.forEach { recordIndex ->
-                    queries.deleteError(qif_import_id = importIdString, record_index = recordIndex)
+                    writeQueries.deleteError(qif_import_id = importIdString, record_index = recordIndex)
                 }
             }
         }
@@ -174,7 +175,7 @@ class QifImportRepositoryImpl(
         appliedAt: Instant,
     ): Unit =
         withContext(coroutineContext) {
-            queries.insertApplication(
+            writeQueries.insertApplication(
                 id = Uuid.random().toString(),
                 qif_import_id = id.id.toString(),
                 strategy_id = strategyId.id.toString(),
@@ -185,7 +186,7 @@ class QifImportRepositoryImpl(
 
     override suspend fun findImportsByChecksum(checksum: String): List<QifImport> =
         withContext(coroutineContext) {
-            queries.selectImportsByChecksum(checksum, ::toQifImport).executeAsList()
+            selectQueries.selectImportsByChecksum(checksum, ::toQifImport).executeAsList()
         }
 
     private fun Qif_record.toDomain(): QifImportRecord =

@@ -1,0 +1,7 @@
+-- Select all mappings for a strategy ordered by id (first match wins)
+selectByStrategyId:
+SELECT * FROM csv_account_mapping WHERE strategy_id = ? ORDER BY id;
+
+-- Select a mapping by ID
+selectById:
+SELECT * FROM csv_account_mapping WHERE id = ?;

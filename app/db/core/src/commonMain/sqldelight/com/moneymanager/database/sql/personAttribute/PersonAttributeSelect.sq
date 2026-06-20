@@ -1,0 +1,22 @@
+selectByPerson:
+SELECT
+    person_attribute.id,
+    person_attribute.person_id,
+    person_attribute.attribute_type_id,
+    person_attribute.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM person_attribute
+JOIN attribute_type ON person_attribute.attribute_type_id = attribute_type.id
+WHERE person_attribute.person_id = ?
+ORDER BY attribute_type.name;
+
+selectById:
+SELECT
+    person_attribute.id,
+    person_attribute.person_id,
+    person_attribute.attribute_type_id,
+    person_attribute.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM person_attribute
+JOIN attribute_type ON person_attribute.attribute_type_id = attribute_type.id
+WHERE person_attribute.id = ?;

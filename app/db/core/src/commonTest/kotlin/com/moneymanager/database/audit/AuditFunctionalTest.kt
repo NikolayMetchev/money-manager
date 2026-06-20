@@ -322,7 +322,7 @@ class AuditFunctionalTest : DbTest() {
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("TST", "Original Name")
             assertNotNull(currencyId)
 
-            database.currencyQueries.update(
+            database.currencyWriteQueries.update(
                 code = "TST2",
                 name = "Updated Name",
                 scale_factor = 100,
@@ -344,7 +344,7 @@ class AuditFunctionalTest : DbTest() {
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("TST", "Test Currency")
             assertNotNull(currencyId)
 
-            database.currencyQueries.delete(currencyId.id)
+            database.currencyWriteQueries.delete(currencyId.id)
 
             val auditHistory = selectAuditHistoryForCurrency(currencyId.id)
 
@@ -438,7 +438,7 @@ class AuditFunctionalTest : DbTest() {
                     ),
                 )
 
-            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
+            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
 
             assertEquals(1, auditHistory.size)
             assertEquals("INSERT", auditHistory[0].audit_type)
@@ -484,7 +484,7 @@ class AuditFunctionalTest : DbTest() {
                 source = Source.Manual,
             )
 
-            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
+            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
 
             assertEquals(2, auditHistory.size)
             val updateAudit = auditHistory[0]
@@ -514,7 +514,7 @@ class AuditFunctionalTest : DbTest() {
 
             repositories.transactionRepository.deleteTransaction(transfer.id.id)
 
-            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
+            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
 
             assertEquals(2, auditHistory.size)
             assertEquals("DELETE", auditHistory[0].audit_type)
@@ -559,7 +559,7 @@ class AuditFunctionalTest : DbTest() {
                 source = Source.Manual,
             )
 
-            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
+            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
 
             assertEquals(2, auditHistory.size, "Should have 2 audit records (INSERT + UPDATE)")
 
@@ -632,7 +632,7 @@ class AuditFunctionalTest : DbTest() {
                 source = Source.Manual,
             )
 
-            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
+            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
 
             assertEquals(3, auditHistory.size, "Should have 3 audit records (INSERT + 2 UPDATEs)")
 

@@ -1,0 +1,4 @@
+CREATE TABLE relationship_type (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);

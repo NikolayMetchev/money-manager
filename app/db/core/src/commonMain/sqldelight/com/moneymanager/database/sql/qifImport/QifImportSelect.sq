@@ -1,0 +1,115 @@
+-- qif_import_metadata queries
+selectAllImports:
+SELECT
+    qif_import_metadata.id,
+    qif_import_metadata.original_file_name,
+    qif_import_metadata.import_timestamp,
+    qif_import_metadata.record_count,
+    qif_import_metadata.unsupported_count,
+    qif_import_metadata.account_type,
+    qif_import_metadata.file_checksum,
+    qif_import_metadata.file_last_modified,
+    (
+        SELECT COUNT(*)
+        FROM qif_import_application application
+        WHERE application.qif_import_id = qif_import_metadata.id
+    ) AS application_count,
+    latest_application.strategy_id AS last_applied_strategy_id,
+    latest_application.strategy_name AS last_applied_strategy_name,
+    latest_application.applied_at AS last_applied_at,
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model
+FROM qif_import_metadata
+JOIN device_view ON qif_import_metadata.device_id = device_view.id
+LEFT JOIN qif_import_application latest_application
+    ON latest_application.id = (
+        SELECT application.id
+        FROM qif_import_application application
+        WHERE application.qif_import_id = qif_import_metadata.id
+        ORDER BY application.applied_at DESC, application.id DESC
+        LIMIT 1
+    )
+ORDER BY qif_import_metadata.import_timestamp DESC;
+
+selectImportById:
+SELECT
+    qif_import_metadata.id,
+    qif_import_metadata.original_file_name,
+    qif_import_metadata.import_timestamp,
+    qif_import_metadata.record_count,
+    qif_import_metadata.unsupported_count,
+    qif_import_metadata.account_type,
+    qif_import_metadata.file_checksum,
+    qif_import_metadata.file_last_modified,
+    (
+        SELECT COUNT(*)
+        FROM qif_import_application application
+        WHERE application.qif_import_id = qif_import_metadata.id
+    ) AS application_count,
+    latest_application.strategy_id AS last_applied_strategy_id,
+    latest_application.strategy_name AS last_applied_strategy_name,
+    latest_application.applied_at AS last_applied_at,
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model
+FROM qif_import_metadata
+JOIN device_view ON qif_import_metadata.device_id = device_view.id
+LEFT JOIN qif_import_application latest_application
+    ON latest_application.id = (
+        SELECT application.id
+        FROM qif_import_application application
+        WHERE application.qif_import_id = qif_import_metadata.id
+        ORDER BY application.applied_at DESC, application.id DESC
+        LIMIT 1
+    )
+WHERE qif_import_metadata.id = ?;
+
+selectImportsByChecksum:
+SELECT
+    qif_import_metadata.id,
+    qif_import_metadata.original_file_name,
+    qif_import_metadata.import_timestamp,
+    qif_import_metadata.record_count,
+    qif_import_metadata.unsupported_count,
+    qif_import_metadata.account_type,
+    qif_import_metadata.file_checksum,
+    qif_import_metadata.file_last_modified,
+    (
+        SELECT COUNT(*)
+        FROM qif_import_application application
+        WHERE application.qif_import_id = qif_import_metadata.id
+    ) AS application_count,
+    latest_application.strategy_id AS last_applied_strategy_id,
+    latest_application.strategy_name AS last_applied_strategy_name,
+    latest_application.applied_at AS last_applied_at,
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model
+FROM qif_import_metadata
+JOIN device_view ON qif_import_metadata.device_id = device_view.id
+LEFT JOIN qif_import_application latest_application
+    ON latest_application.id = (
+        SELECT application.id
+        FROM qif_import_application application
+        WHERE application.qif_import_id = qif_import_metadata.id
+        ORDER BY application.applied_at DESC, application.id DESC
+        LIMIT 1
+    )
+WHERE qif_import_metadata.file_checksum = ?
+ORDER BY qif_import_metadata.import_timestamp DESC;
+
+selectRecordsByImportId:
+SELECT * FROM qif_record
+WHERE import_id = ?
+ORDER BY record_index
+LIMIT ? OFFSET ?;
+
+countRecords:
+SELECT COUNT(*) FROM qif_record WHERE import_id = ?;

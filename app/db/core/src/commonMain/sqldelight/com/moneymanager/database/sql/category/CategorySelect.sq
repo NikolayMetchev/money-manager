@@ -1,0 +1,27 @@
+selectAll:
+SELECT * FROM category ORDER BY name;
+
+selectById:
+SELECT * FROM category WHERE id = ?;
+
+selectTopLevel:
+SELECT * FROM category WHERE parent_id IS NULL ORDER BY name;
+
+selectByParent:
+SELECT * FROM category WHERE parent_id = ? ORDER BY name;
+
+selectRevisionById:
+SELECT revision_id FROM category WHERE id = ?;
+
+selectAllCategoryBalances:
+SELECT
+    category_balance_view.category_id,
+    category_balance_view.currency_id,
+    category_balance_view.balance,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM category_balance_view
+JOIN currency ON category_balance_view.currency_id = currency.id
+ORDER BY category_id, currency_id;

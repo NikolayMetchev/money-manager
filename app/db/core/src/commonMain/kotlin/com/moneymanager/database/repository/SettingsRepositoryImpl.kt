@@ -14,10 +14,11 @@ import kotlinx.coroutines.withContext
 class SettingsRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : SettingsRepository {
-    private val queries = database.settingsQueries
+    private val selectQueries = database.settingsSelectQueries
+    private val writeQueries = database.settingsWriteQueries
 
     override fun getDefaultCurrencyId(): Flow<CurrencyId?> =
-        queries
+        selectQueries
             .selectDefaultCurrencyId()
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
@@ -25,11 +26,11 @@ class SettingsRepositoryImpl(
 
     override suspend fun setDefaultCurrencyId(currencyId: CurrencyId): Unit =
         withContext(Dispatchers.Default) {
-            queries.upsertDefaultCurrency(currencyId.id)
+            writeQueries.upsertDefaultCurrency(currencyId.id)
         }
 
     override fun getLastQifAccountId(): Flow<AccountId?> =
-        queries
+        selectQueries
             .selectLastQifAccountId()
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
@@ -37,6 +38,6 @@ class SettingsRepositoryImpl(
 
     override suspend fun setLastQifAccountId(accountId: AccountId): Unit =
         withContext(Dispatchers.Default) {
-            queries.upsertLastQifAccount(accountId.id)
+            writeQueries.upsertLastQifAccount(accountId.id)
         }
 }

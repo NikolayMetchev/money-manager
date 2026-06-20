@@ -7,8 +7,8 @@ import com.moneymanager.database.mapper.SourceColumns
 import com.moneymanager.database.mapper.SourceDetailColumns
 import com.moneymanager.database.mapper.buildSourceRecord
 import com.moneymanager.database.recordSource
-import com.moneymanager.database.sql.SelectAllTransferSourcesByTransaction
-import com.moneymanager.database.sql.SelectTransferSourceByRevision
+import com.moneymanager.database.sql.entitySource.SelectAllTransferSourcesByTransaction
+import com.moneymanager.database.sql.entitySource.SelectTransferSourceByRevision
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
@@ -28,7 +28,8 @@ class TransferSourceRepositoryImpl(
     database: MoneyManagerDatabaseWrapper,
     private val deviceRepository: DeviceRepository,
 ) : TransferSourceRepository {
-    private val queries = database.entitySourceQueries
+    private val database = database
+    private val selectQueries = database.entitySourceSelectQueries
 
     override suspend fun recordManualSource(
         transactionId: TransferId,
@@ -38,7 +39,7 @@ class TransferSourceRepositoryImpl(
         withContext(Dispatchers.Default) {
             val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
 
-            queries.recordSource(
+            database.recordSource(
                 deviceId = deviceId,
                 entityType = EntityType.TRANSFER,
                 entityId = transactionId.id,
@@ -49,7 +50,7 @@ class TransferSourceRepositoryImpl(
 
     override suspend fun getSourcesForTransaction(transactionId: TransferId): List<SourceRecord> =
         withContext(Dispatchers.Default) {
-            queries
+            selectQueries
                 .selectAllTransferSourcesByTransaction(transactionId.id)
                 .executeAsList()
                 .mapNotNull { it.toSourceRecord() }
@@ -60,7 +61,7 @@ class TransferSourceRepositoryImpl(
         revisionId: Long,
     ): SourceRecord? =
         withContext(Dispatchers.Default) {
-            queries
+            selectQueries
                 .selectTransferSourceByRevision(transactionId.id, revisionId)
                 .executeAsOneOrNull()
                 ?.toSourceRecord()

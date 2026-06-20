@@ -22,19 +22,20 @@ class PersonRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
     private val deviceId: DeviceId,
 ) : PersonRepository {
-    private val queries = database.personQueries
-    private val attributeQueries = database.personAttributeQueries
-    private val entitySourceQueries = database.entitySourceQueries
+    private val personSelectQueries = database.personSelectQueries
+    private val personWriteQueries = database.personWriteQueries
+    private val attributeSelectQueries = database.personAttributeSelectQueries
+    private val attributeWriteQueries = database.personAttributeWriteQueries
 
     override fun getAllPeople(): Flow<List<Person>> =
-        queries
+        personSelectQueries
             .selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(PersonMapper::mapList)
 
     override fun getPersonById(id: PersonId): Flow<Person?> =
-        queries
+        personSelectQueries
             .selectById(id.id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
@@ -46,14 +47,14 @@ class PersonRepositoryImpl(
     ): PersonId =
         withContext(Dispatchers.Default) {
             val id =
-                queries.transactionWithResult {
-                    queries.insert(
+                personWriteQueries.transactionWithResult {
+                    personWriteQueries.insert(
                         first_name = person.firstName,
                         middle_name = person.middleName,
                         last_name = person.lastName,
                     )
-                    val newId = queries.lastInsertRowId().executeAsOne()
-                    entitySourceQueries.recordSource(deviceId, EntityType.PERSON, newId, 1L, source)
+                    val newId = personWriteQueries.lastInsertRowId().executeAsOne()
+                    database.recordSource(deviceId, EntityType.PERSON, newId, 1L, source)
                     newId
                 }
             PersonId(id)
@@ -64,15 +65,15 @@ class PersonRepositoryImpl(
         source: Source,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                queries.update(
+            personWriteQueries.transactionWithResult {
+                personWriteQueries.update(
                     first_name = person.firstName,
                     middle_name = person.middleName,
                     last_name = person.lastName,
                     id = person.id.id,
                 )
-                val revision = queries.selectRevisionById(person.id.id).executeAsOne()
-                entitySourceQueries.recordSource(deviceId, EntityType.PERSON, person.id.id, revision, source)
+                val revision = personSelectQueries.selectRevisionById(person.id.id).executeAsOne()
+                database.recordSource(deviceId, EntityType.PERSON, person.id.id, revision, source)
             }
         }
 
@@ -87,7 +88,7 @@ class PersonRepositoryImpl(
         withContext(Dispatchers.Default) {
             val effectivePersonId = person?.id ?: personId
 
-            queries.transactionWithResult {
+            personWriteQueries.transactionWithResult {
                 val finalRevision =
                     updateEntityWithAttributes(
                         database = database,
@@ -97,29 +98,29 @@ class PersonRepositoryImpl(
                         newAttributes = newAttributes,
                         updateEntity = {
                             val personToUpdate = requireNotNull(person)
-                            queries.update(
+                            personWriteQueries.update(
                                 first_name = personToUpdate.firstName,
                                 middle_name = personToUpdate.middleName,
                                 last_name = personToUpdate.lastName,
                                 id = personToUpdate.id.id,
                             )
                         },
-                        bumpRevisionOnly = { queries.bumpRevisionOnly(effectivePersonId.id) },
-                        selectRevision = { queries.selectRevisionById(effectivePersonId.id).executeAsOne() },
+                        bumpRevisionOnly = { personWriteQueries.bumpRevisionOnly(effectivePersonId.id) },
+                        selectRevision = { personSelectQueries.selectRevisionById(effectivePersonId.id).executeAsOne() },
                         selectCurrentTypeId = { id ->
-                            attributeQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
+                            attributeSelectQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
                         },
-                        deleteById = { id -> attributeQueries.deleteById(id) },
+                        deleteById = { id -> attributeWriteQueries.deleteById(id) },
                         insertAttribute = { attr ->
-                            attributeQueries.insert(
+                            attributeWriteQueries.insert(
                                 person_id = effectivePersonId.id,
                                 attribute_type_id = attr.typeId.id,
                                 attribute_value = attr.value,
                             )
                         },
-                        updateValue = { value, id -> attributeQueries.updateValue(value, id) },
+                        updateValue = { value, id -> attributeWriteQueries.updateValue(value, id) },
                     )
-                entitySourceQueries.recordSource(
+                database.recordSource(
                     deviceId,
                     EntityType.PERSON,
                     effectivePersonId.id,
@@ -132,6 +133,6 @@ class PersonRepositoryImpl(
 
     override suspend fun deletePerson(id: PersonId): Unit =
         withContext(Dispatchers.Default) {
-            queries.delete(id.id)
+            personWriteQueries.delete(id.id)
         }
 }

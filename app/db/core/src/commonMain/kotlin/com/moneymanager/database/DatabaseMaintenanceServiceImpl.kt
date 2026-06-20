@@ -15,41 +15,41 @@ import kotlin.time.measureTime
 class DatabaseMaintenanceServiceImpl(
     database: MoneyManagerDatabase,
 ) : DatabaseMaintenanceService {
-    private val maintenanceQueries = database.maintenanceQueries
-    private val transferQueries = database.transferQueries
+    private val maintenanceWriteQueries = database.maintenanceWriteQueries
+    private val transferWriteQueries = database.transferWriteQueries
 
     override suspend fun reindex(): Duration =
         withContext(Dispatchers.Default) {
             measureTime {
-                maintenanceQueries.reindex()
+                maintenanceWriteQueries.reindex()
             }
         }
 
     override suspend fun vacuum(): Duration =
         withContext(Dispatchers.Default) {
             measureTime {
-                maintenanceQueries.vacuum()
+                maintenanceWriteQueries.vacuum()
             }
         }
 
     override suspend fun analyze(): Duration =
         withContext(Dispatchers.Default) {
             measureTime {
-                maintenanceQueries.analyze()
+                maintenanceWriteQueries.analyze()
             }
         }
 
     override suspend fun refreshMaterializedViews(): Duration =
         withContext(Dispatchers.Default) {
             measureTime {
-                transferQueries.transaction {
+                transferWriteQueries.transaction {
                     // Incremental refresh - only update affected account-currency pairs
-                    transferQueries.incrementalRefreshAccountBalances()
-                    transferQueries.incrementalPopulateAccountBalances()
-                    transferQueries.incrementalRefreshRunningBalances()
-                    transferQueries.incrementalPopulateRunningBalances()
+                    transferWriteQueries.incrementalRefreshAccountBalances()
+                    transferWriteQueries.incrementalPopulateAccountBalances()
+                    transferWriteQueries.incrementalRefreshRunningBalances()
+                    transferWriteQueries.incrementalPopulateRunningBalances()
                     // Clear pending changes after both views are refreshed
-                    transferQueries.clearPendingChanges()
+                    transferWriteQueries.clearPendingChanges()
                 }
             }
         }
@@ -57,11 +57,11 @@ class DatabaseMaintenanceServiceImpl(
     override suspend fun truncateMaterializedViews(): Duration =
         withContext(Dispatchers.Default) {
             measureTime {
-                transferQueries.transaction {
+                transferWriteQueries.transaction {
                     // Reuse the existing full-refresh DELETE statements, without repopulating.
-                    transferQueries.refreshAccountBalances()
-                    transferQueries.refreshRunningBalances()
-                    transferQueries.clearPendingChanges()
+                    transferWriteQueries.refreshAccountBalances()
+                    transferWriteQueries.refreshRunningBalances()
+                    transferWriteQueries.clearPendingChanges()
                 }
             }
         }
@@ -69,14 +69,14 @@ class DatabaseMaintenanceServiceImpl(
     override suspend fun fullRefreshMaterializedViews(): Duration =
         withContext(Dispatchers.Default) {
             measureTime {
-                transferQueries.transaction {
+                transferWriteQueries.transaction {
                     // Full refresh - delete and rebuild all data
-                    transferQueries.refreshAccountBalances()
-                    transferQueries.populateAccountBalances()
-                    transferQueries.refreshRunningBalances()
-                    transferQueries.populateRunningBalances()
+                    transferWriteQueries.refreshAccountBalances()
+                    transferWriteQueries.populateAccountBalances()
+                    transferWriteQueries.refreshRunningBalances()
+                    transferWriteQueries.populateRunningBalances()
                     // Clear pending changes to avoid redundant work
-                    transferQueries.clearPendingChanges()
+                    transferWriteQueries.clearPendingChanges()
                 }
             }
         }

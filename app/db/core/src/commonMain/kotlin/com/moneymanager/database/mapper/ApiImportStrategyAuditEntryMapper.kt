@@ -3,7 +3,7 @@
 package com.moneymanager.database.mapper
 
 import com.moneymanager.database.json.ApiStrategyJsonCodec
-import com.moneymanager.database.sql.SelectAuditHistoryForApiImportStrategy
+import com.moneymanager.database.sql.audit.SelectAuditHistoryForApiImportStrategy
 import com.moneymanager.domain.model.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.EntityType

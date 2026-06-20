@@ -1,0 +1,16 @@
+insertMerge:
+INSERT INTO account_merge(
+    merged_at, surviving_account_id, deleted_account_id, deleted_account_name,
+    deleted_account_opening_date, deleted_account_category_id, deleted_account_revision_id
+)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+insertMergeTransfer:
+INSERT INTO account_merge_transfer(merge_id, transfer_id, moved_source, moved_target)
+VALUES (?, ?, ?, ?);
+
+markReversed:
+UPDATE account_merge SET reversed = 1 WHERE id = ?;

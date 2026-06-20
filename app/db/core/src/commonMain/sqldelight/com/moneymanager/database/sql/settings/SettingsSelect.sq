@@ -1,0 +1,5 @@
+selectDefaultCurrencyId:
+SELECT default_currency_id FROM settings LIMIT 1;
+
+selectLastQifAccountId:
+SELECT last_qif_account_id FROM settings LIMIT 1;

@@ -18,10 +18,11 @@ import kotlinx.coroutines.withContext
 class TransferAttributeRepositoryImpl(
     database: MoneyManagerDatabaseWrapper,
 ) : TransferAttributeRepository {
-    private val queries = database.transferAttributeQueries
+    private val selectQueries = database.transferAttributeSelectQueries
+    private val writeQueries = database.transferAttributeWriteQueries
 
     override fun getByTransaction(transactionId: TransferId): Flow<List<TransferAttribute>> =
-        queries
+        selectQueries
             .selectByTransaction(transactionId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -46,14 +47,14 @@ class TransferAttributeRepositoryImpl(
         value: String,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                queries.insert(
+            writeQueries.transactionWithResult {
+                writeQueries.insert(
                     transactionId.id,
                     attributeTypeId.id,
                     value,
                 )
                 // Get the inserted ID using last_insert_rowid()
-                queries.selectLastInsertedId().executeAsOne()
+                writeQueries.selectLastInsertedId().executeAsOne()
             }
         }
 
@@ -62,11 +63,11 @@ class TransferAttributeRepositoryImpl(
         newValue: String,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.updateValue(newValue, id)
+            writeQueries.updateValue(newValue, id)
         }
 
     override suspend fun delete(id: Long): Unit =
         withContext(Dispatchers.Default) {
-            queries.deleteById(id)
+            writeQueries.deleteById(id)
         }
 }

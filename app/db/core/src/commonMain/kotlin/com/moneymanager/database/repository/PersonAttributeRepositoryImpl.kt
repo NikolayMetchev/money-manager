@@ -16,10 +16,11 @@ import kotlinx.coroutines.withContext
 class PersonAttributeRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
 ) : PersonAttributeRepository {
-    private val queries = database.personAttributeQueries
+    private val selectQueries = database.personAttributeSelectQueries
+    private val writeQueries = database.personAttributeWriteQueries
 
     override fun getByPerson(personId: PersonId): Flow<List<PersonAttribute>> =
-        queries
+        selectQueries
             .selectByPerson(personId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -44,9 +45,9 @@ class PersonAttributeRepositoryImpl(
         value: String,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                queries.insert(personId.id, attributeTypeId.id, value)
-                queries.selectLastInsertedId().executeAsOne()
+            writeQueries.transactionWithResult {
+                writeQueries.insert(personId.id, attributeTypeId.id, value)
+                writeQueries.selectLastInsertedId().executeAsOne()
             }
         }
 
@@ -56,11 +57,11 @@ class PersonAttributeRepositoryImpl(
         value: String,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
+            writeQueries.transactionWithResult {
                 database.beginCreationMode()
                 try {
-                    queries.insert(personId.id, attributeTypeId.id, value)
-                    queries.selectLastInsertedId().executeAsOne()
+                    writeQueries.insert(personId.id, attributeTypeId.id, value)
+                    writeQueries.selectLastInsertedId().executeAsOne()
                 } finally {
                     database.endCreationMode()
                 }
@@ -72,11 +73,11 @@ class PersonAttributeRepositoryImpl(
         newValue: String,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.updateValue(newValue, id)
+            writeQueries.updateValue(newValue, id)
         }
 
     override suspend fun delete(id: Long): Unit =
         withContext(Dispatchers.Default) {
-            queries.deleteById(id)
+            writeQueries.deleteById(id)
         }
 }

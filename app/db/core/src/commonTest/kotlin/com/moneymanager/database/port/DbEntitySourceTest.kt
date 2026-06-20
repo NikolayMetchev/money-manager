@@ -27,16 +27,16 @@ class DbEntitySourceTest : DbTest() {
                     url = "https://example.test/accounts",
                     headers = emptyMap(),
                 )
-            val queries = database.entitySourceQueries
+            val queries = database.entitySourceSelectQueries
 
-            queries.recordSource(
+            database.recordSource(
                 deviceId = deviceId,
                 entityType = EntityType.ACCOUNT,
                 entityId = 99L,
                 revisionId = 1L,
                 source = Source.Api(sessionId, requestId, JsonPath("$.accounts[0]")),
             )
-            queries.recordSource(
+            database.recordSource(
                 deviceId = deviceId,
                 entityType = EntityType.ACCOUNT,
                 entityId = 99L,

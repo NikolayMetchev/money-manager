@@ -1,0 +1,43 @@
+-- Records a reversible account merge so it can be undone (unmerge).
+-- When account D ("deleted") is merged into account S ("surviving"), D's transactions are
+-- reassigned to S and D is deleted. To reverse this we must remember D's own data (it is gone
+-- after the merge) and exactly which transfers were reassigned, since after the move there is no
+-- way to tell which transfers originally belonged to D versus those already on S.
+--
+-- These tables are excluded from the audit trail (see EXCLUDED_FROM_AUDIT in
+-- MoneyManagerDatabaseWrapper): they ARE the reversal record, not user-facing entities.
+CREATE TABLE account_merge (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    merged_at INTEGER NOT NULL,
+    surviving_account_id INTEGER NOT NULL,
+    -- Snapshot of the deleted account so it can be recreated on unmerge.
+    deleted_account_id INTEGER NOT NULL,
+    deleted_account_name TEXT NOT NULL,
+    deleted_account_opening_date INTEGER NOT NULL,
+    deleted_account_category_id INTEGER NOT NULL,
+    deleted_account_revision_id INTEGER NOT NULL,
+    reversed INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (surviving_account_id) REFERENCES account(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_merge_surviving ON account_merge(surviving_account_id);
+
+-- The transfers reassigned by the merge and which side (source/target) pointed at the deleted
+-- account, so unmerge moves back exactly those references.
+CREATE TABLE account_merge_transfer (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    merge_id INTEGER NOT NULL,
+    transfer_id INTEGER NOT NULL,
+    moved_source INTEGER NOT NULL DEFAULT 0,
+    moved_target INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (merge_id) REFERENCES account_merge(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_merge_transfer_merge ON account_merge_transfer(merge_id);
+
+-- Note: neither attributes nor ownerships are snapshotted here. The merge's cascade delete records
+-- each one as a DELETE in account_attribute_audit / person_account_ownership_audit (the attribute
+-- delete trigger uses the attribute's own stamped revision_id, so it fires even after the parent
+-- account is gone), so unmerge reconstructs both from the audit trail (Audit.sq
+-- selectDeletedAttributesForAccount / selectDeletedOwnershipPersonIds). Only the deleted account's own
+-- core fields are snapshotted above, since the cascade delete leaves no recoverable trace of them.

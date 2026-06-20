@@ -1,0 +1,41 @@
+selectAllCredentials:
+SELECT * FROM api_credential ORDER BY created_at DESC;
+
+selectById:
+SELECT * FROM api_session_with_latest_import WHERE id = ?;
+
+selectByToken:
+SELECT * FROM api_session_with_latest_import WHERE token = ? ORDER BY created_at DESC LIMIT 1;
+
+selectByDeviceId:
+SELECT * FROM api_session_with_latest_import WHERE device_id = ? ORDER BY created_at DESC;
+
+selectByCredentialId:
+SELECT * FROM api_session_with_latest_import WHERE credential_id = ? ORDER BY created_at DESC;
+
+selectSessions:
+SELECT * FROM api_session_with_latest_import
+WHERE (expires_at IS NULL OR expires_at > ?)
+ORDER BY created_at DESC;
+
+selectRequestsBySession:
+SELECT * FROM api_request WHERE session_id = ? ORDER BY requested_at DESC, id DESC;
+
+selectHeadersByRequestIds:
+SELECT * FROM api_request_header WHERE request_id IN ? ORDER BY request_id, id;
+
+selectResponsesBySession:
+SELECT * FROM api_response WHERE session_id = ? ORDER BY responded_at DESC, id DESC;
+
+selectResponseTransactionsByResponseId:
+SELECT * FROM api_response_transaction WHERE response_id = ? ORDER BY id;
+
+selectResponseTransactionsBySession:
+SELECT api_response_transaction.*
+FROM api_response_transaction
+JOIN api_response ON api_response_transaction.response_id = api_response.id
+WHERE api_response.session_id = ?
+ORDER BY api_response_transaction.response_id, api_response_transaction.id;
+
+selectImportedSessionRevisions:
+SELECT session_id, revision_id FROM api_import;

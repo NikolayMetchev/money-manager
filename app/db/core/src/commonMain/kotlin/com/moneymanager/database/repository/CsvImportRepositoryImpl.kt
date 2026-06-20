@@ -33,7 +33,8 @@ class CsvImportRepositoryImpl(
     private val deviceId: DeviceId,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : CsvImportRepository {
-    private val csvImportQueries = database.csvImportQueries
+    private val csvImportSelectQueries = database.csvImportSelectQueries
+    private val csvImportWriteQueries = database.csvImportWriteQueries
     private val tableManager = CsvTableManager(database)
 
     override suspend fun createImport(
@@ -53,7 +54,7 @@ class CsvImportRepositoryImpl(
                 tableManager.createCsvTable(tableName, columnCount)
                 tableManager.insertRowsBatch(tableName, rows, columnCount)
 
-                csvImportQueries.insertImport(
+                csvImportWriteQueries.insertImport(
                     id = importId.id.toString(),
                     table_name = tableName,
                     original_file_name = fileName,
@@ -67,7 +68,7 @@ class CsvImportRepositoryImpl(
 
                 headers.forEachIndexed { index, header ->
                     val columnId = Uuid.random()
-                    csvImportQueries.insertColumn(
+                    csvImportWriteQueries.insertColumn(
                         id = columnId.toString(),
                         import_id = importId.id.toString(),
                         column_index = index.toLong(),
@@ -80,7 +81,7 @@ class CsvImportRepositoryImpl(
         }
 
     override fun getAllImports(): Flow<List<CsvImport>> =
-        csvImportQueries
+        csvImportSelectQueries
             .selectAllImports(::toCsvImportRecord)
             .asFlow()
             .mapToList(coroutineContext)
@@ -90,13 +91,13 @@ class CsvImportRepositoryImpl(
 
     override fun getImport(id: CsvImportId): Flow<CsvImport?> {
         val importFlow =
-            csvImportQueries
+            csvImportSelectQueries
                 .selectImportById(id.id.toString(), ::toCsvImportRecord)
                 .asFlow()
                 .mapToOneOrNull(coroutineContext)
 
         val columnsFlow =
-            csvImportQueries
+            csvImportSelectQueries
                 .selectColumnsByImportId(id.id.toString())
                 .asFlow()
                 .mapToList(coroutineContext)
@@ -125,7 +126,7 @@ class CsvImportRepositoryImpl(
     ): List<CsvRow> =
         withContext(coroutineContext) {
             val import =
-                csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
                     ?: return@withContext emptyList()
 
             tableManager.queryRows(
@@ -140,17 +141,17 @@ class CsvImportRepositoryImpl(
     override suspend fun deleteImport(id: CsvImportId): Unit =
         withContext(coroutineContext) {
             val import =
-                csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
                     ?: return@withContext
 
             // Drop the dynamic table first
             tableManager.dropCsvTable(import.table_name)
 
             // Delete column metadata (cascades from import delete, but be explicit)
-            csvImportQueries.deleteColumnsByImportId(id.id.toString())
+            csvImportWriteQueries.deleteColumnsByImportId(id.id.toString())
 
             // Delete import metadata
-            csvImportQueries.deleteImport(id.id.toString())
+            csvImportWriteQueries.deleteImport(id.id.toString())
         }
 
     override suspend fun updateRowTransferId(
@@ -160,7 +161,7 @@ class CsvImportRepositoryImpl(
     ): Unit =
         withContext(coroutineContext) {
             val import =
-                csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
                     ?: return@withContext
 
             tableManager.updateTransferId(import.table_name, rowIndex, transferId)
@@ -174,7 +175,7 @@ class CsvImportRepositoryImpl(
             if (rowTransferMap.isEmpty()) return@withContext
 
             val import =
-                csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
                     ?: return@withContext
 
             tableManager.updateTransferIdsBatch(import.table_name, rowTransferMap)
@@ -188,7 +189,7 @@ class CsvImportRepositoryImpl(
     ): Unit =
         withContext(coroutineContext) {
             val import =
-                csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
                     ?: return@withContext
 
             tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
@@ -203,7 +204,7 @@ class CsvImportRepositoryImpl(
             if (rowTransferMap.isEmpty()) return@withContext
 
             val import =
-                csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
                     ?: return@withContext
 
             database.transaction {
@@ -219,7 +220,7 @@ class CsvImportRepositoryImpl(
         errorMessage: String,
     ): Unit =
         withContext(coroutineContext) {
-            csvImportQueries.insertOrReplaceError(
+            csvImportWriteQueries.insertOrReplaceError(
                 csv_import_id = id.id.toString(),
                 row_index = rowIndex,
                 error_message = errorMessage,
@@ -232,7 +233,7 @@ class CsvImportRepositoryImpl(
         rowIndex: Long,
     ): Unit =
         withContext(coroutineContext) {
-            csvImportQueries.deleteError(
+            csvImportWriteQueries.deleteError(
                 csv_import_id = id.id.toString(),
                 row_index = rowIndex,
             )
@@ -247,7 +248,7 @@ class CsvImportRepositoryImpl(
 
             database.transaction {
                 rowIndexes.forEach { rowIndex ->
-                    csvImportQueries.deleteError(
+                    csvImportWriteQueries.deleteError(
                         csv_import_id = id.id.toString(),
                         row_index = rowIndex,
                     )
@@ -262,7 +263,7 @@ class CsvImportRepositoryImpl(
         appliedAt: Instant,
     ): Unit =
         withContext(coroutineContext) {
-            csvImportQueries.insertApplication(
+            csvImportWriteQueries.insertApplication(
                 id = Uuid.random().toString(),
                 csv_import_id = id.id.toString(),
                 strategy_id = strategyId.id.toString(),
@@ -273,7 +274,7 @@ class CsvImportRepositoryImpl(
 
     override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =
         withContext(coroutineContext) {
-            csvImportQueries.selectImportsByChecksum(checksum, ::toCsvImportRecord).executeAsList().map { import ->
+            csvImportSelectQueries.selectImportsByChecksum(checksum, ::toCsvImportRecord).executeAsList().map { import ->
                 toCsvImport(import)
             }
         }
@@ -421,7 +422,7 @@ class CsvImportRepositoryImpl(
         )
 
     private fun loadColumns(importId: String): List<CsvColumn> =
-        csvImportQueries
+        csvImportSelectQueries
             .selectColumnsByImportId(importId)
             .executeAsList()
             .map { col ->

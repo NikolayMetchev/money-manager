@@ -3,7 +3,7 @@
 package com.moneymanager.database.mapper
 
 import com.moneymanager.database.json.FieldMappingJsonCodec
-import com.moneymanager.database.sql.SelectAuditHistoryForCsvImportStrategy
+import com.moneymanager.database.sql.audit.SelectAuditHistoryForCsvImportStrategy
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CsvImportStrategyAuditEntry
 import com.moneymanager.domain.model.EntityType

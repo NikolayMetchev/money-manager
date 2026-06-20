@@ -1,0 +1,133 @@
+CREATE TABLE api_session_type (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- Stores a saved token/credential. One credential can produce many download sessions.
+-- strategy_id links this credential to an api_import_strategy, determining how data is
+-- fetched and mapped. NULL means use the legacy type-specific (Monzo) behaviour.
+CREATE TABLE api_credential (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type_id INTEGER NOT NULL,
+    token TEXT NOT NULL UNIQUE CHECK(length(trim(token)) > 0),
+    created_at INTEGER NOT NULL,
+    strategy_id TEXT,
+    -- PEM-encoded RSA key pair for request signing (e.g. Wise SCA); null when not configured.
+    -- A signing key is only meaningful as a pair, so enforce both-null or both-present.
+    private_key TEXT,
+    public_key TEXT,
+    CHECK ((private_key IS NULL) = (public_key IS NULL)),
+    FOREIGN KEY (type_id) REFERENCES api_session_type(id),
+    FOREIGN KEY (strategy_id) REFERENCES api_import_strategy(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_api_credential_token ON api_credential(token);
+CREATE INDEX idx_api_credential_strategy_id ON api_credential(strategy_id);
+
+-- One session holds a full download: accounts, transactions and people are all fetched into it.
+CREATE TABLE api_session (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type_id INTEGER NOT NULL,
+    token TEXT NOT NULL CHECK(length(trim(token)) > 0),
+    device_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER,
+    credential_id INTEGER,
+    FOREIGN KEY (type_id) REFERENCES api_session_type(id),
+    FOREIGN KEY (device_id) REFERENCES device(id),
+    FOREIGN KEY (credential_id) REFERENCES api_credential(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_api_session_type ON api_session(type_id);
+CREATE INDEX idx_api_session_device ON api_session(device_id);
+
+CREATE TABLE api_import (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    imported_at INTEGER NOT NULL,
+    import_duration_millis INTEGER,
+    FOREIGN KEY (session_id) REFERENCES api_session(id) ON DELETE CASCADE,
+    UNIQUE (session_id, revision_id)
+);
+
+CREATE INDEX idx_api_import_session ON api_import(session_id);
+CREATE INDEX idx_api_import_imported_at ON api_import(imported_at);
+
+CREATE VIEW api_session_with_latest_import AS
+SELECT
+    api_session.*,
+    latest_import.imported_at AS imported_at,
+    latest_import.import_duration_millis AS import_duration_millis
+FROM api_session
+LEFT JOIN api_import AS latest_import ON latest_import.id = (
+    SELECT ai.id
+    FROM api_import AS ai
+    WHERE ai.session_id = api_session.id
+    ORDER BY ai.imported_at DESC, ai.id DESC
+    LIMIT 1
+);
+
+CREATE TABLE api_request (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    requested_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+    method TEXT NOT NULL CHECK(length(trim(method)) > 0),
+    url TEXT NOT NULL CHECK(length(trim(url)) > 0),
+    FOREIGN KEY (session_id) REFERENCES api_session(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_api_request_session ON api_request(session_id);
+CREATE INDEX idx_api_request_requested_at ON api_request(requested_at);
+
+CREATE TABLE api_request_header (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL,
+    key TEXT NOT NULL CHECK(length(trim(key)) > 0),
+    value TEXT NOT NULL,
+    FOREIGN KEY (request_id) REFERENCES api_request(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_api_request_header_request ON api_request_header(request_id);
+
+CREATE TABLE api_response (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL UNIQUE,
+    session_id INTEGER NOT NULL,
+    responded_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+    json TEXT NOT NULL CHECK(length(trim(json)) > 0),
+    FOREIGN KEY (request_id) REFERENCES api_request(id) ON DELETE CASCADE,
+    FOREIGN KEY (session_id) REFERENCES api_session(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_api_response_request ON api_response(request_id);
+CREATE INDEX idx_api_response_session ON api_response(session_id);
+CREATE INDEX idx_api_response_responded_at ON api_response(responded_at);
+
+-- Tracks the import state of each transaction entry found in an API response.
+-- Created when processing responses during import so that the UI can display
+-- which transactions were imported, which were duplicates, and which failed.
+-- transaction_id meaning depends on state:
+--   state=imported (1): the newly created transaction
+--   state=duplicate (2): the pre-existing transaction this entry duplicates
+--   state=error (3): NULL
+CREATE TABLE api_response_transaction (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    response_id INTEGER NOT NULL,
+    json_path TEXT NOT NULL,
+    -- State: 1=imported, 2=duplicate, 3=error
+    state INTEGER NOT NULL CHECK(state IN (1, 2, 3)),
+    transaction_id INTEGER,
+    error_message TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+    CHECK (
+        (state IN (1, 2) AND transaction_id IS NOT NULL AND error_message IS NULL) OR
+        (state = 3 AND transaction_id IS NULL)
+    ),
+    FOREIGN KEY (response_id) REFERENCES api_response(id) ON DELETE CASCADE,
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id)
+);
+
+CREATE UNIQUE INDEX idx_api_response_transaction_response_json_path
+    ON api_response_transaction(response_id, json_path);
+CREATE INDEX idx_api_response_transaction_transaction ON api_response_transaction(transaction_id);

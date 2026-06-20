@@ -1,0 +1,74 @@
+-- os: Lookup table for operating system names
+CREATE TABLE os (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- machine: Lookup table for machine names/hostnames
+CREATE TABLE machine (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- device_make: Lookup table for device manufacturers
+CREATE TABLE device_make (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- device_model: Lookup table for device models
+CREATE TABLE device_model (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- Indexes for lookup table name searches
+CREATE INDEX idx_os_name ON os(name);
+CREATE INDEX idx_machine_name ON machine(name);
+CREATE INDEX idx_device_make_name ON device_make(name);
+CREATE INDEX idx_device_model_name ON device_model(name);
+
+-- device: Normalized device information table
+-- JVM devices: platform_id, os_id, machine_id are set; device_make_id, device_model_id are NULL
+-- Android devices: platform_id, device_make_id, device_model_id are set; os_id, machine_id are NULL
+CREATE TABLE device (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform_id INTEGER NOT NULL,
+    os_id INTEGER,
+    machine_id INTEGER,
+    device_make_id INTEGER,
+    device_model_id INTEGER,
+    FOREIGN KEY (platform_id) REFERENCES platform(id),
+    FOREIGN KEY (os_id) REFERENCES os(id),
+    FOREIGN KEY (machine_id) REFERENCES machine(id),
+    FOREIGN KEY (device_make_id) REFERENCES device_make(id),
+    FOREIGN KEY (device_model_id) REFERENCES device_model(id),
+    UNIQUE (platform_id, os_id, machine_id, device_make_id, device_model_id),
+    -- JVM devices must have os_id and machine_id (platform_id = 1)
+    CHECK (platform_id != 1 OR (os_id IS NOT NULL AND machine_id IS NOT NULL)),
+    -- Android devices must have device_make_id and device_model_id (platform_id = 2)
+    CHECK (platform_id != 2 OR (device_make_id IS NOT NULL AND device_model_id IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_platform ON device(platform_id);
+CREATE INDEX idx_device_lookup ON device(platform_id, os_id, machine_id, device_make_id, device_model_id);
+
+-- View that joins device with all related lookup tables
+CREATE VIEW device_view AS
+SELECT
+    device.id,
+    platform.name AS platform_name,
+    os.id AS os_id,
+    os.name AS os_name,
+    machine.id AS machine_id,
+    machine.name AS machine_name,
+    device_make.id AS device_make_id,
+    device_make.name AS device_make,
+    device_model.id AS device_model_id,
+    device_model.name AS device_model
+FROM device
+JOIN platform ON device.platform_id = platform.id
+LEFT JOIN os ON device.os_id = os.id
+LEFT JOIN machine ON device.machine_id = machine.id
+LEFT JOIN device_make ON device.device_make_id = device_make.id
+LEFT JOIN device_model ON device.device_model_id = device_model.id;

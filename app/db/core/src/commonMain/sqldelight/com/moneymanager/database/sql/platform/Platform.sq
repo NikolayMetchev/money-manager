@@ -1,0 +1,5 @@
+-- platform: Lookup table for platform types (JVM, ANDROID)
+CREATE TABLE platform (
+    id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL UNIQUE
+);

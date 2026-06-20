@@ -24,18 +24,19 @@ class CategoryRepositoryImpl(
     database: MoneyManagerDatabase,
     private val deviceId: DeviceId,
 ) : CategoryRepository {
-    private val queries = database.categoryQueries
-    private val entitySourceQueries = database.entitySourceQueries
+    private val selectQueries = database.categorySelectQueries
+    private val writeQueries = database.categoryWriteQueries
+    private val database = database
 
     override fun getAllCategories(): Flow<List<Category>> =
-        queries
+        selectQueries
             .selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(CategoryMapper::mapList)
 
     override fun getCategoryBalances(): Flow<List<CategoryBalance>> =
-        queries
+        selectQueries
             .selectAllCategoryBalances()
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -56,21 +57,21 @@ class CategoryRepositoryImpl(
             }
 
     override fun getCategoryById(id: Long): Flow<Category?> =
-        queries
+        selectQueries
             .selectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(CategoryMapper::map) }
 
     override fun getTopLevelCategories(): Flow<List<Category>> =
-        queries
+        selectQueries
             .selectTopLevel()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(CategoryMapper::mapList)
 
     override fun getCategoriesByParent(parentId: Long): Flow<List<Category>> =
-        queries
+        selectQueries
             .selectByParent(parentId)
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -81,13 +82,13 @@ class CategoryRepositoryImpl(
         source: Source,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                queries.insert(
+            writeQueries.transactionWithResult {
+                writeQueries.insert(
                     name = category.name,
                     parent_id = category.parentId,
                 )
-                val id = queries.lastInsertRowId().executeAsOne()
-                entitySourceQueries.recordSource(deviceId, EntityType.CATEGORY, id, 1L, source)
+                val id = writeQueries.lastInsertRowId().executeAsOne()
+                database.recordSource(deviceId, EntityType.CATEGORY, id, 1L, source)
                 id
             }
         }
@@ -97,20 +98,20 @@ class CategoryRepositoryImpl(
         source: Source,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                queries.update(
+            writeQueries.transactionWithResult {
+                writeQueries.update(
                     name = category.name,
                     parent_id = category.parentId,
                     id = category.id,
                 )
-                val revision = queries.selectRevisionById(category.id).executeAsOne()
-                entitySourceQueries.recordSource(deviceId, EntityType.CATEGORY, category.id, revision, source)
+                val revision = selectQueries.selectRevisionById(category.id).executeAsOne()
+                database.recordSource(deviceId, EntityType.CATEGORY, category.id, revision, source)
             }
         }
 
     override suspend fun deleteCategory(id: Long): Unit =
         withContext(Dispatchers.Default) {
             // Trigger handles updating children's parentId before delete
-            queries.delete(id)
+            writeQueries.delete(id)
         }
 }

@@ -32,7 +32,8 @@ import kotlin.uuid.Uuid
 class ApiSessionRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : ApiSessionRepository {
-    private val queries = database.apiSessionQueries
+    private val selectQueries = database.apiSessionSelectQueries
+    private val writeQueries = database.apiSessionWriteQueries
 
     override suspend fun createCredential(
         token: String,
@@ -44,8 +45,8 @@ class ApiSessionRepositoryImpl(
     ): MonzoCredentialId =
         withContext(Dispatchers.Default) {
             val id =
-                queries.transactionWithResult {
-                    queries.insertCredential(
+                writeQueries.transactionWithResult {
+                    writeQueries.insertCredential(
                         type_id = type.id,
                         token = token,
                         created_at = createdAt.toEpochMilliseconds(),
@@ -53,7 +54,7 @@ class ApiSessionRepositoryImpl(
                         private_key = privateKey,
                         public_key = publicKey,
                     )
-                    queries.lastInsertCredentialRowId().executeAsOne()
+                    writeQueries.lastInsertCredentialRowId().executeAsOne()
                 }
             MonzoCredentialId(id)
         }
@@ -64,7 +65,7 @@ class ApiSessionRepositoryImpl(
     ): Unit =
         withContext(Dispatchers.Default) {
             val affected =
-                queries
+                writeQueries
                     .updateCredentialStrategy(
                         strategy_id = strategyId?.id?.toString(),
                         id = credentialId.id,
@@ -79,7 +80,7 @@ class ApiSessionRepositoryImpl(
     ): Unit =
         withContext(Dispatchers.Default) {
             val affected =
-                queries
+                writeQueries
                     .updateCredentialKeys(
                         private_key = privateKey,
                         public_key = publicKey,
@@ -90,12 +91,12 @@ class ApiSessionRepositoryImpl(
 
     override suspend fun getAllCredentials(): List<MonzoCredential> =
         withContext(Dispatchers.Default) {
-            queries.selectAllCredentials().executeAsList().map { it.toMonzoCredential() }
+            selectQueries.selectAllCredentials().executeAsList().map { it.toMonzoCredential() }
         }
 
     override suspend fun getSessionsByCredential(credentialId: MonzoCredentialId): List<ApiSession> =
         withContext(Dispatchers.Default) {
-            queries.selectByCredentialId(credentialId.id).executeAsList().map { it.toApiSession() }
+            selectQueries.selectByCredentialId(credentialId.id).executeAsList().map { it.toApiSession() }
         }
 
     override suspend fun createSession(
@@ -108,8 +109,8 @@ class ApiSessionRepositoryImpl(
     ): ApiSessionId =
         withContext(Dispatchers.Default) {
             val id =
-                queries.transactionWithResult {
-                    queries.insert(
+                writeQueries.transactionWithResult {
+                    writeQueries.insert(
                         type_id = type.id,
                         token = token,
                         device_id = deviceId.id,
@@ -117,29 +118,29 @@ class ApiSessionRepositoryImpl(
                         expires_at = expiresAt?.toEpochMilliseconds(),
                         credential_id = credentialId?.id,
                     )
-                    queries.lastInsertRowId().executeAsOne()
+                    writeQueries.lastInsertRowId().executeAsOne()
                 }
             ApiSessionId(id)
         }
 
     override suspend fun getSessionById(id: ApiSessionId): ApiSession? =
         withContext(Dispatchers.Default) {
-            queries.selectById(id.id).executeAsOneOrNull()?.toApiSession()
+            selectQueries.selectById(id.id).executeAsOneOrNull()?.toApiSession()
         }
 
     override suspend fun getSessionByToken(token: String): ApiSession? =
         withContext(Dispatchers.Default) {
-            queries.selectByToken(token).executeAsOneOrNull()?.toApiSession()
+            selectQueries.selectByToken(token).executeAsOneOrNull()?.toApiSession()
         }
 
     override suspend fun getSessionsByDevice(deviceId: DeviceId): List<ApiSession> =
         withContext(Dispatchers.Default) {
-            queries.selectByDeviceId(deviceId.id).executeAsList().map { it.toApiSession() }
+            selectQueries.selectByDeviceId(deviceId.id).executeAsList().map { it.toApiSession() }
         }
 
     override suspend fun getSessions(now: Instant): List<ApiSession> =
         withContext(Dispatchers.Default) {
-            queries.selectSessions(now.toEpochMilliseconds()).executeAsList().map { it.toApiSession() }
+            selectQueries.selectSessions(now.toEpochMilliseconds()).executeAsList().map { it.toApiSession() }
         }
 
     override suspend fun insertRequest(
@@ -150,16 +151,16 @@ class ApiSessionRepositoryImpl(
     ): ApiRequestId =
         withContext(Dispatchers.Default) {
             val id =
-                queries.transactionWithResult {
-                    queries.insertRequest(
+                writeQueries.transactionWithResult {
+                    writeQueries.insertRequest(
                         session_id = sessionId.id,
                         method = method,
                         url = url,
                     )
-                    val requestId = queries.lastInsertRowId().executeAsOne()
+                    val requestId = writeQueries.lastInsertRowId().executeAsOne()
 
                     headers.forEach { (key, value) ->
-                        queries.insertRequestHeader(
+                        writeQueries.insertRequestHeader(
                             request_id = requestId,
                             key = key,
                             value_ = value,
@@ -173,13 +174,13 @@ class ApiSessionRepositoryImpl(
 
     override suspend fun getRequestsBySession(sessionId: ApiSessionId): List<ApiRequest> =
         withContext(Dispatchers.Default) {
-            val requests = queries.selectRequestsBySession(sessionId.id).executeAsList()
+            val requests = selectQueries.selectRequestsBySession(sessionId.id).executeAsList()
             val requestIds = requests.map { it.id }
             val headersByRequestId =
                 if (requestIds.isEmpty()) {
                     emptyMap()
                 } else {
-                    queries
+                    selectQueries
                         .selectHeadersByRequestIds(requestIds)
                         .executeAsList()
                         .groupBy { it.request_id }
@@ -197,25 +198,25 @@ class ApiSessionRepositoryImpl(
     ): ApiResponseId =
         withContext(Dispatchers.Default) {
             val id =
-                queries.transactionWithResult {
-                    queries.insertResponse(
+                writeQueries.transactionWithResult {
+                    writeQueries.insertResponse(
                         request_id = requestId.id,
                         session_id = sessionId.id,
                         json = json,
                     )
-                    queries.lastInsertRowId().executeAsOne()
+                    writeQueries.lastInsertRowId().executeAsOne()
                 }
             ApiResponseId(id)
         }
 
     override suspend fun getResponsesBySession(sessionId: ApiSessionId): List<ApiResponse> =
         withContext(Dispatchers.Default) {
-            queries.selectResponsesBySession(sessionId.id).executeAsList().map { it.toApiResponse() }
+            selectQueries.selectResponsesBySession(sessionId.id).executeAsList().map { it.toApiResponse() }
         }
 
     override suspend fun deleteSession(id: ApiSessionId): Unit =
         withContext(Dispatchers.Default) {
-            queries.delete(id.id)
+            writeQueries.delete(id.id)
         }
 
     override suspend fun insertResponseTransaction(
@@ -227,15 +228,15 @@ class ApiSessionRepositoryImpl(
     ): ApiResponseTransactionId =
         withContext(Dispatchers.Default) {
             val id =
-                queries.transactionWithResult {
-                    queries.insertResponseTransaction(
+                writeQueries.transactionWithResult {
+                    writeQueries.insertResponseTransaction(
                         response_id = responseId.id,
                         json_path = jsonPath.value,
                         state = state.id.toLong(),
                         transaction_id = transactionId?.id,
                         error_message = errorMessage,
                     )
-                    queries.lastInsertApiResponseTransactionId().executeAsOne()
+                    writeQueries.lastInsertApiResponseTransactionId().executeAsOne()
                 }
             ApiResponseTransactionId(id)
         }
@@ -244,9 +245,9 @@ class ApiSessionRepositoryImpl(
         withContext(Dispatchers.Default) {
             if (transactions.isEmpty()) return@withContext
 
-            queries.transaction {
+            writeQueries.transaction {
                 transactions.forEach { transaction ->
-                    queries.insertResponseTransaction(
+                    writeQueries.insertResponseTransaction(
                         response_id = transaction.responseId.id,
                         json_path = transaction.jsonPath.value,
                         state = transaction.state.id.toLong(),
@@ -259,7 +260,7 @@ class ApiSessionRepositoryImpl(
 
     override suspend fun getResponseTransactions(responseId: ApiResponseId): List<ApiResponseTransaction> =
         withContext(Dispatchers.Default) {
-            queries.selectResponseTransactionsByResponseId(responseId.id).executeAsList().map { row ->
+            selectQueries.selectResponseTransactionsByResponseId(responseId.id).executeAsList().map { row ->
                 ApiResponseTransaction(
                     id = ApiResponseTransactionId(row.id),
                     responseId = ApiResponseId(row.response_id),
@@ -273,7 +274,7 @@ class ApiSessionRepositoryImpl(
 
     override suspend fun getResponseTransactionsBySession(sessionId: ApiSessionId): List<ApiResponseTransaction> =
         withContext(Dispatchers.Default) {
-            queries.selectResponseTransactionsBySession(sessionId.id).executeAsList().map { row ->
+            selectQueries.selectResponseTransactionsBySession(sessionId.id).executeAsList().map { row ->
                 ApiResponseTransaction(
                     id = ApiResponseTransactionId(row.id),
                     responseId = ApiResponseId(row.response_id),
@@ -287,7 +288,7 @@ class ApiSessionRepositoryImpl(
 
     override suspend fun getImportedSessionRevisions(): Set<ApiSessionImportRevision> =
         withContext(Dispatchers.Default) {
-            queries
+            selectQueries
                 .selectImportedSessionRevisions()
                 .executeAsList()
                 .map { ApiSessionImportRevision(ApiSessionId(it.session_id), it.revision_id) }
@@ -301,7 +302,7 @@ class ApiSessionRepositoryImpl(
         importDurationMillis: Long?,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries
+            writeQueries
                 .markSessionImported(
                     session_id = id.id,
                     revision_id = revisionId,
@@ -310,8 +311,8 @@ class ApiSessionRepositoryImpl(
                 ).await()
         }
 
-    private fun com.moneymanager.database.sql.Api_request.toApiRequest(
-        headers: List<com.moneymanager.database.sql.Api_request_header>,
+    private fun com.moneymanager.database.sql.apiSession.Api_request.toApiRequest(
+        headers: List<com.moneymanager.database.sql.apiSession.Api_request_header>,
     ): ApiRequest =
         ApiRequest(
             id = ApiRequestId(id),
@@ -322,7 +323,7 @@ class ApiSessionRepositoryImpl(
             headers = headers.map { it.toApiRequestHeader() },
         )
 
-    private fun com.moneymanager.database.sql.Api_request_header.toApiRequestHeader(): ApiRequestHeader =
+    private fun com.moneymanager.database.sql.apiSession.Api_request_header.toApiRequestHeader(): ApiRequestHeader =
         ApiRequestHeader(
             id = ApiRequestHeaderId(id),
             requestId = ApiRequestId(request_id),
@@ -330,7 +331,7 @@ class ApiSessionRepositoryImpl(
             value = value_,
         )
 
-    private fun com.moneymanager.database.sql.Api_response.toApiResponse(): ApiResponse =
+    private fun com.moneymanager.database.sql.apiSession.Api_response.toApiResponse(): ApiResponse =
         ApiResponse(
             id = ApiResponseId(id),
             requestId = ApiRequestId(request_id),
@@ -339,7 +340,7 @@ class ApiSessionRepositoryImpl(
             json = json,
         )
 
-    private fun com.moneymanager.database.sql.Api_credential.toMonzoCredential(): MonzoCredential =
+    private fun com.moneymanager.database.sql.apiSession.Api_credential.toMonzoCredential(): MonzoCredential =
         MonzoCredential(
             id = MonzoCredentialId(id),
             type = ApiSessionType.fromId(type_id),
@@ -350,7 +351,7 @@ class ApiSessionRepositoryImpl(
             publicKey = public_key,
         )
 
-    private fun com.moneymanager.database.sql.Api_session_with_latest_import.toApiSession(): ApiSession =
+    private fun com.moneymanager.database.sql.apiSession.Api_session_with_latest_import.toApiSession(): ApiSession =
         ApiSession(
             id = ApiSessionId(id),
             type = ApiSessionType.fromId(type_id),

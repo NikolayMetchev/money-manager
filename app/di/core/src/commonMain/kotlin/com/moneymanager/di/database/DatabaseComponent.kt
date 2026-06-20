@@ -3,7 +3,6 @@ package com.moneymanager.di.database
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.service.CsvStrategyExportService
-import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -62,7 +61,6 @@ interface DatabaseComponent {
     val transferAttributeRepository: TransferAttributeRepository
     val transferRelationshipRepository: TransferRelationshipRepository
     val transferSourceRepository: TransferSourceRepository
-    val entitySourceQueries: EntitySourceQueries
     val deviceId: DeviceId
     val importEngine: ImportEngine
 

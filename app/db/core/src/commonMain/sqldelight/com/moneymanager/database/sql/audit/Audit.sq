@@ -1,0 +1,202 @@
+-- Audit tables store historical records of changes to main tables
+-- Each audit table mirrors its source table structure plus audit metadata
+
+-- account_audit: Audit trail for account table
+CREATE TABLE account_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    opening_date INTEGER NOT NULL,
+    category_id INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_audit_account_id ON account_audit(account_id);
+CREATE INDEX IF NOT EXISTS idx_account_audit_timestamp ON account_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_account_audit_type ON account_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_account_audit_account_id_timestamp ON account_audit(account_id, audit_timestamp DESC);
+
+-- currency_audit: Audit trail for currency table
+CREATE TABLE currency_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    currency_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    scale_factor INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_currency_audit_currency_id ON currency_audit(currency_id);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_timestamp ON currency_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_type ON currency_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_currency_id_timestamp ON currency_audit(currency_id, audit_timestamp DESC);
+
+-- category_audit: Audit trail for category table
+CREATE TABLE category_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    category_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    parent_id INTEGER,
+    parent_name TEXT,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_category_audit_category_id ON category_audit(category_id);
+CREATE INDEX IF NOT EXISTS idx_category_audit_timestamp ON category_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_category_audit_type ON category_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_category_audit_category_id_timestamp ON category_audit(category_id, audit_timestamp DESC);
+
+-- transfer_audit: Audit trail for transfer table
+CREATE TABLE transfer_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    transfer_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    source_account_id INTEGER NOT NULL,
+    target_account_id INTEGER NOT NULL,
+    currency_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_transfer_id ON transfer_audit(transfer_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_timestamp ON transfer_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_type ON transfer_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_transfer_id_timestamp ON transfer_audit(transfer_id, audit_timestamp DESC);
+
+-- transfer_attribute_audit: Audit trail for transfer attributes
+CREATE TABLE transfer_attribute_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    transfer_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfer_attribute_audit_transfer_id ON transfer_attribute_audit(transfer_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_attribute_audit_revision ON transfer_attribute_audit(transfer_id, revision_id);
+
+-- account_attribute_audit: Audit trail for account attributes
+CREATE TABLE account_attribute_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_attribute_audit_account_id ON account_attribute_audit(account_id);
+CREATE INDEX IF NOT EXISTS idx_account_attribute_audit_revision ON account_attribute_audit(account_id, revision_id);
+
+-- person_attribute_audit: Audit trail for person attributes
+CREATE TABLE person_attribute_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    person_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_person_attribute_audit_person_id ON person_attribute_audit(person_id);
+CREATE INDEX IF NOT EXISTS idx_person_attribute_audit_revision ON person_attribute_audit(person_id, revision_id);
+
+-- person_audit: Audit trail for person table
+CREATE TABLE person_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    person_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    first_name TEXT NOT NULL,
+    middle_name TEXT,
+    last_name TEXT,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_person_audit_person_id ON person_audit(person_id);
+CREATE INDEX IF NOT EXISTS idx_person_audit_timestamp ON person_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_person_audit_type ON person_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_person_audit_person_id_timestamp ON person_audit(person_id, audit_timestamp DESC);
+
+-- person_account_ownership_audit: Audit trail for person_account_ownership table
+CREATE TABLE person_account_ownership_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    person_account_ownership_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    person_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_person_account_ownership_id ON person_account_ownership_audit(person_account_ownership_id);
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_timestamp ON person_account_ownership_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_type ON person_account_ownership_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_person_account_ownership_id_timestamp ON person_account_ownership_audit(person_account_ownership_id, audit_timestamp DESC);
+
+-- api_import_strategy_audit: Audit trail for api_import_strategy table
+CREATE TABLE api_import_strategy_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    api_import_strategy_id TEXT NOT NULL,
+    revision_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_import_strategy_audit_strategy_id ON api_import_strategy_audit(api_import_strategy_id);
+CREATE INDEX IF NOT EXISTS idx_api_import_strategy_audit_timestamp ON api_import_strategy_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_api_import_strategy_audit_type ON api_import_strategy_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_api_import_strategy_audit_strategy_id_timestamp ON api_import_strategy_audit(api_import_strategy_id, audit_timestamp DESC);
+
+-- csv_import_strategy_audit: Audit trail for csv_import_strategy table
+CREATE TABLE csv_import_strategy_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    csv_import_strategy_id TEXT NOT NULL,
+    revision_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    identification_columns_json TEXT NOT NULL,
+    field_mappings_json TEXT NOT NULL,
+    attribute_mappings_json TEXT NOT NULL,
+    row_rules_json TEXT NOT NULL,
+    companion_rules_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_strategy_id ON csv_import_strategy_audit(csv_import_strategy_id);
+CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_timestamp ON csv_import_strategy_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_type ON csv_import_strategy_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_strategy_id_timestamp ON csv_import_strategy_audit(csv_import_strategy_id, audit_timestamp DESC);

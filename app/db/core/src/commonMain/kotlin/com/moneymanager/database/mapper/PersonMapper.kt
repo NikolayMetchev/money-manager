@@ -4,5 +4,5 @@ import com.moneymanager.domain.model.Person
 import tech.mappie.api.ObjectMappie
 
 object PersonMapper :
-    ObjectMappie<com.moneymanager.database.sql.Person, Person>(),
+    ObjectMappie<com.moneymanager.database.sql.person.Person, Person>(),
     IdConversions

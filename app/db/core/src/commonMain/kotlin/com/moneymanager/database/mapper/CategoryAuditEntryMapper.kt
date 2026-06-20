@@ -2,7 +2,7 @@
 
 package com.moneymanager.database.mapper
 
-import com.moneymanager.database.sql.SelectAuditHistoryForCategory
+import com.moneymanager.database.sql.audit.SelectAuditHistoryForCategory
 import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.SourceRecord

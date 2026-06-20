@@ -17,10 +17,11 @@ import kotlinx.coroutines.withContext
 class AccountAttributeRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
 ) : AccountAttributeRepository {
-    private val queries = database.accountAttributeQueries
+    private val selectQueries = database.accountAttributeSelectQueries
+    private val writeQueries = database.accountAttributeWriteQueries
 
     override fun getByAccount(accountId: AccountId): Flow<List<AccountAttribute>> =
-        queries
+        selectQueries
             .selectByAccount(accountId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -45,13 +46,13 @@ class AccountAttributeRepositoryImpl(
         value: String,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                queries.insert(
+            writeQueries.transactionWithResult {
+                writeQueries.insert(
                     accountId.id,
                     attributeTypeId.id,
                     value,
                 )
-                queries.selectLastInsertedId().executeAsOne()
+                writeQueries.selectLastInsertedId().executeAsOne()
             }
         }
 
@@ -61,15 +62,15 @@ class AccountAttributeRepositoryImpl(
         value: String,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
+            writeQueries.transactionWithResult {
                 database.beginCreationMode()
                 try {
-                    queries.insert(
+                    writeQueries.insert(
                         accountId.id,
                         attributeTypeId.id,
                         value,
                     )
-                    queries.selectLastInsertedId().executeAsOne()
+                    writeQueries.selectLastInsertedId().executeAsOne()
                 } finally {
                     database.endCreationMode()
                 }
@@ -79,11 +80,11 @@ class AccountAttributeRepositoryImpl(
     override suspend fun insertInCreationModeBatch(attributes: List<AccountAttributeCreateInput>): Unit =
         withContext(Dispatchers.Default) {
             if (attributes.isEmpty()) return@withContext
-            queries.transaction {
+            writeQueries.transaction {
                 database.beginCreationMode()
                 try {
                     attributes.forEach { input ->
-                        queries.insert(
+                        writeQueries.insert(
                             input.accountId.id,
                             input.attributeTypeId.id,
                             input.value,
@@ -100,11 +101,11 @@ class AccountAttributeRepositoryImpl(
         newValue: String,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.updateValue(newValue, id)
+            writeQueries.updateValue(newValue, id)
         }
 
     override suspend fun delete(id: Long): Unit =
         withContext(Dispatchers.Default) {
-            queries.deleteById(id)
+            writeQueries.deleteById(id)
         }
 }

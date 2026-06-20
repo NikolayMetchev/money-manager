@@ -1,0 +1,92 @@
+-- Generic source tracking for entity changes for every entity type, including transfers.
+-- This is the single provenance store: a transfer's source is an entity_source row with
+-- entity_type_id = 7 (TRANSFER) and entity_id = the transfer id.
+
+-- entity_type values:
+-- 1 = ACCOUNT
+-- 2 = PERSON
+-- 3 = CURRENCY
+-- 4 = PERSON_ACCOUNT_OWNERSHIP
+-- 5 = CATEGORY
+-- 6 = API_IMPORT_STRATEGY
+-- 7 = TRANSFER
+-- 8 = CSV_IMPORT_STRATEGY
+
+CREATE TABLE entity_type (
+    id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL UNIQUE
+);
+
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (1, 'ACCOUNT');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (2, 'PERSON');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (3, 'CURRENCY');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (4, 'PERSON_ACCOUNT_OWNERSHIP');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (5, 'CATEGORY');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (6, 'API_IMPORT_STRATEGY');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (7, 'TRANSFER');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (8, 'CSV_IMPORT_STRATEGY');
+
+CREATE TABLE entity_source (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type_id INTEGER NOT NULL,
+    entity_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    source_type_id INTEGER NOT NULL,
+    device_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+    FOREIGN KEY (entity_type_id) REFERENCES entity_type(id),
+    FOREIGN KEY (source_type_id) REFERENCES source_type(id),
+    FOREIGN KEY (device_id) REFERENCES device(id),
+    UNIQUE (entity_type_id, entity_id, revision_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_source_entity ON entity_source(entity_type_id, entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_source_type ON entity_source(source_type_id);
+CREATE INDEX IF NOT EXISTS idx_entity_source_entity_revision ON entity_source(entity_type_id, entity_id, revision_id);
+CREATE INDEX IF NOT EXISTS idx_entity_source_device ON entity_source(device_id);
+
+-- api_entity_source: API-specific data for API sources (source_type_id = 5)
+-- 1:1 relationship with entity_source
+-- Sessions and requests must not be deleted while entity sources reference them (ON DELETE RESTRICT),
+-- preserving referential integrity of the audit trail.
+CREATE TABLE api_entity_source (
+    id INTEGER PRIMARY KEY,  -- Same as entity_source.id
+    api_session_id INTEGER NOT NULL,
+    api_request_id INTEGER NOT NULL,
+    json_path TEXT NOT NULL,
+    FOREIGN KEY (id) REFERENCES entity_source(id),
+    FOREIGN KEY (api_session_id) REFERENCES api_session(id) ON DELETE RESTRICT,
+    FOREIGN KEY (api_request_id) REFERENCES api_request(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_entity_source_session ON api_entity_source(api_session_id);
+CREATE INDEX IF NOT EXISTS idx_api_entity_source_request ON api_entity_source(api_request_id);
+
+-- csv_entity_source: CSV-specific data for CSV sources (source_type_id = 2), 1:1 with entity_source.
+-- Records which CSV import and which row created the entity (e.g. the first row that referenced a
+-- new account), so the audit trail can link back to that row in the CSV import detail.
+-- csv_row_index is nullable: an entity created from the import as a whole (e.g. an account derived
+-- from many rows) has a known import id but no single originating row.
+CREATE TABLE csv_entity_source (
+    id INTEGER PRIMARY KEY,  -- Same as entity_source.id
+    csv_import_id TEXT NOT NULL,
+    csv_row_index INTEGER,
+    FOREIGN KEY (id) REFERENCES entity_source(id),
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_csv_entity_source_import ON csv_entity_source(csv_import_id);
+
+-- qif_entity_source: QIF-specific data for QIF sources (source_type_id = 6), 1:1 with entity_source.
+-- Records which QIF import and record created the entity, mirroring csv_entity_source.
+-- qif_record_index is nullable: an entity created from the import as a whole (e.g. an account
+-- derived from many records) has a known import id but no single originating record.
+CREATE TABLE qif_entity_source (
+    id INTEGER PRIMARY KEY,  -- Same as entity_source.id
+    qif_import_id TEXT NOT NULL,
+    qif_record_index INTEGER,
+    FOREIGN KEY (id) REFERENCES entity_source(id),
+    FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_qif_entity_source_import ON qif_entity_source(qif_import_id);

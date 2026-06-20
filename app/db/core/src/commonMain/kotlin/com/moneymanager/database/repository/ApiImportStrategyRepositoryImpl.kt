@@ -8,7 +8,7 @@ import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.json.ApiStrategyConfigJson
 import com.moneymanager.database.json.ApiStrategyJsonCodec
-import com.moneymanager.database.sql.Api_import_strategy
+import com.moneymanager.database.sql.apiImportStrategy.Api_import_strategy
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
@@ -29,24 +29,25 @@ class ApiImportStrategyRepositoryImpl(
     private val deviceId: DeviceId,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : ApiImportStrategyRepository {
-    private val queries = database.apiImportStrategyQueries
+    private val selectQueries = database.apiImportStrategySelectQueries
+    private val writeQueries = database.apiImportStrategyWriteQueries
 
     override fun getAllStrategies(): Flow<List<ApiImportStrategy>> =
-        queries
+        selectQueries
             .selectAll()
             .asFlow()
             .mapToList(coroutineContext)
             .map { rows -> rows.map(::toDomain) }
 
     override fun getStrategyById(id: ApiImportStrategyId): Flow<ApiImportStrategy?> =
-        queries
+        selectQueries
             .selectById(id.id.toString())
             .asFlow()
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }
 
     override fun getStrategyByName(name: String): Flow<ApiImportStrategy?> =
-        queries
+        selectQueries
             .selectByName(name)
             .asFlow()
             .mapToOneOrNull(coroutineContext)
@@ -59,12 +60,12 @@ class ApiImportStrategyRepositoryImpl(
         withContext(coroutineContext) {
             // created_at/updated_at are stamped with the current time by the table's column DEFAULTs,
             // so the database always records when the row was actually persisted (not a domain value).
-            queries.insert(
+            writeQueries.insert(
                 id = strategy.id.id.toString(),
                 name = strategy.name,
                 config_json = ApiStrategyJsonCodec.encode(strategy.toConfigJson()),
             )
-            queries.insertSource(
+            writeQueries.insertSource(
                 strategy_id = strategy.id.id.toString(),
                 revision_id = 1,
                 source_type_id = source.toSourceType().id.toLong(),
@@ -83,7 +84,7 @@ class ApiImportStrategyRepositoryImpl(
             // revision_id read back below reflects exactly this update and cannot interleave
             // with a concurrent writer.
             database.transaction {
-                queries.update(
+                writeQueries.update(
                     name = strategy.name,
                     config_json = ApiStrategyJsonCodec.encode(strategy.toConfigJson()),
                     updated_at = now.toEpochMilliseconds(),
@@ -93,8 +94,8 @@ class ApiImportStrategyRepositoryImpl(
                 // persisted value back instead of deriving it from the (possibly stale) snapshot.
                 // This keeps the source row aligned with the audit row the update trigger writes.
                 val persistedRevisionId =
-                    queries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
-                queries.insertSource(
+                    selectQueries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
+                writeQueries.insertSource(
                     strategy_id = strategy.id.id.toString(),
                     revision_id = persistedRevisionId,
                     source_type_id = source.toSourceType().id.toLong(),
@@ -105,7 +106,7 @@ class ApiImportStrategyRepositoryImpl(
 
     override suspend fun deleteStrategy(id: ApiImportStrategyId): Unit =
         withContext(coroutineContext) {
-            queries.deleteById(id.id.toString())
+            writeQueries.deleteById(id.id.toString())
         }
 
     private fun toDomain(entity: Api_import_strategy): ApiImportStrategy {

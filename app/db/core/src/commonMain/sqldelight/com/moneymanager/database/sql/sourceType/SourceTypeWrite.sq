@@ -1,0 +1,3 @@
+-- Insert source type (used during seeding)
+insert:
+INSERT INTO source_type (id, name) VALUES (?, ?);

@@ -29,24 +29,25 @@ class CsvImportStrategyRepositoryImpl(
     private val deviceId: DeviceId,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : CsvImportStrategyRepository {
-    private val queries = database.csvImportStrategyQueries
+    private val selectQueries = database.csvImportStrategySelectQueries
+    private val writeQueries = database.csvImportStrategyWriteQueries
 
     override fun getAllStrategies(): Flow<List<CsvImportStrategy>> =
-        queries
+        selectQueries
             .selectAll()
             .asFlow()
             .mapToList(coroutineContext)
             .map { strategies -> strategies.map(::toDomain) }
 
     override fun getStrategyById(id: CsvImportStrategyId): Flow<CsvImportStrategy?> =
-        queries
+        selectQueries
             .selectById(id.id.toString())
             .asFlow()
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }
 
     override fun getStrategyByName(name: String): Flow<CsvImportStrategy?> =
-        queries
+        selectQueries
             .selectByName(name)
             .asFlow()
             .mapToOneOrNull(coroutineContext)
@@ -64,8 +65,8 @@ class CsvImportStrategyRepositoryImpl(
     ): CsvImportStrategyId =
         withContext(coroutineContext) {
             database.transaction {
-                queries.insertStrategy(strategy)
-                queries.insertSource(
+                writeQueries.insertStrategy(strategy)
+                writeQueries.insertSource(
                     strategy_id = strategy.id.id.toString(),
                     revision_id = 1,
                     source_type_id = source.toSourceType().id.toLong(),
@@ -84,7 +85,7 @@ class CsvImportStrategyRepositoryImpl(
             // Wrap the update and its source attribution in a single transaction so the revision_id read
             // back below reflects exactly this update and cannot interleave with a concurrent writer.
             database.transaction {
-                queries.update(
+                writeQueries.update(
                     name = strategy.name,
                     identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
                     field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
@@ -96,8 +97,8 @@ class CsvImportStrategyRepositoryImpl(
                     id = strategy.id.id.toString(),
                 )
                 val persistedRevisionId =
-                    queries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
-                queries.insertSource(
+                    selectQueries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
+                writeQueries.insertSource(
                     strategy_id = strategy.id.id.toString(),
                     revision_id = persistedRevisionId,
                     source_type_id = source.toSourceType().id.toLong(),
@@ -108,10 +109,10 @@ class CsvImportStrategyRepositoryImpl(
 
     override suspend fun deleteStrategy(id: CsvImportStrategyId): Unit =
         withContext(coroutineContext) {
-            queries.deleteById(id.id.toString())
+            writeQueries.deleteById(id.id.toString())
         }
 
-    private fun toDomain(entity: com.moneymanager.database.sql.Csv_import_strategy): CsvImportStrategy =
+    private fun toDomain(entity: com.moneymanager.database.sql.csvImportStrategy.Csv_import_strategy): CsvImportStrategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.parse(entity.id)),
             name = entity.name,

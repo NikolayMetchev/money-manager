@@ -22,33 +22,34 @@ class PersonAccountOwnershipRepositoryImpl(
     database: MoneyManagerDatabase,
     private val deviceId: DeviceId,
 ) : PersonAccountOwnershipRepository {
-    private val queries = database.personQueries
-    private val accountQueries = database.accountQueries
-    private val entitySourceQueries = database.entitySourceQueries
+    private val personSelectQueries = database.personSelectQueries
+    private val personWriteQueries = database.personWriteQueries
+    private val accountWriteQueries = database.accountWriteQueries
+    private val database = database
 
     override fun getOwnershipsByPerson(personId: PersonId): Flow<List<PersonAccountOwnership>> =
-        queries
+        personSelectQueries
             .ownershipSelectByPerson(personId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(PersonAccountOwnershipMapper::mapList)
 
     override fun getOwnershipsByAccount(accountId: AccountId): Flow<List<PersonAccountOwnership>> =
-        queries
+        personSelectQueries
             .ownershipSelectByAccount(accountId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(PersonAccountOwnershipMapper::mapList)
 
     override fun getAllOwnerships(): Flow<List<PersonAccountOwnership>> =
-        queries
+        personSelectQueries
             .ownershipSelectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(PersonAccountOwnershipMapper::mapList)
 
     override fun getOwnershipById(id: Long): Flow<PersonAccountOwnership?> =
-        queries
+        personSelectQueries
             .ownershipSelectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
@@ -60,18 +61,18 @@ class PersonAccountOwnershipRepositoryImpl(
         source: Source,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                queries.ownershipInsert(
+            personWriteQueries.transactionWithResult {
+                personWriteQueries.ownershipInsert(
                     person_id = personId.id,
                     account_id = accountId.id,
                 )
-                val id = queries.ownershipLastInsertRowId().executeAsOne()
-                entitySourceQueries.recordSource(deviceId, EntityType.PERSON_ACCOUNT_OWNERSHIP, id, 1L, source)
+                val id = personWriteQueries.ownershipLastInsertRowId().executeAsOne()
+                database.recordSource(deviceId, EntityType.PERSON_ACCOUNT_OWNERSHIP, id, 1L, source)
                 // A manual ownership change is a change to the account, so bump its revision and record
                 // it in the account audit trail (the ownership change is matched to that revision in the
                 // audit UI). Import/sample ownerships are part of bulk creation and don't bump.
                 if (source is Source.Manual) {
-                    accountQueries.bumpRevisionOnly(accountId.id)
+                    accountWriteQueries.bumpRevisionOnly(accountId.id)
                 }
                 id
             }
@@ -79,22 +80,22 @@ class PersonAccountOwnershipRepositoryImpl(
 
     override suspend fun deleteOwnership(id: Long): Unit =
         withContext(Dispatchers.Default) {
-            queries.transaction {
+            personWriteQueries.transaction {
                 // deleteOwnership is only reachable from manual account editing, so removing an owner is
                 // a change to the account: bump its revision so it shows in the account audit trail.
-                val accountId = queries.ownershipSelectById(id).executeAsOneOrNull()?.account_id
-                queries.ownershipDelete(id)
-                accountId?.let { accountQueries.bumpRevisionOnly(it) }
+                val accountId = personSelectQueries.ownershipSelectById(id).executeAsOneOrNull()?.account_id
+                personWriteQueries.ownershipDelete(id)
+                accountId?.let { accountWriteQueries.bumpRevisionOnly(it) }
             }
         }
 
     override suspend fun deleteOwnershipsByPerson(personId: PersonId): Unit =
         withContext(Dispatchers.Default) {
-            queries.ownershipDeleteByPerson(personId.id)
+            personWriteQueries.ownershipDeleteByPerson(personId.id)
         }
 
     override suspend fun deleteOwnershipsByAccount(accountId: AccountId): Unit =
         withContext(Dispatchers.Default) {
-            queries.ownershipDeleteByAccount(accountId.id)
+            personWriteQueries.ownershipDeleteByAccount(accountId.id)
         }
 }

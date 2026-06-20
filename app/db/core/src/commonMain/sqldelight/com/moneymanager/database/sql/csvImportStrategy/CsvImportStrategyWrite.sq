@@ -1,0 +1,18 @@
+-- Insert a new strategy. created_at/updated_at are filled by their column DEFAULTs (current time).
+insert:
+INSERT INTO csv_import_strategy (id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, row_rules_json, companion_rules_json, content_match_rules_json)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Update an existing strategy
+update:
+UPDATE csv_import_strategy
+SET revision_id = revision_id + 1, name = ?, identification_columns_json = ?, field_mappings_json = ?, attribute_mappings_json = ?, row_rules_json = ?, companion_rules_json = ?, content_match_rules_json = ?, updated_at = ?
+WHERE id = ?;
+
+-- Delete a strategy by ID
+deleteById:
+DELETE FROM csv_import_strategy WHERE id = ?;
+
+insertSource:
+INSERT OR IGNORE INTO csv_import_strategy_source (strategy_id, revision_id, source_type_id, device_id)
+VALUES (?, ?, ?, ?);

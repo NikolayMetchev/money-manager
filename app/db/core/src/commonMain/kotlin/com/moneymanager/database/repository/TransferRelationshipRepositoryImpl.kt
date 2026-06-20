@@ -16,10 +16,11 @@ import kotlinx.coroutines.withContext
 class TransferRelationshipRepositoryImpl(
     database: MoneyManagerDatabaseWrapper,
 ) : TransferRelationshipRepository {
-    private val queries = database.transferRelationshipQueries
+    private val selectQueries = database.transferRelationshipSelectQueries
+    private val writeQueries = database.transferRelationshipWriteQueries
 
     override fun getByTransfer(transferId: TransferId): Flow<List<TransferRelationship>> =
-        queries
+        selectQueries
             .selectByTransfer(transferId.id, transferId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -43,7 +44,7 @@ class TransferRelationshipRepositoryImpl(
         typeId: RelationshipTypeId,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.insert(id1.id, id2.id, typeId.id)
+            writeQueries.insert(id1.id, id2.id, typeId.id)
         }
 
     override suspend fun delete(
@@ -52,6 +53,6 @@ class TransferRelationshipRepositoryImpl(
         typeId: RelationshipTypeId,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.delete(id1.id, id2.id, typeId.id)
+            writeQueries.delete(id1.id, id2.id, typeId.id)
         }
 }

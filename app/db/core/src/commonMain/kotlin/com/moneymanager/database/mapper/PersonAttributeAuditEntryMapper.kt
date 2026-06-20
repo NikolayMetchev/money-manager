@@ -2,7 +2,7 @@
 
 package com.moneymanager.database.mapper
 
-import com.moneymanager.database.sql.SelectAttributeAuditByPerson
+import com.moneymanager.database.sql.audit.SelectAttributeAuditByPerson
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.PersonAttributeAuditEntry

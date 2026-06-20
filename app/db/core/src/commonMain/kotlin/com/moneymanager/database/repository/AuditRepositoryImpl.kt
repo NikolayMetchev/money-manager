@@ -41,12 +41,12 @@ import kotlin.time.Instant
 class AuditRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : AuditRepository {
-    private val queries = database.auditQueries
+    private val auditSelectQueries = database.auditSelectQueries
 
     override suspend fun getAuditHistoryForTransfer(transferId: TransferId): List<TransferAuditEntry> =
         withContext(Dispatchers.Default) {
             val entries =
-                queries
+                auditSelectQueries
                     .selectAuditHistoryForTransfer(transferId.id)
                     .executeAsList()
                     .map(TransferAuditEntryMapper::map)
@@ -57,7 +57,7 @@ class AuditRepositoryImpl(
     override suspend fun getAuditHistoryForAccount(accountId: AccountId): List<AccountAuditEntry> =
         withContext(Dispatchers.Default) {
             val entries =
-                queries
+                auditSelectQueries
                     .selectAuditHistoryForAccount(accountId.id)
                     .executeAsList()
                     .map(AccountAuditEntryMapper::map)
@@ -67,7 +67,7 @@ class AuditRepositoryImpl(
 
     override suspend fun getLatestAuditedAccountNames(): Map<Long, String> =
         withContext(Dispatchers.Default) {
-            queries
+            auditSelectQueries
                 .selectLatestAuditedAccountNames()
                 .executeAsList()
                 .associate { it.account_id to it.name }
@@ -76,7 +76,7 @@ class AuditRepositoryImpl(
     override suspend fun getAuditHistoryForPerson(personId: PersonId): List<PersonAuditEntry> =
         withContext(Dispatchers.Default) {
             val entries =
-                queries
+                auditSelectQueries
                     .selectAuditHistoryForPerson(personId.id)
                     .executeAsList()
                     .map(PersonAuditEntryMapper::map)
@@ -85,7 +85,7 @@ class AuditRepositoryImpl(
 
     override suspend fun getAuditHistoryForPersonAccountOwnership(ownershipId: Long): List<PersonAccountOwnershipAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries
+            auditSelectQueries
                 .selectAuditHistoryForPersonAccountOwnership(ownershipId)
                 .executeAsList()
                 .map(PersonAccountOwnershipAuditEntryMapper::map)
@@ -93,7 +93,7 @@ class AuditRepositoryImpl(
 
     override suspend fun getOwnershipAuditHistoryForAccount(accountId: AccountId): List<PersonAccountOwnershipAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries
+            auditSelectQueries
                 .selectOwnershipAuditHistoryForAccount(accountId.id)
                 .executeAsList()
                 .map(OwnershipAuditHistoryForAccountMapper::map)
@@ -101,7 +101,7 @@ class AuditRepositoryImpl(
 
     override suspend fun getAuditHistoryForCurrency(currencyId: CurrencyId): List<CurrencyAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries
+            auditSelectQueries
                 .selectAuditHistoryForCurrency(currencyId.id)
                 .executeAsList()
                 .map(CurrencyAuditEntryMapper::map)
@@ -109,7 +109,7 @@ class AuditRepositoryImpl(
 
     override suspend fun getAuditHistoryForCategory(categoryId: Long): List<CategoryAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries
+            auditSelectQueries
                 .selectAuditHistoryForCategory(categoryId)
                 .executeAsList()
                 .map(CategoryAuditEntryMapper::map)
@@ -127,7 +127,7 @@ class AuditRepositoryImpl(
 
     override suspend fun getAuditHistoryForApiImportStrategy(strategyId: ApiImportStrategyId): List<ApiImportStrategyAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries
+            auditSelectQueries
                 .selectAuditHistoryForApiImportStrategy(strategyId.id.toString())
                 .executeAsList()
                 .map(ApiImportStrategyAuditEntryMapper::map)
@@ -135,14 +135,14 @@ class AuditRepositoryImpl(
 
     override suspend fun getAuditHistoryForCsvImportStrategy(strategyId: CsvImportStrategyId): List<CsvImportStrategyAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries
+            auditSelectQueries
                 .selectAuditHistoryForCsvImportStrategy(strategyId.id.toString())
                 .executeAsList()
                 .map(CsvImportStrategyAuditEntryMapper::map)
         }
 
     private fun fetchAccountAttributeAudit(accountId: AccountId): List<AccountAttributeAuditEntry> =
-        queries
+        auditSelectQueries
             .selectAttributeAuditByAccount(accountId.id)
             .executeAsList()
             .map { row ->
@@ -177,7 +177,7 @@ class AuditRepositoryImpl(
     }
 
     private fun fetchPersonAttributeAudit(personId: PersonId): List<PersonAttributeAuditEntry> =
-        queries
+        auditSelectQueries
             .selectAttributeAuditByPerson(personId.id)
             .executeAsList()
             .map(PersonAttributeAuditEntryMapper::map)
@@ -199,7 +199,7 @@ class AuditRepositoryImpl(
     ): List<TransferAuditEntry> {
         // Fetch all attribute audit entries for this transfer
         val allAttributeChanges =
-            queries
+            auditSelectQueries
                 .selectAttributeAuditByTransfer(transferId.id)
                 .executeAsList()
                 .map { row ->

@@ -1,0 +1,7 @@
+-- Insert a new transaction ID
+insert:
+INSERT INTO transaction_id DEFAULT VALUES;
+
+-- Get the last inserted transaction ID
+lastInsertedId:
+SELECT last_insert_rowid();

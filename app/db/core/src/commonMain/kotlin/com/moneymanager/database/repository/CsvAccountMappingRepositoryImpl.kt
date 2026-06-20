@@ -23,17 +23,18 @@ class CsvAccountMappingRepositoryImpl(
     database: MoneyManagerDatabaseWrapper,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : CsvAccountMappingRepository {
-    private val queries = database.csvAccountMappingQueries
+    private val selectQueries = database.csvAccountMappingSelectQueries
+    private val writeQueries = database.csvAccountMappingWriteQueries
 
     override fun getMappingsForStrategy(strategyId: CsvImportStrategyId): Flow<List<CsvAccountMapping>> =
-        queries
+        selectQueries
             .selectByStrategyId(strategyId.id.toString())
             .asFlow()
             .mapToList(coroutineContext)
             .map { mappings -> mappings.map(::toDomain) }
 
     override fun getMappingById(id: Long): Flow<CsvAccountMapping?> =
-        queries
+        selectQueries
             .selectById(id)
             .asFlow()
             .mapToOneOrNull(coroutineContext)
@@ -47,7 +48,7 @@ class CsvAccountMappingRepositoryImpl(
     ): Long =
         withContext(coroutineContext) {
             val now = Clock.System.now()
-            queries.insert(
+            writeQueries.insert(
                 strategy_id = strategyId.id.toString(),
                 column_name = columnName,
                 value_pattern = valuePattern.pattern,
@@ -55,16 +56,16 @@ class CsvAccountMappingRepositoryImpl(
                 created_at = now.toEpochMilliseconds(),
                 updated_at = now.toEpochMilliseconds(),
             )
-            queries.lastInsertRowId().executeAsOne()
+            writeQueries.lastInsertRowId().executeAsOne()
         }
 
     override suspend fun createMappings(mappings: List<CsvAccountMapping>): Unit =
         withContext(coroutineContext) {
             if (mappings.isEmpty()) return@withContext
 
-            queries.transaction {
+            writeQueries.transaction {
                 mappings.forEach { mapping ->
-                    queries.insert(
+                    writeQueries.insert(
                         strategy_id = mapping.strategyId.id.toString(),
                         column_name = mapping.columnName,
                         value_pattern = mapping.valuePattern.pattern,
@@ -79,7 +80,7 @@ class CsvAccountMappingRepositoryImpl(
     override suspend fun updateMapping(mapping: CsvAccountMapping): Unit =
         withContext(coroutineContext) {
             val now = Clock.System.now()
-            queries.update(
+            writeQueries.update(
                 column_name = mapping.columnName,
                 value_pattern = mapping.valuePattern.pattern,
                 account_id = mapping.accountId.id,
@@ -90,15 +91,15 @@ class CsvAccountMappingRepositoryImpl(
 
     override suspend fun deleteMapping(id: Long): Unit =
         withContext(coroutineContext) {
-            queries.deleteById(id)
+            writeQueries.deleteById(id)
         }
 
     override suspend fun deleteMappingsForStrategy(strategyId: CsvImportStrategyId): Unit =
         withContext(coroutineContext) {
-            queries.deleteByStrategyId(strategyId.id.toString())
+            writeQueries.deleteByStrategyId(strategyId.id.toString())
         }
 
-    private fun toDomain(entity: com.moneymanager.database.sql.Csv_account_mapping): CsvAccountMapping =
+    private fun toDomain(entity: com.moneymanager.database.sql.csvAccountMapping.Csv_account_mapping): CsvAccountMapping =
         CsvAccountMapping(
             id = entity.id,
             strategyId = CsvImportStrategyId(Uuid.parse(entity.strategy_id)),

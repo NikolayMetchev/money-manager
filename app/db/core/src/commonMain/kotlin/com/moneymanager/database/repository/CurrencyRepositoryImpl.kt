@@ -22,25 +22,26 @@ class CurrencyRepositoryImpl(
     database: MoneyManagerDatabase,
     private val deviceId: DeviceId,
 ) : CurrencyRepository {
-    private val queries = database.currencyQueries
-    private val entitySourceQueries = database.entitySourceQueries
+    private val selectQueries = database.currencySelectQueries
+    private val writeQueries = database.currencyWriteQueries
+    private val database = database
 
     override fun getAllCurrencies(): Flow<List<Currency>> =
-        queries
+        selectQueries
             .selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(CurrencyMapper::mapList)
 
     override fun getCurrencyById(id: CurrencyId): Flow<Currency?> =
-        queries
+        selectQueries
             .selectById(id.id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(CurrencyMapper::map) }
 
     override fun getCurrencyByCode(code: String): Flow<Currency?> =
-        queries
+        selectQueries
             .selectByCode(code)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
@@ -52,15 +53,15 @@ class CurrencyRepositoryImpl(
         source: Source,
     ): CurrencyId =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                val existing = queries.selectByCode(code).executeAsOneOrNull()
+            writeQueries.transactionWithResult {
+                val existing = selectQueries.selectByCode(code).executeAsOneOrNull()
                 existing?.let { CurrencyId(it.id) }
                     ?: run {
                         val scaleFactor = CurrencyScaleFactors.getScaleFactor(code)
-                        queries.insert(code, name, scaleFactor.toLong())
-                        val newId = queries.lastInsertedId().executeAsOne()
+                        writeQueries.insert(code, name, scaleFactor.toLong())
+                        val newId = writeQueries.lastInsertedId().executeAsOne()
                         // Only a freshly inserted currency records a source (the existing branch keeps its own).
-                        entitySourceQueries.recordSource(deviceId, EntityType.CURRENCY, newId, 1L, source)
+                        database.recordSource(deviceId, EntityType.CURRENCY, newId, 1L, source)
                         CurrencyId(newId)
                     }
             }
@@ -71,20 +72,20 @@ class CurrencyRepositoryImpl(
         source: Source,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                queries.update(
+            writeQueries.transactionWithResult {
+                writeQueries.update(
                     code = currency.code,
                     name = currency.name,
                     scale_factor = currency.scaleFactor,
                     id = currency.id.id,
                 )
-                val revision = queries.selectById(currency.id.id).executeAsOne().revision_id
-                entitySourceQueries.recordSource(deviceId, EntityType.CURRENCY, currency.id.id, revision, source)
+                val revision = selectQueries.selectById(currency.id.id).executeAsOne().revision_id
+                database.recordSource(deviceId, EntityType.CURRENCY, currency.id.id, revision, source)
             }
         }
 
     override suspend fun deleteCurrency(id: CurrencyId): Unit =
         withContext(Dispatchers.Default) {
-            queries.delete(id.id)
+            writeQueries.delete(id.id)
         }
 }

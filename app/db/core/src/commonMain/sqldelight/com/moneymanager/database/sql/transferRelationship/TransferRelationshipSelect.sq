@@ -1,0 +1,12 @@
+-- All relationships touching a transfer, from either side of the pair.
+selectByTransfer:
+SELECT
+    transfer_relationship.id1,
+    transfer_relationship.id2,
+    transfer_relationship.relationship_type_id,
+    relationship_type.id AS relationship_type_id,
+    relationship_type.name AS relationship_type_name
+FROM transfer_relationship
+JOIN relationship_type ON transfer_relationship.relationship_type_id = relationship_type.id
+WHERE transfer_relationship.id1 = ? OR transfer_relationship.id2 = ?
+ORDER BY relationship_type.name;

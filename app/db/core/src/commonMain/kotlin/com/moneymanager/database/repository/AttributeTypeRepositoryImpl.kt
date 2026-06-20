@@ -15,10 +15,11 @@ import kotlinx.coroutines.withContext
 class AttributeTypeRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : AttributeTypeRepository {
-    private val queries = database.attributeTypeQueries
+    private val selectQueries = database.attributeTypeSelectQueries
+    private val writeQueries = database.attributeTypeWriteQueries
 
     override fun getAll(): Flow<List<AttributeType>> =
-        queries
+        selectQueries
             .selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -32,7 +33,7 @@ class AttributeTypeRepositoryImpl(
             }
 
     override fun getById(id: AttributeTypeId): Flow<AttributeType?> =
-        queries
+        selectQueries
             .selectById(id.id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
@@ -46,7 +47,7 @@ class AttributeTypeRepositoryImpl(
             }
 
     override fun getByName(name: String): Flow<AttributeType?> =
-        queries
+        selectQueries
             .selectByName(name)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
@@ -61,14 +62,14 @@ class AttributeTypeRepositoryImpl(
 
     override suspend fun getOrCreate(name: String): AttributeTypeId =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
+            writeQueries.transactionWithResult {
                 // Try to find existing
-                val existing = queries.selectByName(name).executeAsOneOrNull()
+                val existing = selectQueries.selectByName(name).executeAsOneOrNull()
                 existing?.let { AttributeTypeId(it.id) }
                     ?: run {
                         // Insert and get the new ID
-                        queries.insert(name)
-                        val newId = queries.selectByName(name).executeAsOne().id
+                        writeQueries.insert(name)
+                        val newId = selectQueries.selectByName(name).executeAsOne().id
                         AttributeTypeId(newId)
                     }
             }

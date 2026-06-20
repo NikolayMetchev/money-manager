@@ -26,7 +26,6 @@ import com.moneymanager.database.repository.TransferAttributeRepositoryImpl
 import com.moneymanager.database.repository.TransferRelationshipRepositoryImpl
 import com.moneymanager.database.repository.TransferSourceRepositoryImpl
 import com.moneymanager.database.service.CsvStrategyExportService
-import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -62,10 +61,6 @@ import dev.zacsweers.metro.SingleIn
  */
 @ContributesTo(DatabaseScope::class)
 interface RepositoryModule {
-    @Provides
-    @SingleIn(DatabaseScope::class)
-    fun provideEntitySourceQueries(database: MoneyManagerDatabaseWrapper): EntitySourceQueries = database.entitySourceQueries
-
     @Provides
     @SingleIn(DatabaseScope::class)
     fun provideAccountAttributeRepository(database: MoneyManagerDatabaseWrapper): AccountAttributeRepository =
