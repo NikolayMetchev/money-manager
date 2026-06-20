@@ -77,6 +77,7 @@ import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -816,6 +817,7 @@ private fun TransferPreviewTable(transfers: List<Transfer>) {
         modifier =
             Modifier
                 .fillMaxWidth()
+                .linuxHorizontalScrollWheel(scrollState)
                 .horizontalScroll(scrollState),
     ) {
         Column {

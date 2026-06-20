@@ -76,6 +76,20 @@ exclude:
       - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/IdConversions.kt
       - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt
       - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/SourceTypeConversions.kt
+  # Android no-op actual for the Linux-only horizontal-scroll-wheel modifier: the scrollState
+  # parameter is required by the expect signature but unused on Android (no mouse wheel).
+  - name: unused
+    paths:
+      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.android.kt
+  - name: UnusedSymbol
+    paths:
+      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.android.kt
+  - name: UnusedDeclaration
+    paths:
+      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.android.kt
+  - name: UnusedSymbolLocal
+    paths:
+      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.android.kt
   # Metro DI module + platform factories contributed via @ContributesTo/@Provides and expect-actual:
   # Qodana sees no direct usage (mirrors DatabaseManagerModule / CreateDatabaseManager.jvm.kt).
   - name: unused

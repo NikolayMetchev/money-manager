@@ -44,6 +44,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
 
 private val TRANSFER_COLUMN_WIDTH = 120.dp
 private val ROW_INDEX_COLUMN_WIDTH = 60.dp
@@ -122,7 +123,7 @@ fun CsvPreviewTable(
             }
         }
 
-    Column(modifier = modifier) {
+    Column(modifier = modifier.linuxHorizontalScrollWheel(horizontalScrollState)) {
         // Header row
         Row(
             modifier =

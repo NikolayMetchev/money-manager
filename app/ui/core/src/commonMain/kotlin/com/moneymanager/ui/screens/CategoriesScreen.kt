@@ -83,6 +83,7 @@ import com.moneymanager.ui.components.ErrorMessageText
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
 import com.moneymanager.ui.util.CategoryNode
 import com.moneymanager.ui.util.buildCategoryForest
 import com.moneymanager.ui.util.flattenCategoryForest
@@ -402,7 +403,7 @@ private fun CurrencyHeaderRow(
 
         // Scrollable currency headers
         Row(
-            modifier = Modifier.horizontalScroll(scrollState),
+            modifier = Modifier.linuxHorizontalScrollWheel(scrollState).horizontalScroll(scrollState),
         ) {
             currencies.forEach { currency ->
                 Text(
@@ -589,7 +590,7 @@ fun CategoryTreeItem(
         // Right column: scrollable balance matrix (aligned with header)
         if (currenciesWithBalances.isNotEmpty()) {
             Row(
-                modifier = Modifier.horizontalScroll(balancesScrollState),
+                modifier = Modifier.linuxHorizontalScrollWheel(balancesScrollState).horizontalScroll(balancesScrollState),
             ) {
                 currenciesWithBalances.forEach { currency ->
                     val balance = balancesByCurrency[currency.id]
