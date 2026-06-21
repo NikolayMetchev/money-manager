@@ -38,8 +38,11 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 | `gradle/build-logic/` | Convention plugins (kotlin, android, compose, metro, mappie) |
 | `utils/bigdecimal/` | Arbitrary-precision decimal arithmetic (JVM/Android) |
 | `utils/currency/` | Locale-aware currency formatting |
-| `app/model/core/` | Domain models and repository interfaces |
+| `app/model/core/` | Domain models and `*ReadRepository`/`*WriteRepository` interfaces |
 | `app/db/core/` | SQLDelight database, repository implementations, mappers |
+| `app/importengineapi/` | `ImportEngine` interface + `ImportBatch`/`ImportResult` model + `ImportEngine.*` write helpers (DB-free) |
+| `app/importer/` | `ImportEngineImpl` — the **sole** DB writer (consumes write repositories) |
+| `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Parse/download sources and build an `ImportBatch` (DB-free, enforced) |
 | `app/di/core/` | Metro DI configuration |
 | `app/ui/core/` | Compose UI (JVM/Android only) |
 | `app/main/jvm/` | JVM Desktop entry point |
@@ -72,6 +75,39 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 **Important**: Store booleans as INTEGER (0/1). Don't use `AS Boolean` in .sq files.
 
 **Mappie** generates type-safe mappers from database entities to domain models. Annotate mapper interfaces with `@Mapper`.
+
+## Database Writes (the ImportEngine is the sole writer)
+
+**Every database mutation goes through the `ImportEngine`.** The UI, importers, services, and DI
+bootstrap never call a `*WriteRepository` directly. A caller builds an `ImportBatch` declaratively
+(transfers + account/person/category/currency intents, CSV/API strategy + mapping + CSV/QIF staging +
+API-session mutations, attribute-type names to resolve, settings) and calls `importEngine.import(batch)`,
+reading generated ids back from `ImportResult`. Convenience `ImportEngine.*` extensions
+(`ImportEngineActions.kt`, `ImportEngineConfigActions.kt` in `app/importengineapi`) wrap the common
+one-item cases — `createCurrency`, `deleteCsvStrategy`, `createCsvImport`, `getOrCreateAttributeType`,
+`setDefaultCurrency`, `insertApiRequest`, …
+
+**Why:** one write seam means one `EditGate`, so writes can be blocked centrally when a cloud-backed
+database is locked, and provenance/audit recording lives in a single place.
+
+**Read vs write interfaces:** repositories come in `*ReadRepository` + `*WriteRepository` pairs (write
+extends read). **Only `ImportEngineImpl` (`app/importer`) is injected with write repositories.** The UI
+gets a fully read-only `AppServices` (every field a `*ReadRepository`) plus the prebuilt `ImportEngine`;
+the engine is constructed in di/core via `DatabaseComponent.createImportEngine(editGate)`. In Compose,
+reach it through `LocalImportEngine.current`.
+
+**Enforced in Gradle:** `moneymanager.kotlin-multiplatform-convention` registers a
+`verifyNoWriteRepositoryUsage` check (wired into `check`) that fails if a module's main sources
+reference any `*WriteRepository`. Exempt: `:app:model:core` (interfaces), `:app:db:core` (impls),
+`:app:di:core` (wiring), `:app:importer` (the engine), `:test:app:db` (fixtures).
+
+**The one exception:** `DeviceWriteRepository` is injected directly in `DeviceIdModule` (di/core).
+`DeviceId` is a synchronous singleton that every write-repo impl — and therefore the engine — depends
+on, so routing it through the suspend engine would be a DI cycle.
+
+**How to apply:** to add a write (new field, entity, or config), extend `ImportBatch`/`ImportResult`
+and `ImportEngineImpl`, add a helper if useful, and call it — never inject a `*WriteRepository` outside
+the engine.
 
 ## Dependency Injection
 
