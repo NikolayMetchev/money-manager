@@ -48,7 +48,6 @@ sealed interface ApiSessionMutation {
         val token: String,
         val deviceId: DeviceId,
         val createdAt: Instant,
-        val expiresAt: Instant?,
         val type: ApiSessionType = ApiSessionType.MONZO,
         val credentialId: MonzoCredentialId? = null,
     ) : ApiSessionMutation

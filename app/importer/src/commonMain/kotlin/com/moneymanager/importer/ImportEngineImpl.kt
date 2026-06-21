@@ -1105,7 +1105,7 @@ class ImportEngineImpl(
                     )
                 is ApiSessionMutation.CreateSession ->
                     apiSessionIds[m.key] =
-                        apiSessionRepository.createSession(m.token, m.deviceId, m.createdAt, m.expiresAt, m.type, m.credentialId)
+                        apiSessionRepository.createSession(m.token, m.deviceId, m.createdAt, expiresAt = null, m.type, m.credentialId)
                 is ApiSessionMutation.InsertRequest ->
                     apiRequestIds[m.key] = apiSessionRepository.insertRequest(m.sessionId, m.method, m.url, m.headers)
                 is ApiSessionMutation.InsertResponse ->

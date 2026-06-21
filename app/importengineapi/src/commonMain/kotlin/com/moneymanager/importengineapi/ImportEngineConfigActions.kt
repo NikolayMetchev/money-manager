@@ -88,16 +88,14 @@ suspend fun ImportEngine.createCsvMapping(
     columnName: String,
     valuePattern: Regex,
     accountId: AccountId,
-): Long {
-    val key = columnName
-    return requireNotNull(
+): Long =
+    requireNotNull(
         import(
             ImportBatch(
-                csvMappingMutations = listOf(CsvMappingMutation.Create(key, strategyId, columnName, valuePattern, accountId)),
+                csvMappingMutations = listOf(CsvMappingMutation.Create(columnName, strategyId, columnName, valuePattern, accountId)),
             ),
-        ).createdCsvMappingIds[key],
+        ).createdCsvMappingIds[columnName],
     )
-}
 
 suspend fun ImportEngine.createCsvMappings(mappings: List<CsvAccountMapping>) {
     import(ImportBatch(csvMappingMutations = listOf(CsvMappingMutation.CreateBatch(mappings))))
@@ -121,16 +119,14 @@ suspend fun ImportEngine.createCsvImport(
     rows: List<List<String>>,
     fileChecksum: String,
     fileLastModified: Instant,
-): CsvImportId {
-    val key = fileName
-    return requireNotNull(
+): CsvImportId =
+    requireNotNull(
         import(
             ImportBatch(
-                csvImportMutations = listOf(CsvImportMutation.Create(key, fileName, headers, rows, fileChecksum, fileLastModified)),
+                csvImportMutations = listOf(CsvImportMutation.Create(fileName, fileName, headers, rows, fileChecksum, fileLastModified)),
             ),
-        ).createdCsvImportIds[key],
+        ).createdCsvImportIds[fileName],
     )
-}
 
 suspend fun ImportEngine.deleteCsvImport(id: CsvImportId) {
     import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Delete(id))))
@@ -151,17 +147,15 @@ suspend fun ImportEngine.createQifImport(
     accountType: String,
     fileChecksum: String,
     fileLastModified: Instant,
-): QifImportId {
-    val key = fileName
-    return requireNotNull(
+): QifImportId =
+    requireNotNull(
         import(
             ImportBatch(
                 qifImportMutations =
-                    listOf(QifImportMutation.Create(key, fileName, records, accountType, fileChecksum, fileLastModified)),
+                    listOf(QifImportMutation.Create(fileName, fileName, records, accountType, fileChecksum, fileLastModified)),
             ),
-        ).createdQifImportIds[key],
+        ).createdQifImportIds[fileName],
     )
-}
 
 suspend fun ImportEngine.deleteQifImport(id: QifImportId) {
     import(ImportBatch(qifImportMutations = listOf(QifImportMutation.Delete(id))))
@@ -195,17 +189,15 @@ suspend fun ImportEngine.createApiCredential(
     strategyId: ApiImportStrategyId? = null,
     privateKey: String? = null,
     publicKey: String? = null,
-): MonzoCredentialId {
-    val key = token
-    return requireNotNull(
+): MonzoCredentialId =
+    requireNotNull(
         import(
             ImportBatch(
                 apiSessionMutations =
-                    listOf(ApiSessionMutation.CreateCredential(key, token, createdAt, type, strategyId, privateKey, publicKey)),
+                    listOf(ApiSessionMutation.CreateCredential(token, token, createdAt, type, strategyId, privateKey, publicKey)),
             ),
-        ).apiCredentialIds[key],
+        ).apiCredentialIds[token],
     )
-}
 
 suspend fun ImportEngine.updateApiCredentialKeys(
     credentialId: MonzoCredentialId,
@@ -221,30 +213,26 @@ suspend fun ImportEngine.createApiSession(
     createdAt: Instant,
     type: ApiSessionType = ApiSessionType.MONZO,
     credentialId: MonzoCredentialId? = null,
-): ApiSessionId {
-    val key = token
-    return requireNotNull(
+): ApiSessionId =
+    requireNotNull(
         import(
             ImportBatch(
                 apiSessionMutations =
-                    listOf(ApiSessionMutation.CreateSession(key, token, deviceId, createdAt, expiresAt = null, type, credentialId)),
+                    listOf(ApiSessionMutation.CreateSession(token, token, deviceId, createdAt, type, credentialId)),
             ),
-        ).apiSessionIds[key],
+        ).apiSessionIds[token],
     )
-}
 
 suspend fun ImportEngine.insertApiRequest(
     sessionId: ApiSessionId,
     method: String,
     url: String,
     headers: Map<String, String>,
-): ApiRequestId {
-    val key = url
-    return requireNotNull(
-        import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.InsertRequest(key, sessionId, method, url, headers))))
-            .apiRequestIds[key],
+): ApiRequestId =
+    requireNotNull(
+        import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.InsertRequest(url, sessionId, method, url, headers))))
+            .apiRequestIds[url],
     )
-}
 
 suspend fun ImportEngine.insertApiResponse(
     requestId: ApiRequestId,
