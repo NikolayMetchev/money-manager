@@ -21,11 +21,11 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
 import com.moneymanager.importengineapi.ImportBatch
@@ -33,6 +33,12 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.applyCsvImportMutations
+import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.importengineapi.createAccounts
+import com.moneymanager.importengineapi.createCsvMapping
+import com.moneymanager.importengineapi.createCsvMappings
+import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -62,10 +68,9 @@ suspend fun bulkApplyCsv(
     sourceAccountOverride: AccountId?,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
-    csvImportRepository: CsvImportWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
+    csvImportRepository: CsvImportReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit,
@@ -116,8 +121,6 @@ suspend fun bulkApplyCsv(
                     currencies = currencies,
                     csvAccountMappingRepository = csvAccountMappingRepository,
                     accountRepository = accountRepository,
-                    csvImportRepository = csvImportRepository,
-                    attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
                     refreshViews = false,
@@ -185,20 +188,20 @@ fun buildCsvMapper(
  * one bad mapping doesn't block the rest. [kind] just labels log messages ("selected"/"auto-captured").
  */
 private suspend fun persistMappingsWithFallback(
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    importEngine: ImportEngine,
     mappings: List<CsvAccountMapping>,
     kind: String,
 ) {
     if (mappings.isEmpty()) return
     try {
-        csvAccountMappingRepository.createMappings(mappings)
+        importEngine.createCsvMappings(mappings)
         logger.info { "Saved ${mappings.size} $kind account mappings" }
     } catch (expected: Exception) {
         // Batch is atomic, nothing was committed — retry per mapping so one bad mapping doesn't block the rest
         logger.warn(expected) { "Bulk $kind mapping save failed, falling back to per-mapping save" }
         for (mapping in mappings) {
             try {
-                csvAccountMappingRepository.createMapping(
+                importEngine.createCsvMapping(
                     strategyId = mapping.strategyId,
                     columnName = mapping.columnName,
                     valuePattern = mapping.valuePattern,
@@ -216,7 +219,7 @@ private suspend fun persistMappingsWithFallback(
  * created. Failures are skipped — transfers referencing a missing account fail later.
  */
 private suspend fun createNewAccounts(
-    accountRepository: AccountWriteRepository,
+    importEngine: ImportEngine,
     accountsToCreate: List<NewAccount>,
     csvImportId: CsvImportId,
     firstRowByAccountName: Map<String, Long>,
@@ -233,21 +236,21 @@ private suspend fun createNewAccounts(
             )
         }
     // CSV provenance pointing each account at the first row that referenced it (its creation row);
-    // row-less when unknown. Recorded atomically by the repository.
+    // row-less when unknown.
     val sourceFor: (Account) -> Source = { account ->
         Source.Csv(csvImportId, firstRowByAccountName[account.name])
     }
     try {
-        // Bulk-create all accounts in a single database transaction
-        val createdIds = accountRepository.createAccountsBatch(newAccounts, sourceFor)
-        newAccounts.zip(createdIds).forEach { (account, _) -> createdAccountNames.add(account.name) }
+        // Bulk-create all accounts in a single engine batch
+        importEngine.createAccounts(newAccounts, sourceFor)
+        newAccounts.forEach { account -> createdAccountNames.add(account.name) }
         logger.info { "Created ${accountsToCreate.size} new accounts" }
     } catch (expected: Exception) {
-        // Batch is atomic, nothing was committed — fall back to per-account creation to skip only failing accounts
+        // Bulk create failed — fall back to per-account creation to skip only failing accounts
         logger.warn(expected) { "Bulk account creation failed, falling back to per-account creation" }
         for (account in newAccounts) {
             try {
-                accountRepository.createAccount(account, sourceFor(account))
+                importEngine.createAccount(account, sourceFor(account))
                 createdAccountNames.add(account.name)
                 logger.info { "Created new account: ${account.name}" }
             } catch (expectedAccountError: Exception) {
@@ -349,10 +352,8 @@ suspend fun runCsvImport(
     selectedNewAccountNames: Map<String, String>,
     selectedSourceAccountId: AccountId?,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
-    csvImportRepository: CsvImportWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
@@ -371,14 +372,14 @@ suspend fun runCsvImport(
             strategyId = strategy.id,
             accountSelections = selectedExistingAccounts,
         )
-    persistMappingsWithFallback(csvAccountMappingRepository, selectedMappingsToPersist, "selected")
+    persistMappingsWithFallback(importEngine, selectedMappingsToPersist, "selected")
 
     // Create new accounts first (skip failures - transfers using them will fail later).
     // Record CSV provenance pointing each account at the first row that referenced it.
     val firstRowByAccountName = buildFirstRowByAccountName(basePrep, selectedNewAccountNames)
     val createdAccountNames =
         createNewAccounts(
-            accountRepository = accountRepository,
+            importEngine = importEngine,
             accountsToCreate = accountsToCreate,
             csvImportId = csvImport.id,
             firstRowByAccountName = firstRowByAccountName,
@@ -394,7 +395,7 @@ suspend fun runCsvImport(
                 selectedNewAccountNames = selectedNewAccountNames,
                 strategyId = strategy.id,
             )
-        persistMappingsWithFallback(csvAccountMappingRepository, mappingsToCapture, "auto-captured")
+        persistMappingsWithFallback(importEngine, mappingsToCapture, "auto-captured")
     }
 
     // Re-map with new account IDs
@@ -432,18 +433,14 @@ suspend fun runCsvImport(
     logger.info { "Prepared $validCount valid transfers, $errorCount error rows" }
 
     // Mark mapping errors as ERROR status in database and save error messages
-    for (errorRow in finalPrep.errorRows) {
-        csvImportRepository.updateRowStatus(
-            csvImport.id,
-            errorRow.rowIndex,
-            ImportStatus.ERROR.name,
-        )
-        csvImportRepository.saveError(
-            csvImport.id,
-            errorRow.rowIndex,
-            errorRow.errorMessage,
-        )
-    }
+    importEngine.applyCsvImportMutations(
+        finalPrep.errorRows.flatMap { errorRow ->
+            listOf(
+                CsvImportMutation.UpdateRowStatus(csvImport.id, errorRow.rowIndex, ImportStatus.ERROR.name),
+                CsvImportMutation.SaveError(csvImport.id, errorRow.rowIndex, errorRow.errorMessage),
+            )
+        },
+    )
 
     // Pre-resolve attribute types
     val allAttributeTypeNames =
@@ -451,10 +448,7 @@ suspend fun runCsvImport(
             .flatMap { it.attributes }
             .map { it.first }
             .toSet()
-    val attributeTypeIdByName =
-        allAttributeTypeNames.associateWith { name ->
-            attributeTypeRepository.getOrCreate(name)
-        }
+    val attributeTypeIdByName = importEngine.getOrCreateAttributeTypes(allAttributeTypeNames.toList())
 
     logger.info { "Starting to import $validCount transfers" }
 
@@ -480,7 +474,7 @@ suspend fun runCsvImport(
         if (finalPrep.validTransfers.any { it.feeAmount != null }) {
             val feeAccountName = "${strategy.name} Fees"
             accountsByName[feeAccountName]?.id
-                ?: accountRepository.createAccount(
+                ?: importEngine.createAccount(
                     Account(
                         id = AccountId(0),
                         name = feeAccountName,
@@ -562,29 +556,19 @@ suspend fun runCsvImport(
             ImportStatus.ERROR -> Unit
         }
     }
+    val statusMutations = mutableListOf<CsvImportMutation>()
     if (importedStatuses.isNotEmpty()) {
-        csvImportRepository.updateRowStatusesBatch(
-            csvImport.id,
-            ImportStatus.IMPORTED.name,
-            importedStatuses,
-        )
-        csvImportRepository.clearErrors(csvImport.id, importedStatuses.keys.toList())
+        statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.IMPORTED.name, importedStatuses)
+        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, importedStatuses.keys.toList())
     }
     if (duplicateStatuses.isNotEmpty()) {
-        csvImportRepository.updateRowStatusesBatch(
-            csvImport.id,
-            ImportStatus.DUPLICATE.name,
-            duplicateStatuses,
-        )
+        statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.DUPLICATE.name, duplicateStatuses)
     }
     if (updatedStatuses.isNotEmpty()) {
-        csvImportRepository.updateRowStatusesBatch(
-            csvImport.id,
-            ImportStatus.UPDATED.name,
-            updatedStatuses,
-        )
-        csvImportRepository.clearErrors(csvImport.id, updatedStatuses.keys.toList())
+        statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.UPDATED.name, updatedStatuses)
+        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, updatedStatuses.keys.toList())
     }
+    importEngine.applyCsvImportMutations(statusMutations)
     val successCount = importResult.transfersImported + importResult.updated
     val duplicateCount = importResult.duplicates
 
@@ -600,11 +584,15 @@ suspend fun runCsvImport(
 
     if ((successCount + duplicateCount) > 0) {
         runCatching {
-            csvImportRepository.recordImportApplication(
-                id = csvImport.id,
-                strategyId = strategy.id,
-                strategyName = strategy.name,
-                appliedAt = Clock.System.now(),
+            importEngine.applyCsvImportMutations(
+                listOf(
+                    CsvImportMutation.RecordApplication(
+                        id = csvImport.id,
+                        strategyId = strategy.id,
+                        strategyName = strategy.name,
+                        appliedAt = Clock.System.now(),
+                    ),
+                ),
             )
         }.onFailure { error ->
             logger.warn {

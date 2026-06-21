@@ -6,28 +6,32 @@ import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
-import com.moneymanager.domain.repository.ApiSessionWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
+import com.moneymanager.domain.repository.ApiSessionReadRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CsvImportWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportWriteRepository
-import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
-import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importer.ImportEngineImpl
 
+/**
+ * The UI's view of the database. Every repository here is a **read** interface — the UI never mutates
+ * the database through a repository. All writes go through [TransactionsDomain.importEngine] (the single
+ * write seam, which carries the session's edit gate). The engine is built in di/core
+ * ([com.moneymanager.di.database.createImportEngine]) so the write repositories never reach this layer.
+ */
 data class AppServices(
     val accounts: AccountsDomain,
     val imports: ImportsDomain,
@@ -39,28 +43,28 @@ data class AppServices(
 )
 
 data class AccountsDomain(
-    val accountRepository: AccountWriteRepository,
+    val accountRepository: AccountReadRepository,
     val accountAttributeRepository: AccountAttributeReadRepository,
     val categoryRepository: CategoryReadRepository,
-    val currencyRepository: CurrencyWriteRepository,
+    val currencyRepository: CurrencyReadRepository,
 )
 
 data class ImportsDomain(
-    val apiImportStrategyRepository: ApiImportStrategyWriteRepository,
-    val apiSessionRepository: ApiSessionWriteRepository,
-    val csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    val csvImportRepository: CsvImportWriteRepository,
-    val csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+    val apiImportStrategyRepository: ApiImportStrategyReadRepository,
+    val apiSessionRepository: ApiSessionReadRepository,
+    val csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    val csvImportRepository: CsvImportReadRepository,
+    val csvImportStrategyRepository: CsvImportStrategyReadRepository,
     val csvStrategyExportService: CsvStrategyExportService,
     val csvStrategyImportExport: CsvStrategyImportExport,
-    val qifImportRepository: QifImportWriteRepository,
+    val qifImportRepository: QifImportReadRepository,
     val maintenance: Maintenance,
 )
 
 data class TransactionsDomain(
     val transactionRepository: TransactionReadRepository,
     val transferSourceRepository: TransferSourceReadRepository,
-    val attributeTypeRepository: AttributeTypeWriteRepository,
+    val attributeTypeRepository: AttributeTypeReadRepository,
     val importEngine: ImportEngine,
 )
 
@@ -71,7 +75,7 @@ data class PeopleDomain(
 )
 
 data class SettingsDomain(
-    val settingsRepository: SettingsWriteRepository,
+    val settingsRepository: SettingsReadRepository,
     val deviceRepository: DeviceReadRepository,
 )
 
@@ -79,7 +83,11 @@ data class AuditDomain(
     val auditRepository: AuditReadRepository,
 )
 
-fun Application.toAppServices(editGate: EditGate = EditGate.AlwaysWritable) =
+/**
+ * Narrows the db-layer [Application] (whose repositories are write interfaces) to the UI's read-only
+ * [AppServices], plugging in the already-constructed [importEngine] as the single write seam.
+ */
+fun Application.toAppServices(importEngine: ImportEngine) =
     AppServices(
         accounts =
             AccountsDomain(
@@ -105,17 +113,7 @@ fun Application.toAppServices(editGate: EditGate = EditGate.AlwaysWritable) =
                 transactionRepository = transactions.transactionRepository,
                 transferSourceRepository = transactions.transferSourceRepository,
                 attributeTypeRepository = transactions.attributeTypeRepository,
-                importEngine =
-                    ImportEngineImpl(
-                        transactionRepository = transactions.transactionRepository,
-                        accountRepository = accounts.accountRepository,
-                        accountAttributeRepository = accounts.accountAttributeRepository,
-                        personRepository = people.personRepository,
-                        personAttributeRepository = people.personAttributeRepository,
-                        ownershipRepository = people.personAccountOwnershipRepository,
-                        categoryRepository = accounts.categoryRepository,
-                        editGate = editGate,
-                    ),
+                importEngine = importEngine,
             ),
         people =
             PeopleDomain(

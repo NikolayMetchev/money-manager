@@ -28,16 +28,16 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.qif.QifImportRecord
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportWriteRepository
-import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.deleteQifImport
 import com.moneymanager.ui.components.qif.QifRecordList
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -49,15 +49,14 @@ import kotlinx.coroutines.launch
 fun QifImportDetailScreen(
     importId: QifImportId,
     scrollToRecordIndex: Long? = null,
-    qifImportRepository: QifImportWriteRepository,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
+    qifImportRepository: QifImportReadRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
-    settingsRepository: SettingsWriteRepository,
+    settingsRepository: SettingsReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onBack: () -> Unit,
@@ -146,8 +145,6 @@ fun QifImportDetailScreen(
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             personRepository = personRepository,
-            qifImportRepository = qifImportRepository,
-            attributeTypeRepository = attributeTypeRepository,
             settingsRepository = settingsRepository,
             maintenance = maintenance,
             importEngine = importEngine,
@@ -168,7 +165,7 @@ fun QifImportDetailScreen(
                 TextButton(onClick = {
                     showDeleteDialog = false
                     scope.launch {
-                        qifImportRepository.deleteImport(importId)
+                        importEngine.deleteQifImport(importId)
                         onDeleted()
                     }
                 }) {

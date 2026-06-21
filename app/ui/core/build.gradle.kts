@@ -15,7 +15,6 @@ kotlin {
                 api(projects.app.csvimporter)
                 api(projects.app.db.core)
                 api(projects.app.importengineapi)
-                api(projects.app.importer)
                 api(projects.app.model.core)
                 api(projects.app.qifimporter)
                 api(projects.app.remotestorage.core)
@@ -105,7 +104,6 @@ kotlin {
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
                 implementation(projects.app.apiimporter)
-                implementation(projects.app.importer)
                 implementation(projects.utils.rest)
 
                 runtimeOnly(libs.kotlinx.coroutines.swing)
@@ -120,6 +118,7 @@ kotlin {
                 implementation(libs.compose.ui.test.desktop)
                 implementation(libs.mokkery.core)
                 implementation(projects.app.di.core)
+                implementation(projects.app.importer)
             }
         }
         getByName("androidDeviceTest") {
@@ -133,6 +132,7 @@ kotlin {
                 implementation(libs.ktor.client.mock)
                 implementation(libs.mokkery.core)
                 implementation(projects.app.di.core)
+                implementation(projects.app.importer)
                 implementation(projects.test.app.db)
             }
             kotlin.srcDir("src/commonTest/kotlin")
@@ -146,6 +146,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.mokkery.core)
                 implementation(projects.app.di.core)
+                implementation(projects.app.importer)
                 implementation(projects.test.app.db)
             }
         }

@@ -28,7 +28,7 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
@@ -39,6 +39,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -56,7 +57,7 @@ private val logger = logging()
 fun EditAccountDialog(
     account: Account,
     accountAttributeRepository: AccountAttributeReadRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    attributeTypeRepository: AttributeTypeReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     personAttributeRepository: PersonAttributeReadRepository? = null,
@@ -202,7 +203,7 @@ fun EditAccountDialog(
                                         val typeChanged = original.attributeType.name != typeName
                                         val valueChanged = original.value != value
                                         if (typeChanged || valueChanged) {
-                                            val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
+                                            val typeId = importEngine.getOrCreateAttributeType(typeName.trim())
                                             updatedAttributes[id] = NewAttribute(typeId, value.trim())
                                         }
                                     }
@@ -212,7 +213,7 @@ fun EditAccountDialog(
                                 editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
                                     val (typeName, value) = pair
                                     if (typeName.isNotBlank() && value.isNotBlank()) {
-                                        val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
+                                        val typeId = importEngine.getOrCreateAttributeType(typeName.trim())
                                         newAttributes.add(NewAttribute(typeId, value.trim()))
                                     }
                                 }

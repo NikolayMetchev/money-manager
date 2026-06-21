@@ -42,9 +42,18 @@ import com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport
 import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.TemplateAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.TimezoneLookupExport
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.CategoryWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.importengineapi.AccountMatchKey
+import com.moneymanager.importengineapi.ImportAccountIntent
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportCategoryIntent
+import com.moneymanager.importengineapi.ImportCurrencyIntent
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalCategoryKey
+import com.moneymanager.importengineapi.LocalCurrencyKey
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -127,9 +136,10 @@ private data class StrategyReferenceData(
  * Service for converting between domain models and portable export format.
  */
 class CsvStrategyExportService(
-    private val accountRepository: AccountWriteRepository,
-    private val currencyRepository: CurrencyWriteRepository,
-    private val categoryRepository: CategoryWriteRepository,
+    private val accountRepository: AccountReadRepository,
+    private val currencyRepository: CurrencyReadRepository,
+    private val categoryRepository: CategoryReadRepository,
+    private val importEngine: ImportEngine,
 ) {
     // Entities created while importing a strategy are a manual user action on this device.
     private val source = Source.Manual
@@ -291,41 +301,52 @@ class CsvStrategyExportService(
         export: CsvStrategyExport,
         resolutions: Map<UnresolvedReference, Resolution>,
     ): CsvImportStrategy {
-        // First, create any new entities that were requested
-        val createdAccounts = mutableMapOf<String, AccountId>()
-        val createdCategories = mutableMapOf<String, Long>()
-        val createdCurrencies = mutableMapOf<String, CurrencyId>()
+        // First, create any new entities that were requested — in one engine batch (the sole writer).
+        val accountIntents = mutableMapOf<String, ImportAccountIntent>()
+        val categoryIntents = mutableMapOf<String, ImportCategoryIntent>()
+        val currencyIntents = mutableMapOf<String, ImportCurrencyIntent>()
 
         for ((ref, resolution) in resolutions) {
             if (resolution is Resolution.CreateNew) {
                 when (ref.type) {
-                    ReferenceType.ACCOUNT -> {
-                        val account =
-                            Account(
-                                id = AccountId(0),
+                    ReferenceType.ACCOUNT ->
+                        accountIntents[ref.name] =
+                            ImportAccountIntent(
+                                key = LocalAccountKey(ref.name),
+                                source = source,
+                                match = AccountMatchKey.AlwaysCreate,
                                 name = resolution.name,
                                 openingDate = Instant.fromEpochMilliseconds(System.currentTimeMillis()),
                             )
-                        val id = accountRepository.createAccount(account, source)
-                        createdAccounts[ref.name] = id
-                    }
-                    ReferenceType.CATEGORY -> {
-                        val category = Category(name = resolution.name)
-                        val id = categoryRepository.createCategory(category, source)
-                        createdCategories[ref.name] = id
-                    }
-                    ReferenceType.CURRENCY -> {
-                        val id =
-                            currencyRepository.upsertCurrencyByCode(
+                    ReferenceType.CATEGORY ->
+                        categoryIntents[ref.name] =
+                            ImportCategoryIntent(key = LocalCategoryKey(ref.name), source = source, name = resolution.name)
+                    ReferenceType.CURRENCY ->
+                        currencyIntents[ref.name] =
+                            ImportCurrencyIntent(
+                                key = LocalCurrencyKey(ref.name),
+                                source = source,
                                 code = resolution.name,
                                 name = resolution.name,
-                                source = source,
                             )
-                        createdCurrencies[ref.name] = id
-                    }
                 }
             }
         }
+
+        val importResult =
+            importEngine.import(
+                ImportBatch(
+                    accountsToCreate = accountIntents.values.toList(),
+                    categories = categoryIntents.values.toList(),
+                    currencies = currencyIntents.values.toList(),
+                ),
+            )
+        val createdAccounts =
+            accountIntents.mapValues { (_, intent) -> requireNotNull(importResult.createdAccountIds[intent.key]) }
+        val createdCategories =
+            categoryIntents.mapValues { (_, intent) -> requireNotNull(importResult.createdCategoryIds[intent.key]) }
+        val createdCurrencies =
+            currencyIntents.mapValues { (_, intent) -> requireNotNull(importResult.createdCurrencyIds[intent.key]) }
 
         // Build lookup maps including both existing and newly created entities
         val accounts = accountRepository.getAllAccounts().first()

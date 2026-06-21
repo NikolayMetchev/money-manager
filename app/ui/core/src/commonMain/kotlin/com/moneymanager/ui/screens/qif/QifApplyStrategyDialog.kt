@@ -34,16 +34,15 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportRecord
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportWriteRepository
-import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.setLastQifAccount
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.QifImportResult
 import com.moneymanager.qifimporter.buildMapper
@@ -77,15 +76,13 @@ private val logger = logging()
 fun QifApplyStrategyDialog(
     qifImport: QifImport,
     records: List<QifImportRecord>,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
-    qifImportRepository: QifImportWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
-    settingsRepository: SettingsWriteRepository,
+    settingsRepository: SettingsReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
@@ -311,13 +308,11 @@ fun QifApplyStrategyDialog(
                                     currencies = currencies,
                                     csvAccountMappingRepository = csvAccountMappingRepository,
                                     accountRepository = accountRepository,
-                                    qifImportRepository = qifImportRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
                                     maintenance = maintenance,
                                     importEngine = importEngine,
                                 )
                             // Remember the source account so the next QIF import pre-selects it.
-                            selectedSourceAccountId?.let { settingsRepository.setLastQifAccountId(it) }
+                            selectedSourceAccountId?.let { importEngine.setLastQifAccount(it) }
                             onImportComplete(result)
                         } catch (expected: Exception) {
                             logger.error(expected) { "QIF import failed: ${expected.message}" }

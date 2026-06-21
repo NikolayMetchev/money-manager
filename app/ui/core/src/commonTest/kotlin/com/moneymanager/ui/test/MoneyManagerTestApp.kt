@@ -94,7 +94,7 @@ internal object MoneyManagerTestApp {
                 MoneyManagerApp(
                     appVersion = appVersion,
                     databaseLocation = state.location,
-                    services = dc.toApplication().toAppServices(),
+                    services = dc.toApplication().toAppServices(dc.importEngine),
                     onRequestSwitchDatabase = {},
                 )
             }

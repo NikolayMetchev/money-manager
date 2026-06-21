@@ -79,13 +79,15 @@ import com.moneymanager.domain.model.MonzoCredential
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionImportRevision
-import com.moneymanager.domain.repository.ApiSessionWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.ApiSessionReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.createApiSession
+import com.moneymanager.importengineapi.markApiSessionImported
+import com.moneymanager.importengineapi.updateApiCredentialKeys
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.ScaParams
 import com.moneymanager.rest.createApiClient
@@ -115,12 +117,11 @@ import kotlin.time.Instant
 
 @Composable
 fun ApiSessionsScreen(
-    apiSessionRepository: ApiSessionWriteRepository,
-    apiImportStrategyRepository: ApiImportStrategyWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
+    apiImportStrategyRepository: ApiImportStrategyReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
-    accountRepository: AccountWriteRepository,
-    currencyRepository: CurrencyWriteRepository,
+    accountRepository: AccountReadRepository,
+    currencyRepository: CurrencyReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     deviceId: DeviceId,
@@ -251,7 +252,6 @@ fun ApiSessionsScreen(
                 importApiSessionTransactions(
                     apiSessionRepository = apiSessionRepository,
                     currencyRepository = currencyRepository,
-                    attributeTypeRepository = attributeTypeRepository,
                     sessionId = session.id,
                     strategy = strategy,
                     importEngine = importEngine,
@@ -271,7 +271,6 @@ fun ApiSessionsScreen(
                         apiSessionRepository = apiSessionRepository,
                         accountRepository = accountRepository,
                         accountAttributeRepository = accountAttributeRepository,
-                        attributeTypeRepository = attributeTypeRepository,
                         importEngine = importEngine,
                         sessionId = session.id,
                         strategy = strategy,
@@ -285,7 +284,7 @@ fun ApiSessionsScreen(
                     personCount = transactionsResult.personCount + (peopleResult?.personCount ?: 0),
                 )
             val importDurationMillis = System.currentTimeMillis() - importStartedAt
-            apiSessionRepository.markSessionImported(
+            importEngine.markApiSessionImported(
                 id = session.id,
                 revisionId = strategy.revisionId,
                 importedAt = Clock.System.now(),
@@ -349,7 +348,7 @@ fun ApiSessionsScreen(
                                 onGenerateSigningKey = {
                                     scope.launch {
                                         val keyPair = withContext(Dispatchers.Default) { generateScaKeyPair() }
-                                        apiSessionRepository.updateCredentialKeys(
+                                        importEngine.updateApiCredentialKeys(
                                             credentialId = credential.id,
                                             privateKey = keyPair.privateKeyPem,
                                             publicKey = keyPair.publicKeyPem,
@@ -375,7 +374,7 @@ fun ApiSessionsScreen(
                                     scope.launch {
                                         val strategy = resolveStrategy(credential) ?: return@launch
                                         val newSessionId =
-                                            apiSessionRepository.createSession(
+                                            importEngine.createApiSession(
                                                 token = credential.token,
                                                 deviceId = deviceId,
                                                 createdAt = Clock.System.now(),
@@ -394,7 +393,7 @@ fun ApiSessionsScreen(
                                                     trafficRecorder =
                                                         ApiSessionTrafficRecorder(
                                                             sessionId = newSessionId,
-                                                            apiSessionRepository = apiSessionRepository,
+                                                            importEngine = importEngine,
                                                         ),
                                                     engine = null,
                                                 )
@@ -920,7 +919,7 @@ private fun SessionStatusBadge(isActive: Boolean) {
 
 @Composable
 fun ApiSessionTrafficScreen(
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     sessionId: ApiSessionId,
     highlightRequestId: ApiRequestId? = null,
     highlightJsonPath: String? = null,

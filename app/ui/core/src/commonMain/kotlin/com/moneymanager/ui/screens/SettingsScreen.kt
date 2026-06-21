@@ -37,10 +37,10 @@ import androidx.compose.ui.unit.sp
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
-import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.setDefaultCurrency
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.DatabasePickerMode
 import com.moneymanager.ui.components.CurrencyPicker
@@ -151,10 +151,9 @@ private fun DatabaseCard(
 
 @Composable
 fun SettingsScreen(
-    currencyRepository: CurrencyWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     importEngine: ImportEngine,
-    settingsRepository: SettingsWriteRepository,
+    settingsRepository: SettingsReadRepository,
     maintenance: Maintenance,
     currentDatabaseLocation: DbLocation,
     onRequestSwitchDatabase: (DbLocation) -> Unit,
@@ -210,7 +209,7 @@ fun SettingsScreen(
                     selectedCurrencyId = defaultCurrencyId,
                     onCurrencySelected = { currencyId ->
                         scope.launch {
-                            settingsRepository.setDefaultCurrencyId(currencyId)
+                            importEngine.setDefaultCurrency(currencyId)
                         }
                     },
                     label = "Default Currency",
@@ -497,7 +496,6 @@ fun SettingsScreen(
                                 // Generate sample data
                                 generateSampleData(
                                     currencyRepository = currencyRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
                                     importEngine = importEngine,
                                     maintenance = maintenance,
                                     progressFlow = progressFlow,

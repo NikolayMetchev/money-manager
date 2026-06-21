@@ -34,8 +34,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
-import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
-import com.moneymanager.domain.repository.ApiSessionWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
+import com.moneymanager.importengineapi.createApiCredential
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
@@ -49,10 +50,10 @@ import kotlin.time.Clock
  */
 @Composable
 fun ApiConnectScreen(
-    apiSessionRepository: ApiSessionWriteRepository,
-    apiImportStrategyRepository: ApiImportStrategyWriteRepository,
+    apiImportStrategyRepository: ApiImportStrategyReadRepository,
     onCredentialSaved: () -> Unit = {},
 ) {
+    val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
     val uriHandler = LocalUriHandler.current
 
@@ -209,7 +210,7 @@ fun ApiConnectScreen(
                         errorMessage = null
                         scope.launch {
                             try {
-                                apiSessionRepository.createCredential(
+                                importEngine.createApiCredential(
                                     token = trimmedToken,
                                     createdAt = Clock.System.now(),
                                     strategyId = strategyId,

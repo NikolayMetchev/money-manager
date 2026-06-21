@@ -170,7 +170,7 @@ class MonzoImportAuditE2ETest {
 
                 val apiClient =
                     createApiClient(
-                        trafficRecorder = ApiSessionTrafficRecorder(sessionId, dc.apiSessionRepository),
+                        trafficRecorder = ApiSessionTrafficRecorder(sessionId, dc.importEngine),
                         engine = mockEngine,
                     )
                 val strategy =
@@ -196,7 +196,6 @@ class MonzoImportAuditE2ETest {
                 importApiSessionTransactions(
                     apiSessionRepository = dc.apiSessionRepository,
                     currencyRepository = dc.currencyRepository,
-                    attributeTypeRepository = dc.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = dc.importEngine,

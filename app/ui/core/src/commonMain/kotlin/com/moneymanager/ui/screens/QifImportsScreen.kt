@@ -36,16 +36,16 @@ import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportId
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportWriteRepository
-import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.createQifImport
 import com.moneymanager.qif.QifParser
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -61,15 +61,14 @@ import kotlin.time.Clock
 // Mirrors CsvImportsScreen (QIF reuses the CSV import engine); overlap is intentional.
 @Suppress("LongParameterList", "DuplicatedCode")
 fun QifImportsScreen(
-    qifImportRepository: QifImportWriteRepository,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
+    qifImportRepository: QifImportReadRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
-    settingsRepository: SettingsWriteRepository,
+    settingsRepository: SettingsReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onImportClick: (QifImportId) -> Unit,
@@ -104,7 +103,7 @@ fun QifImportsScreen(
                                 continue
                             }
                             val parseResult = QifParser().parse(result.content)
-                            qifImportRepository.createImport(
+                            importEngine.createQifImport(
                                 fileName = result.fileName,
                                 records = parseResult.toImportRecords(),
                                 accountType = parseResult.dominantAccountType(),
@@ -230,7 +229,6 @@ fun QifImportsScreen(
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
                     qifImportRepository = qifImportRepository,
-                    attributeTypeRepository = attributeTypeRepository,
                     settingsRepository = settingsRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,

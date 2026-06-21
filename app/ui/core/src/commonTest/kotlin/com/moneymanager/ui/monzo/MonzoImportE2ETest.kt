@@ -548,7 +548,7 @@ class MonzoImportE2ETest : DbTest() {
                     trafficRecorder =
                         ApiSessionTrafficRecorder(
                             sessionId = sessionId,
-                            apiSessionRepository = repositories.apiSessionRepository,
+                            importEngine = repositories.importEngine,
                         ),
                     engine = mockEngine,
                 )
@@ -578,7 +578,6 @@ class MonzoImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -732,7 +731,7 @@ class MonzoImportE2ETest : DbTest() {
                     trafficRecorder =
                         ApiSessionTrafficRecorder(
                             sessionId = sessionId,
-                            apiSessionRepository = repositories.apiSessionRepository,
+                            importEngine = repositories.importEngine,
                         ),
                     engine = mockEngine,
                 )
@@ -761,7 +760,6 @@ class MonzoImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -817,7 +815,7 @@ class MonzoImportE2ETest : DbTest() {
                 }
             val apiClient =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
                     engine = mockEngine,
                 )
             val strategy =
@@ -853,7 +851,6 @@ class MonzoImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -903,7 +900,7 @@ class MonzoImportE2ETest : DbTest() {
                 }
             val apiClient =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
                     engine = mockEngine,
                 )
             val strategy =
@@ -931,7 +928,6 @@ class MonzoImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -987,7 +983,7 @@ class MonzoImportE2ETest : DbTest() {
                 }
             val apiClient =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
                     engine = mockEngine,
                 )
             val strategy =
@@ -1022,7 +1018,6 @@ class MonzoImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -1078,7 +1073,7 @@ class MonzoImportE2ETest : DbTest() {
                 }
             val apiClient =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
                     engine = mockEngine,
                 )
             val strategy =
@@ -1114,7 +1109,6 @@ class MonzoImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -1225,7 +1219,7 @@ class MonzoImportE2ETest : DbTest() {
                 }
             val apiClient =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
                     engine = mockEngine,
                 )
             val strategy =
@@ -1261,7 +1255,6 @@ class MonzoImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -1319,7 +1312,7 @@ class MonzoImportE2ETest : DbTest() {
                 }
             val apiClient =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
                     engine = mockEngine,
                 )
 
@@ -1351,7 +1344,6 @@ class MonzoImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -1406,7 +1398,7 @@ class MonzoImportE2ETest : DbTest() {
                 }
             val apiClient =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
                     engine = mockEngine,
                 )
 
@@ -1428,7 +1420,6 @@ class MonzoImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -1490,7 +1481,7 @@ class MonzoImportE2ETest : DbTest() {
                     }
                 val apiClient =
                     createApiClient(
-                        trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                        trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
                         engine = mockEngine,
                     )
 
@@ -1511,7 +1502,6 @@ class MonzoImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -1601,7 +1591,7 @@ class MonzoImportE2ETest : DbTest() {
                 }
             val apiClient =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
                     engine = mockEngine,
                 )
             // Configure the strategy to use local_amount / local_currency fields
@@ -1639,7 +1629,6 @@ class MonzoImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -1696,7 +1685,7 @@ class MonzoImportE2ETest : DbTest() {
                 }
             val apiClient =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
                     engine = mockEngine,
                 )
             // Use the seeded Monzo strategy unchanged: it already maps the fee via atm_fees_detailed.fee_amount.
@@ -1725,7 +1714,6 @@ class MonzoImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,

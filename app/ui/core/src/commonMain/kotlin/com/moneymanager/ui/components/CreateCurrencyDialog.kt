@@ -18,8 +18,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.importengineapi.createCurrency
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -29,16 +29,15 @@ private val logger = logging()
 /**
  * A dialog for creating a new currency.
  *
- * @param currencyRepository Repository to create currencies
  * @param onCurrencyCreated Callback invoked when a currency is created, with the new currency ID
  * @param onDismiss Callback invoked when the dialog is dismissed
  */
 @Composable
 fun CreateCurrencyDialog(
-    currencyRepository: CurrencyWriteRepository,
     onCurrencyCreated: (CurrencyId) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val importEngine = LocalImportEngine.current
     var code by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     val saveState = rememberDialogSaveState()
@@ -89,7 +88,7 @@ fun CreateCurrencyDialog(
                             saveState.errorMessage = null
                             scope.launch {
                                 try {
-                                    val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim(), Source.Manual)
+                                    val currencyId = importEngine.createCurrency(code.trim(), name.trim())
                                     onCurrencyCreated(currencyId)
                                 } catch (expected: Exception) {
                                     logger.error(expected) { "Failed to create currency: ${expected.message}" }

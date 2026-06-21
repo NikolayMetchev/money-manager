@@ -11,7 +11,7 @@ import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.repository.AuditReadRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
@@ -26,7 +26,7 @@ import kotlin.time.Instant
 fun CurrencyAuditScreen(
     currencyId: CurrencyId,
     auditRepository: AuditReadRepository,
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     onBack: () -> Unit,
 ) {
     AuditScreen(

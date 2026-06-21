@@ -51,10 +51,10 @@ import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -108,11 +108,11 @@ private fun verticalMatrixScrollTarget(
 fun AccountTransactionsScreen(
     accountId: AccountId,
     transactionRepository: TransactionReadRepository,
-    accountRepository: AccountWriteRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    attributeTypeRepository: AttributeTypeReadRepository,
     personRepository: PersonReadRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     maintenance: Maintenance,

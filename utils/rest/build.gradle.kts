@@ -8,6 +8,7 @@ kotlin {
         commonMain {
             dependencies {
                 api(libs.ktor.client.core)
+                api(projects.app.importengineapi)
                 api(projects.app.model.core)
 
                 implementation(libs.ktor.client.cio)
@@ -31,10 +32,11 @@ kotlin {
 
         jvmMain {
             dependencies {
-                api(projects.app.model.core)
+                api(projects.app.importengineapi)
 
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
+                implementation(projects.app.model.core)
             }
         }
 

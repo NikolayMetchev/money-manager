@@ -11,6 +11,7 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
+import com.moneymanager.di.database.createImportEngine
 import com.moneymanager.di.database.toApplication
 import com.moneymanager.di.initializeVersionReader
 import com.moneymanager.importengineapi.EditingLockedException
@@ -111,11 +112,14 @@ class MainActivity : ComponentActivity() {
                 appVersion = component.appVersion,
                 localSettings = component.localSettings,
                 createAppServices = { database ->
-                    DatabaseComponent.create(database).toApplication().toAppServices(
-                        editGate = {
-                            if (controller.syncState.value.editingLocked) throw EditingLockedException()
-                        },
-                    )
+                    val component = DatabaseComponent.create(database)
+                    val importEngine =
+                        component.createImportEngine(
+                            editGate = {
+                                if (controller.syncState.value.editingLocked) throw EditingLockedException()
+                            },
+                        )
+                    component.toApplication().toAppServices(importEngine)
                 },
                 onInfoLog = { message -> Log.i(TAG, message) },
                 onErrorLog = { message, error -> Log.e(TAG, message, error) },

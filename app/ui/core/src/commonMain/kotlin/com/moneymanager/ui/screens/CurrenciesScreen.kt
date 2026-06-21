@@ -13,7 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.importengineapi.deleteCurrency
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CreateCurrencyDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -24,7 +26,7 @@ private val logger = logging()
 
 @Composable
 fun CurrenciesScreen(
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     onAuditClick: (Currency) -> Unit = {},
 ) {
     val currencies by currencyRepository
@@ -66,7 +68,6 @@ fun CurrenciesScreen(
                         items(currencies) { currency ->
                             CurrencyCard(
                                 currency = currency,
-                                currencyRepository = currencyRepository,
                                 onAuditClick = { onAuditClick(currency) },
                             )
                         }
@@ -91,7 +92,6 @@ fun CurrenciesScreen(
 
         if (showCreateDialog) {
             CreateCurrencyDialog(
-                currencyRepository = currencyRepository,
                 onCurrencyCreated = { showCreateDialog = false },
                 onDismiss = { showCreateDialog = false },
             )
@@ -102,7 +102,6 @@ fun CurrenciesScreen(
 @Composable
 fun CurrencyCard(
     currency: Currency,
-    currencyRepository: CurrencyWriteRepository,
     onAuditClick: () -> Unit = {},
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -152,7 +151,6 @@ fun CurrencyCard(
     if (showDeleteDialog) {
         DeleteCurrencyDialog(
             currency = currency,
-            currencyRepository = currencyRepository,
             onDismiss = { showDeleteDialog = false },
         )
     }
@@ -161,9 +159,9 @@ fun CurrencyCard(
 @Composable
 fun DeleteCurrencyDialog(
     currency: Currency,
-    currencyRepository: CurrencyWriteRepository,
     onDismiss: () -> Unit,
 ) {
+    val importEngine = LocalImportEngine.current
     var isDeleting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberSchemaAwareCoroutineScope()
@@ -207,7 +205,7 @@ fun DeleteCurrencyDialog(
                     errorMessage = null
                     scope.launch {
                         try {
-                            currencyRepository.deleteCurrency(currency.id)
+                            importEngine.deleteCurrency(currency.id)
                             onDismiss()
                         } catch (expected: Exception) {
                             logger.error(expected) { "Failed to delete currency: ${expected.message}" }

@@ -16,11 +16,20 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
+import com.moneymanager.domain.repository.ApiSessionWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.PersonWriteRepository
+import com.moneymanager.domain.repository.QifImportWriteRepository
+import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
+import com.moneymanager.domain.repository.SettingsWriteRepository
 import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importer.ImportEngineImpl
@@ -55,6 +64,16 @@ class CategoriesScreenTest {
             personAttributeRepository = mock<PersonAttributeWriteRepository>(MockMode.autoUnit),
             ownershipRepository = mock<PersonAccountOwnershipWriteRepository>(MockMode.autoUnit),
             categoryRepository = categoryRepository,
+            currencyRepository = mock<CurrencyWriteRepository>(MockMode.autoUnit),
+            attributeTypeRepository = mock<AttributeTypeWriteRepository>(MockMode.autoUnit),
+            relationshipTypeRepository = mock<RelationshipTypeWriteRepository>(MockMode.autoUnit),
+            csvImportStrategyRepository = mock<CsvImportStrategyWriteRepository>(MockMode.autoUnit),
+            apiImportStrategyRepository = mock<ApiImportStrategyWriteRepository>(MockMode.autoUnit),
+            csvAccountMappingRepository = mock<CsvAccountMappingWriteRepository>(MockMode.autoUnit),
+            csvImportRepository = mock<CsvImportWriteRepository>(MockMode.autoUnit),
+            qifImportRepository = mock<QifImportWriteRepository>(MockMode.autoUnit),
+            apiSessionRepository = mock<ApiSessionWriteRepository>(MockMode.autoUnit),
+            settingsRepository = mock<SettingsWriteRepository>(MockMode.autoUnit),
         )
 
     private val fakeCurrencyRepository: CurrencyWriteRepository =

@@ -112,7 +112,6 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
