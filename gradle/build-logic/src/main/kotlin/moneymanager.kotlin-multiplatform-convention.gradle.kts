@@ -39,7 +39,7 @@ if (project.path !in writeRepositoryExemptModules) {
             group = "verification"
             description = "Fails if this module references a *WriteRepository (writes must go through the ImportEngine)."
             projectPath.set(project.path)
-            allowedFileNames.set(emptySet<String>())
+            allowedFileNames.set(emptySet())
             // Scan only main source sets — test code may legitimately seed fixtures via write repositories.
             listOf("commonMain", "jvmMain", "androidMain").forEach { sourceSet ->
                 sources.from(fileTree("src/$sourceSet") { include("**/*.kt") })

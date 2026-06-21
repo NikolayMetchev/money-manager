@@ -333,20 +333,15 @@ class CsvStrategyExportService(
             }
         }
 
-        val importResult =
-            importEngine.import(
-                ImportBatch(
-                    accountsToCreate = accountIntents.values.toList(),
-                    categories = categoryIntents.values.toList(),
-                    currencies = currencyIntents.values.toList(),
-                ),
-            )
-        val createdAccounts =
-            accountIntents.mapValues { (_, intent) -> requireNotNull(importResult.createdAccountIds[intent.key]) }
-        val createdCategories =
-            categoryIntents.mapValues { (_, intent) -> requireNotNull(importResult.createdCategoryIds[intent.key]) }
-        val createdCurrencies =
-            currencyIntents.mapValues { (_, intent) -> requireNotNull(importResult.createdCurrencyIds[intent.key]) }
+        // Create the requested new entities through the engine (the sole writer); they are then read
+        // back below via the re-fetched lookup maps.
+        importEngine.import(
+            ImportBatch(
+                accountsToCreate = accountIntents.values.toList(),
+                categories = categoryIntents.values.toList(),
+                currencies = currencyIntents.values.toList(),
+            ),
+        )
 
         // Build lookup maps including both existing and newly created entities
         val accounts = accountRepository.getAllAccounts().first()

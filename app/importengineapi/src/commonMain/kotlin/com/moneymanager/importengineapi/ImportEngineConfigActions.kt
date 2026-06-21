@@ -5,15 +5,12 @@ package com.moneymanager.importengineapi
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
-import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -25,24 +22,25 @@ import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.repository.ApiResponseTransactionInsert
 import kotlin.time.Instant
 
-/**
- * Convenience [ImportEngine] extensions mirroring the config/staging/session/settings/device write
- * repositories, each building a one-item [ImportBatch]. Callers use these instead of injecting the
- * corresponding `*WriteRepository`, keeping the engine the sole writer. A constant key is used for
- * single-item batches that need their generated id read back.
+/*
+ * Convenience ImportEngine extensions mirroring the config/staging/session/settings write repositories,
+ * each building a one-item ImportBatch. Callers use these instead of injecting the corresponding write
+ * repository, keeping the engine the sole writer. Each create reads its generated id back from the
+ * result map under a per-call read-back key derived from the input.
  */
-private const val KEY = "it"
 
 // region CSV strategies
 
 suspend fun ImportEngine.createCsvStrategy(
     strategy: CsvImportStrategy,
     source: Source = Source.Manual,
-): CsvImportStrategyId =
-    requireNotNull(
-        import(ImportBatch(csvStrategyMutations = listOf(CsvStrategyMutation.Create(KEY, strategy, source))))
-            .createdCsvStrategyIds[KEY],
+): CsvImportStrategyId {
+    val key = strategy.name
+    return requireNotNull(
+        import(ImportBatch(csvStrategyMutations = listOf(CsvStrategyMutation.Create(key, strategy, source))))
+            .createdCsvStrategyIds[key],
     )
+}
 
 suspend fun ImportEngine.updateCsvStrategy(
     strategy: CsvImportStrategy,
@@ -62,11 +60,13 @@ suspend fun ImportEngine.deleteCsvStrategy(id: CsvImportStrategyId) {
 suspend fun ImportEngine.createApiStrategy(
     strategy: ApiImportStrategy,
     source: Source = Source.Manual,
-): ApiImportStrategyId =
-    requireNotNull(
-        import(ImportBatch(apiStrategyMutations = listOf(ApiStrategyMutation.Create(KEY, strategy, source))))
-            .createdApiStrategyIds[KEY],
+): ApiImportStrategyId {
+    val key = strategy.name
+    return requireNotNull(
+        import(ImportBatch(apiStrategyMutations = listOf(ApiStrategyMutation.Create(key, strategy, source))))
+            .createdApiStrategyIds[key],
     )
+}
 
 suspend fun ImportEngine.updateApiStrategy(
     strategy: ApiImportStrategy,
@@ -88,14 +88,16 @@ suspend fun ImportEngine.createCsvMapping(
     columnName: String,
     valuePattern: Regex,
     accountId: AccountId,
-): Long =
-    requireNotNull(
+): Long {
+    val key = columnName
+    return requireNotNull(
         import(
             ImportBatch(
-                csvMappingMutations = listOf(CsvMappingMutation.Create(KEY, strategyId, columnName, valuePattern, accountId)),
+                csvMappingMutations = listOf(CsvMappingMutation.Create(key, strategyId, columnName, valuePattern, accountId)),
             ),
-        ).createdCsvMappingIds[KEY],
+        ).createdCsvMappingIds[key],
     )
+}
 
 suspend fun ImportEngine.createCsvMappings(mappings: List<CsvAccountMapping>) {
     import(ImportBatch(csvMappingMutations = listOf(CsvMappingMutation.CreateBatch(mappings))))
@@ -109,10 +111,6 @@ suspend fun ImportEngine.deleteCsvMapping(id: Long) {
     import(ImportBatch(csvMappingMutations = listOf(CsvMappingMutation.Delete(id))))
 }
 
-suspend fun ImportEngine.deleteCsvMappingsForStrategy(strategyId: CsvImportStrategyId) {
-    import(ImportBatch(csvMappingMutations = listOf(CsvMappingMutation.DeleteForStrategy(strategyId))))
-}
-
 // endregion
 
 // region CSV staging
@@ -123,14 +121,16 @@ suspend fun ImportEngine.createCsvImport(
     rows: List<List<String>>,
     fileChecksum: String,
     fileLastModified: Instant,
-): CsvImportId =
-    requireNotNull(
+): CsvImportId {
+    val key = fileName
+    return requireNotNull(
         import(
             ImportBatch(
-                csvImportMutations = listOf(CsvImportMutation.Create(KEY, fileName, headers, rows, fileChecksum, fileLastModified)),
+                csvImportMutations = listOf(CsvImportMutation.Create(key, fileName, headers, rows, fileChecksum, fileLastModified)),
             ),
-        ).createdCsvImportIds[KEY],
+        ).createdCsvImportIds[key],
     )
+}
 
 suspend fun ImportEngine.deleteCsvImport(id: CsvImportId) {
     import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Delete(id))))
@@ -151,15 +151,17 @@ suspend fun ImportEngine.createQifImport(
     accountType: String,
     fileChecksum: String,
     fileLastModified: Instant,
-): QifImportId =
-    requireNotNull(
+): QifImportId {
+    val key = fileName
+    return requireNotNull(
         import(
             ImportBatch(
                 qifImportMutations =
-                    listOf(QifImportMutation.Create(KEY, fileName, records, accountType, fileChecksum, fileLastModified)),
+                    listOf(QifImportMutation.Create(key, fileName, records, accountType, fileChecksum, fileLastModified)),
             ),
-        ).createdQifImportIds[KEY],
+        ).createdQifImportIds[key],
     )
+}
 
 suspend fun ImportEngine.deleteQifImport(id: QifImportId) {
     import(ImportBatch(qifImportMutations = listOf(QifImportMutation.Delete(id))))
@@ -193,21 +195,16 @@ suspend fun ImportEngine.createApiCredential(
     strategyId: ApiImportStrategyId? = null,
     privateKey: String? = null,
     publicKey: String? = null,
-): MonzoCredentialId =
-    requireNotNull(
+): MonzoCredentialId {
+    val key = token
+    return requireNotNull(
         import(
             ImportBatch(
                 apiSessionMutations =
-                    listOf(ApiSessionMutation.CreateCredential(KEY, token, createdAt, type, strategyId, privateKey, publicKey)),
+                    listOf(ApiSessionMutation.CreateCredential(key, token, createdAt, type, strategyId, privateKey, publicKey)),
             ),
-        ).apiCredentialIds[KEY],
+        ).apiCredentialIds[key],
     )
-
-suspend fun ImportEngine.updateApiCredentialStrategy(
-    credentialId: MonzoCredentialId,
-    strategyId: ApiImportStrategyId?,
-) {
-    import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.UpdateCredentialStrategy(credentialId, strategyId))))
 }
 
 suspend fun ImportEngine.updateApiCredentialKeys(
@@ -222,56 +219,42 @@ suspend fun ImportEngine.createApiSession(
     token: String,
     deviceId: DeviceId,
     createdAt: Instant,
-    expiresAt: Instant?,
     type: ApiSessionType = ApiSessionType.MONZO,
     credentialId: MonzoCredentialId? = null,
-): ApiSessionId =
-    requireNotNull(
+): ApiSessionId {
+    val key = token
+    return requireNotNull(
         import(
             ImportBatch(
                 apiSessionMutations =
-                    listOf(ApiSessionMutation.CreateSession(KEY, token, deviceId, createdAt, expiresAt, type, credentialId)),
+                    listOf(ApiSessionMutation.CreateSession(key, token, deviceId, createdAt, expiresAt = null, type, credentialId)),
             ),
-        ).apiSessionIds[KEY],
+        ).apiSessionIds[key],
     )
+}
 
 suspend fun ImportEngine.insertApiRequest(
     sessionId: ApiSessionId,
     method: String,
     url: String,
     headers: Map<String, String>,
-): ApiRequestId =
-    requireNotNull(
-        import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.InsertRequest(KEY, sessionId, method, url, headers))))
-            .apiRequestIds[KEY],
+): ApiRequestId {
+    val key = url
+    return requireNotNull(
+        import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.InsertRequest(key, sessionId, method, url, headers))))
+            .apiRequestIds[key],
     )
+}
 
 suspend fun ImportEngine.insertApiResponse(
     requestId: ApiRequestId,
     sessionId: ApiSessionId,
     json: String,
-): ApiResponseId =
-    requireNotNull(
-        import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.InsertResponse(KEY, requestId, sessionId, json))))
-            .apiResponseIds[KEY],
-    )
-
-suspend fun ImportEngine.deleteApiSession(id: ApiSessionId) {
-    import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.DeleteSession(id))))
-}
-
-suspend fun ImportEngine.insertApiResponseTransaction(
-    responseId: ApiResponseId,
-    jsonPath: JsonPath,
-    state: ApiResponseTransactionState,
-    transactionId: TransferId?,
-    errorMessage: String?,
-) {
-    import(
-        ImportBatch(
-            apiSessionMutations =
-                listOf(ApiSessionMutation.InsertResponseTransaction(KEY, responseId, jsonPath, state, transactionId, errorMessage)),
-        ),
+): ApiResponseId {
+    val key = requestId.toString()
+    return requireNotNull(
+        import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.InsertResponse(key, requestId, sessionId, json))))
+            .apiResponseIds[key],
     )
 }
 

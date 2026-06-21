@@ -378,7 +378,6 @@ fun ApiSessionsScreen(
                                                 token = credential.token,
                                                 deviceId = deviceId,
                                                 createdAt = Clock.System.now(),
-                                                expiresAt = null,
                                                 credentialId = credential.id,
                                             )
                                         refresh()

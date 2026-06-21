@@ -3,9 +3,7 @@ package com.moneymanager.importengineapi
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 
 /*
@@ -29,27 +27,6 @@ suspend fun ImportEngine.createCurrency(
             ),
         )
     return requireNotNull(result.createdCurrencyIds[key]) { "Currency $code was not created" }
-}
-
-/** Updates an existing currency row. */
-suspend fun ImportEngine.updateCurrency(
-    currency: Currency,
-    source: Source = Source.Manual,
-) {
-    import(
-        ImportBatch(
-            currencies =
-                listOf(
-                    ImportCurrencyIntent(
-                        key = LocalCurrencyKey(currency.code),
-                        source = source,
-                        operation = ImportOperation.UPDATE,
-                        existingId = currency.id,
-                        currency = currency,
-                    ),
-                ),
-        ),
-    )
 }
 
 /** Deletes a currency by id. */
@@ -81,12 +58,6 @@ suspend fun ImportEngine.getOrCreateAttributeType(name: String): AttributeTypeId
 /** Resolves (get-or-create) several attribute-type ids by name in one batch. */
 suspend fun ImportEngine.getOrCreateAttributeTypes(names: List<String>): Map<String, AttributeTypeId> =
     if (names.isEmpty()) emptyMap() else import(ImportBatch(attributeTypeNames = names)).attributeTypeIds
-
-/** Resolves (get-or-create) a single relationship-type id by name. */
-suspend fun ImportEngine.getOrCreateRelationshipType(name: String): RelationshipTypeId =
-    requireNotNull(import(ImportBatch(relationshipTypeNames = listOf(name))).relationshipTypeIds[name]) {
-        "Relationship type $name was not resolved"
-    }
 
 /**
  * Creates [accounts] (always new, no matching), returning their ids in input order. [sourceFor] gives
