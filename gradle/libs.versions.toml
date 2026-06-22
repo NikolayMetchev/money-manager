@@ -6,7 +6,7 @@ develocity = "4.4.2"
 android-gradle-plugin = "9.2.1"
 android-minSdk = "30"
 android-targetSdk = "36"
-play-services-auth = "21.3.0"
+play-services-auth = "21.6.0"
 androidx-activity-compose = "1.13.0"
 # Transitive-alignment versions: pin divergent androidx/kotlinx transitive deps to the
 # version the assembled app already resolves to (see moneymanager.kotlin-convention).
