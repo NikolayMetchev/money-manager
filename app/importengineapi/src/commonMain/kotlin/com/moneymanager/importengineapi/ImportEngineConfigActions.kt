@@ -190,8 +190,9 @@ suspend fun ImportEngine.createApiCredential(
     privateKey: String? = null,
     publicKey: String? = null,
 ): MonzoCredentialId {
-    // The read-back key is echoed through ImportResult, so use an opaque label rather than the secret token.
-    val key = "create_api_credential"
+    // The read-back key is echoed through ImportResult, so derive it from the (non-secret) createdAt
+    // timestamp rather than the secret token. A helper creates exactly one credential per batch.
+    val key = createdAt.toString()
     return requireNotNull(
         import(
             ImportBatch(
@@ -217,8 +218,9 @@ suspend fun ImportEngine.createApiSession(
     type: ApiSessionType = ApiSessionType.MONZO,
     credentialId: MonzoCredentialId? = null,
 ): ApiSessionId {
-    // The read-back key is echoed through ImportResult, so use an opaque label rather than the secret token.
-    val key = "create_api_session"
+    // The read-back key is echoed through ImportResult, so derive it from the (non-secret) createdAt
+    // timestamp rather than the secret token. A helper creates exactly one session per batch.
+    val key = createdAt.toString()
     return requireNotNull(
         import(
             ImportBatch(
