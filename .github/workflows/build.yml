@@ -34,7 +34,7 @@ jobs:
       # Needed so paths-filter can diff against the previous commit on push
       # events (on pull_request it uses the API and the checkout is unused).
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false  # read-only job, no git push
       - name: Filter changed paths
@@ -64,7 +64,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Build with Gradle
         uses: ./.github/actions/gradle-run
@@ -97,7 +97,7 @@ jobs:
           df -h
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Gradle environment
         uses: ./.github/actions/gradle-setup
@@ -174,7 +174,7 @@ jobs:
       checks: write
       security-events: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # On PRs check out the actual PR commit, not the merge commit; on
           # push/workflow_dispatch fall back to the triggered ref.
@@ -229,7 +229,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.head_ref }}
           # Use PAT to trigger workflows on the pushed commit
