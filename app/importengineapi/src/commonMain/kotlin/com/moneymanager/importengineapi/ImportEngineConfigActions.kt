@@ -189,15 +189,18 @@ suspend fun ImportEngine.createApiCredential(
     strategyId: ApiImportStrategyId? = null,
     privateKey: String? = null,
     publicKey: String? = null,
-): MonzoCredentialId =
-    requireNotNull(
+): MonzoCredentialId {
+    // The read-back key is echoed through ImportResult, so use an opaque label rather than the secret token.
+    val key = "create_api_credential"
+    return requireNotNull(
         import(
             ImportBatch(
                 apiSessionMutations =
-                    listOf(ApiSessionMutation.CreateCredential(token, token, createdAt, type, strategyId, privateKey, publicKey)),
+                    listOf(ApiSessionMutation.CreateCredential(key, token, createdAt, type, strategyId, privateKey, publicKey)),
             ),
-        ).apiCredentialIds[token],
+        ).apiCredentialIds[key],
     )
+}
 
 suspend fun ImportEngine.updateApiCredentialKeys(
     credentialId: MonzoCredentialId,
@@ -213,15 +216,18 @@ suspend fun ImportEngine.createApiSession(
     createdAt: Instant,
     type: ApiSessionType = ApiSessionType.MONZO,
     credentialId: MonzoCredentialId? = null,
-): ApiSessionId =
-    requireNotNull(
+): ApiSessionId {
+    // The read-back key is echoed through ImportResult, so use an opaque label rather than the secret token.
+    val key = "create_api_session"
+    return requireNotNull(
         import(
             ImportBatch(
                 apiSessionMutations =
-                    listOf(ApiSessionMutation.CreateSession(token, token, deviceId, createdAt, type, credentialId)),
+                    listOf(ApiSessionMutation.CreateSession(key, token, deviceId, createdAt, type, credentialId)),
             ),
-        ).apiSessionIds[token],
+        ).apiSessionIds[key],
     )
+}
 
 suspend fun ImportEngine.insertApiRequest(
     sessionId: ApiSessionId,

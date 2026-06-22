@@ -84,13 +84,13 @@ import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.updateApiCredentialKeys
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.ScaParams
 import com.moneymanager.rest.createApiClient
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.api.sca.generateScaKeyPair
 import com.moneymanager.ui.api.sca.signScaChallenge
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
@@ -123,13 +123,13 @@ fun ApiSessionsScreen(
     accountRepository: AccountReadRepository,
     currencyRepository: CurrencyReadRepository,
     maintenance: Maintenance,
-    importEngine: ImportEngine,
     deviceId: DeviceId,
     onMonzoConnectClick: () -> Unit = {},
     onApiStrategiesClick: () -> Unit = {},
     onSessionClick: (ApiSession) -> Unit = {},
     onTransactionsImported: () -> Unit = {},
 ) {
+    val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
     val backgroundTasks = LocalBackgroundTaskManager.current
     val clipboard = LocalClipboard.current

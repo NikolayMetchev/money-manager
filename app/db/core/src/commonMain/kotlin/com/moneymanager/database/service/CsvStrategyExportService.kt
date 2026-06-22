@@ -51,6 +51,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.ImportCurrencyIntent
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
@@ -334,14 +335,15 @@ class CsvStrategyExportService(
         }
 
         // Create the requested new entities through the engine (the sole writer); they are then read
-        // back below via the re-fetched lookup maps.
-        importEngine.import(
-            ImportBatch(
-                accountsToCreate = accountIntents.values.toList(),
-                categories = categoryIntents.values.toList(),
-                currencies = currencyIntents.values.toList(),
-            ),
-        )
+        // back below via the re-fetched lookup maps, keyed by the engine-returned ids.
+        val importResult =
+            importEngine.import(
+                ImportBatch(
+                    accountsToCreate = accountIntents.values.toList(),
+                    categories = categoryIntents.values.toList(),
+                    currencies = currencyIntents.values.toList(),
+                ),
+            )
 
         // Build lookup maps including both existing and newly created entities
         val accounts = accountRepository.getAllAccounts().first()
@@ -380,7 +382,17 @@ class CsvStrategyExportService(
                         }
                     }
                 }
-                is Resolution.CreateNew -> Unit
+                is Resolution.CreateNew ->
+                    aliasCreatedEntity(
+                        ref,
+                        importResult,
+                        accounts,
+                        categories,
+                        currencies,
+                        accountsByName,
+                        categoriesByName,
+                        currenciesByCode,
+                    )
             }
         }
 
@@ -401,6 +413,36 @@ class CsvStrategyExportService(
             createdAt = now,
             updatedAt = now,
         )
+    }
+
+    // A new entity is created under its (possibly renamed) resolution name, but the export's field
+    // mappings still reference it by the original ref.name. Alias ref.name to the just-created entity
+    // (looked up by the engine-returned id) so toDomain resolves it instead of failing/UNCATEGORIZED.
+    @Suppress("LongParameterList")
+    private fun aliasCreatedEntity(
+        ref: UnresolvedReference,
+        importResult: ImportResult,
+        accounts: List<Account>,
+        categories: List<Category>,
+        currencies: List<Currency>,
+        accountsByName: MutableMap<String, Account>,
+        categoriesByName: MutableMap<String, Category>,
+        currenciesByCode: MutableMap<String, Currency>,
+    ) {
+        when (ref.type) {
+            ReferenceType.ACCOUNT -> {
+                val id = importResult.createdAccountIds[LocalAccountKey(ref.name)] ?: return
+                accounts.find { it.id == id }?.let { accountsByName[ref.name] = it }
+            }
+            ReferenceType.CATEGORY -> {
+                val id = importResult.createdCategoryIds[LocalCategoryKey(ref.name)] ?: return
+                categories.find { it.id == id }?.let { categoriesByName[ref.name] = it }
+            }
+            ReferenceType.CURRENCY -> {
+                val id = importResult.createdCurrencyIds[LocalCurrencyKey(ref.name)] ?: return
+                currencies.find { it.id == id }?.let { currenciesByCode[ref.name] = it }
+            }
+        }
     }
 
     private fun FieldMapping.toExport(

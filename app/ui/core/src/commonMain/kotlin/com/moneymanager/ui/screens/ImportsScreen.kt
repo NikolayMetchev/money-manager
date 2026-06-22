@@ -118,7 +118,6 @@ fun ImportsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     maintenance = maintenance,
-                    importEngine = importEngine,
                     deviceId = deviceId,
                     onMonzoConnectClick = onAddCredentialClick,
                     onApiStrategiesClick = onApiStrategiesClick,

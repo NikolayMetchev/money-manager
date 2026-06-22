@@ -428,6 +428,8 @@ suspend fun runImport(
     }
     if (duplicateRecords.isNotEmpty()) {
         statusMutations += QifImportMutation.UpdateRecordStatuses(qifImport.id, ImportStatus.DUPLICATE.name, duplicateRecords)
+        // A record retried from ERROR can resolve as DUPLICATE; clear its stale error like imported/updated do.
+        statusMutations += QifImportMutation.ClearErrors(qifImport.id, duplicateRecords.keys.toList())
     }
     importEngine.applyQifImportMutations(statusMutations)
 

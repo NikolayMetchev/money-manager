@@ -39,10 +39,10 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
-import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setDefaultCurrency
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.DatabasePickerMode
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -152,7 +152,6 @@ private fun DatabaseCard(
 @Composable
 fun SettingsScreen(
     currencyRepository: CurrencyReadRepository,
-    importEngine: ImportEngine,
     settingsRepository: SettingsReadRepository,
     maintenance: Maintenance,
     currentDatabaseLocation: DbLocation,
@@ -161,6 +160,7 @@ fun SettingsScreen(
     remoteController: RemoteDatabaseController? = null,
     database: MoneyManagerDatabaseWrapper? = null,
 ) {
+    val importEngine = LocalImportEngine.current
     var showWarningDialog by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
     var showProgressDialog by remember { mutableStateOf(false) }

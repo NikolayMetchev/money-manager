@@ -303,7 +303,13 @@ fun CsvStrategyEditorScreen(
                         accounts = accounts,
                         onEditAccountMapping = { editingAccountMapping = it },
                         onDeleteAccountMapping = { mapping ->
-                            scope.launch { importEngine.deleteCsvMapping(mapping.id) }
+                            scope.launch {
+                                try {
+                                    importEngine.deleteCsvMapping(mapping.id)
+                                } catch (expected: Exception) {
+                                    state.errorMessage = "Failed to delete account mapping: ${expected.message}"
+                                }
+                            }
                         },
                         onAddAccountMapping = { showAddAccountMappingDialog = true },
                     )

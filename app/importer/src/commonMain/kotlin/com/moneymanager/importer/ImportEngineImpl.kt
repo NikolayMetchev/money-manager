@@ -1001,11 +1001,23 @@ class ImportEngineImpl(
         val apiResponseTransactionIds: Map<String, ApiResponseTransactionId>,
     )
 
+    // Fail fast rather than silently overwrite a generated id when two create mutations share a read-back
+    // key in one batch — a duplicate key would otherwise drop the earlier id from the ImportResult map.
+    private fun <K, V> MutableMap<K, V>.putUnique(
+        key: K,
+        value: V,
+        label: String,
+    ) {
+        require(key !in this) { "Duplicate $label read-back key in ImportBatch: $key" }
+        this[key] = value
+    }
+
     private suspend fun applyConfigMutations(batch: ImportBatch): ConfigOutcome {
         val csvStrategyIds = mutableMapOf<String, CsvImportStrategyId>()
         for (m in batch.csvStrategyMutations) {
             when (m) {
-                is CsvStrategyMutation.Create -> csvStrategyIds[m.key] = csvImportStrategyRepository.createStrategy(m.strategy, m.source)
+                is CsvStrategyMutation.Create ->
+                    csvStrategyIds.putUnique(m.key, csvImportStrategyRepository.createStrategy(m.strategy, m.source), "CsvStrategy")
                 is CsvStrategyMutation.Update -> csvImportStrategyRepository.updateStrategy(m.strategy, m.source)
                 is CsvStrategyMutation.Delete -> csvImportStrategyRepository.deleteStrategy(m.id)
             }
@@ -1014,7 +1026,8 @@ class ImportEngineImpl(
         val apiStrategyIds = mutableMapOf<String, ApiImportStrategyId>()
         for (m in batch.apiStrategyMutations) {
             when (m) {
-                is ApiStrategyMutation.Create -> apiStrategyIds[m.key] = apiImportStrategyRepository.createStrategy(m.strategy, m.source)
+                is ApiStrategyMutation.Create ->
+                    apiStrategyIds.putUnique(m.key, apiImportStrategyRepository.createStrategy(m.strategy, m.source), "ApiStrategy")
                 is ApiStrategyMutation.Update -> apiImportStrategyRepository.updateStrategy(m.strategy, m.source)
                 is ApiStrategyMutation.Delete -> apiImportStrategyRepository.deleteStrategy(m.id)
             }
@@ -1024,8 +1037,11 @@ class ImportEngineImpl(
         for (m in batch.csvMappingMutations) {
             when (m) {
                 is CsvMappingMutation.Create ->
-                    csvMappingIds[m.key] =
-                        csvAccountMappingRepository.createMapping(m.strategyId, m.columnName, m.valuePattern, m.accountId)
+                    csvMappingIds.putUnique(
+                        m.key,
+                        csvAccountMappingRepository.createMapping(m.strategyId, m.columnName, m.valuePattern, m.accountId),
+                        "CsvMapping",
+                    )
                 is CsvMappingMutation.CreateBatch -> csvAccountMappingRepository.createMappings(m.mappings)
                 is CsvMappingMutation.Update -> csvAccountMappingRepository.updateMapping(m.mapping)
                 is CsvMappingMutation.Delete -> csvAccountMappingRepository.deleteMapping(m.id)
@@ -1037,8 +1053,11 @@ class ImportEngineImpl(
         for (m in batch.csvImportMutations) {
             when (m) {
                 is CsvImportMutation.Create ->
-                    csvImportIds[m.key] =
-                        csvImportRepository.createImport(m.fileName, m.headers, m.rows, m.fileChecksum, m.fileLastModified)
+                    csvImportIds.putUnique(
+                        m.key,
+                        csvImportRepository.createImport(m.fileName, m.headers, m.rows, m.fileChecksum, m.fileLastModified),
+                        "CsvImport",
+                    )
                 is CsvImportMutation.Delete -> csvImportRepository.deleteImport(m.id)
                 is CsvImportMutation.UpdateRowTransferId -> csvImportRepository.updateRowTransferId(m.id, m.rowIndex, m.transferId)
                 is CsvImportMutation.UpdateRowTransferIds -> csvImportRepository.updateRowTransferIdsBatch(m.id, m.rowTransferMap)
@@ -1061,8 +1080,11 @@ class ImportEngineImpl(
         for (m in batch.qifImportMutations) {
             when (m) {
                 is QifImportMutation.Create ->
-                    qifImportIds[m.key] =
-                        qifImportRepository.createImport(m.fileName, m.records, m.accountType, m.fileChecksum, m.fileLastModified)
+                    qifImportIds.putUnique(
+                        m.key,
+                        qifImportRepository.createImport(m.fileName, m.records, m.accountType, m.fileChecksum, m.fileLastModified),
+                        "QifImport",
+                    )
                 is QifImportMutation.Delete -> qifImportRepository.deleteImport(m.id)
                 is QifImportMutation.UpdateRecordStatuses ->
                     qifImportRepository.updateRecordStatusesBatch(
@@ -1090,8 +1112,11 @@ class ImportEngineImpl(
         for (m in batch.apiSessionMutations) {
             when (m) {
                 is ApiSessionMutation.CreateCredential ->
-                    apiCredentialIds[m.key] =
-                        apiSessionRepository.createCredential(m.token, m.createdAt, m.type, m.strategyId, m.privateKey, m.publicKey)
+                    apiCredentialIds.putUnique(
+                        m.key,
+                        apiSessionRepository.createCredential(m.token, m.createdAt, m.type, m.strategyId, m.privateKey, m.publicKey),
+                        "ApiCredential",
+                    )
                 is ApiSessionMutation.UpdateCredentialStrategy ->
                     apiSessionRepository.updateCredentialStrategy(
                         m.credentialId,
@@ -1104,16 +1129,30 @@ class ImportEngineImpl(
                         m.publicKey,
                     )
                 is ApiSessionMutation.CreateSession ->
-                    apiSessionIds[m.key] =
-                        apiSessionRepository.createSession(m.token, m.deviceId, m.createdAt, expiresAt = null, m.type, m.credentialId)
+                    apiSessionIds.putUnique(
+                        m.key,
+                        apiSessionRepository.createSession(m.token, m.deviceId, m.createdAt, expiresAt = null, m.type, m.credentialId),
+                        "ApiSession",
+                    )
                 is ApiSessionMutation.InsertRequest ->
-                    apiRequestIds[m.key] = apiSessionRepository.insertRequest(m.sessionId, m.method, m.url, m.headers)
+                    apiRequestIds.putUnique(
+                        m.key,
+                        apiSessionRepository.insertRequest(m.sessionId, m.method, m.url, m.headers),
+                        "ApiRequest",
+                    )
                 is ApiSessionMutation.InsertResponse ->
-                    apiResponseIds[m.key] = apiSessionRepository.insertResponse(m.requestId, m.sessionId, m.json)
+                    apiResponseIds.putUnique(
+                        m.key,
+                        apiSessionRepository.insertResponse(m.requestId, m.sessionId, m.json),
+                        "ApiResponse",
+                    )
                 is ApiSessionMutation.DeleteSession -> apiSessionRepository.deleteSession(m.id)
                 is ApiSessionMutation.InsertResponseTransaction ->
-                    apiResponseTransactionIds[m.key] =
-                        apiSessionRepository.insertResponseTransaction(m.responseId, m.jsonPath, m.state, m.transactionId, m.errorMessage)
+                    apiResponseTransactionIds.putUnique(
+                        m.key,
+                        apiSessionRepository.insertResponseTransaction(m.responseId, m.jsonPath, m.state, m.transactionId, m.errorMessage),
+                        "ApiResponseTransaction",
+                    )
                 is ApiSessionMutation.InsertResponseTransactions -> apiSessionRepository.insertResponseTransactions(m.transactions)
                 is ApiSessionMutation.MarkSessionImported ->
                     apiSessionRepository.markSessionImported(m.id, m.revisionId, m.importedAt, m.importDurationMillis)

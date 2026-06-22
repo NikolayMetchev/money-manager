@@ -563,6 +563,8 @@ suspend fun runCsvImport(
     }
     if (duplicateStatuses.isNotEmpty()) {
         statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.DUPLICATE.name, duplicateStatuses)
+        // A row retried from ERROR can resolve as DUPLICATE; clear its stale error like imported/updated do.
+        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, duplicateStatuses.keys.toList())
     }
     if (updatedStatuses.isNotEmpty()) {
         statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.UPDATED.name, updatedStatuses)
@@ -603,11 +605,11 @@ suspend fun runCsvImport(
 
     logger.info { "Import completed successfully" }
 
-    // The engine import is atomic: on success there are no per-row failures
-    // (any failure throws to the caller), so the import is complete.
+    // The engine import is atomic: any engine failure throws to the caller. The only per-row failures
+    // are mapping errors detected before the import, so surface those to the dialog.
     return CsvImportResult(
         successCount = successCount,
-        failedRows = emptyList(),
+        failedRows = finalPrep.errorRows.map { CsvImportResult.FailedRow(it.rowIndex, it.errorMessage) },
         duplicateCount = duplicateCount,
     )
 }

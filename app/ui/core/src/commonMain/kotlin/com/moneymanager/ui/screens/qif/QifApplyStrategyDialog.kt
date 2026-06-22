@@ -57,6 +57,7 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.ImportPreviewSection
 import com.moneymanager.ui.screens.csv.NewAccountResolutionSection
 import com.moneymanager.ui.screens.csv.StrategySelector
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -311,8 +312,17 @@ fun QifApplyStrategyDialog(
                                     maintenance = maintenance,
                                     importEngine = importEngine,
                                 )
-                            // Remember the source account so the next QIF import pre-selects it.
-                            selectedSourceAccountId?.let { importEngine.setLastQifAccount(it) }
+                            // Best-effort: the import already persisted, so a failure to remember the
+                            // source account must not make a completed import look failed.
+                            try {
+                                selectedSourceAccountId?.let { importEngine.setLastQifAccount(it) }
+                            } catch (cancellation: CancellationException) {
+                                throw cancellation
+                            } catch (expected: Exception) {
+                                logger.error(expected) {
+                                    "QIF import completed, but failed to remember last QIF account: ${expected.message}"
+                                }
+                            }
                             onImportComplete(result)
                         } catch (expected: Exception) {
                             logger.error(expected) { "QIF import failed: ${expected.message}" }

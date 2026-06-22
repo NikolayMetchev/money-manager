@@ -379,7 +379,6 @@ fun MoneyManagerApp(
                                         }
                                         SettingsScreen(
                                             currencyRepository = services.accounts.currencyRepository,
-                                            importEngine = services.transactions.importEngine,
                                             settingsRepository = services.settings.settingsRepository,
                                             maintenance = services.imports.maintenance,
                                             currentDatabaseLocation = databaseLocation,
