@@ -26,12 +26,13 @@ import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.transactions.EditableAttributesSection
@@ -47,7 +48,7 @@ fun EditPersonDialog(
     onDismiss: () -> Unit,
     onPersonCreated: ((PersonId) -> Unit)? = null,
     personAttributeRepository: PersonAttributeReadRepository? = null,
-    attributeTypeRepository: AttributeTypeWriteRepository? = null,
+    attributeTypeRepository: AttributeTypeReadRepository? = null,
 ) {
     var firstName by remember { mutableStateOf(personToEdit?.firstName.orEmpty()) }
     var middleName by remember { mutableStateOf(personToEdit?.middleName.orEmpty()) }
@@ -161,14 +162,14 @@ fun EditPersonDialog(
                                         when {
                                             typeName.isBlank() || value.isBlank() -> deletedAttributeIds.add(id)
                                             original.attributeType.name != typeName || original.value != value ->
-                                                updatedAttributes[id] = NewAttribute(attributeTypeRepository.getOrCreate(typeName), value)
+                                                updatedAttributes[id] = NewAttribute(importEngine.getOrCreateAttributeType(typeName), value)
                                         }
                                     }
                                     editableAttributes.filterKeys { it < 0 }.forEach { (_, pair) ->
                                         val typeName = pair.first.trim()
                                         val value = pair.second.trim()
                                         if (typeName.isNotEmpty() && value.isNotEmpty()) {
-                                            newAttributes.add(NewAttribute(attributeTypeRepository.getOrCreate(typeName), value))
+                                            newAttributes.add(NewAttribute(importEngine.getOrCreateAttributeType(typeName), value))
                                         }
                                     }
                                 }

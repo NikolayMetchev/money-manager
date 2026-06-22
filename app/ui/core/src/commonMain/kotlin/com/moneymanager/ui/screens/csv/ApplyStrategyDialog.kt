@@ -64,13 +64,11 @@ import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CsvImportWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
@@ -90,14 +88,12 @@ private val logger = logging()
 fun ApplyStrategyDialog(
     csvImport: CsvImport,
     rows: List<CsvRow>,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
-    csvImportRepository: CsvImportWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
@@ -363,8 +359,6 @@ fun ApplyStrategyDialog(
                                     currencies = currencies,
                                     csvAccountMappingRepository = csvAccountMappingRepository,
                                     accountRepository = accountRepository,
-                                    csvImportRepository = csvImportRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
                                     maintenance = maintenance,
                                     importEngine = importEngine,
                                 )

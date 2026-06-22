@@ -379,8 +379,6 @@ fun MoneyManagerApp(
                                         }
                                         SettingsScreen(
                                             currencyRepository = services.accounts.currencyRepository,
-                                            attributeTypeRepository = services.transactions.attributeTypeRepository,
-                                            importEngine = services.transactions.importEngine,
                                             settingsRepository = services.settings.settingsRepository,
                                             maintenance = services.imports.maintenance,
                                             currentDatabaseLocation = databaseLocation,
@@ -453,7 +451,6 @@ fun MoneyManagerApp(
                                             settingsRepository = services.settings.settingsRepository,
                                             apiSessionRepository = services.imports.apiSessionRepository,
                                             apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
-                                            attributeTypeRepository = services.transactions.attributeTypeRepository,
                                             accountAttributeRepository = services.accounts.accountAttributeRepository,
                                             accountRepository = services.accounts.accountRepository,
                                             currencyRepository = services.accounts.currencyRepository,
@@ -528,7 +525,6 @@ fun MoneyManagerApp(
                                             accountRepository = services.accounts.accountRepository,
                                             categoryRepository = services.accounts.categoryRepository,
                                             currencyRepository = services.accounts.currencyRepository,
-                                            attributeTypeRepository = services.transactions.attributeTypeRepository,
                                             personRepository = services.people.personRepository,
                                             maintenance = services.imports.maintenance,
                                             transferSourceRepository = services.transactions.transferSourceRepository,
@@ -555,7 +551,6 @@ fun MoneyManagerApp(
                                             categoryRepository = services.accounts.categoryRepository,
                                             currencyRepository = services.accounts.currencyRepository,
                                             personRepository = services.people.personRepository,
-                                            attributeTypeRepository = services.transactions.attributeTypeRepository,
                                             settingsRepository = services.settings.settingsRepository,
                                             maintenance = services.imports.maintenance,
                                             importEngine = services.transactions.importEngine,
@@ -755,7 +750,6 @@ fun MoneyManagerApp(
                                             currentlyViewedCurrencyId = null
                                         }
                                         ApiConnectScreen(
-                                            apiSessionRepository = services.imports.apiSessionRepository,
                                             apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                                             onCredentialSaved = {
                                                 navigationHistory.navigateBack()
@@ -792,7 +786,6 @@ fun MoneyManagerApp(
                 if (defaultCurrencyLoaded && defaultCurrencyId == null) {
                     DefaultCurrencyInitDialog(
                         currencyRepository = services.accounts.currencyRepository,
-                        settingsRepository = services.settings.settingsRepository,
                     )
                 }
 

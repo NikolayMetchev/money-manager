@@ -73,7 +73,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.ImportOperation
@@ -101,7 +101,7 @@ private val HIERARCHY_COLUMN_WIDTH = 250.dp
 @Composable
 fun CategoriesScreen(
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     onAuditClick: (Category) -> Unit = {},
 ) {
     val categories by categoryRepository

@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.components.AccountPicker
@@ -32,7 +32,7 @@ internal fun AccountsTab(
     rows: List<CsvRow>,
     firstRow: CsvRow?,
     enabled: Boolean,
-    accountRepository: AccountWriteRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
 ) {

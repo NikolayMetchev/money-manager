@@ -25,10 +25,9 @@ import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifImport
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.QifImportWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
@@ -39,6 +38,11 @@ import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.QifImportMutation
+import com.moneymanager.importengineapi.applyQifImportMutations
+import com.moneymanager.importengineapi.createAccounts
+import com.moneymanager.importengineapi.createCsvMappings
+import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import com.moneymanager.importengineapi.normalizeNameKey
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
@@ -122,10 +126,9 @@ suspend fun bulkApplyQif(
     sourceAccountId: AccountId,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
-    qifImportRepository: QifImportWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
+    qifImportRepository: QifImportReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit,
@@ -171,8 +174,6 @@ suspend fun bulkApplyQif(
                     currencies = currencies,
                     csvAccountMappingRepository = csvAccountMappingRepository,
                     accountRepository = accountRepository,
-                    qifImportRepository = qifImportRepository,
-                    attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
                     refreshViews = false,
@@ -238,12 +239,14 @@ fun buildMapper(
 
 /** Records that this strategy was applied to the import (so the import shows as imported). */
 suspend fun recordApplication(
-    qifImportRepository: QifImportWriteRepository,
+    importEngine: ImportEngine,
     qifImport: QifImport,
     strategy: CsvImportStrategy,
 ) {
     runCatching {
-        qifImportRepository.recordImportApplication(qifImport.id, strategy.id, strategy.name, Clock.System.now())
+        importEngine.applyQifImportMutations(
+            listOf(QifImportMutation.RecordApplication(qifImport.id, strategy.id, strategy.name, Clock.System.now())),
+        )
     }.onFailure { logger.warn { "Could not record QIF import application: ${it.message}" } }
 }
 
@@ -257,10 +260,8 @@ suspend fun runImport(
     selectedNewAccountNames: Map<String, String>,
     selectedSourceAccountId: AccountId?,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
-    qifImportRepository: QifImportWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
@@ -268,7 +269,7 @@ suspend fun runImport(
     // Persist any "map to existing account" selections so future imports reuse them.
     val selectedMappingsToPersist = buildPendingAccountMappings(basePrep, strategy.id, selectedExistingAccounts)
     if (selectedMappingsToPersist.isNotEmpty()) {
-        runCatching { csvAccountMappingRepository.createMappings(selectedMappingsToPersist) }
+        runCatching { importEngine.createCsvMappings(selectedMappingsToPersist) }
             .onFailure { logger.warn(it) { "Failed to persist account mappings" } }
     }
 
@@ -285,7 +286,7 @@ suspend fun runImport(
         // record that referenced each account.
         val firstRecordByAccountName = buildFirstRowByAccountName(basePrep, selectedNewAccountNames)
         runCatching {
-            accountRepository.createAccountsBatch(newAccounts) { account ->
+            importEngine.createAccounts(newAccounts) { account ->
                 Source.Qif(qifImport.id, firstRecordByAccountName[account.name])
             }
         }.onFailure { logger.warn(it) { "Failed to bulk-create accounts" } }
@@ -299,10 +300,14 @@ suspend fun runImport(
     val finalPrep = mapper.prepareImport(rows)
 
     // Surface mapping errors on their records.
-    finalPrep.errorRows.forEach { errorRow ->
-        qifImportRepository.updateRecordStatusesBatch(qifImport.id, ImportStatus.ERROR.name, mapOf(errorRow.rowIndex to null))
-        qifImportRepository.saveError(qifImport.id, errorRow.rowIndex, errorRow.errorMessage)
-    }
+    importEngine.applyQifImportMutations(
+        finalPrep.errorRows.flatMap { errorRow ->
+            listOf(
+                QifImportMutation.UpdateRecordStatuses(qifImport.id, ImportStatus.ERROR.name, mapOf(errorRow.rowIndex to null)),
+                QifImportMutation.SaveError(qifImport.id, errorRow.rowIndex, errorRow.errorMessage),
+            )
+        },
+    )
 
     if (finalPrep.validTransfers.isEmpty()) {
         return QifImportResult(successCount = 0, failedCount = finalPrep.errorRows.size)
@@ -310,11 +315,13 @@ suspend fun runImport(
 
     // Pre-resolve attribute types.
     val attributeTypeIdByName =
-        finalPrep.validTransfers
-            .flatMap { it.attributes }
-            .map { it.first }
-            .toSet()
-            .associateWith { attributeTypeRepository.getOrCreate(it) }
+        importEngine.getOrCreateAttributeTypes(
+            finalPrep.validTransfers
+                .flatMap { it.attributes }
+                .map { it.first }
+                .toSet()
+                .toList(),
+        )
 
     fun attributesFor(attributes: List<Pair<String, String>>): List<NewAttribute> =
         attributes.mapNotNull { (typeName, value) ->
@@ -410,20 +417,24 @@ suspend fun runImport(
                 else -> duplicateRecords[recordIndex] = outcomes.firstOrNull()?.transferId
             }
         }
+    val statusMutations = mutableListOf<QifImportMutation>()
     if (importedRecords.isNotEmpty()) {
-        qifImportRepository.updateRecordStatusesBatch(qifImport.id, ImportStatus.IMPORTED.name, importedRecords)
-        qifImportRepository.clearErrors(qifImport.id, importedRecords.keys.toList())
+        statusMutations += QifImportMutation.UpdateRecordStatuses(qifImport.id, ImportStatus.IMPORTED.name, importedRecords)
+        statusMutations += QifImportMutation.ClearErrors(qifImport.id, importedRecords.keys.toList())
     }
     if (updatedRecords.isNotEmpty()) {
-        qifImportRepository.updateRecordStatusesBatch(qifImport.id, ImportStatus.UPDATED.name, updatedRecords)
-        qifImportRepository.clearErrors(qifImport.id, updatedRecords.keys.toList())
+        statusMutations += QifImportMutation.UpdateRecordStatuses(qifImport.id, ImportStatus.UPDATED.name, updatedRecords)
+        statusMutations += QifImportMutation.ClearErrors(qifImport.id, updatedRecords.keys.toList())
     }
     if (duplicateRecords.isNotEmpty()) {
-        qifImportRepository.updateRecordStatusesBatch(qifImport.id, ImportStatus.DUPLICATE.name, duplicateRecords)
+        statusMutations += QifImportMutation.UpdateRecordStatuses(qifImport.id, ImportStatus.DUPLICATE.name, duplicateRecords)
+        // A record retried from ERROR can resolve as DUPLICATE; clear its stale error like imported/updated do.
+        statusMutations += QifImportMutation.ClearErrors(qifImport.id, duplicateRecords.keys.toList())
     }
+    importEngine.applyQifImportMutations(statusMutations)
 
     if (importedRecords.isNotEmpty() || updatedRecords.isNotEmpty() || duplicateRecords.isNotEmpty()) {
-        recordApplication(qifImportRepository, qifImport, strategy)
+        recordApplication(importEngine, qifImport, strategy)
     }
 
     if (refreshViews) {

@@ -34,16 +34,16 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CsvImportWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.deleteCsvImport
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -55,13 +55,12 @@ import kotlinx.coroutines.launch
 fun CsvImportDetailScreen(
     importId: CsvImportId,
     scrollToRowIndex: Long? = null,
-    csvImportRepository: CsvImportWriteRepository,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
+    csvImportRepository: CsvImportReadRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     maintenance: Maintenance,
     transferSourceRepository: TransferSourceReadRepository,
@@ -371,7 +370,7 @@ fun CsvImportDetailScreen(
                     onClick = {
                         isDeleting = true
                         scope.launch {
-                            csvImportRepository.deleteImport(importId)
+                            importEngine.deleteCsvImport(importId)
                             showDeleteDialog = false
                             onDeleted()
                         }
@@ -403,8 +402,6 @@ fun CsvImportDetailScreen(
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             personRepository = personRepository,
-            csvImportRepository = csvImportRepository,
-            attributeTypeRepository = attributeTypeRepository,
             maintenance = maintenance,
             importEngine = importEngine,
             onDismiss = { showApplyStrategyDialog = false },

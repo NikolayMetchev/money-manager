@@ -31,11 +31,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
-import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
-import com.moneymanager.domain.repository.ApiSessionWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
+import com.moneymanager.domain.repository.ApiSessionReadRepository
+import com.moneymanager.importengineapi.createApiStrategy
+import com.moneymanager.importengineapi.updateApiStrategy
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
@@ -55,11 +57,12 @@ import kotlin.uuid.Uuid
 @Composable
 fun ApiStrategyEditorScreen(
     strategyId: ApiImportStrategyId?,
-    apiImportStrategyRepository: ApiImportStrategyWriteRepository,
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiImportStrategyRepository: ApiImportStrategyReadRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     onBack: () -> Unit,
 ) {
     val isEditMode = strategyId != null
+    val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
 
     val strategyFlow =
@@ -159,9 +162,9 @@ fun ApiStrategyEditorScreen(
                         updatedAt = now,
                     )
                 if (isEditMode) {
-                    apiImportStrategyRepository.updateStrategy(strategy, Source.Manual)
+                    importEngine.updateApiStrategy(strategy)
                 } else {
-                    apiImportStrategyRepository.createStrategy(strategy, Source.Manual)
+                    importEngine.createApiStrategy(strategy)
                 }
                 onBack()
             } catch (expected: Exception) {

@@ -27,8 +27,8 @@ import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -53,9 +53,9 @@ private val logger = logging()
 
 @Composable
 fun AccountsScreen(
-    accountRepository: AccountWriteRepository,
+    accountRepository: AccountReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    attributeTypeRepository: AttributeTypeReadRepository,
     categoryRepository: CategoryReadRepository,
     transactionRepository: TransactionReadRepository,
     personRepository: PersonReadRepository,
@@ -305,7 +305,7 @@ fun AccountCard(
     account: Account,
     category: Category?,
     balances: List<AccountBalance>,
-    accountRepository: AccountWriteRepository,
+    accountRepository: AccountReadRepository,
     personRepository: PersonReadRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     maintenance: Maintenance,
@@ -442,7 +442,7 @@ fun AccountCard(
 @Composable
 fun DeleteAccountDialog(
     account: Account,
-    accountRepository: AccountWriteRepository,
+    accountRepository: AccountReadRepository,
     maintenance: Maintenance,
     onDismiss: () -> Unit,
 ) {

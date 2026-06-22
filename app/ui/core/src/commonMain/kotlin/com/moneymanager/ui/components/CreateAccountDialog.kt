@@ -26,7 +26,7 @@ import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -54,7 +54,7 @@ fun CreateAccountDialog(
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     personAttributeRepository: PersonAttributeReadRepository? = null,
-    attributeTypeRepository: AttributeTypeWriteRepository? = null,
+    attributeTypeRepository: AttributeTypeReadRepository? = null,
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
     initialName: String = "",

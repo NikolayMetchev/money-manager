@@ -4,13 +4,11 @@ package com.moneymanager.ui.util
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
-import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
@@ -26,6 +24,7 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import com.moneymanager.importengineapi.normalizeNameKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -44,13 +43,11 @@ private const val ACCOUNT_COUNT = 100
 /**
  * Generates sample data through the central [ImportEngine] — the sole DB writer for entities and
  * transfers — so accounts, people, ownerships and transactions are created exactly the way a real
- * import creates them (with `Source.SampleGenerator` provenance). Categories and attribute types have
- * no engine creation path, so (mirroring how real importers behave) they are created directly up front
- * and then referenced by id from the batch.
+ * import creates them (with `Source.SampleGenerator` provenance). Attribute types are resolved
+ * (get-or-create) through the engine up front and then referenced by id from the batch.
  */
 suspend fun generateSampleData(
-    currencyRepository: CurrencyWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     importEngine: ImportEngine,
     maintenance: Maintenance,
     progressFlow: MutableStateFlow<GenerationProgress>,
@@ -258,10 +255,8 @@ suspend fun generateSampleData(
             "Check Number",
         )
 
-    val attributeTypeIds = mutableListOf<AttributeTypeId>()
-    for (typeName in attributeTypeNames) {
-        attributeTypeIds.add(attributeTypeRepository.getOrCreate(typeName))
-    }
+    val attributeTypeIdsByName = importEngine.getOrCreateAttributeTypes(attributeTypeNames)
+    val attributeTypeIds = attributeTypeNames.map { attributeTypeIdsByName.getValue(it) }
 
     // Step 7: Determine transaction counts per account (variable distribution)
     val transactionCounts =

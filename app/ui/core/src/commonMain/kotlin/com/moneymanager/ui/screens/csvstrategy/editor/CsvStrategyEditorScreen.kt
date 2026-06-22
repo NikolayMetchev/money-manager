@@ -32,21 +32,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CsvImportWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.importengineapi.createCsvStrategy
+import com.moneymanager.importengineapi.deleteCsvMapping
+import com.moneymanager.importengineapi.updateCsvStrategy
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csvstrategy.AccountMappingEditorDialog
@@ -68,21 +71,22 @@ import kotlin.uuid.Uuid
 fun CsvStrategyEditorScreen(
     csvImportId: CsvImportId?,
     strategyId: CsvImportStrategyId?,
-    csvImportRepository: CsvImportWriteRepository,
+    csvImportRepository: CsvImportReadRepository,
     // When set, the editor uses these fixed columns and sample rows instead of loading them from a
     // CSV import. QIF reuses this editor by supplying its fixed columns (see QifCsvAdapter).
     columnsOverride: List<CsvColumn>? = null,
     sampleRowsOverride: List<CsvRow>? = null,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    currencyRepository: CurrencyReadRepository,
+    attributeTypeRepository: AttributeTypeReadRepository,
     personRepository: PersonReadRepository,
     onBack: () -> Unit,
 ) {
     val isEditMode = strategyId != null
+    val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
 
     // Repository flows are collected via the schema-aware helper so database schema errors are
@@ -222,9 +226,9 @@ fun CsvStrategyEditorScreen(
                         updatedAt = now,
                     )
                 if (isEditMode) {
-                    csvImportStrategyRepository.updateStrategy(strategy, Source.Manual)
+                    importEngine.updateCsvStrategy(strategy)
                 } else {
-                    csvImportStrategyRepository.createStrategy(strategy, Source.Manual)
+                    importEngine.createCsvStrategy(strategy)
                 }
                 onBack()
             } catch (expected: Exception) {
@@ -299,7 +303,13 @@ fun CsvStrategyEditorScreen(
                         accounts = accounts,
                         onEditAccountMapping = { editingAccountMapping = it },
                         onDeleteAccountMapping = { mapping ->
-                            scope.launch { csvAccountMappingRepository.deleteMapping(mapping.id) }
+                            scope.launch {
+                                try {
+                                    importEngine.deleteCsvMapping(mapping.id)
+                                } catch (expected: Exception) {
+                                    state.errorMessage = "Failed to delete account mapping: ${expected.message}"
+                                }
+                            }
                         },
                         onAddAccountMapping = { showAddAccountMappingDialog = true },
                     )
@@ -328,7 +338,6 @@ fun CsvStrategyEditorScreen(
             existingMapping = mapping,
             strategyId = currentStrategyId,
             accounts = accounts,
-            csvAccountMappingRepository = csvAccountMappingRepository,
             onDismiss = { editingAccountMapping = null },
         )
     }
@@ -338,7 +347,6 @@ fun CsvStrategyEditorScreen(
             existingMapping = null,
             strategyId = strategyId,
             accounts = accounts,
-            csvAccountMappingRepository = csvAccountMappingRepository,
             onDismiss = { showAddAccountMappingDialog = false },
         )
     }

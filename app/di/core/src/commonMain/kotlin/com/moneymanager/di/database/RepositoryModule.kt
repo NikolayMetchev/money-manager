@@ -323,10 +323,11 @@ interface RepositoryModule {
     @Provides
     @SingleIn(DatabaseScope::class)
     fun provideCsvStrategyExportService(
-        accountRepository: AccountWriteRepository,
-        currencyRepository: CurrencyWriteRepository,
-        categoryRepository: CategoryWriteRepository,
-    ): CsvStrategyExportService = CsvStrategyExportService(accountRepository, currencyRepository, categoryRepository)
+        accountRepository: AccountReadRepository,
+        currencyRepository: CurrencyReadRepository,
+        categoryRepository: CategoryReadRepository,
+        importEngine: ImportEngine,
+    ): CsvStrategyExportService = CsvStrategyExportService(accountRepository, currencyRepository, categoryRepository, importEngine)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -388,6 +389,16 @@ interface RepositoryModule {
         personAttributeRepository: PersonAttributeWriteRepository,
         ownershipRepository: PersonAccountOwnershipWriteRepository,
         categoryRepository: CategoryWriteRepository,
+        currencyRepository: CurrencyWriteRepository,
+        attributeTypeRepository: AttributeTypeWriteRepository,
+        relationshipTypeRepository: RelationshipTypeWriteRepository,
+        csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+        apiImportStrategyRepository: ApiImportStrategyWriteRepository,
+        csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+        csvImportRepository: CsvImportWriteRepository,
+        qifImportRepository: QifImportWriteRepository,
+        apiSessionRepository: ApiSessionWriteRepository,
+        settingsRepository: SettingsWriteRepository,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,
@@ -397,5 +408,15 @@ interface RepositoryModule {
             personAttributeRepository = personAttributeRepository,
             ownershipRepository = ownershipRepository,
             categoryRepository = categoryRepository,
+            currencyRepository = currencyRepository,
+            attributeTypeRepository = attributeTypeRepository,
+            relationshipTypeRepository = relationshipTypeRepository,
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            apiImportStrategyRepository = apiImportStrategyRepository,
+            csvAccountMappingRepository = csvAccountMappingRepository,
+            csvImportRepository = csvImportRepository,
+            qifImportRepository = qifImportRepository,
+            apiSessionRepository = apiSessionRepository,
+            settingsRepository = settingsRepository,
         )
 }

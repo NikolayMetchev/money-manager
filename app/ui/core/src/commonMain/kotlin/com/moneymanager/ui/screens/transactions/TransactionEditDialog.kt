@@ -44,15 +44,16 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
@@ -71,10 +72,10 @@ import kotlin.time.Instant
 @Composable
 fun TransactionEditDialog(
     transaction: Transfer? = null,
-    accountRepository: AccountWriteRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    currencyRepository: CurrencyReadRepository,
+    attributeTypeRepository: AttributeTypeReadRepository,
     personRepository: PersonReadRepository,
     maintenance: Maintenance,
     preSelectedSourceAccountId: AccountId? = null,
@@ -413,7 +414,7 @@ fun TransactionEditDialog(
                                                 val typeChanged = original.attributeType.name != typeName
                                                 val valueChanged = original.value != value
                                                 if (typeChanged || valueChanged) {
-                                                    val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                                    val typeId = importEngine.getOrCreateAttributeType(typeName)
                                                     updatedAttributes[id] = NewAttribute(typeId, value)
                                                 }
                                             }
@@ -424,7 +425,7 @@ fun TransactionEditDialog(
                                         editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
                                             val (typeName, value) = pair
                                             if (typeName.isNotBlank() && value.isNotBlank()) {
-                                                val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                                val typeId = importEngine.getOrCreateAttributeType(typeName)
                                                 newAttributes.add(NewAttribute(typeId, value))
                                             }
                                         }
@@ -473,7 +474,7 @@ fun TransactionEditDialog(
                                             editableAttributes
                                                 .filter { (_, pair) -> pair.first.isNotBlank() && pair.second.isNotBlank() }
                                                 .map { (_, pair) ->
-                                                    val typeId = attributeTypeRepository.getOrCreate(pair.first.trim())
+                                                    val typeId = importEngine.getOrCreateAttributeType(pair.first.trim())
                                                     NewAttribute(typeId, pair.second.trim())
                                                 }.toMutableList()
 

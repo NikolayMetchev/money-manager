@@ -109,7 +109,6 @@ class SantanderQifE2ETest : DbTest() {
             csvAccountMappingRepository = repositories.csvAccountMappingRepository,
             accountRepository = repositories.accountRepository,
             qifImportRepository = repositories.qifImportRepository,
-            attributeTypeRepository = repositories.attributeTypeRepository,
             maintenance = maintenance,
             importEngine = repositories.importEngine,
             onProgress = { _, _ -> },

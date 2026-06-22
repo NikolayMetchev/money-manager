@@ -37,18 +37,21 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
-import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
+import com.moneymanager.importengineapi.deleteApiStrategy
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 
 @Composable
 fun ApiStrategiesScreen(
-    apiImportStrategyRepository: ApiImportStrategyWriteRepository,
+    apiImportStrategyRepository: ApiImportStrategyReadRepository,
     onBack: () -> Unit = {},
     onCreateStrategy: () -> Unit = {},
     onEditStrategy: (ApiImportStrategyId) -> Unit = {},
     onAuditHistoryClick: ((ApiImportStrategy) -> Unit)? = null,
 ) {
+    val importEngine = LocalImportEngine.current
     val strategies by apiImportStrategyRepository
         .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -121,7 +124,7 @@ fun ApiStrategiesScreen(
                 TextButton(
                     onClick = {
                         scope.launch {
-                            apiImportStrategyRepository.deleteStrategy(strategy.id)
+                            importEngine.deleteApiStrategy(strategy.id)
                         }
                         strategyPendingDelete = null
                     },

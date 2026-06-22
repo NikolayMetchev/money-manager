@@ -40,7 +40,7 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -53,7 +53,7 @@ fun PeopleScreen(
     personRepository: PersonReadRepository,
     personAttributeRepository: PersonAttributeReadRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    attributeTypeRepository: AttributeTypeReadRepository,
     scrollToPersonId: PersonId? = null,
     onAuditClick: (Person) -> Unit = {},
 ) {

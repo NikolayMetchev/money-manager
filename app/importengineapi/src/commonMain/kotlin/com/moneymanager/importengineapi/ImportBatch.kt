@@ -8,6 +8,8 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Auditable
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -215,6 +217,29 @@ data class ImportCategoryIntent(
 ) : Auditable,
     WriteIntent
 
+/** Builder-chosen placeholder identity for a currency created in this batch, before DB ids exist. */
+@JvmInline
+value class LocalCurrencyKey(
+    val value: String,
+)
+
+/**
+ * A currency to create/update/delete. CREATE upserts by [code] (existing code is updated to [name]);
+ * the resulting id is read back from [ImportResult.createdCurrencyIds] via [key]. [existingId]/[currency]
+ * target the row for UPDATE; [existingId] for DELETE.
+ */
+data class ImportCurrencyIntent(
+    val key: LocalCurrencyKey,
+    override val source: Source,
+    val code: String? = null,
+    val name: String? = null,
+    override val operation: ImportOperation = ImportOperation.CREATE,
+    val existingId: CurrencyId? = null,
+    /** UPDATE: the new currency row, passed straight to the repository. */
+    val currency: Currency? = null,
+) : Auditable,
+    WriteIntent
+
 /** A request to merge [deletedId] into [survivingId] (reassign its transfers, then delete it). */
 data class AccountMergeRequest(
     val deletedId: AccountId,
@@ -323,8 +348,24 @@ data class ImportBatch(
     val peopleToCreate: List<ImportPersonIntent> = emptyList(),
     val ownerships: List<ImportOwnershipIntent> = emptyList(),
     val categories: List<ImportCategoryIntent> = emptyList(),
+    val currencies: List<ImportCurrencyIntent> = emptyList(),
+    val csvStrategyMutations: List<CsvStrategyMutation> = emptyList(),
+    val apiStrategyMutations: List<ApiStrategyMutation> = emptyList(),
+    val csvMappingMutations: List<CsvMappingMutation> = emptyList(),
+    val csvImportMutations: List<CsvImportMutation> = emptyList(),
+    val qifImportMutations: List<QifImportMutation> = emptyList(),
+    val apiSessionMutations: List<ApiSessionMutation> = emptyList(),
+    val settings: ImportSettings? = null,
     val accountMerges: List<AccountMergeRequest> = emptyList(),
     val accountUnmerges: List<MergeId> = emptyList(),
+    /**
+     * Attribute-type names to resolve (get-or-create) before anything else; the resulting ids are
+     * returned in [ImportResult.attributeTypeIds]. Lets producers build [NewAttribute]s by id without
+     * holding an `AttributeTypeWriteRepository` — they issue a resolve-only batch first.
+     */
+    val attributeTypeNames: List<String> = emptyList(),
+    /** Relationship-type names to resolve (get-or-create); ids returned in [ImportResult.relationshipTypeIds]. */
+    val relationshipTypeNames: List<String> = emptyList(),
     /** Required when [dedupePolicy] is [DedupePolicy.UniqueIdentifier] or [DedupePolicy.ApiMultiKey]. */
     val uniqueKeyExtractor: ExistingUniqueKeyExtractor? = null,
     /** Required when [dedupePolicy] is [DedupePolicy.ApiMultiKey]. */
@@ -342,6 +383,7 @@ data class ImportBatch(
             people: List<ImportPersonIntent> = emptyList(),
             ownerships: List<ImportOwnershipIntent> = emptyList(),
             categories: List<ImportCategoryIntent> = emptyList(),
+            currencies: List<ImportCurrencyIntent> = emptyList(),
             accountMerges: List<AccountMergeRequest> = emptyList(),
             accountUnmerges: List<MergeId> = emptyList(),
         ): ImportBatch =
@@ -352,6 +394,7 @@ data class ImportBatch(
                 peopleToCreate = people,
                 ownerships = ownerships,
                 categories = categories,
+                currencies = currencies,
                 accountMerges = accountMerges,
                 accountUnmerges = accountUnmerges,
             )

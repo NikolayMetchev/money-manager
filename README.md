@@ -80,9 +80,9 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 | `utils/rest/` | REST/HTTP utilities |
 | `utils/compose/*` | Reusable Compose components (file picker, scrollbar) |
 | `utils/archive/` | Compress + password-encrypt the database archive (shared by remote backends) |
-| `app/model/core/` | Domain models and repository interfaces |
+| `app/model/core/` | Domain models and `*ReadRepository`/`*WriteRepository` interfaces |
 | `app/db/core/` | SQLDelight database, repository implementations, mappers |
-| `app/importengineapi/` | DB-free import API — `ImportBatch`, dedup policies, source/key types |
+| `app/importengineapi/` | DB-free import/write API — `ImportBatch`/`ImportResult`, `ImportEngine.*` helpers, dedup policies, source/key types |
 | `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Per-format importers that build an `ImportBatch` (DB-free) |
 | `app/importer/` | Central import engine — applies an `ImportBatch`, deduplicates; the sole DB writer |
 | `app/remotestorage/core/` | Generic remote-storage provider interface (DB-free, backend-agnostic) |
@@ -109,6 +109,11 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 
 ## Development Notes
 
+* **Single write seam** — every database mutation goes through the `ImportEngine`: callers build an
+  `ImportBatch` and call `importEngine.import(batch)`; they never use a `*WriteRepository` directly.
+  Repositories are split into read/write pairs, only `app/importer` is injected with the write side, and
+  the UI gets a read-only view plus the engine. A Gradle `verifyNoWriteRepositoryUsage` check enforces
+  it. (The lone exception is device-id bootstrap.) See [`CLAUDE.md`](CLAUDE.md) for details.
 * **Database design**, **CI/CD** and the **data model** are designed and reviewed closely.
 * The **UI** and **unit tests** are partly AI-generated and will be reviewed/refactored over time.
 * See [`CLAUDE.md`](CLAUDE.md) for detailed contributor/AI-assistant guidance.

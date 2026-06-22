@@ -36,13 +36,13 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferMissingCompanion
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -72,9 +72,8 @@ private data class PendingCompanionGroup(
 @OptIn(ExperimentalCoroutinesApi::class)
 @Composable
 fun ManualEntriesScreen(
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
     transactionRepository: TransactionReadRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
     maintenance: Maintenance,
     onTransactionsImported: () -> Unit,
 ) {
@@ -157,7 +156,6 @@ fun ManualEntriesScreen(
                                             rule = group.rule,
                                             entries = entries,
                                             importEngine = importEngine,
-                                            attributeTypeRepository = attributeTypeRepository,
                                         )
                                         maintenance.refreshMaterializedViews()
                                         entries.forEach { (matched, _) -> amounts.remove(matched.transferId) }
@@ -192,9 +190,8 @@ private suspend fun createCompanionTransfers(
     rule: CompanionTransactionRule,
     entries: List<Pair<TransferMissingCompanion, BigDecimal>>,
     importEngine: ImportEngine,
-    attributeTypeRepository: AttributeTypeWriteRepository,
 ) {
-    val linkTypeId = attributeTypeRepository.getOrCreate(rule.linkAttributeName)
+    val linkTypeId = importEngine.getOrCreateAttributeType(rule.linkAttributeName)
     val transfers =
         entries.map { (matched, amount) ->
             ImportTransfer(

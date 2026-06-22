@@ -17,7 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 
 /**
@@ -31,7 +31,7 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
  * @param selectedCurrencyId The currently selected currency ID, or null if none selected
  * @param onCurrencySelected Callback invoked when a currency is selected
  * @param label The label text displayed on the dropdown
- * @param currencyRepository Repository to fetch currencies and create new ones
+ * @param currencyRepository Repository to fetch currencies
  * @param modifier Optional modifier for the component
  * @param enabled Whether the picker is enabled
  * @param placeholder Placeholder text shown when dropdown is expanded
@@ -42,7 +42,7 @@ fun CurrencyPicker(
     selectedCurrencyId: CurrencyId?,
     onCurrencySelected: (CurrencyId) -> Unit,
     label: String,
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     placeholder: String = "Type to search...",
@@ -125,7 +125,6 @@ fun CurrencyPicker(
 
     if (showCreateCurrencyDialog) {
         CreateCurrencyDialog(
-            currencyRepository = currencyRepository,
             onCurrencyCreated = { currencyId ->
                 onCurrencySelected(currencyId)
                 showCreateCurrencyDialog = false

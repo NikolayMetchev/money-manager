@@ -14,15 +14,15 @@ import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.qif.QifImportId
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CsvImportWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportWriteRepository
+import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 
@@ -35,14 +35,14 @@ import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 fun QifStrategyEditorScreen(
     qifImportId: QifImportId,
     strategyId: CsvImportStrategyId?,
-    qifImportRepository: QifImportWriteRepository,
-    csvImportRepository: CsvImportWriteRepository,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
+    qifImportRepository: QifImportReadRepository,
+    csvImportRepository: CsvImportReadRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    currencyRepository: CurrencyReadRepository,
+    attributeTypeRepository: AttributeTypeReadRepository,
     personRepository: PersonReadRepository,
     onBack: () -> Unit,
 ) {

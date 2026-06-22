@@ -35,9 +35,10 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.qif.QifImport
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CsvImportWriteRepository
-import com.moneymanager.domain.repository.QifImportWriteRepository
+import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.importengineapi.deleteCsvStrategy
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
@@ -49,9 +50,9 @@ import nl.jacobras.humanreadable.HumanReadable
 @Composable
 fun DeleteCsvStrategyDialog(
     strategy: CsvImportStrategy,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
     onDismiss: () -> Unit,
 ) {
+    val importEngine = LocalImportEngine.current
     var isDeleting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberSchemaAwareCoroutineScope()
@@ -85,7 +86,7 @@ fun DeleteCsvStrategyDialog(
                     errorMessage = null
                     scope.launch {
                         try {
-                            csvImportStrategyRepository.deleteStrategy(strategy.id)
+                            importEngine.deleteCsvStrategy(strategy.id)
                             onDismiss()
                         } catch (expected: Exception) {
                             errorMessage = "Failed to delete: ${expected.message}"
@@ -180,7 +181,7 @@ fun ExportAccountMappingsDialog(
  */
 @Composable
 fun SelectCsvImportDialog(
-    csvImportRepository: CsvImportWriteRepository,
+    csvImportRepository: CsvImportReadRepository,
     onCsvSelected: (CsvImport) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -274,7 +275,7 @@ fun SelectCsvImportDialog(
  */
 @Composable
 fun SelectQifImportDialog(
-    qifImportRepository: QifImportWriteRepository,
+    qifImportRepository: QifImportReadRepository,
     onQifSelected: (QifImport) -> Unit,
     onDismiss: () -> Unit,
 ) {

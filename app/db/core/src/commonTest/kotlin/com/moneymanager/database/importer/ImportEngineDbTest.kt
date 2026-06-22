@@ -48,6 +48,16 @@ class ImportEngineDbTest : DbTest() {
             personAttributeRepository = repositories.personAttributeRepository,
             ownershipRepository = repositories.personAccountOwnershipRepository,
             categoryRepository = repositories.categoryRepository,
+            currencyRepository = repositories.currencyRepository,
+            attributeTypeRepository = repositories.attributeTypeRepository,
+            relationshipTypeRepository = repositories.relationshipTypeRepository,
+            csvImportStrategyRepository = repositories.csvImportStrategyRepository,
+            apiImportStrategyRepository = repositories.apiImportStrategyRepository,
+            csvAccountMappingRepository = repositories.csvAccountMappingRepository,
+            csvImportRepository = repositories.csvImportRepository,
+            qifImportRepository = repositories.qifImportRepository,
+            apiSessionRepository = repositories.apiSessionRepository,
+            settingsRepository = repositories.settingsRepository,
         )
 
     private suspend fun gbp(): Currency =

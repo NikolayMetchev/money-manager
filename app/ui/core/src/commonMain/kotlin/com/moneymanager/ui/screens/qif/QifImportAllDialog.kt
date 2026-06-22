@@ -19,16 +19,16 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.qif.QifImport
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportWriteRepository
-import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.setLastQifAccount
 import com.moneymanager.qifimporter.bulkApplyQif
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
@@ -47,15 +47,14 @@ import kotlinx.coroutines.launch
 @Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
 fun QifImportAllDialog(
     unimported: List<QifImport>,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    accountRepository: AccountWriteRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
-    qifImportRepository: QifImportWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
-    settingsRepository: SettingsWriteRepository,
+    qifImportRepository: QifImportReadRepository,
+    settingsRepository: SettingsReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
@@ -123,12 +122,11 @@ fun QifImportAllDialog(
                                         csvAccountMappingRepository = csvAccountMappingRepository,
                                         accountRepository = accountRepository,
                                         qifImportRepository = qifImportRepository,
-                                        attributeTypeRepository = attributeTypeRepository,
                                         maintenance = maintenance,
                                         importEngine = importEngine,
                                         onProgress = { done, total -> progress = done to total },
                                     )
-                                settingsRepository.setLastQifAccountId(source)
+                                importEngine.setLastQifAccount(source)
                                 summary = result.toSummary()
                             } finally {
                                 isImporting = false

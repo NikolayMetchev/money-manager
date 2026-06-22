@@ -251,7 +251,7 @@ class StarlingImportE2ETest : DbTest() {
             val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                     engine = mockEngine(feedRequestUrls = feedRequestUrls),
                 )
 
@@ -274,7 +274,6 @@ class StarlingImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -323,7 +322,7 @@ class StarlingImportE2ETest : DbTest() {
             val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                     engine = mockEngine(),
                 )
 
@@ -344,7 +343,6 @@ class StarlingImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -422,7 +420,7 @@ class StarlingImportE2ETest : DbTest() {
             val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                     engine = mockEngine(feedJson = FEED_SAME_BANK_JSON),
                 )
 
@@ -443,7 +441,6 @@ class StarlingImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -502,7 +499,7 @@ class StarlingImportE2ETest : DbTest() {
             val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                     engine = mockEngine(),
                 )
 
@@ -523,7 +520,6 @@ class StarlingImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -572,7 +568,7 @@ class StarlingImportE2ETest : DbTest() {
             val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                     engine = mockEngine(identifiersJson = IDENTIFIERS_JSON),
                 )
 
@@ -600,7 +596,6 @@ class StarlingImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -665,7 +660,7 @@ class StarlingImportE2ETest : DbTest() {
             val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                     engine = mockEngine(identifiersJson = IDENTIFIERS_JSON),
                 )
 
@@ -693,7 +688,6 @@ class StarlingImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -722,7 +716,7 @@ class StarlingImportE2ETest : DbTest() {
             val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                     engine = mockEngine(identifiersJson = IDENTIFIERS_JSON),
                 )
 
@@ -750,7 +744,6 @@ class StarlingImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -784,7 +777,7 @@ class StarlingImportE2ETest : DbTest() {
             val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                     engine = mockEngine(),
                 )
 
@@ -816,7 +809,6 @@ class StarlingImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -826,7 +818,6 @@ class StarlingImportE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 importEngine = repositories.importEngine,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 accountsSessionId = sessionId,
@@ -861,7 +852,7 @@ class StarlingImportE2ETest : DbTest() {
             val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                     engine = mockEngine(),
                 )
             downloadApiSessionAccounts(
@@ -885,7 +876,6 @@ class StarlingImportE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 importEngine = repositories.importEngine,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 accountsSessionId = sessionId,
@@ -896,7 +886,6 @@ class StarlingImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = sessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -930,7 +919,7 @@ class StarlingImportE2ETest : DbTest() {
             fun clientFor(session: ApiSessionId) =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = session, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = session, importEngine = repositories.importEngine),
                     engine = mockEngine(feedJson = FEED_HOLDER_COUNTERPARTY_JSON),
                 )
 
@@ -948,7 +937,6 @@ class StarlingImportE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 importEngine = repositories.importEngine,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = peopleSessionId,
                 strategy = strategy,
             )
@@ -973,7 +961,6 @@ class StarlingImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = txSessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -1010,7 +997,7 @@ class StarlingImportE2ETest : DbTest() {
             val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                     engine = mockEngine(feedJson = FEED_WITH_DECLINED_JSON),
                 )
 
@@ -1032,7 +1019,6 @@ class StarlingImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,

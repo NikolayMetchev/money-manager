@@ -15,7 +15,7 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AuditReadRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
@@ -33,7 +33,7 @@ import kotlin.time.Instant
 fun CsvImportStrategyAuditScreen(
     strategyId: CsvImportStrategyId,
     auditRepository: AuditReadRepository,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
     onBack: () -> Unit,
 ) {
     AuditScreen(

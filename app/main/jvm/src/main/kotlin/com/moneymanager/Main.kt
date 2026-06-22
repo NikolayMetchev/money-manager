@@ -15,6 +15,7 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
+import com.moneymanager.di.database.createImportEngine
 import com.moneymanager.di.database.toApplication
 import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.remotestorage.sync.SyncResult
@@ -144,11 +145,14 @@ private fun MainWindow(onExit: () -> Unit) {
                 appVersion = appVersion,
                 localSettings = localSettings,
                 createAppServices = { database ->
-                    DatabaseComponent.create(database).toApplication().toAppServices(
-                        editGate = {
-                            if (remoteController.syncState.value.editingLocked) throw EditingLockedException()
-                        },
-                    )
+                    val component = DatabaseComponent.create(database)
+                    val importEngine =
+                        component.createImportEngine(
+                            editGate = {
+                                if (remoteController.syncState.value.editingLocked) throw EditingLockedException()
+                            },
+                        )
+                    component.toApplication().toAppServices(importEngine)
                 },
                 onInfoLog = { message -> logger.info { message } },
                 onErrorLog = { message, error -> logger.error(error) { message } },

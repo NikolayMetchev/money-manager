@@ -4,8 +4,14 @@ package com.moneymanager.importer
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiResponseId
+import com.moneymanager.domain.model.ApiResponseTransactionId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
@@ -14,17 +20,36 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
+import com.moneymanager.domain.repository.ApiSessionWriteRepository
+import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
+import com.moneymanager.domain.repository.CsvImportWriteRepository
+import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.PersonWriteRepository
+import com.moneymanager.domain.repository.QifImportWriteRepository
+import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
+import com.moneymanager.domain.repository.SettingsWriteRepository
 import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.domain.repository.TransferUpdate
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ApiSessionMutation
+import com.moneymanager.importengineapi.ApiStrategyMutation
+import com.moneymanager.importengineapi.CsvImportMutation
+import com.moneymanager.importengineapi.CsvMappingMutation
+import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportAccountIntent
@@ -38,8 +63,10 @@ import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
+import com.moneymanager.importengineapi.LocalCurrencyKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.QifImportMutation
 import com.moneymanager.importengineapi.RowOutcome
 import com.moneymanager.importengineapi.WriteIntent
 import com.moneymanager.importengineapi.bankKeyFromExternalId
@@ -65,6 +92,16 @@ class ImportEngineImpl(
     private val personAttributeRepository: PersonAttributeWriteRepository,
     private val ownershipRepository: PersonAccountOwnershipWriteRepository,
     private val categoryRepository: CategoryWriteRepository,
+    private val currencyRepository: CurrencyWriteRepository,
+    private val attributeTypeRepository: AttributeTypeWriteRepository,
+    private val relationshipTypeRepository: RelationshipTypeWriteRepository,
+    private val csvImportStrategyRepository: CsvImportStrategyWriteRepository,
+    private val apiImportStrategyRepository: ApiImportStrategyWriteRepository,
+    private val csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    private val csvImportRepository: CsvImportWriteRepository,
+    private val qifImportRepository: QifImportWriteRepository,
+    private val apiSessionRepository: ApiSessionWriteRepository,
+    private val settingsRepository: SettingsWriteRepository,
     private val editGate: EditGate = EditGate.AlwaysWritable,
 ) : ImportEngine {
     override suspend fun import(
@@ -75,7 +112,23 @@ class ImportEngineImpl(
         editGate.ensureWritable()
         validate(batch)
 
+        // ----- Lookup-table resolution (first: ids feed attributes/relationships built by callers) -----
+        val attributeTypeIds = batch.attributeTypeNames.associateWith { attributeTypeRepository.getOrCreate(it) }
+        val relationshipTypeIds = batch.relationshipTypeNames.associateWith { relationshipTypeRepository.getOrCreate(it) }
+
+        // ----- Config / staging / session / settings / device mutations -----
+        val config = applyConfigMutations(batch)
+
         // ----- CREATE phase (first, so batch-local keys resolve for dependents) -----
+        val createdCurrencyIds = mutableMapOf<LocalCurrencyKey, CurrencyId>()
+        for (intent in batch.currencies.creates()) {
+            createdCurrencyIds[intent.key] =
+                currencyRepository.upsertCurrencyByCode(
+                    requireNotNull(intent.code),
+                    requireNotNull(intent.name),
+                    intent.source,
+                )
+        }
         val createdCategoryIds = mutableMapOf<LocalCategoryKey, Long>()
         for (intent in batch.categories.creates()) {
             createdCategoryIds[intent.key] =
@@ -125,6 +178,9 @@ class ImportEngineImpl(
         for (intent in batch.categories.updates()) {
             categoryRepository.updateCategory(requireNotNull(intent.category), intent.source)
         }
+        for (intent in batch.currencies.updates()) {
+            currencyRepository.updateCurrency(requireNotNull(intent.currency), intent.source)
+        }
         for (intent in batch.peopleToCreate.updates()) {
             personRepository.updatePersonWithAttributes(
                 person = intent.person,
@@ -145,6 +201,7 @@ class ImportEngineImpl(
         batch.transfers.deletes().forEach { transactionRepository.deleteTransaction(requireNotNull(it.existingId).id) }
         batch.accountsToCreate.deletes().forEach { accountRepository.deleteAccount(requireNotNull(it.existingId)) }
         batch.categories.deletes().forEach { categoryRepository.deleteCategory(requireNotNull(it.existingId)) }
+        batch.currencies.deletes().forEach { currencyRepository.deleteCurrency(requireNotNull(it.existingId)) }
         batch.peopleToCreate.deletes().forEach { personRepository.deletePerson(requireNotNull(it.existingId)) }
 
         return ImportResult(
@@ -161,6 +218,19 @@ class ImportEngineImpl(
             createdAccountIds = accountResolution.keyToId,
             createdCategoryIds = createdCategoryIds,
             createdPersonIds = personResolution.keyToId,
+            createdCurrencyIds = createdCurrencyIds,
+            attributeTypeIds = attributeTypeIds,
+            relationshipTypeIds = relationshipTypeIds,
+            createdCsvStrategyIds = config.csvStrategyIds,
+            createdApiStrategyIds = config.apiStrategyIds,
+            createdCsvMappingIds = config.csvMappingIds,
+            createdCsvImportIds = config.csvImportIds,
+            createdQifImportIds = config.qifImportIds,
+            apiCredentialIds = config.apiCredentialIds,
+            apiSessionIds = config.apiSessionIds,
+            apiRequestIds = config.apiRequestIds,
+            apiResponseIds = config.apiResponseIds,
+            apiResponseTransactionIds = config.apiResponseTransactionIds,
         )
     }
 
@@ -198,6 +268,14 @@ class ImportEngineImpl(
                 ImportOperation.UPDATE ->
                     require(it.existingId != null && it.category != null) { "UPDATE category requires existingId and category" }
                 ImportOperation.DELETE -> require(it.existingId != null) { "DELETE category requires existingId" }
+            }
+        }
+        batch.currencies.forEach {
+            when (it.operation) {
+                ImportOperation.CREATE -> require(it.code != null && it.name != null) { "CREATE currency requires code/name" }
+                ImportOperation.UPDATE ->
+                    require(it.currency != null) { "UPDATE currency requires currency" }
+                ImportOperation.DELETE -> require(it.existingId != null) { "DELETE currency requires existingId" }
             }
         }
         batch.peopleToCreate.forEach {
@@ -907,4 +985,198 @@ class ImportEngineImpl(
             if (!middleName.isNullOrBlank()) append(" ").append(middleName)
             if (!lastName.isNullOrBlank()) append(" ").append(lastName)
         }
+
+    // region Config / staging / session / settings / device mutations
+
+    private class ConfigOutcome(
+        val csvStrategyIds: Map<String, CsvImportStrategyId>,
+        val apiStrategyIds: Map<String, ApiImportStrategyId>,
+        val csvMappingIds: Map<String, Long>,
+        val csvImportIds: Map<String, CsvImportId>,
+        val qifImportIds: Map<String, QifImportId>,
+        val apiCredentialIds: Map<String, MonzoCredentialId>,
+        val apiSessionIds: Map<String, ApiSessionId>,
+        val apiRequestIds: Map<String, ApiRequestId>,
+        val apiResponseIds: Map<String, ApiResponseId>,
+        val apiResponseTransactionIds: Map<String, ApiResponseTransactionId>,
+    )
+
+    // Fail fast rather than silently overwrite a generated id when two create mutations share a read-back
+    // key in one batch — a duplicate key would otherwise drop the earlier id from the ImportResult map.
+    private fun <K, V> MutableMap<K, V>.putUnique(
+        key: K,
+        value: V,
+        label: String,
+    ) {
+        require(key !in this) { "Duplicate $label read-back key in ImportBatch: $key" }
+        this[key] = value
+    }
+
+    private suspend fun applyConfigMutations(batch: ImportBatch): ConfigOutcome {
+        val csvStrategyIds = mutableMapOf<String, CsvImportStrategyId>()
+        for (m in batch.csvStrategyMutations) {
+            when (m) {
+                is CsvStrategyMutation.Create ->
+                    csvStrategyIds.putUnique(m.key, csvImportStrategyRepository.createStrategy(m.strategy, m.source), "CsvStrategy")
+                is CsvStrategyMutation.Update -> csvImportStrategyRepository.updateStrategy(m.strategy, m.source)
+                is CsvStrategyMutation.Delete -> csvImportStrategyRepository.deleteStrategy(m.id)
+            }
+        }
+
+        val apiStrategyIds = mutableMapOf<String, ApiImportStrategyId>()
+        for (m in batch.apiStrategyMutations) {
+            when (m) {
+                is ApiStrategyMutation.Create ->
+                    apiStrategyIds.putUnique(m.key, apiImportStrategyRepository.createStrategy(m.strategy, m.source), "ApiStrategy")
+                is ApiStrategyMutation.Update -> apiImportStrategyRepository.updateStrategy(m.strategy, m.source)
+                is ApiStrategyMutation.Delete -> apiImportStrategyRepository.deleteStrategy(m.id)
+            }
+        }
+
+        val csvMappingIds = mutableMapOf<String, Long>()
+        for (m in batch.csvMappingMutations) {
+            when (m) {
+                is CsvMappingMutation.Create ->
+                    csvMappingIds.putUnique(
+                        m.key,
+                        csvAccountMappingRepository.createMapping(m.strategyId, m.columnName, m.valuePattern, m.accountId),
+                        "CsvMapping",
+                    )
+                is CsvMappingMutation.CreateBatch -> csvAccountMappingRepository.createMappings(m.mappings)
+                is CsvMappingMutation.Update -> csvAccountMappingRepository.updateMapping(m.mapping)
+                is CsvMappingMutation.Delete -> csvAccountMappingRepository.deleteMapping(m.id)
+                is CsvMappingMutation.DeleteForStrategy -> csvAccountMappingRepository.deleteMappingsForStrategy(m.strategyId)
+            }
+        }
+
+        val csvImportIds = mutableMapOf<String, CsvImportId>()
+        for (m in batch.csvImportMutations) {
+            when (m) {
+                is CsvImportMutation.Create ->
+                    csvImportIds.putUnique(
+                        m.key,
+                        csvImportRepository.createImport(m.fileName, m.headers, m.rows, m.fileChecksum, m.fileLastModified),
+                        "CsvImport",
+                    )
+                is CsvImportMutation.Delete -> csvImportRepository.deleteImport(m.id)
+                is CsvImportMutation.UpdateRowTransferId -> csvImportRepository.updateRowTransferId(m.id, m.rowIndex, m.transferId)
+                is CsvImportMutation.UpdateRowTransferIds -> csvImportRepository.updateRowTransferIdsBatch(m.id, m.rowTransferMap)
+                is CsvImportMutation.UpdateRowStatus -> csvImportRepository.updateRowStatus(m.id, m.rowIndex, m.status, m.transferId)
+                is CsvImportMutation.UpdateRowStatuses -> csvImportRepository.updateRowStatusesBatch(m.id, m.status, m.rowTransferMap)
+                is CsvImportMutation.SaveError -> csvImportRepository.saveError(m.id, m.rowIndex, m.errorMessage)
+                is CsvImportMutation.ClearError -> csvImportRepository.clearError(m.id, m.rowIndex)
+                is CsvImportMutation.ClearErrors -> csvImportRepository.clearErrors(m.id, m.rowIndexes)
+                is CsvImportMutation.RecordApplication ->
+                    csvImportRepository.recordImportApplication(
+                        m.id,
+                        m.strategyId,
+                        m.strategyName,
+                        m.appliedAt,
+                    )
+            }
+        }
+
+        val qifImportIds = mutableMapOf<String, QifImportId>()
+        for (m in batch.qifImportMutations) {
+            when (m) {
+                is QifImportMutation.Create ->
+                    qifImportIds.putUnique(
+                        m.key,
+                        qifImportRepository.createImport(m.fileName, m.records, m.accountType, m.fileChecksum, m.fileLastModified),
+                        "QifImport",
+                    )
+                is QifImportMutation.Delete -> qifImportRepository.deleteImport(m.id)
+                is QifImportMutation.UpdateRecordStatuses ->
+                    qifImportRepository.updateRecordStatusesBatch(
+                        m.id,
+                        m.status,
+                        m.recordTransferMap,
+                    )
+                is QifImportMutation.SaveError -> qifImportRepository.saveError(m.id, m.recordIndex, m.errorMessage)
+                is QifImportMutation.ClearErrors -> qifImportRepository.clearErrors(m.id, m.recordIndexes)
+                is QifImportMutation.RecordApplication ->
+                    qifImportRepository.recordImportApplication(
+                        m.id,
+                        m.strategyId,
+                        m.strategyName,
+                        m.appliedAt,
+                    )
+            }
+        }
+
+        val apiCredentialIds = mutableMapOf<String, MonzoCredentialId>()
+        val apiSessionIds = mutableMapOf<String, ApiSessionId>()
+        val apiRequestIds = mutableMapOf<String, ApiRequestId>()
+        val apiResponseIds = mutableMapOf<String, ApiResponseId>()
+        val apiResponseTransactionIds = mutableMapOf<String, ApiResponseTransactionId>()
+        for (m in batch.apiSessionMutations) {
+            when (m) {
+                is ApiSessionMutation.CreateCredential ->
+                    apiCredentialIds.putUnique(
+                        m.key,
+                        apiSessionRepository.createCredential(m.token, m.createdAt, m.type, m.strategyId, m.privateKey, m.publicKey),
+                        "ApiCredential",
+                    )
+                is ApiSessionMutation.UpdateCredentialStrategy ->
+                    apiSessionRepository.updateCredentialStrategy(
+                        m.credentialId,
+                        m.strategyId,
+                    )
+                is ApiSessionMutation.UpdateCredentialKeys ->
+                    apiSessionRepository.updateCredentialKeys(
+                        m.credentialId,
+                        m.privateKey,
+                        m.publicKey,
+                    )
+                is ApiSessionMutation.CreateSession ->
+                    apiSessionIds.putUnique(
+                        m.key,
+                        apiSessionRepository.createSession(m.token, m.deviceId, m.createdAt, expiresAt = null, m.type, m.credentialId),
+                        "ApiSession",
+                    )
+                is ApiSessionMutation.InsertRequest ->
+                    apiRequestIds.putUnique(
+                        m.key,
+                        apiSessionRepository.insertRequest(m.sessionId, m.method, m.url, m.headers),
+                        "ApiRequest",
+                    )
+                is ApiSessionMutation.InsertResponse ->
+                    apiResponseIds.putUnique(
+                        m.key,
+                        apiSessionRepository.insertResponse(m.requestId, m.sessionId, m.json),
+                        "ApiResponse",
+                    )
+                is ApiSessionMutation.DeleteSession -> apiSessionRepository.deleteSession(m.id)
+                is ApiSessionMutation.InsertResponseTransaction ->
+                    apiResponseTransactionIds.putUnique(
+                        m.key,
+                        apiSessionRepository.insertResponseTransaction(m.responseId, m.jsonPath, m.state, m.transactionId, m.errorMessage),
+                        "ApiResponseTransaction",
+                    )
+                is ApiSessionMutation.InsertResponseTransactions -> apiSessionRepository.insertResponseTransactions(m.transactions)
+                is ApiSessionMutation.MarkSessionImported ->
+                    apiSessionRepository.markSessionImported(m.id, m.revisionId, m.importedAt, m.importDurationMillis)
+            }
+        }
+
+        batch.settings?.let { s ->
+            s.defaultCurrencyId?.let { settingsRepository.setDefaultCurrencyId(it) }
+            s.lastQifAccountId?.let { settingsRepository.setLastQifAccountId(it) }
+        }
+
+        return ConfigOutcome(
+            csvStrategyIds = csvStrategyIds,
+            apiStrategyIds = apiStrategyIds,
+            csvMappingIds = csvMappingIds,
+            csvImportIds = csvImportIds,
+            qifImportIds = qifImportIds,
+            apiCredentialIds = apiCredentialIds,
+            apiSessionIds = apiSessionIds,
+            apiRequestIds = apiRequestIds,
+            apiResponseIds = apiResponseIds,
+            apiResponseTransactionIds = apiResponseTransactionIds,
+        )
+    }
+
+    // endregion
 }

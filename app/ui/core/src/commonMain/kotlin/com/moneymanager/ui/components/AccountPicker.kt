@@ -17,7 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -46,7 +46,7 @@ fun AccountPicker(
     selectedAccountId: AccountId?,
     onAccountSelected: (AccountId) -> Unit,
     label: String,
-    accountRepository: AccountWriteRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     enabled: Boolean = true,

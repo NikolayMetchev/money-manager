@@ -13,18 +13,17 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
-import com.moneymanager.domain.repository.ApiSessionWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
+import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CsvImportWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportWriteRepository
-import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.navigation.ImportTab
@@ -33,18 +32,17 @@ import com.moneymanager.ui.navigation.ImportTab
 fun ImportsScreen(
     selectedTab: ImportTab,
     onTabSelected: (ImportTab) -> Unit,
-    csvImportRepository: CsvImportWriteRepository,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
-    qifImportRepository: QifImportWriteRepository,
+    csvImportRepository: CsvImportReadRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    qifImportRepository: QifImportReadRepository,
     categoryRepository: CategoryReadRepository,
-    settingsRepository: SettingsWriteRepository,
-    apiSessionRepository: ApiSessionWriteRepository,
-    apiImportStrategyRepository: ApiImportStrategyWriteRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
+    settingsRepository: SettingsReadRepository,
+    apiSessionRepository: ApiSessionReadRepository,
+    apiImportStrategyRepository: ApiImportStrategyReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
-    accountRepository: AccountWriteRepository,
-    currencyRepository: CurrencyWriteRepository,
+    accountRepository: AccountReadRepository,
+    currencyRepository: CurrencyReadRepository,
     transactionRepository: TransactionReadRepository,
     maintenance: Maintenance,
     personRepository: PersonReadRepository,
@@ -92,7 +90,6 @@ fun ImportsScreen(
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
-                    attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
                     onImportClick = onCsvImportClick,
@@ -107,7 +104,6 @@ fun ImportsScreen(
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
-                    attributeTypeRepository = attributeTypeRepository,
                     settingsRepository = settingsRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
@@ -118,12 +114,10 @@ fun ImportsScreen(
                 ApiSessionsScreen(
                     apiSessionRepository = apiSessionRepository,
                     apiImportStrategyRepository = apiImportStrategyRepository,
-                    attributeTypeRepository = attributeTypeRepository,
                     accountAttributeRepository = accountAttributeRepository,
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     maintenance = maintenance,
-                    importEngine = importEngine,
                     deviceId = deviceId,
                     onMonzoConnectClick = onAddCredentialClick,
                     onApiStrategiesClick = onApiStrategiesClick,
@@ -134,7 +128,6 @@ fun ImportsScreen(
                 ManualEntriesScreen(
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     transactionRepository = transactionRepository,
-                    attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
                     onTransactionsImported = onTransactionsImported,
                 )

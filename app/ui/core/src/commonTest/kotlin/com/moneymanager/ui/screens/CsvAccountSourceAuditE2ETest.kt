@@ -132,8 +132,6 @@ class CsvAccountSourceAuditE2ETest {
                     currencies = currencies,
                     csvAccountMappingRepository = dc.csvAccountMappingRepository,
                     accountRepository = dc.accountRepository,
-                    csvImportRepository = dc.csvImportRepository,
-                    attributeTypeRepository = dc.attributeTypeRepository,
                     maintenance = DbMaintenance(dc.maintenanceService),
                     importEngine =
                         ImportEngineImpl(
@@ -144,6 +142,16 @@ class CsvAccountSourceAuditE2ETest {
                             personAttributeRepository = dc.personAttributeRepository,
                             ownershipRepository = dc.personAccountOwnershipRepository,
                             categoryRepository = dc.categoryRepository,
+                            currencyRepository = dc.currencyRepository,
+                            attributeTypeRepository = dc.attributeTypeRepository,
+                            relationshipTypeRepository = dc.relationshipTypeRepository,
+                            csvImportStrategyRepository = dc.csvImportStrategyRepository,
+                            apiImportStrategyRepository = dc.apiImportStrategyRepository,
+                            csvAccountMappingRepository = dc.csvAccountMappingRepository,
+                            csvImportRepository = dc.csvImportRepository,
+                            qifImportRepository = dc.qifImportRepository,
+                            apiSessionRepository = dc.apiSessionRepository,
+                            settingsRepository = dc.settingsRepository,
                         ),
                 )
             }

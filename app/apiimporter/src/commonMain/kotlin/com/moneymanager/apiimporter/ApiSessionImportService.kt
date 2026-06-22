@@ -37,8 +37,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiResponseTransactionInsert
-import com.moneymanager.domain.repository.ApiSessionWriteRepository
-import com.moneymanager.domain.repository.AttributeTypeWriteRepository
+import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
@@ -57,6 +56,8 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.getOrCreateAttributeType
+import com.moneymanager.importengineapi.insertApiResponseTransactions
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.personalCounterpartyKey
 import com.moneymanager.rest.ApiClient
@@ -194,7 +195,7 @@ data class ApiTransactionsDownloadProgress(
 suspend fun downloadApiSessionAccounts(
     token: String,
     apiClient: ApiClient,
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
     sca: ScaParams? = null,
@@ -265,7 +266,7 @@ private suspend fun fetchAncestorContexts(
 suspend fun downloadApiSessionTransactions(
     token: String,
     apiClient: ApiClient,
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
     accountsSessionId: ApiSessionId? = null,
@@ -390,7 +391,7 @@ suspend fun downloadApiSessionTransactions(
 suspend fun downloadApiSessionAccountIdentifiers(
     token: String,
     apiClient: ApiClient,
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
     accountsSessionId: ApiSessionId? = null,
@@ -446,7 +447,7 @@ suspend fun downloadApiSessionAccountIdentifiers(
 suspend fun downloadApiSessionPeople(
     token: String,
     apiClient: ApiClient,
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
     sca: ScaParams? = null,
@@ -480,10 +481,9 @@ private fun validatePeopleOwnershipConfig(config: ApiPersonImportConfig) {
  * profile (via [ApiPersonImportConfig.accountOwnerAncestorExpr]).
  */
 suspend fun importApiSessionPeople(
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     accountRepository: AccountReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
     importEngine: ImportEngine,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
@@ -491,7 +491,7 @@ suspend fun importApiSessionPeople(
 ): ApiPeopleImportResult {
     val config = strategy.peopleDownload ?: return ApiPeopleImportResult(personCount = 0, ownershipCount = 0)
     validatePeopleOwnershipConfig(config)
-    val externalIdAttributeTypeId = strategy.personExternalIdAttribute?.let { attributeTypeRepository.getOrCreate(it) }
+    val externalIdAttributeTypeId = strategy.personExternalIdAttribute?.let { importEngine.getOrCreateAttributeType(it) }
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val peopleResponses =
         apiSessionRepository.getResponsesBySession(sessionId).filter { response ->
@@ -557,7 +557,7 @@ suspend fun importApiSessionPeople(
 
 /** Builds a map of profile external id → the [AccountId]s fetched under that profile. */
 private suspend fun buildProfileAccountMap(
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     accountRepository: AccountReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
     accountsSessionId: ApiSessionId?,
@@ -586,7 +586,7 @@ private suspend fun buildProfileAccountMap(
 
 /** Returns every [AccountId] imported under [accountsSessionId] (used for [ApiPersonImportConfig.ownsAllAccounts]). */
 private suspend fun loadSessionAccountIds(
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     accountRepository: AccountReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
     accountsSessionId: ApiSessionId?,
@@ -629,9 +629,8 @@ private fun JsonObject.toPersonOwner(
 }
 
 suspend fun importApiSessionTransactions(
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     currencyRepository: CurrencyReadRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
     sessionId: ApiSessionId,
     accountsSessionId: ApiSessionId? = null,
     strategy: ApiImportStrategy,
@@ -643,7 +642,6 @@ suspend fun importApiSessionTransactions(
         setupImportSession(
             apiSessionRepository = apiSessionRepository,
             currencyRepository = currencyRepository,
-            attributeTypeRepository = attributeTypeRepository,
             sessionId = sessionId,
             accountsSessionId = accountsSessionId,
             strategy = strategy,
@@ -762,14 +760,13 @@ private data class ImportSetup(
     val counts: ImportCounts,
     val progressMutex: Mutex,
     val onProgress: (ApiSessionImportProgress) -> Unit,
-    val apiSessionRepository: ApiSessionWriteRepository,
+    val apiSessionRepository: ApiSessionReadRepository,
     val importEngine: ImportEngine,
 )
 
 private suspend fun setupImportSession(
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     currencyRepository: CurrencyReadRepository,
-    attributeTypeRepository: AttributeTypeWriteRepository,
     sessionId: ApiSessionId,
     accountsSessionId: ApiSessionId?,
     strategy: ApiImportStrategy,
@@ -823,7 +820,7 @@ private suspend fun setupImportSession(
     val transactionResponses = responses.filter { requestsById[it.requestId]?.resolveAccountExternalId(strategy) != null }
 
     val currencyCache = CurrencyCache(currencyRepository)
-    val attributeTypeCache = AttributeTypeCache(attributeTypeRepository)
+    val attributeTypeCache = AttributeTypeCache(importEngine)
     val customTxFields = strategy.transactionMappings.customFields
     val uniqueIdTxFields = strategy.transactionMappings.uniqueIdentifierFields
     val counterpartyIdField = strategy.transactionMappings.counterpartyIdField
@@ -1010,7 +1007,7 @@ private suspend fun resolveOwnAccountKey(
 }
 
 suspend fun discoverApiCounterpartiesToCreate(
-    apiSessionRepository: ApiSessionWriteRepository,
+    apiSessionRepository: ApiSessionReadRepository,
     accountRepository: AccountReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
     sessionId: ApiSessionId,
@@ -1568,8 +1565,8 @@ private suspend fun prepareTransactionTransfers(setup: ImportSetup): PreparedTra
 
 /**
  * Assembles the single [ImportBatch] from the prepared transfers + the resolver's account/people/ownership
- * intents and runs the engine exactly once. The engine performs every entity/transfer/ownership write; the
- * only DB write here is the API bookkeeping ([ApiSessionWriteRepository.insertResponseTransactions]).
+ * intents and runs the engine exactly once. The engine performs every write, including the API
+ * bookkeeping (the response-transaction records, via an [ImportBatch] session mutation).
  */
 private suspend fun runImportEngine(
     setup: ImportSetup,
@@ -1664,7 +1661,7 @@ private suspend fun runImportEngine(
             )
     }
 
-    setup.apiSessionRepository.insertResponseTransactions(
+    setup.importEngine.insertApiResponseTransactions(
         responseRecords
             .sortedWith(compareBy<ResponseTransactionImportRecord> { it.pageIndex }.thenBy { it.itemIndex })
             .map { it.toInsert() },
@@ -2891,10 +2888,11 @@ private fun JsonObject.resolveJsonElementPath(dotPath: String): JsonElement? {
 }
 
 private class AttributeTypeCache(
-    private val repo: AttributeTypeWriteRepository,
+    private val importEngine: ImportEngine,
 ) {
     private val mutex = Mutex()
     private val cache = mutableMapOf<String, AttributeTypeId>()
 
-    suspend fun getOrCreate(name: String): AttributeTypeId = mutex.withLock { cache.getOrPut(name) { repo.getOrCreate(name) } }
+    suspend fun getOrCreate(name: String): AttributeTypeId =
+        mutex.withLock { cache.getOrPut(name) { importEngine.getOrCreateAttributeType(name) } }
 }

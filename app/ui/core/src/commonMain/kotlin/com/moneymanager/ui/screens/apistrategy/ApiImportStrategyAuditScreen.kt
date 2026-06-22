@@ -12,7 +12,7 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.PaginationMode
-import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
+import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
@@ -31,7 +31,7 @@ import kotlin.time.Instant
 fun ApiImportStrategyAuditScreen(
     strategyId: ApiImportStrategyId,
     auditRepository: AuditReadRepository,
-    apiImportStrategyRepository: ApiImportStrategyWriteRepository,
+    apiImportStrategyRepository: ApiImportStrategyReadRepository,
     onBack: () -> Unit,
 ) {
     AuditScreen(

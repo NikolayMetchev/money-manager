@@ -35,7 +35,7 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.qif.QifImportId
-import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.ui.audit.AuditDiffCard
@@ -57,7 +57,7 @@ import kotlinx.datetime.toLocalDateTime
 fun AccountAuditScreen(
     accountId: AccountId,
     auditRepository: AuditReadRepository,
-    accountRepository: AccountWriteRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     maintenance: Maintenance,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },

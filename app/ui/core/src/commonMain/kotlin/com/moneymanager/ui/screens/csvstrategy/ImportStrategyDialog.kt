@@ -53,16 +53,19 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
-import com.moneymanager.domain.repository.AccountWriteRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.importengineapi.createCsvMapping
+import com.moneymanager.importengineapi.createCsvStrategy
+import com.moneymanager.importengineapi.deleteCsvStrategy
+import com.moneymanager.importengineapi.updateCsvMapping
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -76,16 +79,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun ImportStrategyDialog(
     parseResult: CsvImportParseResult,
-    csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
     csvStrategyImportExport: CsvStrategyImportExport,
-    accountRepository: AccountWriteRepository,
+    accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyWriteRepository,
+    currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
 ) {
+    val importEngine = LocalImportEngine.current
     val accounts by accountRepository
         .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -234,10 +237,10 @@ fun ImportStrategyDialog(
                                     accounts = accountRepository.getAllAccounts().first(),
                                 )
 
-                            val persistedStrategyId = csvImportStrategyRepository.createStrategy(strategy, Source.Manual)
+                            val persistedStrategyId = importEngine.createCsvStrategy(strategy)
                             createdStrategyId = persistedStrategyId
                             resolvedAccountMappings.forEach { mapping ->
-                                csvAccountMappingRepository.createMapping(
+                                importEngine.createCsvMapping(
                                     strategyId = persistedStrategyId,
                                     columnName = mapping.columnName,
                                     valuePattern = mapping.valuePattern,
@@ -249,7 +252,7 @@ fun ImportStrategyDialog(
                         } catch (expected: Exception) {
                             createdStrategyId?.let { strategyId ->
                                 runCatching {
-                                    csvImportStrategyRepository.deleteStrategy(strategyId)
+                                    importEngine.deleteCsvStrategy(strategyId)
                                 }
                             }
                             errorMessage = "Failed to import: ${expected.message}"
@@ -800,9 +803,9 @@ internal fun AccountMappingEditorDialog(
     existingMapping: CsvAccountMapping?,
     strategyId: CsvImportStrategyId,
     accounts: List<Account>,
-    csvAccountMappingRepository: CsvAccountMappingWriteRepository,
     onDismiss: () -> Unit,
 ) {
+    val importEngine = LocalImportEngine.current
     val isEditMode = existingMapping != null
     var columnName by remember { mutableStateOf(existingMapping?.columnName.orEmpty()) }
     var patternText by remember { mutableStateOf(existingMapping?.valuePattern?.pattern.orEmpty()) }
@@ -874,7 +877,7 @@ internal fun AccountMappingEditorDialog(
                             try {
                                 val pattern = Regex(patternText, RegexOption.IGNORE_CASE)
                                 if (existingMapping != null) {
-                                    csvAccountMappingRepository.updateMapping(
+                                    importEngine.updateCsvMapping(
                                         existingMapping.copy(
                                             columnName = columnName,
                                             valuePattern = pattern,
@@ -882,7 +885,7 @@ internal fun AccountMappingEditorDialog(
                                         ),
                                     )
                                 } else {
-                                    csvAccountMappingRepository.createMapping(
+                                    importEngine.createCsvMapping(
                                         strategyId = strategyId,
                                         columnName = columnName,
                                         valuePattern = pattern,

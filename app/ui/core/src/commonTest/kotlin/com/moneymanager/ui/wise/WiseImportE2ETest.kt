@@ -116,7 +116,7 @@ class WiseImportE2ETest : DbTest() {
                     trafficRecorder =
                         ApiSessionTrafficRecorder(
                             sessionId = sessionId,
-                            apiSessionRepository = repositories.apiSessionRepository,
+                            importEngine = repositories.importEngine,
                         ),
                     engine = mockEngine,
                 )
@@ -145,7 +145,6 @@ class WiseImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -206,7 +205,7 @@ class WiseImportE2ETest : DbTest() {
                     trafficRecorder =
                         ApiSessionTrafficRecorder(
                             sessionId = sessionId,
-                            apiSessionRepository = repositories.apiSessionRepository,
+                            importEngine = repositories.importEngine,
                         ),
                     engine = mockEngine,
                 )
@@ -228,7 +227,6 @@ class WiseImportE2ETest : DbTest() {
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     currencyRepository = repositories.currencyRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
                     importEngine = repositories.importEngine,
@@ -270,7 +268,7 @@ class WiseImportE2ETest : DbTest() {
                     trafficRecorder =
                         ApiSessionTrafficRecorder(
                             sessionId = sessionId,
-                            apiSessionRepository = repositories.apiSessionRepository,
+                            importEngine = repositories.importEngine,
                         ),
                     engine = engine(),
                 )
@@ -288,7 +286,6 @@ class WiseImportE2ETest : DbTest() {
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = accountsSessionId,
                 strategy = strategy,
                 importEngine = repositories.importEngine,
@@ -313,7 +310,6 @@ class WiseImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     accountAttributeRepository = repositories.accountAttributeRepository,
                     importEngine = repositories.importEngine,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
                     sessionId = peopleSessionId,
                     strategy = strategy,
                     accountsSessionId = accountsSessionId,
@@ -361,7 +357,7 @@ class WiseImportE2ETest : DbTest() {
                     trafficRecorder =
                         ApiSessionTrafficRecorder(
                             sessionId = peopleSessionId,
-                            apiSessionRepository = repositories.apiSessionRepository,
+                            importEngine = repositories.importEngine,
                         ),
                     engine =
                         MockEngine { _ ->
@@ -374,7 +370,6 @@ class WiseImportE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 importEngine = repositories.importEngine,
-                attributeTypeRepository = repositories.attributeTypeRepository,
                 sessionId = peopleSessionId,
                 strategy = strategy,
             )
