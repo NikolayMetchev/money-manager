@@ -8,6 +8,12 @@ import com.moneymanager.database.sql.MoneyManagerDatabase
 class MoneyManagerDatabaseWrapper(
     private val driver: SqlDriver,
 ) : MoneyManagerDatabase by MoneyManagerDatabase(driver) {
+    data class DbObjectSize(
+        val objectName: String,
+        val pageCount: Long,
+        val totalBytes: Long,
+    )
+
     /**
      * Closes the underlying driver/connection. Used for short-lived databases opened off the main
      * session (e.g. rehydrating a remote snapshot) so the file can be safely reopened afterwards.
@@ -45,6 +51,41 @@ class MoneyManagerDatabaseWrapper(
             ).value
         }
     }
+
+    /**
+     * Returns the SQLite object-level size breakdown using `dbstat`.
+     *
+     * The list is sorted by descending on-disk size.
+     * If `dbstat` is unavailable in the current SQLite build, returns an empty list.
+     */
+    fun getDbSizeBreakdown(): List<DbObjectSize> =
+        runCatching {
+            val result = mutableListOf<DbObjectSize>()
+            executeQuery(
+                null,
+                """
+                SELECT
+                    name,
+                    COUNT(*) AS page_count,
+                    SUM(pgsize) AS total_bytes
+                FROM dbstat
+                WHERE name IS NOT NULL AND name != ''
+                GROUP BY name
+                ORDER BY total_bytes DESC, name ASC
+                """.trimIndent(),
+                { cursor ->
+                    while (cursor.next().value) {
+                        val objectName = cursor.getString(0) ?: continue
+                        val pageCount = cursor.getLong(1) ?: continue
+                        val totalBytes = cursor.getLong(2) ?: continue
+                        result += DbObjectSize(objectName = objectName, pageCount = pageCount, totalBytes = totalBytes)
+                    }
+                    QueryResult.Unit
+                },
+                0,
+            )
+            result
+        }.getOrDefault(emptyList())
 
     /**
      * Execute a SQL statement on the database.
