@@ -35,7 +35,9 @@ class RemoteDatabaseSyncService(
 
     /**
      * Uploads [database] as a new remote archive named [remoteName], persists the resulting binding
-     * (so the database is remote-backed from now on) and returns it.
+     * (so the database is remote-backed from now on) and returns it. Pass [overwriteFileId] to replace
+     * an existing remote file in place (the caller having confirmed the name collision) instead of
+     * creating a new one.
      */
     suspend fun createRemote(
         provider: RemoteStorageProvider,
@@ -44,11 +46,12 @@ class RemoteDatabaseSyncService(
         database: MoneyManagerDatabaseWrapper,
         password: String,
         providerConfig: String? = null,
+        overwriteFileId: String? = null,
         onProgress: (SyncProgress) -> Unit = {},
     ): RemoteDatabaseBinding {
         val archive = shrinkAndPack(database, password, rebuildAfter = true, onProgress = onProgress)
         onProgress(SyncProgress("Uploading to cloud…", UPLOAD_FRACTION))
-        val file = provider.upload(fileId = null, name = remoteName, bytes = archive)
+        val file = provider.upload(fileId = overwriteFileId, name = remoteName, bytes = archive)
         onProgress(SyncProgress("Done", 1f))
         val binding =
             RemoteDatabaseBinding(

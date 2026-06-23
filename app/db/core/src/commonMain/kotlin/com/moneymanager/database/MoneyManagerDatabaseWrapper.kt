@@ -15,10 +15,17 @@ class MoneyManagerDatabaseWrapper(
     fun close() = driver.close()
 
     /**
-     * A monotonically-increasing token reflecting how much logical data has changed: the total number
-     * of rows across the append-only `*_audit` tables. Every entity create/update/delete appends an
-     * audit row, while derived materialized-view rebuilds do not, so this is a stable "has the data
-     * changed since last sync?" signal that ignores our own view maintenance.
+     * A token reflecting how much logical, syncable state has changed since it was last captured. It
+     * folds together two things:
+     *  - the total number of rows across the append-only `*_audit` tables (every entity
+     *    create/update/delete appends one), and
+     *  - the values of the singleton `settings` row (default currency, last QIF account), which is
+     *    excluded from the audit trail but is still part of the synced database and must register as a
+     *    change — otherwise e.g. setting the default currency would never be detected as unsynced.
+     *
+     * Derived materialized-view rebuilds append no audit rows and don't touch settings, so this stays a
+     * stable "has the data changed since last sync?" signal that ignores our own view maintenance. Only
+     * equality of two tokens is meaningful (it is a hash, not a counter).
      */
     fun dataChangeToken(): Long {
         val auditTables = mutableListOf<String>()
@@ -33,17 +40,41 @@ class MoneyManagerDatabaseWrapper(
             },
             0,
         )
-        return auditTables.sumOf { table ->
-            executeQuery(
-                null,
-                "SELECT COUNT(*) FROM $table",
-                { cursor ->
-                    cursor.next()
-                    QueryResult.Value(cursor.getLong(0)!!)
-                },
-                0,
-            ).value
-        }
+        val auditRowCount =
+            auditTables.sumOf { table ->
+                executeQuery(
+                    null,
+                    "SELECT COUNT(*) FROM $table",
+                    { cursor ->
+                        cursor.next()
+                        QueryResult.Value(cursor.getLong(0)!!)
+                    },
+                    0,
+                ).value
+            }
+        return foldSettingsInto(auditRowCount)
+    }
+
+    /**
+     * Mixes the non-audited `settings` row (id = 1) into [base] with a rolling hash, so a change to any
+     * tracked setting (default currency, last QIF account) yields a different token even though the
+     * settings table appends no audit rows. A missing row leaves [base] unchanged.
+     */
+    private fun foldSettingsInto(base: Long): Long {
+        var token = base
+        executeQuery(
+            null,
+            "SELECT COALESCE(default_currency_id, 0), COALESCE(last_qif_account_id, 0) FROM settings WHERE id = 1",
+            { cursor ->
+                if (cursor.next().value) {
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
+                }
+                QueryResult.Unit
+            },
+            0,
+        )
+        return token
     }
 
     /**
@@ -235,5 +266,10 @@ class MoneyManagerDatabaseWrapper(
             0,
         )
         return columns
+    }
+
+    private companion object {
+        /** Odd prime used to mix settings values into the data-change token (collision-resistant fold). */
+        const val SETTINGS_HASH_PRIME = 1_000_003L
     }
 }

@@ -2,6 +2,7 @@ package com.moneymanager.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -36,7 +37,7 @@ fun GoogleDriveSetupDialog(
     defaultName: String,
     onSignIn: suspend (config: String?) -> Unit,
     onList: suspend (config: String?) -> List<RemoteFile>,
-    onCreate: (config: String?, name: String, password: String) -> Unit,
+    onCreate: (config: String?, name: String, password: String, overwriteFileId: String?) -> Unit,
     onOpen: (config: String?, file: RemoteFile, password: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -58,15 +59,25 @@ fun GoogleDriveSetupDialog(
         scope.launch {
             runCatching {
                 onSignIn(null)
-                if (mode == GoogleDriveSetupMode.OPEN) files = onList(null)
+                // List in both modes: OPEN needs the picker, CREATE needs it to warn about name clashes.
+                files = onList(null)
             }.onSuccess { connected = true }
                 .onFailure { error = it.message ?: "Google sign-in failed" }
             connecting = false
         }
     }
 
+    // In CREATE mode, the existing archive whose name matches what the user typed (a collision), if any.
+    val clash =
+        if (mode == GoogleDriveSetupMode.CREATE && connected) {
+            files.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) }
+        } else {
+            null
+        }
     val createValid =
-        connected && name.isNotBlank() && password.isNotEmpty() && password == confirmPassword
+        connected && clash == null && name.isNotBlank() && password.isNotEmpty() && password == confirmPassword
+    val overwriteValid = connected && clash != null && password.isNotEmpty() && password == confirmPassword
+    val openClashValid = connected && clash != null && password.isNotEmpty()
     val openValid = connected && selected != null && password.isNotEmpty()
 
     AlertDialog(
@@ -89,11 +100,26 @@ fun GoogleDriveSetupDialog(
                 } else if (mode == GoogleDriveSetupMode.CREATE) {
                     Text("Connected to Google Drive.", color = MaterialTheme.colorScheme.primary)
                     OutlinedTextField(name, { name = it }, label = { Text("Archive name") }, singleLine = true)
+                    if (clash != null) {
+                        Text(
+                            "A database named “${clash.name}” already exists. Choose a different name, open " +
+                                "the existing one, or overwrite it.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     PasswordField(password, { password = it }, "Password")
+                    // Confirm matters only when encrypting new content (Upload/Overwrite); it is ignored
+                    // when opening the existing archive with its own password.
                     PasswordField(confirmPassword, { confirmPassword = it }, "Confirm password")
                     Text(
-                        "The database is compressed and encrypted with this password. Keep it safe — it can't " +
-                            "be recovered.",
+                        if (clash != null) {
+                            "Open uses the existing database's password. Overwrite replaces it and encrypts " +
+                                "the new database with the password above — this can't be undone."
+                        } else {
+                            "The database is compressed and encrypted with this password. Keep it safe — it " +
+                                "can't be recovered."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                     )
                 } else {
@@ -121,9 +147,19 @@ fun GoogleDriveSetupDialog(
                     TextButton(onClick = ::connect, enabled = !connecting) {
                         Text("Sign in with Google")
                     }
+                // Name clash: let the user open the existing archive or overwrite it in place.
+                mode == GoogleDriveSetupMode.CREATE && clash != null ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { onOpen(null, clash, password) }, enabled = openClashValid) {
+                            Text("Open")
+                        }
+                        TextButton(onClick = { onCreate(null, name, password, clash.id) }, enabled = overwriteValid) {
+                            Text("Overwrite")
+                        }
+                    }
                 mode == GoogleDriveSetupMode.CREATE ->
                     TextButton(
-                        onClick = { onCreate(null, name, password) },
+                        onClick = { onCreate(null, name, password, null) },
                         enabled = createValid,
                     ) { Text("Upload") }
                 else ->

@@ -28,7 +28,9 @@ import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.components.DatabaseStartupProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
+import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.SchemaErrorDetector
+import com.moneymanager.ui.screens.FirstRunDatabaseSetupScreen
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -47,6 +49,9 @@ private sealed class AppDatabaseState {
         val location: DbLocation,
         val error: Throwable,
     ) : AppDatabaseState()
+
+    /** Fresh run: no remembered database and no remote binding, so the user must choose one. */
+    data object ChoosingDatabase : AppDatabaseState()
 }
 
 private data class RemoteUnlockState(
@@ -85,10 +90,17 @@ fun AppStartupHost(
             remoteUnlock = RemoteUnlockState(prompt = "Unlock “${binding.remoteName}” from cloud storage")
             return@LaunchedEffect
         }
-        val location = resolveStartupLocation(databaseManager, localSettings)
+        // A corrupted persisted value (e.g. an invalid path) must not crash startup; treat it as absent.
+        val stored =
+            localSettings.getString(KEY_LAST_DATABASE)?.let { runCatching { dbLocationFromString(it) }.getOrNull() }
+        if (stored == null || !databaseManager.databaseExists(stored)) {
+            // Fresh run: no valid remembered database and no remote binding → the user must choose one.
+            databaseState = AppDatabaseState.ChoosingDatabase
+            return@LaunchedEffect
+        }
         val error =
             openAndLoad(
-                location = location,
+                location = stored,
                 databaseManager = databaseManager,
                 createAppServices = createAppServices,
                 databaseStateUpdater = { databaseState = it },
@@ -96,7 +108,7 @@ fun AppStartupHost(
                 onErrorLog = onErrorLog,
             )
         if (error == null) {
-            localSettings.putString(KEY_LAST_DATABASE, location.toString())
+            localSettings.putString(KEY_LAST_DATABASE, stored.toString())
         }
     }
 
@@ -194,6 +206,50 @@ fun AppStartupHost(
             )
         }
         is AppDatabaseState.Loading -> DatabaseStartupProgressScreen(state.progress)
+        is AppDatabaseState.ChoosingDatabase ->
+            // The setup screen (and the Google Drive dialog it reuses) need a schema-aware scope, which
+            // MoneyManagerApp only provides once a database is loaded — so provide one here too.
+            ProvideSchemaAwareScope {
+                FirstRunDatabaseSetupScreen(
+                    databaseManager = databaseManager,
+                    remoteController = remoteController,
+                    createAppServices = createAppServices,
+                    onLocalReady = { location ->
+                        scope.launch {
+                            val error =
+                                openAndLoad(
+                                    location = location,
+                                    databaseManager = databaseManager,
+                                    createAppServices = createAppServices,
+                                    databaseStateUpdater = { databaseState = it },
+                                    onInfoLog = onInfoLog,
+                                    onErrorLog = onErrorLog,
+                                )
+                            if (error == null) localSettings.putString(KEY_LAST_DATABASE, location.toString())
+                        }
+                    },
+                    onRemoteOpened = { location ->
+                        scope.launch {
+                            val error =
+                                openAndLoad(
+                                    location = location,
+                                    databaseManager = databaseManager,
+                                    createAppServices = createAppServices,
+                                    databaseStateUpdater = { databaseState = it },
+                                    onInfoLog = onInfoLog,
+                                    onErrorLog = onErrorLog,
+                                )
+                            if (error == null) localSettings.putString(KEY_LAST_DATABASE, location.toString())
+                        }
+                    },
+                    // createRemote already opened, seeded, uploaded and bound the database, so go straight to Loaded.
+                    onRemoteCreated = { location, services, database ->
+                        localSettings.putString(KEY_LAST_DATABASE, location.toString())
+                        databaseState = AppDatabaseState.Loaded(location, services, database)
+                    },
+                    onErrorLog = onErrorLog,
+                )
+            }
         is AppDatabaseState.Error -> {
             // Schema errors are handled by the recovery dialog below; show other failures so the
             // user isn't left on a blank screen.
@@ -328,23 +384,6 @@ private fun RemoteDatabaseUnlockDialog(
             }
         },
     )
-}
-
-/**
- * Resolves which database to open on startup: the last-opened one if it still exists, otherwise the
- * platform default.
- */
-private suspend fun resolveStartupLocation(
-    databaseManager: DatabaseManager,
-    localSettings: LocalSettings,
-): DbLocation {
-    // A corrupted persisted value (e.g. an invalid path) must not crash startup; fall back to default.
-    val stored = localSettings.getString(KEY_LAST_DATABASE)?.let { runCatching { dbLocationFromString(it) }.getOrNull() }
-    return if (stored != null && databaseManager.databaseExists(stored)) {
-        stored
-    } else {
-        databaseManager.getDefaultLocation()
-    }
 }
 
 /**
