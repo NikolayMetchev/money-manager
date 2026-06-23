@@ -39,10 +39,11 @@ fun buildBearerDriveClient(
     }
 
 /**
- * Builds a [GoogleDriveProvider] for the JVM/desktop loopback flow from the [config] persisted in the
- * database binding (the user's OAuth client id/secret as JSON) plus the platform [browser] for the
- * consent step. Tokens are read from / written to [localSettings] via [GoogleDriveAccountStore]; the
- * Drive REST client uses Ktor's Bearer auth plugin to attach the access token and refresh it on a 401.
+ * Builds a [GoogleDriveProvider] for the JVM/desktop loopback flow from the OAuth client id/secret in
+ * [config] (the app's shipped default credentials, or a per-binding override) plus the platform
+ * [browser] for the consent step. Tokens are read from / written to [localSettings] via
+ * [GoogleDriveAccountStore]; the Drive REST client uses Ktor's Bearer auth plugin to attach the access
+ * token and refresh it on a 401.
  */
 fun googleDriveProvider(
     config: String?,
@@ -51,7 +52,7 @@ fun googleDriveProvider(
 ): GoogleDriveProvider {
     val credentials =
         GoogleDriveCredentials.fromConfig(
-            requireNotNull(config) { "Google Drive requires its OAuth client credentials" },
+            requireNotNull(config) { "Google Drive is not configured in this build (no OAuth client credentials)." },
         )
     val accountStore = GoogleDriveAccountStore(localSettings)
     val oauth = GoogleOAuth(tokenHttpClient)
