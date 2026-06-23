@@ -156,7 +156,11 @@ class RemoteDatabaseController(
         return provider.list()
     }
 
-    /** Uploads the open [database] as a new remote archive and makes it the active remote-backed database. */
+    /**
+     * Uploads the open [database] as a new remote archive and makes it the active remote-backed database.
+     * Pass [overwriteFileId] to replace an existing remote file in place (after the user confirmed a name
+     * collision) instead of creating a new one.
+     */
     suspend fun createRemote(
         providerId: String,
         config: String?,
@@ -164,10 +168,12 @@ class RemoteDatabaseController(
         localCachePath: DbLocation,
         database: MoneyManagerDatabaseWrapper,
         password: String,
+        overwriteFileId: String? = null,
         onProgress: (SyncProgress) -> Unit = {},
     ): RemoteDatabaseBinding {
         val provider = resolve(providerId, config)
-        val binding = syncService.createRemote(provider, remoteName, localCachePath, database, password, config, onProgress)
+        val binding =
+            syncService.createRemote(provider, remoteName, localCachePath, database, password, config, overwriteFileId, onProgress)
         session = Session(provider, binding, password)
         syncedRevision = binding.syncedRevision
         markSynced(database)
