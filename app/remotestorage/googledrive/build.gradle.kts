@@ -82,21 +82,25 @@ fun resolveOAuthValue(
     gradleProp: String,
     fileKey: String,
 ): String {
+    // Trim before the emptiness check: a trailing newline/space from a CI secret or a properties file
+    // would otherwise embed an invalid credential while isConfigured still reports true.
     providers
         .environmentVariable(envVar)
         .orNull
-        ?.takeIf { it.isNotBlank() }
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
         ?.let { return it }
     providers
         .gradleProperty(gradleProp)
         .orNull
-        ?.takeIf { it.isNotBlank() }
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
         ?.let { return it }
     val secretsFile = rootDir.resolve("secrets/google-oauth.properties")
     if (secretsFile.exists()) {
         val props = Properties()
         secretsFile.inputStream().use { props.load(it) }
-        props.getProperty(fileKey)?.takeIf { it.isNotBlank() }?.let { return it }
+        props.getProperty(fileKey)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
     }
     return ""
 }
@@ -149,6 +153,8 @@ val generatedGoogleOAuthSource =
 
 val generateGoogleOAuthDefaults =
     tasks.register("generateGoogleOAuthDefaults") {
+        group = "build setup"
+        description = "Generates the obfuscated shipped desktop Google OAuth client (GoogleOAuthDefaults.kt)."
         val outputDir = layout.buildDirectory.dir("generated/googleOAuth/jvmMain/kotlin")
         val source = generatedGoogleOAuthSource
         // The source holds only the XOR-obfuscated bytes (never the plaintext secret), so fingerprinting

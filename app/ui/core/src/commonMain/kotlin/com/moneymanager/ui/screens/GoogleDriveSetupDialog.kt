@@ -79,7 +79,11 @@ fun GoogleDriveSetupDialog(
             ) {
                 if (!connected) {
                     Text(
-                        "Sign in with your Google account to store this database in Google Drive.",
+                        if (mode == GoogleDriveSetupMode.CREATE) {
+                            "Sign in with your Google account to store this database in Google Drive."
+                        } else {
+                            "Sign in with your Google account to open a database from Google Drive."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 } else if (mode == GoogleDriveSetupMode.CREATE) {

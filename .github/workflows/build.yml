@@ -62,19 +62,18 @@ jobs:
       (github.event_name == 'pull_request' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
 
-    # Default desktop Google OAuth client, injected into the JVM build by the
-    # generateGoogleOAuthDefaults task. Empty on forks/PRs without the secrets — the build still
-    # compiles and Google Drive reports "not configured".
-    env:
-      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
       - name: Build with Gradle
         uses: ./.github/actions/gradle-run
+        # Default desktop Google OAuth client, injected into the JVM build by the
+        # generateGoogleOAuthDefaults task. Scoped to this step only. Empty on forks/PRs without the
+        # secrets — the build still compiles and Google Drive reports "not configured".
+        env:
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         with:
           command: build --stacktrace
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
