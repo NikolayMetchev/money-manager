@@ -100,7 +100,11 @@ fun resolveOAuthValue(
     if (secretsFile.exists()) {
         val props = Properties()
         secretsFile.inputStream().use { props.load(it) }
-        props.getProperty(fileKey)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        props
+            .getProperty(fileKey)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
     }
     return ""
 }
