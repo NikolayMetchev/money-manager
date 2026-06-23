@@ -298,7 +298,6 @@ fun CloudStorageCard(
         GoogleDriveSetupDialog(
             mode = GoogleDriveSetupMode.CREATE,
             defaultName = defaultArchiveName,
-            requiresConfig = type.requiresConfig,
             onSignIn = { config -> controller.signInTo(type.id, config) },
             onList = { config -> controller.list(type.id, config) },
             onCreate = { config, name, password -> startCreate(type, config, name, password) },
@@ -311,7 +310,6 @@ fun CloudStorageCard(
         GoogleDriveSetupDialog(
             mode = GoogleDriveSetupMode.OPEN,
             defaultName = defaultArchiveName,
-            requiresConfig = type.requiresConfig,
             onSignIn = { config -> controller.signInTo(type.id, config) },
             onList = { config -> controller.list(type.id, config) },
             onCreate = { _, _, _ -> },

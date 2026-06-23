@@ -27,6 +27,10 @@ NUL
 # Local configuration
 local.properties
 
+# Local Google OAuth client for the desktop build (injected at build time; see
+# secrets/google-oauth.properties.example). The example template is committed; the real file is not.
+secrets/google-oauth.properties
+
 # SQLDelight generated files (keep in source control)
 # All generated files in build/ are already ignored above
 
