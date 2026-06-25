@@ -157,6 +157,7 @@ fun SettingsScreen(
     currentDatabaseLocation: DbLocation,
     onRequestSwitchDatabase: (DbLocation) -> Unit,
     onReloadFromRemote: () -> Unit = {},
+    onShowDbSizeBreakdown: () -> Unit = {},
     remoteController: RemoteDatabaseController? = null,
     database: MoneyManagerDatabaseWrapper? = null,
 ) {
@@ -404,6 +405,15 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
                         )
+                    }
+                }
+
+                if (database != null) {
+                    OutlinedButton(
+                        onClick = onShowDbSizeBreakdown,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Database size breakdown…")
                     }
                 }
             }
