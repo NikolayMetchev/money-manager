@@ -245,17 +245,20 @@ fun CloudStorageCard(
             currentDatabaseLocation.toString().substringAfterLast('/').substringAfterLast('\\'),
         )
 
+    // The setup dialog already warned about (and resolved) any name collision before calling this; a
+    // non-null [overwriteFileId] means the user chose to replace that existing archive in place.
     fun startCreate(
         type: RemoteStorageType,
         config: String?,
         name: String,
         password: String,
+        overwriteFileId: String?,
     ) {
         createType = null
         busy = true
         scope.launch {
             runCatching {
-                controller.createRemote(type.id, config, name, currentDatabaseLocation, database, password) {
+                controller.createRemote(type.id, config, name, currentDatabaseLocation, database, password, overwriteFileId) {
                     syncProgress = it
                 }
             }.onSuccess {
@@ -298,11 +301,13 @@ fun CloudStorageCard(
         GoogleDriveSetupDialog(
             mode = GoogleDriveSetupMode.CREATE,
             defaultName = defaultArchiveName,
-            requiresConfig = type.requiresConfig,
             onSignIn = { config -> controller.signInTo(type.id, config) },
             onList = { config -> controller.list(type.id, config) },
-            onCreate = { config, name, password -> startCreate(type, config, name, password) },
-            onOpen = { _, _, _ -> },
+            onCreate = { config, name, password, overwriteFileId ->
+                startCreate(type, config, name, password, overwriteFileId)
+            },
+            // The create dialog offers "Open" when the typed name clashes with an existing archive.
+            onOpen = { config, file, password -> startOpen(type, config, file, password) },
             onDismiss = { createType = null },
         )
     }
@@ -311,10 +316,9 @@ fun CloudStorageCard(
         GoogleDriveSetupDialog(
             mode = GoogleDriveSetupMode.OPEN,
             defaultName = defaultArchiveName,
-            requiresConfig = type.requiresConfig,
             onSignIn = { config -> controller.signInTo(type.id, config) },
             onList = { config -> controller.list(type.id, config) },
-            onCreate = { _, _, _ -> },
+            onCreate = { _, _, _, _ -> },
             onOpen = { config, file, password -> startOpen(type, config, file, password) },
             onDismiss = { openType = null },
         )

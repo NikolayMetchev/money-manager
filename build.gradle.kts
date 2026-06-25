@@ -81,6 +81,14 @@ dependencyAnalysis {
 
         project(":app:ui:core") {
             ignoreSourceSet("jvmDev")
+            sourceSet("commonMain") {
+                onUnusedDependencies {
+                    // CloudStorageCard references GOOGLE_DRIVE_PROVIDER_ID / GOOGLE_DRIVE_FOLDER_NAME,
+                    // which are `const val` and get inlined, so DAGP sees no remaining binary reference
+                    // to the module even though the dependency is genuinely needed to compile.
+                    exclude(":app:remotestorage:googledrive")
+                }
+            }
             sourceSet("commonTest") {
                 onUnusedDependencies {
                     exclude("org.jetbrains.kotlin:kotlin-test")

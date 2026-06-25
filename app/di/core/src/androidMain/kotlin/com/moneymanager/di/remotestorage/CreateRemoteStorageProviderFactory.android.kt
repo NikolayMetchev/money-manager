@@ -17,8 +17,7 @@ actual fun createRemoteStorageProviderFactory(
 ): RemoteStorageProviderFactory =
     object : RemoteStorageProviderFactory {
         // Android authenticates natively (AuthorizationClient), so no bring-your-own config is needed.
-        override fun types(): List<RemoteStorageType> =
-            listOf(RemoteStorageType(GOOGLE_DRIVE_PROVIDER_ID, "Google Drive", requiresConfig = false))
+        override fun types(): List<RemoteStorageType> = listOf(RemoteStorageType(GOOGLE_DRIVE_PROVIDER_ID, "Google Drive"))
 
         override fun create(
             providerId: String,
