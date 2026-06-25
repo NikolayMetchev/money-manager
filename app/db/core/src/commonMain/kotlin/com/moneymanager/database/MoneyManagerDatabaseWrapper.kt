@@ -12,6 +12,12 @@ class MoneyManagerDatabaseWrapper(
         val objectName: String,
         val pageCount: Long,
         val totalBytes: Long,
+        /** `sqlite_master` object type (table/index/trigger/view), or "internal" for SQLite-internal objects. */
+        val objectType: String = "internal",
+        /** Number of rows; null for objects that aren't tables (e.g. indexes, internal objects). */
+        val rowCount: Long? = null,
+        /** Number of columns; null for objects that aren't tables. */
+        val columnCount: Long? = null,
     )
 
     /**
@@ -106,17 +112,97 @@ class MoneyManagerDatabaseWrapper(
                 """.trimIndent(),
                 { cursor ->
                     while (cursor.next().value) {
-                        val objectName = cursor.getString(0) ?: continue
-                        val pageCount = cursor.getLong(1) ?: continue
-                        val totalBytes = cursor.getLong(2) ?: continue
-                        result += DbObjectSize(objectName = objectName, pageCount = pageCount, totalBytes = totalBytes)
+                        val objectName = cursor.getString(0)
+                        val pageCount = cursor.getLong(1)
+                        val totalBytes = cursor.getLong(2)
+                        if (objectName != null && pageCount != null && totalBytes != null) {
+                            result += DbObjectSize(objectName = objectName, pageCount = pageCount, totalBytes = totalBytes)
+                        }
                     }
                     QueryResult.Unit
                 },
                 0,
             )
-            result
+            // Enrich with object type, plus row/column counts for tables (non-tables stay null).
+            val types = sqliteMasterTypes()
+            val columnCounts = tableColumnCounts()
+            result.map { row ->
+                val columnCount = columnCounts[row.objectName]
+                row.copy(
+                    objectType = types[row.objectName] ?: "internal",
+                    rowCount = if (columnCount != null) tableRowCount(row.objectName) else null,
+                    columnCount = columnCount,
+                )
+            }
         }.getOrDefault(emptyList())
+
+    /** Returns the object type (table/index/trigger/view) keyed by name, from `sqlite_master`. */
+    private fun sqliteMasterTypes(): Map<String, String> {
+        val types = mutableMapOf<String, String>()
+        executeQuery(
+            null,
+            "SELECT name, type FROM sqlite_master WHERE name IS NOT NULL AND type IS NOT NULL",
+            { cursor ->
+                while (cursor.next().value) {
+                    val name = cursor.getString(0)
+                    val type = cursor.getString(1)
+                    if (name != null && type != null) {
+                        types[name] = type
+                    }
+                }
+                QueryResult.Unit
+            },
+            0,
+        )
+        return types
+    }
+
+    /** Returns column counts keyed by table name (tables only, from `sqlite_master`). */
+    private fun tableColumnCounts(): Map<String, Long> {
+        val counts = mutableMapOf<String, Long>()
+        executeQuery(
+            null,
+            """
+            SELECT m.name, COUNT(ti.cid)
+            FROM sqlite_master m
+            JOIN pragma_table_info(m.name) ti
+            WHERE m.type = 'table'
+            GROUP BY m.name
+            """.trimIndent(),
+            { cursor ->
+                while (cursor.next().value) {
+                    val name = cursor.getString(0)
+                    val count = cursor.getLong(1)
+                    if (name != null && count != null) {
+                        counts[name] = count
+                    }
+                }
+                QueryResult.Unit
+            },
+            0,
+        )
+        return counts
+    }
+
+    /** Returns `COUNT(*)` for a table, or null if it can't be queried. */
+    private fun tableRowCount(tableName: String): Long? =
+        runCatching {
+            // tableName comes from sqlite_master (trusted schema); still quote-escape defensively.
+            val quoted = "\"" + tableName.replace("\"", "\"\"") + "\""
+            var count: Long? = null
+            executeQuery(
+                null,
+                "SELECT COUNT(*) FROM $quoted",
+                { cursor ->
+                    if (cursor.next().value) {
+                        count = cursor.getLong(0)
+                    }
+                    QueryResult.Unit
+                },
+                0,
+            )
+            count
+        }.getOrNull()
 
     /**
      * Execute a SQL statement on the database.

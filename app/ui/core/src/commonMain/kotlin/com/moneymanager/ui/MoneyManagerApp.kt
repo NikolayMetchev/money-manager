@@ -65,6 +65,7 @@ import com.moneymanager.ui.screens.CategoryAuditScreen
 import com.moneymanager.ui.screens.CsvImportDetailScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.CurrencyAuditScreen
+import com.moneymanager.ui.screens.DatabaseSizeBreakdownScreen
 import com.moneymanager.ui.screens.ImportsScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
@@ -255,7 +256,7 @@ fun MoneyManagerApp(
                             NavigationBarItem(
                                 icon = { Text("\u2699\uFE0F") },
                                 label = { Text("Settings") },
-                                selected = currentScreen is Screen.Settings,
+                                selected = currentScreen is Screen.Settings || currentScreen is Screen.DatabaseSizeBreakdown,
                                 onClick = { navigationHistory.navigateTo(Screen.Settings) },
                             )
                         }
@@ -384,9 +385,26 @@ fun MoneyManagerApp(
                                             currentDatabaseLocation = databaseLocation,
                                             onRequestSwitchDatabase = onRequestSwitchDatabase,
                                             onReloadFromRemote = onReloadFromRemote,
+                                            onShowDbSizeBreakdown = {
+                                                navigationHistory.navigateTo(Screen.DatabaseSizeBreakdown)
+                                            },
                                             remoteController = remoteController,
                                             database = database,
                                         )
+                                    }
+                                    is Screen.DatabaseSizeBreakdown -> {
+                                        LaunchedEffect(Unit) {
+                                            currentlyViewedAccountId = null
+                                            currentlyViewedCurrencyId = null
+                                        }
+                                        if (database != null) {
+                                            DatabaseSizeBreakdownScreen(
+                                                database = database,
+                                                onBack = { navigationHistory.navigateBack() },
+                                            )
+                                        } else {
+                                            LaunchedEffect(Unit) { navigationHistory.navigateBack() }
+                                        }
                                     }
                                     is Screen.AccountTransactions -> {
                                         // Initialize currentlyViewedAccountId when first entering the screen

@@ -3,6 +3,7 @@ package com.moneymanager.database
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -32,5 +33,21 @@ class DatabaseSizeBreakdownTest : DbTest() {
                 breakdown.any { it.objectName == "account" || it.objectName == "account_audit" },
                 "breakdown should include account-related objects after inserting an account",
             )
+
+            val accountTable = breakdown.firstOrNull { it.objectName == "account" }
+            if (accountTable != null) {
+                assertTrue(
+                    accountTable.objectType == "table",
+                    "the account object should be typed as a table",
+                )
+                assertTrue(
+                    (accountTable.columnCount ?: 0) > 0,
+                    "the account table should report its column count",
+                )
+                assertTrue(
+                    (accountTable.rowCount ?: -1) >= 1,
+                    "the account table should report at least the inserted row",
+                )
+            }
         }
 }

@@ -22,7 +22,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,10 +49,8 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.rememberDatabaseLocationPicker
 import com.moneymanager.ui.util.GenerationProgress
 import com.moneymanager.ui.util.generateSampleData
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import nl.jacobras.humanreadable.HumanReadable
 import kotlin.time.Duration
 
@@ -160,6 +157,7 @@ fun SettingsScreen(
     currentDatabaseLocation: DbLocation,
     onRequestSwitchDatabase: (DbLocation) -> Unit,
     onReloadFromRemote: () -> Unit = {},
+    onShowDbSizeBreakdown: () -> Unit = {},
     remoteController: RemoteDatabaseController? = null,
     database: MoneyManagerDatabaseWrapper? = null,
 ) {
@@ -174,24 +172,6 @@ fun SettingsScreen(
 
     // Maintenance state
     var maintenanceState by remember { mutableStateOf(MaintenanceState()) }
-    var dbSizeBreakdown by remember(database) { mutableStateOf<List<MoneyManagerDatabaseWrapper.DbObjectSize>>(emptyList()) }
-    var isLoadingDbSizeBreakdown by remember(database) { mutableStateOf(false) }
-    var dbSizeBreakdownError by remember(database) { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(database) {
-        if (database == null) return@LaunchedEffect
-        isLoadingDbSizeBreakdown = true
-        dbSizeBreakdownError = null
-        dbSizeBreakdown =
-            runCatching {
-                withContext(Dispatchers.Default) {
-                    database.getDbSizeBreakdown()
-                }
-            }.onFailure { expected ->
-                dbSizeBreakdownError = "Failed to load database size breakdown: ${expected.message}"
-            }.getOrDefault(emptyList())
-        isLoadingDbSizeBreakdown = false
-    }
 
     Column(
         modifier =
@@ -429,57 +409,11 @@ fun SettingsScreen(
                 }
 
                 if (database != null) {
-                    Text(
-                        text = "Database size breakdown",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
                     OutlinedButton(
-                        onClick = {
-                            isLoadingDbSizeBreakdown = true
-                            dbSizeBreakdownError = null
-                            scope.launch {
-                                dbSizeBreakdown =
-                                    runCatching {
-                                        withContext(Dispatchers.Default) {
-                                            database.getDbSizeBreakdown()
-                                        }
-                                    }.onFailure { expected ->
-                                        dbSizeBreakdownError = "Failed to load database size breakdown: ${expected.message}"
-                                    }.getOrDefault(emptyList())
-                                isLoadingDbSizeBreakdown = false
-                            }
-                        },
-                        enabled = !isLoadingDbSizeBreakdown,
+                        onClick = onShowDbSizeBreakdown,
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        if (isLoadingDbSizeBreakdown) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text("Refresh breakdown")
-                        }
-                    }
-
-                    when {
-                        dbSizeBreakdownError != null ->
-                            Text(
-                                text = dbSizeBreakdownError ?: "",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-
-                        dbSizeBreakdown.isEmpty() && !isLoadingDbSizeBreakdown ->
-                            Text(
-                                text = "No breakdown available (dbstat may be unavailable in this SQLite build).",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-
-                        dbSizeBreakdown.isNotEmpty() ->
-                            DatabaseSizeBreakdownTable(
-                                breakdown = dbSizeBreakdown,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                        Text("Database size breakdown…")
                     }
                 }
             }
@@ -695,59 +629,3 @@ private fun MaintenanceButton(
 }
 
 private fun formatDuration(duration: Duration): String = HumanReadable.duration(duration)
-
-@Composable
-private fun DatabaseSizeBreakdownTable(
-    breakdown: List<MoneyManagerDatabaseWrapper.DbObjectSize>,
-    modifier: Modifier = Modifier,
-) {
-    val totalBytes = breakdown.sumOf { it.totalBytes }
-    val topObjects = breakdown.take(10)
-
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        topObjects.forEach { item ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = item.objectName,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = HumanReadable.fileSize(item.totalBytes),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(
-                    text = formatDbSizePercentage(item.totalBytes, totalBytes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-
-        if (breakdown.size > topObjects.size) {
-            Text(
-                text = "Showing top ${topObjects.size} of ${breakdown.size} objects",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-private fun formatDbSizePercentage(
-    bytes: Long,
-    totalBytes: Long,
-): String {
-    if (totalBytes <= 0L) return "0.0%"
-    val tenths = (bytes * 1000) / totalBytes
-    return "${tenths / 10}.${tenths % 10}%"
-}

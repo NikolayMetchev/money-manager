@@ -51,6 +51,8 @@ sealed class Screen(
 
     data object Settings : Screen("Settings")
 
+    data object DatabaseSizeBreakdown : Screen("Database Size Breakdown")
+
     data class AccountTransactions(
         val accountId: AccountId,
         val accountName: String,
