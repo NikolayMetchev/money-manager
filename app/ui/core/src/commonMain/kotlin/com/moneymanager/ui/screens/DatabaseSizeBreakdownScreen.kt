@@ -353,7 +353,7 @@ private fun SizeBreakdownTable(
                                 .background(background),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        SizeBodyCell(item.objectName, Modifier.weight(1f), maxLines = 1)
+                        SizeBodyCell(item.objectName, Modifier.weight(1f))
                         SizeBodyCell(item.objectType, Modifier.width(90.dp))
                         SizeBodyCell(HumanReadable.fileSize(item.totalBytes), Modifier.width(110.dp))
                         SizeBodyCell(
@@ -423,7 +423,6 @@ private fun SizeBodyCell(
     text: String,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
-    maxLines: Int = 1,
 ) {
     Box(
         modifier =
@@ -435,7 +434,7 @@ private fun SizeBodyCell(
             text = text,
             style = MaterialTheme.typography.bodySmall,
             color = color,
-            maxLines = maxLines,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
