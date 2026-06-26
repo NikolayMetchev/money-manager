@@ -19,6 +19,7 @@ kotlin {
                 api(projects.app.qifimporter)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.ui.foundation)
                 api(projects.utils.bigdecimal)
                 api(projects.utils.localsettings)
                 api(projects.utils.rest)

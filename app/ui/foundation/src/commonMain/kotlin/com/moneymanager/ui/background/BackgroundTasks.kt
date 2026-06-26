@@ -347,7 +347,7 @@ private fun BackgroundTaskStatus.label(): String =
         BackgroundTaskStatus.FAILED -> "Failed"
     }
 
-internal fun formatElapsedTime(elapsed: Duration): String =
+fun formatElapsedTime(elapsed: Duration): String =
     maxOf(elapsed, Duration.ZERO).toComponents { hours, minutes, seconds, _ ->
         if (hours > 0) {
             "$hours:${minutes.formatTwoDigits()}:${seconds.formatTwoDigits()}"
