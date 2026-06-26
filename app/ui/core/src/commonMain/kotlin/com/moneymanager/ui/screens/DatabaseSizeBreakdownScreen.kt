@@ -281,7 +281,8 @@ private fun DatabaseSizePieChart(
     val slices = remember(breakdown) { buildPieSlices(breakdown) }
     var pieSizePx by remember { mutableStateOf(IntSize.Zero) }
     var pointer by remember { mutableStateOf(Offset.Zero) }
-    var activeSlice by remember { mutableStateOf<Int?>(null) }
+    // Keyed on slices so a refresh that shrinks the list clears any stale (now out-of-bounds) index.
+    var activeSlice by remember(slices) { mutableStateOf<Int?>(null) }
 
     BoxWithConstraints(
         modifier = modifier,
