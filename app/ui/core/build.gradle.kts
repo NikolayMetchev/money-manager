@@ -45,6 +45,7 @@ kotlin {
                 implementation(libs.ktor.client.mock)
                 implementation(libs.mokkery.runtime)
                 implementation(projects.test.app.db)
+                implementation(projects.test.app.ui)
             }
         }
         getByName("androidMain") {
@@ -136,6 +137,7 @@ kotlin {
                 implementation(projects.app.di.core)
                 implementation(projects.app.importer)
                 implementation(projects.test.app.db)
+                implementation(projects.test.app.ui)
             }
             kotlin.srcDir("src/commonTest/kotlin")
             // Include commonTest resources for test database files
