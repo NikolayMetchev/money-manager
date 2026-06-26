@@ -5,17 +5,16 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 
 plugins {
-    id("com.android.application")
-    id("moneymanager.kotlin-convention")
-    id("org.jetbrains.compose")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.android.application)
+    alias(conventions.plugins.moneymanager.kotlin.convention)
+    alias(libs.plugins.compose)
+    alias(libs.plugins.compose.compiler)
 }
 
-val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
-val jvmTargetVersion = libs.findVersion("jvm-target").get().toString()
+val jvmTargetVersion = libs.versions.jvm.target.get()
 
 configure<KotlinAndroidProjectExtension> {
-    jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
+    jvmToolchain(libs.versions.jvm.toolchain.get().toInt())
 
     compilerOptions {
         jvmTarget.set(JvmTarget.fromTarget(jvmTargetVersion))
@@ -23,11 +22,11 @@ configure<KotlinAndroidProjectExtension> {
 }
 
 configure<ApplicationExtension> {
-    compileSdk = libs.findVersion("android-compileSdk").get().toString().toInt()
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        minSdk = libs.findVersion("android-minSdk").get().toString().toInt()
-        targetSdk = libs.findVersion("android-targetSdk").get().toString().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        targetSdk = libs.versions.android.targetSdk.get().toInt()
     }
 
     buildTypes {

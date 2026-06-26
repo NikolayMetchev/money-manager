@@ -1,21 +1,19 @@
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 plugins {
-    id("moneymanager.kotlin-convention")
-    id("org.jetbrains.kotlin.multiplatform")
+    alias(conventions.plugins.moneymanager.kotlin.convention)
+    alias(libs.plugins.kotlin.multiplatform)
 }
-
-val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 configure<KotlinMultiplatformExtension> {
     jvm()
 
-    jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
+    jvmToolchain(libs.versions.jvm.toolchain.get().toInt())
 
     sourceSets {
         getByName("jvmMain") {
             dependencies {
-                runtimeOnly(libs.findLibrary("kotlinx-coroutines-swing").get())
+                runtimeOnly(libs.kotlinx.coroutines.swing)
             }
         }
     }
