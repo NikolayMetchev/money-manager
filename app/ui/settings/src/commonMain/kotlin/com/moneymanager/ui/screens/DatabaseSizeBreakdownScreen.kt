@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -282,7 +281,8 @@ private fun DatabaseSizePieChart(
     val slices = remember(breakdown) { buildPieSlices(breakdown) }
     var pieSizePx by remember { mutableStateOf(IntSize.Zero) }
     var pointer by remember { mutableStateOf(Offset.Zero) }
-    var activeSlice by remember { mutableStateOf<Int?>(null) }
+    // Keyed on slices so a refresh that shrinks the list clears any stale (now out-of-bounds) index.
+    var activeSlice by remember(slices) { mutableStateOf<Int?>(null) }
 
     BoxWithConstraints(
         modifier = modifier,
@@ -509,7 +509,7 @@ private fun SizeBreakdownTable(
 
 /** The data columns after the frozen colour/Object columns, laid out in the enclosing [Row]. */
 @Composable
-private fun RowScope.SizeHeaderTrailingCells(
+private fun SizeHeaderTrailingCells(
     activeSortKey: SizeSortKey,
     sortDirection: SortDirection,
     onHeaderClick: (SizeSortKey) -> Unit,
@@ -524,7 +524,7 @@ private fun RowScope.SizeHeaderTrailingCells(
 
 /** Body equivalent of [SizeHeaderTrailingCells] for a single [item] row. */
 @Composable
-private fun RowScope.SizeBodyTrailingCells(
+private fun SizeBodyTrailingCells(
     item: MoneyManagerDatabaseWrapper.DbObjectSize,
     totalBytes: Long,
 ) {
