@@ -399,7 +399,7 @@ fun ApplyStrategyDialog(
 }
 
 @Composable
-internal fun StrategySelector(
+fun StrategySelector(
     strategies: List<CsvImportStrategy>,
     selectedStrategy: CsvImportStrategy?,
     onStrategySelected: (CsvImportStrategy) -> Unit,
@@ -468,7 +468,7 @@ internal fun StrategySelector(
 }
 
 @Composable
-internal fun NewAccountResolutionSection(
+fun NewAccountResolutionSection(
     newAccounts: List<NewAccount>,
     discoveredMappings: List<DiscoveredAccountMapping>,
     accounts: List<Account>,
@@ -625,7 +625,7 @@ private fun NewAccountResolutionRow(
 }
 
 @Composable
-internal fun ImportPreviewSection(
+fun ImportPreviewSection(
     prep: ImportPreparation,
     renamedNewAccountNames: Map<String, String> = emptyMap(),
 ) {
