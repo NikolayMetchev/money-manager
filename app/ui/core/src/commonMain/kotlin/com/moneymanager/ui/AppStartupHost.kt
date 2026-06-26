@@ -282,19 +282,20 @@ fun AppStartupHost(
     }
 
     remoteUnlock?.let { unlock ->
-        val binding = remoteController?.activeBinding()
+        // The dialog only shows for a remote-backed database, so a controller is always present here.
+        val controller = remoteController ?: return@let
+        val binding = controller.activeBinding()
 
         // Hydrates the bound database with [password]. A failed Google connection (expired/revoked refresh
         // token) is surfaced distinctly from a bad password so the dialog can offer to re-run consent
         // rather than wrongly blaming the password.
         suspend fun restoreWithPassword(password: String) {
-            // A non-null binding implies a non-null controller (the binding came from it), smart-casting both.
             if (binding == null) return
             databaseState =
                 AppDatabaseState.Loading(DatabaseInitializationProgress("Restoring from cloud…", 0, 100))
             try {
                 val location =
-                    remoteController.restore(binding, password) { progress ->
+                    controller.restore(binding, password) { progress ->
                         databaseState =
                             AppDatabaseState.Loading(
                                 DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100),
@@ -312,7 +313,9 @@ fun AppStartupHost(
                 if (error == null) {
                     localSettings.putString(KEY_LAST_DATABASE, location.toString())
                 } else {
-                    remoteUnlock = unlock.copy(password = password, error = error.message ?: "Failed to open database")
+                    // A non-auth failure: leave reconnect mode so the password field returns.
+                    remoteUnlock =
+                        unlock.copy(needsReconnect = false, password = "", error = error.message ?: "Failed to open database")
                 }
             } catch (expected: CancellationException) {
                 throw expected
@@ -328,7 +331,8 @@ fun AppStartupHost(
             } catch (expected: Exception) {
                 onErrorLog("Failed to restore database from cloud", expected)
                 databaseState = AppDatabaseState.Loading(initialDatabaseProgress())
-                remoteUnlock = unlock.copy(error = "Wrong password, or download failed")
+                // A non-auth failure (e.g. wrong password): leave reconnect mode so the password field returns.
+                remoteUnlock = unlock.copy(needsReconnect = false, password = "", error = "Wrong password, or download failed")
             }
         }
 
@@ -353,7 +357,7 @@ fun AppStartupHost(
                         try {
                             // Full interactive consent mints a fresh refresh token; then retry the restore
                             // with the password the user already supplied (held on the dialog state).
-                            remoteController.reconnect(binding.providerId, binding.providerConfig)
+                            controller.reconnect(binding.providerId, binding.providerConfig)
                             restoreWithPassword(unlock.password)
                         } catch (expected: CancellationException) {
                             throw expected
