@@ -11,8 +11,39 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(libs.compose.ui.test)
                 api(libs.kotlinx.coroutines.core)
+            }
+        }
+        getByName("androidMain") {
+            dependencies {
+                api(libs.androidx.compose.ui.test)
+
+                runtimeOnly(libs.kotlinx.coroutines.android)
+                runtimeOnly(libs.kotlinx.coroutines.test)
+            }
+        }
+        getByName("jvmMain") {
+            dependencies {
+                api(libs.compose.ui.test.desktop)
+
+                runtimeOnly(libs.kotlinx.coroutines.test)
+            }
+        }
+        getByName("jvmTest") {
+            dependencies {
+                runtimeOnly(libs.kotlinx.coroutines.test)
+            }
+        }
+        getByName("androidHostTest") {
+            dependencies {
+                runtimeOnly(libs.kotlinx.coroutines.android)
+                runtimeOnly(libs.kotlinx.coroutines.test)
+            }
+        }
+        getByName("androidDeviceTest") {
+            dependencies {
+                runtimeOnly(libs.kotlinx.coroutines.android)
+                runtimeOnly(libs.kotlinx.coroutines.test)
             }
         }
     }

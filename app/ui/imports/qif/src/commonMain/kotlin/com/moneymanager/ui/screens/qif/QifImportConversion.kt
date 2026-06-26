@@ -5,7 +5,7 @@ import com.moneymanager.domain.model.qif.QifRecordSplit
 import com.moneymanager.qif.QifParseResult
 
 /** Converts a parsed QIF file into the domain records persisted by the repository. */
-internal fun QifParseResult.toImportRecords(): List<QifImportRecord> =
+fun QifParseResult.toImportRecords(): List<QifImportRecord> =
     records.map { record ->
         QifImportRecord(
             recordIndex = record.recordIndex.toLong(),
@@ -34,7 +34,7 @@ internal fun QifParseResult.toImportRecords(): List<QifImportRecord> =
     }
 
 /** The dominant account/section type used for strategy matching (first banking section, else first section). */
-internal fun QifParseResult.dominantAccountType(): String =
+fun QifParseResult.dominantAccountType(): String =
     sections.firstOrNull { it.type.isBankingTransaction }?.type?.name
         ?: sections.firstOrNull()?.type?.name
         ?: "UNKNOWN"

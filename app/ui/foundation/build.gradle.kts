@@ -12,10 +12,10 @@ kotlin {
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.utils.bigdecimal)
+                api(projects.utils.localsettings)
 
                 implementation(libs.kmlogging)
                 implementation(projects.utils.currency)
-                implementation(projects.utils.localsettings)
             }
         }
         val jvmAndroidMain =
@@ -37,9 +37,12 @@ kotlin {
                 api(libs.androidx.compose.ui)
                 api(libs.androidx.compose.ui.unit)
 
+                implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.compose.material.icons.core)
                 implementation(libs.androidx.compose.material3)
+                implementation(libs.androidx.compose.runtime.annotation)
                 implementation(libs.androidx.compose.ui.graphics)
+                implementation(libs.androidx.compose.ui.text)
                 implementation(libs.diamondedge.logging)
             }
         }
@@ -48,13 +51,19 @@ kotlin {
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.desktop)
-                api(libs.compose.foundation.layout.desktop)
                 api(libs.compose.ui.desktop)
-                api(libs.compose.ui.unit.desktop)
+                api(projects.app.importengineapi)
+                api(projects.app.model.core)
+                api(projects.utils.bigdecimal)
 
+                implementation(libs.androidx.compose.runtime.annotation)
+                implementation(libs.compose.foundation.layout.desktop)
                 implementation(libs.compose.material.icons.core.desktop)
                 implementation(libs.compose.material3.desktop)
                 implementation(libs.compose.ui.graphics.desktop)
+                implementation(libs.compose.ui.text.desktop)
+                implementation(libs.compose.ui.unit.desktop)
+                implementation(libs.compose.ui.util.desktop)
                 implementation(libs.diamondedge.logging)
             }
         }
