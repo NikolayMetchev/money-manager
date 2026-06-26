@@ -26,6 +26,8 @@ kotlin {
                 api(projects.app.ui.currencies)
                 api(projects.app.ui.foundation)
                 api(projects.app.ui.people)
+                api(projects.app.ui.settings)
+                api(projects.app.ui.transactions)
                 api(projects.utils.bigdecimal)
                 api(projects.utils.localsettings)
                 api(projects.utils.rest)

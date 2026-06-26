@@ -15,6 +15,7 @@ kotlin {
 
                 implementation(libs.kmlogging)
                 implementation(projects.utils.currency)
+                implementation(projects.utils.localsettings)
             }
         }
         val jvmAndroidMain =
