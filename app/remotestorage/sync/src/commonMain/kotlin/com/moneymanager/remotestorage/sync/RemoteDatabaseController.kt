@@ -147,6 +147,20 @@ class RemoteDatabaseController(
         resolve(providerId, config)
     }
 
+    /**
+     * Forces a fresh interactive sign-in (full consent) for [providerId]/[config], replacing any stored
+     * credentials. Unlike [signInTo], this does not short-circuit when a refresh token is already on disk:
+     * a stored token that the provider still reports as "signed in" can nonetheless be expired or revoked
+     * (Google rejects it with `invalid_grant` only when it is actually used), so recovering from such a
+     * failure requires re-running consent unconditionally to mint a new refresh token.
+     */
+    suspend fun reconnect(
+        providerId: String,
+        config: String?,
+    ) {
+        providerFactory.create(providerId, config).signIn()
+    }
+
     /** Lists the archives stored by [providerId] (signing in if needed) for an open-from-remote picker. */
     suspend fun list(
         providerId: String,
