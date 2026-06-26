@@ -36,10 +36,8 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.AccountMergeRequest
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
-import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.LocalAccountKey
-import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.components.EditAccountDialog

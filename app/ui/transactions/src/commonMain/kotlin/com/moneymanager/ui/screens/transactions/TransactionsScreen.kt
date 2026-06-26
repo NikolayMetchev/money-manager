@@ -2,8 +2,6 @@
 
 package com.moneymanager.ui.screens.transactions
 
-import com.moneymanager.ui.util.ScreenSizeClass
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -64,6 +62,7 @@ import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
+import com.moneymanager.ui.util.ScreenSizeClass
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

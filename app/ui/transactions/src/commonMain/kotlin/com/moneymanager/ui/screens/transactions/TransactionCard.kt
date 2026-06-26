@@ -1,7 +1,5 @@
 package com.moneymanager.ui.screens.transactions
 
-import com.moneymanager.ui.util.ScreenSizeClass
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +30,7 @@ import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.ui.util.ScreenSizeClass
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
