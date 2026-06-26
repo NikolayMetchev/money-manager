@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
 import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.components.DatabaseStartupProgressScreen
@@ -57,6 +58,11 @@ private sealed class AppDatabaseState {
 private data class RemoteUnlockState(
     val prompt: String,
     val error: String? = null,
+    // True when the restore failed because the cloud connection (refresh token) expired/was revoked:
+    // the password is fine, but the user must re-run Google consent before the download can succeed.
+    val needsReconnect: Boolean = false,
+    // The password already entered this run, retained so the post-reconnect retry needn't re-prompt.
+    val password: String = "",
 )
 
 private fun initialDatabaseProgress() =
@@ -276,45 +282,93 @@ fun AppStartupHost(
     }
 
     remoteUnlock?.let { unlock ->
+        // The dialog only shows for a remote-backed database, so a controller is always present here.
+        val controller = remoteController ?: return@let
+        val binding = controller.activeBinding()
+
+        // Hydrates the bound database with [password]. A failed Google connection (expired/revoked refresh
+        // token) is surfaced distinctly from a bad password so the dialog can offer to re-run consent
+        // rather than wrongly blaming the password.
+        suspend fun restoreWithPassword(password: String) {
+            if (binding == null) return
+            databaseState =
+                AppDatabaseState.Loading(DatabaseInitializationProgress("Restoring from cloud…", 0, 100))
+            try {
+                val location =
+                    controller.restore(binding, password) { progress ->
+                        databaseState =
+                            AppDatabaseState.Loading(
+                                DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100),
+                            )
+                    }
+                val error =
+                    openAndLoad(
+                        location = location,
+                        databaseManager = databaseManager,
+                        createAppServices = createAppServices,
+                        databaseStateUpdater = { databaseState = it },
+                        onInfoLog = onInfoLog,
+                        onErrorLog = onErrorLog,
+                    )
+                if (error == null) {
+                    localSettings.putString(KEY_LAST_DATABASE, location.toString())
+                } else {
+                    // A non-auth failure: leave reconnect mode so the password field returns.
+                    remoteUnlock =
+                        unlock.copy(needsReconnect = false, password = "", error = error.message ?: "Failed to open database")
+                }
+            } catch (expected: CancellationException) {
+                throw expected
+            } catch (authExpired: RemoteAuthException) {
+                onErrorLog("Cloud authentication expired while restoring database", authExpired)
+                databaseState = AppDatabaseState.Loading(initialDatabaseProgress())
+                remoteUnlock =
+                    unlock.copy(
+                        needsReconnect = true,
+                        password = password,
+                        error = "Your Google Drive connection has expired or was revoked.",
+                    )
+            } catch (expected: Exception) {
+                onErrorLog("Failed to restore database from cloud", expected)
+                databaseState = AppDatabaseState.Loading(initialDatabaseProgress())
+                // A non-auth failure (e.g. wrong password): leave reconnect mode so the password field returns.
+                remoteUnlock = unlock.copy(needsReconnect = false, password = "", error = "Wrong password, or download failed")
+            }
+        }
+
         RemoteDatabaseUnlockDialog(
             state = unlock,
             onUnlock = { password ->
-                val binding = remoteController?.activeBinding()
                 if (binding != null) {
                     // Close the dialog immediately so the restore progress bar is clearly visible; it is
                     // only reopened (with an error) if the password was wrong or the download failed.
                     remoteUnlock = null
+                    scope.launch { restoreWithPassword(password) }
+                }
+            },
+            onReconnect = {
+                if (binding != null) {
+                    remoteUnlock = null
                     scope.launch {
                         databaseState =
-                            AppDatabaseState.Loading(DatabaseInitializationProgress("Restoring from cloud…", 0, 100))
+                            AppDatabaseState.Loading(
+                                DatabaseInitializationProgress("Reconnecting to ${binding.remoteName}…", 0, 100),
+                            )
                         try {
-                            val location =
-                                remoteController.restore(binding, password) { progress ->
-                                    databaseState =
-                                        AppDatabaseState.Loading(
-                                            DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100),
-                                        )
-                                }
-                            val error =
-                                openAndLoad(
-                                    location = location,
-                                    databaseManager = databaseManager,
-                                    createAppServices = createAppServices,
-                                    databaseStateUpdater = { databaseState = it },
-                                    onInfoLog = onInfoLog,
-                                    onErrorLog = onErrorLog,
-                                )
-                            if (error == null) {
-                                localSettings.putString(KEY_LAST_DATABASE, location.toString())
-                            } else {
-                                remoteUnlock = unlock.copy(error = error.message ?: "Failed to open database")
-                            }
+                            // Full interactive consent mints a fresh refresh token; then retry the restore
+                            // with the password the user already supplied (held on the dialog state).
+                            controller.reconnect(binding.providerId, binding.providerConfig)
+                            restoreWithPassword(unlock.password)
                         } catch (expected: CancellationException) {
                             throw expected
                         } catch (expected: Exception) {
-                            onErrorLog("Failed to restore database from cloud", expected)
+                            onErrorLog("Failed to reconnect to cloud storage", expected)
                             databaseState = AppDatabaseState.Loading(initialDatabaseProgress())
-                            remoteUnlock = unlock.copy(error = "Wrong password, or download failed")
+                            remoteUnlock =
+                                unlock.copy(
+                                    needsReconnect = true,
+                                    error = "Reconnect failed: ${expected.message ?: "could not sign in"}",
+                                )
                         }
                     }
                 }
@@ -360,6 +414,7 @@ fun AppStartupHost(
 private fun RemoteDatabaseUnlockDialog(
     state: RemoteUnlockState,
     onUnlock: (String) -> Unit,
+    onReconnect: () -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
     AlertDialog(
@@ -368,19 +423,29 @@ private fun RemoteDatabaseUnlockDialog(
         title = { Text(state.prompt) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Password") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                )
+                if (state.needsReconnect) {
+                    // The password is already known to be correct; only the cloud sign-in needs renewing,
+                    // so prompt for re-consent instead of showing the password field again.
+                    Text("Reconnect to your Google account to finish restoring this database.")
+                } else {
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                }
                 state.error?.let { Text(it) }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onUnlock(password) }, enabled = password.isNotEmpty()) {
-                Text("Unlock")
+            if (state.needsReconnect) {
+                TextButton(onClick = onReconnect) { Text("Reconnect to Google Drive") }
+            } else {
+                TextButton(onClick = { onUnlock(password) }, enabled = password.isNotEmpty()) {
+                    Text("Unlock")
+                }
             }
         },
     )
