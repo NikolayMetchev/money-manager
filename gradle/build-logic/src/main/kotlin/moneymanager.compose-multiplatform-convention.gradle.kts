@@ -1,7 +1,7 @@
 plugins {
-    id("moneymanager.android-convention")
-    id("moneymanager.kotlin-multiplatform-convention")
-    id("org.jetbrains.compose")
+    alias(conventions.plugins.moneymanager.android.convention)
+    alias(conventions.plugins.moneymanager.kotlin.multiplatform.convention)
+    alias(libs.plugins.compose)
 }
 
 // Workaround: Compose Multiplatform 1.10.0 doesn't configure outputDirectory for

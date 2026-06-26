@@ -17,13 +17,17 @@ dependencyResolutionManagement {
 }
 
 pluginManagement {
-    includeBuild("gradle/build-logic")
     repositories {
         google()
         mavenCentral()
         gradlePluginPortal()
     }
 }
+
+// Included at the top level (not inside pluginManagement) because the typesafe-conventions plugin
+// applied in build-logic requires the included build to be aware of the build hierarchy, which an
+// early-evaluated pluginManagement { includeBuild(...) } is not.
+includeBuild("gradle/build-logic")
 
 buildscript {
     repositories {

@@ -39,16 +39,10 @@ configurations.all {
 }
 
 dependencies {
+    // develocity is consumed as an API by BuildScan.kt (not applied as a plugin), so it stays explicit.
     compileOnly(libs.develocity.gradle.plugin)
-    implementation(libs.android.gradle.plugin)
-    implementation(libs.compose.gradle.plugin)
-    implementation(libs.detekt.gradle.plugin)
-    implementation(libs.kotlin.compose.compiler.gradle.plugin)
-    implementation(libs.kotlin.gradle.plugin)
-    implementation(libs.kover.gradle.plugin)
-    implementation(libs.ktlint.gradle.plugin)
-    implementation(libs.mappie.gradle.plugin)
-    implementation(libs.metro.gradle.plugin)
-    implementation(libs.sort.dependencies.gradle.plugin)
+    // Every other plugin marker is contributed automatically by the typesafe-conventions plugin when a
+    // convention plugin applies it via `alias(libs.plugins.*)`, so those manual entries are redundant.
+    // sqldelight is applied directly in module build scripts (no convention plugin), so it stays.
     implementation(libs.sqldelight.gradle.plugin)
 }
