@@ -132,6 +132,7 @@ compose-ui-desktop = { module = "org.jetbrains.compose.ui:ui-desktop", version.r
 compose-ui-geometry-desktop = { module = "org.jetbrains.compose.ui:ui-geometry-desktop", version.ref = "compose-plugin" }
 compose-ui-graphics-desktop = { module = "org.jetbrains.compose.ui:ui-graphics-desktop", version.ref = "compose-plugin" }
 compose-ui-text-desktop = { module = "org.jetbrains.compose.ui:ui-text-desktop", version.ref = "compose-plugin" }
+compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-plugin" }
 compose-ui-test-desktop = { module = "org.jetbrains.compose.ui:ui-test-desktop", version.ref = "compose-plugin" }
 compose-ui-unit-desktop = { module = "org.jetbrains.compose.ui:ui-unit-desktop", version.ref = "compose-plugin" }
 compose-ui-util-desktop = { module = "org.jetbrains.compose.ui:ui-util-desktop", version.ref = "compose-plugin" }

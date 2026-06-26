@@ -13,7 +13,9 @@ exclude:
   - name: XmlHighlighting
   - name: FunctionName
     paths:
-      - app/ui/core/src
+      # app/ui/core was split into per-feature app/ui/<feature> modules; the Compose
+      # @Composable PascalCase functions are now spread across all of them.
+      - app/ui
       - app/main/android/src
   - name: KotlinUnreachableCode
     paths:
@@ -25,7 +27,8 @@ exclude:
       - app/ui/core/build/generated
   - name: EditorConfigKeyCorrectness
     paths:
-      - app/ui/core/.editorconfig
+      # .editorconfig was moved up from app/ui/core to app/ui (shared Compose ktlint rules).
+      - app/ui/.editorconfig
   - name: unused
     paths:
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
@@ -185,6 +188,50 @@ exclude:
     paths:
       - app/ui/core/src/commonTest
       - app/db/core/src/commonTest
+  # ── app/ui/core split into per-feature app/ui/<feature> modules (PR #585) ──────────
+  # Relocating the UI out of app/ui/core makes Qodana's PR-mode re-analyse every moved
+  # file as "new code", resurfacing the same inspection families already suppressed for
+  # app/ui/core above — now spread across the new modules. Scope them to app/ui:
+  #   * HasPlatformType — Mokkery stubs / Android interop infer platform types in UI
+  #     code and (mostly) tests; unchecked-nullability noise, not real defects.
+  #   * JUnitMalformedDeclaration — expression-body `@Test fun … = runComposeUiTest {}`
+  #     infers a non-Unit return; a Compose-UI-test idiom, not a malformed test.
+  #   * unused / UnusedSymbol(Local) / UnusedDeclaration — sealed `Screen` destinations
+  #     and platform expect/actual + DI-referenced files are used cross-module, which
+  #     Qodana's per-module KMP import doesn't resolve (mirrors the app/ui/core entries).
+  #   * KotlinUnusedImport / KotlinConstantConditions — pre-existing test false positives
+  #     (e.g. `by` delegations, Mokkery `calls {}` lambdas) carried over with the tests.
+  #   * SameParameterValue / DuplicatedCode — small repeated Compose field/label fragments.
+  - name: HasPlatformType
+    paths:
+      - app/ui
+  - name: JUnitMalformedDeclaration
+    paths:
+      - app/ui
+  - name: KotlinUnusedImport
+    paths:
+      - app/ui
+  - name: KotlinConstantConditions
+    paths:
+      - app/ui
+  - name: SameParameterValue
+    paths:
+      - app/ui
+  - name: DuplicatedCode
+    paths:
+      - app/ui
+  - name: unused
+    paths:
+      - app/ui
+  - name: UnusedSymbol
+    paths:
+      - app/ui
+  - name: UnusedDeclaration
+    paths:
+      - app/ui
+  - name: UnusedSymbolLocal
+    paths:
+      - app/ui
 include:
   - name: CheckDependencyLicenses
 failureConditions:

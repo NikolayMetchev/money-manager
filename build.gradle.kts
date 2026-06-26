@@ -105,6 +105,54 @@ dependencyAnalysis {
                 }
             }
         }
+
+        // The Compose hot-reload plugin's `jvmDev` source set produces unused-dependency noise
+        // (compose-desktop, hot-reload-runtime-api) in every split-out Compose UI module.
+        listOf(
+            ":app:ui:components",
+            ":app:ui:audit",
+            ":app:ui:people",
+            ":app:ui:imports:api",
+            ":app:ui:imports:qif",
+            ":test:app:ui",
+        ).forEach { p -> project(p) { ignoreSourceSet("jvmDev") } }
+
+        // Modules whose jvmTest uses `compose.desktop.currentOs` pull in the per-OS Skiko native
+        // artifacts, which DAGP flags as unused (only the current OS one is used in CI). They also
+        // get the `jvmDev` hot-reload noise.
+        listOf(
+            ":app:ui:foundation",
+            ":app:ui:accounts",
+            ":app:ui:categories",
+            ":app:ui:currencies",
+            ":app:ui:transactions",
+            ":app:ui:imports:csv",
+        ).forEach { p ->
+            project(p) {
+                ignoreSourceSet("jvmDev")
+                sourceSet("jvmTest") {
+                    onUnusedDependencies {
+                        exclude("org.jetbrains.compose.desktop:desktop-jvm-linux-arm64")
+                        exclude("org.jetbrains.compose.desktop:desktop-jvm-linux-x64")
+                        exclude("org.jetbrains.compose.desktop:desktop-jvm-macos-arm64")
+                        exclude("org.jetbrains.compose.desktop:desktop-jvm-macos-x64")
+                        exclude("org.jetbrains.compose.desktop:desktop-jvm-windows-x64")
+                    }
+                }
+            }
+        }
+
+        project(":app:ui:settings") {
+            ignoreSourceSet("jvmDev")
+            sourceSet("commonMain") {
+                onUnusedDependencies {
+                    // CloudStorageCard references GOOGLE_DRIVE_PROVIDER_ID / GOOGLE_DRIVE_FOLDER_NAME,
+                    // which are `const val` and get inlined, so DAGP sees no remaining binary reference
+                    // to the module even though the dependency is genuinely needed to compile.
+                    exclude(":app:remotestorage:googledrive")
+                }
+            }
+        }
     }
 }
 
