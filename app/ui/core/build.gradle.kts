@@ -23,6 +23,7 @@ kotlin {
                 api(projects.utils.localsettings)
                 api(projects.utils.rest)
 
+                implementation(libs.compose.charts)
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
                 implementation(projects.app.remotestorage.googledrive)
@@ -94,6 +95,7 @@ kotlin {
                 implementation(libs.androidx.compose.runtime.annotation)
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.animation.desktop)
+                implementation(libs.compose.charts.desktop)
                 implementation(libs.compose.material.icons.core.desktop)
                 implementation(libs.compose.material3.desktop)
                 implementation(libs.compose.ui.graphics.desktop)

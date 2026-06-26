@@ -28,6 +28,7 @@ androidx-test-core = "1.7.0"
 androidx-test-monitor = "1.8.0"
 androidx-test-runner = "1.7.0"
 compose = "1.7.5"
+compose-charts = "0.2.5"
 compose-plugin = "1.11.1"
 compose-material-icons-desktop = "1.7.3"
 compose-material3-desktop = "1.9.0"
@@ -110,6 +111,8 @@ androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-te
 androidx-test-monitor = { module = "androidx.test:monitor", version.ref = "androidx-test-monitor" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 compose-animation-core-desktop = { module = "org.jetbrains.compose.animation:animation-core-desktop", version.ref = "compose-plugin" }
+compose-charts = { module = "io.github.ehsannarmani:compose-charts", version.ref = "compose-charts" }
+compose-charts-desktop = { module = "io.github.ehsannarmani:compose-charts-desktop", version.ref = "compose-charts" }
 compose-animation-desktop = { module = "org.jetbrains.compose.animation:animation-desktop", version.ref = "compose-plugin" }
 compose-desktop-linux-arm64 = { module = "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64", version.ref = "compose-plugin" }
 compose-desktop-linux-x64 = { module = "org.jetbrains.compose.desktop:desktop-jvm-linux-x64", version.ref = "compose-plugin" }
