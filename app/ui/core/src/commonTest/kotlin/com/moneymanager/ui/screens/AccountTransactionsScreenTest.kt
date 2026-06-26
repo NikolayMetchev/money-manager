@@ -55,7 +55,7 @@ import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.screens.transactions.AccountTransactionCard
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
-import com.moneymanager.ui.screens.transactions.ScreenSizeClass
+import com.moneymanager.ui.util.ScreenSizeClass
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode

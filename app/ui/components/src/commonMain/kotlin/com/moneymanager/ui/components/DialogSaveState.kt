@@ -17,7 +17,7 @@ internal class DialogSaveState {
 internal fun rememberDialogSaveState(): DialogSaveState = remember { DialogSaveState() }
 
 @Composable
-internal fun ErrorMessageText(error: String) {
+fun ErrorMessageText(error: String) {
     Text(
         text = error,
         color = MaterialTheme.colorScheme.error,

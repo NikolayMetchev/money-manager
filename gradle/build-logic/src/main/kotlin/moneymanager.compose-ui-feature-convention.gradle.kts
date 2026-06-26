@@ -18,6 +18,11 @@ plugins {
 // dependsOn(commonTest) due to KMP source-set tree restrictions).
 extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension> {
     sourceSets.getByName("androidDeviceTest") {
+        // kotlin("test") is universally used by the shared tests (and DAGP-excluded), so wire it here;
+        // all other deps are declared per-module to keep buildHealth's unused-dependency check happy.
+        dependencies {
+            implementation(kotlin("test"))
+        }
         kotlin.srcDir("src/commonTest/kotlin")
         resources.srcDir("src/commonTest/resources")
     }

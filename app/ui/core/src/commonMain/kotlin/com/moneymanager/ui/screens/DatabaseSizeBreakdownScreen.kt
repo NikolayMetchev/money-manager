@@ -59,7 +59,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.transactions.ScreenSizeClass
+import com.moneymanager.ui.util.ScreenSizeClass
 import com.moneymanager.ui.util.formatGroupedNumber
 import ir.ehsannarmani.compose_charts.PieChart
 import ir.ehsannarmani.compose_charts.models.LabelHelperProperties
