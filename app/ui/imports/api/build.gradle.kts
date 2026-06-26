@@ -70,5 +70,13 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
+        getByName("androidDeviceTest") {
+            dependencies {
+                // These are pure-logic tests (no Compose UI), so unlike the other feature
+                // modules nothing pulls in the instrumentation runner transitively; provide
+                // it explicitly so the device-test APK can launch AndroidJUnitRunner.
+                runtimeOnly(libs.androidx.test.runner)
+            }
+        }
     }
 }
