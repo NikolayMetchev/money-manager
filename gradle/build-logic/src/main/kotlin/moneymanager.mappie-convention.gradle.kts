@@ -2,21 +2,19 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import tech.mappie.NamingConvention
 
 plugins {
-    id("moneymanager.kotlin-multiplatform-convention")
-    id("tech.mappie.plugin")
+    alias(conventions.plugins.moneymanager.kotlin.multiplatform.convention)
+    alias(libs.plugins.mappie)
 }
 
 mappie {
     namingConvention = NamingConvention.LENIENT
 }
 
-val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
-
 configure<KotlinMultiplatformExtension> {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                implementation(libs.findLibrary("mappie-api").get())
+                implementation(libs.mappie.api)
             }
         }
     }

@@ -6,6 +6,12 @@ pluginManagement {
     }
 }
 
+plugins {
+    // Version is hardcoded (not a catalog alias) because type-safe `libs.plugins.*` accessors only
+    // become available *after* this very plugin is applied — a bootstrap chicken-and-egg.
+    id("dev.panuszewski.typesafe-conventions") version "0.11.1"
+}
+
 dependencyResolutionManagement {
     repositories {
         google()
@@ -15,11 +21,8 @@ dependencyResolutionManagement {
         // org.gradle.experimental:gradle-public-api, which is published only here.
         maven("https://repo.gradle.org/gradle/libs-releases")
     }
-    versionCatalogs {
-        create("libs") {
-            from(files("../libs.versions.toml"))
-        }
-    }
+    // The `libs` version catalog is auto-imported from the parent build by the
+    // typesafe-conventions plugin, so it must not be created here.
 }
 
 rootProject.name = "build-logic"

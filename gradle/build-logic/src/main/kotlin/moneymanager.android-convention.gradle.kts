@@ -2,12 +2,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 plugins {
-    id("moneymanager.kotlin-convention")
-    id("org.jetbrains.kotlin.multiplatform")
-    id("com.android.kotlin.multiplatform.library")
+    alias(conventions.plugins.moneymanager.kotlin.convention)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kotlin.multiplatform.library)
 }
 
-val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 // Android emulator API level sync: update with .github/workflows/build.yml,
 // .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
 val androidTestManagedDeviceNames = listOf("pixel6api36")
@@ -17,11 +16,11 @@ fun KotlinMultiplatformExtension.configureAndroidTarget() {
         // Use group (set by kotlin-convention based on project path)
         // Sanitize hyphens in group name for valid Android package name
         namespace = "com.moneymanager.${project.group.toString().replace("-", ".")}"
-        compileSdk = libs.findVersion("android-compileSdk").get().toString().toInt()
-        minSdk = libs.findVersion("android-minSdk").get().toString().toInt()
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
 
         compilerOptions {
-            jvmTarget.set(JvmTarget.fromTarget(libs.findVersion("jvm-target").get().toString()))
+            jvmTarget.set(JvmTarget.fromTarget(libs.versions.jvm.target.get()))
         }
 
         lint {
@@ -61,7 +60,7 @@ fun KotlinMultiplatformExtension.configureAndroidTarget() {
 kotlin {
     jvm()
 
-    jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
+    jvmToolchain(libs.versions.jvm.toolchain.get().toInt())
 
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
@@ -70,7 +69,7 @@ kotlin {
     sourceSets {
         getByName("jvmMain") {
             dependencies {
-                runtimeOnly(libs.findLibrary("kotlinx-coroutines-swing").get())
+                runtimeOnly(libs.kotlinx.coroutines.swing)
             }
         }
         getByName("commonTest") {
