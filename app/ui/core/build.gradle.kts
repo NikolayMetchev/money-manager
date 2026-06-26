@@ -19,6 +19,7 @@ kotlin {
                 api(projects.app.qifimporter)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.ui.accounts)
                 api(projects.app.ui.audit)
                 api(projects.app.ui.components)
                 api(projects.app.ui.foundation)

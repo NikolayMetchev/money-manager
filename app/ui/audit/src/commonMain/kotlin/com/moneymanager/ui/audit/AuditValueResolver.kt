@@ -18,7 +18,7 @@ private fun <T> resolveUpdateValue(
         else -> entryValue
     }
 
-internal fun <T> changedOrUnchanged(
+fun <T> changedOrUnchanged(
     oldValue: T,
     newValue: T,
 ): FieldChange<T> =
@@ -28,7 +28,7 @@ internal fun <T> changedOrUnchanged(
         FieldChange.Unchanged(oldValue)
     }
 
-internal fun <T, C, E> resolveUpdateChange(
+fun <T, C, E> resolveUpdateChange(
     index: Int,
     currentEntry: C?,
     previousEntry: E?,
