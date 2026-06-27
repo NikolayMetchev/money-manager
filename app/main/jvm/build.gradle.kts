@@ -22,7 +22,9 @@ dependencies {
     implementation(projects.app.importengineapi)
     implementation(projects.app.model.core)
     implementation(projects.app.remotestorage.sync)
+    implementation(projects.app.ui.components)
     implementation(projects.app.ui.core)
+    implementation(projects.app.ui.foundation)
     implementation(projects.utils.localsettings)
 
     runtimeOnly(compose.desktop.currentOs)
