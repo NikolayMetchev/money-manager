@@ -66,8 +66,34 @@ class RemoteDatabaseController(
 
     /** Records the current database state as "fully synced" (call when the live DB matches the remote). */
     suspend fun markSynced(database: MoneyManagerDatabaseWrapper) {
-        syncedToken = currentToken(database)
+        val token = currentToken(database)
+        syncedToken = token
+        // Persist the baseline so "has the local file changed since the last upload?" survives a restart
+        // (the working copy may be kept on disk between runs).
+        persistSyncedToken(token)
         publish(localDirty = false, remoteChanged = false)
+    }
+
+    /**
+     * Seeds the in-memory dirty baseline from the persisted binding without arming a session (no password
+     * known yet). Used when the cloud-backed database is opened straight from a kept local copy: it lets
+     * [hasUnsyncedChanges] report whether the local file changed since the last upload, even across
+     * restarts, so the close dialog can pre-tick "Upload changes" only when something actually changed.
+     */
+    suspend fun adoptLocalCache(database: MoneyManagerDatabaseWrapper) {
+        val binding = syncService.activeBinding() ?: return
+        syncedToken = binding.syncedToken
+        syncedRevision = binding.syncedRevision
+        publish(localDirty = hasUnsyncedChanges(database), remoteChanged = false)
+    }
+
+    /** Writes [token] onto the persisted (and in-session) binding so it survives the next launch. */
+    private fun persistSyncedToken(token: Long?) {
+        val binding = session?.binding ?: syncService.activeBinding() ?: return
+        if (binding.syncedToken == token) return
+        val updated = binding.copy(syncedToken = token)
+        syncService.bind(updated)
+        session = session?.copy(binding = updated)
     }
 
     /** True if [database] has logical changes that haven't been pushed since the last [markSynced]. */
@@ -190,8 +216,10 @@ class RemoteDatabaseController(
             syncService.createRemote(provider, remoteName, localCachePath, database, password, config, overwriteFileId, onProgress)
         session = Session(provider, binding, password)
         syncedRevision = binding.syncedRevision
+        // Captures + persists the upload baseline (data-change token) onto the binding.
         markSynced(database)
-        return binding
+        // Return the binding as persisted (now carrying the synced token), not the pre-baseline copy.
+        return session?.binding ?: binding
     }
 
     /**
@@ -307,7 +335,10 @@ class RemoteDatabaseController(
         val result = syncService.hydrate(current.provider, current.binding, current.password, onProgress)
         recordSyncedRevision(result.revisionId)
         // Invalidate the local baseline so AppStartupHost re-captures it on the reopened database handle.
+        // Clear the persisted token too: if the app exits before the reopened DB re-baselines, a stale
+        // persisted token would otherwise make the next startup flag the freshly downloaded cache as dirty.
         syncedToken = null
+        persistSyncedToken(null)
         publish(localDirty = false, remoteChanged = false)
         return result.location
     }

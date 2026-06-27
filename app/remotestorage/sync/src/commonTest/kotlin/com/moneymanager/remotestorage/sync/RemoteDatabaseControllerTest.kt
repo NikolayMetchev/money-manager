@@ -194,6 +194,39 @@ class RemoteDatabaseControllerTest {
             }
         }
 
+    @Test
+    fun syncedTokenPersistsForCrossSessionDirtyDetection() =
+        runTest {
+            val manager = createTestDatabaseManager()
+            val location = createTestDatabaseLocation()
+            try {
+                val database = manager.openDatabase(location)
+                val provider = InMemoryStorageProvider()
+                // A shared settings store carries the upload baseline across "restarts".
+                val sync = RemoteDatabaseSyncService(manager, InMemoryLocalSettings())
+                val controller = RemoteDatabaseController(sync, SingleProviderFactory(provider))
+                controller.createRemote("in-memory", null, "db.mmdb", location, database, "pw")
+
+                // The data-change token at upload time is persisted in the binding.
+                assertTrue(sync.activeBinding()?.syncedToken != null, "synced token should persist after create")
+
+                // A fresh controller (no session, no password) adopts the kept local copy and, with the
+                // persisted baseline, correctly reports it as unchanged.
+                val fresh = RemoteDatabaseController(sync, SingleProviderFactory(provider))
+                fresh.adoptLocalCache(database)
+                assertFalse(fresh.hasActiveSession(), "adopting a local cache must not arm a session")
+                assertFalse(fresh.hasUnsyncedChanges(database), "unedited working copy should not look dirty")
+
+                // A local edit is detected as a change against that same persisted baseline.
+                database.bumpDataChange()
+                assertTrue(fresh.hasUnsyncedChanges(database), "edited working copy should look dirty across restart")
+
+                database.close()
+            } finally {
+                deleteTestDatabase(location)
+            }
+        }
+
     private suspend fun withController(
         block: suspend (
             controller: RemoteDatabaseController,

@@ -29,13 +29,17 @@ actual class DatabaseLocationPickerLauncher(
     private fun showDialog(mode: DatabasePickerMode): DbLocation? {
         val frame = Frame()
         try {
-            val isCreate = mode == DatabasePickerMode.CREATE
+            // SAVE lets the user pick an existing file *or* type a new name, so it backs both CREATE and
+            // the unified OPEN_OR_CREATE; downstream open-or-seed handles whichever the user chose.
+            val isOpenOnly = mode == DatabasePickerMode.OPEN
+            val title =
+                when (mode) {
+                    DatabasePickerMode.OPEN -> "Open database"
+                    DatabasePickerMode.CREATE -> "Create database"
+                    DatabasePickerMode.OPEN_OR_CREATE -> "Open or create database"
+                }
             val fileDialog =
-                FileDialog(
-                    frame,
-                    if (isCreate) "Create database" else "Open database",
-                    if (isCreate) FileDialog.SAVE else FileDialog.LOAD,
-                )
+                FileDialog(frame, title, if (isOpenOnly) FileDialog.LOAD else FileDialog.SAVE)
             localSettings.getString(KEY_LAST_DIRECTORY)?.let { fileDialog.directory = it }
             fileDialog.setFilenameFilter { _, name -> name.lowercase().endsWith(DATABASE_EXTENSION) }
             fileDialog.isVisible = true
@@ -46,7 +50,7 @@ actual class DatabaseLocationPickerLauncher(
 
             localSettings.putString(KEY_LAST_DIRECTORY, directory)
             val fileName =
-                if (isCreate && !file.lowercase().endsWith(DATABASE_EXTENSION)) file + DATABASE_EXTENSION else file
+                if (!isOpenOnly && !file.lowercase().endsWith(DATABASE_EXTENSION)) file + DATABASE_EXTENSION else file
             val resolved = Paths.get(directory, fileName)
             val parent = resolved.parent
             logger.info {

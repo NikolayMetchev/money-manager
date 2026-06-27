@@ -3,8 +3,12 @@ package com.moneymanager.ui
 import androidx.compose.runtime.Composable
 import com.moneymanager.domain.model.DbLocation
 
-/** Whether the database picker should open an existing database or create a new one. */
-enum class DatabasePickerMode { OPEN, CREATE }
+/**
+ * Whether the database picker should open an existing database, create a new one, or let the user do
+ * either in a single dialog ([OPEN_OR_CREATE] — picking an existing file opens it; typing a new name
+ * creates it).
+ */
+enum class DatabasePickerMode { OPEN, CREATE, OPEN_OR_CREATE }
 
 /** Platform-specific launcher that opens a dialog for choosing a [DbLocation]. */
 expect class DatabaseLocationPickerLauncher {

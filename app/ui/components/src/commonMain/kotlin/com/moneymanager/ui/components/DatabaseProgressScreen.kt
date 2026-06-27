@@ -20,7 +20,10 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseInitializationProgress
 
 @Composable
-fun DatabaseStartupProgressScreen(progress: DatabaseInitializationProgress) {
+fun DatabaseProgressScreen(
+    progress: DatabaseInitializationProgress,
+    title: String,
+) {
     MaterialTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -35,7 +38,7 @@ fun DatabaseStartupProgressScreen(progress: DatabaseInitializationProgress) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "Starting Money Manager",
+                    text = title,
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center,
