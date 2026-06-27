@@ -41,11 +41,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
- * First-run chooser shown when there is no remembered database and no remote binding: the user must
- * pick one of four options (no silent default). Local options reuse the platform database picker;
- * remote options reuse the Google Drive setup dialog. Creating a new remote database opens a freshly
- * seeded local working copy first, then uploads it (so [RemoteDatabaseController.createRemote] has an
- * open database to push).
+ * First-run chooser shown when there is no remembered database and no remote binding: the user picks
+ * **Local** or a remote provider (no silent default). Create-vs-open is resolved by what the user then
+ * picks/types — the local picker opens an existing file or creates a new one ([DatabasePickerMode.OPEN_OR_CREATE]),
+ * and the Google Drive setup dialog opens the existing archive when the typed name already exists,
+ * otherwise creates it. Creating a new remote database opens a freshly seeded local working copy first,
+ * then uploads it (so [RemoteDatabaseController.createRemote] has an open database to push).
  *
  * Remote progress is shown **inline** (this screen stays composed) rather than by switching to the
  * shared loading screen: the create/open coroutine runs on this screen's scope, so navigating away
@@ -67,7 +68,6 @@ fun FirstRunDatabaseSetupScreen(
     var message by remember { mutableStateOf<String?>(null) }
 
     var createRemoteType by remember { mutableStateOf<RemoteStorageType?>(null) }
-    var openRemoteType by remember { mutableStateOf<RemoteStorageType?>(null) }
 
     // The picker delivers its result asynchronously on both platforms (JVM posts after the blocking AWT
     // dialog; Android renders the dialog on the next recomposition). A null result = cancelled, so we stay
@@ -128,7 +128,7 @@ fun FirstRunDatabaseSetupScreen(
         file: RemoteFile,
         password: String,
     ) {
-        openRemoteType = null
+        createRemoteType = null
         busy = true
         message = null
         scope.launch {
@@ -174,16 +174,10 @@ fun FirstRunDatabaseSetupScreen(
 
                 val buttonModifier = Modifier.fillMaxWidth().widthIn(max = 360.dp)
                 OutlinedButton(
-                    onClick = { picker.launch(DatabasePickerMode.CREATE) },
+                    onClick = { picker.launch(DatabasePickerMode.OPEN_OR_CREATE) },
                     enabled = !busy,
                     modifier = buttonModifier,
-                ) { Text("New local database") }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { picker.launch(DatabasePickerMode.OPEN) },
-                    enabled = !busy,
-                    modifier = buttonModifier,
-                ) { Text("Open existing local database") }
+                ) { Text("Local database") }
 
                 remoteController?.providerFactory?.types()?.forEach { type ->
                     Spacer(modifier = Modifier.height(8.dp))
@@ -191,13 +185,7 @@ fun FirstRunDatabaseSetupScreen(
                         onClick = { createRemoteType = type },
                         enabled = !busy,
                         modifier = buttonModifier,
-                    ) { Text("New database on ${type.displayName}") }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { openRemoteType = type },
-                        enabled = !busy,
-                        modifier = buttonModifier,
-                    ) { Text("Open database from ${type.displayName}") }
+                    ) { Text("${type.displayName} database") }
                 }
 
                 progress?.let {
@@ -237,18 +225,6 @@ fun FirstRunDatabaseSetupScreen(
             // The create dialog offers "Open" when the typed name clashes with an existing archive.
             onOpen = { config, file, password -> startOpenRemote(type, config, file, password) },
             onDismiss = { createRemoteType = null },
-        )
-    }
-
-    openRemoteType?.let { type ->
-        GoogleDriveSetupDialog(
-            mode = GoogleDriveSetupMode.OPEN,
-            defaultName = defaultArchiveName,
-            onSignIn = { config -> remoteController!!.signInTo(type.id, config) },
-            onList = { config -> remoteController!!.list(type.id, config) },
-            onCreate = { _, _, _, _ -> },
-            onOpen = { config, file, password -> startOpenRemote(type, config, file, password) },
-            onDismiss = { openRemoteType = null },
         )
     }
 }

@@ -18,9 +18,11 @@ import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.createImportEngine
 import com.moneymanager.di.database.toApplication
 import com.moneymanager.importengineapi.EditingLockedException
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncResult
 import com.moneymanager.ui.AppStartupHost
-import com.moneymanager.ui.components.DatabaseStartupProgressScreen
+import com.moneymanager.ui.CloseDatabaseDialog
+import com.moneymanager.ui.components.DatabaseProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
 import com.moneymanager.ui.toAppServices
@@ -30,6 +32,63 @@ import kotlinx.coroutines.swing.Swing
 import org.lighthousegames.logging.logging
 
 private val logger = logging()
+
+/** The defaults computed for the close dialog of a cloud-backed database. */
+private data class CloseDecision(
+    val remoteName: String,
+    val localChanged: Boolean,
+    val needsPassword: Boolean,
+)
+
+/**
+ * Applies the user's close choices for a cloud-backed database: optionally arms a session (when the
+ * database was opened straight from a kept local copy, [password] is required) and uploads, then
+ * closes the connection and — only when the user chose not to keep the local copy AND the remote is
+ * up to date — deletes the local working copy. The local copy is never dropped while it holds
+ * unsynced changes.
+ */
+private suspend fun performClose(
+    database: MoneyManagerDatabaseWrapper,
+    remoteController: RemoteDatabaseController,
+    upload: Boolean,
+    keepLocal: Boolean,
+    password: String?,
+    localChanged: Boolean,
+    onProgress: (DatabaseInitializationProgress) -> Unit,
+) {
+    // When no upload is requested the remote is "current" only if nothing changed locally.
+    var remoteCurrent = !localChanged
+    if (upload) {
+        onProgress(DatabaseInitializationProgress("Checking for changes…", 0, 100))
+        val ready =
+            remoteController.hasActiveSession() ||
+                (password != null && runCatching { remoteController.resume(password) }.getOrDefault(false))
+        remoteCurrent =
+            if (ready) {
+                // Guarded push: if another device pushed since our last sync the upload is refused
+                // (BLOCKED) rather than clobbering it — then we keep the local copy.
+                runCatching {
+                    remoteController.syncNow(database, rebuildViews = false) { progress ->
+                        onProgress(DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100))
+                    }
+                }.onFailure { logger.error(it) { "Failed to sync database on close" } }
+                    .getOrNull() == SyncResult.UPLOADED
+            } else {
+                logger.warn { "Could not arm cloud session on close (wrong password?); keeping local copy" }
+                false
+            }
+    }
+    onProgress(DatabaseInitializationProgress("Finishing…", 95, 100))
+    database.close()
+    when {
+        keepLocal -> Unit
+        remoteCurrent ->
+            runCatching { remoteController.deleteLocalCache() }
+                .onSuccess { logger.info { "Deleted local working copy; cloud copy is up to date" } }
+                .onFailure { logger.error(it) { "Failed to delete local database on close" } }
+        else -> logger.warn { "Kept local database despite delete request: cloud copy is not up to date" }
+    }
+}
 
 fun main() {
     logger.info { "Starting Money Manager application" }
@@ -87,50 +146,32 @@ private fun MainWindow(onExit: () -> Unit) {
     val scope = rememberCoroutineScope()
     // Non-null while the closing sync (shrink → encrypt → upload) is running; drives the progress UI.
     var closeProgress by remember { mutableStateOf<DatabaseInitializationProgress?>(null) }
+    // Non-null while the close dialog (upload / keep-local tickboxes) is shown for a cloud-backed database.
+    var closeDecision by remember { mutableStateOf<CloseDecision?>(null) }
 
     Window(
         onCloseRequest = {
             val database = openDatabase[0]
-            val hasSession = remoteController.hasActiveSession()
-            logger.info { "Window close: database=${database != null}, cloudSession=$hasSession" }
+            val cloudBacked = remoteController.activeBinding() != null
+            logger.info { "Window close: database=${database != null}, cloudBacked=$cloudBacked" }
             when {
                 closeProgress != null -> Unit // a close sync is already in progress; ignore repeat clicks
-                database == null || !hasSession -> onExit()
-                else -> {
-                    // Upload the latest database only if it changed (with a progress screen), then delete
-                    // the local working copy: when cloud storage is in use only the encrypted remote copy
-                    // is kept between runs.
-                    closeProgress = DatabaseInitializationProgress("Checking for changes…", 0, 100)
+                closeDecision != null -> Unit // the close dialog is already open
+                database == null || !cloudBacked -> onExit()
+                else ->
+                    // Decide the dialog's defaults (is the local copy dirty? do we still need a password?)
+                    // off the close click, then show the tickbox dialog.
                     scope.launch {
-                        // If we can't tell, assume changed and upload to be safe.
+                        val baselineKnown = remoteController.hasSyncBaseline()
                         val changed = runCatching { remoteController.hasUnsyncedChanges(database) }.getOrDefault(true)
-                        val remoteUpToDate =
-                            if (changed) {
-                                // Guarded push: if another device pushed since our last sync the upload is
-                                // refused (BLOCKED) rather than clobbering it — then we keep the local copy.
-                                runCatching {
-                                    remoteController.syncNow(database, rebuildViews = false) { progress ->
-                                        closeProgress =
-                                            DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100)
-                                    }
-                                }.onFailure { logger.error(it) { "Failed to sync database on close" } }
-                                    .getOrNull() == SyncResult.UPLOADED
-                            } else {
-                                logger.info { "No changes since last sync; skipping upload on close" }
-                                true
-                            }
-                        closeProgress = DatabaseInitializationProgress("Finishing…", 95, 100)
-                        database.close()
-                        if (remoteUpToDate) {
-                            runCatching { remoteController.deleteLocalCache() }
-                                .onSuccess { logger.info { "Deleted local working copy; cloud copy is up to date" } }
-                                .onFailure { logger.error(it) { "Failed to delete local database on close" } }
-                        } else {
-                            logger.warn { "Kept local database: cloud sync failed, so the local copy is the only safe copy" }
-                        }
-                        onExit()
+                        closeDecision =
+                            CloseDecision(
+                                remoteName = remoteController.activeBinding()?.remoteName ?: "cloud storage",
+                                // Assume changed when we have no baseline, so the upload is offered by default.
+                                localChanged = !baselineKnown || changed,
+                                needsPassword = !remoteController.hasActiveSession(),
+                            )
                     }
-                }
             }
         },
         title = "Money Manager",
@@ -138,8 +179,31 @@ private fun MainWindow(onExit: () -> Unit) {
     ) {
         val progress = closeProgress
         if (progress != null) {
-            DatabaseStartupProgressScreen(progress)
+            DatabaseProgressScreen(progress, title = "Closing Money Manager")
         } else {
+            closeDecision?.let { decision ->
+                val database = openDatabase[0]
+                CloseDatabaseDialog(
+                    remoteName = decision.remoteName,
+                    localChanged = decision.localChanged,
+                    needsPassword = decision.needsPassword,
+                    onCancel = { closeDecision = null },
+                    onConfirm = { upload, keepLocal, password ->
+                        closeDecision = null
+                        if (database == null) {
+                            onExit()
+                        } else {
+                            closeProgress = DatabaseInitializationProgress("Finishing…", 0, 100)
+                            scope.launch {
+                                performClose(database, remoteController, upload, keepLocal, password, decision.localChanged) {
+                                    closeProgress = it
+                                }
+                                onExit()
+                            }
+                        }
+                    },
+                )
+            }
             AppStartupHost(
                 databaseManager = databaseManager,
                 appVersion = appVersion,

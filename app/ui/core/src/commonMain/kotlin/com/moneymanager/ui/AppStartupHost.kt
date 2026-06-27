@@ -33,7 +33,7 @@ import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
-import com.moneymanager.ui.components.DatabaseStartupProgressScreen
+import com.moneymanager.ui.components.DatabaseProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.SchemaErrorDetector
@@ -96,10 +96,31 @@ fun AppStartupHost(
     var remoteUnlock by remember { mutableStateOf<RemoteUnlockState?>(null) }
 
     LaunchedEffect(Unit) {
-        // When the active database is cloud-backed its local copy was deleted on the previous close,
-        // so it must be restored from the remote — which requires the user's password first.
         val binding = remoteController?.activeBinding()
         if (binding != null) {
+            // If the working copy was kept on the previous close, open it directly: no password, no
+            // download, no network. The remote is only touched at close, and only to upload changes.
+            val cacheLocation = runCatching { dbLocationFromString(binding.localCachePath) }.getOrNull()
+            if (cacheLocation != null && databaseManager.databaseExists(cacheLocation)) {
+                val error =
+                    openAndLoad(
+                        location = cacheLocation,
+                        databaseManager = databaseManager,
+                        createAppServices = createAppServices,
+                        databaseStateUpdater = { databaseState = it },
+                        onInfoLog = onInfoLog,
+                        onErrorLog = onErrorLog,
+                    )
+                if (error == null) {
+                    // Seed the dirty baseline from the persisted binding so the close dialog can tell
+                    // whether the local copy changed since its last upload.
+                    (databaseState as? AppDatabaseState.Loaded)?.database?.let { remoteController.adoptLocalCache(it) }
+                    localSettings.putString(KEY_LAST_DATABASE, cacheLocation.toString())
+                }
+                return@LaunchedEffect
+            }
+            // No local copy (first run on this device, or the user chose not to keep it): the encrypted
+            // remote copy is all we have, so restore it — which requires the user's password first.
             remoteUnlock = RemoteUnlockState(prompt = "Unlock “${binding.remoteName}” from cloud storage")
             return@LaunchedEffect
         }
@@ -218,7 +239,7 @@ fun AppStartupHost(
                 },
             )
         }
-        is AppDatabaseState.Loading -> DatabaseStartupProgressScreen(state.progress)
+        is AppDatabaseState.Loading -> DatabaseProgressScreen(state.progress, title = "Starting Money Manager")
         is AppDatabaseState.ChoosingDatabase ->
             // The setup screen (and the Google Drive dialog it reuses) need a schema-aware scope, which
             // MoneyManagerApp only provides once a database is loaded — so provide one here too.

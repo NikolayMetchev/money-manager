@@ -59,19 +59,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         googleAuthConsentLauncher.detach()
-        // A true "close": when finishing, push any changes and drop the local working copy so only the
-        // encrypted remote copy is kept between runs.
+        // A true "close": when finishing, push any changes. The local working copy is kept by default so
+        // the next launch opens instantly and offline (it's re-downloaded only if the user later deletes
+        // it). onDestroy is non-interactive, so the desktop close dialog's tickboxes don't apply here.
         val controller = remoteController
         if (isFinishing && controller?.hasActiveSession() == true) {
-            val remoteUpToDate = ensureRemoteUpToDate()
+            ensureRemoteUpToDate()
             openDatabase?.close()
-            if (remoteUpToDate) {
-                runCatching { runBlocking { controller.deleteLocalCache() } }
-                    .onSuccess { Log.i(TAG, "Deleted local working copy; cloud copy is up to date") }
-                    .onFailure { Log.e(TAG, "Failed to delete local database on close", it) }
-            } else {
-                Log.w(TAG, "Kept local database: cloud sync failed, so the local copy is the only safe copy")
-            }
         }
         super.onDestroy()
     }
