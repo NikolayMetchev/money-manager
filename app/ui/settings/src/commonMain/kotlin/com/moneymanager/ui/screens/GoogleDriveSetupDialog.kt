@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch
 
 /**
@@ -80,6 +81,17 @@ fun GoogleDriveSetupDialog(
     val openClashValid = connected && clash != null && password.isNotEmpty()
     val openValid = connected && selected != null && password.isNotEmpty()
 
+    // Enter mirrors the currently-valid confirm action. On a name clash it defaults to the
+    // non-destructive "Open" (never the in-place Overwrite), and never triggers the sign-in step.
+    val onEnterSubmit: () -> Unit = {
+        when {
+            !connected -> Unit
+            mode == GoogleDriveSetupMode.CREATE && clash != null -> if (openClashValid) onOpen(null, clash, password)
+            mode == GoogleDriveSetupMode.CREATE -> if (createValid) onCreate(null, name, password, null)
+            else -> if (openValid) selected?.let { file -> onOpen(null, file, password) }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (mode == GoogleDriveSetupMode.CREATE) "Store in Google Drive" else "Open from Google Drive") },
@@ -99,7 +111,13 @@ fun GoogleDriveSetupDialog(
                     )
                 } else if (mode == GoogleDriveSetupMode.CREATE) {
                     Text("Connected to Google Drive.", color = MaterialTheme.colorScheme.primary)
-                    OutlinedTextField(name, { name = it }, label = { Text("Archive name") }, singleLine = true)
+                    OutlinedTextField(
+                        name,
+                        { name = it },
+                        label = { Text("Archive name") },
+                        singleLine = true,
+                        modifier = Modifier.onEnterKeyDown(onEnterSubmit),
+                    )
                     if (clash != null) {
                         Text(
                             "A database named “${clash.name}” already exists. Choose a different name, open " +
@@ -108,10 +126,10 @@ fun GoogleDriveSetupDialog(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                    PasswordField(password, { password = it }, "Password")
+                    PasswordField(password, { password = it }, "Password", onSubmit = onEnterSubmit)
                     // Confirm matters only when encrypting new content (Upload/Overwrite); it is ignored
                     // when opening the existing archive with its own password.
-                    PasswordField(confirmPassword, { confirmPassword = it }, "Confirm password")
+                    PasswordField(confirmPassword, { confirmPassword = it }, "Confirm password", onSubmit = onEnterSubmit)
                     Text(
                         if (clash != null) {
                             "Open uses the existing database's password. Overwrite replaces it and encrypts " +
@@ -132,7 +150,7 @@ fun GoogleDriveSetupDialog(
                             Text((if (selected == file) "✓ " else "") + file.name)
                         }
                     }
-                    if (selected != null) PasswordField(password, { password = it }, "Password")
+                    if (selected != null) PasswordField(password, { password = it }, "Password", onSubmit = onEnterSubmit)
                 }
 
                 if (connecting) {

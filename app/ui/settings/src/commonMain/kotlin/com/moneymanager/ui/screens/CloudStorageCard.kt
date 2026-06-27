@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
@@ -24,7 +26,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
@@ -41,6 +46,7 @@ import com.moneymanager.remotestorage.sync.SyncResult
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
@@ -491,22 +497,40 @@ private fun PasswordDialog(
     onConfirm: (String) -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
+    val submit = { if (password.isNotEmpty()) onConfirm(password) }
+    val passwordFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { passwordFocusRequester.requestFocus() } }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Enter sync password") },
-        text = { PasswordField(password, { password = it }, "Password") },
+        text = {
+            PasswordField(
+                password,
+                { password = it },
+                "Password",
+                modifier = Modifier.focusRequester(passwordFocusRequester),
+                onSubmit = submit,
+            )
+        },
         confirmButton = {
-            TextButton(onClick = { onConfirm(password) }, enabled = password.isNotEmpty()) { Text("Resume sync") }
+            TextButton(onClick = submit, enabled = password.isNotEmpty()) { Text("Resume sync") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
+/**
+ * Shared password input. When [onSubmit] is provided the field confirms the dialog on Enter (desktop /
+ * hardware keyboard) and on the soft-keyboard "Done" action (Android); the caller gates [onSubmit] on
+ * the same validity its confirm button uses.
+ */
 @Composable
 internal fun PasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
+    modifier: Modifier = Modifier,
+    onSubmit: (() -> Unit)? = null,
 ) {
     OutlinedTextField(
         value = value,
@@ -514,5 +538,8 @@ internal fun PasswordField(
         label = { Text(label) },
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
+        modifier = if (onSubmit != null) modifier.onEnterKeyDown(onSubmit) else modifier,
+        keyboardOptions = KeyboardOptions(imeAction = if (onSubmit != null) ImeAction.Done else ImeAction.Default),
+        keyboardActions = KeyboardActions(onDone = { onSubmit?.invoke() }),
     )
 }

@@ -10,7 +10,17 @@ internal class AccountDialogState(
     initialName: String,
     initialCategoryId: Long,
 ) {
-    var name by mutableStateOf(initialName)
+    private var nameBacking by mutableStateOf(initialName)
+
+    // Editing the name clears its error highlight so the red outline disappears as soon as the user
+    // starts filling in the required field.
+    var name: String
+        get() = nameBacking
+        set(value) {
+            nameBacking = value
+            nameError = false
+        }
+    var nameError by mutableStateOf(false)
     var selectedCategoryId by mutableStateOf(initialCategoryId)
     var selectedCategoryName by mutableStateOf<String?>(null)
     var categoryExpanded by mutableStateOf(false)
