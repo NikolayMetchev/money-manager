@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -20,11 +22,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Source
@@ -35,6 +41,7 @@ import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -59,6 +66,49 @@ fun CreateCategoryDialog(
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberSchemaAwareCoroutineScope()
 
+    val nameFocusRequester = remember { FocusRequester() }
+    var nameError by remember { mutableStateOf(false) }
+
+    // Focus the name field on open so the user can type immediately and Enter has a focused field to
+    // route through (the key-event handler only fires while a field inside the dialog is focused).
+    LaunchedEffect(Unit) { runCatching { nameFocusRequester.requestFocus() } }
+
+    val submit: () -> Unit = submit@{
+        if (isSaving) return@submit
+        if (name.isBlank()) {
+            errorMessage = "Category name is required"
+            nameError = true
+            nameFocusRequester.requestFocus()
+        } else {
+            isSaving = true
+            errorMessage = null
+            scope.launch {
+                try {
+                    val key = LocalCategoryKey("create")
+                    val result =
+                        importEngine.import(
+                            ImportBatch.manualEdits(
+                                categories =
+                                    listOf(
+                                        ImportCategoryIntent(
+                                            key = key,
+                                            source = source,
+                                            name = name.trim(),
+                                            parentId = selectedParentId,
+                                        ),
+                                    ),
+                            ),
+                        )
+                    onCategoryCreated(result.createdCategoryIds.getValue(key), name.trim())
+                } catch (expected: Exception) {
+                    logger.error(expected) { "Failed to create category: ${expected.message}" }
+                    errorMessage = "Failed to create category: ${expected.message}"
+                    isSaving = false
+                }
+            }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
         title = { Text("Create New Category") },
@@ -67,16 +117,23 @@ fun CreateCategoryDialog(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 8.dp)
+                        .onEnterKeyDown(submit),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = {
+                        name = it
+                        nameError = false
+                    },
                     label = { Text("Category Name") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(nameFocusRequester).onEnterKeyDown(submit),
                     singleLine = true,
                     enabled = !isSaving,
+                    isError = nameError,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
                 )
 
                 ParentCategorySelector(
@@ -100,38 +157,7 @@ fun CreateCategoryDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = {
-                    if (name.isBlank()) {
-                        errorMessage = "Category name is required"
-                    } else {
-                        isSaving = true
-                        errorMessage = null
-                        scope.launch {
-                            try {
-                                val key = LocalCategoryKey("create")
-                                val result =
-                                    importEngine.import(
-                                        ImportBatch.manualEdits(
-                                            categories =
-                                                listOf(
-                                                    ImportCategoryIntent(
-                                                        key = key,
-                                                        source = source,
-                                                        name = name.trim(),
-                                                        parentId = selectedParentId,
-                                                    ),
-                                                ),
-                                        ),
-                                    )
-                                onCategoryCreated(result.createdCategoryIds.getValue(key), name.trim())
-                            } catch (expected: Exception) {
-                                logger.error(expected) { "Failed to create category: ${expected.message}" }
-                                errorMessage = "Failed to create category: ${expected.message}"
-                                isSaving = false
-                            }
-                        }
-                    }
-                },
+                onClick = submit,
                 enabled = !isSaving,
             ) {
                 if (isSaving) {

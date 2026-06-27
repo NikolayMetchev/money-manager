@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.NewAttribute
@@ -45,6 +46,7 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.CreateCategoryDialog
 import com.moneymanager.ui.screens.transactions.EditableAttributesSection
+import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -111,6 +113,116 @@ fun EditAccountDialog(
     val scope = rememberSchemaAwareCoroutineScope()
     val importEngine = LocalImportEngine.current
 
+    val nameFocusRequester = remember { FocusRequester() }
+
+    // Focus the name field on open so Enter has a focused field to route through (the key-event handler
+    // only fires while a field inside the dialog is focused).
+    LaunchedEffect(Unit) { runCatching { nameFocusRequester.requestFocus() } }
+
+    val submit: () -> Unit = submit@{
+        if (accountState.isSaving) return@submit
+        if (accountState.name.isBlank()) {
+            accountState.errorMessage = "Account name is required"
+            accountState.nameError = true
+            nameFocusRequester.requestFocus()
+        } else {
+            accountState.isSaving = true
+            accountState.errorMessage = null
+            scope.launch {
+                try {
+                    // Determine if account fields actually changed
+                    val accountFieldsChanged =
+                        accountState.name.trim() != account.name ||
+                            accountState.selectedCategoryId != account.categoryId
+                    val updatedAccount =
+                        if (accountFieldsChanged) {
+                            account.copy(
+                                name = accountState.name.trim(),
+                                categoryId = accountState.selectedCategoryId,
+                            )
+                        } else {
+                            null
+                        }
+
+                    // Resolve attribute type IDs before the atomic update
+                    val originalIds = originalAttributeList.map { it.id }.toSet()
+                    val editableIds = editableAttributes.keys.filter { it > 0 }.toSet()
+                    val deletedAttributeIds = originalIds - editableIds
+
+                    val updatedAttributes = mutableMapOf<Long, NewAttribute>()
+                    editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
+                        val (typeName, value) = pair
+                        val original = originalAttributeList.find { it.id == id }
+                        if (original != null) {
+                            val typeChanged = original.attributeType.name != typeName
+                            val valueChanged = original.value != value
+                            if (typeChanged || valueChanged) {
+                                val typeId = importEngine.getOrCreateAttributeType(typeName.trim())
+                                updatedAttributes[id] = NewAttribute(typeId, value.trim())
+                            }
+                        }
+                    }
+
+                    val newAttributes = mutableListOf<NewAttribute>()
+                    editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
+                        val (typeName, value) = pair
+                        if (typeName.isNotBlank() && value.isNotBlank()) {
+                            val typeId = importEngine.getOrCreateAttributeType(typeName.trim())
+                            newAttributes.add(NewAttribute(typeId, value.trim()))
+                        }
+                    }
+
+                    val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
+                    val ownersToAdd = selectedOwnerIds - existingOwnerIds
+                    val ownersToRemove = existingOwnerIds - selectedOwnerIds
+
+                    // One atomic batch: the account update (one revision bump for fields +
+                    // attributes) plus the ownership add/remove rows.
+                    importEngine.import(
+                        ImportBatch.manualEdits(
+                            accounts =
+                                listOf(
+                                    ImportAccountIntent(
+                                        key = LocalAccountKey("edit"),
+                                        source = Source.Manual,
+                                        operation = ImportOperation.UPDATE,
+                                        existingId = account.id,
+                                        account = updatedAccount,
+                                        deletedAttributeIds = deletedAttributeIds,
+                                        updatedAttributes = updatedAttributes,
+                                        attributes = newAttributes,
+                                    ),
+                                ),
+                            ownerships =
+                                ownersToRemove.mapNotNull { personId ->
+                                    existingOwnerships.find { it.personId.id == personId }?.let {
+                                        ImportOwnershipIntent(
+                                            source = Source.Manual,
+                                            operation = ImportOperation.DELETE,
+                                            existingId = it.id,
+                                        )
+                                    }
+                                } +
+                                    ownersToAdd.map { personId ->
+                                        ImportOwnershipIntent(
+                                            source = Source.Manual,
+                                            existingPersonId = PersonId(personId),
+                                            account = AccountRef.Existing(account.id),
+                                        )
+                                    },
+                        ),
+                    )
+
+                    onDismiss()
+                } catch (expected: Exception) {
+                    logger.error(expected) { "Failed to update account: ${expected.message}" }
+                    accountState.errorMessage = "Failed to update account: ${expected.message}"
+                    accountState.isSaving = false
+                }
+            }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = { if (!accountState.isSaving) onDismiss() },
         title = { Text("Edit Account") },
@@ -118,7 +230,9 @@ fun EditAccountDialog(
             AccountDialogContent(
                 accountState = accountState,
                 categories = categories,
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier.verticalScroll(rememberScrollState()).onEnterKeyDown(submit),
+                nameFocusRequester = nameFocusRequester,
+                onNameSubmit = submit,
             ) {
                 AccountOwnersSection(hasPeople = people.isNotEmpty()) {
                     people.forEach { person ->
@@ -168,106 +282,7 @@ fun EditAccountDialog(
         },
         confirmButton = {
             LoadingTextButton(
-                onClick = {
-                    if (accountState.name.isBlank()) {
-                        accountState.errorMessage = "Account name is required"
-                    } else {
-                        accountState.isSaving = true
-                        accountState.errorMessage = null
-                        scope.launch {
-                            try {
-                                // Determine if account fields actually changed
-                                val accountFieldsChanged =
-                                    accountState.name.trim() != account.name ||
-                                        accountState.selectedCategoryId != account.categoryId
-                                val updatedAccount =
-                                    if (accountFieldsChanged) {
-                                        account.copy(
-                                            name = accountState.name.trim(),
-                                            categoryId = accountState.selectedCategoryId,
-                                        )
-                                    } else {
-                                        null
-                                    }
-
-                                // Resolve attribute type IDs before the atomic update
-                                val originalIds = originalAttributeList.map { it.id }.toSet()
-                                val editableIds = editableAttributes.keys.filter { it > 0 }.toSet()
-                                val deletedAttributeIds = originalIds - editableIds
-
-                                val updatedAttributes = mutableMapOf<Long, NewAttribute>()
-                                editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
-                                    val (typeName, value) = pair
-                                    val original = originalAttributeList.find { it.id == id }
-                                    if (original != null) {
-                                        val typeChanged = original.attributeType.name != typeName
-                                        val valueChanged = original.value != value
-                                        if (typeChanged || valueChanged) {
-                                            val typeId = importEngine.getOrCreateAttributeType(typeName.trim())
-                                            updatedAttributes[id] = NewAttribute(typeId, value.trim())
-                                        }
-                                    }
-                                }
-
-                                val newAttributes = mutableListOf<NewAttribute>()
-                                editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
-                                    val (typeName, value) = pair
-                                    if (typeName.isNotBlank() && value.isNotBlank()) {
-                                        val typeId = importEngine.getOrCreateAttributeType(typeName.trim())
-                                        newAttributes.add(NewAttribute(typeId, value.trim()))
-                                    }
-                                }
-
-                                val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
-                                val ownersToAdd = selectedOwnerIds - existingOwnerIds
-                                val ownersToRemove = existingOwnerIds - selectedOwnerIds
-
-                                // One atomic batch: the account update (one revision bump for fields +
-                                // attributes) plus the ownership add/remove rows.
-                                importEngine.import(
-                                    ImportBatch.manualEdits(
-                                        accounts =
-                                            listOf(
-                                                ImportAccountIntent(
-                                                    key = LocalAccountKey("edit"),
-                                                    source = Source.Manual,
-                                                    operation = ImportOperation.UPDATE,
-                                                    existingId = account.id,
-                                                    account = updatedAccount,
-                                                    deletedAttributeIds = deletedAttributeIds,
-                                                    updatedAttributes = updatedAttributes,
-                                                    attributes = newAttributes,
-                                                ),
-                                            ),
-                                        ownerships =
-                                            ownersToRemove.mapNotNull { personId ->
-                                                existingOwnerships.find { it.personId.id == personId }?.let {
-                                                    ImportOwnershipIntent(
-                                                        source = Source.Manual,
-                                                        operation = ImportOperation.DELETE,
-                                                        existingId = it.id,
-                                                    )
-                                                }
-                                            } +
-                                                ownersToAdd.map { personId ->
-                                                    ImportOwnershipIntent(
-                                                        source = Source.Manual,
-                                                        existingPersonId = PersonId(personId),
-                                                        account = AccountRef.Existing(account.id),
-                                                    )
-                                                },
-                                    ),
-                                )
-
-                                onDismiss()
-                            } catch (expected: Exception) {
-                                logger.error(expected) { "Failed to update account: ${expected.message}" }
-                                accountState.errorMessage = "Failed to update account: ${expected.message}"
-                                accountState.isSaving = false
-                            }
-                        }
-                    }
-                },
+                onClick = submit,
                 enabled = !accountState.isSaving,
                 loading = accountState.isSaving,
                 label = "Save",

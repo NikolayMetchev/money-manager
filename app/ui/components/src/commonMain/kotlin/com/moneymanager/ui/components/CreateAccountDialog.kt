@@ -18,11 +18,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
@@ -39,6 +41,7 @@ import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.CreateCategoryDialog
+import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -73,6 +76,59 @@ fun CreateAccountDialog(
     val scope = rememberSchemaAwareCoroutineScope()
     val importEngine = LocalImportEngine.current
 
+    val nameFocusRequester = remember { FocusRequester() }
+
+    // Focus the name field on open so the user can type immediately and Enter has a focused field to
+    // route through (the key-event handler only fires while a field inside the dialog is focused).
+    LaunchedEffect(Unit) { runCatching { nameFocusRequester.requestFocus() } }
+
+    val submit: () -> Unit = submit@{
+        if (accountState.isSaving) return@submit
+        if (accountState.name.isBlank()) {
+            accountState.errorMessage = "Account name is required"
+            accountState.nameError = true
+            nameFocusRequester.requestFocus()
+        } else {
+            accountState.isSaving = true
+            accountState.errorMessage = null
+            scope.launch {
+                try {
+                    val now = Clock.System.now()
+                    val key = LocalAccountKey("new-account")
+                    val result =
+                        importEngine.import(
+                            ImportBatch.manualEdits(
+                                accounts =
+                                    listOf(
+                                        ImportAccountIntent(
+                                            key = key,
+                                            source = Source.Manual,
+                                            name = accountState.name.trim(),
+                                            openingDate = now,
+                                            categoryId = accountState.selectedCategoryId,
+                                        ),
+                                    ),
+                                ownerships =
+                                    selectedOwnerIds.map { personId ->
+                                        ImportOwnershipIntent(
+                                            source = Source.Manual,
+                                            existingPersonId = PersonId(personId),
+                                            account = AccountRef.Local(key),
+                                        )
+                                    },
+                            ),
+                        )
+                    onAccountCreated?.invoke(result.createdAccountIds.getValue(key))
+                    onDismiss()
+                } catch (expected: Exception) {
+                    logger.error(expected) { "Failed to create account: ${expected.message}" }
+                    accountState.errorMessage = "Failed to create account: ${expected.message}"
+                    accountState.isSaving = false
+                }
+            }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = { if (!accountState.isSaving) onDismiss() },
         title = { Text("Create New Account") },
@@ -80,6 +136,9 @@ fun CreateAccountDialog(
             AccountDialogContent(
                 accountState = accountState,
                 categories = categories,
+                modifier = Modifier.onEnterKeyDown(submit),
+                nameFocusRequester = nameFocusRequester,
+                onNameSubmit = submit,
             ) {
                 AccountOwnersSection(hasPeople = people.isNotEmpty()) {
                     if (people.isNotEmpty()) {
@@ -164,49 +223,7 @@ fun CreateAccountDialog(
         },
         confirmButton = {
             LoadingTextButton(
-                onClick = {
-                    if (accountState.name.isBlank()) {
-                        accountState.errorMessage = "Account name is required"
-                    } else {
-                        accountState.isSaving = true
-                        accountState.errorMessage = null
-                        scope.launch {
-                            try {
-                                val now = Clock.System.now()
-                                val key = LocalAccountKey("new-account")
-                                val result =
-                                    importEngine.import(
-                                        ImportBatch.manualEdits(
-                                            accounts =
-                                                listOf(
-                                                    ImportAccountIntent(
-                                                        key = key,
-                                                        source = Source.Manual,
-                                                        name = accountState.name.trim(),
-                                                        openingDate = now,
-                                                        categoryId = accountState.selectedCategoryId,
-                                                    ),
-                                                ),
-                                            ownerships =
-                                                selectedOwnerIds.map { personId ->
-                                                    ImportOwnershipIntent(
-                                                        source = Source.Manual,
-                                                        existingPersonId = PersonId(personId),
-                                                        account = AccountRef.Local(key),
-                                                    )
-                                                },
-                                        ),
-                                    )
-                                onAccountCreated?.invoke(result.createdAccountIds.getValue(key))
-                                onDismiss()
-                            } catch (expected: Exception) {
-                                logger.error(expected) { "Failed to create account: ${expected.message}" }
-                                accountState.errorMessage = "Failed to create account: ${expected.message}"
-                                accountState.isSaving = false
-                            }
-                        }
-                    }
-                },
+                onClick = submit,
                 enabled = !accountState.isSaving,
                 loading = accountState.isSaving,
                 label = "Create",
