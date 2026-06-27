@@ -31,5 +31,5 @@ runs:
       with:
         # Gradle version sync: keep this aligned with gradle/wrapper/gradle-wrapper.properties
         # and .github/workflows/build.yml.
-        gradle-version: 9.5.0
+        gradle-version: 9.6.1
         cache-read-only: ${{ inputs.cache-read-only }}
