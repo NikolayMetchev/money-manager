@@ -116,11 +116,14 @@ fun AppStartupHost(
                     // whether the local copy changed since its last upload.
                     (databaseState as? AppDatabaseState.Loaded)?.database?.let { remoteController.adoptLocalCache(it) }
                     localSettings.putString(KEY_LAST_DATABASE, cacheLocation.toString())
+                    return@LaunchedEffect
                 }
-                return@LaunchedEffect
+                // The kept copy is unusable (corrupt/unreadable). Fall through to the remote restore below
+                // so a cloud-backed DB can still recover from the encrypted remote copy.
             }
-            // No local copy (first run on this device, or the user chose not to keep it): the encrypted
-            // remote copy is all we have, so restore it — which requires the user's password first.
+            // No (usable) local copy — first run on this device, the user chose not to keep it, or the kept
+            // copy failed to open: the encrypted remote copy is all we have, so restore it, which requires
+            // the user's password first.
             remoteUnlock = RemoteUnlockState(prompt = "Unlock “${binding.remoteName}” from cloud storage")
             return@LaunchedEffect
         }

@@ -62,9 +62,10 @@ class MainActivity : ComponentActivity() {
         // A true "close": when finishing, push any changes. The local working copy is kept by default so
         // the next launch opens instantly and offline (it's re-downloaded only if the user later deletes
         // it). onDestroy is non-interactive, so the desktop close dialog's tickboxes don't apply here.
-        val controller = remoteController
-        if (isFinishing && controller?.hasActiveSession() == true) {
-            ensureRemoteUpToDate()
+        if (isFinishing) {
+            if (remoteController?.hasActiveSession() == true) {
+                ensureRemoteUpToDate()
+            }
             openDatabase?.close()
         }
         super.onDestroy()

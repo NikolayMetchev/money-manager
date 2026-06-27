@@ -56,8 +56,7 @@ private suspend fun performClose(
     localChanged: Boolean,
     onProgress: (DatabaseInitializationProgress) -> Unit,
 ) {
-    // When no upload is requested the remote is "current" only if nothing changed locally.
-    var remoteCurrent = !localChanged
+    var remoteCurrent = false
     if (upload) {
         onProgress(DatabaseInitializationProgress("Checking for changes…", 0, 100))
         val ready =
@@ -77,6 +76,15 @@ private suspend fun performClose(
                 logger.warn { "Could not arm cloud session on close (wrong password?); keeping local copy" }
                 false
             }
+    } else if (!localChanged && !keepLocal) {
+        // About to drop the only local copy without uploading: confirm the remote archive still exists
+        // and is reachable first. A "no local changes" baseline doesn't guarantee the remote wasn't
+        // deleted externally since our last sync — without this check we'd close with no recoverable copy.
+        onProgress(DatabaseInitializationProgress("Checking cloud copy…", 0, 100))
+        remoteCurrent =
+            runCatching { remoteController.remoteArchiveSize() != null }
+                .onFailure { logger.error(it) { "Failed to verify remote copy on close; keeping local copy" } }
+                .getOrDefault(false)
     }
     onProgress(DatabaseInitializationProgress("Finishing…", 95, 100))
     database.close()
@@ -86,7 +94,7 @@ private suspend fun performClose(
             runCatching { remoteController.deleteLocalCache() }
                 .onSuccess { logger.info { "Deleted local working copy; cloud copy is up to date" } }
                 .onFailure { logger.error(it) { "Failed to delete local database on close" } }
-        else -> logger.warn { "Kept local database despite delete request: cloud copy is not up to date" }
+        else -> logger.warn { "Kept local database despite delete request: cloud copy is not up to date or unverified" }
     }
 }
 

@@ -88,7 +88,7 @@ class RemoteDatabaseController(
     }
 
     /** Writes [token] onto the persisted (and in-session) binding so it survives the next launch. */
-    private fun persistSyncedToken(token: Long) {
+    private fun persistSyncedToken(token: Long?) {
         val binding = session?.binding ?: syncService.activeBinding() ?: return
         if (binding.syncedToken == token) return
         val updated = binding.copy(syncedToken = token)
@@ -335,7 +335,10 @@ class RemoteDatabaseController(
         val result = syncService.hydrate(current.provider, current.binding, current.password, onProgress)
         recordSyncedRevision(result.revisionId)
         // Invalidate the local baseline so AppStartupHost re-captures it on the reopened database handle.
+        // Clear the persisted token too: if the app exits before the reopened DB re-baselines, a stale
+        // persisted token would otherwise make the next startup flag the freshly downloaded cache as dirty.
         syncedToken = null
+        persistSyncedToken(null)
         publish(localDirty = false, remoteChanged = false)
         return result.location
     }
