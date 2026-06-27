@@ -16,9 +16,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.util.onEnterKeyDown
 
 /**
  * A reusable currency picker component with search and inline currency creation.
@@ -47,6 +50,8 @@ fun CurrencyPicker(
     enabled: Boolean = true,
     placeholder: String = "Type to search...",
     isError: Boolean = false,
+    focusRequester: FocusRequester? = null,
+    onSubmit: (() -> Unit)? = null,
 ) {
     val currencies by currencyRepository
         .getAllCurrencies()
@@ -89,7 +94,9 @@ fun CurrencyPicker(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
+                    .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
+                    .let { if (onSubmit != null) it.onEnterKeyDown(onSubmit) else it },
             enabled = enabled,
             singleLine = true,
             isError = isError,

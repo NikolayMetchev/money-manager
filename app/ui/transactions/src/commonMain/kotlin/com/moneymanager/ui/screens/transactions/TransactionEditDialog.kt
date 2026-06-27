@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -32,6 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
@@ -59,6 +63,7 @@ import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalTime
@@ -206,6 +211,212 @@ fun TransactionEditDialog(
             }
         }
 
+    val sourceFocusRequester = remember { FocusRequester() }
+    val targetFocusRequester = remember { FocusRequester() }
+    val currencyFocusRequester = remember { FocusRequester() }
+    val amountFocusRequester = remember { FocusRequester() }
+    val descriptionFocusRequester = remember { FocusRequester() }
+    var sourceError by remember { mutableStateOf(false) }
+    var targetError by remember { mutableStateOf(false) }
+    var currencyError by remember { mutableStateOf(false) }
+    var amountError by remember { mutableStateOf(false) }
+    var descriptionError by remember { mutableStateOf(false) }
+
+    // Focus the first field on open so Enter has a focused field to route through (the key-event handler
+    // only fires while a field inside the dialog is focused).
+    LaunchedEffect(Unit) { runCatching { sourceFocusRequester.requestFocus() } }
+
+    val submit: () -> Unit = submit@{
+        if (isSaving) return@submit
+        // Flag every invalid required field so they all highlight at once (not just the first).
+        sourceError = sourceAccountId == null
+        targetError = targetAccountId == null || (sourceAccountId != null && sourceAccountId == targetAccountId)
+        currencyError = currencyId == null
+        amountError = amount.isBlank() || parsedAmount == null || parsedAmount <= BigDecimal.ZERO
+        descriptionError = description.isBlank()
+
+        when {
+            sourceError || targetError || currencyError || amountError || descriptionError -> {
+                errorMessage =
+                    when {
+                        sourceAccountId == null -> "Source account is required"
+                        targetAccountId == null -> "Target account is required"
+                        sourceAccountId == targetAccountId -> "Source and target accounts must be different"
+                        currencyId == null -> "Currency is required"
+                        amount.isBlank() -> "Amount is required"
+                        parsedAmount == null -> "Invalid amount"
+                        parsedAmount <= BigDecimal.ZERO -> "Amount must be greater than 0"
+                        else -> "Description is required"
+                    }
+                // Move the cursor to the first invalid field; the rest stay highlighted via their flags.
+                when {
+                    sourceError -> sourceFocusRequester.requestFocus()
+                    targetError -> targetFocusRequester.requestFocus()
+                    currencyError -> currencyFocusRequester.requestFocus()
+                    amountError -> amountFocusRequester.requestFocus()
+                    else -> descriptionFocusRequester.requestFocus()
+                }
+            }
+            // All fields are valid but nothing changed (edit mode) — mirror the disabled Save button.
+            !hasChanges -> return@submit
+            else -> {
+                isSaving = true
+                errorMessage = null
+                scope.launch {
+                    try {
+                        // Get the currency object from repository
+                        val currency =
+                            currencyRepository.getCurrencyById(currencyId!!).first()
+                                ?: error("Currency not found")
+
+                        val timestamp =
+                            selectedDate
+                                .atTime(selectedHour, selectedMinute, originalSecond, originalNanosecond)
+                                .toInstant(TimeZone.currentSystemDefault())
+
+                        if (transaction != null) {
+                            // EDIT MODE: Update existing transaction
+                            // Check if transfer fields actually changed
+                            val transferFieldsChanged =
+                                sourceAccountId != transaction.sourceAccountId ||
+                                    targetAccountId != transaction.targetAccountId ||
+                                    currencyId != transaction.amount.currency.id ||
+                                    parsedAmount != transaction.amount.toDisplayValue() ||
+                                    description.trim() != transaction.description ||
+                                    timestamp != transaction.timestamp
+
+                            // Build the transfer object if fields changed
+                            val updatedTransfer =
+                                if (transferFieldsChanged) {
+                                    Transfer(
+                                        id = transaction.id,
+                                        timestamp = timestamp,
+                                        description = description.trim(),
+                                        sourceAccountId = sourceAccountId!!,
+                                        targetAccountId = targetAccountId!!,
+                                        amount = Money.fromDisplayValue(parsedAmount!!, currency),
+                                    )
+                                } else {
+                                    null
+                                }
+
+                            // Build attribute change data structures
+                            val originalIds = originalAttributes.map { it.id }.toSet()
+                            val editableIds = editableAttributes.keys
+                            val deletedAttributeIds = (originalIds - editableIds).toMutableSet()
+
+                            // Build updated attributes map (id -> NewAttribute)
+                            val updatedAttributes = mutableMapOf<Long, NewAttribute>()
+                            editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
+                                val (typeName, value) = pair
+                                val original = originalAttributes.find { it.id == id }
+                                if (original != null) {
+                                    val typeChanged = original.attributeType.name != typeName
+                                    val valueChanged = original.value != value
+                                    if (typeChanged || valueChanged) {
+                                        val typeId = importEngine.getOrCreateAttributeType(typeName)
+                                        updatedAttributes[id] = NewAttribute(typeId, value)
+                                    }
+                                }
+                            }
+
+                            // Build new attributes list
+                            val newAttributes = mutableListOf<NewAttribute>()
+                            editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
+                                val (typeName, value) = pair
+                                if (typeName.isNotBlank() && value.isNotBlank()) {
+                                    val typeId = importEngine.getOrCreateAttributeType(typeName)
+                                    newAttributes.add(NewAttribute(typeId, value))
+                                }
+                            }
+
+                            // Handle the "excluded" attribute (well-known id = -1)
+                            when {
+                                isExcluded && originalExcludedAttr == null ->
+                                    newAttributes.add(NewAttribute(AttributeTypeId(-1), excludeReason))
+                                isExcluded && excludeReason != originalExcludedAttr!!.value ->
+                                    updatedAttributes[originalExcludedAttr.id] =
+                                        NewAttribute(AttributeTypeId(-1), excludeReason)
+                                !isExcluded && originalExcludedAttr != null ->
+                                    deletedAttributeIds.add(originalExcludedAttr.id)
+                            }
+
+                            // One UPDATE intent: transfer fields + attribute deltas, applied
+                            // atomically (one revision bump) by the engine.
+                            importEngine.import(
+                                ImportBatch.manualEdits(
+                                    transfers =
+                                        listOf(
+                                            ImportTransfer(
+                                                source = Source.Manual,
+                                                operation = ImportOperation.UPDATE,
+                                                existingId = transaction.id,
+                                                // Null when only attributes changed (no transfer-field update).
+                                                // When fields didn't change, updatedTransfer is null so
+                                                // from/to/timestamp/amount are all null; the engine's
+                                                // toUpdatedTransfer() then returns null (attribute-only
+                                                // update) and this "" description is never written.
+                                                fromAccount = updatedTransfer?.let { AccountRef.Existing(it.sourceAccountId) },
+                                                toAccount = updatedTransfer?.let { AccountRef.Existing(it.targetAccountId) },
+                                                timestamp = updatedTransfer?.timestamp,
+                                                description = updatedTransfer?.description ?: "",
+                                                amount = updatedTransfer?.amount,
+                                                deletedAttributeIds = deletedAttributeIds,
+                                                updatedAttributes = updatedAttributes,
+                                                attributes = newAttributes,
+                                            ),
+                                        ),
+                                ),
+                            )
+                        } else {
+                            // CREATE MODE: build attributes to save (only non-blank ones).
+                            val attributesToSave =
+                                editableAttributes
+                                    .filter { (_, pair) -> pair.first.isNotBlank() && pair.second.isNotBlank() }
+                                    .map { (_, pair) ->
+                                        val typeId = importEngine.getOrCreateAttributeType(pair.first.trim())
+                                        NewAttribute(typeId, pair.second.trim())
+                                    }.toMutableList()
+
+                            if (isExcluded) {
+                                attributesToSave.add(NewAttribute(AttributeTypeId(-1), excludeReason))
+                            }
+
+                            importEngine.import(
+                                ImportBatch.manualEdits(
+                                    transfers =
+                                        listOf(
+                                            ImportTransfer(
+                                                source = Source.Manual,
+                                                fromAccount = AccountRef.Existing(sourceAccountId!!),
+                                                toAccount = AccountRef.Existing(targetAccountId!!),
+                                                timestamp = timestamp,
+                                                description = description.trim(),
+                                                amount = Money.fromDisplayValue(parsedAmount!!, currency),
+                                                attributes = attributesToSave,
+                                            ),
+                                        ),
+                                ),
+                            )
+                        }
+
+                        maintenance.refreshMaterializedViews()
+
+                        onSaved()
+                        onDismiss()
+                    } catch (expected: Exception) {
+                        logger.error(expected) {
+                            "Failed to ${if (isEditMode) "update" else "create"} transaction: ${expected.message}"
+                        }
+                        errorMessage =
+                            "Failed to ${if (isEditMode) "update" else "create"} transaction: ${expected.message}"
+                        isSaving = false
+                    }
+                }
+            }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
         title = { Text(if (isEditMode) "Edit Transaction" else "Create New Transaction") },
@@ -215,40 +426,59 @@ fun TransactionEditDialog(
                     Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 8.dp)
+                        .onEnterKeyDown(submit),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 // Source Account Picker
                 AccountPicker(
                     selectedAccountId = sourceAccountId,
-                    onAccountSelected = { sourceAccountId = it },
+                    onAccountSelected = {
+                        sourceAccountId = it
+                        sourceError = false
+                    },
                     label = "From Account",
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     enabled = !isSaving,
                     excludeAccountId = targetAccountId,
+                    isError = sourceError,
+                    focusRequester = sourceFocusRequester,
+                    onSubmit = submit,
                 )
 
                 // Target Account Picker
                 AccountPicker(
                     selectedAccountId = targetAccountId,
-                    onAccountSelected = { targetAccountId = it },
+                    onAccountSelected = {
+                        targetAccountId = it
+                        targetError = false
+                    },
                     label = "To Account",
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     enabled = !isSaving,
                     excludeAccountId = sourceAccountId,
+                    isError = targetError,
+                    focusRequester = targetFocusRequester,
+                    onSubmit = submit,
                 )
 
                 // Currency Picker
                 CurrencyPicker(
                     selectedCurrencyId = currencyId,
-                    onCurrencySelected = { currencyId = it },
+                    onCurrencySelected = {
+                        currencyId = it
+                        currencyError = false
+                    },
                     label = "Currency",
                     currencyRepository = currencyRepository,
                     enabled = !isSaving,
+                    isError = currencyError,
+                    focusRequester = currencyFocusRequester,
+                    onSubmit = submit,
                 )
 
                 // Date and Time Pickers
@@ -278,22 +508,32 @@ fun TransactionEditDialog(
                 // Amount Input
                 OutlinedTextField(
                     value = amount,
-                    onValueChange = { amount = it },
+                    onValueChange = {
+                        amount = it
+                        amountError = false
+                    },
                     label = { Text("Amount") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth().focusRequester(amountFocusRequester).onEnterKeyDown(submit),
                     singleLine = true,
                     enabled = !isSaving,
+                    isError = amountError,
                 )
 
                 // Description Input
                 OutlinedTextField(
                     value = description,
-                    onValueChange = { description = it },
+                    onValueChange = {
+                        description = it
+                        descriptionError = false
+                    },
                     label = { Text("Description") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(descriptionFocusRequester).onEnterKeyDown(submit),
                     singleLine = true,
                     enabled = !isSaving,
+                    isError = descriptionError,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
                 )
 
                 // Excluded toggle
@@ -349,173 +589,7 @@ fun TransactionEditDialog(
         },
         confirmButton = {
             LoadingTextButton(
-                onClick = {
-                    when {
-                        sourceAccountId == null -> errorMessage = "Source account is required"
-                        targetAccountId == null -> errorMessage = "Target account is required"
-                        sourceAccountId == targetAccountId -> errorMessage = "Source and target accounts must be different"
-                        currencyId == null -> errorMessage = "Currency is required"
-                        amount.isBlank() -> errorMessage = "Amount is required"
-                        parsedAmount == null -> errorMessage = "Invalid amount"
-                        parsedAmount <= BigDecimal.ZERO -> errorMessage = "Amount must be greater than 0"
-                        description.isBlank() -> errorMessage = "Description is required"
-                        else -> {
-                            isSaving = true
-                            errorMessage = null
-                            scope.launch {
-                                try {
-                                    // Get the currency object from repository
-                                    val currency =
-                                        currencyRepository.getCurrencyById(currencyId!!).first()
-                                            ?: error("Currency not found")
-
-                                    val timestamp =
-                                        selectedDate
-                                            .atTime(selectedHour, selectedMinute, originalSecond, originalNanosecond)
-                                            .toInstant(TimeZone.currentSystemDefault())
-
-                                    if (transaction != null) {
-                                        // EDIT MODE: Update existing transaction
-                                        // Check if transfer fields actually changed
-                                        val transferFieldsChanged =
-                                            sourceAccountId != transaction.sourceAccountId ||
-                                                targetAccountId != transaction.targetAccountId ||
-                                                currencyId != transaction.amount.currency.id ||
-                                                parsedAmount != transaction.amount.toDisplayValue() ||
-                                                description.trim() != transaction.description ||
-                                                timestamp != transaction.timestamp
-
-                                        // Build the transfer object if fields changed
-                                        val updatedTransfer =
-                                            if (transferFieldsChanged) {
-                                                Transfer(
-                                                    id = transaction.id,
-                                                    timestamp = timestamp,
-                                                    description = description.trim(),
-                                                    sourceAccountId = sourceAccountId!!,
-                                                    targetAccountId = targetAccountId!!,
-                                                    amount = Money.fromDisplayValue(parsedAmount, currency),
-                                                )
-                                            } else {
-                                                null
-                                            }
-
-                                        // Build attribute change data structures
-                                        val originalIds = originalAttributes.map { it.id }.toSet()
-                                        val editableIds = editableAttributes.keys
-                                        val deletedAttributeIds = (originalIds - editableIds).toMutableSet()
-
-                                        // Build updated attributes map (id -> NewAttribute)
-                                        val updatedAttributes = mutableMapOf<Long, NewAttribute>()
-                                        editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
-                                            val (typeName, value) = pair
-                                            val original = originalAttributes.find { it.id == id }
-                                            if (original != null) {
-                                                val typeChanged = original.attributeType.name != typeName
-                                                val valueChanged = original.value != value
-                                                if (typeChanged || valueChanged) {
-                                                    val typeId = importEngine.getOrCreateAttributeType(typeName)
-                                                    updatedAttributes[id] = NewAttribute(typeId, value)
-                                                }
-                                            }
-                                        }
-
-                                        // Build new attributes list
-                                        val newAttributes = mutableListOf<NewAttribute>()
-                                        editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
-                                            val (typeName, value) = pair
-                                            if (typeName.isNotBlank() && value.isNotBlank()) {
-                                                val typeId = importEngine.getOrCreateAttributeType(typeName)
-                                                newAttributes.add(NewAttribute(typeId, value))
-                                            }
-                                        }
-
-                                        // Handle the "excluded" attribute (well-known id = -1)
-                                        when {
-                                            isExcluded && originalExcludedAttr == null ->
-                                                newAttributes.add(NewAttribute(AttributeTypeId(-1), excludeReason))
-                                            isExcluded && excludeReason != originalExcludedAttr!!.value ->
-                                                updatedAttributes[originalExcludedAttr.id] =
-                                                    NewAttribute(AttributeTypeId(-1), excludeReason)
-                                            !isExcluded && originalExcludedAttr != null ->
-                                                deletedAttributeIds.add(originalExcludedAttr.id)
-                                        }
-
-                                        // One UPDATE intent: transfer fields + attribute deltas, applied
-                                        // atomically (one revision bump) by the engine.
-                                        importEngine.import(
-                                            ImportBatch.manualEdits(
-                                                transfers =
-                                                    listOf(
-                                                        ImportTransfer(
-                                                            source = Source.Manual,
-                                                            operation = ImportOperation.UPDATE,
-                                                            existingId = transaction.id,
-                                                            // Null when only attributes changed (no transfer-field update).
-                                                            // When fields didn't change, updatedTransfer is null so
-                                                            // from/to/timestamp/amount are all null; the engine's
-                                                            // toUpdatedTransfer() then returns null (attribute-only
-                                                            // update) and this "" description is never written.
-                                                            fromAccount = updatedTransfer?.let { AccountRef.Existing(it.sourceAccountId) },
-                                                            toAccount = updatedTransfer?.let { AccountRef.Existing(it.targetAccountId) },
-                                                            timestamp = updatedTransfer?.timestamp,
-                                                            description = updatedTransfer?.description ?: "",
-                                                            amount = updatedTransfer?.amount,
-                                                            deletedAttributeIds = deletedAttributeIds,
-                                                            updatedAttributes = updatedAttributes,
-                                                            attributes = newAttributes,
-                                                        ),
-                                                    ),
-                                            ),
-                                        )
-                                    } else {
-                                        // CREATE MODE: build attributes to save (only non-blank ones).
-                                        val attributesToSave =
-                                            editableAttributes
-                                                .filter { (_, pair) -> pair.first.isNotBlank() && pair.second.isNotBlank() }
-                                                .map { (_, pair) ->
-                                                    val typeId = importEngine.getOrCreateAttributeType(pair.first.trim())
-                                                    NewAttribute(typeId, pair.second.trim())
-                                                }.toMutableList()
-
-                                        if (isExcluded) {
-                                            attributesToSave.add(NewAttribute(AttributeTypeId(-1), excludeReason))
-                                        }
-
-                                        importEngine.import(
-                                            ImportBatch.manualEdits(
-                                                transfers =
-                                                    listOf(
-                                                        ImportTransfer(
-                                                            source = Source.Manual,
-                                                            fromAccount = AccountRef.Existing(sourceAccountId!!),
-                                                            toAccount = AccountRef.Existing(targetAccountId!!),
-                                                            timestamp = timestamp,
-                                                            description = description.trim(),
-                                                            amount = Money.fromDisplayValue(parsedAmount, currency),
-                                                            attributes = attributesToSave,
-                                                        ),
-                                                    ),
-                                            ),
-                                        )
-                                    }
-
-                                    maintenance.refreshMaterializedViews()
-
-                                    onSaved()
-                                    onDismiss()
-                                } catch (expected: Exception) {
-                                    logger.error(expected) {
-                                        "Failed to ${if (isEditMode) "update" else "create"} transaction: ${expected.message}"
-                                    }
-                                    errorMessage =
-                                        "Failed to ${if (isEditMode) "update" else "create"} transaction: ${expected.message}"
-                                    isSaving = false
-                                }
-                            }
-                        }
-                    }
-                },
+                onClick = submit,
                 enabled = !isSaving && hasChanges,
                 loading = isSaving,
                 label = if (isEditMode) "Update" else "Create",
