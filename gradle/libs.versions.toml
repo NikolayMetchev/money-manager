@@ -38,7 +38,7 @@ dependency-analysis = "3.15.0"
 detekt = "2.0.0-alpha.5"
 diamondedge-logging = "2.1.1"
 gradle-doctor = "0.12.1"
-human-readable = "1.12.3"
+human-readable = "1.13.0"
 # JVM version sync: keep jvm-target and jvm-toolchain aligned with .github/actions/gradle-setup/action.yml,
 # .github/workflows/lint-format.yml, and AGENTS.md.
 jvm-target = "25"
