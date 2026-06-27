@@ -2,6 +2,8 @@ package com.moneymanager.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -14,6 +16,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseInitializationProgress
@@ -32,6 +38,7 @@ import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.SchemaErrorDetector
 import com.moneymanager.ui.screens.FirstRunDatabaseSetupScreen
+import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -417,6 +424,10 @@ private fun RemoteDatabaseUnlockDialog(
     onReconnect: () -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
+    val passwordFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(state.needsReconnect) {
+        if (!state.needsReconnect) runCatching { passwordFocusRequester.requestFocus() }
+    }
     AlertDialog(
         // Non-dismissible: the local copy was deleted on close, so the password is required to proceed.
         onDismissRequest = {},
@@ -428,12 +439,16 @@ private fun RemoteDatabaseUnlockDialog(
                     // so prompt for re-consent instead of showing the password field again.
                     Text("Reconnect to your Google account to finish restoring this database.")
                 } else {
+                    val submit = { if (password.isNotEmpty()) onUnlock(password) }
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
                         label = { Text("Password") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.focusRequester(passwordFocusRequester).onEnterKeyDown(submit),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { submit() }),
                     )
                 }
                 state.error?.let { Text(it) }

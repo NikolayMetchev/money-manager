@@ -17,14 +17,19 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Category
+import com.moneymanager.ui.util.onEnterKeyDown
 
 @Composable
 internal fun AccountDialogContent(
     accountState: AccountDialogState,
     categories: List<Category>,
     modifier: Modifier = Modifier,
+    nameFocusRequester: FocusRequester? = null,
+    onNameSubmit: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -45,6 +50,9 @@ internal fun AccountDialogContent(
             onExpandedChange = { accountState.categoryExpanded = it },
             onCategorySelected = accountState::selectCategory,
             onCreateCategoryClick = { accountState.showCreateCategoryDialog = true },
+            nameFocusRequester = nameFocusRequester,
+            nameIsError = accountState.nameError,
+            onNameSubmit = onNameSubmit,
         )
 
         content()
@@ -63,14 +71,22 @@ internal fun AccountBasicsFields(
     onExpandedChange: (Boolean) -> Unit,
     onCategorySelected: (Long) -> Unit,
     onCreateCategoryClick: () -> Unit,
+    nameFocusRequester: FocusRequester? = null,
+    nameIsError: Boolean = false,
+    onNameSubmit: (() -> Unit)? = null,
 ) {
     OutlinedTextField(
         value = name,
         onValueChange = onNameChange,
         label = { Text("Account Name") },
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .let { if (nameFocusRequester != null) it.focusRequester(nameFocusRequester) else it }
+                .let { if (onNameSubmit != null) it.onEnterKeyDown(onNameSubmit) else it },
         singleLine = true,
         enabled = !isSaving,
+        isError = nameIsError,
     )
 
     AccountCategorySelector(
