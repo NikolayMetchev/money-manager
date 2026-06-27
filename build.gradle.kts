@@ -34,17 +34,6 @@ tasks.register("lintFormat") {
     group = "formatting"
 }
 
-// TEMPORARY workaround for a DAGP 3.16.0 regression, filed upstream as
-// autonomousapps/dependency-analysis-gradle-plugin#1749. On Kotlin Multiplatform, 3.16.0 no
-// longer recognizes that commonMain project dependencies are used, so it floods every KMP module
-// with false "unused dependency" advice for commonMain project deps and matching "declare
-// directly" advice across the platform source sets (~678 lines). The pre-existing
-// kotlin-metadata-jvm override does not address it (the failure persists with the metadata read
-// successfully), and no fixed DAGP release exists yet. Until one ships, exclude project
-// dependencies from these two categories; external-library analysis is unaffected. Revert by
-// deleting this list and the two exclude loops below once #1749 is fixed.
-val dagp1749ProjectPaths = allprojects.map { it.path }.filter { it != ":" }
-
 dependencyAnalysis {
     issues {
         all {
@@ -56,12 +45,6 @@ dependencyAnalysis {
             // It is an implementation detail of kotlin("test"), not a direct dependency.
             onUsedTransitiveDependencies {
                 exclude("org.jetbrains.kotlin:kotlin-test-junit")
-                // DAGP #1749: false "declare directly" advice for commonMain project deps.
-                dagp1749ProjectPaths.forEach { exclude(it) }
-            }
-            // DAGP #1749: false "unused" advice for commonMain project deps.
-            onUnusedDependencies {
-                dagp1749ProjectPaths.forEach { exclude(it) }
             }
         }
 
