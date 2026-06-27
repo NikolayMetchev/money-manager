@@ -55,6 +55,7 @@ dependencies {
     implementation(projects.app.remotestorage.googledrive)
     implementation(projects.app.remotestorage.sync)
     implementation(projects.app.ui.core)
+    implementation(projects.app.ui.foundation)
     implementation(projects.utils.localsettings)
 }
 
