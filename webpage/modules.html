@@ -124,7 +124,7 @@
 
   <main>
     <div class="controls hidden" id="controls">
-      <input type="search" id="filter" placeholder="Filter top-level modules…" autocomplete="off">
+      <input type="search" id="filter" aria-label="Filter top-level modules" placeholder="Filter top-level modules…" autocomplete="off">
       <button id="expandAll" type="button">Expand all</button>
       <button id="collapseAll" type="button">Collapse all</button>
       <label><input type="checkbox" id="showAll"> Show all modules</label>
@@ -177,6 +177,8 @@
     // path from the root, used to stop dependency cycles (and avoid infinite nesting).
     function makeNode(module, ancestors) {
       const li = document.createElement('li');
+      // Stable label for filtering, independent of which descendants are expanded.
+      li.dataset.label = shortName(module);
       const children = deps.get(module) || [];
 
       if (ancestors.has(module)) {
@@ -228,7 +230,7 @@
     function applyFilter() {
       const q = document.getElementById('filter').value.trim().toLowerCase();
       for (const li of treeEl.querySelectorAll(':scope > ul > li')) {
-        const label = li.textContent.toLowerCase();
+        const label = (li.dataset.label || '').toLowerCase();
         li.classList.toggle('hidden', q !== '' && !label.includes(q));
       }
     }

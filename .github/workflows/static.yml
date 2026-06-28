@@ -13,6 +13,7 @@ on:
       - '.github/workflows/static.yml'
       - 'settings.gradle.kts'
       - '**/build.gradle.kts'
+      - 'gradle/libs.versions.toml'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
