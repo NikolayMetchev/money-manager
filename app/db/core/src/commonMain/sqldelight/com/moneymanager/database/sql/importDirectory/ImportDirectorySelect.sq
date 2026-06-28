@@ -6,10 +6,6 @@ SELECT * FROM import_directory ORDER BY name;
 selectById:
 SELECT * FROM import_directory WHERE id = ?;
 
--- Select an import directory by name
-selectByName:
-SELECT * FROM import_directory WHERE name = ?;
-
 -- Select all tracked files for a directory
 selectFilesForDirectory:
 SELECT * FROM import_directory_file WHERE directory_id = ? ORDER BY file_name;

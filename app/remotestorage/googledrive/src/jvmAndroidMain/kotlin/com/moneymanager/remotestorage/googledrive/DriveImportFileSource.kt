@@ -38,7 +38,7 @@ class DriveImportFileSource(
                             parameters.append("spaces", "drive")
                             parameters.append("fields", "files($FILE_FIELDS)")
                         }
-                    }.requireBody("list Google Drive folder")
+                    }.requireBody()
             json.decodeFromString<DriveFileList>(body).files.map { it.toEntry() }
         }
 
@@ -71,8 +71,8 @@ class DriveImportFileSource(
             response.body<ByteArray>()
         }
 
-    private suspend fun HttpResponse.requireBody(action: String): String {
-        if (!status.isSuccess()) throw RemoteStorageException("Failed to $action (${status.value})")
+    private suspend fun HttpResponse.requireBody(): String {
+        if (!status.isSuccess()) throw RemoteStorageException("Failed to list Google Drive folder (${status.value})")
         return bodyAsText()
     }
 
