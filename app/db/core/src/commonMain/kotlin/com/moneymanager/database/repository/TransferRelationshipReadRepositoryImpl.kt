@@ -2,7 +2,7 @@ package com.moneymanager.database.repository
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
-import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.RelationshipType
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TransferId

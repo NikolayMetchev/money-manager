@@ -2,7 +2,7 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestHeader
 import com.moneymanager.domain.model.ApiRequestHeaderId

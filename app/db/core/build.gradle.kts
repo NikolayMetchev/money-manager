@@ -2,7 +2,6 @@ plugins {
     id("moneymanager.android-convention")
     id("moneymanager.mappie-convention")
     id("moneymanager.kotlin-multiplatform-convention")
-    alias(libs.plugins.sqldelight)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -12,6 +11,8 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.mappie.api)
+                api(projects.app.db.read)
+                api(projects.app.db.write)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.utils.currency)
@@ -39,6 +40,12 @@ kotlin {
         getByName("jvmMain") {
             dependencies {
                 api(libs.kotlinx.serialization.core)
+                // sqldelight.runtime + read/write are used directly by jvmMain (JvmDatabaseManager uses
+                // the read Schema); declared here per dependency-analysis (the SQLDelight plugin that
+                // used to supply the runtime now lives in :app:db:read/:write).
+                api(libs.sqldelight.runtime)
+                api(projects.app.db.read)
+                api(projects.app.db.write)
                 api(projects.utils.currency)
 
                 implementation(libs.sqldelight.sqlite.driver)
@@ -47,14 +54,17 @@ kotlin {
 
         getByName("jvmTest") {
             dependencies {
+                implementation(libs.sqldelight.runtime)
                 implementation(projects.app.db.core)
                 implementation(projects.app.di.core)
+                implementation(projects.app.importfilesource.core)
             }
         }
 
         getByName("androidMain") {
             dependencies {
                 api(libs.kotlinx.serialization.core)
+                api(libs.sqldelight.runtime)
 
                 implementation(libs.androidx.sqlite)
                 implementation(libs.sqldelight.android.driver)
@@ -63,7 +73,9 @@ kotlin {
 
         getByName("androidHostTest") {
             dependencies {
+                implementation(libs.sqldelight.runtime)
                 implementation(projects.app.di.core)
+                implementation(projects.app.importfilesource.core)
             }
         }
 
@@ -74,6 +86,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.sqldelight.runtime)
                 implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
 
@@ -84,20 +97,6 @@ kotlin {
             kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/audit")
         }
     }
-}
-
-sqldelight {
-    databases {
-        create("MoneyManagerDatabase") {
-            packageName.set("com.moneymanager.database.sql")
-            verifyMigrations.set(false)
-            dialect(libs.sqldelight.dialect.sqlite)
-        }
-    }
-}
-
-tasks.withType<app.cash.sqldelight.gradle.VerifyMigrationTask>().configureEach {
-    enabled = false
 }
 
 // Repository tests shared via commonTest use androidx.test.InstrumentationRegistry

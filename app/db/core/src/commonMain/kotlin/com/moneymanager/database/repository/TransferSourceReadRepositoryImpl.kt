@@ -5,9 +5,9 @@ package com.moneymanager.database.repository
 import com.moneymanager.database.mapper.SourceColumns
 import com.moneymanager.database.mapper.SourceDetailColumns
 import com.moneymanager.database.mapper.buildSourceRecord
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.database.sql.entitySource.SelectAllTransferSourcesByTransaction
 import com.moneymanager.database.sql.entitySource.SelectTransferSourceByRevision
+import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TransferId

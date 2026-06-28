@@ -9,7 +9,7 @@ import com.moneymanager.database.mapper.AccountBalanceMapper
 import com.moneymanager.database.mapper.AccountRowMapper
 import com.moneymanager.database.mapper.TransferMapper
 import com.moneymanager.database.mapper.TransferMissingCompanionMapper
-import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow

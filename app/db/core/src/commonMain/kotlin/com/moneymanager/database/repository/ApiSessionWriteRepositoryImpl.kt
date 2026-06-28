@@ -2,7 +2,7 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiResponseTransactionId
@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Instant
 
 class ApiSessionWriteRepositoryImpl(
-    database: MoneyManagerDatabase,
+    database: MoneyManagerDatabaseWrapper,
     reader: ApiSessionReadRepository,
 ) : ApiSessionWriteRepository,
     ApiSessionReadRepository by reader {

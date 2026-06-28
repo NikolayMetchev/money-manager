@@ -2,8 +2,8 @@
 
 package com.moneymanager.database.repository
 
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.recordSource
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
@@ -16,7 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class CurrencyWriteRepositoryImpl(
-    private val database: MoneyManagerDatabase,
+    private val database: MoneyManagerDatabaseWrapper,
     private val deviceId: DeviceId,
     reader: CurrencyReadRepository,
 ) : CurrencyWriteRepository,

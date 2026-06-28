@@ -6,8 +6,8 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.json.ApiStrategyJsonCodec
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.database.sql.apiImportStrategy.Api_import_strategy
+import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository

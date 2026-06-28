@@ -3,11 +3,52 @@ package com.moneymanager.database
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
-import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.database.sql.read.MoneyManagerDatabase
+import com.moneymanager.database.sql.write.MoneyManagerDatabase as WriteDatabase
 
+/**
+ * Composes the read and write SQLDelight databases over a single [SqlDriver].
+ *
+ * The schema and every `*Select.sq` live in :app:db:read (generating the read [MoneyManagerDatabase]
+ * delegated below — this exposes the `*SelectQueries`). Every `*Write.sq` lives in :app:db:write
+ * (generating a separate write database in com.moneymanager.database.sql.write). Both wrap the SAME
+ * driver, so writes through [writeDb] are seen by read-side query listeners. The `*WriteQueries` are
+ * re-exposed under their original names so existing repository/seed code (`database.accountWriteQueries`,
+ * `database.accountSelectQueries`, …) compiles unchanged.
+ */
 class MoneyManagerDatabaseWrapper(
     private val driver: SqlDriver,
 ) : MoneyManagerDatabase by MoneyManagerDatabase(driver) {
+    private val writeDb = WriteDatabase(driver)
+
+    val accountAttributeWriteQueries get() = writeDb.accountAttributeWriteQueries
+    val accountMergeWriteQueries get() = writeDb.accountMergeWriteQueries
+    val accountWriteQueries get() = writeDb.accountWriteQueries
+    val apiImportStrategyWriteQueries get() = writeDb.apiImportStrategyWriteQueries
+    val apiSessionWriteQueries get() = writeDb.apiSessionWriteQueries
+    val attributeTypeWriteQueries get() = writeDb.attributeTypeWriteQueries
+    val auditTypeWriteQueries get() = writeDb.auditTypeWriteQueries
+    val categoryWriteQueries get() = writeDb.categoryWriteQueries
+    val csvAccountMappingWriteQueries get() = writeDb.csvAccountMappingWriteQueries
+    val csvImportStrategyWriteQueries get() = writeDb.csvImportStrategyWriteQueries
+    val csvImportWriteQueries get() = writeDb.csvImportWriteQueries
+    val currencyWriteQueries get() = writeDb.currencyWriteQueries
+    val deviceWriteQueries get() = writeDb.deviceWriteQueries
+    val entitySourceWriteQueries get() = writeDb.entitySourceWriteQueries
+    val importDirectoryWriteQueries get() = writeDb.importDirectoryWriteQueries
+    val maintenanceWriteQueries get() = writeDb.maintenanceWriteQueries
+    val personAttributeWriteQueries get() = writeDb.personAttributeWriteQueries
+    val personWriteQueries get() = writeDb.personWriteQueries
+    val platformWriteQueries get() = writeDb.platformWriteQueries
+    val qifImportWriteQueries get() = writeDb.qifImportWriteQueries
+    val relationshipTypeWriteQueries get() = writeDb.relationshipTypeWriteQueries
+    val settingsWriteQueries get() = writeDb.settingsWriteQueries
+    val sourceTypeWriteQueries get() = writeDb.sourceTypeWriteQueries
+    val transactionIdWriteQueries get() = writeDb.transactionIdWriteQueries
+    val transferAttributeWriteQueries get() = writeDb.transferAttributeWriteQueries
+    val transferRelationshipWriteQueries get() = writeDb.transferRelationshipWriteQueries
+    val transferWriteQueries get() = writeDb.transferWriteQueries
+
     data class DbObjectSize(
         val objectName: String,
         val pageCount: Long,

@@ -20,6 +20,7 @@ dependencies {
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
     implementation(projects.app.importengineapi)
+    implementation(projects.app.importfilesource.core)
     implementation(projects.app.model.core)
     implementation(projects.app.remotestorage.sync)
     implementation(projects.app.ui.components)

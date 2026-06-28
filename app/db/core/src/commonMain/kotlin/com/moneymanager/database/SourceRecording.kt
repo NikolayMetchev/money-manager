@@ -2,7 +2,6 @@
 
 package com.moneymanager.database
 
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
@@ -17,7 +16,7 @@ import com.moneymanager.domain.model.toSourceType
  * INSIDE their own transaction (it does not open one), immediately after inserting/updating the
  * entity, so source recording is atomic with the change and can never be forgotten.
  */
-internal fun MoneyManagerDatabase.recordSource(
+internal fun MoneyManagerDatabaseWrapper.recordSource(
     deviceId: DeviceId,
     entityType: EntityType,
     entityId: Long,

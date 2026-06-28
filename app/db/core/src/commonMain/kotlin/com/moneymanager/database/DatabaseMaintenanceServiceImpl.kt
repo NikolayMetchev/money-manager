@@ -2,7 +2,6 @@
 
 package com.moneymanager.database
 
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration
@@ -13,7 +12,7 @@ import kotlin.time.measureTime
  * using SQLDelight-generated queries.
  */
 class DatabaseMaintenanceServiceImpl(
-    database: MoneyManagerDatabase,
+    database: MoneyManagerDatabaseWrapper,
 ) : DatabaseMaintenanceService {
     private val maintenanceWriteQueries = database.maintenanceWriteQueries
     private val transferWriteQueries = database.transferWriteQueries

@@ -18,6 +18,7 @@ kotlin {
             dependencies {
                 api(kotlin("test-junit"))
                 api(projects.app.db.core)
+                api(projects.app.db.write)
                 api(projects.app.di.core)
                 api(projects.app.model.core)
 
@@ -27,6 +28,7 @@ kotlin {
         getByName("androidMain") {
             dependencies {
                 api(kotlin("test-junit"))
+                api(projects.app.db.write)
 
                 implementation(libs.androidx.test.core)
                 implementation(libs.androidx.test.monitor)
