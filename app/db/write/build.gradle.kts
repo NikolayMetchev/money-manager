@@ -2,31 +2,49 @@ plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
     alias(libs.plugins.sqldelight)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                api(libs.kotlinx.coroutines.core)
+                api(libs.sqldelight.runtime)
+                // Write repositories use read-side Mappie mappers and JSON codecs, and the wrapper exposes
+                // SqlDriver/QueryResult; the CSV read repository (raw dynamic-table access via the wrapper)
+                // lives here too and uses coroutine Flows.
+                api(projects.app.db.read)
                 // Both a normal dependency (for generated row types) AND the sqldelight dependency() below
-                // (for .sq cross-module schema resolution) are required. api, not implementation: the
-                // generated write database's public API exposes schema's row types.
+                // (for .sq cross-module schema resolution) are required.
                 api(projects.app.db.schema)
+                api(projects.app.model.core)
+
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.sqldelight.coroutines.extensions)
             }
         }
-        // dependency-analysis wants the JVM variant's use of schema declared in jvmMain too.
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.db.read)
                 api(projects.app.db.schema)
+                api(projects.app.model.core)
+
+                implementation(libs.kotlinx.serialization.core)
+            }
+        }
+        getByName("androidMain") {
+            dependencies {
+                implementation(libs.kotlinx.serialization.core)
             }
         }
     }
 }
 
-// Write side: owns every *Write.sq (DML + materialized-view refresh). Generates its own
-// MoneyManagerDatabase in com.moneymanager.database.sql.write, reusing the schema module's tables via
-// dependency(). Does NOT depend on :app:db:read. Needs SQLDelight 2.4.0+ for Gradle Isolated Projects
-// support (sqldelight#6259).
+// Write side: *Write.sq plus the write repository implementations, the MoneyManagerDatabaseWrapper
+// (composing read+write databases over one driver), source recording, and the dynamic-CSV-table helpers.
+// Generates MoneyManagerDatabase in com.moneymanager.database.sql.write. Needs SQLDelight 2.4.0+ for
+// Gradle Isolated Projects support (sqldelight#6259).
 sqldelight {
     databases {
         create("MoneyManagerDatabase") {

@@ -11,7 +11,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
  * repository (user-created strategies) and the seeder (built-in strategies) so the column/encoder list
  * lives in one place. created_at/updated_at are filled by the table's DEFAULT (current time).
  */
-internal fun CsvImportStrategyWriteQueries.insertStrategy(strategy: CsvImportStrategy) {
+fun CsvImportStrategyWriteQueries.insertStrategy(strategy: CsvImportStrategy) {
     insert(
         id = strategy.id.id.toString(),
         name = strategy.name,

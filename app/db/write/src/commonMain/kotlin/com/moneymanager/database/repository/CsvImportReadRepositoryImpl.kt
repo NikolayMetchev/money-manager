@@ -218,7 +218,7 @@ class CsvImportReadRepositoryImpl(
             columnCount = columnCount,
             columns = columns,
             deviceInfo =
-                DeviceWriteRepositoryImpl.createDeviceInfo(
+                createDeviceInfo(
                     platformName = platformName,
                     osName = osName,
                     machineName = machineName,

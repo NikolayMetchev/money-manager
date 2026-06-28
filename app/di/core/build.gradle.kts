@@ -20,6 +20,7 @@ kotlin {
             dependencies {
                 api(libs.metro.runtime)
                 api(projects.app.db.core)
+                api(projects.app.db.write)
                 api(projects.app.importengineapi)
                 api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
@@ -37,6 +38,7 @@ kotlin {
         getByName("androidMain") {
             dependencies {
                 api(libs.metro.runtime)
+                api(projects.app.db.write)
                 api(projects.app.importfilesource.core)
                 api(projects.app.remotestorage.core)
                 // api (not implementation): GoogleAccessTokenSource is a field type of the Android

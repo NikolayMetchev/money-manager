@@ -1,6 +1,5 @@
 plugins {
     id("moneymanager.android-convention")
-    id("moneymanager.mappie-convention")
     id("moneymanager.kotlin-multiplatform-convention")
     alias(libs.plugins.kotlin.serialization)
 }
@@ -10,7 +9,6 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
-                api(libs.mappie.api)
                 api(projects.app.db.read)
                 api(projects.app.db.write)
                 api(projects.app.importengineapi)
@@ -19,7 +17,6 @@ kotlin {
 
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.json)
-                implementation(libs.sqldelight.coroutines.extensions)
                 implementation(projects.app.importer)
                 implementation(projects.utils.bigdecimal)
             }
@@ -44,11 +41,12 @@ kotlin {
                 // the read Schema); declared here per dependency-analysis (the SQLDelight plugin that
                 // used to supply the runtime now lives in :app:db:read/:write).
                 api(libs.sqldelight.runtime)
-                api(projects.app.db.read)
                 api(projects.app.db.write)
                 api(projects.utils.currency)
 
                 implementation(libs.sqldelight.sqlite.driver)
+                implementation(projects.app.db.read)
+                implementation(projects.app.db.schema)
             }
         }
 
@@ -68,6 +66,7 @@ kotlin {
 
                 implementation(libs.androidx.sqlite)
                 implementation(libs.sqldelight.android.driver)
+                implementation(projects.app.db.schema)
             }
         }
 

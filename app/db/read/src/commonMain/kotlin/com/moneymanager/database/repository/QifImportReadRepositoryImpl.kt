@@ -126,7 +126,7 @@ class QifImportReadRepositoryImpl(
             unsupportedCount = unsupportedCount.toInt(),
             accountType = accountType,
             deviceInfo =
-                DeviceWriteRepositoryImpl.createDeviceInfo(
+                createDeviceInfo(
                     platformName = platformName,
                     osName = osName,
                     machineName = machineName,

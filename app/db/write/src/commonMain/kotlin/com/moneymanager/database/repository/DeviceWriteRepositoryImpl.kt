@@ -88,30 +88,4 @@ class DeviceWriteRepositoryImpl(
                 ).executeAsOne(),
         )
     }
-
-    companion object {
-        /**
-         * Creates DeviceInfo from query result columns.
-         */
-        fun createDeviceInfo(
-            platformName: String,
-            osName: String?,
-            machineName: String?,
-            deviceMake: String?,
-            deviceModel: String?,
-        ): DeviceInfo =
-            when (platformName) {
-                "JVM" ->
-                    DeviceInfo.Jvm(
-                        osName = osName ?: "Unknown",
-                        machineName = machineName ?: "Unknown",
-                    )
-                "ANDROID" ->
-                    DeviceInfo.Android(
-                        deviceMake = deviceMake ?: "Unknown",
-                        deviceModel = deviceModel ?: "Unknown",
-                    )
-                else -> throw IllegalArgumentException("Unknown platform: $platformName")
-            }
-    }
 }
