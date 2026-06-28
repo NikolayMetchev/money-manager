@@ -174,7 +174,7 @@ LIMIT :limit;
 -- Get the row position (0-indexed) of a transaction within an account's transaction list
 -- Returns the count of transactions that come BEFORE this one (i.e., have higher timestamp or same timestamp but higher id)
 getTransactionRowPosition:
-SELECT COUNT(*) AS row_position
+SELECT COUNT(*)
 FROM running_balance_materialized_view
 WHERE account_id = :accountId
   AND (timestamp > :targetTimestamp
@@ -222,12 +222,12 @@ LIMIT :limit OFFSET :offset;
 
 -- Get total count of transactions for an account
 countTransactionsByAccount:
-SELECT COUNT(*) AS count
+SELECT COUNT(*)
 FROM running_balance_materialized_view
 WHERE account_id = :accountId;
 
 countTransfersByAccount:
-SELECT COUNT(*) AS count
+SELECT COUNT(*)
 FROM transfer
 WHERE source_account_id = :accountId OR target_account_id = :accountId;
 
