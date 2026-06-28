@@ -53,6 +53,7 @@ ktlint = "14.2.0"
 ktor = "3.5.1"
 log4j = "2.26.0"
 mappie = "2.4.0-2.4.1"
+module-graph = "0.13.0"
 proguard = "7.8.2"
 metro = "1.2.1"
 mokkery = "3.4.2"
@@ -298,6 +299,7 @@ kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 mappie = { id = "tech.mappie.plugin", version.ref = "mappie" }
 metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
+module-graph = { id = "dev.iurysouza.modulegraph", version.ref = "module-graph" }
 mokkery = { id = "dev.mokkery", version.ref = "mokkery" }
 sort-dependencies = { id = "com.squareup.sort-dependencies", version.ref = "sort-dependencies" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }

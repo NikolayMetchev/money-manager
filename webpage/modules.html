@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Money Manager — Gradle module dependency tree.">
+  <title>Money Manager · Module dependency tree</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1f2328;
+      --muted: #59636e;
+      --accent: #1a7f37;
+      --border: #d1d9e0;
+      --code-bg: #f6f8fa;
+      --hover: #eef1f4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --fg: #e6edf3;
+        --muted: #9198a1;
+        --accent: #3fb950;
+        --border: #30363d;
+        --code-bg: #161b22;
+        --hover: #161b22;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 2.5rem 1.5rem 1.5rem;
+      text-align: center;
+    }
+    header h1 { margin: 0 0 0.5rem; font-size: 2rem; }
+    header p { margin: 0 auto; max-width: 42rem; color: var(--muted); }
+    header a { color: var(--accent); }
+    main { max-width: 60rem; margin: 0 auto; padding: 1.5rem; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .controls input[type="search"] {
+      flex: 1 1 14rem;
+      padding: 0.45em 0.7em;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--fg);
+      font-size: 0.95rem;
+    }
+    .controls button, .controls label {
+      padding: 0.45em 0.9em;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--fg);
+      font-size: 0.9rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .controls button:hover, .controls label:hover { border-color: var(--accent); }
+    .controls label input { margin-right: 0.4em; vertical-align: middle; }
+
+    .tree { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9rem; }
+    .tree ul { list-style: none; margin: 0; padding-left: 1.3rem; border-left: 1px solid var(--border); }
+    .tree > ul { padding-left: 0; border-left: none; }
+    .tree li { margin: 0.05rem 0; }
+
+    details > summary {
+      cursor: pointer;
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      list-style: none;
+    }
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary::before {
+      content: "▶";
+      display: inline-block;
+      width: 1em;
+      color: var(--muted);
+      font-size: 0.75em;
+      transition: transform 0.1s;
+    }
+    details[open] > summary::before { transform: rotate(90deg); }
+    summary:hover { background: var(--hover); }
+
+    .leaf { padding: 0.15em 0.4em 0.15em 1.4em; color: var(--fg); }
+    .leaf::before { content: "•"; color: var(--muted); margin-left: -1em; margin-right: 0.5em; }
+    .count { color: var(--muted); font-weight: normal; }
+    .cycle { color: #cf222e; font-style: italic; }
+    @media (prefers-color-scheme: dark) { .cycle { color: #f85149; } }
+
+    .status { color: var(--muted); padding: 2rem; text-align: center; }
+    .hidden { display: none !important; }
+    footer {
+      border-top: 1px solid var(--border);
+      margin-top: 2rem; padding: 1.5rem;
+      text-align: center; color: var(--muted); font-size: 0.9rem;
+    }
+    footer a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🌳 Module dependency tree</h1>
+    <p>
+      Expand a module to see the Gradle modules it depends on, and drill down
+      through the chain. Generated from the build with the
+      <a href="https://github.com/iurysza/module-graph">module-graph</a> plugin.
+      <a href="index.html">← Back to home</a>
+    </p>
+  </header>
+
+  <main>
+    <div class="controls hidden" id="controls">
+      <input type="search" id="filter" placeholder="Filter top-level modules…" autocomplete="off">
+      <button id="expandAll" type="button">Expand all</button>
+      <button id="collapseAll" type="button">Collapse all</button>
+      <label><input type="checkbox" id="showAll"> Show all modules</label>
+    </div>
+    <div id="status" class="status">Loading module tree…</div>
+    <div id="tree" class="tree"></div>
+  </main>
+
+  <footer>
+    Money Manager · <a href="https://github.com/NikolayMetchev/money-manager">GitHub</a>
+  </footer>
+
+  <script type="module">
+    const statusEl = document.getElementById('status');
+    const treeEl = document.getElementById('tree');
+    const controlsEl = document.getElementById('controls');
+
+    // module -> sorted list of modules it directly depends on
+    const deps = new Map();
+    // every module that has at least one incoming edge (i.e. is depended upon)
+    const depended = new Set();
+
+    function shortName(id) {
+      // ":app:ui:imports:csv" -> "app/ui/imports/csv"
+      return id.replace(/^:/, '').replace(/:/g, '/');
+    }
+
+    function parse(markdown) {
+      const edge = /^\s*(:[\w:.-]+)\s*-->\s*(:[\w:.-]+)\s*$/;
+      for (const line of markdown.split('\n')) {
+        const m = line.match(edge);
+        if (!m) continue;
+        const [, from, to] = m;
+        if (!deps.has(from)) deps.set(from, []);
+        deps.get(from).push(to);
+        depended.add(to);
+        if (!deps.has(to)) deps.set(to, []); // ensure leaves are known modules
+      }
+      for (const list of deps.values()) {
+        list.sort();
+        // de-duplicate (a module can declare the same dep in several source sets)
+        const seen = new Set();
+        for (let i = list.length - 1; i >= 0; i--) {
+          if (seen.has(list[i])) list.splice(i, 1); else seen.add(list[i]);
+        }
+      }
+    }
+
+    // Build a tree node for `module`. `ancestors` is the Set of module ids on the
+    // path from the root, used to stop dependency cycles (and avoid infinite nesting).
+    function makeNode(module, ancestors) {
+      const li = document.createElement('li');
+      const children = deps.get(module) || [];
+
+      if (ancestors.has(module)) {
+        const span = document.createElement('span');
+        span.className = 'leaf cycle';
+        span.textContent = `${shortName(module)} (cycle)`;
+        li.appendChild(span);
+        return li;
+      }
+      if (children.length === 0) {
+        const span = document.createElement('span');
+        span.className = 'leaf';
+        span.textContent = shortName(module);
+        li.appendChild(span);
+        return li;
+      }
+
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.innerHTML =
+        `${shortName(module)} <span class="count">(${children.length})</span>`;
+      details.appendChild(summary);
+
+      let built = false;
+      const ul = document.createElement('ul');
+      details.appendChild(ul);
+      const build = () => {
+        if (built) return;
+        built = true;
+        const childAncestors = new Set(ancestors).add(module);
+        for (const child of children) ul.appendChild(makeNode(child, childAncestors));
+      };
+      details.addEventListener('toggle', () => { if (details.open) build(); });
+      details._build = build; // exposed for "Expand all"
+      li.appendChild(details);
+      return li;
+    }
+
+    function render(entryOnly) {
+      treeEl.innerHTML = '';
+      const all = [...deps.keys()].sort();
+      const roots = entryOnly ? all.filter(m => !depended.has(m)) : all;
+      const ul = document.createElement('ul');
+      for (const m of roots) ul.appendChild(makeNode(m, new Set()));
+      treeEl.appendChild(ul);
+      applyFilter();
+    }
+
+    function applyFilter() {
+      const q = document.getElementById('filter').value.trim().toLowerCase();
+      for (const li of treeEl.querySelectorAll(':scope > ul > li')) {
+        const label = li.textContent.toLowerCase();
+        li.classList.toggle('hidden', q !== '' && !label.includes(q));
+      }
+    }
+
+    function expandAll() {
+      // Opening a node lazily builds its children, so loop until nothing new opens.
+      for (let pass = 0; pass < 64; pass++) {
+        const closed = treeEl.querySelectorAll('details:not([open])');
+        if (closed.length === 0) break;
+        closed.forEach(d => { if (d._build) d._build(); d.open = true; });
+      }
+    }
+
+    function collapseAll() {
+      treeEl.querySelectorAll('details[open]').forEach(d => { d.open = false; });
+    }
+
+    try {
+      const res = await fetch('modules-graph.md', { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      parse(await res.text());
+      if (deps.size === 0) throw new Error('No module edges found in modules-graph.md');
+
+      // Default to only the top-level modules (the entry points nothing depends on)
+      // as roots; "Show all modules" lists every module at the top level instead.
+      render(true);
+      statusEl.classList.add('hidden');
+      controlsEl.classList.remove('hidden');
+
+      document.getElementById('filter').addEventListener('input', applyFilter);
+      document.getElementById('expandAll').addEventListener('click', expandAll);
+      document.getElementById('collapseAll').addEventListener('click', collapseAll);
+      document.getElementById('showAll').addEventListener('change', (e) => {
+        render(!e.target.checked);
+      });
+    } catch (err) {
+      statusEl.textContent =
+        'Could not load the module tree. It is generated during deployment — ' +
+        'see the project on GitHub instead.';
+      console.error('Failed to render module tree:', err);
+    }
+  </script>
+</body>
+</html>
