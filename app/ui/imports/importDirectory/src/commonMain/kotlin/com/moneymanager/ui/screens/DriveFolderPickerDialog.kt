@@ -74,9 +74,8 @@ fun DriveFolderPickerDialog(
     // Keyed on the current parent so navigating elsewhere cancels an in-flight load — a slow response
     // for a previous folder can no longer land late and overwrite the children of the new one.
     LaunchedEffect(currentParentId) {
-        val parent = currentParentId
         // Home level: show the two roots without an API call.
-        if (parent == null) {
+        if (currentParentId == null) {
             children = roots
             error = null
             loading = false
@@ -86,7 +85,7 @@ fun DriveFolderPickerDialog(
         error = null
         children = null
         try {
-            children = browser.listChildFolders(null, parent)
+            children = browser.listChildFolders(null, currentParentId)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (expected: Exception) {

@@ -54,7 +54,7 @@ class CsvTableManager(
         // A zero-column file has no col_ values; insert bare rows (row_index autoincrements) rather than
         // emitting the invalid `INSERT INTO t () VALUES ()`.
         if (columnCount == 0) {
-            rows.forEach { database.execute(null, "INSERT INTO $tableName DEFAULT VALUES", 0) }
+            repeat(rows.size) { database.execute(null, "INSERT INTO $tableName DEFAULT VALUES", 0) }
             return
         }
 

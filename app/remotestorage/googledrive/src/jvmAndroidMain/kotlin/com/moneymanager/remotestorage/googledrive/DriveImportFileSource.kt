@@ -4,9 +4,9 @@ import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportSubfolder
 import com.moneymanager.remotestorage.RemoteStorageException
+import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
-import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
@@ -30,28 +30,10 @@ class DriveImportFileSource(
     override suspend fun list(): List<ImportFileEntry> =
         withContext(Dispatchers.IO) {
             val driveQuery = "'$folderId' in parents and trashed = false and mimeType != '$FOLDER_MIME_TYPE'"
-            val entries = mutableListOf<ImportFileEntry>()
-            var pageToken: String? = null
-            do {
-                val body =
-                    httpClient
-                        .get(FILES_ENDPOINT) {
-                            url {
-                                parameters.append("q", driveQuery)
-                                parameters.append("spaces", "drive")
-                                parameters.append("fields", "nextPageToken,files($FILE_FIELDS)")
-                                parameters.append("pageSize", PAGE_SIZE)
-                                // Surface Shared Drive content too (folders picked there would otherwise scan empty).
-                                parameters.append("includeItemsFromAllDrives", "true")
-                                parameters.append("supportsAllDrives", "true")
-                                pageToken?.let { parameters.append("pageToken", it) }
-                            }
-                        }.requireBody()
+            fetchAllPages(httpClient, driveQuery, "nextPageToken,files($FILE_FIELDS)") { body ->
                 val page = json.decodeFromString<DriveFileList>(body)
-                page.files.mapTo(entries) { it.toEntry() }
-                pageToken = page.nextPageToken
-            } while (pageToken != null)
-            entries
+                page.files.map { it.toEntry() } to page.nextPageToken
+            }
         }
 
     override suspend fun listSubfolders(): List<ImportSubfolder> =
@@ -82,11 +64,6 @@ class DriveImportFileSource(
             }
             response.body<ByteArray>()
         }
-
-    private suspend fun HttpResponse.requireBody(): String {
-        if (!status.isSuccess()) throw RemoteStorageException("Failed to list Google Drive folder (${status.value})")
-        return bodyAsText()
-    }
 
     private fun DriveFile.toEntry() =
         ImportFileEntry(
@@ -164,33 +141,48 @@ class DriveImportFileSource(
         private suspend fun queryFolders(
             tokenSource: GoogleAccessTokenSource,
             driveQuery: String,
-        ): List<DriveFolder> {
-            val folders = mutableListOf<DriveFolder>()
+        ): List<DriveFolder> =
+            fetchAllPages(tokenSource.httpClient, driveQuery, "nextPageToken,files(id,name)") { body ->
+                val page = json.decodeFromString<DriveFolderList>(body)
+                page.files to page.nextPageToken
+            }
+
+        /**
+         * Runs a Drive `files.list` query and follows `nextPageToken` to the end, accumulating every
+         * page's items via [decodePage] (which returns that page's items + its next-page token).
+         * `includeItemsFromAllDrives`/`supportsAllDrives` surface Shared Drive content; not using
+         * `corpora=allDrives` (it conflicts with the 'root' in parents / sharedWithMe terms).
+         */
+        private suspend fun <T> fetchAllPages(
+            client: HttpClient,
+            driveQuery: String,
+            fields: String,
+            decodePage: (String) -> Pair<List<T>, String?>,
+        ): List<T> {
+            val all = mutableListOf<T>()
             var pageToken: String? = null
             do {
                 val response =
-                    tokenSource.httpClient.get(FILES_ENDPOINT) {
+                    client.get(FILES_ENDPOINT) {
                         url {
                             parameters.append("q", driveQuery)
                             parameters.append("spaces", "drive")
-                            parameters.append("fields", "nextPageToken,files(id,name)")
+                            parameters.append("fields", fields)
                             parameters.append("orderBy", "name")
                             parameters.append("pageSize", PAGE_SIZE)
-                            // Surface Shared Drive content too (no-op for plain My Drive accounts). Not using
-                            // corpora=allDrives: it conflicts with the 'root' in parents / sharedWithMe terms.
                             parameters.append("includeItemsFromAllDrives", "true")
                             parameters.append("supportsAllDrives", "true")
                             pageToken?.let { parameters.append("pageToken", it) }
                         }
                     }
                 if (!response.status.isSuccess()) {
-                    throw RemoteStorageException("Failed to list Google Drive folders (${response.status.value})")
+                    throw RemoteStorageException("Failed to list Google Drive (${response.status.value})")
                 }
-                val page = json.decodeFromString<DriveFolderList>(response.bodyAsText())
-                folders.addAll(page.files)
-                pageToken = page.nextPageToken
+                val (items, next) = decodePage(response.bodyAsText())
+                all += items
+                pageToken = next
             } while (pageToken != null)
-            return folders
+            return all
         }
     }
 }
