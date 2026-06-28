@@ -32,8 +32,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFolder
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * A popup that navigates the user's Google Drive folder hierarchy one level at a time (like Drive
@@ -47,7 +46,6 @@ fun DriveFolderPickerDialog(
     onDismiss: () -> Unit,
     onSelected: (id: String, leafName: String, fullPath: String) -> Unit,
 ) {
-    val scope = rememberSchemaAwareCoroutineScope()
     // The two synthetic top-level roots, mirroring Drive's app: "My Drive" and "Shared with me".
     val roots =
         remember(browser) {
@@ -73,29 +71,30 @@ fun DriveFolderPickerDialog(
         if (canUseCurrent) path.lastOrNull()?.let { onSelected(it.id, it.name, pathOf(null)) }
     }
 
-    fun load() {
+    // Keyed on the current parent so navigating elsewhere cancels an in-flight load — a slow response
+    // for a previous folder can no longer land late and overwrite the children of the new one.
+    LaunchedEffect(currentParentId) {
+        val parent = currentParentId
         // Home level: show the two roots without an API call.
-        if (currentParentId == null) {
+        if (parent == null) {
             children = roots
             error = null
             loading = false
-            return
+            return@LaunchedEffect
         }
         loading = true
         error = null
         children = null
-        scope.launch {
-            try {
-                children = browser.listChildFolders(null, currentParentId)
-            } catch (expected: Exception) {
-                error = expected.message ?: "Failed to list Google Drive folders"
-            } finally {
-                loading = false
-            }
+        try {
+            children = browser.listChildFolders(null, parent)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (expected: Exception) {
+            error = expected.message ?: "Failed to list Google Drive folders"
+        } finally {
+            loading = false
         }
     }
-
-    LaunchedEffect(currentParentId) { load() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     AlertDialog(

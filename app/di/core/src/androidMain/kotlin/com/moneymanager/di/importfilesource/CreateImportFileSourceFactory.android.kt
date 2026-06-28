@@ -10,11 +10,13 @@ import com.moneymanager.localsettings.LocalSettings
 @Suppress("ktlint:standard:function-naming")
 actual fun createImportFileSourceFactory(localSettings: LocalSettings): ImportFileSourceFactory =
     object : ImportFileSourceFactory {
+        // Android reads local folders only; Drive needs the drive.readonly native auth path (not wired
+        // yet), so the UI disables download for synced GDRIVE directories rather than failing on click.
+        override fun supportsProvider(provider: ImportDirectoryProvider): Boolean = provider == ImportDirectoryProvider.LOCAL
+
         override suspend fun create(directory: ImportDirectory): ImportFileSource =
             when (directory.provider) {
                 ImportDirectoryProvider.LOCAL -> LocalFolderImportFileSource(directory.folderRef)
-                // Drive import directories need the drive.readonly scope via the native Android auth path,
-                // which is not wired yet; configure Drive directories from desktop for now.
                 ImportDirectoryProvider.GDRIVE ->
                     throw UnsupportedOperationException("Google Drive import directories are not yet supported on Android.")
             }

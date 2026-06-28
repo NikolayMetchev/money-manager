@@ -18,6 +18,7 @@ import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.qif.QifParser
 import org.lighthousegames.logging.logging
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -71,12 +72,9 @@ suspend fun scanImportDirectory(
             return@forEachIndexed
         }
         try {
+            // Always hash the content: a provider that preserves/backdates the timestamp on an edit
+            // would otherwise hide a real content change forever. The checksum below decides re-staging.
             val tracked = importDirectoryRepository.getTrackedFile(directory.id, entry.ref)
-            if (tracked != null && !entry.isNewerThan(tracked.lastModified)) {
-                unchanged++
-                return@forEachIndexed
-            }
-
             val content = fileSource.download(entry.ref).decodeToString()
             val checksum = sha256Hex(content)
             val lastModified = entry.lastModifiedInstant()
@@ -125,6 +123,8 @@ suspend fun scanImportDirectory(
                 importedAt = Clock.System.now(),
             )
             downloaded++
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (expected: Exception) {
             scanLogger.error(expected) { "Scan failed for ${entry.name} in '${directory.name}': ${expected.message}" }
             failed++
@@ -182,8 +182,3 @@ private suspend fun stageQif(
 }
 
 private fun ImportFileEntry.lastModifiedInstant(): Instant = lastModifiedEpochMs?.let(Instant::fromEpochMilliseconds) ?: Clock.System.now()
-
-private fun ImportFileEntry.isNewerThan(previous: Instant): Boolean {
-    val current = lastModifiedEpochMs ?: return true
-    return current > previous.toEpochMilliseconds()
-}

@@ -6,6 +6,8 @@ import com.moneymanager.importfilesource.ImportSubfolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileNotFoundException
+import java.io.IOException
 
 /**
  * Lists and reads files from a filesystem folder. [folderPath] is an absolute path; on JVM it is a
@@ -22,34 +24,43 @@ class LocalFolderImportFileSource(
 
     override suspend fun list(): List<ImportFileEntry> =
         withContext(Dispatchers.IO) {
-            folder
-                .listFiles()
-                ?.filter { it.isFile }
-                ?.map { file ->
+            requireListing()
+                .filter { it.isFile }
+                .map { file ->
                     ImportFileEntry(
                         ref = file.name,
                         name = file.name,
                         lastModifiedEpochMs = file.lastModified(),
                         sizeBytes = file.length(),
                     )
-                }?.sortedBy { it.name }
-                .orEmpty()
+                }.sortedBy { it.name }
         }
 
     override suspend fun listSubfolders(): List<ImportSubfolder> =
         withContext(Dispatchers.IO) {
-            folder
-                .listFiles()
-                ?.filter { it.isDirectory }
-                ?.map { ImportSubfolder(ref = it.absolutePath, name = it.name) }
-                ?.sortedBy { it.name }
-                .orEmpty()
+            requireListing()
+                .filter { it.isDirectory }
+                .map { ImportSubfolder(ref = it.absolutePath, name = it.name) }
+                .sortedBy { it.name }
         }
 
     override suspend fun download(fileRef: String): ByteArray =
         withContext(Dispatchers.IO) {
             File(folder, fileRef).readBytes()
         }
+
+    // listFiles() returns null for a missing path, a non-directory, or a permission failure — all of
+    // which must surface as an error rather than masquerade as an empty (and silently skipped) folder.
+    private fun requireListing(): Array<File> {
+        val problem =
+            when {
+                !folder.exists() -> "does not exist"
+                !folder.isDirectory -> "is not a folder"
+                else -> null
+            }
+        if (problem != null) throw FileNotFoundException("Import directory $problem: $folder")
+        return folder.listFiles() ?: throw IOException("Cannot read import directory (permission denied?): $folder")
+    }
 
     private companion object {
         fun expandTilde(path: String): String {

@@ -17,7 +17,7 @@ private fun googleDriveDefaultConfig(): String? =
     }
 
 @Suppress("ktlint:standard:function-naming")
-actual fun createDriveFolderBrowser(localSettings: LocalSettings): DriveFolderBrowser =
+actual fun createDriveFolderBrowser(localSettings: LocalSettings): DriveFolderBrowser? =
     object : DriveFolderBrowser {
         override val rootFolderId: String = DriveImportFileSource.ROOT_FOLDER_ID
         override val sharedWithMeFolderId: String = DriveImportFileSource.SHARED_WITH_ME_FOLDER_ID

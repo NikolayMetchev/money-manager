@@ -30,16 +30,28 @@ class DriveImportFileSource(
     override suspend fun list(): List<ImportFileEntry> =
         withContext(Dispatchers.IO) {
             val driveQuery = "'$folderId' in parents and trashed = false and mimeType != '$FOLDER_MIME_TYPE'"
-            val body =
-                httpClient
-                    .get(FILES_ENDPOINT) {
-                        url {
-                            parameters.append("q", driveQuery)
-                            parameters.append("spaces", "drive")
-                            parameters.append("fields", "files($FILE_FIELDS)")
-                        }
-                    }.requireBody()
-            json.decodeFromString<DriveFileList>(body).files.map { it.toEntry() }
+            val entries = mutableListOf<ImportFileEntry>()
+            var pageToken: String? = null
+            do {
+                val body =
+                    httpClient
+                        .get(FILES_ENDPOINT) {
+                            url {
+                                parameters.append("q", driveQuery)
+                                parameters.append("spaces", "drive")
+                                parameters.append("fields", "nextPageToken,files($FILE_FIELDS)")
+                                parameters.append("pageSize", PAGE_SIZE)
+                                // Surface Shared Drive content too (folders picked there would otherwise scan empty).
+                                parameters.append("includeItemsFromAllDrives", "true")
+                                parameters.append("supportsAllDrives", "true")
+                                pageToken?.let { parameters.append("pageToken", it) }
+                            }
+                        }.requireBody()
+                val page = json.decodeFromString<DriveFileList>(body)
+                page.files.mapTo(entries) { it.toEntry() }
+                pageToken = page.nextPageToken
+            } while (pageToken != null)
+            entries
         }
 
     override suspend fun listSubfolders(): List<ImportSubfolder> =
@@ -95,6 +107,7 @@ class DriveImportFileSource(
     @Serializable
     private data class DriveFileList(
         val files: List<DriveFile> = emptyList(),
+        val nextPageToken: String? = null,
     )
 
     companion object {
@@ -102,6 +115,7 @@ class DriveImportFileSource(
         private const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
         private const val FILE_FIELDS = "id,name,size,modifiedTime"
         private const val HTTP_FORBIDDEN = 403
+        private const val PAGE_SIZE = "1000"
         private val json = JsonFormat { ignoreUnknownKeys = true }
 
         /** A Drive folder the user can pick as an import directory. */
@@ -114,6 +128,7 @@ class DriveImportFileSource(
         @Serializable
         private data class DriveFolderList(
             val files: List<DriveFolder> = emptyList(),
+            val nextPageToken: String? = null,
         )
 
         /** The My Drive root alias, used as the starting parent for navigation under "My Drive". */
@@ -150,23 +165,32 @@ class DriveImportFileSource(
             tokenSource: GoogleAccessTokenSource,
             driveQuery: String,
         ): List<DriveFolder> {
-            val response =
-                tokenSource.httpClient.get(FILES_ENDPOINT) {
-                    url {
-                        parameters.append("q", driveQuery)
-                        parameters.append("spaces", "drive")
-                        parameters.append("fields", "files(id,name)")
-                        parameters.append("orderBy", "name")
-                        // Surface Shared Drive content too (no-op for plain My Drive accounts). Not using
-                        // corpora=allDrives: it conflicts with the 'root' in parents / sharedWithMe terms.
-                        parameters.append("includeItemsFromAllDrives", "true")
-                        parameters.append("supportsAllDrives", "true")
+            val folders = mutableListOf<DriveFolder>()
+            var pageToken: String? = null
+            do {
+                val response =
+                    tokenSource.httpClient.get(FILES_ENDPOINT) {
+                        url {
+                            parameters.append("q", driveQuery)
+                            parameters.append("spaces", "drive")
+                            parameters.append("fields", "nextPageToken,files(id,name)")
+                            parameters.append("orderBy", "name")
+                            parameters.append("pageSize", PAGE_SIZE)
+                            // Surface Shared Drive content too (no-op for plain My Drive accounts). Not using
+                            // corpora=allDrives: it conflicts with the 'root' in parents / sharedWithMe terms.
+                            parameters.append("includeItemsFromAllDrives", "true")
+                            parameters.append("supportsAllDrives", "true")
+                            pageToken?.let { parameters.append("pageToken", it) }
+                        }
                     }
+                if (!response.status.isSuccess()) {
+                    throw RemoteStorageException("Failed to list Google Drive folders (${response.status.value})")
                 }
-            if (!response.status.isSuccess()) {
-                throw RemoteStorageException("Failed to list Google Drive folders (${response.status.value})")
-            }
-            return json.decodeFromString<DriveFolderList>(response.bodyAsText()).files
+                val page = json.decodeFromString<DriveFolderList>(response.bodyAsText())
+                folders.addAll(page.files)
+                pageToken = page.nextPageToken
+            } while (pageToken != null)
+            return folders
         }
     }
 }

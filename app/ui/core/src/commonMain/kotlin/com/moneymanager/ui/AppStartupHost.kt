@@ -424,38 +424,44 @@ fun AppStartupHost(
                 databaseLocation = location.toString(),
                 error = error,
                 onBackupAndCreateNew = {
-                    isRecreatingDatabase = true
-                    scope.launch {
-                        try {
-                            recreateDatabase(
-                                location = location,
-                                databaseManager = databaseManager,
-                                createAppServices = createAppServices,
-                                databaseStateUpdater = { databaseState = it },
-                                onInfoLog = onInfoLog,
-                                onErrorLog = onErrorLog,
-                                shouldBackup = true,
-                            )
-                        } finally {
-                            isRecreatingDatabase = false
+                    // Guard against a fast double-click queuing a second recreate before recomposition
+                    // hides the dialog (overlapping delete/recreate would corrupt the fresh schema).
+                    if (!isRecreatingDatabase) {
+                        isRecreatingDatabase = true
+                        scope.launch {
+                            try {
+                                recreateDatabase(
+                                    location = location,
+                                    databaseManager = databaseManager,
+                                    createAppServices = createAppServices,
+                                    databaseStateUpdater = { databaseState = it },
+                                    onInfoLog = onInfoLog,
+                                    onErrorLog = onErrorLog,
+                                    shouldBackup = true,
+                                )
+                            } finally {
+                                isRecreatingDatabase = false
+                            }
                         }
                     }
                 },
                 onDeleteAndCreateNew = {
-                    isRecreatingDatabase = true
-                    scope.launch {
-                        try {
-                            recreateDatabase(
-                                location = location,
-                                databaseManager = databaseManager,
-                                createAppServices = createAppServices,
-                                databaseStateUpdater = { databaseState = it },
-                                onInfoLog = onInfoLog,
-                                onErrorLog = onErrorLog,
-                                shouldBackup = false,
-                            )
-                        } finally {
-                            isRecreatingDatabase = false
+                    if (!isRecreatingDatabase) {
+                        isRecreatingDatabase = true
+                        scope.launch {
+                            try {
+                                recreateDatabase(
+                                    location = location,
+                                    databaseManager = databaseManager,
+                                    createAppServices = createAppServices,
+                                    databaseStateUpdater = { databaseState = it },
+                                    onInfoLog = onInfoLog,
+                                    onErrorLog = onErrorLog,
+                                    shouldBackup = false,
+                                )
+                            } finally {
+                                isRecreatingDatabase = false
+                            }
                         }
                     }
                 },

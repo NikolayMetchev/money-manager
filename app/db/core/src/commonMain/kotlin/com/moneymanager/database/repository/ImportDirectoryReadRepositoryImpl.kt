@@ -19,6 +19,7 @@ import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -54,10 +55,12 @@ class ImportDirectoryReadRepositoryImpl(
         id: ImportDirectoryId,
         fileRef: String,
     ): ImportDirectoryFile? =
-        selectQueries
-            .selectFileByRef(id.id.toString(), fileRef)
-            .executeAsOneOrNull()
-            ?.let(::toFileDomain)
+        withContext(coroutineContext) {
+            selectQueries
+                .selectFileByRef(id.id.toString(), fileRef)
+                .executeAsOneOrNull()
+                ?.let(::toFileDomain)
+        }
 
     private fun toDomain(entity: Import_directory): ImportDirectory =
         ImportDirectory(

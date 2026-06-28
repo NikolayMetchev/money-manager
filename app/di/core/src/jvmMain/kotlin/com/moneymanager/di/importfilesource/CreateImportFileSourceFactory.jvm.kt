@@ -24,6 +24,9 @@ private fun googleDriveDefaultConfig(): String? =
 @Suppress("ktlint:standard:function-naming")
 actual fun createImportFileSourceFactory(localSettings: LocalSettings): ImportFileSourceFactory =
     object : ImportFileSourceFactory {
+        // Desktop reads both local folders and Google Drive.
+        override fun supportsProvider(provider: ImportDirectoryProvider): Boolean = true
+
         override suspend fun create(directory: ImportDirectory): ImportFileSource =
             when (directory.provider) {
                 ImportDirectoryProvider.LOCAL -> LocalFolderImportFileSource(directory.folderRef)

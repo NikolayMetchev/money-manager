@@ -17,11 +17,13 @@ enum class ImportDirectoryProvider {
 }
 
 /**
- * A configured import directory: a local folder or Google Drive folder pinned to one CSV import
- * strategy. On a manual scan the app lists the folder and imports new/changed files (tracked per
- * file via [ImportDirectoryFile]).
+ * A configured import directory: a local folder or Google Drive folder. On a manual download the app
+ * lists the folder and stages new/changed importable files (.csv/.qif) into the Imports tabs, tracked
+ * per file via [ImportDirectoryFile].
  *
- * @property folderRef Local absolute path / Android tree URI, or Drive folder id (used to access it).
+ * @property folderRef Local absolute filesystem path, or Drive folder id (used to access it). LOCAL
+ *   directories are filesystem paths only — Android Storage Access Framework tree URIs are not
+ *   supported (the local backend reads via java.io.File).
  * @property displayPath Human-readable full path shown in the UI (e.g. "My Drive / Statements"); null
  *   falls back to [folderRef] (e.g. local folders, whose ref is already readable).
  * @property providerConfig Provider-specific config (e.g. Drive OAuth client JSON); null for LOCAL.

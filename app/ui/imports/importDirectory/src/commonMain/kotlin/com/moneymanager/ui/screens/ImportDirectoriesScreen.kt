@@ -90,6 +90,7 @@ fun ImportDirectoriesScreen(
 
     fun scannable(directory: ImportDirectory): Boolean =
         importFileSourceFactory != null &&
+            importFileSourceFactory.supportsProvider(directory.provider) &&
             (directory.provider != ImportDirectoryProvider.LOCAL || directory.deviceId == deviceId)
 
     // Walks [root]'s folder tree all the way down and creates a (non-top-level) import directory for

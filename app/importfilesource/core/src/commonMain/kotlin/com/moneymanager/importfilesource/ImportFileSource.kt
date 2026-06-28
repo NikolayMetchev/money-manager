@@ -1,6 +1,7 @@
 package com.moneymanager.importfilesource
 
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 
 /** A file found in an import directory. [ref] uniquely identifies the file within its folder. */
 data class ImportFileEntry(
@@ -34,6 +35,13 @@ interface ImportFileSource {
 
 /** Resolves an [ImportFileSource] for a configured [ImportDirectory] (local folder or Drive folder). */
 interface ImportFileSourceFactory {
+    /**
+     * Whether this platform can read directories backed by [provider]. Lets the UI hide/disable
+     * download for unsupported providers (e.g. Android can't yet read Google Drive) instead of
+     * offering an action that fails at runtime.
+     */
+    fun supportsProvider(provider: ImportDirectoryProvider): Boolean
+
     suspend fun create(directory: ImportDirectory): ImportFileSource
 }
 
