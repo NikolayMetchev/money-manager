@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.qif.QifImportId
 
 enum class ImportTab { DIRECTORIES, CSV, QIF, API, MANUAL }
@@ -108,6 +109,11 @@ sealed class Screen(
         val strategyId: CsvImportStrategyId,
         val strategyName: String,
     ) : Screen("CSV Strategy Audit: $strategyName")
+
+    data class ImportDirectoryAuditHistory(
+        val directoryId: ImportDirectoryId,
+        val directoryName: String,
+    ) : Screen("Import Directory Audit: $directoryName")
 
     data object ConnectApi : Screen("Connect API Account")
 

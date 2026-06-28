@@ -68,6 +68,7 @@ import com.moneymanager.ui.screens.CsvImportDetailScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.CurrencyAuditScreen
 import com.moneymanager.ui.screens.DatabaseSizeBreakdownScreen
+import com.moneymanager.ui.screens.ImportDirectoryAuditScreen
 import com.moneymanager.ui.screens.ImportsScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
@@ -502,6 +503,11 @@ fun MoneyManagerApp(
                                             onSessionClick = { session ->
                                                 navigationHistory.navigateTo(Screen.ApiSessionTraffic(session.id))
                                             },
+                                            onImportDirectoryAuditClick = { directory ->
+                                                navigationHistory.navigateTo(
+                                                    Screen.ImportDirectoryAuditHistory(directory.id, directory.name),
+                                                )
+                                            },
                                             onTransactionsImported = {
                                                 transactionRefreshTrigger++
                                             },
@@ -766,6 +772,14 @@ fun MoneyManagerApp(
                                             strategyId = screen.strategyId,
                                             auditRepository = services.audit.auditRepository,
                                             csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                            onBack = { navigationHistory.navigateBack() },
+                                        )
+                                    }
+                                    is Screen.ImportDirectoryAuditHistory -> {
+                                        ImportDirectoryAuditScreen(
+                                            directoryId = screen.directoryId,
+                                            auditRepository = services.audit.auditRepository,
+                                            importDirectoryRepository = services.imports.importDirectoryRepository,
                                             onBack = { navigationHistory.navigateBack() },
                                         )
                                     }

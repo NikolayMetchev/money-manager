@@ -281,6 +281,7 @@ class MoneyManagerDatabaseWrapper(
             "csv_import_strategy_audit",
             "csv_import_strategy_source",
             "import_directory",
+            "import_directory_audit",
             "import_directory_source",
             "import_directory_file",
             "android_metadata",

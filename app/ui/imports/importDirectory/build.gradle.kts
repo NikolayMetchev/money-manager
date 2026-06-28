@@ -16,6 +16,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(projects.app.csvimporter)
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.ui.audit)
                 implementation(projects.utils.compose.filePicker)
             }
         }

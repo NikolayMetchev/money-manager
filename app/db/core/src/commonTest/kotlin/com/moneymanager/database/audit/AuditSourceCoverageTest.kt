@@ -14,6 +14,9 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createCategory
@@ -178,6 +181,26 @@ class AuditSourceCoverageTest : DbTest() {
                 repositories.auditRepository.getAuditHistoryForCsvImportStrategy(csvStrategyId),
             ) { it.source }
             coveredTables.add("csv_import_strategy_audit")
+
+            // Import directory (dedicated source table, like the CSV strategy)
+            val directoryId =
+                repositories.importDirectoryRepository.createDirectory(
+                    ImportDirectory(
+                        id = ImportDirectoryId(Uuid.random()),
+                        name = "Coverage Directory",
+                        provider = ImportDirectoryProvider.LOCAL,
+                        folderRef = "/coverage",
+                        deviceId = repositories.deviceId,
+                        createdAt = now,
+                        updatedAt = now,
+                    ),
+                    Source.Manual,
+                )
+            assertAllHaveSource(
+                "import directory",
+                repositories.auditRepository.getAuditHistoryForImportDirectory(directoryId),
+            ) { it.source }
+            coveredTables.add("import_directory_audit")
 
             // ---------------------------------------------------------------
             // Structural check: every entity audit table in the schema must be covered above.

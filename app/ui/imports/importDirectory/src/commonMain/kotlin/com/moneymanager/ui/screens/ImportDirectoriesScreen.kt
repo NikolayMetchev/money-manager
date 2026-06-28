@@ -70,6 +70,7 @@ fun ImportDirectoriesScreen(
     importFileSourceFactory: ImportFileSourceFactory?,
     driveFolderBrowser: DriveFolderBrowser?,
     onOpenImports: (ImportTab) -> Unit = {},
+    onOpenAudit: (ImportDirectory) -> Unit = {},
 ) {
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
@@ -258,6 +259,7 @@ fun ImportDirectoriesScreen(
                         scope.launch { importEngine.updateImportDirectory(directory.copy(excluded = !directory.excluded)) }
                     },
                     onImport = onOpenImports,
+                    onAudit = { onOpenAudit(directory) },
                     onDelete = { scope.launch { importEngine.deleteImportDirectory(directory.id) } },
                 )
             }
@@ -305,6 +307,7 @@ private fun ImportDirectoryRow(
     onDownload: () -> Unit,
     onToggleExclude: () -> Unit,
     onImport: (ImportTab) -> Unit,
+    onAudit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val trackedFiles by importDirectoryRepository
@@ -378,6 +381,7 @@ private fun ImportDirectoryRow(
                     enabled = outstandingQif,
                     onClick = { onImport(ImportTab.QIF) },
                 ) { Text("QIF imports") }
+                TextButton(onClick = onAudit) { Text("History") }
                 TextButton(enabled = !isDownloading, onClick = onDelete) { Text("Delete") }
             }
         }

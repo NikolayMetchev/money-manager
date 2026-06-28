@@ -11,6 +11,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -60,6 +61,7 @@ fun ImportsScreen(
     onAddCredentialClick: () -> Unit,
     onApiStrategiesClick: () -> Unit,
     onSessionClick: (ApiSession) -> Unit,
+    onImportDirectoryAuditClick: (ImportDirectory) -> Unit,
     onTransactionsImported: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -101,6 +103,7 @@ fun ImportsScreen(
                     importFileSourceFactory = importFileSourceFactory,
                     driveFolderBrowser = driveFolderBrowser,
                     onOpenImports = onTabSelected,
+                    onOpenAudit = onImportDirectoryAuditClick,
                 )
             ImportTab.CSV ->
                 CsvImportsScreen(

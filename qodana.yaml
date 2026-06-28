@@ -234,9 +234,6 @@ exclude:
       - app/ui
   # ── Import directories feature (issue #602) ──────────────────────────────────────
   # New DB-free ImportFileSource abstraction + per-platform DI factories + scanner.
-  #   * UnusedColumn — import_directory_source is a write-only audit table (insert-only,
-  #     mirrors csv_import_strategy_source); its id/created_at columns are never SELECTed.
-  #     The import_directory columns are read via `SELECT *` and mapped in Kotlin.
   #   * UnusedReceiverParameter — ImportFileEntry/QifParseResult extension helpers DO use
   #     their receiver (lastModifiedEpochMs / records / sections); flagged only because
   #     Qodana's per-module KMP import leaves those members unresolved.
@@ -247,9 +244,6 @@ exclude:
   #   * UnusedSymbol(Local)/UnusedDeclaration — createImportFileSourceFactory /
   #     createDriveFolderBrowser expect/actuals are called from the Android app + DI,
   #     which Qodana's KMP import doesn't resolve (mirrors the RemoteStorage entries).
-  - name: UnusedColumn
-    paths:
-      - app/db/core/src/commonMain/sqldelight/com/moneymanager/database/sql/importDirectory
   - name: UnusedReceiverParameter
     paths:
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/ImportDirectoryScanner.kt
