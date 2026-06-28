@@ -1,0 +1,143 @@
+-- Triggers that schedule incremental materialized-view refresh by recording affected
+-- (account, currency) partitions into pending_materialized_view_changes.
+
+-- trigger_excluded_attribute_delete_track_changes
+CREATE TRIGGER trigger_excluded_attribute_delete_track_changes
+AFTER DELETE ON transfer_attribute
+FOR EACH ROW
+WHEN old.attribute_type_id = -1
+BEGIN
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    SELECT source_account_id, currency_id, timestamp FROM transfer WHERE id = old.transaction_id;
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = old.transaction_id)
+    WHERE account_id = (SELECT source_account_id FROM transfer WHERE id = old.transaction_id)
+      AND currency_id = (SELECT currency_id FROM transfer WHERE id = old.transaction_id)
+      AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = old.transaction_id);
+
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    SELECT target_account_id, currency_id, timestamp FROM transfer WHERE id = old.transaction_id;
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = old.transaction_id)
+    WHERE account_id = (SELECT target_account_id FROM transfer WHERE id = old.transaction_id)
+      AND currency_id = (SELECT currency_id FROM transfer WHERE id = old.transaction_id)
+      AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = old.transaction_id);
+END;
+
+-- trigger_excluded_attribute_insert_track_changes
+CREATE TRIGGER trigger_excluded_attribute_insert_track_changes
+AFTER INSERT ON transfer_attribute
+FOR EACH ROW
+WHEN new.attribute_type_id = -1
+BEGIN
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    SELECT source_account_id, currency_id, timestamp FROM transfer WHERE id = new.transaction_id;
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = new.transaction_id)
+    WHERE account_id = (SELECT source_account_id FROM transfer WHERE id = new.transaction_id)
+      AND currency_id = (SELECT currency_id FROM transfer WHERE id = new.transaction_id)
+      AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = new.transaction_id);
+
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    SELECT target_account_id, currency_id, timestamp FROM transfer WHERE id = new.transaction_id;
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = new.transaction_id)
+    WHERE account_id = (SELECT target_account_id FROM transfer WHERE id = new.transaction_id)
+      AND currency_id = (SELECT currency_id FROM transfer WHERE id = new.transaction_id)
+      AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = new.transaction_id);
+END;
+
+-- trigger_transfer_delete_track_changes
+CREATE TRIGGER trigger_transfer_delete_track_changes
+AFTER DELETE ON transfer
+FOR EACH ROW
+BEGIN
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    VALUES (old.source_account_id, old.currency_id, old.timestamp);
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = old.timestamp
+    WHERE account_id = old.source_account_id
+      AND currency_id = old.currency_id
+      AND min_timestamp > old.timestamp;
+
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    VALUES (old.target_account_id, old.currency_id, old.timestamp);
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = old.timestamp
+    WHERE account_id = old.target_account_id
+      AND currency_id = old.currency_id
+      AND min_timestamp > old.timestamp;
+END;
+
+-- trigger_transfer_insert_track_changes
+CREATE TRIGGER trigger_transfer_insert_track_changes
+AFTER INSERT ON transfer
+FOR EACH ROW
+BEGIN
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    VALUES (new.source_account_id, new.currency_id, new.timestamp);
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = new.timestamp
+    WHERE account_id = new.source_account_id
+      AND currency_id = new.currency_id
+      AND min_timestamp > new.timestamp;
+
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    VALUES (new.target_account_id, new.currency_id, new.timestamp);
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = new.timestamp
+    WHERE account_id = new.target_account_id
+      AND currency_id = new.currency_id
+      AND min_timestamp > new.timestamp;
+END;
+
+-- trigger_transfer_update_track_changes
+CREATE TRIGGER trigger_transfer_update_track_changes
+AFTER UPDATE ON transfer
+FOR EACH ROW
+BEGIN
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    VALUES (old.source_account_id, old.currency_id, MIN(old.timestamp, new.timestamp));
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = MIN(old.timestamp, new.timestamp)
+    WHERE account_id = old.source_account_id
+      AND currency_id = old.currency_id
+      AND min_timestamp > MIN(old.timestamp, new.timestamp);
+
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    VALUES (new.source_account_id, new.currency_id, MIN(old.timestamp, new.timestamp));
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = MIN(old.timestamp, new.timestamp)
+    WHERE account_id = new.source_account_id
+      AND currency_id = new.currency_id
+      AND min_timestamp > MIN(old.timestamp, new.timestamp);
+
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    VALUES (old.target_account_id, old.currency_id, MIN(old.timestamp, new.timestamp));
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = MIN(old.timestamp, new.timestamp)
+    WHERE account_id = old.target_account_id
+      AND currency_id = old.currency_id
+      AND min_timestamp > MIN(old.timestamp, new.timestamp);
+
+    INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+    VALUES (new.target_account_id, new.currency_id, MIN(old.timestamp, new.timestamp));
+
+    UPDATE pending_materialized_view_changes
+    SET min_timestamp = MIN(old.timestamp, new.timestamp)
+    WHERE account_id = new.target_account_id
+      AND currency_id = new.currency_id
+      AND min_timestamp > MIN(old.timestamp, new.timestamp);
+END;
+

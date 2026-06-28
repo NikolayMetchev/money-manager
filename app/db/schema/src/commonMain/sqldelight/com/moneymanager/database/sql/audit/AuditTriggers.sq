@@ -1,0 +1,490 @@
+-- Audit triggers: append-only history for every audited entity. Moved verbatim from
+-- DatabaseConfig (new/old lowercased for the SQLDelight parser; see sqldelight/sql-psi#771).
+
+-- trigger_account_attribute_delete_audit
+CREATE TRIGGER trigger_account_attribute_delete_audit
+AFTER DELETE ON account_attribute
+FOR EACH ROW
+WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+BEGIN
+    -- Only bump revision if NOT in creation mode
+    UPDATE account
+    SET revision_id = revision_id + 1
+    WHERE id = old.account_id
+      AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+    -- Always record the deletion in audit table (OLD value - what was deleted).
+    -- VALUES (not SELECT FROM account): on a cascade delete (e.g. account merge) the parent
+    -- account is already gone, so a join would record nothing and the deleted attribute
+    -- values would be unrecoverable. The revision falls back to the attribute's own stamped
+    -- revision_id (kept current by the insert/update triggers) when the parent revision is no
+    -- longer readable. This makes merged-away attributes reconstructable from the audit (see
+    -- unmergeAccount).
+    INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
+    VALUES (
+        CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.account_id,
+        COALESCE((SELECT revision_id FROM account WHERE id = old.account_id), old.revision_id),
+        old.attribute_type_id, old.attribute_value);
+END;
+
+-- trigger_account_attribute_insert_audit
+CREATE TRIGGER trigger_account_attribute_insert_audit
+AFTER INSERT ON account_attribute
+FOR EACH ROW
+WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+BEGIN
+    -- Only bump revision if NOT in creation mode
+    UPDATE account
+    SET revision_id = revision_id + 1
+    WHERE id = new.account_id
+      AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+    -- Always record the addition in audit table at current revision
+    INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.account_id, revision_id, new.attribute_type_id, new.attribute_value
+    FROM account WHERE id = new.account_id;
+
+    -- Stamp the attribute with the (post-bump) account revision so a later cascade delete can
+    -- record the exact revision. Re-fires this table's UPDATE trigger but its WHEN guard skips
+    -- it (attribute_value is unchanged), so there is no recursion or double audit.
+    UPDATE account_attribute
+    SET revision_id = (SELECT revision_id FROM account WHERE id = new.account_id)
+    WHERE id = new.id;
+END;
+
+-- trigger_account_attribute_update_audit
+CREATE TRIGGER trigger_account_attribute_update_audit
+AFTER UPDATE ON account_attribute
+FOR EACH ROW
+WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+  AND old.attribute_value != new.attribute_value
+BEGIN
+    -- Only bump revision if NOT in creation mode
+    UPDATE account
+    SET revision_id = revision_id + 1
+    WHERE id = new.account_id
+      AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+    -- Always record the change in audit table (OLD value - what it was before)
+    INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.account_id, revision_id, new.attribute_type_id, old.attribute_value
+    FROM account WHERE id = new.account_id;
+
+    -- Advance the attribute's stamped revision to the new value's revision (guarded re-fire).
+    UPDATE account_attribute
+    SET revision_id = (SELECT revision_id FROM account WHERE id = new.account_id)
+    WHERE id = new.id;
+END;
+
+-- trigger_account_delete_audit
+CREATE TRIGGER trigger_account_delete_audit
+AFTER DELETE ON account
+FOR EACH ROW
+BEGIN
+    INSERT INTO account_audit (audit_timestamp, audit_type_id, account_id, revision_id, name, opening_date, category_id)
+    VALUES (
+        CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+        3,
+        old.id,
+        old.revision_id + 1,
+        old.name,
+        old.opening_date,
+        old.category_id
+    );
+END;
+
+-- trigger_account_insert_audit
+CREATE TRIGGER trigger_account_insert_audit
+AFTER INSERT ON account
+FOR EACH ROW
+BEGIN
+    INSERT INTO account_audit (audit_timestamp, audit_type_id, account_id, revision_id, name, opening_date, category_id)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.name, new.opening_date, new.category_id);
+END;
+
+-- trigger_account_update_audit
+CREATE TRIGGER trigger_account_update_audit
+AFTER UPDATE ON account
+FOR EACH ROW
+BEGIN
+    INSERT INTO account_audit (audit_timestamp, audit_type_id, account_id, revision_id, name, opening_date, category_id)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.name, old.opening_date, old.category_id);
+END;
+
+-- trigger_api_import_strategy_delete_audit
+CREATE TRIGGER trigger_api_import_strategy_delete_audit
+AFTER DELETE ON api_import_strategy
+FOR EACH ROW
+BEGIN
+    INSERT INTO api_import_strategy_audit (audit_timestamp, audit_type_id, api_import_strategy_id, revision_id, name, config_json, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.name, old.config_json, old.created_at, old.updated_at);
+END;
+
+-- trigger_api_import_strategy_insert_audit
+CREATE TRIGGER trigger_api_import_strategy_insert_audit
+AFTER INSERT ON api_import_strategy
+FOR EACH ROW
+BEGIN
+    INSERT INTO api_import_strategy_audit (audit_timestamp, audit_type_id, api_import_strategy_id, revision_id, name, config_json, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.name, new.config_json, new.created_at, new.updated_at);
+END;
+
+-- trigger_api_import_strategy_update_audit
+CREATE TRIGGER trigger_api_import_strategy_update_audit
+AFTER UPDATE ON api_import_strategy
+FOR EACH ROW
+BEGIN
+    INSERT INTO api_import_strategy_audit (audit_timestamp, audit_type_id, api_import_strategy_id, revision_id, name, config_json, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.name, old.config_json, old.created_at, old.updated_at);
+END;
+
+-- trigger_attribute_delete_audit
+CREATE TRIGGER trigger_attribute_delete_audit
+AFTER DELETE ON transfer_attribute
+FOR EACH ROW
+WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+BEGIN
+    -- Only bump revision if NOT in creation mode
+    UPDATE transfer
+    SET revision_id = revision_id + 1
+    WHERE id = old.transaction_id
+      AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+    -- Always record the deletion in audit table (OLD value - what was deleted).
+    -- VALUES (not SELECT FROM transfer): on a cascade delete the parent transfer is already
+    -- gone, so a join would record nothing. The revision falls back to the attribute's own
+    -- stamped revision_id (kept current by the insert/update triggers) when the parent
+    -- revision is no longer readable.
+    INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
+    VALUES (
+        CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.transaction_id,
+        COALESCE((SELECT revision_id FROM transfer WHERE id = old.transaction_id), old.revision_id),
+        old.attribute_type_id, old.attribute_value);
+END;
+
+-- trigger_attribute_insert_audit
+CREATE TRIGGER trigger_attribute_insert_audit
+AFTER INSERT ON transfer_attribute
+FOR EACH ROW
+WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+BEGIN
+    -- Only bump revision if NOT in creation mode
+    UPDATE transfer
+    SET revision_id = revision_id + 1
+    WHERE id = new.transaction_id
+      AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+    -- Always record the addition in audit table at current revision
+    INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.transaction_id, revision_id, new.attribute_type_id, new.attribute_value
+    FROM transfer WHERE id = new.transaction_id;
+
+    -- Stamp the attribute with the (post-bump) transfer revision so a later cascade delete can
+    -- record the exact revision. Re-fires this table's UPDATE trigger but its WHEN guard skips
+    -- it (attribute_value is unchanged), so there is no recursion or double audit.
+    UPDATE transfer_attribute
+    SET revision_id = (SELECT revision_id FROM transfer WHERE id = new.transaction_id)
+    WHERE id = new.id;
+END;
+
+-- trigger_attribute_update_audit
+CREATE TRIGGER trigger_attribute_update_audit
+AFTER UPDATE ON transfer_attribute
+FOR EACH ROW
+WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+  AND old.attribute_value != new.attribute_value
+BEGIN
+    -- Only bump revision if NOT in creation mode
+    UPDATE transfer
+    SET revision_id = revision_id + 1
+    WHERE id = new.transaction_id
+      AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+    -- Always record the change in audit table (OLD value - what it was before)
+    INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.transaction_id, revision_id, new.attribute_type_id, old.attribute_value
+    FROM transfer WHERE id = new.transaction_id;
+
+    -- Advance the attribute's stamped revision to the new value's revision (guarded re-fire).
+    UPDATE transfer_attribute
+    SET revision_id = (SELECT revision_id FROM transfer WHERE id = new.transaction_id)
+    WHERE id = new.id;
+END;
+
+-- trigger_category_delete_audit
+CREATE TRIGGER trigger_category_delete_audit
+AFTER DELETE ON category
+FOR EACH ROW
+BEGIN
+    INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name, parent_id, parent_name)
+    VALUES (
+        CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+        3,
+        old.id,
+        old.revision_id,
+        old.name,
+        old.parent_id,
+        (SELECT name FROM category WHERE id = old.parent_id)
+    );
+END;
+
+-- trigger_category_insert_audit
+CREATE TRIGGER trigger_category_insert_audit
+AFTER INSERT ON category
+FOR EACH ROW
+BEGIN
+    INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name, parent_id, parent_name)
+    VALUES (
+        CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+        1,
+        new.id,
+        new.revision_id,
+        new.name,
+        new.parent_id,
+        (SELECT name FROM category WHERE id = new.parent_id)
+    );
+END;
+
+-- trigger_category_update_audit
+CREATE TRIGGER trigger_category_update_audit
+AFTER UPDATE ON category
+FOR EACH ROW
+BEGIN
+    INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name, parent_id, parent_name)
+    VALUES (
+        CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+        2,
+        old.id,
+        new.revision_id,
+        old.name,
+        old.parent_id,
+        (SELECT name FROM category WHERE id = old.parent_id)
+    );
+END;
+
+-- trigger_csv_import_strategy_delete_audit
+CREATE TRIGGER trigger_csv_import_strategy_delete_audit
+AFTER DELETE ON csv_import_strategy
+FOR EACH ROW
+BEGIN
+    INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, csv_import_strategy_id, revision_id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, row_rules_json, companion_rules_json, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.name, old.identification_columns_json, old.field_mappings_json, old.attribute_mappings_json, old.row_rules_json, old.companion_rules_json, old.created_at, old.updated_at);
+END;
+
+-- trigger_csv_import_strategy_insert_audit
+CREATE TRIGGER trigger_csv_import_strategy_insert_audit
+AFTER INSERT ON csv_import_strategy
+FOR EACH ROW
+BEGIN
+    INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, csv_import_strategy_id, revision_id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, row_rules_json, companion_rules_json, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.name, new.identification_columns_json, new.field_mappings_json, new.attribute_mappings_json, new.row_rules_json, new.companion_rules_json, new.created_at, new.updated_at);
+END;
+
+-- trigger_csv_import_strategy_update_audit
+CREATE TRIGGER trigger_csv_import_strategy_update_audit
+AFTER UPDATE ON csv_import_strategy
+FOR EACH ROW
+BEGIN
+    INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, csv_import_strategy_id, revision_id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, row_rules_json, companion_rules_json, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.name, old.identification_columns_json, old.field_mappings_json, old.attribute_mappings_json, old.row_rules_json, old.companion_rules_json, old.created_at, old.updated_at);
+END;
+
+-- trigger_currency_delete_audit
+CREATE TRIGGER trigger_currency_delete_audit
+AFTER DELETE ON currency
+FOR EACH ROW
+BEGIN
+    INSERT INTO currency_audit (audit_timestamp, audit_type_id, currency_id, revision_id, code, name, scale_factor)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.code, old.name, old.scale_factor);
+END;
+
+-- trigger_currency_insert_audit
+CREATE TRIGGER trigger_currency_insert_audit
+AFTER INSERT ON currency
+FOR EACH ROW
+BEGIN
+    INSERT INTO currency_audit (audit_timestamp, audit_type_id, currency_id, revision_id, code, name, scale_factor)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.code, new.name, new.scale_factor);
+END;
+
+-- trigger_currency_update_audit
+CREATE TRIGGER trigger_currency_update_audit
+AFTER UPDATE ON currency
+FOR EACH ROW
+BEGIN
+    INSERT INTO currency_audit (audit_timestamp, audit_type_id, currency_id, revision_id, code, name, scale_factor)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.code, old.name, old.scale_factor);
+END;
+
+-- trigger_import_directory_delete_audit
+CREATE TRIGGER trigger_import_directory_delete_audit
+AFTER DELETE ON import_directory
+FOR EACH ROW
+BEGIN
+    INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, import_directory_id, revision_id, name, provider_type, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.name, old.provider_type, old.folder_ref, old.folder_display_path, old.provider_config, old.device_id, old.top_level, old.parent_id, old.excluded, old.created_at, old.updated_at);
+END;
+
+-- trigger_import_directory_insert_audit
+CREATE TRIGGER trigger_import_directory_insert_audit
+AFTER INSERT ON import_directory
+FOR EACH ROW
+BEGIN
+    INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, import_directory_id, revision_id, name, provider_type, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.name, new.provider_type, new.folder_ref, new.folder_display_path, new.provider_config, new.device_id, new.top_level, new.parent_id, new.excluded, new.created_at, new.updated_at);
+END;
+
+-- trigger_import_directory_update_audit
+CREATE TRIGGER trigger_import_directory_update_audit
+AFTER UPDATE ON import_directory
+FOR EACH ROW
+BEGIN
+    INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, import_directory_id, revision_id, name, provider_type, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.name, old.provider_type, old.folder_ref, old.folder_display_path, old.provider_config, old.device_id, old.top_level, old.parent_id, old.excluded, old.created_at, old.updated_at);
+END;
+
+-- trigger_person_account_ownership_delete_audit
+CREATE TRIGGER trigger_person_account_ownership_delete_audit
+AFTER DELETE ON person_account_ownership
+FOR EACH ROW
+BEGIN
+    INSERT INTO person_account_ownership_audit (audit_timestamp, audit_type_id, person_account_ownership_id, revision_id, person_id, account_id)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.person_id, old.account_id);
+END;
+
+-- trigger_person_account_ownership_insert_audit
+CREATE TRIGGER trigger_person_account_ownership_insert_audit
+AFTER INSERT ON person_account_ownership
+FOR EACH ROW
+BEGIN
+    INSERT INTO person_account_ownership_audit (audit_timestamp, audit_type_id, person_account_ownership_id, revision_id, person_id, account_id)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.person_id, new.account_id);
+END;
+
+-- trigger_person_account_ownership_update_audit
+CREATE TRIGGER trigger_person_account_ownership_update_audit
+AFTER UPDATE ON person_account_ownership
+FOR EACH ROW
+BEGIN
+    INSERT INTO person_account_ownership_audit (audit_timestamp, audit_type_id, person_account_ownership_id, revision_id, person_id, account_id)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.person_id, old.account_id);
+END;
+
+-- trigger_person_attribute_delete_audit
+CREATE TRIGGER trigger_person_attribute_delete_audit
+AFTER DELETE ON person_attribute
+FOR EACH ROW
+BEGIN
+    UPDATE person
+    SET revision_id = revision_id + 1
+    WHERE id = old.person_id
+      AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+    -- VALUES (not SELECT FROM person): on a cascade delete the parent person is already gone,
+    -- so a join would record nothing. The revision falls back to the attribute's own stamped
+    -- revision_id (kept current by the insert/update triggers) when the parent revision is no
+    -- longer readable.
+    INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+    VALUES (
+        CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.person_id,
+        COALESCE((SELECT revision_id FROM person WHERE id = old.person_id), old.revision_id),
+        old.attribute_type_id, old.attribute_value);
+END;
+
+-- trigger_person_attribute_insert_audit
+CREATE TRIGGER trigger_person_attribute_insert_audit
+AFTER INSERT ON person_attribute
+FOR EACH ROW
+BEGIN
+    UPDATE person
+    SET revision_id = revision_id + 1
+    WHERE id = new.person_id
+      AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+    INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.person_id, revision_id, new.attribute_type_id, new.attribute_value
+    FROM person WHERE id = new.person_id;
+
+    -- Stamp the attribute with the (post-bump) person revision so a later cascade delete can
+    -- record the exact revision. Re-fires this table's UPDATE trigger but its WHEN guard skips
+    -- it (attribute_value is unchanged), so there is no recursion or double audit.
+    UPDATE person_attribute
+    SET revision_id = (SELECT revision_id FROM person WHERE id = new.person_id)
+    WHERE id = new.id;
+END;
+
+-- trigger_person_attribute_update_audit
+CREATE TRIGGER trigger_person_attribute_update_audit
+AFTER UPDATE ON person_attribute
+FOR EACH ROW
+WHEN old.attribute_value != new.attribute_value
+BEGIN
+    UPDATE person
+    SET revision_id = revision_id + 1
+    WHERE id = new.person_id
+      AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+    INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.person_id, revision_id, new.attribute_type_id, old.attribute_value
+    FROM person WHERE id = new.person_id;
+
+    -- Advance the attribute's stamped revision to the new value's revision (guarded re-fire).
+    UPDATE person_attribute
+    SET revision_id = (SELECT revision_id FROM person WHERE id = new.person_id)
+    WHERE id = new.id;
+END;
+
+-- trigger_person_delete_audit
+CREATE TRIGGER trigger_person_delete_audit
+AFTER DELETE ON person
+FOR EACH ROW
+BEGIN
+    INSERT INTO person_audit (audit_timestamp, audit_type_id, person_id, revision_id, first_name, middle_name, last_name)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.first_name, old.middle_name, old.last_name);
+END;
+
+-- trigger_person_insert_audit
+CREATE TRIGGER trigger_person_insert_audit
+AFTER INSERT ON person
+FOR EACH ROW
+BEGIN
+    INSERT INTO person_audit (audit_timestamp, audit_type_id, person_id, revision_id, first_name, middle_name, last_name)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.first_name, new.middle_name, new.last_name);
+END;
+
+-- trigger_person_update_audit
+CREATE TRIGGER trigger_person_update_audit
+AFTER UPDATE ON person
+FOR EACH ROW
+BEGIN
+    INSERT INTO person_audit (audit_timestamp, audit_type_id, person_id, revision_id, first_name, middle_name, last_name)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.first_name, old.middle_name, old.last_name);
+END;
+
+-- trigger_transfer_delete_audit
+CREATE TRIGGER trigger_transfer_delete_audit
+AFTER DELETE ON transfer
+FOR EACH ROW
+BEGIN
+    INSERT INTO transfer_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, timestamp, description, source_account_id, target_account_id, currency_id, amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.timestamp, old.description, old.source_account_id, old.target_account_id, old.currency_id, old.amount);
+END;
+
+-- trigger_transfer_insert_audit
+CREATE TRIGGER trigger_transfer_insert_audit
+AFTER INSERT ON transfer
+FOR EACH ROW
+BEGIN
+    INSERT INTO transfer_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, timestamp, description, source_account_id, target_account_id, currency_id, amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.timestamp, new.description, new.source_account_id, new.target_account_id, new.currency_id, new.amount);
+END;
+
+-- trigger_transfer_update_audit
+CREATE TRIGGER trigger_transfer_update_audit
+AFTER UPDATE ON transfer
+FOR EACH ROW
+BEGIN
+    INSERT INTO transfer_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, timestamp, description, source_account_id, target_account_id, currency_id, amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.timestamp, old.description, old.source_account_id, old.target_account_id, old.currency_id, old.amount);
+END;
+

@@ -34,8 +34,10 @@ class SqlFileNamingConventionTest {
     private fun sqlDirs(): List<File> {
         val candidates =
             listOf(
+                "../schema/src/commonMain/sqldelight/com/moneymanager/database/sql",
                 "../read/src/commonMain/sqldelight/com/moneymanager/database/sql",
                 "../write/src/commonMain/sqldelight/com/moneymanager/database/sql",
+                "app/db/schema/src/commonMain/sqldelight/com/moneymanager/database/sql",
                 "app/db/read/src/commonMain/sqldelight/com/moneymanager/database/sql",
                 "app/db/write/src/commonMain/sqldelight/com/moneymanager/database/sql",
             )
