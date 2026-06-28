@@ -25,10 +25,11 @@ class CsvTableManager(
         tableName: String,
         columnCount: Int,
     ) {
-        val columns = (0 until columnCount).joinToString(", ") { "col_$it TEXT" }
+        // A file that parses to 0 columns must not emit a trailing comma before ')' (invalid SQL).
+        val columns = (0 until columnCount).joinToString("") { ", col_$it TEXT" }
         val sql =
             "CREATE TABLE IF NOT EXISTS $tableName " +
-                "(row_index INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, import_status TEXT, $columns)"
+                "(row_index INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, import_status TEXT$columns)"
         database.execute(
             null,
             sql,
@@ -49,6 +50,13 @@ class CsvTableManager(
         columnCount: Int,
     ) {
         if (rows.isEmpty()) return
+
+        // A zero-column file has no col_ values; insert bare rows (row_index autoincrements) rather than
+        // emitting the invalid `INSERT INTO t () VALUES ()`.
+        if (columnCount == 0) {
+            repeat(rows.size) { database.execute(null, "INSERT INTO $tableName DEFAULT VALUES", 0) }
+            return
+        }
 
         val columns = (0 until columnCount).joinToString(", ") { "col_$it" }
         val placeholders = (0 until columnCount).joinToString(", ") { "?" }
@@ -89,14 +97,15 @@ class CsvTableManager(
         offset: Int,
     ): List<CsvRow> {
         val columns = (0 until columnCount).joinToString(", ") { "t.col_$it" }
+        // A zero-column table has no col_ projection: avoid a trailing comma before FROM.
+        val projectedColumns = if (columns.isEmpty()) "" else ",\n                $columns"
         val sql =
             """
             SELECT
                 t.row_index,
                 COALESCE(NULLIF(t.transaction_id, '0'), source_rows.transaction_id) AS transaction_id,
                 t.import_status,
-                e.error_message,
-                $columns
+                e.error_message$projectedColumns
             FROM $tableName t
             LEFT JOIN csv_import_error e ON e.csv_import_id = '$csvImportId' AND e.row_index = t.row_index
             LEFT JOIN (

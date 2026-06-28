@@ -12,6 +12,9 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -130,6 +133,31 @@ class UpdateProvenanceTest : DbTest() {
             assertTrue(history.size >= 2, "Expected create + update audit entries, got ${history.size}")
             history.forEach { entry ->
                 assertNotNull(entry.source, "csv strategy audit revision ${entry.revisionId} has null source")
+            }
+            assertTrue(history.any { it.source?.source == Source.Manual }, "update source not recorded")
+        }
+
+    @Test
+    fun updateImportDirectoryRecordsSource() =
+        runTest {
+            val now = Clock.System.now()
+            val directory =
+                ImportDirectory(
+                    id = ImportDirectoryId(Uuid.random()),
+                    name = "Prov Directory",
+                    provider = ImportDirectoryProvider.LOCAL,
+                    folderRef = "/prov",
+                    deviceId = repositories.deviceId,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            repositories.importDirectoryRepository.createDirectory(directory, Source.SampleGenerator)
+            repositories.importDirectoryRepository.updateDirectory(directory.copy(excluded = true), Source.Manual)
+
+            val history = repositories.auditRepository.getAuditHistoryForImportDirectory(directory.id)
+            assertTrue(history.size >= 2, "Expected create + update audit entries, got ${history.size}")
+            history.forEach { entry ->
+                assertNotNull(entry.source, "import directory audit revision ${entry.revisionId} has null source")
             }
             assertTrue(history.any { it.source?.source == Source.Manual }, "update source not recorded")
         }

@@ -354,6 +354,7 @@ data class ImportBatch(
     val csvMappingMutations: List<CsvMappingMutation> = emptyList(),
     val csvImportMutations: List<CsvImportMutation> = emptyList(),
     val qifImportMutations: List<QifImportMutation> = emptyList(),
+    val importDirectoryMutations: List<ImportDirectoryMutation> = emptyList(),
     val apiSessionMutations: List<ApiSessionMutation> = emptyList(),
     val settings: ImportSettings? = null,
     val accountMerges: List<AccountMergeRequest> = emptyList(),

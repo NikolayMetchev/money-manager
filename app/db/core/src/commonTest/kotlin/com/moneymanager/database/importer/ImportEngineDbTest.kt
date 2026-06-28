@@ -58,6 +58,7 @@ class ImportEngineDbTest : DbTest() {
             qifImportRepository = repositories.qifImportRepository,
             apiSessionRepository = repositories.apiSessionRepository,
             settingsRepository = repositories.settingsRepository,
+            importDirectoryRepository = repositories.importDirectoryRepository,
         )
 
     private suspend fun gbp(): Currency =

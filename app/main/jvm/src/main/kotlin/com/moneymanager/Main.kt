@@ -17,6 +17,8 @@ import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.createImportEngine
 import com.moneymanager.di.database.toApplication
+import com.moneymanager.di.importfilesource.createDriveFolderBrowser
+import com.moneymanager.di.importfilesource.createImportFileSourceFactory
 import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncResult
@@ -149,6 +151,8 @@ private fun MainWindow(onExit: () -> Unit) {
     val appVersion = component.appVersion
     val localSettings = component.localSettings
     val remoteController = component.remoteDatabaseController
+    val importFileSourceFactory = createImportFileSourceFactory(localSettings)
+    val driveFolderBrowser = createDriveFolderBrowser(localSettings)
     // The currently open database, tracked so we can push it and clean up on app close.
     val openDatabase = remember { arrayOfNulls<MoneyManagerDatabaseWrapper>(1) }
     val scope = rememberCoroutineScope()
@@ -229,6 +233,8 @@ private fun MainWindow(onExit: () -> Unit) {
                 onInfoLog = { message -> logger.info { message } },
                 onErrorLog = { message, error -> logger.error(error) { message } },
                 remoteController = remoteController,
+                importFileSourceFactory = importFileSourceFactory,
+                driveFolderBrowser = driveFolderBrowser,
                 onDatabaseReady = { database, _ -> openDatabase[0] = database },
             )
         }

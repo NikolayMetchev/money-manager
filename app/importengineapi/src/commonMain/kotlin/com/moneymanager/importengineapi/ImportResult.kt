@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.qif.QifImportId
 
 /**
@@ -67,6 +68,7 @@ data class ImportResult(
     val createdCsvMappingIds: Map<String, Long> = emptyMap(),
     val createdCsvImportIds: Map<String, CsvImportId> = emptyMap(),
     val createdQifImportIds: Map<String, QifImportId> = emptyMap(),
+    val createdImportDirectoryIds: Map<String, ImportDirectoryId> = emptyMap(),
     val apiCredentialIds: Map<String, MonzoCredentialId> = emptyMap(),
     val apiSessionIds: Map<String, ApiSessionId> = emptyMap(),
     val apiRequestIds: Map<String, ApiRequestId> = emptyMap(),

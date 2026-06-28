@@ -25,4 +25,11 @@ enum class EntityType(
      * only the read-model discriminator.
      */
     CSV_IMPORT_STRATEGY(8),
+
+    /**
+     * An import directory. Like [CSV_IMPORT_STRATEGY], its provenance lives in a dedicated source
+     * table (`import_directory_source`), not the unified `entity_source` store; this enum value is
+     * only the read-model discriminator.
+     */
+    IMPORT_DIRECTORY(9),
 }

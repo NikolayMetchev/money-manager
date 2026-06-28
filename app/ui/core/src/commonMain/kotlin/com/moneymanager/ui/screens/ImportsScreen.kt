@@ -11,6 +11,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -21,17 +22,23 @@ import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importfilesource.DriveFolderBrowser
+import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.ui.navigation.ImportTab
 
 @Composable
 fun ImportsScreen(
     selectedTab: ImportTab,
     onTabSelected: (ImportTab) -> Unit,
+    importDirectoryRepository: ImportDirectoryReadRepository,
+    importFileSourceFactory: ImportFileSourceFactory?,
+    driveFolderBrowser: DriveFolderBrowser?,
     csvImportRepository: CsvImportReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     csvAccountMappingRepository: CsvAccountMappingReadRepository,
@@ -54,10 +61,16 @@ fun ImportsScreen(
     onAddCredentialClick: () -> Unit,
     onApiStrategiesClick: () -> Unit,
     onSessionClick: (ApiSession) -> Unit,
+    onImportDirectoryAuditClick: (ImportDirectory) -> Unit,
     onTransactionsImported: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
+            Tab(
+                selected = selectedTab == ImportTab.DIRECTORIES,
+                onClick = { onTabSelected(ImportTab.DIRECTORIES) },
+                text = { Text("Directories") },
+            )
             Tab(
                 selected = selectedTab == ImportTab.CSV,
                 onClick = { onTabSelected(ImportTab.CSV) },
@@ -81,6 +94,17 @@ fun ImportsScreen(
         }
 
         when (selectedTab) {
+            ImportTab.DIRECTORIES ->
+                ImportDirectoriesScreen(
+                    importDirectoryRepository = importDirectoryRepository,
+                    csvImportRepository = csvImportRepository,
+                    qifImportRepository = qifImportRepository,
+                    deviceId = deviceId,
+                    importFileSourceFactory = importFileSourceFactory,
+                    driveFolderBrowser = driveFolderBrowser,
+                    onOpenImports = onTabSelected,
+                    onOpenAudit = onImportDirectoryAuditClick,
+                )
             ImportTab.CSV ->
                 CsvImportsScreen(
                     csvImportRepository = csvImportRepository,

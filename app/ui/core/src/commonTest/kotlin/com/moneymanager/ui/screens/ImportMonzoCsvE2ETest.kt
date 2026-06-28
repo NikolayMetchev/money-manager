@@ -87,9 +87,12 @@ class ImportMonzoCsvE2ETest {
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
 
-            // Navigate to Imports screen using nav bar, then CSV tab is shown by default
+            // Navigate to Imports screen using nav bar (lands on the Directories tab), then open CSV.
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
+            waitForIdle()
+            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
             // Wait for navigation to complete - should show empty state
@@ -144,6 +147,9 @@ class ImportMonzoCsvE2ETest {
             // Step 1: Navigate to CSV Imports screen
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
+            waitForIdle()
+            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
             // Wait for the imported file to appear (more reliable than waiting for title)
@@ -293,6 +299,9 @@ class ImportMonzoCsvE2ETest {
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
+            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
+            waitForIdle()
 
             waitUntilExactlyOneExists(hasText("monzo_test_export.csv"), timeoutMillis = 15000)
             onNodeWithText("monzo_test_export.csv").performClick()
@@ -383,6 +392,9 @@ class ImportMonzoCsvE2ETest {
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
+            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
+            waitForIdle()
 
             // The Unimported tab (default) shows only the file that hasn't been imported yet.
             waitUntilExactlyOneExists(hasText("not_imported_yet.csv"), timeoutMillis = 15000)
@@ -449,6 +461,9 @@ class ImportMonzoCsvE2ETest {
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
+            waitForIdle()
+            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
             // The Unimported tab offers a single "Import all (2)" action.

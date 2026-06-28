@@ -127,6 +127,7 @@ dependencyAnalysis {
             ":app:ui:audit",
             ":app:ui:people",
             ":app:ui:imports:api",
+            ":app:ui:imports:importDirectory",
             ":app:ui:imports:qif",
             ":test:app:ui",
         ).forEach { p -> project(p) { ignoreSourceSet("jvmDev") } }

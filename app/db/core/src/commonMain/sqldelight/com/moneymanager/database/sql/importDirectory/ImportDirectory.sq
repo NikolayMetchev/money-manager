@@ -1,0 +1,73 @@
+-- An import directory: a local folder or Google Drive folder to download importable files from.
+-- On a manual "Scan now" the app lists the folder and DOWNLOADS new/changed files into the CSV/QIF
+-- staging tables (so they appear in the Imports section); the existing "Import All" then applies the
+-- matching strategy. See import_directory_file for the per-file change-detection cursor.
+-- provider_type: 'LOCAL' | 'GDRIVE'. Supported files (.csv/.qif) are detected by extension on scan.
+-- folder_ref: local absolute path / Android tree URI, or Drive folder id (used to access the folder).
+-- folder_display_path: human-readable full path shown in the UI (e.g. "My Drive / Statements"); for
+--   Drive directories this is the navigated hierarchy, since folder_ref is an opaque id. NULL → fall
+--   back to folder_ref (e.g. local folders, whose ref is already a readable path).
+-- device_id: set for LOCAL directories (scanned only on that device); NULL for shared GDRIVE.
+CREATE TABLE import_directory (
+    id TEXT PRIMARY KEY NOT NULL,
+    revision_id INTEGER NOT NULL DEFAULT 1,
+    name TEXT NOT NULL UNIQUE,
+    provider_type TEXT NOT NULL,
+    folder_ref TEXT NOT NULL,
+    folder_display_path TEXT,
+    provider_config TEXT,
+    device_id INTEGER,
+    -- 1 = a folder the user picked: its download discovers + creates child directories (no file download).
+    -- 0 = a discovered subfolder: its download fetches its own importable files.
+    top_level INTEGER NOT NULL DEFAULT 1,
+    -- The top-level directory a discovered subfolder belongs to (for the hierarchical view); NULL for tops.
+    parent_id TEXT,
+    -- 1 = the user excluded this directory: its download is disabled and "Download all" skips it.
+    excluded INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+    updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+    FOREIGN KEY (device_id) REFERENCES device(id),
+    FOREIGN KEY (parent_id) REFERENCES import_directory(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_import_directory_name ON import_directory(name);
+CREATE INDEX idx_import_directory_device ON import_directory(device_id);
+
+-- Source attribution for import_directory revisions. Uses TEXT directory_id because
+-- import_directory.id is a UUID, unlike the INTEGER entity_id used by the generic entity_source
+-- table. Mirrors csv_import_strategy_source.
+CREATE TABLE import_directory_source (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    directory_id TEXT NOT NULL,
+    revision_id INTEGER NOT NULL,
+    source_type_id INTEGER NOT NULL,
+    device_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+    FOREIGN KEY (source_type_id) REFERENCES source_type(id),
+    FOREIGN KEY (device_id) REFERENCES device(id),
+    UNIQUE (directory_id, revision_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_import_directory_source_directory ON import_directory_source(directory_id);
+CREATE INDEX IF NOT EXISTS idx_import_directory_source_revision ON import_directory_source(directory_id, revision_id);
+
+-- Per-(directory, file) change-detection cursor. last_modified is compared against the file's
+-- current last-modified on each scan; a newer timestamp (sha256-confirmed) triggers a re-import,
+-- producing a fresh csv_import_metadata / qif_import_metadata staging row.
+CREATE TABLE import_directory_file (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    directory_id TEXT NOT NULL,
+    file_ref TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    last_modified INTEGER NOT NULL,
+    checksum TEXT,
+    csv_import_id TEXT,
+    qif_import_id TEXT,
+    imported_at INTEGER,
+    FOREIGN KEY (directory_id) REFERENCES import_directory(id) ON DELETE CASCADE,
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id),
+    FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id),
+    UNIQUE (directory_id, file_ref)
+);
+
+CREATE INDEX IF NOT EXISTS idx_import_directory_file_directory ON import_directory_file(directory_id);

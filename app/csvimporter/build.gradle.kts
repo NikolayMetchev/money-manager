@@ -19,19 +19,26 @@ kotlin {
         getByName("jvmMain") {
             dependencies {
                 api(projects.app.importengineapi)
+                api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
 
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(projects.utils.bigdecimal)
+                implementation(projects.utils.parsers.csv)
+                implementation(projects.utils.parsers.qif)
             }
         }
 
         getByName("androidMain") {
             dependencies {
+                api(projects.app.importfilesource.core)
+
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(projects.utils.bigdecimal)
+                implementation(projects.utils.parsers.csv)
+                implementation(projects.utils.parsers.qif)
             }
         }
 

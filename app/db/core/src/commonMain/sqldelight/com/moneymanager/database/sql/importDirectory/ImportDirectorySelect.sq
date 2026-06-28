@@ -1,0 +1,15 @@
+-- Select all import directories ordered by name
+selectAll:
+SELECT * FROM import_directory ORDER BY name;
+
+-- Select an import directory by ID
+selectById:
+SELECT * FROM import_directory WHERE id = ?;
+
+-- Select all tracked files for a directory
+selectFilesForDirectory:
+SELECT * FROM import_directory_file WHERE directory_id = ? ORDER BY file_name;
+
+-- Select a single tracked file by its (directory, file_ref) key
+selectFileByRef:
+SELECT * FROM import_directory_file WHERE directory_id = ? AND file_ref = ?;

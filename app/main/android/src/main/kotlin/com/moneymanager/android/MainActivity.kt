@@ -13,6 +13,8 @@ import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.createImportEngine
 import com.moneymanager.di.database.toApplication
+import com.moneymanager.di.importfilesource.createDriveFolderBrowser
+import com.moneymanager.di.importfilesource.createImportFileSourceFactory
 import com.moneymanager.di.initializeVersionReader
 import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
@@ -100,6 +102,8 @@ class MainActivity : ComponentActivity() {
         val component: AppComponent = AppComponent.create(params)
         val controller = component.remoteDatabaseController
         remoteController = controller
+        val importFileSourceFactory = createImportFileSourceFactory(component.localSettings)
+        val driveFolderBrowser = createDriveFolderBrowser(component.localSettings)
 
         setContent {
             AppStartupHost(
@@ -119,6 +123,8 @@ class MainActivity : ComponentActivity() {
                 onInfoLog = { message -> Log.i(TAG, message) },
                 onErrorLog = { message, error -> Log.e(TAG, message, error) },
                 remoteController = controller,
+                importFileSourceFactory = importFileSourceFactory,
+                driveFolderBrowser = driveFolderBrowser,
                 onDatabaseReady = { database, _ -> openDatabase = database },
             )
         }
