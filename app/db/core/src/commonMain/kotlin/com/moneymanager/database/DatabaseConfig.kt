@@ -807,6 +807,69 @@ object DatabaseConfig {
     }
 
     /**
+     * Creates audit triggers for import_directory. A CUSTOM set because import_directory is in
+     * EXCLUDED_FROM_AUDIT (so the generic [createAuditTriggers] skips it). Mirrors the generic triggers:
+     * INSERT stores NEW (type 1), UPDATE stores OLD except the bumped revision_id which uses NEW
+     * (type 2), DELETE stores OLD (type 3).
+     */
+    private fun MoneyManagerDatabaseWrapper.createImportDirectoryAuditTriggers() {
+        val auditColumns =
+            "import_directory_id, revision_id, name, provider_type, folder_ref, folder_display_path, " +
+                "provider_config, device_id, top_level, parent_id, excluded, created_at, updated_at"
+        val newValues =
+            "NEW.id, NEW.revision_id, NEW.name, NEW.provider_type, NEW.folder_ref, NEW.folder_display_path, " +
+                "NEW.provider_config, NEW.device_id, NEW.top_level, NEW.parent_id, NEW.excluded, NEW.created_at, NEW.updated_at"
+        val updateValues =
+            "OLD.id, NEW.revision_id, OLD.name, OLD.provider_type, OLD.folder_ref, OLD.folder_display_path, " +
+                "OLD.provider_config, OLD.device_id, OLD.top_level, OLD.parent_id, OLD.excluded, OLD.created_at, OLD.updated_at"
+        val oldValues =
+            "OLD.id, OLD.revision_id, OLD.name, OLD.provider_type, OLD.folder_ref, OLD.folder_display_path, " +
+                "OLD.provider_config, OLD.device_id, OLD.top_level, OLD.parent_id, OLD.excluded, OLD.created_at, OLD.updated_at"
+
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_import_directory_insert_audit
+            AFTER INSERT ON import_directory
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, $auditColumns)
+                VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, $newValues);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_import_directory_update_audit
+            AFTER UPDATE ON import_directory
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, $auditColumns)
+                VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, $updateValues);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_import_directory_delete_audit
+            AFTER DELETE ON import_directory
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, $auditColumns)
+                VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, $oldValues);
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Creates audit triggers for person attributes.
      * Each attribute change bumps the person revision and records to person_attribute_audit.
      * Must be called BEFORE createAuditTriggers() so generic triggers are skipped via IF NOT EXISTS.
@@ -956,6 +1019,9 @@ object DatabaseConfig {
 
             // Custom csv_import_strategy audit triggers (the generic mechanism skips csv_import_* tables).
             createCsvImportStrategyAuditTriggers()
+
+            // Custom import_directory audit triggers (import_directory is in EXCLUDED_FROM_AUDIT).
+            createImportDirectoryAuditTriggers()
 
             // Create audit triggers for all main tables
             // Category triggers are skipped because custom ones already exist (IF NOT EXISTS)

@@ -38,6 +38,7 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.serialization.core)
                 api(libs.ktor.client.core)
+                api(projects.app.importfilesource.core)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
 
@@ -51,6 +52,7 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.serialization.core)
                 api(libs.ktor.client.core)
+                api(projects.app.importfilesource.core)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
 

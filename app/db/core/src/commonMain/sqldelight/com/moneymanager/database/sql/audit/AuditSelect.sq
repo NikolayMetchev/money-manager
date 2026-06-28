@@ -506,3 +506,42 @@ LEFT JOIN source_type ON csv_import_strategy_source.source_type_id = source_type
 LEFT JOIN device_view ON csv_import_strategy_source.device_id = device_view.id
 WHERE csv_import_strategy_audit.csv_import_strategy_id = ?
 ORDER BY csv_import_strategy_audit.audit_timestamp DESC, csv_import_strategy_audit.id DESC;
+
+-- Get audit history for an import directory
+selectAuditHistoryForImportDirectory:
+SELECT
+    import_directory_audit.id,
+    import_directory_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    import_directory_audit.import_directory_id,
+    import_directory_audit.revision_id,
+    import_directory_audit.name,
+    import_directory_audit.provider_type,
+    import_directory_audit.folder_ref,
+    import_directory_audit.folder_display_path,
+    import_directory_audit.provider_config,
+    import_directory_audit.device_id,
+    import_directory_audit.top_level,
+    import_directory_audit.parent_id,
+    import_directory_audit.excluded,
+    import_directory_audit.created_at,
+    import_directory_audit.updated_at,
+    -- Source information
+    import_directory_source.id AS source_id,
+    import_directory_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    import_directory_source.created_at AS source_created_at
+FROM import_directory_audit
+JOIN audit_type ON import_directory_audit.audit_type_id = audit_type.id
+LEFT JOIN import_directory_source ON import_directory_audit.import_directory_id = import_directory_source.directory_id
+    AND import_directory_audit.revision_id = import_directory_source.revision_id
+LEFT JOIN source_type ON import_directory_source.source_type_id = source_type.id
+LEFT JOIN device_view ON import_directory_source.device_id = device_view.id
+WHERE import_directory_audit.import_directory_id = ?
+ORDER BY import_directory_audit.audit_timestamp DESC, import_directory_audit.id DESC;

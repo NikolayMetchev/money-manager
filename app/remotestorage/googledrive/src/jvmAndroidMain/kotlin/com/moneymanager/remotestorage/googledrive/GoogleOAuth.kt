@@ -38,13 +38,14 @@ class GoogleOAuth(
         clientId: String,
         redirectUri: String,
         state: String,
+        scopes: List<String> = listOf(DRIVE_FILE_SCOPE),
     ): String =
         URLBuilder(AUTH_ENDPOINT)
             .apply {
                 parameters.append("client_id", clientId)
                 parameters.append("redirect_uri", redirectUri)
                 parameters.append("response_type", "code")
-                parameters.append("scope", DRIVE_FILE_SCOPE)
+                parameters.append("scope", scopes.joinToString(" "))
                 // offline + consent forces Google to return a refresh token we can reuse silently later.
                 parameters.append("access_type", "offline")
                 parameters.append("prompt", "consent")
@@ -109,3 +110,10 @@ class GoogleOAuth(
 
 /** Least-privilege scope: the app can only see and manage files it created. */
 const val DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+
+/**
+ * Read-only access to the user's Drive files. Required to list + download CSV/QIF files the user drops
+ * into an arbitrary folder (those files were not created by the app, so [DRIVE_FILE_SCOPE] can't see
+ * them). Only requested when configuring a Google Drive import directory.
+ */
+const val DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly"

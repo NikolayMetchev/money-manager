@@ -7,6 +7,7 @@ import com.moneymanager.database.mapper.ApiImportStrategyAuditEntryMapper
 import com.moneymanager.database.mapper.CategoryAuditEntryMapper
 import com.moneymanager.database.mapper.CsvImportStrategyAuditEntryMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
+import com.moneymanager.database.mapper.ImportDirectoryAuditEntryMapper
 import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAttributeAuditEntryMapper
@@ -24,6 +25,7 @@ import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CsvImportStrategyAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.ImportDirectoryAuditEntry
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
@@ -33,6 +35,7 @@ import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.repository.AuditReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -139,6 +142,14 @@ class AuditReadRepositoryImpl(
                 .selectAuditHistoryForCsvImportStrategy(strategyId.id.toString())
                 .executeAsList()
                 .map(CsvImportStrategyAuditEntryMapper::map)
+        }
+
+    override suspend fun getAuditHistoryForImportDirectory(directoryId: ImportDirectoryId): List<ImportDirectoryAuditEntry> =
+        withContext(Dispatchers.Default) {
+            auditSelectQueries
+                .selectAuditHistoryForImportDirectory(directoryId.id.toString())
+                .executeAsList()
+                .map(ImportDirectoryAuditEntryMapper::map)
         }
 
     private fun fetchAccountAttributeAudit(accountId: AccountId): List<AccountAttributeAuditEntry> =

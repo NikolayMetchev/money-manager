@@ -17,6 +17,8 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.repository.ApiResponseTransactionInsert
@@ -267,6 +269,62 @@ suspend fun ImportEngine.markApiSessionImported(
     import(
         ImportBatch(
             apiSessionMutations = listOf(ApiSessionMutation.MarkSessionImported(id, revisionId, importedAt, importDurationMillis)),
+        ),
+    )
+}
+
+// endregion
+
+// region Import directories
+
+suspend fun ImportEngine.createImportDirectory(
+    directory: ImportDirectory,
+    source: Source = Source.Manual,
+): ImportDirectoryId {
+    val key = directory.id.toString()
+    return requireNotNull(
+        import(ImportBatch(importDirectoryMutations = listOf(ImportDirectoryMutation.Create(key, directory, source))))
+            .createdImportDirectoryIds[key],
+    )
+}
+
+suspend fun ImportEngine.updateImportDirectory(
+    directory: ImportDirectory,
+    source: Source = Source.Manual,
+) {
+    import(ImportBatch(importDirectoryMutations = listOf(ImportDirectoryMutation.Update(directory, source))))
+}
+
+suspend fun ImportEngine.deleteImportDirectory(id: ImportDirectoryId) {
+    import(ImportBatch(importDirectoryMutations = listOf(ImportDirectoryMutation.Delete(id))))
+}
+
+@Suppress("LongParameterList")
+suspend fun ImportEngine.recordDirectoryFileImported(
+    directoryId: ImportDirectoryId,
+    fileRef: String,
+    fileName: String,
+    lastModified: Instant,
+    checksum: String?,
+    csvImportId: CsvImportId? = null,
+    qifImportId: QifImportId? = null,
+    importedAt: Instant,
+) {
+    import(
+        ImportBatch(
+            importDirectoryMutations =
+                listOf(
+                    ImportDirectoryMutation.RecordFileImported(
+                        directoryId = directoryId,
+                        fileRef = fileRef,
+                        fileName = fileName,
+                        lastModified = lastModified,
+                        checksum = checksum,
+                        csvImportId = csvImportId,
+                        qifImportId = qifImportId,
+                        importedAt = importedAt,
+                    ),
+                ),
         ),
     )
 }

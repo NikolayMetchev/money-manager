@@ -28,6 +28,8 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.dbLocationFromString
+import com.moneymanager.importfilesource.DriveFolderBrowser
+import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteAuthException
@@ -88,6 +90,8 @@ fun AppStartupHost(
     onInfoLog: (String) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
     remoteController: RemoteDatabaseController? = null,
+    importFileSourceFactory: ImportFileSourceFactory? = null,
+    driveFolderBrowser: DriveFolderBrowser? = null,
     onDatabaseReady: (MoneyManagerDatabaseWrapper?, DbLocation?) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
@@ -150,6 +154,10 @@ fun AppStartupHost(
     }
 
     val globalSchemaError by GlobalSchemaErrorState.schemaError.collectAsState()
+    // Guards against overlapping recreate runs: multiple schema-error flows (or a double-click) could
+    // otherwise each delete the database, so a second delete wipes the schema the first just created,
+    // making its seed fail with "no such table". Only one recreate runs at a time.
+    var isRecreatingDatabase by remember { mutableStateOf(false) }
     val effectiveSchemaError: Pair<DbLocation, Throwable>? =
         globalSchemaError
             ?.takeIf { info -> SchemaErrorDetector.isSchemaError(info.error) }
@@ -177,6 +185,8 @@ fun AppStartupHost(
                 services = state.services,
                 remoteController = remoteController,
                 database = state.database,
+                importFileSourceFactory = importFileSourceFactory,
+                driveFolderBrowser = driveFolderBrowser,
                 onRequestSwitchDatabase = { target ->
                     scope.launch {
                         switchDatabase(
@@ -408,36 +418,55 @@ fun AppStartupHost(
     }
 
     effectiveSchemaError?.let { (location, error) ->
-        DatabaseSchemaErrorDialog(
-            databaseLocation = location.toString(),
-            error = error,
-            onBackupAndCreateNew = {
-                scope.launch {
-                    recreateDatabase(
-                        location = location,
-                        databaseManager = databaseManager,
-                        createAppServices = createAppServices,
-                        databaseStateUpdater = { databaseState = it },
-                        onInfoLog = onInfoLog,
-                        onErrorLog = onErrorLog,
-                        shouldBackup = true,
-                    )
-                }
-            },
-            onDeleteAndCreateNew = {
-                scope.launch {
-                    recreateDatabase(
-                        location = location,
-                        databaseManager = databaseManager,
-                        createAppServices = createAppServices,
-                        databaseStateUpdater = { databaseState = it },
-                        onInfoLog = onInfoLog,
-                        onErrorLog = onErrorLog,
-                        shouldBackup = false,
-                    )
-                }
-            },
-        )
+        // Hide the dialog while a recreate is running so its buttons can't fire a second, racing delete.
+        if (!isRecreatingDatabase) {
+            DatabaseSchemaErrorDialog(
+                databaseLocation = location.toString(),
+                error = error,
+                onBackupAndCreateNew = {
+                    // Guard against a fast double-click queuing a second recreate before recomposition
+                    // hides the dialog (overlapping delete/recreate would corrupt the fresh schema).
+                    if (!isRecreatingDatabase) {
+                        isRecreatingDatabase = true
+                        scope.launch {
+                            try {
+                                recreateDatabase(
+                                    location = location,
+                                    databaseManager = databaseManager,
+                                    createAppServices = createAppServices,
+                                    databaseStateUpdater = { databaseState = it },
+                                    onInfoLog = onInfoLog,
+                                    onErrorLog = onErrorLog,
+                                    shouldBackup = true,
+                                )
+                            } finally {
+                                isRecreatingDatabase = false
+                            }
+                        }
+                    }
+                },
+                onDeleteAndCreateNew = {
+                    if (!isRecreatingDatabase) {
+                        isRecreatingDatabase = true
+                        scope.launch {
+                            try {
+                                recreateDatabase(
+                                    location = location,
+                                    databaseManager = databaseManager,
+                                    createAppServices = createAppServices,
+                                    databaseStateUpdater = { databaseState = it },
+                                    onInfoLog = onInfoLog,
+                                    onErrorLog = onErrorLog,
+                                    shouldBackup = false,
+                                )
+                            } finally {
+                                isRecreatingDatabase = false
+                            }
+                        }
+                    }
+                },
+            )
+        }
     }
 }
 

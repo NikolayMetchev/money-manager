@@ -93,38 +93,19 @@ suspend fun bulkApplyCsv(
             return@forEachIndexed
         }
         try {
-            val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
-            val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
-            if (rows.isEmpty()) return@forEachIndexed
-
-            // The shared override only applies to strategies that need a user-chosen source. A
-            // hard-coded mapping resolves its own account; a per-row mapping decides per row.
-            val effectiveSource = effectiveSourceFor(matched, sourceAccountOverride)
-
-            // Re-fetch accounts so payee accounts created by earlier files are seen.
-            val accounts = accountRepository.getAllAccounts().first()
-            val mappings = csvAccountMappingRepository.getMappingsForStrategy(matched.id).first()
-            val basePrep =
-                buildCsvMapper(matched, csvImport.columns, accounts, currencies, mappings, effectiveSource)
-                    .prepareImport(rows)
-
             val result =
-                runCsvImport(
+                applyStagedCsv(
                     csvImport = csvImport,
-                    rows = rows,
-                    columns = csvImport.columns,
                     strategy = matched,
-                    basePrep = basePrep,
-                    selectedExistingAccounts = emptyMap(),
-                    selectedNewAccountNames = emptyMap(),
-                    selectedSourceAccountId = effectiveSource,
+                    sourceAccountOverride = sourceAccountOverride,
                     currencies = currencies,
                     csvAccountMappingRepository = csvAccountMappingRepository,
                     accountRepository = accountRepository,
+                    csvImportRepository = csvImportRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
                     refreshViews = false,
-                )
+                ) ?: return@forEachIndexed
             filesImported++
             transfers += result.successCount
             duplicates += result.duplicateCount
@@ -143,6 +124,58 @@ suspend fun bulkApplyCsv(
         duplicatesSkipped = duplicates,
         filesSkippedNoStrategy = skippedNoStrategy,
         filesFailed = failed,
+    )
+}
+
+/**
+ * Applies a fixed [strategy] to all importable rows of an already-staged [csvImport] and returns the
+ * run result (null when there are no rows left to import). Unlike [bulkApplyCsv] the strategy is given,
+ * not auto-matched — used by the import-directory scanner, which pins one strategy per directory.
+ * [refreshViews] = false lets a caller batch many files and refresh once at the end.
+ */
+@Suppress("LongParameterList")
+suspend fun applyStagedCsv(
+    csvImport: CsvImport,
+    strategy: CsvImportStrategy,
+    sourceAccountOverride: AccountId?,
+    currencies: List<Currency>,
+    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
+    csvImportRepository: CsvImportReadRepository,
+    maintenance: Maintenance,
+    importEngine: ImportEngine,
+    refreshViews: Boolean,
+): CsvImportResult? {
+    val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
+    val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
+    if (rows.isEmpty()) return null
+
+    // The shared override only applies to strategies that need a user-chosen source. A hard-coded
+    // mapping resolves its own account; a per-row mapping decides per row.
+    val effectiveSource = effectiveSourceFor(strategy, sourceAccountOverride)
+
+    // Re-fetch accounts so payee accounts created by earlier files in the same scan are seen.
+    val accounts = accountRepository.getAllAccounts().first()
+    val mappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+    val basePrep =
+        buildCsvMapper(strategy, csvImport.columns, accounts, currencies, mappings, effectiveSource)
+            .prepareImport(rows)
+
+    return runCsvImport(
+        csvImport = csvImport,
+        rows = rows,
+        columns = csvImport.columns,
+        strategy = strategy,
+        basePrep = basePrep,
+        selectedExistingAccounts = emptyMap(),
+        selectedNewAccountNames = emptyMap(),
+        selectedSourceAccountId = effectiveSource,
+        currencies = currencies,
+        csvAccountMappingRepository = csvAccountMappingRepository,
+        accountRepository = accountRepository,
+        maintenance = maintenance,
+        importEngine = importEngine,
+        refreshViews = refreshViews,
     )
 }
 

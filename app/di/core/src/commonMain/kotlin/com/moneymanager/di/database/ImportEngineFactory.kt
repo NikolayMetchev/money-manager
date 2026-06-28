@@ -29,5 +29,6 @@ fun DatabaseComponent.createImportEngine(editGate: EditGate): ImportEngine =
         qifImportRepository = qifImportRepository,
         apiSessionRepository = apiSessionRepository,
         settingsRepository = settingsRepository,
+        importDirectoryRepository = importDirectoryRepository,
         editGate = editGate,
     )

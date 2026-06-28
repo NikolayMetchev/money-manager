@@ -200,3 +200,30 @@ CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_strategy_id ON csv_impo
 CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_timestamp ON csv_import_strategy_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_type ON csv_import_strategy_audit(audit_type_id);
 CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_strategy_id_timestamp ON csv_import_strategy_audit(csv_import_strategy_id, audit_timestamp DESC);
+
+-- import_directory_audit: Audit trail for import_directory table (full row snapshot per revision,
+-- written by custom triggers because import_directory is excluded from the generic audit mechanism).
+CREATE TABLE import_directory_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    import_directory_id TEXT NOT NULL,
+    revision_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    provider_type TEXT NOT NULL,
+    folder_ref TEXT NOT NULL,
+    folder_display_path TEXT,
+    provider_config TEXT,
+    device_id INTEGER,
+    top_level INTEGER NOT NULL,
+    parent_id TEXT,
+    excluded INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_import_directory_audit_directory_id ON import_directory_audit(import_directory_id);
+CREATE INDEX IF NOT EXISTS idx_import_directory_audit_timestamp ON import_directory_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_import_directory_audit_type ON import_directory_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_import_directory_audit_directory_id_timestamp ON import_directory_audit(import_directory_id, audit_timestamp DESC);

@@ -22,6 +22,14 @@ interface GoogleAccessTokenSource {
     /** True when a usable session exists without prompting (a cached/silent grant). */
     suspend fun isSignedIn(): Boolean
 
+    /**
+     * True when a usable session exists AND it already covers every scope this source needs. Used by
+     * callers that require a broader scope (e.g. `drive.readonly` to browse arbitrary folders) so they
+     * re-prompt for consent when the cached grant only covers a narrower scope. Defaults to
+     * [isSignedIn]; platforms that track granted scopes override it.
+     */
+    suspend fun isSignedInWithRequiredScopes(): Boolean = isSignedIn()
+
     /** Runs interactive sign-in. Throws `RemoteAuthException` on cancellation or failure. */
     suspend fun signIn()
 

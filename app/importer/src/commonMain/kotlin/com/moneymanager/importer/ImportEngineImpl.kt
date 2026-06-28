@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.AccountWriteRepository
@@ -35,6 +36,7 @@ import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.PersonWriteRepository
@@ -54,6 +56,7 @@ import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportDirectoryMutation
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
@@ -102,6 +105,7 @@ class ImportEngineImpl(
     private val qifImportRepository: QifImportWriteRepository,
     private val apiSessionRepository: ApiSessionWriteRepository,
     private val settingsRepository: SettingsWriteRepository,
+    private val importDirectoryRepository: ImportDirectoryWriteRepository,
     private val editGate: EditGate = EditGate.AlwaysWritable,
 ) : ImportEngine {
     override suspend fun import(
@@ -226,6 +230,7 @@ class ImportEngineImpl(
             createdCsvMappingIds = config.csvMappingIds,
             createdCsvImportIds = config.csvImportIds,
             createdQifImportIds = config.qifImportIds,
+            createdImportDirectoryIds = config.importDirectoryIds,
             apiCredentialIds = config.apiCredentialIds,
             apiSessionIds = config.apiSessionIds,
             apiRequestIds = config.apiRequestIds,
@@ -994,6 +999,7 @@ class ImportEngineImpl(
         val csvMappingIds: Map<String, Long>,
         val csvImportIds: Map<String, CsvImportId>,
         val qifImportIds: Map<String, QifImportId>,
+        val importDirectoryIds: Map<String, ImportDirectoryId>,
         val apiCredentialIds: Map<String, MonzoCredentialId>,
         val apiSessionIds: Map<String, ApiSessionId>,
         val apiRequestIds: Map<String, ApiRequestId>,
@@ -1104,6 +1110,31 @@ class ImportEngineImpl(
             }
         }
 
+        val importDirectoryIds = mutableMapOf<String, ImportDirectoryId>()
+        for (m in batch.importDirectoryMutations) {
+            when (m) {
+                is ImportDirectoryMutation.Create ->
+                    importDirectoryIds.putUnique(
+                        m.key,
+                        importDirectoryRepository.createDirectory(m.directory, m.source),
+                        "ImportDirectory",
+                    )
+                is ImportDirectoryMutation.Update -> importDirectoryRepository.updateDirectory(m.directory, m.source)
+                is ImportDirectoryMutation.Delete -> importDirectoryRepository.deleteDirectory(m.id)
+                is ImportDirectoryMutation.RecordFileImported ->
+                    importDirectoryRepository.recordFileImported(
+                        m.directoryId,
+                        m.fileRef,
+                        m.fileName,
+                        m.lastModified,
+                        m.checksum,
+                        m.csvImportId,
+                        m.qifImportId,
+                        m.importedAt,
+                    )
+            }
+        }
+
         val apiCredentialIds = mutableMapOf<String, MonzoCredentialId>()
         val apiSessionIds = mutableMapOf<String, ApiSessionId>()
         val apiRequestIds = mutableMapOf<String, ApiRequestId>()
@@ -1170,6 +1201,7 @@ class ImportEngineImpl(
             csvMappingIds = csvMappingIds,
             csvImportIds = csvImportIds,
             qifImportIds = qifImportIds,
+            importDirectoryIds = importDirectoryIds,
             apiCredentialIds = apiCredentialIds,
             apiSessionIds = apiSessionIds,
             apiRequestIds = apiRequestIds,

@@ -1,0 +1,30 @@
+-- Insert a new import directory. created_at/updated_at are filled by their column DEFAULTs.
+insert:
+INSERT INTO import_directory (id, name, provider_type, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Update an existing import directory (bumps revision)
+update:
+UPDATE import_directory
+SET revision_id = revision_id + 1, name = ?, provider_type = ?, folder_ref = ?, folder_display_path = ?, provider_config = ?, device_id = ?, top_level = ?, parent_id = ?, excluded = ?, updated_at = ?
+WHERE id = ?;
+
+-- Delete a directory by ID (cascades to import_directory_file)
+deleteById:
+DELETE FROM import_directory WHERE id = ?;
+
+insertSource:
+INSERT OR IGNORE INTO import_directory_source (directory_id, revision_id, source_type_id, device_id)
+VALUES (?, ?, ?, ?);
+
+-- Upsert the per-file change-detection cursor
+upsertFile:
+INSERT INTO import_directory_file (directory_id, file_ref, file_name, last_modified, checksum, csv_import_id, qif_import_id, imported_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (directory_id, file_ref) DO UPDATE SET
+    file_name = excluded.file_name,
+    last_modified = excluded.last_modified,
+    checksum = excluded.checksum,
+    csv_import_id = excluded.csv_import_id,
+    qif_import_id = excluded.qif_import_id,
+    imported_at = excluded.imported_at;

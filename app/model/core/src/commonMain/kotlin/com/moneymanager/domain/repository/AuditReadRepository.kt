@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CsvImportStrategyAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.ImportDirectoryAuditEntry
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
@@ -18,6 +19,7 @@ import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 
 interface AuditReadRepository {
     /**
@@ -133,4 +135,13 @@ interface AuditReadRepository {
      * @return List of audit entries for the strategy
      */
     suspend fun getAuditHistoryForCsvImportStrategy(strategyId: CsvImportStrategyId): List<CsvImportStrategyAuditEntry>
+
+    /**
+     * Gets the audit history for a specific import directory.
+     * Returns entries ordered by audit timestamp descending (most recent first).
+     *
+     * @param directoryId The ID of the directory to get audit history for
+     * @return List of audit entries for the directory
+     */
+    suspend fun getAuditHistoryForImportDirectory(directoryId: ImportDirectoryId): List<ImportDirectoryAuditEntry>
 }

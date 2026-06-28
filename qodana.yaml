@@ -232,6 +232,49 @@ exclude:
   - name: UnusedSymbolLocal
     paths:
       - app/ui
+  # ── Import directories feature (issue #602) ──────────────────────────────────────
+  # New DB-free ImportFileSource abstraction + per-platform DI factories + scanner.
+  #   * UnusedReceiverParameter — ImportFileEntry/QifParseResult extension helpers DO use
+  #     their receiver (lastModifiedEpochMs / records / sections); flagged only because
+  #     Qodana's per-module KMP import leaves those members unresolved.
+  #   * unused — ImportFileSource.download(fileRef)'s param is used by the local + Drive
+  #     backends, which live in separate modules Qodana doesn't resolve here; the Android
+  #     DI factory actuals must match the expect signature but stub out (Drive-on-Android
+  #     not wired yet).
+  #   * UnusedSymbol(Local)/UnusedDeclaration — createImportFileSourceFactory /
+  #     createDriveFolderBrowser expect/actuals are called from the Android app + DI,
+  #     which Qodana's KMP import doesn't resolve (mirrors the RemoteStorage entries).
+  - name: UnusedReceiverParameter
+    paths:
+      - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/ImportDirectoryScanner.kt
+      - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/QifStagingConversion.kt
+  # Per-platform capability stubs intentionally return a constant: JVM supports every provider, and
+  # Android can't browse Drive yet (returns null so the UI hides it). Not a simplifiable code smell.
+  - name: SameReturnValue
+    paths:
+      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource/CreateImportFileSourceFactory.jvm.kt
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource/CreateDriveFolderBrowser.android.kt
+  - name: unused
+    paths:
+      - app/importfilesource/core/src/commonMain/kotlin/com/moneymanager/importfilesource/ImportFileSource.kt
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/importfilesource
+      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource
+  - name: UnusedSymbol
+    paths:
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/importfilesource
+      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource
+  - name: UnusedDeclaration
+    paths:
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/importfilesource
+      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource
+  - name: UnusedSymbolLocal
+    paths:
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/importfilesource
+      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource
 include:
   - name: CheckDependencyLicenses
 failureConditions:

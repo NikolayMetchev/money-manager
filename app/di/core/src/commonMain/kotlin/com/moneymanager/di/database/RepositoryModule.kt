@@ -26,6 +26,8 @@ import com.moneymanager.database.repository.CurrencyReadRepositoryImpl
 import com.moneymanager.database.repository.CurrencyWriteRepositoryImpl
 import com.moneymanager.database.repository.DeviceReadRepositoryImpl
 import com.moneymanager.database.repository.DeviceWriteRepositoryImpl
+import com.moneymanager.database.repository.ImportDirectoryReadRepositoryImpl
+import com.moneymanager.database.repository.ImportDirectoryWriteRepositoryImpl
 import com.moneymanager.database.repository.PersonAccountOwnershipReadRepositoryImpl
 import com.moneymanager.database.repository.PersonAccountOwnershipWriteRepositoryImpl
 import com.moneymanager.database.repository.PersonAttributeReadRepositoryImpl
@@ -72,6 +74,8 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.DeviceWriteRepository
+import com.moneymanager.domain.repository.ImportDirectoryReadRepository
+import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
@@ -218,6 +222,19 @@ interface RepositoryModule {
         deviceId: DeviceId,
         reader: CsvImportStrategyReadRepository,
     ): CsvImportStrategyWriteRepository = CsvImportStrategyWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideImportDirectoryReadRepository(database: MoneyManagerDatabaseWrapper): ImportDirectoryReadRepository =
+        ImportDirectoryReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideImportDirectoryWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+        reader: ImportDirectoryReadRepository,
+    ): ImportDirectoryWriteRepository = ImportDirectoryWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -399,6 +416,7 @@ interface RepositoryModule {
         qifImportRepository: QifImportWriteRepository,
         apiSessionRepository: ApiSessionWriteRepository,
         settingsRepository: SettingsWriteRepository,
+        importDirectoryRepository: ImportDirectoryWriteRepository,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,
@@ -418,5 +436,6 @@ interface RepositoryModule {
             qifImportRepository = qifImportRepository,
             apiSessionRepository = apiSessionRepository,
             settingsRepository = settingsRepository,
+            importDirectoryRepository = importDirectoryRepository,
         )
 }

@@ -152,6 +152,7 @@ class CsvAccountSourceAuditE2ETest {
                             qifImportRepository = dc.qifImportRepository,
                             apiSessionRepository = dc.apiSessionRepository,
                             settingsRepository = dc.settingsRepository,
+                            importDirectoryRepository = dc.importDirectoryRepository,
                         ),
                 )
             }
