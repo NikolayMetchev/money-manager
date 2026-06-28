@@ -3,13 +3,17 @@ name: Deploy static content to Pages
 
 on:
   # Runs on pushes targeting the default branch, but only when the published
-  # content or the database schema (which drives the generated schema docs) changes
+  # content, the database schema (which drives the generated schema docs), or the
+  # module structure (which drives the generated module graph) changes
   push:
     branches: ["main"]
     paths:
       - 'webpage/**'
       - 'app/db/core/src/commonMain/sqldelight/**'
       - '.github/workflows/static.yml'
+      - 'settings.gradle.kts'
+      - '**/build.gradle.kts'
+      - 'gradle/libs.versions.toml'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -45,6 +49,14 @@ jobs:
         uses: ./.github/actions/gradle-run
         with:
           command: ':app:db:schemaspy:publishSchemaSpyDocs --stacktrace'
+          cache-read-only: true
+      - name: Generate module dependency graph
+        # The module-graph plugin reads the whole project via `allprojects`, which is
+        # incompatible with Isolated Projects / the configuration cache, so disable both
+        # for this single reporting task. It writes webpage/modules-graph.md.
+        uses: ./.github/actions/gradle-run
+        with:
+          command: 'createModuleGraph -Dorg.gradle.unsafe.isolated-projects=false --no-configuration-cache --stacktrace'
           cache-read-only: true
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5

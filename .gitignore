@@ -47,5 +47,8 @@ app/db/core/src/commonTest/resources/monzo/sample-apis/
 # Generated SchemaSpy database docs (regenerated and published by CI)
 webpage/database/
 
+# Generated module dependency graph (regenerated and published by CI)
+webpage/modules-graph.md
+
 # Guard against a literal "~" directory accidentally created by un-expanded tilde paths
 /~/

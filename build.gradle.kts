@@ -1,6 +1,10 @@
+import dev.iurysouza.modulegraph.Orientation
+import dev.iurysouza.modulegraph.Theme
+
 plugins {
     alias(libs.plugins.gradle.doctor) apply false
     alias(libs.plugins.kover)
+    alias(libs.plugins.module.graph)
 }
 
 // Read version from system property, project property, or VERSION file
@@ -32,6 +36,16 @@ tasks.register("build") {
 tasks.register("lintFormat") {
     description = "Runs all formatting tasks"
     group = "formatting"
+}
+
+// `createModuleGraph` writes a Mermaid module-dependency graph into this Markdown file.
+// The webpage/modules.html page fetches that Markdown and renders the graph client-side,
+// and the static-Pages workflow regenerates it before publishing.
+moduleGraphConfig {
+    readmePath.set("${rootDir}/webpage/modules-graph.md")
+    heading.set("## Module dependency graph")
+    orientation.set(Orientation.LEFT_TO_RIGHT)
+    theme.set(Theme.NEUTRAL)
 }
 
 dependencyAnalysis {
