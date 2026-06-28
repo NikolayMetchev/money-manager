@@ -54,8 +54,25 @@ class GoogleDriveAccountStore(
         localSettings.remove(expiryKey(clientId))
     }
 
+    /** The OAuth scopes most recently granted for [clientId] (empty if never recorded). */
+    fun grantedScopes(clientId: String): Set<String> =
+        localSettings
+            .getString(scopesKey(clientId))
+            ?.split(' ')
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            .orEmpty()
+
+    fun saveGrantedScopes(
+        clientId: String,
+        scopes: Set<String>,
+    ) {
+        localSettings.putString(scopesKey(clientId), scopes.joinToString(" "))
+    }
+
     fun clear(clientId: String) {
         localSettings.remove(refreshKey(clientId))
+        localSettings.remove(scopesKey(clientId))
         clearAccessToken(clientId)
     }
 
@@ -70,6 +87,8 @@ class GoogleDriveAccountStore(
     private fun accessKey(clientId: String) = "gdrive.at.${handle(clientId)}"
 
     private fun expiryKey(clientId: String) = "gdrive.ate.${handle(clientId)}"
+
+    private fun scopesKey(clientId: String) = "gdrive.sc.${handle(clientId)}"
 
     private companion object {
         const val MAX_RADIX = 36

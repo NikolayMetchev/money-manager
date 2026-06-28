@@ -63,6 +63,39 @@ fun googleDriveProvider(
     return GoogleDriveProvider(JvmGoogleAccessTokenSource(credentials, accountStore, browser, oauth, driveClient))
 }
 
+/**
+ * Builds a JVM/desktop [GoogleAccessTokenSource] signed in (or signable) for the given [scopes]. Used
+ * by the import-directory Drive flow, which needs [DRIVE_READONLY_SCOPE] to list/download files the app
+ * did not create.
+ *
+ * Uses a **dedicated** Bearer Drive client (not the shared per-clientId one used by DB-archive): a
+ * shared client may have already cached a narrower-scope (`drive.file`) access token in memory, and the
+ * Bearer plugin would keep using it after a re-consent for `drive.readonly` (a scope-limited Drive
+ * response is a 200, never the 401 that triggers a refresh). A fresh client loads the upgraded token
+ * from the store on first use.
+ */
+fun googleDriveTokenSource(
+    config: String?,
+    localSettings: LocalSettings,
+    browser: BrowserLauncher,
+    scopes: List<String> = listOf(DRIVE_FILE_SCOPE, DRIVE_READONLY_SCOPE),
+): GoogleAccessTokenSource {
+    val credentials =
+        GoogleDriveCredentials.fromConfig(
+            requireNotNull(config) { "Google Drive is not configured (no OAuth client credentials)." },
+        )
+    val accountStore = GoogleDriveAccountStore(localSettings)
+    val oauth = GoogleOAuth(tokenHttpClient)
+    val driveClient = buildDriveClient(credentials, accountStore, oauth)
+    return JvmGoogleAccessTokenSource(credentials, accountStore, browser, oauth, driveClient, scopes)
+}
+
+/** Builds a [DriveImportFileSource] over a [tokenSource] for the folder identified by [folderId]. */
+fun driveImportFileSource(
+    tokenSource: GoogleAccessTokenSource,
+    folderId: String,
+): DriveImportFileSource = DriveImportFileSource(tokenSource, folderId)
+
 private fun buildDriveClient(
     credentials: GoogleDriveCredentials,
     accountStore: GoogleDriveAccountStore,

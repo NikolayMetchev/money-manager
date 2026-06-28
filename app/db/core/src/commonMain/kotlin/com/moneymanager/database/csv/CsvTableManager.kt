@@ -25,10 +25,11 @@ class CsvTableManager(
         tableName: String,
         columnCount: Int,
     ) {
-        val columns = (0 until columnCount).joinToString(", ") { "col_$it TEXT" }
+        // A file that parses to 0 columns must not emit a trailing comma before ')' (invalid SQL).
+        val columns = (0 until columnCount).joinToString("") { ", col_$it TEXT" }
         val sql =
             "CREATE TABLE IF NOT EXISTS $tableName " +
-                "(row_index INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, import_status TEXT, $columns)"
+                "(row_index INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, import_status TEXT$columns)"
         database.execute(
             null,
             sql,

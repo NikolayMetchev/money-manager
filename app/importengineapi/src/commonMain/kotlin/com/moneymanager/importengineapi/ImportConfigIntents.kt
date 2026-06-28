@@ -12,6 +12,8 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.qif.QifImportRecord
 import kotlin.time.Instant
@@ -187,6 +189,36 @@ sealed interface QifImportMutation {
         val strategyName: String,
         val appliedAt: Instant,
     ) : QifImportMutation
+}
+
+/** A write on the import-directory config + its per-file change-detection cursor. */
+sealed interface ImportDirectoryMutation {
+    data class Create(
+        val key: String,
+        val directory: ImportDirectory,
+        val source: Source,
+    ) : ImportDirectoryMutation
+
+    data class Update(
+        val directory: ImportDirectory,
+        val source: Source,
+    ) : ImportDirectoryMutation
+
+    data class Delete(
+        val id: ImportDirectoryId,
+    ) : ImportDirectoryMutation
+
+    /** Advance the cursor for a file just imported from the directory. */
+    data class RecordFileImported(
+        val directoryId: ImportDirectoryId,
+        val fileRef: String,
+        val fileName: String,
+        val lastModified: Instant,
+        val checksum: String?,
+        val csvImportId: CsvImportId?,
+        val qifImportId: QifImportId?,
+        val importedAt: Instant,
+    ) : ImportDirectoryMutation
 }
 
 /** Settings writes; non-null fields are applied. */

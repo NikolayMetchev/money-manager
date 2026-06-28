@@ -41,6 +41,8 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.importfilesource.DriveFolderBrowser
+import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
@@ -96,6 +98,8 @@ fun MoneyManagerApp(
     onReloadFromRemote: () -> Unit = {},
     remoteController: RemoteDatabaseController? = null,
     database: MoneyManagerDatabaseWrapper? = null,
+    importFileSourceFactory: ImportFileSourceFactory? = null,
+    driveFolderBrowser: DriveFolderBrowser? = null,
 ) {
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
@@ -247,7 +251,7 @@ fun MoneyManagerApp(
                                                 -> ImportTab.API
                                                 is Screen.QifImportDetail, is Screen.QifStrategyEditor -> ImportTab.QIF
                                                 is Screen.Imports -> currentScreen.tab
-                                                else -> ImportTab.CSV
+                                                else -> ImportTab.DIRECTORIES
                                             },
                                         ),
                                     )
@@ -461,6 +465,9 @@ fun MoneyManagerApp(
                                             onTabSelected = { tab ->
                                                 navigationHistory.replaceCurrentScreen(Screen.Imports(tab))
                                             },
+                                            importDirectoryRepository = services.imports.importDirectoryRepository,
+                                            importFileSourceFactory = importFileSourceFactory,
+                                            driveFolderBrowser = driveFolderBrowser,
                                             csvImportRepository = services.imports.csvImportRepository,
                                             csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                             csvAccountMappingRepository = services.imports.csvAccountMappingRepository,

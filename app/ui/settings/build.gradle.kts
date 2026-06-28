@@ -11,6 +11,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.ui.foundation)
 
                 implementation(libs.compose.charts)
                 implementation(libs.human.readable)
@@ -18,7 +19,6 @@ kotlin {
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.app.ui.components)
-                implementation(projects.app.ui.foundation)
                 implementation(projects.utils.compose.scrollbar)
             }
         }
@@ -57,6 +57,7 @@ kotlin {
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.compose.ui.unit.desktop)
+                implementation(projects.app.ui.foundation)
             }
         }
     }

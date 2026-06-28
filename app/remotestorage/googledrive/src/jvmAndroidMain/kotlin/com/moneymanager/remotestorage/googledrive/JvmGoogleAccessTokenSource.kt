@@ -20,14 +20,18 @@ class JvmGoogleAccessTokenSource(
     private val browser: BrowserLauncher,
     private val oauth: GoogleOAuth,
     override val httpClient: HttpClient,
+    private val scopes: List<String> = listOf(DRIVE_FILE_SCOPE),
 ) : GoogleAccessTokenSource {
     override suspend fun isSignedIn(): Boolean = accountStore.refreshToken(credentials.clientId) != null
+
+    override suspend fun isSignedInWithRequiredScopes(): Boolean =
+        isSignedIn() && accountStore.grantedScopes(credentials.clientId).containsAll(scopes)
 
     override suspend fun signIn() {
         withContext(Dispatchers.IO) {
             LoopbackRedirectReceiver().use { receiver ->
                 val state = oauth.newState()
-                browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri, state))
+                browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri, state, scopes))
                 val code = receiver.awaitCode(state)
                 val tokens = oauth.exchangeCode(credentials, code, receiver.redirectUri)
                 val refreshToken =
@@ -38,8 +42,7 @@ class JvmGoogleAccessTokenSource(
                         )
                 accountStore.saveRefreshToken(credentials.clientId, refreshToken)
                 accountStore.saveAccessToken(credentials.clientId, tokens.accessToken, accessTokenExpiry(tokens.expiresInSeconds))
-                // No need to reset the Bearer plugin's cache: sign-in itself makes no Drive request, so the
-                // plugin first loads tokens (from the store) only on the next API call, after this persist.
+                accountStore.saveGrantedScopes(credentials.clientId, scopes.toSet())
             }
         }
     }

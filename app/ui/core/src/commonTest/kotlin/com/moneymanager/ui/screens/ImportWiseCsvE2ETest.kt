@@ -103,6 +103,9 @@ class ImportWiseCsvE2ETest {
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
+            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
+            waitForIdle()
 
             waitUntilExactlyOneExists(hasText("transaction-history.csv"), timeoutMillis = 15000)
             onNodeWithText("transaction-history.csv").performClick()
@@ -191,6 +194,9 @@ class ImportWiseCsvE2ETest {
             // Navigate to the imported Wise CSV
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
+            waitForIdle()
+            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
             waitUntilExactlyOneExists(hasText("transaction-history.csv"), timeoutMillis = 15000)

@@ -13,7 +13,7 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.qif.QifImportId
 
-enum class ImportTab { CSV, QIF, API, MANUAL }
+enum class ImportTab { DIRECTORIES, CSV, QIF, API, MANUAL }
 
 sealed class Screen(
     val title: String,
@@ -33,7 +33,7 @@ sealed class Screen(
     ) : Screen("People")
 
     data class Imports(
-        val tab: ImportTab = ImportTab.CSV,
+        val tab: ImportTab = ImportTab.DIRECTORIES,
     ) : Screen("Imports")
 
     data object CsvStrategies : Screen("Import Strategies")
