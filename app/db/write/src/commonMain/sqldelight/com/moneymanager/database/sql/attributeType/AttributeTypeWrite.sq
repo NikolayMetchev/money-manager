@@ -1,0 +1,2 @@
+insert:
+INSERT INTO attribute_type (name) VALUES (?);

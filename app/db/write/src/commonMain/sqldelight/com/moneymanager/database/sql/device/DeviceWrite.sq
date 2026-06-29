@@ -1,0 +1,21 @@
+insertOrIgnoreOs:
+INSERT OR IGNORE INTO os (name) VALUES (?);
+
+insertOrIgnoreMachine:
+INSERT OR IGNORE INTO machine (name) VALUES (?);
+
+insertOrIgnoreDeviceMake:
+INSERT OR IGNORE INTO device_make (name) VALUES (?);
+
+insertOrIgnoreDeviceModel:
+INSERT OR IGNORE INTO device_model (name) VALUES (?);
+
+-- Insert JVM device
+insertJvm:
+INSERT INTO device (platform_id, os_id, machine_id, device_make_id, device_model_id)
+VALUES (1, ?, ?, NULL, NULL);
+
+-- Insert Android device
+insertAndroid:
+INSERT INTO device (platform_id, os_id, machine_id, device_make_id, device_model_id)
+VALUES (2, NULL, NULL, ?, ?);

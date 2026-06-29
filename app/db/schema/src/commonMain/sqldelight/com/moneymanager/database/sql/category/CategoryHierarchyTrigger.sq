@@ -1,0 +1,12 @@
+-- On category delete, children inherit the deleted category's parent (grandparent).
+
+-- trigger_category_delete_update_children
+CREATE TRIGGER trigger_category_delete_update_children
+BEFORE DELETE ON category
+FOR EACH ROW
+BEGIN
+    UPDATE category
+    SET parent_id = old.parent_id
+    WHERE parent_id = old.id;
+END;
+

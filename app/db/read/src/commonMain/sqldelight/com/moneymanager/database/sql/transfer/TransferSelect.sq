@@ -1,0 +1,296 @@
+selectById:
+SELECT
+    transfer.id,
+    transfer.revision_id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    transfer.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer
+JOIN currency ON transfer.currency_id = currency.id
+WHERE transfer.id = ?;
+
+selectByAccount:
+SELECT
+    transfer.id,
+    transfer.revision_id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    transfer.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer
+JOIN currency ON transfer.currency_id = currency.id
+WHERE source_account_id = ? OR target_account_id = ?
+ORDER BY timestamp DESC;
+
+selectByDateRange:
+SELECT
+    transfer.id,
+    transfer.revision_id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    transfer.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer
+JOIN currency ON transfer.currency_id = currency.id
+WHERE timestamp >= ? AND timestamp <= ?
+ORDER BY timestamp DESC;
+
+selectByAccountAndDateRange:
+SELECT
+    transfer.id,
+    transfer.revision_id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    transfer.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer
+JOIN currency ON transfer.currency_id = currency.id
+WHERE (source_account_id = ? OR target_account_id = ?)
+AND timestamp >= ? AND timestamp <= ?
+ORDER BY timestamp DESC;
+
+selectAllBalances:
+SELECT
+    account_balance_materialized_view.account_id,
+    account_balance_materialized_view.currency_id,
+    account_balance_materialized_view.balance,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM account_balance_materialized_view
+JOIN account ON account_balance_materialized_view.account_id = account.id
+JOIN currency ON account_balance_materialized_view.currency_id = currency.id
+ORDER BY currency.code, account.name;
+
+selectRunningBalanceByAccountPaginated:
+SELECT
+    running_balance_materialized_view.id,
+    running_balance_materialized_view.timestamp,
+    running_balance_materialized_view.description,
+    running_balance_materialized_view.account_id,
+    running_balance_materialized_view.transaction_amount,
+    running_balance_materialized_view.running_balance,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    running_balance_materialized_view.is_excluded,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM transfer_relationship tr
+        WHERE (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id)
+          AND tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+    ) THEN 1 ELSE 0 END AS is_reconciled,
+    -- The linked fee transfer when this row is the main transaction (id1 of a `fee` relationship),
+    -- and the linked main transaction when this row is the fee transfer (id2). FEE_RELATIONSHIP_TYPE_ID = 2.
+    -- Linked fee transfer when this row is the main transaction (fee_as_main.id2), and the linked main
+    -- transaction when this row is the fee transfer (fee_as_child.id1). LEFT JOINs (rather than scalar
+    -- subqueries) so SQLDelight infers these as NULLABLE; there is at most one fee link per side, so the
+    -- joins never multiply rows. FEE_RELATIONSHIP_TYPE_ID = 2.
+    fee_as_main.id2 AS fee_transfer_id,
+    fee_as_child.id1 AS fee_parent_id
+FROM running_balance_materialized_view
+JOIN currency ON running_balance_materialized_view.currency_id = currency.id
+JOIN transfer ON running_balance_materialized_view.id = transfer.id
+LEFT JOIN transfer_relationship fee_as_main
+    ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
+LEFT JOIN transfer_relationship fee_as_child
+    ON fee_as_child.id2 = running_balance_materialized_view.id AND fee_as_child.relationship_type_id = 2
+WHERE running_balance_materialized_view.account_id = :accountId
+  AND ((:lastTimestamp IS NULL AND :lastId IS NULL)
+       OR running_balance_materialized_view.timestamp < :lastTimestamp
+       OR (running_balance_materialized_view.timestamp = :lastTimestamp
+           AND running_balance_materialized_view.id < :lastId))
+ORDER BY running_balance_materialized_view.timestamp DESC, running_balance_materialized_view.id DESC
+LIMIT :limit;
+
+-- Load earlier transactions (backward pagination - items newer than the current first item)
+-- Results are returned in ASC order (oldest first), must be reversed in code
+selectRunningBalanceByAccountPaginatedBackward:
+SELECT
+    running_balance_materialized_view.id,
+    running_balance_materialized_view.timestamp,
+    running_balance_materialized_view.description,
+    running_balance_materialized_view.account_id,
+    running_balance_materialized_view.transaction_amount,
+    running_balance_materialized_view.running_balance,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    running_balance_materialized_view.is_excluded,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM transfer_relationship tr
+        WHERE (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id)
+          AND tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+    ) THEN 1 ELSE 0 END AS is_reconciled,
+    -- The linked fee transfer when this row is the main transaction (id1 of a `fee` relationship),
+    -- and the linked main transaction when this row is the fee transfer (id2). FEE_RELATIONSHIP_TYPE_ID = 2.
+    -- Linked fee transfer when this row is the main transaction (fee_as_main.id2), and the linked main
+    -- transaction when this row is the fee transfer (fee_as_child.id1). LEFT JOINs (rather than scalar
+    -- subqueries) so SQLDelight infers these as NULLABLE; there is at most one fee link per side, so the
+    -- joins never multiply rows. FEE_RELATIONSHIP_TYPE_ID = 2.
+    fee_as_main.id2 AS fee_transfer_id,
+    fee_as_child.id1 AS fee_parent_id
+FROM running_balance_materialized_view
+JOIN currency ON running_balance_materialized_view.currency_id = currency.id
+JOIN transfer ON running_balance_materialized_view.id = transfer.id
+LEFT JOIN transfer_relationship fee_as_main
+    ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
+LEFT JOIN transfer_relationship fee_as_child
+    ON fee_as_child.id2 = running_balance_materialized_view.id AND fee_as_child.relationship_type_id = 2
+WHERE running_balance_materialized_view.account_id = :accountId
+  AND (running_balance_materialized_view.timestamp > :firstTimestamp
+       OR (running_balance_materialized_view.timestamp = :firstTimestamp
+           AND running_balance_materialized_view.id > :firstId))
+ORDER BY running_balance_materialized_view.timestamp ASC, running_balance_materialized_view.id ASC
+LIMIT :limit;
+
+-- Get the row position (0-indexed) of a transaction within an account's transaction list
+-- Returns the count of transactions that come BEFORE this one (i.e., have higher timestamp or same timestamp but higher id)
+getTransactionRowPosition:
+SELECT COUNT(*)
+FROM running_balance_materialized_view
+WHERE account_id = :accountId
+  AND (timestamp > :targetTimestamp
+       OR (timestamp = :targetTimestamp AND id > :targetId));
+
+-- Load transactions for an account with offset-based pagination
+selectRunningBalanceByAccountOffset:
+SELECT
+    running_balance_materialized_view.id,
+    running_balance_materialized_view.timestamp,
+    running_balance_materialized_view.description,
+    running_balance_materialized_view.account_id,
+    running_balance_materialized_view.transaction_amount,
+    running_balance_materialized_view.running_balance,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    running_balance_materialized_view.is_excluded,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM transfer_relationship tr
+        WHERE (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id)
+          AND tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+    ) THEN 1 ELSE 0 END AS is_reconciled,
+    -- The linked fee transfer when this row is the main transaction (id1 of a `fee` relationship),
+    -- and the linked main transaction when this row is the fee transfer (id2). FEE_RELATIONSHIP_TYPE_ID = 2.
+    -- Linked fee transfer when this row is the main transaction (fee_as_main.id2), and the linked main
+    -- transaction when this row is the fee transfer (fee_as_child.id1). LEFT JOINs (rather than scalar
+    -- subqueries) so SQLDelight infers these as NULLABLE; there is at most one fee link per side, so the
+    -- joins never multiply rows. FEE_RELATIONSHIP_TYPE_ID = 2.
+    fee_as_main.id2 AS fee_transfer_id,
+    fee_as_child.id1 AS fee_parent_id
+FROM running_balance_materialized_view
+JOIN currency ON running_balance_materialized_view.currency_id = currency.id
+JOIN transfer ON running_balance_materialized_view.id = transfer.id
+LEFT JOIN transfer_relationship fee_as_main
+    ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
+LEFT JOIN transfer_relationship fee_as_child
+    ON fee_as_child.id2 = running_balance_materialized_view.id AND fee_as_child.relationship_type_id = 2
+WHERE running_balance_materialized_view.account_id = :accountId
+ORDER BY running_balance_materialized_view.timestamp DESC, running_balance_materialized_view.id DESC
+LIMIT :limit OFFSET :offset;
+
+-- Get total count of transactions for an account
+countTransactionsByAccount:
+SELECT COUNT(*)
+FROM running_balance_materialized_view
+WHERE account_id = :accountId;
+
+countTransfersByAccount:
+SELECT COUNT(*)
+FROM transfer
+WHERE source_account_id = :accountId OR target_account_id = :accountId;
+
+selectTransfersBetweenAccounts:
+SELECT
+    transfer.id,
+    transfer.revision_id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    transfer.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer
+JOIN currency ON transfer.currency_id = currency.id
+WHERE (source_account_id = :accountA AND target_account_id = :accountB)
+   OR (source_account_id = :accountB AND target_account_id = :accountA)
+ORDER BY timestamp DESC;
+
+-- Current revision of a single transfer, for recording its source after a merge/unmerge reassignment.
+selectRevisionById:
+SELECT revision_id FROM transfer WHERE id = ?;
+
+-- Captured before a merge moves them, so unmerge can move back exactly the affected transfers.
+selectTransferIdsBySourceAccount:
+SELECT id FROM transfer WHERE source_account_id = ?;
+
+selectTransferIdsByTargetAccount:
+SELECT id FROM transfer WHERE target_account_id = ?;
+
+-- Transfers whose match attribute fits the LIKE pattern but for which no transfer
+-- carries the link attribute with the same value (companion transaction missing).
+selectTransfersMissingCompanion:
+SELECT
+    transfer.id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.amount,
+    match_attr.attribute_value AS match_value,
+    source_account.id AS source_account_id,
+    source_account.name AS source_account_name,
+    target_account.id AS target_account_id,
+    target_account.name AS target_account_name,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer
+JOIN transfer_attribute match_attr ON match_attr.transaction_id = transfer.id
+JOIN attribute_type match_type ON match_attr.attribute_type_id = match_type.id
+JOIN account source_account ON transfer.source_account_id = source_account.id
+JOIN account target_account ON transfer.target_account_id = target_account.id
+JOIN currency ON transfer.currency_id = currency.id
+WHERE match_type.name = :matchAttributeName
+  AND match_attr.attribute_value LIKE :matchValuePattern
+  AND NOT EXISTS (
+    SELECT 1
+    FROM transfer_attribute link_attr
+    JOIN attribute_type link_type ON link_attr.attribute_type_id = link_type.id
+    WHERE link_type.name = :linkAttributeName
+      AND link_attr.attribute_value = match_attr.attribute_value
+  )
+ORDER BY transfer.timestamp DESC, transfer.id DESC;

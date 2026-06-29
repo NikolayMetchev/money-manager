@@ -1,5 +1,0 @@
-insert:
-INSERT INTO attribute_type (name) VALUES (?);
-
-insertWithId:
-INSERT INTO attribute_type (id, name) VALUES (?, ?);

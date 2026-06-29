@@ -1,0 +1,48 @@
+insertCredential:
+INSERT INTO api_credential(type_id, token, created_at, strategy_id, private_key, public_key)
+VALUES (?, ?, ?, ?, ?, ?);
+
+lastInsertCredentialRowId:
+SELECT last_insert_rowid();
+
+updateCredentialStrategy:
+UPDATE api_credential SET strategy_id = ? WHERE id = ?;
+
+updateCredentialKeys:
+UPDATE api_credential SET private_key = ?, public_key = ? WHERE id = ?;
+
+insert:
+INSERT INTO api_session(type_id, token, device_id, created_at, expires_at, credential_id)
+VALUES (?, ?, ?, ?, ?, ?);
+
+insertRequest:
+INSERT INTO api_request(session_id, method, url)
+VALUES (?, ?, ?);
+
+insertRequestHeader:
+INSERT INTO api_request_header(request_id, key, value)
+VALUES (?, ?, ?);
+
+insertResponse:
+INSERT INTO api_response(request_id, session_id, json)
+VALUES (?, ?, ?);
+
+delete:
+DELETE FROM api_session WHERE id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+insertResponseTransaction:
+INSERT INTO api_response_transaction(response_id, json_path, state, transaction_id, error_message)
+VALUES (?, ?, ?, ?, ?);
+
+markSessionImported:
+INSERT INTO api_import(session_id, revision_id, imported_at, import_duration_millis)
+VALUES (:session_id, :revision_id, :imported_at, :import_duration_millis)
+ON CONFLICT(session_id, revision_id) DO UPDATE SET
+    imported_at = excluded.imported_at,
+    import_duration_millis = excluded.import_duration_millis;
+
+lastInsertApiResponseTransactionId:
+SELECT last_insert_rowid();

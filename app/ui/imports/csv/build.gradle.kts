@@ -14,7 +14,6 @@ kotlin {
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)
-                implementation(projects.app.db.core)
                 implementation(projects.app.qifimporter)
                 implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
@@ -46,6 +45,7 @@ kotlin {
                 implementation(libs.androidx.compose.ui.unit)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.datetime)
+                implementation(projects.app.db.read)
                 implementation(projects.utils.bigdecimal)
             }
         }
@@ -68,6 +68,7 @@ kotlin {
                 implementation(libs.compose.ui.unit.desktop)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.datetime)
+                implementation(projects.app.db.read)
                 implementation(projects.utils.bigdecimal)
             }
         }

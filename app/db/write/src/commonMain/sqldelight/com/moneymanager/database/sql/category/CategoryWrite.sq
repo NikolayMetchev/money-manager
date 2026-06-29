@@ -1,0 +1,14 @@
+insert:
+INSERT INTO category(name, parent_id)
+VALUES (?, ?);
+
+update:
+UPDATE category
+SET revision_id = revision_id + 1, name = ?, parent_id = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM category WHERE id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();

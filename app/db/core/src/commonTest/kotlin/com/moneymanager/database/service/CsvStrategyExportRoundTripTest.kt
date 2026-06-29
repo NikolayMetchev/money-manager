@@ -2,9 +2,9 @@
 
 package com.moneymanager.database.service
 
-import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.csvstrategy.BuiltInCsvStrategies
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -17,7 +17,7 @@ import kotlin.time.Clock
  * Verifies that exporting a strategy to JSON and importing it back is lossless.
  *
  * Parameterised over every CSV strategy seeded into a fresh database, so any
- * strategy added to [com.moneymanager.database.DatabaseConfig.builtInCsvStrategies]
+ * strategy added to [com.moneymanager.database.BuiltInCsvStrategies.builtInCsvStrategies]
  * is covered automatically. Equality is checked on the export representation,
  * which is id-free, so freshly generated mapping/strategy ids don't interfere.
  */
@@ -38,7 +38,7 @@ class CsvStrategyExportRoundTripTest : DbTest() {
             assertTrue(strategies.isNotEmpty(), "Expected built-in CSV strategies to be seeded")
             // Compare against the authoritative seed list so new strategies are picked up automatically
             assertEquals(
-                DatabaseConfig.builtInCsvStrategies(Clock.System.now()).map { it.name }.toSet(),
+                BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now()).map { it.name }.toSet(),
                 strategies.map { it.name }.toSet(),
             )
 

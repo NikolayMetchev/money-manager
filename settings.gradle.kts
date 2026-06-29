@@ -13,6 +13,15 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // SQLDelight 2.4.0-SNAPSHOT: needed for Gradle Isolated Projects support (sqldelight/sqldelight#6259),
+        // which the latest 2.3.2 release lacks. Scoped to app.cash.sqldelight + snapshots only so it doesn't
+        // affect resolution of anything else. Remove once 2.4.0 is released.
+        maven {
+            name = "centralSnapshots"
+            url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+            mavenContent { snapshotsOnly() }
+            content { includeGroup("app.cash.sqldelight") }
+        }
     }
 }
 
@@ -21,6 +30,13 @@ pluginManagement {
         google()
         mavenCentral()
         gradlePluginPortal()
+        // See note in dependencyResolutionManagement — required for the SQLDelight Gradle plugin snapshot.
+        maven {
+            name = "centralSnapshots"
+            url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+            mavenContent { snapshotsOnly() }
+            content { includeGroup("app.cash.sqldelight") }
+        }
     }
 }
 

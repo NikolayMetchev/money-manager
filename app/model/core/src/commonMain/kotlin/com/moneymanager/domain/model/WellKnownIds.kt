@@ -6,6 +6,9 @@ package com.moneymanager.domain.model
  * can use them without depending on the database layer; the database seeds exactly these ids.
  */
 object WellKnownIds {
+    /** The SYSTEM device, seeded with this fixed id so seed provenance device_id is a known constant. */
+    const val SYSTEM_DEVICE_ID: Long = 1
+
     /** "excluded" attribute type. Excluded transactions are hidden from balances. */
     const val EXCLUDED_ATTR_TYPE_ID: Long = -1
 

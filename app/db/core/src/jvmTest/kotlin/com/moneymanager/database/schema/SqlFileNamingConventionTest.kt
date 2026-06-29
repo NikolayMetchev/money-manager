@@ -28,17 +28,25 @@ class SqlFileNamingConventionTest {
     private val labelRegex = Regex("^([A-Za-z][A-Za-z0-9_]*):\\s*$")
     private val writeKeywords = setOf("INSERT", "UPDATE", "DELETE", "REPLACE", "REINDEX", "VACUUM", "ANALYZE")
 
-    private fun sqlDir(): File {
+    // The .sq files now live in two sibling modules: schema + *Select.sq in :app:db:read and *Write.sq
+    // in :app:db:write. This test scans both. Working dir under Gradle is the module dir (app/db/core),
+    // with a repo-root fallback for other runners.
+    private fun sqlDirs(): List<File> {
         val candidates =
             listOf(
-                "src/commonMain/sqldelight/com/moneymanager/database/sql",
-                "app/db/core/src/commonMain/sqldelight/com/moneymanager/database/sql",
+                "../schema/src/commonMain/sqldelight/com/moneymanager/database/sql",
+                "../read/src/commonMain/sqldelight/com/moneymanager/database/sql",
+                "../write/src/commonMain/sqldelight/com/moneymanager/database/sql",
+                "app/db/schema/src/commonMain/sqldelight/com/moneymanager/database/sql",
+                "app/db/read/src/commonMain/sqldelight/com/moneymanager/database/sql",
+                "app/db/write/src/commonMain/sqldelight/com/moneymanager/database/sql",
             )
-        return candidates.map(::File).firstOrNull { it.isDirectory }
-            ?: fail(
-                "Could not locate the sqldelight sql directory. Tried (relative to ${File(".").absolutePath}): " +
+        return candidates.map(::File).filter { it.isDirectory }.ifEmpty {
+            fail(
+                "Could not locate the sqldelight sql directories. Tried (relative to ${File(".").absolutePath}): " +
                     candidates.joinToString(),
             )
+        }
     }
 
     private data class LabelledQuery(
@@ -92,8 +100,8 @@ class SqlFileNamingConventionTest {
 
     @Test
     fun `sq files separate reads from writes by file name`() {
-        val files = sqlDir().walkTopDown().filter { it.isFile && it.extension == "sq" }.toList()
-        assertTrue(files.isNotEmpty(), "Expected to find .sq files under ${sqlDir().absolutePath}")
+        val files = sqlDirs().flatMap { dir -> dir.walkTopDown().filter { it.isFile && it.extension == "sq" } }
+        assertTrue(files.isNotEmpty(), "Expected to find .sq files under ${sqlDirs().joinToString { it.absolutePath }}")
 
         val violations = mutableListOf<String>()
 

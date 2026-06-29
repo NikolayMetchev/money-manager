@@ -70,10 +70,15 @@ exclude:
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/MinimalErrorScreen.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/SimpleFallbackErrorScreen.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/ErrorDialog.kt
-      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/AuditTypeConversions.kt
-      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/IdConversions.kt
-      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt
-      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/SourceTypeConversions.kt
+      # Mappie conversion interfaces: implemented by the generated mappers (value-class/Instant
+      # conversions) but not all defaults are invoked. Moved app/db/core -> app/db/read in the split.
+      - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/AuditTypeConversions.kt
+      - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/IdConversions.kt
+      - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt
+      - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/SourceTypeConversions.kt
+      # getAuditableTables/getTableColumns are used only by app/db/core tests (cross-module), which
+      # Qodana misses here — same situation as TestProvenance above.
+      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/MoneyManagerDatabaseWrapper.kt
   # Android no-op actual for the Linux-only horizontal-scroll-wheel modifier: the scrollState
   # parameter is required by the expect signature but unused on Android (no mouse wheel).
   - name: unused
@@ -275,6 +280,12 @@ exclude:
       - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/importfilesource
       - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource
+  # Mappie generates near-identical audit-entry mappers from the same template; the duplicated fragment
+  # is codegen-shaped boilerplate, not hand-written duplication.
+  - name: DuplicatedCode
+    paths:
+      - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/OwnershipAuditHistoryForAccountMapper.kt
+      - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/TransferAuditEntryMapper.kt
 include:
   - name: CheckDependencyLicenses
 failureConditions:

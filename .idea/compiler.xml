@@ -30,9 +30,24 @@
       <module name="money-manager.app.db.core" options="-Xlint:all -Werror" />
       <module name="money-manager.app.db.core.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.db.core.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.read" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.read.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.read.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.schema" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.schema.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.schema.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.app.db.schemaspy" options="-Xlint:all -Werror" />
       <module name="money-manager.app.db.schemaspy.main" options="-Xlint:all -Werror" />
       <module name="money-manager.app.db.schemaspy.test" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.seed" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.seed.generator" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.seed.generator.main" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.seed.generator.test" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.seed.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.seed.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.write" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.write.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.write.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.app.di.core" options="-Xlint:all -Werror" />
       <module name="money-manager.app.di.core.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.di.core.jvmTest" options="-Xlint:all -Werror" />
@@ -42,6 +57,12 @@
       <module name="money-manager.app.importer" options="-Xlint:all -Werror" />
       <module name="money-manager.app.importer.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.importer.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importfilesource.core" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importfilesource.core.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importfilesource.core.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importfilesource.localfolder" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importfilesource.localfolder.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importfilesource.localfolder.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.app.importmodel" options="-Xlint:all -Werror" />
       <module name="money-manager.app.importmodel.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.importmodel.jvmTest" options="-Xlint:all -Werror" />
@@ -100,6 +121,10 @@
       <module name="money-manager.app.ui.imports.csv.jvmDev" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.imports.csv.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.imports.csv.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.imports.importDirectory" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.imports.importDirectory.jvmDev" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.imports.importDirectory.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.imports.importDirectory.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.imports.qif" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.imports.qif.jvmDev" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.imports.qif.jvmMain" options="-Xlint:all -Werror" />

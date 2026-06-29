@@ -3,7 +3,7 @@ package com.moneymanager.database
 import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
-import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
 import com.moneymanager.domain.model.DbLocation
 import kotlinx.coroutines.Dispatchers
@@ -80,14 +80,16 @@ class AndroidDatabaseManager(
             )
             val database = MoneyManagerDatabaseWrapper(driver)
 
+            // Lookups, the system device, GBP and the built-in strategies are seeded inside Schema.create
+            // (the :app:db:seed module). The remaining currencies are platform-dependent, so they are
+            // seeded here at runtime for a freshly created database.
             onProgress(DatabaseInitializationProgress("Applying database settings...", 4, 6))
             if (isNewDatabase) {
-                onProgress(DatabaseInitializationProgress("Adding default currencies and settings...", 5, 6))
-                DatabaseConfig.seedDatabase(database)
+                onProgress(DatabaseInitializationProgress("Adding default currencies...", 5, 6))
+                DatabaseConfig.seedCurrencies(database)
             } else {
                 onProgress(DatabaseInitializationProgress("Preparing repositories...", 5, 6))
             }
-
             onProgress(DatabaseInitializationProgress("Finishing database startup...", 6, 6))
             database
         }

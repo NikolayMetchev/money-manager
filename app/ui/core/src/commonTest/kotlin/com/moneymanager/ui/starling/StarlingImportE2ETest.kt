@@ -7,7 +7,6 @@ import com.moneymanager.apiimporter.downloadApiSessionPeople
 import com.moneymanager.apiimporter.downloadApiSessionTransactions
 import com.moneymanager.apiimporter.importApiSessionPeople
 import com.moneymanager.apiimporter.importApiSessionTransactions
-import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiSessionId
@@ -16,6 +15,7 @@ import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
@@ -486,9 +486,9 @@ class StarlingImportE2ETest : DbTest() {
                     Account(id = AccountId(0), name = "Monzo: Personal", openingDate = now),
                 )
             repositories.accountAttributeRepository
-                .insert(existingId, AttributeTypeId(DatabaseConfig.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), "040004")
+                .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), "040004")
             repositories.accountAttributeRepository
-                .insert(existingId, AttributeTypeId(DatabaseConfig.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), "12345678")
+                .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), "12345678")
 
             val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
             val strategy =
@@ -555,9 +555,9 @@ class StarlingImportE2ETest : DbTest() {
                     Account(id = AccountId(0), name = "Monzo Counterparty: Nikolay", openingDate = now),
                 )
             repositories.accountAttributeRepository
-                .insert(existingId, AttributeTypeId(DatabaseConfig.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), "099999")
+                .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), "099999")
             repositories.accountAttributeRepository
-                .insert(existingId, AttributeTypeId(DatabaseConfig.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), "55556666")
+                .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), "55556666")
 
             val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
             val strategy =
@@ -649,7 +649,7 @@ class StarlingImportE2ETest : DbTest() {
                     Account(id = AccountId(0), name = "Monzo Counterparty: Nikolay", openingDate = now),
                 )
             repositories.accountAttributeRepository
-                .insert(existingId, AttributeTypeId(DatabaseConfig.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID), "bank:099999:55556666")
+                .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID), "bank:099999:55556666")
 
             val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
             val strategy =

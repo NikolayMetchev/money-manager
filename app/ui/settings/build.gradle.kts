@@ -7,7 +7,6 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(projects.app.db.core)
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
@@ -27,6 +26,7 @@ kotlin {
                 api(libs.androidx.compose.foundation.layout)
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
+                api(projects.app.db.write)
 
                 implementation(libs.androidx.compose.animation.core)
                 implementation(libs.androidx.compose.foundation)
@@ -42,7 +42,7 @@ kotlin {
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
-                api(projects.app.db.core)
+                api(projects.app.db.write)
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)

@@ -22,6 +22,7 @@ kotlin {
                 // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
                 api(libs.kotlinx.coroutines.core)
                 api(projects.app.db.core)
+                api(projects.app.db.write)
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
@@ -33,6 +34,7 @@ kotlin {
                 // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
                 api(libs.kotlinx.coroutines.core)
                 api(projects.app.db.core)
+                api(projects.app.db.write)
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
@@ -53,7 +55,14 @@ kotlin {
         // uses the module's own main classes directly, which it flags as a transitive dep to declare.
         getByName("jvmTest") {
             dependencies {
+                implementation(projects.app.db.write)
                 implementation(projects.app.remotestorage.sync)
+            }
+        }
+
+        getByName("androidHostTest") {
+            dependencies {
+                implementation(projects.app.db.write)
             }
         }
     }

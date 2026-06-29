@@ -72,6 +72,7 @@ kotlin {
                 implementation(libs.compose.ui.test.desktop)
                 implementation(libs.mokkery.core)
                 implementation(projects.app.db.core)
+                implementation(projects.app.db.write)
                 implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
             }
@@ -79,6 +80,7 @@ kotlin {
         getByName("androidHostTest") {
             dependencies {
                 implementation(projects.app.db.core)
+                implementation(projects.app.db.write)
             }
         }
         getByName("androidDeviceTest") {
@@ -86,6 +88,7 @@ kotlin {
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.mokkery.core)
                 implementation(projects.app.db.core)
+                implementation(projects.app.db.write)
                 implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
                 implementation(projects.test.app.ui)
