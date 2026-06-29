@@ -11,4 +11,6 @@ dependencies {
     api(projects.app.db.read)
 
     implementation(projects.app.model.core)
+
+    testImplementation(kotlin("test"))
 }
