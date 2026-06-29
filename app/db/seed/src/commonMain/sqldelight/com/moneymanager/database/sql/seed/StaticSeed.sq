@@ -1,0 +1,45 @@
+-- Static seed rows, run during Schema.create() AFTER :app:db:schema's tables + triggers.
+-- INSERTs only (no DDL). Ordered for foreign-key satisfaction (foreign_keys is ON during create):
+-- lookups + system device first, then the audited Uncategorized category and its provenance.
+
+-- Lookup tables (all in EXCLUDED_FROM_AUDIT — no triggers fire on these).
+INSERT INTO audit_type (id, name) VALUES (1, 'INSERT');
+INSERT INTO audit_type (id, name) VALUES (2, 'UPDATE');
+INSERT INTO audit_type (id, name) VALUES (3, 'DELETE');
+
+INSERT INTO source_type (id, name) VALUES (1, 'MANUAL');
+INSERT INTO source_type (id, name) VALUES (2, 'CSV_IMPORT');
+INSERT INTO source_type (id, name) VALUES (3, 'SAMPLE_GENERATOR');
+INSERT INTO source_type (id, name) VALUES (4, 'SYSTEM');
+INSERT INTO source_type (id, name) VALUES (5, 'API');
+INSERT INTO source_type (id, name) VALUES (6, 'QIF_IMPORT');
+INSERT INTO source_type (id, name) VALUES (7, 'MERGE_UNDO');
+INSERT INTO source_type (id, name) VALUES (8, 'MERGE');
+
+INSERT INTO api_session_type (id, name) VALUES (1, 'Monzo');
+
+INSERT OR IGNORE INTO platform (id, name) VALUES (0, 'SYSTEM');
+INSERT OR IGNORE INTO platform (id, name) VALUES (1, 'JVM');
+INSERT OR IGNORE INTO platform (id, name) VALUES (2, 'ANDROID');
+
+-- System device with the well-known fixed id (WellKnownIds.SYSTEM_DEVICE_ID = 1) so every seeded
+-- entity's provenance device_id is a compile-time constant (no last_insert_rowid read-back).
+INSERT OR IGNORE INTO device (id, platform_id, os_id, machine_id, device_make_id, device_model_id)
+VALUES (1, 0, NULL, NULL, NULL, NULL);
+
+-- Well-known attribute / relationship types (EXCLUDED_FROM_AUDIT — no triggers fire).
+INSERT INTO attribute_type (id, name) VALUES (-1, 'excluded');
+INSERT INTO attribute_type (id, name) VALUES (-2, 'account-external-id');
+INSERT INTO attribute_type (id, name) VALUES (-3, 'built-in type');
+INSERT INTO attribute_type (id, name) VALUES (-5, 'account-sort-code');
+INSERT INTO attribute_type (id, name) VALUES (-6, 'account-account-number');
+
+INSERT INTO relationship_type (id, name) VALUES (1, 'reconciled');
+INSERT INTO relationship_type (id, name) VALUES (2, 'fee');
+
+-- Default "Uncategorized" category. category IS audited, so this fires trigger_category_insert_audit
+-- (writing a category_audit row) — same as the old runtime seed. Its SYSTEM provenance is recorded
+-- explicitly (entity_type CATEGORY=5, source_type SYSTEM=4, device 1).
+INSERT INTO category (id, name, parent_id) VALUES (-1, 'Uncategorized', NULL);
+INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
+VALUES (5, -1, 1, 4, 1);

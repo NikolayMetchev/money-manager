@@ -47,6 +47,7 @@ kotlin {
                 implementation(libs.sqldelight.sqlite.driver)
                 implementation(projects.app.db.read)
                 implementation(projects.app.db.schema)
+                implementation(projects.app.db.seed)
             }
         }
 
@@ -67,6 +68,7 @@ kotlin {
                 implementation(libs.androidx.sqlite)
                 implementation(libs.sqldelight.android.driver)
                 implementation(projects.app.db.schema)
+                implementation(projects.app.db.seed)
             }
         }
 

@@ -3,7 +3,7 @@ package com.moneymanager.database
 import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
-import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
 import com.moneymanager.domain.model.DbLocation
 import kotlinx.coroutines.Dispatchers

@@ -97,62 +97,10 @@ object DatabaseConfig {
      */
     fun seedDatabase(database: MoneyManagerDatabaseWrapper) {
         with(database) {
-            // Seed AuditType lookup table
-            auditTypeWriteQueries.insert(id = 1, name = "INSERT")
-            auditTypeWriteQueries.insert(id = 2, name = "UPDATE")
-            auditTypeWriteQueries.insert(id = 3, name = "DELETE")
-
-            // Seed SourceType lookup table
-            sourceTypeWriteQueries.insert(id = 1, name = "MANUAL")
-            sourceTypeWriteQueries.insert(id = 2, name = "CSV_IMPORT")
-            sourceTypeWriteQueries.insert(id = 3, name = "SAMPLE_GENERATOR")
-            sourceTypeWriteQueries.insert(id = 4, name = "SYSTEM")
-            sourceTypeWriteQueries.insert(id = 5, name = "API")
-            sourceTypeWriteQueries.insert(id = 6, name = "QIF_IMPORT")
-            sourceTypeWriteQueries.insert(id = 7, name = "MERGE_UNDO")
-            sourceTypeWriteQueries.insert(id = 8, name = "MERGE")
-
-            // Seed API session type lookup table
-            apiSessionWriteQueries.insertSessionType(id = 1, name = "Monzo")
-
-            // Seed Platform lookup table
-            platformWriteQueries.insert(id = 0, name = "SYSTEM")
-            platformWriteQueries.insert(id = 1, name = "JVM")
-            platformWriteQueries.insert(id = 2, name = "ANDROID")
-
-            // Create system device now (before any seeded entities that need source attribution).
-            // Platform 0 = SYSTEM must already exist above.
-            deviceWriteQueries.insertSystemDevice(platform_id = 0)
-            val systemDeviceId =
-                deviceSelectQueries.selectSystemDevice(platform_id = 0).executeAsOneOrNull()
-                    ?: deviceWriteQueries.lastInsertRowId().executeAsOne()
-
-            // Seed default "Uncategorized" category
-            categoryWriteQueries.insertWithId(
-                id = -1,
-                name = "Uncategorized",
-                parent_id = null,
-            )
-            entitySourceWriteQueries.insertSource(
-                entity_type_id = EntityType.CATEGORY.id,
-                entity_id = -1L,
-                revision_id = 1,
-                source_type_id = SourceType.SYSTEM.id.toLong(),
-                device_id = systemDeviceId,
-            )
-
-            // Seed well-known attribute types with stable negative IDs so importers can
-            // reference them without a DB lookup.
-            attributeTypeWriteQueries.insertWithId(id = EXCLUDED_ATTR_TYPE_ID, name = "excluded")
-            attributeTypeWriteQueries.insertWithId(id = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, name = "account-external-id")
-            attributeTypeWriteQueries.insertWithId(id = BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID, name = "built-in type")
-            attributeTypeWriteQueries.insertWithId(id = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, name = "account-sort-code")
-            attributeTypeWriteQueries.insertWithId(id = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, name = "account-account-number")
-
-            // Seed well-known relationship types with stable IDs so importers can reference them
-            // without a DB lookup.
-            relationshipTypeWriteQueries.insertWithId(id = RECONCILED_RELATIONSHIP_TYPE_ID, name = "reconciled")
-            relationshipTypeWriteQueries.insertWithId(id = FEE_RELATIONSHIP_TYPE_ID, name = "fee")
+            // Lookups, well-known attribute/relationship types, the system device and the Uncategorized
+            // category are now seeded statically in :app:db:seed during Schema.create. The SYSTEM device
+            // has a fixed id there, so provenance below references it directly.
+            val systemDeviceId = WellKnownIds.SYSTEM_DEVICE_ID
 
             // Seed the built-in Monzo, Wise and Starling API import strategies (after triggers and
             // system device are created so the INSERT trigger records the initial audit entry/source)
