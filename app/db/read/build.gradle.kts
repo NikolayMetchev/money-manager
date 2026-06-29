@@ -33,6 +33,11 @@ kotlin {
                 api(libs.kotlinx.serialization.core)
             }
         }
+        getByName("commonTest") {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }
 
