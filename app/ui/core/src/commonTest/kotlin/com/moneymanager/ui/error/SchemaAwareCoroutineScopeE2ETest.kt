@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
@@ -103,8 +104,11 @@ class SchemaAwareCoroutineScopeE2ETest {
             waitForIdle()
             onNodeWithText("Database Schema Error").assertDoesNotExist()
 
-            // App should now show normal content after database recreation
-            waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 15000)
+            // App should now show normal content after database recreation. Recreation re-runs
+            // Schema.create (which now seeds currencies + strategies), so use the same robust
+            // wait the other E2E tests use for this screen (at-least-one, 20s) rather than a
+            // tighter exactly-one/15s that flakes under full-build load.
+            waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
             waitForIdle()
         }
 }
