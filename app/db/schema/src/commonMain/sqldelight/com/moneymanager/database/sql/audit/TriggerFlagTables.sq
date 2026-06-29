@@ -2,6 +2,7 @@
 -- DatabaseConfig; now part of the schema so the triggers below can live in .sq.
 --   _import_batch:  when populated, attribute audit triggers are skipped entirely (bulk CSV import).
 --   _creation_mode: when populated, attribute triggers record audit but do not bump the revision.
+-- noinspection UnusedColumn
 CREATE TABLE _import_batch (active INTEGER);
 
 CREATE TABLE _creation_mode (active INTEGER);

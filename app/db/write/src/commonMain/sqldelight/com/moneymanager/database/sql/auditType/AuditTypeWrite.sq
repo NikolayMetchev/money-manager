@@ -1,3 +1,0 @@
--- Insert audit type (used during seeding)
-insert:
-INSERT INTO audit_type (id, name) VALUES (?, ?);

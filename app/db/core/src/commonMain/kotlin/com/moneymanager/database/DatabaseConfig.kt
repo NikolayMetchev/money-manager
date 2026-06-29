@@ -18,10 +18,6 @@ object DatabaseConfig {
     // aliases keep existing db-layer call sites and the seeding below working. The database seeds
     // exactly these ids.
     const val EXCLUDED_ATTR_TYPE_ID: Long = WellKnownIds.EXCLUDED_ATTR_TYPE_ID
-    const val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID: Long = WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID
-    const val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID: Long = WellKnownIds.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID
-    const val ACCOUNT_SORT_CODE_ATTR_TYPE_ID: Long = WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID
-    const val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID: Long = WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID
     const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID
     const val FEE_RELATIONSHIP_TYPE_ID: Long = WellKnownIds.FEE_RELATIONSHIP_TYPE_ID
 

@@ -2,10 +2,6 @@ insert:
 INSERT INTO category(name, parent_id)
 VALUES (?, ?);
 
-insertWithId:
-INSERT INTO category(id, name, parent_id)
-VALUES (?, ?, ?);
-
 update:
 UPDATE category
 SET revision_id = revision_id + 1, name = ?, parent_id = ?

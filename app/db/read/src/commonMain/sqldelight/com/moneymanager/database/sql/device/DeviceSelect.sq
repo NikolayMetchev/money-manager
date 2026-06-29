@@ -39,7 +39,3 @@ SELECT id FROM device_view
 WHERE platform_name = 'ANDROID'
   AND device_make_id = ?
   AND device_model_id = ?;
-
--- Select system device by platform_id (for system source tracking)
-selectSystemDevice:
-SELECT id FROM device WHERE platform_id = ? AND os_id IS NULL AND machine_id IS NULL;

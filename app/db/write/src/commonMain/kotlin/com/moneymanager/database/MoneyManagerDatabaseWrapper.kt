@@ -27,7 +27,6 @@ class MoneyManagerDatabaseWrapper(
     val apiImportStrategyWriteQueries get() = writeDb.apiImportStrategyWriteQueries
     val apiSessionWriteQueries get() = writeDb.apiSessionWriteQueries
     val attributeTypeWriteQueries get() = writeDb.attributeTypeWriteQueries
-    val auditTypeWriteQueries get() = writeDb.auditTypeWriteQueries
     val categoryWriteQueries get() = writeDb.categoryWriteQueries
     val csvAccountMappingWriteQueries get() = writeDb.csvAccountMappingWriteQueries
     val csvImportStrategyWriteQueries get() = writeDb.csvImportStrategyWriteQueries
@@ -39,11 +38,9 @@ class MoneyManagerDatabaseWrapper(
     val maintenanceWriteQueries get() = writeDb.maintenanceWriteQueries
     val personAttributeWriteQueries get() = writeDb.personAttributeWriteQueries
     val personWriteQueries get() = writeDb.personWriteQueries
-    val platformWriteQueries get() = writeDb.platformWriteQueries
     val qifImportWriteQueries get() = writeDb.qifImportWriteQueries
     val relationshipTypeWriteQueries get() = writeDb.relationshipTypeWriteQueries
     val settingsWriteQueries get() = writeDb.settingsWriteQueries
-    val sourceTypeWriteQueries get() = writeDb.sourceTypeWriteQueries
     val transactionIdWriteQueries get() = writeDb.transactionIdWriteQueries
     val transferAttributeWriteQueries get() = writeDb.transferAttributeWriteQueries
     val transferRelationshipWriteQueries get() = writeDb.transferRelationshipWriteQueries
