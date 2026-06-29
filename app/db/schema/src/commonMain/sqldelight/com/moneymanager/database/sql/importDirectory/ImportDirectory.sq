@@ -2,17 +2,25 @@
 -- On a manual "Scan now" the app lists the folder and DOWNLOADS new/changed files into the CSV/QIF
 -- staging tables (so they appear in the Imports section); the existing "Import All" then applies the
 -- matching strategy. See import_directory_file for the per-file change-detection cursor.
--- provider_type: 'LOCAL' | 'GDRIVE'. Supported files (.csv/.qif) are detected by extension on scan.
+-- provider_type_id: FK to import_directory_provider ('LOCAL' | 'GDRIVE'). Supported files (.csv/.qif)
+--   are detected by extension on scan.
 -- folder_ref: local absolute path / Android tree URI, or Drive folder id (used to access the folder).
 -- folder_display_path: human-readable full path shown in the UI (e.g. "My Drive / Statements"); for
 --   Drive directories this is the navigated hierarchy, since folder_ref is an opaque id. NULL → fall
 --   back to folder_ref (e.g. local folders, whose ref is already a readable path).
 -- device_id: set for LOCAL directories (scanned only on that device); NULL for shared GDRIVE.
+
+-- Lookup table for import_directory.provider_type_id (snowflake-style; seeded in StaticSeed.sq).
+CREATE TABLE import_directory_provider (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);
+
 CREATE TABLE import_directory (
     id TEXT PRIMARY KEY NOT NULL,
     revision_id INTEGER NOT NULL DEFAULT 1,
     name TEXT NOT NULL UNIQUE,
-    provider_type TEXT NOT NULL,
+    provider_type_id INTEGER NOT NULL,
     folder_ref TEXT NOT NULL,
     folder_display_path TEXT,
     provider_config TEXT,
@@ -26,6 +34,7 @@ CREATE TABLE import_directory (
     excluded INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
     updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+    FOREIGN KEY (provider_type_id) REFERENCES import_directory_provider(id),
     FOREIGN KEY (device_id) REFERENCES device(id),
     FOREIGN KEY (parent_id) REFERENCES import_directory(id) ON DELETE CASCADE
 );
@@ -53,7 +62,8 @@ CREATE INDEX IF NOT EXISTS idx_import_directory_source_revision ON import_direct
 
 -- Per-(directory, file) change-detection cursor. last_modified is compared against the file's
 -- current last-modified on each scan; a newer timestamp (sha256-confirmed) triggers a re-import,
--- producing a fresh csv_import_metadata / qif_import_metadata staging row.
+-- producing a fresh csv_import_metadata / qif_import_metadata staging row. The csv/qif import a file
+-- staged into lives in the import_directory_file_csv_import / _qif_import child tables (at most one).
 CREATE TABLE import_directory_file (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     directory_id TEXT NOT NULL,
@@ -61,13 +71,26 @@ CREATE TABLE import_directory_file (
     file_name TEXT NOT NULL,
     last_modified INTEGER NOT NULL,
     checksum TEXT,
-    csv_import_id TEXT,
-    qif_import_id TEXT,
     imported_at INTEGER,
     FOREIGN KEY (directory_id) REFERENCES import_directory(id) ON DELETE CASCADE,
-    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id),
-    FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id),
     UNIQUE (directory_id, file_ref)
 );
 
 CREATE INDEX IF NOT EXISTS idx_import_directory_file_directory ON import_directory_file(directory_id);
+
+-- The CSV import a tracked file staged into (1:1; row present only for .csv files). Mirrors
+-- csv_entity_source: PK = the parent import_directory_file.id.
+CREATE TABLE import_directory_file_csv_import (
+    file_id INTEGER PRIMARY KEY,
+    csv_import_id TEXT NOT NULL,
+    FOREIGN KEY (file_id) REFERENCES import_directory_file(id) ON DELETE CASCADE,
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id)
+);
+
+-- The QIF import a tracked file staged into (1:1; row present only for .qif files).
+CREATE TABLE import_directory_file_qif_import (
+    file_id INTEGER PRIMARY KEY,
+    qif_import_id TEXT NOT NULL,
+    FOREIGN KEY (file_id) REFERENCES import_directory_file(id) ON DELETE CASCADE,
+    FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id)
+);

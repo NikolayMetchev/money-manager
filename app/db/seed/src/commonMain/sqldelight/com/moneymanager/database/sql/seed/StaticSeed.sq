@@ -18,6 +18,9 @@ INSERT INTO source_type (id, name) VALUES (8, 'MERGE');
 
 INSERT INTO api_session_type (id, name) VALUES (1, 'Monzo');
 
+INSERT INTO import_directory_provider (id, name) VALUES (1, 'LOCAL');
+INSERT INTO import_directory_provider (id, name) VALUES (2, 'GDRIVE');
+
 INSERT OR IGNORE INTO platform (id, name) VALUES (0, 'SYSTEM');
 INSERT OR IGNORE INTO platform (id, name) VALUES (1, 'JVM');
 INSERT OR IGNORE INTO platform (id, name) VALUES (2, 'ANDROID');

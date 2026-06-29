@@ -516,7 +516,7 @@ SELECT
     import_directory_audit.import_directory_id,
     import_directory_audit.revision_id,
     import_directory_audit.name,
-    import_directory_audit.provider_type,
+    import_directory_provider.name AS provider_type,
     import_directory_audit.folder_ref,
     import_directory_audit.folder_display_path,
     import_directory_audit.provider_config,
@@ -539,6 +539,7 @@ SELECT
     import_directory_source.created_at AS source_created_at
 FROM import_directory_audit
 JOIN audit_type ON import_directory_audit.audit_type_id = audit_type.id
+JOIN import_directory_provider ON import_directory_audit.provider_type_id = import_directory_provider.id
 LEFT JOIN import_directory_source ON import_directory_audit.import_directory_id = import_directory_source.directory_id
     AND import_directory_audit.revision_id = import_directory_source.revision_id
 LEFT JOIN source_type ON import_directory_source.source_type_id = source_type.id

@@ -7,13 +7,20 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Source
 import kotlin.time.Instant
 
-/** Where a directory's files live. */
-enum class ImportDirectoryProvider {
+/** Where a directory's files live. [id] matches the import_directory_provider lookup row. */
+enum class ImportDirectoryProvider(
+    val id: Int,
+) {
     /** A folder on the local filesystem (JVM path) or an Android document-tree URI. */
-    LOCAL,
+    LOCAL(1),
 
     /** A folder in the user's Google Drive. */
-    GDRIVE,
+    GDRIVE(2),
+    ;
+
+    companion object {
+        fun fromId(id: Long): ImportDirectoryProvider = entries.first { it.id.toLong() == id }
+    }
 }
 
 /**

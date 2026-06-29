@@ -1,12 +1,12 @@
 -- Insert a new import directory. created_at/updated_at are filled by their column DEFAULTs.
 insert:
-INSERT INTO import_directory (id, name, provider_type, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded)
+INSERT INTO import_directory (id, name, provider_type_id, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Update an existing import directory (bumps revision)
 update:
 UPDATE import_directory
-SET revision_id = revision_id + 1, name = ?, provider_type = ?, folder_ref = ?, folder_display_path = ?, provider_config = ?, device_id = ?, top_level = ?, parent_id = ?, excluded = ?, updated_at = ?
+SET revision_id = revision_id + 1, name = ?, provider_type_id = ?, folder_ref = ?, folder_display_path = ?, provider_config = ?, device_id = ?, top_level = ?, parent_id = ?, excluded = ?, updated_at = ?
 WHERE id = ?;
 
 -- Delete a directory by ID (cascades to import_directory_file)
@@ -17,14 +17,26 @@ insertSource:
 INSERT OR IGNORE INTO import_directory_source (directory_id, revision_id, source_type_id, device_id)
 VALUES (?, ?, ?, ?);
 
--- Upsert the per-file change-detection cursor
+-- Upsert the per-file change-detection cursor. The csv/qif import a file staged into lives in the
+-- import_directory_file_csv_import / _qif_import child tables, written separately (see below).
 upsertFile:
-INSERT INTO import_directory_file (directory_id, file_ref, file_name, last_modified, checksum, csv_import_id, qif_import_id, imported_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO import_directory_file (directory_id, file_ref, file_name, last_modified, checksum, imported_at)
+VALUES (?, ?, ?, ?, ?, ?)
 ON CONFLICT (directory_id, file_ref) DO UPDATE SET
     file_name = excluded.file_name,
     last_modified = excluded.last_modified,
     checksum = excluded.checksum,
-    csv_import_id = excluded.csv_import_id,
-    qif_import_id = excluded.qif_import_id,
     imported_at = excluded.imported_at;
+
+-- Replace a file's csv/qif import child rows (at most one is present per file).
+deleteCsvImportForFile:
+DELETE FROM import_directory_file_csv_import WHERE file_id = ?;
+
+deleteQifImportForFile:
+DELETE FROM import_directory_file_qif_import WHERE file_id = ?;
+
+insertCsvImportForFile:
+INSERT INTO import_directory_file_csv_import (file_id, csv_import_id) VALUES (?, ?);
+
+insertQifImportForFile:
+INSERT INTO import_directory_file_qif_import (file_id, qif_import_id) VALUES (?, ?);
