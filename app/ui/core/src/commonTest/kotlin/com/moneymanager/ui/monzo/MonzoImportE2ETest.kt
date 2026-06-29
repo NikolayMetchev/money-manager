@@ -319,6 +319,29 @@ private val TRANSACTIONS_WITH_EPHEMERAL_COUNTERPARTY_JSON =
 }
     """.trimIndent()
 
+/**
+ * A LATER import of the same person via yet another ephemeral id, with a spelling ("Olga Ivanna
+ * Zakharenko") that never appeared in [TRANSACTIONS_WITH_EPHEMERAL_COUNTERPARTY_JSON]. Reconciling
+ * onto the existing account therefore proves the match is by the persisted name key, not the exact name.
+ */
+private val TRANSACTIONS_WITH_EPHEMERAL_COUNTERPARTY_SECOND_IMPORT_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000063",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-20T09:15:00.000Z",
+      "amount": -4000,
+      "currency": "GBP",
+      "description": "Sent to Olga again",
+      "merchant": null,
+      "counterparty": { "name": "Olga Ivanna Zakharenko", "user_id": "anonuser_ddd", "beneficiary_account_type": "Personal" }
+    }
+  ]
+}
+    """.trimIndent()
+
 private val TRANSACTIONS_WITH_ATM_WITHDRAWALS_JSON =
     """
 {
@@ -1889,5 +1912,93 @@ class MonzoImportE2ETest : DbTest() {
                 counterpartyAccounts.size,
                 "Ephemeral anonuser ids must not fragment one real person into multiple accounts: $counterpartyAccounts",
             )
+        }
+
+    @Test
+    fun `ephemeral counterparties reconcile onto one account across separate imports`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Monzo" }
+
+            // Runs a full account+transaction import session against the given transactions fixture.
+            suspend fun importSession(transactionsJson: String) {
+                val sessionId =
+                    repositories.apiSessionRepository.createSession(
+                        token = "test-monzo-token",
+                        deviceId = deviceId,
+                        createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                        expiresAt = null,
+                    )
+                val mockEngine =
+                    MockEngine { request ->
+                        val url = request.url.toString()
+                        val json =
+                            when {
+                                url.contains("/accounts") -> ACCOUNTS_JSON
+                                url.contains("/transactions") && !url.contains("before=") -> transactionsJson
+                                url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                                else -> error("Unexpected request: $url")
+                            }
+                        respond(
+                            content = json,
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    }
+                val apiClient =
+                    createApiClient(
+                        trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
+                        engine = mockEngine,
+                    )
+                downloadApiSessionAccounts(
+                    token = "test-monzo-token",
+                    apiClient = apiClient,
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+                downloadApiSessionTransactions(
+                    token = "test-monzo-token",
+                    apiClient = apiClient,
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                    importEngine = repositories.importEngine,
+                )
+            }
+
+            // First import creates the "Olga Zakharenko" counterparty (named after the first spelling).
+            importSession(TRANSACTIONS_WITH_EPHEMERAL_COUNTERPARTY_JSON)
+            // Second, separate import sees the same person under a brand-new ephemeral id and a spelling
+            // that never appeared before — it must reconcile via the persisted name key, not the exact name.
+            importSession(TRANSACTIONS_WITH_EPHEMERAL_COUNTERPARTY_SECOND_IMPORT_JSON)
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val counterpartyAccounts = allAccounts.filter { it.id != monzoAccount.id }
+            assertEquals(
+                1,
+                counterpartyAccounts.size,
+                "A second import of the same person must reuse the existing account, not create a duplicate: $counterpartyAccounts",
+            )
+            val nameKeyAttrs =
+                repositories.accountAttributeRepository
+                    .getByAccount(counterpartyAccounts.single().id)
+                    .first()
+                    .filter { it.attributeType.name == "counterparty-name-key" }
+            assertEquals("olga zakharenko", nameKeyAttrs.single().value, "Account should carry one normalised name key")
         }
 }

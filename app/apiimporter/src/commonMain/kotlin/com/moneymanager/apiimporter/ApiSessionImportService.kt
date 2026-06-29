@@ -94,6 +94,7 @@ private val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCO
 private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID)
 private val ACCOUNT_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
 private val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
+private val ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID)
 
 // How far apart two providers may timestamp the same real movement and still be reconciled as one
 // (a Faster Payment is near-instant; this absorbs send-vs-settle timing differences between banks).
@@ -2574,15 +2575,16 @@ private class BatchAccountResolver {
                 when {
                     counterpartyId != null -> AccountMatchKey.ByExternalId(ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, counterpartyId)
                     dedupeKey != null -> AccountMatchKey.ByPersonalCounterparty(dedupeKey)
-                    // The engine resolves ByName against the exact account name, so the in-batch name-key
-                    // merge above is what collapses spelling variants. Across imports these reconcile by
-                    // the chosen display name; because a re-import replays the same history (Monzo refetches
-                    // the full window, not a delta), the first-seen name is reproduced and matches.
+                    // Persist the normalised name key as an attribute and match on it, so an id-less,
+                    // bank-less counterparty reconciles onto the same account across separate imports
+                    // (not just within this batch) — the engine indexes existing accounts by this attribute.
+                    nameKey != null -> AccountMatchKey.ByExternalId(ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID, nameKey)
                     else -> AccountMatchKey.ByName(normalizedName)
                 }
             val attributes =
                 buildList {
                     if (counterpartyId != null) add(externalIdAttr(counterpartyId))
+                    if (nameKey != null) add(NewAttribute(typeId = ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID, value = nameKey))
                     if (identity != null) addAll(bankAttrs(identity.sortCode, identity.accountNumber))
                 }
             intents[key] =
