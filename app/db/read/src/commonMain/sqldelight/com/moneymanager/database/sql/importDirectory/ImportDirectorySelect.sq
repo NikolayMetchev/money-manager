@@ -6,10 +6,19 @@ SELECT * FROM import_directory ORDER BY name;
 selectById:
 SELECT * FROM import_directory WHERE id = ?;
 
--- Select all tracked files for a directory
+-- Select all tracked files for a directory, joining the csv/qif import a file staged into.
 selectFilesForDirectory:
-SELECT * FROM import_directory_file WHERE directory_id = ? ORDER BY file_name;
+SELECT f.*, c.csv_import_id, q.qif_import_id
+FROM import_directory_file f
+LEFT JOIN import_directory_file_csv_import c ON c.file_id = f.id
+LEFT JOIN import_directory_file_qif_import q ON q.file_id = f.id
+WHERE f.directory_id = ?
+ORDER BY f.file_name;
 
--- Select a single tracked file by its (directory, file_ref) key
+-- Select a single tracked file by its (directory, file_ref) key, with its csv/qif import.
 selectFileByRef:
-SELECT * FROM import_directory_file WHERE directory_id = ? AND file_ref = ?;
+SELECT f.*, c.csv_import_id, q.qif_import_id
+FROM import_directory_file f
+LEFT JOIN import_directory_file_csv_import c ON c.file_id = f.id
+LEFT JOIN import_directory_file_qif_import q ON q.file_id = f.id
+WHERE f.directory_id = ? AND f.file_ref = ?;

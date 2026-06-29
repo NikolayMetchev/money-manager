@@ -4,12 +4,15 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.scanImportDirectory
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
+import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createImportDirectory
+import com.moneymanager.importengineapi.recordDirectoryFileImported
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
@@ -19,6 +22,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -152,6 +156,25 @@ class ImportDirectoryScannerTest : DbTest() {
                     .first()
                     .size,
             )
+        }
+
+    @Test
+    fun `recordFileImported rejects a file that resolves to both csv and qif`() =
+        runTest {
+            val engine = engine()
+            val directory = newDirectory(engine)
+            assertFailsWith<IllegalArgumentException> {
+                engine.recordDirectoryFileImported(
+                    directoryId = directory.id,
+                    fileRef = "both.csv",
+                    fileName = "both.csv",
+                    lastModified = Clock.System.now(),
+                    checksum = "abc",
+                    csvImportId = CsvImportId(Uuid.random()),
+                    qifImportId = QifImportId(Uuid.random()),
+                    importedAt = Clock.System.now(),
+                )
+            }
         }
 
     @Test

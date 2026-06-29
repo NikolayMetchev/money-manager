@@ -37,7 +37,7 @@ class ImportDirectoryWriteRepositoryImpl(
                 writeQueries.insert(
                     id = directory.id.id.toString(),
                     name = directory.name,
-                    provider_type = directory.provider.name,
+                    provider_type_id = directory.provider.id.toLong(),
                     folder_ref = directory.folderRef,
                     folder_display_path = directory.displayPath,
                     provider_config = directory.providerConfig,
@@ -66,7 +66,7 @@ class ImportDirectoryWriteRepositoryImpl(
             database.transaction {
                 writeQueries.update(
                     name = directory.name,
-                    provider_type = directory.provider.name,
+                    provider_type_id = directory.provider.id.toLong(),
                     folder_ref = directory.folderRef,
                     folder_display_path = directory.displayPath,
                     provider_config = directory.providerConfig,
@@ -104,15 +104,28 @@ class ImportDirectoryWriteRepositoryImpl(
         importedAt: Instant,
     ): Unit =
         withContext(coroutineContext) {
-            writeQueries.upsertFile(
-                directory_id = directoryId.id.toString(),
-                file_ref = fileRef,
-                file_name = fileName,
-                last_modified = lastModified.toEpochMilliseconds(),
-                checksum = checksum,
-                csv_import_id = csvImportId?.id?.toString(),
-                qif_import_id = qifImportId?.id?.toString(),
-                imported_at = importedAt.toEpochMilliseconds(),
-            )
+            // A tracked file stages into at most one import type (CSV xor QIF); reject mixed state
+            // before any write. The schema also enforces this via the file's sibling-table triggers.
+            require(csvImportId == null || qifImportId == null) {
+                "A directory file resolves to at most one import type, but both csvImportId=$csvImportId " +
+                    "and qifImportId=$qifImportId were supplied for $fileRef"
+            }
+            database.transaction {
+                writeQueries.upsertFile(
+                    directory_id = directoryId.id.toString(),
+                    file_ref = fileRef,
+                    file_name = fileName,
+                    last_modified = lastModified.toEpochMilliseconds(),
+                    checksum = checksum,
+                    imported_at = importedAt.toEpochMilliseconds(),
+                )
+                // The csv/qif import lives in a 1:1 child table; replace it so a re-import (or a
+                // file that no longer stages anything) leaves exactly the right child row.
+                val fileId = selectQueries.selectFileByRef(directoryId.id.toString(), fileRef).executeAsOne().id
+                writeQueries.deleteCsvImportForFile(fileId)
+                writeQueries.deleteQifImportForFile(fileId)
+                csvImportId?.let { writeQueries.insertCsvImportForFile(fileId, it.id.toString()) }
+                qifImportId?.let { writeQueries.insertQifImportForFile(fileId, it.id.toString()) }
+            }
         }
 }

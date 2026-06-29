@@ -321,8 +321,8 @@ CREATE TRIGGER trigger_import_directory_delete_audit
 AFTER DELETE ON import_directory
 FOR EACH ROW
 BEGIN
-    INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, import_directory_id, revision_id, name, provider_type, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded, created_at, updated_at)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.name, old.provider_type, old.folder_ref, old.folder_display_path, old.provider_config, old.device_id, old.top_level, old.parent_id, old.excluded, old.created_at, old.updated_at);
+    INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, import_directory_id, revision_id, name, provider_type_id, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.name, old.provider_type_id, old.folder_ref, old.folder_display_path, old.provider_config, old.device_id, old.top_level, old.parent_id, old.excluded, old.created_at, old.updated_at);
 END;
 
 -- trigger_import_directory_insert_audit
@@ -330,8 +330,8 @@ CREATE TRIGGER trigger_import_directory_insert_audit
 AFTER INSERT ON import_directory
 FOR EACH ROW
 BEGIN
-    INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, import_directory_id, revision_id, name, provider_type, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded, created_at, updated_at)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.name, new.provider_type, new.folder_ref, new.folder_display_path, new.provider_config, new.device_id, new.top_level, new.parent_id, new.excluded, new.created_at, new.updated_at);
+    INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, import_directory_id, revision_id, name, provider_type_id, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.name, new.provider_type_id, new.folder_ref, new.folder_display_path, new.provider_config, new.device_id, new.top_level, new.parent_id, new.excluded, new.created_at, new.updated_at);
 END;
 
 -- trigger_import_directory_update_audit
@@ -339,8 +339,8 @@ CREATE TRIGGER trigger_import_directory_update_audit
 AFTER UPDATE ON import_directory
 FOR EACH ROW
 BEGIN
-    INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, import_directory_id, revision_id, name, provider_type, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded, created_at, updated_at)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.name, old.provider_type, old.folder_ref, old.folder_display_path, old.provider_config, old.device_id, old.top_level, old.parent_id, old.excluded, old.created_at, old.updated_at);
+    INSERT INTO import_directory_audit (audit_timestamp, audit_type_id, import_directory_id, revision_id, name, provider_type_id, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.name, old.provider_type_id, old.folder_ref, old.folder_display_path, old.provider_config, old.device_id, old.top_level, old.parent_id, old.excluded, old.created_at, old.updated_at);
 END;
 
 -- trigger_person_account_ownership_delete_audit
