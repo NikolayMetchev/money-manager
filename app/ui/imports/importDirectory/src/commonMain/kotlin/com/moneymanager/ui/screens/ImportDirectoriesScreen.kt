@@ -142,8 +142,8 @@ fun ImportDirectoriesScreen(
             onProgress = { done, total -> scanProgress = done to total },
         )
 
-    // Per-row action: a top-level folder only discovers + creates child directories; a discovered
-    // subfolder downloads its own files.
+    // Per-row action: a top-level folder both downloads its OWN importable files and discovers +
+    // creates child directories for any subfolders; a discovered subfolder just downloads its files.
     fun downloadDirectory(directory: ImportDirectory) {
         scanningId = directory.id
         scanProgress = 0 to 0
@@ -151,8 +151,11 @@ fun ImportDirectoriesScreen(
         scope.launch {
             try {
                 if (directory.topLevel) {
+                    val downloaded = downloadFolder(directory).filesDownloaded
                     val created = createSubdirectories(directory, directories.associateByTo(mutableMapOf()) { it.folderRef })
-                    statusMessage = "${directory.name}: created $created subfolder director${if (created == 1) "y" else "ies"}."
+                    statusMessage =
+                        "${directory.name}: downloaded $downloaded file(s); " +
+                            "created $created subfolder director${if (created == 1) "y" else "ies"}."
                 } else {
                     statusMessage = "${directory.name}: downloaded ${downloadFolder(directory).filesDownloaded} file(s)."
                 }
@@ -216,8 +219,8 @@ fun ImportDirectoriesScreen(
         }
 
         Text(
-            "\"Find subfolders\" on a top-level folder discovers its importable subfolders; download those to " +
-                "fetch files, then use each row's import link. Tick \"Exclude\" to skip a folder.",
+            "\"Download & find subfolders\" on a top-level folder fetches its own files AND discovers importable " +
+                "subfolders; download those too, then use each row's import link. Tick \"Exclude\" to skip a folder.",
             style = MaterialTheme.typography.bodyMedium,
         )
 
@@ -331,8 +334,9 @@ private fun ImportDirectoryRow(
         ).joinToString(" and ").ifEmpty { "No" }.let { "$it files downloaded" }
 
     val onWrongDevice = directory.provider == ImportDirectoryProvider.LOCAL && directory.deviceId != deviceId
-    // Top-level folders discover + create child directories; discovered subfolders download their files.
-    val actionLabel = if (directory.topLevel) "Find subfolders" else "Download"
+    // Top-level folders download their own files AND discover/create child directories for subfolders;
+    // discovered subfolders just download their files.
+    val actionLabel = if (directory.topLevel) "Download & find subfolders" else "Download"
 
     Card(modifier = Modifier.fillMaxWidth().padding(start = indent)) {
         Column(
