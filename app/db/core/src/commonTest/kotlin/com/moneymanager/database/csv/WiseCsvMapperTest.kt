@@ -6,7 +6,6 @@ import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ExistingTransferInfo
 import com.moneymanager.csvimporter.MappingResult
 import com.moneymanager.csvimporter.NewAccount
-import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -16,6 +15,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.csvstrategy.BuiltInCsvStrategies
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
@@ -28,11 +28,11 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Exercises the built-in Wise CSV strategy (as seeded by [DatabaseConfig.buildWiseCsvStrategy])
+ * Exercises the built-in Wise CSV strategy (as seeded by [BuiltInCsvStrategies.buildWiseCsvStrategy])
  * against the row shapes found in real Wise transaction-history.csv exports.
  */
 class WiseCsvMapperTest {
-    private val strategy = DatabaseConfig.buildWiseCsvStrategy(Clock.System.now())
+    private val strategy = BuiltInCsvStrategies.buildWiseCsvStrategy(Clock.System.now())
 
     private val eur = Currency(id = CurrencyId(1), code = "EUR", name = "Euro")
     private val gbp = Currency(id = CurrencyId(2), code = "GBP", name = "British Pound")

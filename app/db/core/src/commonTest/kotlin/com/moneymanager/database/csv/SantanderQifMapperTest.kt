@@ -4,12 +4,12 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
-import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csvstrategy.BuiltInCsvStrategies
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.qifimporter.QifCsvAdapter
@@ -23,14 +23,14 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 
 /**
- * Exercises the built-in Santander QIF strategy ([DatabaseConfig.buildSantanderQifStrategy]) — which
+ * Exercises the built-in Santander QIF strategy ([BuiltInCsvStrategies.buildSantanderQifStrategy]) — which
  * is pure config — against the real Santander Payee formats. Verifies the config-driven parsing
  * extracts a clean counterparty (target account), tags transaction-type / reference / mandate / date
  * attributes, cleans the description, and flags person-to-person counterparties.
  */
 class SantanderQifMapperTest {
     private val now = Clock.System.now()
-    private val strategy = DatabaseConfig.buildSantanderQifStrategy(now)
+    private val strategy = BuiltInCsvStrategies.buildSantanderQifStrategy(now)
 
     private val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound")
     private val santander = Account(id = AccountId(1), name = "Santander", openingDate = now)
@@ -176,7 +176,7 @@ class SantanderQifMapperTest {
 
     @Test
     fun `content auto-detect picks Santander for santander rows and the generic QIF strategy otherwise`() {
-        val strategies = DatabaseConfig.builtInCsvStrategies(now).qifCompatible()
+        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now).qifCompatible()
         val santanderRows =
             listOf(row("DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF X, MANDATE NO 1, 5.00", "-5.00"))
         val genericRows = listOf(row("Tesco", "-5.00"))

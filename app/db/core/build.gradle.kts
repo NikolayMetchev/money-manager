@@ -45,8 +45,6 @@ kotlin {
                 api(projects.utils.currency)
 
                 implementation(libs.sqldelight.sqlite.driver)
-                implementation(projects.app.db.read)
-                implementation(projects.app.db.schema)
                 implementation(projects.app.db.seed)
             }
         }
@@ -55,6 +53,7 @@ kotlin {
             dependencies {
                 implementation(libs.sqldelight.runtime)
                 implementation(projects.app.db.core)
+                implementation(projects.app.db.read)
                 implementation(projects.app.di.core)
                 implementation(projects.app.importfilesource.core)
             }
@@ -67,7 +66,6 @@ kotlin {
 
                 implementation(libs.androidx.sqlite)
                 implementation(libs.sqldelight.android.driver)
-                implementation(projects.app.db.schema)
                 implementation(projects.app.db.seed)
             }
         }

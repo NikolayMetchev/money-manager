@@ -80,14 +80,9 @@ class AndroidDatabaseManager(
             )
             val database = MoneyManagerDatabaseWrapper(driver)
 
+            // Seeding now runs inside Schema.create (the :app:db:seed module), so there is no seed step.
             onProgress(DatabaseInitializationProgress("Applying database settings...", 4, 6))
-            if (isNewDatabase) {
-                onProgress(DatabaseInitializationProgress("Adding default currencies and settings...", 5, 6))
-                DatabaseConfig.seedDatabase(database)
-            } else {
-                onProgress(DatabaseInitializationProgress("Preparing repositories...", 5, 6))
-            }
-
+            onProgress(DatabaseInitializationProgress("Preparing repositories...", 5, 6))
             onProgress(DatabaseInitializationProgress("Finishing database startup...", 6, 6))
             database
         }
