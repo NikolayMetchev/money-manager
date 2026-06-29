@@ -155,7 +155,7 @@ fun ImportDirectoriesScreen(
                     val created = createSubdirectories(directory, directories.associateByTo(mutableMapOf()) { it.folderRef })
                     statusMessage =
                         "${directory.name}: downloaded $downloaded file(s); " +
-                            "created $created subfolder director${if (created == 1) "y" else "ies"}."
+                        "created $created subfolder director${if (created == 1) "y" else "ies"}."
                 } else {
                     statusMessage = "${directory.name}: downloaded ${downloadFolder(directory).filesDownloaded} file(s)."
                 }
