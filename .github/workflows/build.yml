@@ -145,7 +145,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: AVD cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         id: avd-cache
         with:
           path: |
@@ -228,7 +228,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Restore Qodana cache (read-only on non-main branches)
         if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/releases/')
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/qodana/caches
           key: qodana-2026.1-refs/heads/main
