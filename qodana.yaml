@@ -280,12 +280,6 @@ exclude:
       - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/importfilesource
       - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource
-  # _import_batch / _creation_mode are trigger-control flag tables: the audit triggers only check row
-  # EXISTENCE (SELECT 1 FROM ...), never the `active` column, and a SQLite table must have >=1 column,
-  # so the column reads as unused but cannot be removed.
-  - name: UnusedColumn
-    paths:
-      - app/db/schema/src/commonMain/sqldelight/com/moneymanager/database/sql/audit/TriggerFlagTables.sq
   # Mappie generates near-identical audit-entry mappers from the same template; the duplicated fragment
   # is codegen-shaped boilerplate, not hand-written duplication.
   - name: DuplicatedCode

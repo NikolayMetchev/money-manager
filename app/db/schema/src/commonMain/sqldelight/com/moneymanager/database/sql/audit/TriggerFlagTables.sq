@@ -5,4 +5,5 @@
 -- noinspection UnusedColumn
 CREATE TABLE _import_batch (active INTEGER);
 
+-- noinspection UnusedColumn
 CREATE TABLE _creation_mode (active INTEGER);
