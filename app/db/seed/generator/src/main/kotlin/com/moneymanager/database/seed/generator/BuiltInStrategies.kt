@@ -64,8 +64,10 @@ object BuiltInStrategies {
                     feeAmountField = "atm_fees_detailed.fee_amount",
                     feeIncludedInAmount = true,
                 ),
-            accountNamePrefix = "Monzo: ",
-            counterpartyPrefix = "Monzo Counterparty: ",
+            // Monzo issues a throwaway `anonuser_…` user id for every bank transfer, so the same person
+            // would otherwise become one counterparty account per transaction. Mark the prefix ephemeral
+            // so such no-bank counterparties are matched by name instead.
+            peopleMappings = ApiPeopleMappings(ephemeralCounterpartyIdPrefixes = setOf("anonuser_")),
             builtInCounterpartyRules = monzoAtmRules,
             personExternalIdAttribute = "monzo-external-id",
         )
@@ -163,8 +165,6 @@ object BuiltInStrategies {
                     merchantNameField = "details.merchant.name",
                     counterpartyNameField = "details.senderName",
                 ),
-            accountNamePrefix = "Wise: ",
-            counterpartyPrefix = "Wise Counterparty: ",
             // Wise balance statements are SCA-protected: a 403 returns an x-2fa-approval one-time
             // token that must be signed with the credential's private key and replayed. Statements
             // are only available via the API for accounts based in these countries.
@@ -281,8 +281,6 @@ object BuiltInStrategies {
                     counterpartyAccountNumberField = "counterPartySubEntitySubIdentifier",
                     preferBankIdentity = true,
                 ),
-            accountNamePrefix = "Starling: ",
-            counterpartyPrefix = "Starling Counterparty: ",
             // The account holder is global (one per connection) and returned as a single object,
             // so it is linked to every account imported in the session.
             peopleDownload =

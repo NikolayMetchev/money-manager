@@ -71,8 +71,6 @@ class ApiStrategyEditorStateTest {
                     customFields = mapOf("note" to "reference"),
                     uniqueIdentifierFields = setOf("note"),
                 ),
-            accountNamePrefix = "Ex: ",
-            counterpartyPrefix = "Ex CP: ",
             peopleMappings =
                 ApiPeopleMappings(
                     personalBeneficiaryAccountTypeValues = setOf("PAYEE", "SENDER"),

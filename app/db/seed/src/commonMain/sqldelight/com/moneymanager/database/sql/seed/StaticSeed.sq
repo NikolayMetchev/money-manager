@@ -33,6 +33,7 @@ INSERT INTO attribute_type (id, name) VALUES (-2, 'account-external-id');
 INSERT INTO attribute_type (id, name) VALUES (-3, 'built-in type');
 INSERT INTO attribute_type (id, name) VALUES (-5, 'account-sort-code');
 INSERT INTO attribute_type (id, name) VALUES (-6, 'account-account-number');
+INSERT INTO attribute_type (id, name) VALUES (-7, 'counterparty-name-key');
 
 INSERT INTO relationship_type (id, name) VALUES (1, 'reconciled');
 INSERT INTO relationship_type (id, name) VALUES (2, 'fee');

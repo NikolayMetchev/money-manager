@@ -38,20 +38,6 @@ internal fun GeneralTab(
             enabled = enabled,
         )
         TextFieldRow(
-            label = "Account name prefix",
-            value = state.accountNamePrefix,
-            onValueChange = { state.accountNamePrefix = it },
-            enabled = enabled,
-            placeholder = "e.g. Monzo: ",
-        )
-        TextFieldRow(
-            label = "Counterparty account prefix",
-            value = state.counterpartyPrefix,
-            onValueChange = { state.counterpartyPrefix = it },
-            enabled = enabled,
-            placeholder = "e.g. Monzo Counterparty: ",
-        )
-        TextFieldRow(
             label = "Person external-id attribute (optional)",
             value = state.personExternalIdAttribute,
             onValueChange = { state.personExternalIdAttribute = it },

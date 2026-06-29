@@ -225,6 +225,12 @@ data class ApiPeopleMappings(
     val counterpartyAccountNumberField: String = "account_number",
     val counterpartyServiceUserNumberField: String = "service_user_number",
     val fallbackCounterpartyAccountIdSuffix: String = ".account_id",
+    // Prefixes marking a resolved counterparty id as ephemeral — a throwaway id that changes per
+    // transaction and so must NOT identify the counterparty account, or the same real counterparty
+    // fragments into one account per transaction (e.g. Monzo issues a fresh "anonuser_…" user id for
+    // every bank transfer to the same person). When the id begins with one of these it is discarded
+    // and the counterparty is matched by name instead. Empty = treat every id as stable.
+    val ephemeralCounterpartyIdPrefixes: Set<String> = emptySet(),
     // When true, a counterparty's bank sub-entity (sort code + account number) identifies the
     // counterparty account in preference to [ApiTransactionMappings.counterpartyIdField]. Set for
     // providers (e.g. Starling) whose per-counterparty id can still split a single real bank account
@@ -364,8 +370,6 @@ data class ApiStrategyConfig(
     val transactionsEndpoint: ApiEndpointConfig,
     val accountMappings: ApiAccountMappings,
     val transactionMappings: ApiTransactionMappings,
-    val accountNamePrefix: String,
-    val counterpartyPrefix: String,
     val peopleMappings: ApiPeopleMappings,
     val accountIdentifiersEndpoint: ApiEndpointConfig? = null,
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),

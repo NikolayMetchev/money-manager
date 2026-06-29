@@ -157,9 +157,9 @@ class WiseImportE2ETest : DbTest() {
             assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             val accounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = accounts.single { it.name == "Wise: GBP" }
-            assertNotNull(accounts.singleOrNull { it.name == "Wise Counterparty: Alice Example" }, "credit counterparty account")
-            assertNotNull(accounts.singleOrNull { it.name == "Wise Counterparty: Coffee Shop Ltd" }, "debit merchant account")
+            val ownAccount = accounts.single { it.name == "GBP" }
+            assertNotNull(accounts.singleOrNull { it.name == "Alice Example" }, "credit counterparty account")
+            assertNotNull(accounts.singleOrNull { it.name == "Coffee Shop Ltd" }, "debit merchant account")
 
             val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
             assertEquals(2, transfers.size, "Own account should have exactly two transfers")
@@ -235,7 +235,7 @@ class WiseImportE2ETest : DbTest() {
             assertEquals(0, importResult.transactionCount, "No transactions are downloaded for an accounts-only session")
             val accounts = repositories.accountRepository.getAllAccounts().first()
             assertNotNull(
-                accounts.singleOrNull { it.name == "Wise: GBP" },
+                accounts.singleOrNull { it.name == "GBP" },
                 "The Wise balance must be created as an account even with no owners and no transactions",
             )
         }
@@ -324,7 +324,7 @@ class WiseImportE2ETest : DbTest() {
                 repositories.accountRepository
                     .getAllAccounts()
                     .first()
-                    .single { it.name == "Wise: GBP" }
+                    .single { it.name == "GBP" }
             val owners =
                 repositories.personAccountOwnershipRepository
                     .getOwnershipsByAccount(gbpAccount.id)
