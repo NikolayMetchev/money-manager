@@ -104,6 +104,12 @@ class ImportDirectoryWriteRepositoryImpl(
         importedAt: Instant,
     ): Unit =
         withContext(coroutineContext) {
+            // A tracked file stages into at most one import type (CSV xor QIF); reject mixed state
+            // before any write. The schema also enforces this via the file's sibling-table triggers.
+            require(csvImportId == null || qifImportId == null) {
+                "A directory file resolves to at most one import type, but both csvImportId=$csvImportId " +
+                    "and qifImportId=$qifImportId were supplied for $fileRef"
+            }
             database.transaction {
                 writeQueries.upsertFile(
                     directory_id = directoryId.id.toString(),

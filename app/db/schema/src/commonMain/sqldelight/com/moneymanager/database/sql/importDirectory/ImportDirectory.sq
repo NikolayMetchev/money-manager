@@ -94,3 +94,20 @@ CREATE TABLE import_directory_file_qif_import (
     FOREIGN KEY (file_id) REFERENCES import_directory_file(id) ON DELETE CASCADE,
     FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id)
 );
+
+-- A file stages into at most one import type: forbid a file_id present in both child tables.
+CREATE TRIGGER trigger_import_directory_file_csv_import_single
+BEFORE INSERT ON import_directory_file_csv_import
+FOR EACH ROW
+WHEN EXISTS (SELECT 1 FROM import_directory_file_qif_import WHERE file_id = new.file_id)
+BEGIN
+    SELECT RAISE(ABORT, 'import_directory_file already has a QIF import');
+END;
+
+CREATE TRIGGER trigger_import_directory_file_qif_import_single
+BEFORE INSERT ON import_directory_file_qif_import
+FOR EACH ROW
+WHEN EXISTS (SELECT 1 FROM import_directory_file_csv_import WHERE file_id = new.file_id)
+BEGIN
+    SELECT RAISE(ABORT, 'import_directory_file already has a CSV import');
+END;
