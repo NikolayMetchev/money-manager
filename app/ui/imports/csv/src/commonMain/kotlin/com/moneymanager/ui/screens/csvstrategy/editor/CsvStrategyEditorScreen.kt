@@ -287,6 +287,7 @@ fun CsvStrategyEditorScreen(
                     AmountDateTab(
                         state = state,
                         csvColumns = csvColumns,
+                        rows = rows,
                         firstRow = firstRow,
                         enabled = !state.isSaving,
                         currencyRepository = currencyRepository,
