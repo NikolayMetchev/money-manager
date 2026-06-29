@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.PaginationMode
@@ -33,6 +34,16 @@ class ApiStrategyJsonCodecTest {
         val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
         assertEquals(original, decoded)
         assertEquals(PaginationMode.CURSOR, decoded.transactionsEndpoint.pagination?.mode)
+    }
+
+    @Test
+    fun `people mappings ephemeral counterparty id prefixes round-trip`() {
+        val original =
+            config(ApiPaginationConfig())
+                .copy(peopleMappings = ApiPeopleMappings(ephemeralCounterpartyIdPrefixes = setOf("anonuser_")))
+        val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
+        assertEquals(original, decoded)
+        assertEquals(setOf("anonuser_"), decoded.peopleMappings.ephemeralCounterpartyIdPrefixes)
     }
 
     @Test

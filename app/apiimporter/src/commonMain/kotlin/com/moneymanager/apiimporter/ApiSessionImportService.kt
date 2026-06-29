@@ -949,6 +949,8 @@ private suspend fun linkCounterpartyOwner(
             builtInType = null,
             name = counterpartyName,
             personalIdentity = identity,
+            // This path only runs for a personal counterparty owner, so collapse middle-name variants.
+            personalCounterparty = true,
             source = counterpartyApiSource.toSource(),
         )
     setup.peopleResolver.linkOwner(
@@ -1271,6 +1273,12 @@ private fun ApiTransactionPageItem.counterpartyJsonPath(peopleMappings: ApiPeopl
     } else {
         JsonPath("${jsonPath.value}.${peopleMappings.counterpartyObjectField}")
     }
+
+/** Whether this transaction's counterparty is flagged a person (vs a merchant/business) by the strategy. */
+private fun ApiTransactionPageItem.isPersonalCounterparty(peopleMappings: ApiPeopleMappings): Boolean {
+    val counterparty = rawJson?.resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return false
+    return peopleMappings.isPersonalBeneficiaryType(counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField))
+}
 
 private fun ApiTransactionPageItem.personalCounterpartyOwner(peopleMappings: ApiPeopleMappings): ApiImportAccountOwner? {
     val counterparty = rawJson?.resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
@@ -1770,6 +1778,7 @@ private suspend fun prepareValidTransactionItem(
                 builtInType = builtInCounterpartyType,
                 name = builtInCounterpartyType ?: item.counterpartyName(setup.nameMappings),
                 personalIdentity = personalCounterpartyIdentity,
+                personalCounterparty = item.isPersonalCounterparty(setup.strategy.peopleMappings),
                 source = counterpartyApiSource.toSource(),
             )
         }
@@ -2352,8 +2361,9 @@ private class BatchAccountResolver {
     private val byName = mutableMapOf<String, LocalAccountKey>()
 
     // Collapses counterparties that carry no stable id and no bank identity (e.g. Monzo transfers with
-    // only an ephemeral anonuser id) onto one account when they share a normalised name — keyed by
-    // [counterpartyNameKey] so case and middle-name variants of one person merge.
+    // only an ephemeral anonuser id) onto one account when they share a normalised name. People key on
+    // [counterpartyNameKey] (case + middle-name insensitive); businesses key on their full normalised
+    // name so unrelated orgs never collide.
     private val byNameKey = mutableMapOf<String, LocalAccountKey>()
 
     /** The accumulated intents, in allocation order, for [ImportBatch.accountsToCreate]. */
@@ -2499,6 +2509,7 @@ private class BatchAccountResolver {
         source: Source,
         dedupeKey: String? = null,
         personalIdentity: PersonalCounterpartyIdentity? = null,
+        personalCounterparty: Boolean = false,
     ): LocalAccountKey =
         mutex.withLock {
             val normalizedName = name.ifBlank { "Unknown" }
@@ -2542,9 +2553,15 @@ private class BatchAccountResolver {
             if (dedupeKey != null) byPersonalKey[dedupeKey]?.let { return@withLock it }
             // A counterparty with no stable id and no bank identity is matched by name, so every
             // transaction to the same real person (each carrying a throwaway ephemeral id) collapses
-            // onto one account instead of fragmenting per transaction.
+            // onto one account instead of fragmenting per transaction. Middle-name collapsing is applied
+            // only to people (so "NIKOLAY IVANOV METCHEV" == "Nikolay Metchev"); businesses key on their
+            // full name so unrelated orgs ("The Coffee Shop Ltd", "The Bike Shop Ltd") never collide.
             val nameKey =
-                if (counterpartyId == null && dedupeKey == null && name.isNotBlank()) counterpartyNameKey(normalizedName) else null
+                when {
+                    counterpartyId != null || dedupeKey != null || name.isBlank() -> null
+                    personalCounterparty -> counterpartyNameKey(normalizedName)
+                    else -> normalizeNameKey(normalizedName)
+                }
             if (nameKey != null) byNameKey[nameKey]?.let { return@withLock it }
 
             val key = allocateKey()
@@ -2557,6 +2574,10 @@ private class BatchAccountResolver {
                 when {
                     counterpartyId != null -> AccountMatchKey.ByExternalId(ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, counterpartyId)
                     dedupeKey != null -> AccountMatchKey.ByPersonalCounterparty(dedupeKey)
+                    // The engine resolves ByName against the exact account name, so the in-batch name-key
+                    // merge above is what collapses spelling variants. Across imports these reconcile by
+                    // the chosen display name; because a re-import replays the same history (Monzo refetches
+                    // the full window, not a delta), the first-seen name is reproduced and matches.
                     else -> AccountMatchKey.ByName(normalizedName)
                 }
             val attributes =
