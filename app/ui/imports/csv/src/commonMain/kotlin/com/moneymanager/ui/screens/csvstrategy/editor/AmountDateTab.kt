@@ -192,6 +192,10 @@ private fun DateTimeSection(
         return rows.mapNotNull { it.values.getOrNull(index) }
     }
 
+    // The first value with content drives both the "Sample:" hint and the format validation, so an
+    // empty leading cell doesn't hide a format that fails to parse real rows.
+    fun firstNonBlankSample(columnName: String?): String? = columnSamples(columnName).firstOrNull { it.isNotBlank() }
+
     // Auto-fill the active format from the chosen column's samples until the user takes over.
     LaunchedEffect(state.dateColumnName, state.dateTimeInOneColumn, rows) {
         if (state.dateTimeInOneColumn) {
@@ -240,7 +244,7 @@ private fun DateTimeSection(
                 state.combinedFormatTouched = true
             },
             label = "Date+time format (e.g., yyyy-MM-dd HH:mm:ss)",
-            sample = getSampleValue(csvColumns, firstRow, state.dateColumnName),
+            sample = firstNonBlankSample(state.dateColumnName),
             enabled = enabled,
             validate = DateFormatDetector::parsesAsDateTime,
             onAutoDetect = {
@@ -255,7 +259,7 @@ private fun DateTimeSection(
                 state.dateFormatTouched = true
             },
             label = "Date format (e.g., dd/MM/yyyy)",
-            sample = getSampleValue(csvColumns, firstRow, state.dateColumnName),
+            sample = firstNonBlankSample(state.dateColumnName),
             enabled = enabled,
             validate = DateFormatDetector::parsesAsDate,
             onAutoDetect = {
@@ -288,7 +292,7 @@ private fun DateTimeSection(
                     state.timeFormatTouched = true
                 },
                 label = "Time format (e.g., HH:mm:ss)",
-                sample = getSampleValue(csvColumns, firstRow, state.timeColumnName),
+                sample = firstNonBlankSample(state.timeColumnName),
                 enabled = enabled,
                 validate = DateFormatDetector::parsesAsTime,
                 onAutoDetect = {
