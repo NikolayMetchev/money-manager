@@ -3,6 +3,10 @@
 package com.moneymanager.database
 
 import com.moneymanager.currency.Currency
+import com.moneymanager.domain.model.CurrencyScaleFactors
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
 
 /**
@@ -36,4 +40,35 @@ object DatabaseConfig {
      */
     val allCurrencies: List<Currency>
         get() = Currency.getAllCurrencies()
+
+    // GBP is seeded with a fixed id in :app:db:seed (StaticSeed.sq) so the build-time-generated QIF
+    // strategies can reference it as a constant; runtime seeding below skips it to avoid a duplicate.
+    private const val GBP_CODE = "GBP"
+
+    /**
+     * Seeds the platform's currencies (every code except [GBP_CODE]) for a freshly created database,
+     * recording SYSTEM provenance for each. Uses the runtime platform currency list (java.util.Currency)
+     * so the seeded set matches the device — Android exposes more ISO 4217 codes than the JVM, so this
+     * cannot be frozen at build time. Runs after Schema.create (which already seeded the lookups,
+     * the system device, and GBP).
+     */
+    fun seedCurrencies(database: MoneyManagerDatabaseWrapper) {
+        with(database) {
+            allCurrencies.forEach { currency ->
+                if (currency.code == GBP_CODE) return@forEach
+                val scaleFactor = CurrencyScaleFactors.getScaleFactor(currency.code)
+                currencyWriteQueries.insert(currency.code, currency.displayName, scaleFactor.toLong())
+                // Fetch the id by code rather than last_insert_rowid(): the currency INSERT fires an audit
+                // trigger that also inserts a row, so the rowid is not reliably the currency's own.
+                val currencyId = currencySelectQueries.selectByCode(currency.code).executeAsOne().id
+                recordSource(
+                    DeviceId(WellKnownIds.SYSTEM_DEVICE_ID),
+                    EntityType.CURRENCY,
+                    currencyId,
+                    1L,
+                    Source.System,
+                )
+            }
+        }
+    }
 }

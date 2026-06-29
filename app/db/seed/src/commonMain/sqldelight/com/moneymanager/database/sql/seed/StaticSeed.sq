@@ -37,6 +37,15 @@ INSERT INTO attribute_type (id, name) VALUES (-6, 'account-account-number');
 INSERT INTO relationship_type (id, name) VALUES (1, 'reconciled');
 INSERT INTO relationship_type (id, name) VALUES (2, 'fee');
 
+-- GBP gets a fixed id (1) here so the build-time-generated QIF strategies can reference it as a
+-- constant. The remaining currencies are seeded at runtime from the platform list (Android exposes
+-- more ISO 4217 codes than the JVM, so the full set cannot be frozen at build time). currency IS
+-- audited, so this fires the currency insert audit trigger; its SYSTEM provenance (entity_type
+-- CURRENCY=3, source_type SYSTEM=4, device 1) is recorded explicitly.
+INSERT INTO currency (id, revision_id, code, name, scale_factor) VALUES (1, 1, 'GBP', 'British Pound', 100);
+INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
+VALUES (3, 1, 1, 4, 1);
+
 -- Default "Uncategorized" category. category IS audited, so this fires trigger_category_insert_audit
 -- (writing a category_audit row) — same as the old runtime seed. Its SYSTEM provenance is recorded
 -- explicitly (entity_type CATEGORY=5, source_type SYSTEM=4, device 1).

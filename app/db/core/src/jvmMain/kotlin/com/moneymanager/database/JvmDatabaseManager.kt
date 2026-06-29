@@ -68,11 +68,17 @@ class JvmDatabaseManager : DatabaseManager {
                 onProgress(DatabaseInitializationProgress("Checking the database schema...", 5, 7))
             }
 
-            // Seeding (lookups, currencies, built-in strategies, provenance) now runs inside
-            // Schema.create above (the :app:db:seed module), so there is no separate seed step.
+            // Lookups, the system device, GBP and the built-in strategies are seeded inside Schema.create
+            // (the :app:db:seed module). The remaining currencies are platform-dependent (java.util.Currency
+            // differs JVM vs Android), so they are seeded here at runtime for a freshly created database.
             val database = MoneyManagerDatabaseWrapper(driver)
 
-            onProgress(DatabaseInitializationProgress("Preparing repositories...", 6, 7))
+            if (isNewDatabase) {
+                onProgress(DatabaseInitializationProgress("Adding default currencies...", 6, 7))
+                DatabaseConfig.seedCurrencies(database)
+            } else {
+                onProgress(DatabaseInitializationProgress("Preparing repositories...", 6, 7))
+            }
             onProgress(DatabaseInitializationProgress("Finishing database startup...", 7, 7))
             database
         }

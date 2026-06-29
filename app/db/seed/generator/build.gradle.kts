@@ -11,5 +11,4 @@ dependencies {
     api(projects.app.db.read)
 
     implementation(projects.app.model.core)
-    implementation(projects.utils.currency)
 }
