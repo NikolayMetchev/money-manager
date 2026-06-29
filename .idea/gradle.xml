@@ -26,11 +26,19 @@
             <option value="$PROJECT_DIR$/app/csvimporter" />
             <option value="$PROJECT_DIR$/app/db" />
             <option value="$PROJECT_DIR$/app/db/core" />
+            <option value="$PROJECT_DIR$/app/db/read" />
+            <option value="$PROJECT_DIR$/app/db/schema" />
             <option value="$PROJECT_DIR$/app/db/schemaspy" />
+            <option value="$PROJECT_DIR$/app/db/seed" />
+            <option value="$PROJECT_DIR$/app/db/seed/generator" />
+            <option value="$PROJECT_DIR$/app/db/write" />
             <option value="$PROJECT_DIR$/app/di" />
             <option value="$PROJECT_DIR$/app/di/core" />
             <option value="$PROJECT_DIR$/app/importengineapi" />
             <option value="$PROJECT_DIR$/app/importer" />
+            <option value="$PROJECT_DIR$/app/importfilesource" />
+            <option value="$PROJECT_DIR$/app/importfilesource/core" />
+            <option value="$PROJECT_DIR$/app/importfilesource/localfolder" />
             <option value="$PROJECT_DIR$/app/main" />
             <option value="$PROJECT_DIR$/app/main/android" />
             <option value="$PROJECT_DIR$/app/main/jvm" />
@@ -52,6 +60,7 @@
             <option value="$PROJECT_DIR$/app/ui/imports" />
             <option value="$PROJECT_DIR$/app/ui/imports/api" />
             <option value="$PROJECT_DIR$/app/ui/imports/csv" />
+            <option value="$PROJECT_DIR$/app/ui/imports/importDirectory" />
             <option value="$PROJECT_DIR$/app/ui/imports/qif" />
             <option value="$PROJECT_DIR$/app/ui/people" />
             <option value="$PROJECT_DIR$/app/ui/settings" />
