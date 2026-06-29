@@ -23,8 +23,6 @@ data class ApiStrategyConfigJson(
     val transactionsEndpoint: ApiEndpointConfig,
     val accountMappings: ApiAccountMappings,
     val transactionMappings: ApiTransactionMappings,
-    val accountNamePrefix: String,
-    val counterpartyPrefix: String,
     val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
     val accountIdentifiersEndpoint: ApiEndpointConfig? = null,
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),

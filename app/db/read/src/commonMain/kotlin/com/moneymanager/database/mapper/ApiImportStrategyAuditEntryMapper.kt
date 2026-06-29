@@ -54,8 +54,6 @@ object ApiImportStrategyAuditEntryMapper {
                 transactionsEndpoint = raw.transactionsEndpoint,
                 accountMappings = raw.accountMappings,
                 transactionMappings = raw.transactionMappings,
-                accountNamePrefix = raw.accountNamePrefix,
-                counterpartyPrefix = raw.counterpartyPrefix,
                 peopleMappings = raw.peopleMappings,
                 ancestorEndpoints = raw.ancestorEndpoints,
                 builtInCounterpartyRules = raw.builtInCounterpartyRules,

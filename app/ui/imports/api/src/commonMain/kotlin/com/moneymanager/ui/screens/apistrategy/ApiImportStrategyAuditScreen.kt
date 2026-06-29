@@ -50,8 +50,6 @@ fun ApiImportStrategyAuditScreen(
                         transactionsEndpoint = it.transactionsEndpoint,
                         accountMappings = it.accountMappings,
                         transactionMappings = it.transactionMappings,
-                        accountNamePrefix = it.accountNamePrefix,
-                        counterpartyPrefix = it.counterpartyPrefix,
                         peopleMappings = it.peopleMappings,
                     )
                 }
@@ -168,8 +166,6 @@ private fun flattenConfig(config: ApiStrategyConfig): Map<String, String> =
     buildMap {
         put("Base URL", config.baseUrl)
         put("Auth type", config.authType.name)
-        put("Account name prefix", config.accountNamePrefix)
-        put("Counterparty prefix", config.counterpartyPrefix)
         flattenEndpoint("Accounts endpoint", config.accountsEndpoint, this)
         flattenEndpoint("Transactions endpoint", config.transactionsEndpoint, this)
         put("Account ID field", config.accountMappings.idField)

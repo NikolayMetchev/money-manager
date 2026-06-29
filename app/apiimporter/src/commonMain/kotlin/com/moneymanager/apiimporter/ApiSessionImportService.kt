@@ -947,7 +947,7 @@ private suspend fun linkCounterpartyOwner(
             counterpartyId = counterpartyId,
             dedupeKey = identity?.dedupeKey ?: bankDedupeKeyFromCounterpartyId(counterpartyId),
             builtInType = null,
-            name = setup.nameMappings.counterpartyPrefix + counterpartyName,
+            name = counterpartyName,
             personalIdentity = identity,
             source = counterpartyApiSource.toSource(),
         )
@@ -999,7 +999,7 @@ private suspend fun resolveOwnAccountKey(
     val (sortCode, accountNumber) = account.bankDetails()
     return setup.accountResolver.resolveSourceAccount(
         externalId = account.id,
-        name = account.displayName(setup.strategy),
+        name = account.displayName(),
         sortCode = sortCode,
         accountNumber = accountNumber,
         source = setup.accountApiSourceByExternalId[account.id]?.toSource() ?: Source.Api(setup.sessionId),
@@ -1034,7 +1034,7 @@ suspend fun discoverApiCounterpartiesToCreate(
         .map { (counterpartyId, names) ->
             ApiCounterpartySuggestion(
                 counterpartyId = counterpartyId,
-                suggestedAccountName = strategy.counterpartyPrefix + suggestCounterpartyName(names),
+                suggestedAccountName = suggestCounterpartyName(names),
                 downloadedNames = names.distinct().sorted(),
             )
         }.sortedBy { it.suggestedAccountName }
@@ -1092,7 +1092,7 @@ private suspend fun precreateCounterparties(
             counterpartyAccountNames[counterpartyId]
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
-                ?: (strategy.counterpartyPrefix + suggestCounterpartyName(candidates.map { it.downloadedName }))
+                ?: suggestCounterpartyName(candidates.map { it.downloadedName })
         accountResolver.resolveCounterpartyAccount(
             counterpartyId = counterpartyId,
             dedupeKey = candidates.firstNotNullOfOrNull { it.dedupeKey },
@@ -1151,14 +1151,38 @@ private suspend fun loadAccountExternalIdIndex(
     return index
 }
 
-private fun suggestCounterpartyName(names: List<String>): String =
-    names
-        .filter { it.isNotBlank() }
-        .groupingBy { it }
-        .eachCount()
-        .maxWithOrNull(compareBy<Map.Entry<String, Int>> { it.value }.thenByDescending { it.key.length })
-        ?.key
-        ?: "Unknown"
+/**
+ * Suggests a single account name for a counterparty seen under several spellings (e.g. Monzo prefixes a
+ * per-transaction reference number, yielding "120386070PAXOS TE", "991204771PAXOS TE", …). Prefers the
+ * longest substring common to *all* the spellings ("PAXOS TE"), which strips such varying noise; falls
+ * back to the first non-blank name when the names share nothing meaningful.
+ */
+internal fun suggestCounterpartyName(names: List<String>): String {
+    val nonBlank = names.filter { it.isNotBlank() }
+    if (nonBlank.isEmpty()) return "Unknown"
+    val common = longestCommonSubstring(nonBlank).trim()
+    return common.takeIf { it.length >= MIN_COMMON_NAME_LENGTH } ?: nonBlank.first()
+}
+
+/** Minimum length of a shared substring before it is trusted as a name rather than incidental overlap. */
+private const val MIN_COMMON_NAME_LENGTH = 3
+
+/**
+ * Returns the leftmost longest substring contained in every one of [strings] (empty when there is none).
+ * Any such substring must occur in the shortest string, so it enumerates that string's substrings from
+ * longest to shortest and returns the first one present in all others. Inputs here are short and few.
+ */
+internal fun longestCommonSubstring(strings: List<String>): String {
+    if (strings.isEmpty()) return ""
+    val shortest = strings.minBy { it.length }
+    for (length in shortest.length downTo 1) {
+        for (start in 0..shortest.length - length) {
+            val candidate = shortest.substring(start, start + length)
+            if (strings.all { it.contains(candidate) }) return candidate
+        }
+    }
+    return ""
+}
 
 private data class CounterpartyImportCandidate(
     val counterpartyId: String,
@@ -1434,14 +1458,12 @@ private data class ApiTransactionPageItem(
 private data class CounterpartyNameMappings(
     val merchantNameField: String?,
     val counterpartyNameField: String?,
-    val counterpartyPrefix: String,
 ) {
     companion object {
         fun from(strategy: ApiImportStrategy): CounterpartyNameMappings =
             CounterpartyNameMappings(
                 merchantNameField = strategy.transactionMappings.merchantNameField,
                 counterpartyNameField = strategy.transactionMappings.counterpartyNameField,
-                counterpartyPrefix = strategy.counterpartyPrefix,
             )
     }
 }
@@ -1734,7 +1756,7 @@ private suspend fun prepareValidTransactionItem(
     val counterpartyKey =
         if (item.isZeroAmount) {
             setup.accountResolver.resolveNamedAccount(
-                setup.nameMappings.counterpartyPrefix + "Void",
+                "Void",
                 source = counterpartyApiSource.toSource(),
             )
         } else {
@@ -1746,9 +1768,7 @@ private suspend fun prepareValidTransactionItem(
                 counterpartyId = counterpartyId,
                 dedupeKey = personalCounterpartyIdentity?.dedupeKey ?: bankDedupeKeyFromCounterpartyId(counterpartyId),
                 builtInType = builtInCounterpartyType,
-                name =
-                    setup.nameMappings.counterpartyPrefix +
-                        (builtInCounterpartyType ?: item.counterpartyName(setup.nameMappings)),
+                name = builtInCounterpartyType ?: item.counterpartyName(setup.nameMappings),
                 personalIdentity = personalCounterpartyIdentity,
                 source = counterpartyApiSource.toSource(),
             )
@@ -2331,6 +2351,11 @@ private class BatchAccountResolver {
     private val byBuiltInType = mutableMapOf<String, LocalAccountKey>()
     private val byName = mutableMapOf<String, LocalAccountKey>()
 
+    // Collapses counterparties that carry no stable id and no bank identity (e.g. Monzo transfers with
+    // only an ephemeral anonuser id) onto one account when they share a normalised name — keyed by
+    // [counterpartyNameKey] so case and middle-name variants of one person merge.
+    private val byNameKey = mutableMapOf<String, LocalAccountKey>()
+
     /** The accumulated intents, in allocation order, for [ImportBatch.accountsToCreate]. */
     suspend fun intents(): List<ImportAccountIntent> = mutex.withLock { intents.values.toList() }
 
@@ -2515,6 +2540,12 @@ private class BatchAccountResolver {
             }
             if (counterpartyId != null) byExternalId[counterpartyId]?.let { return@withLock it }
             if (dedupeKey != null) byPersonalKey[dedupeKey]?.let { return@withLock it }
+            // A counterparty with no stable id and no bank identity is matched by name, so every
+            // transaction to the same real person (each carrying a throwaway ephemeral id) collapses
+            // onto one account instead of fragmenting per transaction.
+            val nameKey =
+                if (counterpartyId == null && dedupeKey == null && name.isNotBlank()) counterpartyNameKey(normalizedName) else null
+            if (nameKey != null) byNameKey[nameKey]?.let { return@withLock it }
 
             val key = allocateKey()
             val identity =
@@ -2544,6 +2575,7 @@ private class BatchAccountResolver {
                 )
             if (counterpartyId != null) byExternalId[counterpartyId] = key
             if (dedupeKey != null) byPersonalKey[dedupeKey] = key
+            if (nameKey != null) byNameKey[nameKey] = key
             if (match is AccountMatchKey.ByName) byName.getOrPut(normalizedName) { key }
             key
         }
@@ -2652,6 +2684,13 @@ private class BatchPeopleResolver {
     }
 }
 
+/**
+ * The name-merge key for a counterparty account with no stable id or bank identity: first+last name,
+ * lower-cased and whitespace-collapsed, so casing and middle-name variants of one person ("NIKOLAY
+ * METCHEV", "Nikolay Ivanov Metchev") resolve to a single account. Mirrors the person name key.
+ */
+private fun counterpartyNameKey(name: String): String = normalizeNameKey(firstLastName(name))
+
 /** Collapses a full name to "first last" (dropping any middle parts), or the single word when there's one. */
 private fun firstLastName(fullName: String): String {
     val parts = fullName.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
@@ -2681,7 +2720,7 @@ private class CurrencyCache(
         }
 }
 
-private fun ApiImportAccount.displayName(strategy: ApiImportStrategy): String = strategy.accountNamePrefix + description.ifBlank { id }
+private fun ApiImportAccount.displayName(): String = description.ifBlank { id }
 
 private fun ApiTransactionPageItem.counterpartyName(nameMappings: CounterpartyNameMappings): String =
     cleanCounterpartyName(nameMappings) ?: description.ifBlank { "Unknown" }
@@ -2781,7 +2820,10 @@ private fun JsonObject.resolveCounterpartyIdentity(
     }
 
     val userId = counterparty.stringOrNull(peopleMappings.counterpartyUserIdField)?.takeIf { it.isNotBlank() }
-    if (userId != null) {
+    // An ephemeral user id (e.g. Monzo's per-transaction "anonuser_…") is not a stable identity, so it
+    // must not key the counterparty account — leaving it to be matched by name keeps the same real
+    // person from fragmenting into one account per transaction.
+    if (userId != null && peopleMappings.ephemeralCounterpartyIdPrefixes.none { userId.startsWith(it) }) {
         return "user:$userId"
     }
 

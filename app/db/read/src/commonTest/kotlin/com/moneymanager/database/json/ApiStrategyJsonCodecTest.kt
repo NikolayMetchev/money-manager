@@ -25,8 +25,6 @@ class ApiStrategyJsonCodecTest {
                 ),
             accountMappings = ApiAccountMappings(),
             transactionMappings = ApiTransactionMappings(),
-            accountNamePrefix = "X: ",
-            counterpartyPrefix = "X CP: ",
         )
 
     @Test
@@ -67,9 +65,7 @@ class ApiStrategyJsonCodecTest {
                 "pagination": { "limitParam": "limit", "limitValue": 100, "cursorParam": "before", "cursorResponseField": "created" }
               },
               "accountMappings": {},
-              "transactionMappings": {},
-              "accountNamePrefix": "X: ",
-              "counterpartyPrefix": "X CP: "
+              "transactionMappings": {}
             }
             """.trimIndent()
 

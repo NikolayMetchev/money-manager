@@ -14,8 +14,6 @@ import kotlin.time.Instant
  * @property transactionsEndpoint Configuration for the transactions endpoint
  * @property accountMappings JSON field paths for mapping account fields
  * @property transactionMappings JSON field paths for mapping transaction fields
- * @property accountNamePrefix Prefix prepended to account names on import (e.g. "Monzo: ")
- * @property counterpartyPrefix Prefix prepended to counterparty account names (e.g. "Monzo Counterparty: ")
  * @property peopleMappings JSON field paths/values for people and personal counterparties
  * @property accountIdentifiersEndpoint Optional per-account endpoint fetched after accounts that
  *                                      returns the account's own bank details (sort code + account
@@ -39,8 +37,6 @@ data class ApiImportStrategy(
     val transactionsEndpoint: ApiEndpointConfig,
     val accountMappings: ApiAccountMappings,
     val transactionMappings: ApiTransactionMappings,
-    val accountNamePrefix: String,
-    val counterpartyPrefix: String,
     val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
     val accountIdentifiersEndpoint: ApiEndpointConfig? = null,
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),

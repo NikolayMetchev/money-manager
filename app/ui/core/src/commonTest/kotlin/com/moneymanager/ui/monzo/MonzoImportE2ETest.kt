@@ -275,6 +275,50 @@ private val TRANSACTIONS_WITH_MIDDLE_NAME_COUNTERPARTY_JSON =
 }
     """.trimIndent()
 
+/**
+ * Three outgoing payments to the SAME real person, each carrying a DIFFERENT throwaway `anonuser_…`
+ * user id and NO bank details (no sort_code/account_number). The names differ only by casing and a
+ * middle name. Because the ephemeral ids cannot key the account, all three must collapse onto one
+ * counterparty account matched by the normalised name key.
+ */
+private val TRANSACTIONS_WITH_EPHEMERAL_COUNTERPARTY_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000060",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-10T09:15:00.000Z",
+      "amount": -1250,
+      "currency": "GBP",
+      "description": "Sent to Olga",
+      "merchant": null,
+      "counterparty": { "name": "Olga Zakharenko", "user_id": "anonuser_aaa", "beneficiary_account_type": "Personal" }
+    },
+    {
+      "id": "tx_00009TEST000000000061",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-11T09:15:00.000Z",
+      "amount": -2500,
+      "currency": "GBP",
+      "description": "Sent to OLGA",
+      "merchant": null,
+      "counterparty": { "name": "OLGA ZAKHARENKO", "user_id": "anonuser_bbb", "beneficiary_account_type": "Personal" }
+    },
+    {
+      "id": "tx_00009TEST000000000062",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-12T09:15:00.000Z",
+      "amount": -3750,
+      "currency": "GBP",
+      "description": "Sent to Olga M",
+      "merchant": null,
+      "counterparty": { "name": "Olga M Zakharenko", "user_id": "anonuser_ccc", "beneficiary_account_type": "Personal" }
+    }
+  ]
+}
+    """.trimIndent()
+
 private val TRANSACTIONS_WITH_ATM_WITHDRAWALS_JSON =
     """
 {
@@ -590,7 +634,7 @@ class MonzoImportE2ETest : DbTest() {
 
             // --- Account audit ---
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == "Monzo: $ACCOUNT_DESCRIPTION" }
+            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
 
             val accountAuditEntries = repositories.auditRepository.getAuditHistoryForAccount(monzoAccount.id)
             assertEquals(1, accountAuditEntries.size, "Monzo account should have exactly one audit entry (INSERT)")
@@ -616,7 +660,7 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals(5, transfers.size, "Should have 5 transfers for the Monzo account (including declined tx stored as excluded)")
 
             // Zero-amount transaction should use the Void counterparty account
-            val voidAccount = allAccounts.find { it.name == "Monzo Counterparty: Void" }
+            val voidAccount = allAccounts.find { it.name == "Void" }
             assertNotNull(voidAccount, "Void counterparty account should be created for zero-amount transactions")
             val zeroTransfer = transfers.single { it.amount.amount == 0L }
             assertEquals(
@@ -662,7 +706,7 @@ class MonzoImportE2ETest : DbTest() {
             // --- Counterparty account audit ---
             // Every counterparty account created during import must also have an API entity source.
             // Previously these had no source, causing "Source data missing" in the audit UI.
-            val counterpartyAccounts = allAccounts.filter { it.name.startsWith("Monzo Counterparty:") }
+            val counterpartyAccounts = allAccounts.filter { it.id != monzoAccount.id }
             assertTrue(counterpartyAccounts.isNotEmpty(), "Should have created counterparty accounts")
             counterpartyAccounts.forEach { counterparty ->
                 val auditEntries = repositories.auditRepository.getAuditHistoryForAccount(counterparty.id)
@@ -773,7 +817,7 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals(0, importResult.errorCount)
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == "Monzo: $ACCOUNT_DESCRIPTION" }
+            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
             val transfers =
                 repositories.transactionRepository
                     .getTransactionsByAccount(monzoAccount.id)
@@ -858,7 +902,8 @@ class MonzoImportE2ETest : DbTest() {
 
             assertEquals(2, importResult.transactionCount)
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val counterpartyAccounts = allAccounts.filter { it.name.startsWith("Monzo Counterparty:") }
+            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val counterpartyAccounts = allAccounts.filter { it.id != monzoAccount.id }
             assertEquals(1, counterpartyAccounts.size, "The same counterparty.id should create one account")
             val counterpartyAttributes =
                 counterpartyAccounts
@@ -1024,7 +1069,8 @@ class MonzoImportE2ETest : DbTest() {
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val counterpartyAccounts = allAccounts.filter { it.name.startsWith("Monzo Counterparty:") }
+            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val counterpartyAccounts = allAccounts.filter { it.id != monzoAccount.id }
             assertEquals(1, counterpartyAccounts.size, "Matching bank details should create one counterparty account")
             val counterpartyAttrs =
                 repositories.accountAttributeRepository
@@ -1537,7 +1583,7 @@ class MonzoImportE2ETest : DbTest() {
 
             repositories.accountRepository.updateAccount(
                 initialAtmAccount.copy(
-                    name = "Monzo Counterparty: Renamed ATM",
+                    name = "Renamed ATM",
                 ),
             )
 
@@ -1552,7 +1598,7 @@ class MonzoImportE2ETest : DbTest() {
                 atmAccounts.size >= 2,
                 "Expected the ATM import to preserve the renamed account and the follow-up import shape",
             )
-            assertTrue(atmAccounts.any { it.name == "Monzo Counterparty: Renamed ATM" })
+            assertTrue(atmAccounts.any { it.name == "Renamed ATM" })
         }
 
     @Test
@@ -1638,7 +1684,7 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == "Monzo: $ACCOUNT_DESCRIPTION" }
+            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
             val transfers =
                 repositories.transactionRepository
                     .getTransactionsByAccount(monzoAccount.id)
@@ -1724,7 +1770,7 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == "Monzo: $ACCOUNT_DESCRIPTION" }
+            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
             val feeAccount = allAccounts.single { it.name == "Monzo Fees" }
 
             // The Monzo account has two movements: the £200 withdrawal and the £3.50 fee.
@@ -1765,5 +1811,83 @@ class MonzoImportE2ETest : DbTest() {
             val feeApiSource = feeSource?.source
             assertIs<Source.Api>(feeApiSource)
             assertEquals("$.transactions[0].atm_fees_detailed", feeApiSource.jsonPath?.value)
+        }
+
+    @Test
+    fun `ephemeral anonuser counterparties with the same name collapse into one account`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") ->
+                                TRANSACTIONS_WITH_EPHEMERAL_COUNTERPARTY_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Monzo" }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                    importEngine = repositories.importEngine,
+                )
+            assertEquals(3, importResult.transactionCount, "All three payments should import")
+            assertEquals(0, importResult.errorCount, "Should have no import errors")
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val counterpartyAccounts = allAccounts.filter { it.id != monzoAccount.id }
+            assertEquals(
+                1,
+                counterpartyAccounts.size,
+                "Ephemeral anonuser ids must not fragment one real person into multiple accounts: $counterpartyAccounts",
+            )
         }
 }

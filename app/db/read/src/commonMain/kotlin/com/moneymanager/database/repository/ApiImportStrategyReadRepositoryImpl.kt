@@ -56,8 +56,6 @@ class ApiImportStrategyReadRepositoryImpl(
             transactionsEndpoint = config.transactionsEndpoint,
             accountMappings = config.accountMappings,
             transactionMappings = config.transactionMappings,
-            accountNamePrefix = config.accountNamePrefix,
-            counterpartyPrefix = config.counterpartyPrefix,
             peopleMappings = config.peopleMappings,
             accountIdentifiersEndpoint = config.accountIdentifiersEndpoint,
             ancestorEndpoints = config.ancestorEndpoints,

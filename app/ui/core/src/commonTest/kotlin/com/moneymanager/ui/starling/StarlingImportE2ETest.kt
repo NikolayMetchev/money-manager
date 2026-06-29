@@ -291,12 +291,12 @@ class StarlingImportE2ETest : DbTest() {
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
+            val ownAccount = allAccounts.single { it.name == "Personal" }
             val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
             assertEquals(2, transfers.size)
 
-            val coffee = allAccounts.single { it.name == "Starling Counterparty: Coffee Shop" }
-            val acme = allAccounts.single { it.name == "Starling Counterparty: ACME Ltd" }
+            val coffee = allAccounts.single { it.name == "Coffee Shop" }
+            val acme = allAccounts.single { it.name == "ACME Ltd" }
 
             val outgoing = transfers.single { it.amount.amount == 1250L }
             assertEquals(ownAccount.id, outgoing.sourceAccountId, "OUT direction: money leaves the user's account")
@@ -349,9 +349,9 @@ class StarlingImportE2ETest : DbTest() {
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
-            val coffee = allAccounts.single { it.name == "Starling Counterparty: Coffee Shop" }
-            val acme = allAccounts.single { it.name == "Starling Counterparty: ACME Ltd" }
+            val ownAccount = allAccounts.single { it.name == "Personal" }
+            val coffee = allAccounts.single { it.name == "Coffee Shop" }
+            val acme = allAccounts.single { it.name == "ACME Ltd" }
 
             // Each transfer carries the feed item's stable id as an identifying attribute.
             val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
@@ -447,11 +447,11 @@ class StarlingImportE2ETest : DbTest() {
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
+            val ownAccount = allAccounts.single { it.name == "Personal" }
 
             // Both feed items name a different counterparty (cp-one/"ACME Ltd" vs cp-two/"ACME Limited")
             // but the same bank account, so exactly one counterparty account must be created.
-            val counterparties = allAccounts.filter { it.name.startsWith("Starling Counterparty: ") }
+            val counterparties = allAccounts.filter { it.id != ownAccount.id }
             assertEquals(1, counterparties.size, "The shared bank account must yield a single counterparty: $counterparties")
             val counterparty = counterparties.single()
 
@@ -483,7 +483,7 @@ class StarlingImportE2ETest : DbTest() {
             // another provider. ACME in FEED_JSON has the same sort code + account number (040004/12345678).
             val existingId =
                 repositories.accountRepository.createAccount(
-                    Account(id = AccountId(0), name = "Monzo: Personal", openingDate = now),
+                    Account(id = AccountId(0), name = "Personal", openingDate = now),
                 )
             repositories.accountAttributeRepository
                 .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), "040004")
@@ -527,15 +527,17 @@ class StarlingImportE2ETest : DbTest() {
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
 
-            // No separate "Starling Counterparty: ACME Ltd" account should be created — the counterparty
+            // No separate "ACME Ltd" counterparty account should be created — the counterparty
             // merges into the pre-existing account sharing 040004/12345678.
             assertTrue(
-                allAccounts.none { it.name == "Starling Counterparty: ACME Ltd" },
+                allAccounts.none { it.name == "ACME Ltd" },
                 "ACME must merge into the existing account, not create a counterparty duplicate: $allAccounts",
             )
 
             // The incoming ACME transfer originates from the pre-existing account.
-            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
+            // The own account shares the bare name "Personal" with the pre-existing fixture, so select
+            // it by excluding the pre-existing account's id.
+            val ownAccount = allAccounts.single { it.name == "Personal" && it.id != existingId }
             val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
             val acmeIncoming = transfers.single { it.amount.amount == 50000L }
             assertEquals(existingId, acmeIncoming.sourceAccountId, "The ACME transfer should link to the pre-existing account")
@@ -552,7 +554,7 @@ class StarlingImportE2ETest : DbTest() {
             // source account rather than creating a duplicate — making cross-provider order irrelevant.
             val existingId =
                 repositories.accountRepository.createAccount(
-                    Account(id = AccountId(0), name = "Monzo Counterparty: Nikolay", openingDate = now),
+                    Account(id = AccountId(0), name = "Nikolay", openingDate = now),
                 )
             repositories.accountAttributeRepository
                 .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), "099999")
@@ -605,10 +607,10 @@ class StarlingImportE2ETest : DbTest() {
 
             // The Starling source account IS the adopted pre-existing account (same id), now renamed; the
             // old counterparty name is gone and no second account carries 099999/55556666.
-            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
+            val ownAccount = allAccounts.single { it.name == "Personal" }
             assertEquals(existingId, ownAccount.id, "The source account should reuse the pre-existing account's id")
             assertTrue(
-                allAccounts.none { it.name == "Monzo Counterparty: Nikolay" },
+                allAccounts.none { it.name == "Nikolay" },
                 "The adopted account should have been renamed, not left as a duplicate: $allAccounts",
             )
 
@@ -646,7 +648,7 @@ class StarlingImportE2ETest : DbTest() {
             // rather than creating a duplicate, keeping cross-provider imports order-independent.
             val existingId =
                 repositories.accountRepository.createAccount(
-                    Account(id = AccountId(0), name = "Monzo Counterparty: Nikolay", openingDate = now),
+                    Account(id = AccountId(0), name = "Nikolay", openingDate = now),
                 )
             repositories.accountAttributeRepository
                 .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID), "bank:099999:55556666")
@@ -694,10 +696,10 @@ class StarlingImportE2ETest : DbTest() {
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
+            val ownAccount = allAccounts.single { it.name == "Personal" }
             assertEquals(existingId, ownAccount.id, "The source account should adopt the bank-external-id account")
             assertTrue(
-                allAccounts.none { it.name == "Monzo Counterparty: Nikolay" },
+                allAccounts.none { it.name == "Nikolay" },
                 "The adopted account should have been renamed, not left as a duplicate: $allAccounts",
             )
         }
@@ -755,7 +757,7 @@ class StarlingImportE2ETest : DbTest() {
                 repositories.accountRepository
                     .getAllAccounts()
                     .first()
-                    .single { it.name == "Starling: Personal" }
+                    .single { it.name == "Personal" }
             val attrs = repositories.accountAttributeRepository.getByAccount(ownAccount.id).first()
             assertEquals("099999", attrs.single { it.attributeType.name == "account-sort-code" }.value)
             assertEquals("55556666", attrs.single { it.attributeType.name == "account-account-number" }.value)
@@ -826,7 +828,7 @@ class StarlingImportE2ETest : DbTest() {
             val people = repositories.personRepository.getAllPeople().first()
             val ada = people.single { it.firstName == "Ada" && it.lastName == "Lovelace" }
             val accounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = accounts.single { it.name == "Starling: Personal" }
+            val ownAccount = accounts.single { it.name == "Personal" }
             val owners =
                 repositories.personAccountOwnershipRepository
                     .getOwnershipsByAccount(ownAccount.id)
@@ -900,7 +902,7 @@ class StarlingImportE2ETest : DbTest() {
                 repositories.accountRepository
                     .getAllAccounts()
                     .first()
-                    .single { it.name == "Starling: Personal" }
+                    .single { it.name == "Personal" }
             val owners = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(ownAccount.id).first()
             assertTrue(owners.any { it.personId == ada.id }, "The holder should own the own account regardless of import order")
         }
@@ -1031,7 +1033,7 @@ class StarlingImportE2ETest : DbTest() {
             repositories.maintenanceService.refreshMaterializedViews()
 
             val accounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = accounts.single { it.name == "Starling: Personal" }
+            val ownAccount = accounts.single { it.name == "Personal" }
             val balances = repositories.transactionRepository.getAccountBalances().first()
             val ownBalance = balances.single { it.accountId == ownAccount.id }
 

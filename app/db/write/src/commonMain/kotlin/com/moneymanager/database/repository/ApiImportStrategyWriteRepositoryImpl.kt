@@ -91,8 +91,6 @@ class ApiImportStrategyWriteRepositoryImpl(
             transactionsEndpoint = transactionsEndpoint,
             accountMappings = accountMappings,
             transactionMappings = transactionMappings,
-            accountNamePrefix = accountNamePrefix,
-            counterpartyPrefix = counterpartyPrefix,
             peopleMappings = peopleMappings,
             accountIdentifiersEndpoint = accountIdentifiersEndpoint,
             ancestorEndpoints = ancestorEndpoints,

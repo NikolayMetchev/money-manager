@@ -113,9 +113,11 @@ private val AUDIT_E2E_TRANSACTIONS_JSON =
  *   1. The imported Monzo account shows "API Import" as the source in its audit history.
  *   2. Clicking "API Import" navigates to the API Traffic screen for that session.
  *
- * Account ordering note: the DB orders accounts by name. "Monzo Counterparty: ..." sorts
- * before "Monzo: ..." (space < colon), so the Monzo account is always last in the list,
- * which lets us use onLast() to click its audit button.
+ * Account ordering note: the DB orders accounts by name (SQLite binary collation). The own account
+ * is named after its description, "user_..." (lowercase initial), while the counterparties have
+ * uppercase initials ("Alice Example", "Coffee Shop Ltd", "Void"). Lowercase letters sort AFTER
+ * uppercase in binary collation, so the own Monzo account is always last in the list, which lets us
+ * use onLast() to click its audit button.
  */
 private class AuditTestDatabaseManager(
     private val databaseManager: DatabaseManager,
@@ -217,11 +219,12 @@ class MonzoImportAuditE2ETest {
 
             // Wait for the Accounts screen to load
             waitForIdle()
-            val monzoAccountName = "Monzo: $AUDIT_E2E_ACCOUNT_DESCRIPTION"
+            val monzoAccountName = AUDIT_E2E_ACCOUNT_DESCRIPTION
             waitUntilAtLeastOneExists(hasText(monzoAccountName), timeoutMillis = 20000)
 
             // --- Part 1: Monzo account audit shows API Import ---
-            // Accounts ordered by name: "Monzo Counterparty: ..." < "Monzo: ..." (space < colon),
+            // Accounts ordered by name: the uppercase-initial counterparties ("Alice Example",
+            // "Coffee Shop Ltd", "Void") sort before the lowercase-initial own account ("user_..."),
             // so the Monzo account is last — use onLast().
             onAllNodesWithText("📋").onLast().performClick()
             waitForIdle()
@@ -240,11 +243,10 @@ class MonzoImportAuditE2ETest {
 
             // --- Part 2: Counterparty account audit also shows API Import (this was the real bug) ---
             // "Coffee Shop Ltd" is a counterparty — click its audit button.
-            val coffeeShopName = "Monzo Counterparty: Coffee Shop Ltd"
+            val coffeeShopName = "Coffee Shop Ltd"
             waitUntilAtLeastOneExists(hasText(coffeeShopName), timeoutMillis = 5000)
-            // Coffee Shop Ltd sorts before the Monzo account alphabetically so use onFirst() is
-            // fragile; instead scroll to the counterparty, then click the first 📋 visible.
-            // Since all counterparties appear before "Monzo: ..." the first 📋 belongs to a counterparty.
+            // The counterparties (uppercase initials) all sort before the own "user_..." account, so the
+            // first 📋 in the list belongs to a counterparty ("Alice Example") — click it.
             onAllNodesWithText("📋").onFirst().performClick()
             waitForIdle()
 
