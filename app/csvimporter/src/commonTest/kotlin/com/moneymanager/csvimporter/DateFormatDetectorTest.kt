@@ -2,9 +2,26 @@ package com.moneymanager.csvimporter
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class DateFormatDetectorTest {
+    @Test
+    fun `parses checks match the sample against the given pattern`() {
+        assertTrue(DateFormatDetector.parsesAsDateTime("yyyy-MM-dd HH:mm:ss", "2026-06-14 13:38:54"))
+        assertFalse(DateFormatDetector.parsesAsDateTime("yyyy-MM-dd HH:mm:ss", "14/06/2026"))
+        assertTrue(DateFormatDetector.parsesAsDate("dd/MM/yyyy", " 14/06/2026 "))
+        assertFalse(DateFormatDetector.parsesAsDate("dd/MM/yyyy", "2026-06-14"))
+        assertTrue(DateFormatDetector.parsesAsTime("HH:mm:ss", "13:38:54"))
+        assertFalse(DateFormatDetector.parsesAsTime("HH:mm:ss", "not a time"))
+    }
+
+    @Test
+    fun `parses returns false for an invalid pattern instead of throwing`() {
+        assertFalse(DateFormatDetector.parsesAsDate("nonsense pattern", "2026-06-14"))
+    }
+
     @Test
     fun `detects crypto-com combined timestamp`() {
         val samples = listOf("2026-06-14 13:38:54", "2026-05-01 06:59:26", "2026-06-14 11:15:34")

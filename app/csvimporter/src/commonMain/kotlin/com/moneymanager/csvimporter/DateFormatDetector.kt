@@ -74,6 +74,32 @@ object DateFormatDetector {
             LocalTime.Format { byUnicodePattern(pattern) }.parse(value)
         }
 
+    /** Whether [pattern] is a valid combined date+time format that parses [value] (after trimming). */
+    fun parsesAsDateTime(
+        pattern: String,
+        value: String,
+    ): Boolean = tryParse { LocalDateTime.Format { byUnicodePattern(pattern) }.parse(value.trim()) }
+
+    /** Whether [pattern] is a valid date-only format that parses [value] (after trimming). */
+    fun parsesAsDate(
+        pattern: String,
+        value: String,
+    ): Boolean = tryParse { LocalDate.Format { byUnicodePattern(pattern) }.parse(value.trim()) }
+
+    /** Whether [pattern] is a valid time-only format that parses [value] (after trimming). */
+    fun parsesAsTime(
+        pattern: String,
+        value: String,
+    ): Boolean = tryParse { LocalTime.Format { byUnicodePattern(pattern) }.parse(value.trim()) }
+
+    private inline fun tryParse(block: () -> Unit): Boolean =
+        try {
+            block()
+            true
+        } catch (_: Exception) {
+            false
+        }
+
     private inline fun firstMatching(
         candidates: List<String>,
         samples: List<String>,

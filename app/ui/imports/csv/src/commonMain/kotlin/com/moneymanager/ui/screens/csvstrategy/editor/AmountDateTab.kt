@@ -242,7 +242,7 @@ private fun DateTimeSection(
             label = "Date+time format (e.g., yyyy-MM-dd HH:mm:ss)",
             sample = getSampleValue(csvColumns, firstRow, state.dateColumnName),
             enabled = enabled,
-            isError = state.dateTimeFormat.isBlank(),
+            validate = DateFormatDetector::parsesAsDateTime,
             onAutoDetect = {
                 DateFormatDetector.detectDateTime(columnSamples(state.dateColumnName))?.let { state.dateTimeFormat = it }
             },
@@ -257,7 +257,7 @@ private fun DateTimeSection(
             label = "Date format (e.g., dd/MM/yyyy)",
             sample = getSampleValue(csvColumns, firstRow, state.dateColumnName),
             enabled = enabled,
-            isError = state.dateFormat.isBlank(),
+            validate = DateFormatDetector::parsesAsDate,
             onAutoDetect = {
                 DateFormatDetector.detectDate(columnSamples(state.dateColumnName))?.let { state.dateFormat = it }
             },
@@ -290,7 +290,7 @@ private fun DateTimeSection(
                 label = "Time format (e.g., HH:mm:ss)",
                 sample = getSampleValue(csvColumns, firstRow, state.timeColumnName),
                 enabled = enabled,
-                isError = state.timeFormat.isBlank(),
+                validate = DateFormatDetector::parsesAsTime,
                 onAutoDetect = {
                     DateFormatDetector.detectTime(columnSamples(state.timeColumnName))?.let { state.timeFormat = it }
                 },
@@ -302,6 +302,10 @@ private fun DateTimeSection(
 /**
  * A date/time format text field with a "Sample: …" hint and an inline "Auto-detect" action that
  * re-guesses the pattern from the column's values.
+ *
+ * Turns red when the format is blank, or when it cannot parse the displayed sample value — so a
+ * mistyped or wrong pattern is caught immediately. [validate] reports whether the current format
+ * successfully parses a given sample.
  */
 @Composable
 private fun FormatField(
@@ -310,9 +314,11 @@ private fun FormatField(
     label: String,
     sample: String?,
     enabled: Boolean,
-    isError: Boolean,
+    validate: (format: String, sample: String) -> Boolean,
     onAutoDetect: () -> Unit,
 ) {
+    val trimmedSample = sample?.trim().orEmpty()
+    val sampleUnparseable = value.isNotBlank() && trimmedSample.isNotEmpty() && !validate(value, trimmedSample)
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -320,14 +326,17 @@ private fun FormatField(
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         enabled = enabled,
-        isError = isError,
+        isError = value.isBlank() || sampleUnparseable,
         trailingIcon = {
             TextButton(onClick = onAutoDetect, enabled = enabled) {
                 Text("Auto-detect")
             }
         },
         supportingText = {
-            sample?.let { Text("Sample: $it") }
+            when {
+                sampleUnparseable -> Text("Sample \"$trimmedSample\" does not match this format")
+                sample != null -> Text("Sample: $sample")
+            }
         },
     )
 }
