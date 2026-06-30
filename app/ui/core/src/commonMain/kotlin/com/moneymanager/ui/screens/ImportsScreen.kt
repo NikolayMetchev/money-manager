@@ -144,6 +144,7 @@ fun ImportsScreen(
                     accountAttributeRepository = accountAttributeRepository,
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
+                    passThroughAccountRepository = passThroughAccountRepository,
                     maintenance = maintenance,
                     deviceId = deviceId,
                     onMonzoConnectClick = onAddCredentialClick,

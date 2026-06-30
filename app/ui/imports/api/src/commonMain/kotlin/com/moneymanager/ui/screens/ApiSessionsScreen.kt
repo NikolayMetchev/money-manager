@@ -84,6 +84,7 @@ import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.updateApiCredentialKeys
@@ -95,6 +96,7 @@ import com.moneymanager.ui.api.sca.generateScaKeyPair
 import com.moneymanager.ui.api.sca.signScaChallenge
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.formatElapsedTime
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.currentCountryCode
@@ -122,6 +124,7 @@ fun ApiSessionsScreen(
     accountAttributeRepository: AccountAttributeReadRepository,
     accountRepository: AccountReadRepository,
     currencyRepository: CurrencyReadRepository,
+    passThroughAccountRepository: PassThroughAccountReadRepository,
     maintenance: Maintenance,
     deviceId: DeviceId,
     onMonzoConnectClick: () -> Unit = {},
@@ -133,6 +136,7 @@ fun ApiSessionsScreen(
     val scope = rememberSchemaAwareCoroutineScope()
     val backgroundTasks = LocalBackgroundTaskManager.current
     val clipboard = LocalClipboard.current
+    val passThroughAccounts by passThroughAccountRepository.getEnabled().collectAsStateWithSchemaErrorHandling(emptyList())
 
     var credentials by remember { mutableStateOf<List<MonzoCredential>>(emptyList()) }
     var sessionsByCredential by remember { mutableStateOf<Map<MonzoCredentialId, List<ApiSession>>>(emptyMap()) }
@@ -256,6 +260,7 @@ fun ApiSessionsScreen(
                     strategy = strategy,
                     importEngine = importEngine,
                     counterpartyAccountNames = counterpartyAccountNames,
+                    passThroughAccounts = passThroughAccounts,
                     onProgress = { progress ->
                         scope.launch {
                             importProgressBySession = importProgressBySession + (session.id to progress)
