@@ -243,7 +243,7 @@ private fun DateTimeSection(
                 state.dateTimeFormat = it
                 state.combinedFormatTouched = true
             },
-            label = "Date+time format (e.g., yyyy-MM-dd HH:mm:ss)",
+            label = "Date+Time Format (e.g., yyyy-MM-dd HH:mm:ss)",
             sample = firstNonBlankSample(state.dateColumnName),
             enabled = enabled,
             validate = DateFormatDetector::parsesAsDateTime,
@@ -258,7 +258,7 @@ private fun DateTimeSection(
                 state.dateFormat = it
                 state.dateFormatTouched = true
             },
-            label = "Date format (e.g., dd/MM/yyyy)",
+            label = "Date Format (e.g., dd/MM/yyyy)",
             sample = firstNonBlankSample(state.dateColumnName),
             enabled = enabled,
             validate = DateFormatDetector::parsesAsDate,
@@ -291,7 +291,7 @@ private fun DateTimeSection(
                     state.timeFormat = it
                     state.timeFormatTouched = true
                 },
-                label = "Time format (e.g., HH:mm:ss)",
+                label = "Time Format (e.g., HH:mm:ss)",
                 sample = firstNonBlankSample(state.timeColumnName),
                 enabled = enabled,
                 validate = DateFormatDetector::parsesAsTime,
