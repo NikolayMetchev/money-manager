@@ -175,7 +175,6 @@ class CsvTransferMapperTest {
                         com.moneymanager.domain.model.passthrough.PassThroughRule(
                             detectionPattern = "(?i)^CRV\\*",
                             merchantPattern = "(?i)^CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$",
-                            merchantTemplate = "$1",
                         ),
                     ),
             )

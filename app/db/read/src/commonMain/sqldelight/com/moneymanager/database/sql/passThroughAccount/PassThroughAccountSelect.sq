@@ -9,7 +9,3 @@ SELECT * FROM pass_through_account WHERE enabled = 1 ORDER BY name;
 -- Select a definition by id.
 selectById:
 SELECT * FROM pass_through_account WHERE id = ?;
-
--- Select a definition by name.
-selectByName:
-SELECT * FROM pass_through_account WHERE name = ?;

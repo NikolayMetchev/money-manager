@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
@@ -919,47 +920,57 @@ class ImportEngineImpl(
                     }
                 }
             val rowKey = requireNotNull(t.rowKey)
+
+            // Appends one leg created in this chunk, sharing the main transfer's timestamp and provenance
+            // (resolved against the leg's own row key when given, so a fee/spend leg's audit can point at
+            // its own source node). Used for the main transfer and its expanded fee / pass-through spend
+            // legs so the construction lives in one place.
+            fun addLeg(
+                tempId: TransferId,
+                description: String,
+                source: AccountRef,
+                target: AccountRef,
+                amount: Money,
+                legRowKey: ImportRowKey?,
+            ) {
+                transfersToCreate +=
+                    Transfer(
+                        id = tempId,
+                        timestamp = requireNotNull(t.timestamp),
+                        description = description,
+                        sourceAccountId = requireId(source),
+                        targetAccountId = requireId(target),
+                        amount = amount,
+                    )
+                orderedSources += t.source.forRow(legRowKey ?: rowKey)
+            }
             mainResultIndices += transfersToCreate.size
-            transfersToCreate +=
-                Transfer(
-                    id = mainTempId,
-                    timestamp = requireNotNull(t.timestamp),
-                    description = t.description,
-                    sourceAccountId = requireId(t.fromAccount),
-                    targetAccountId = requireId(t.toAccount),
-                    amount = requireNotNull(t.amount),
-                )
+            addLeg(
+                mainTempId,
+                t.description,
+                requireNotNull(t.fromAccount),
+                requireNotNull(t.toAccount),
+                requireNotNull(t.amount),
+                rowKey,
+            )
             if (t.attributes.isNotEmpty()) newAttributes[mainTempId] = t.attributes
             if (relationships.isNotEmpty()) newRelationships[mainTempId] = relationships
-            orderedSources += t.source.forRow(rowKey)
+            // The fee is a real movement out of the main transfer's account; counts in balances.
             if (fee != null && feeTempId != null) {
-                transfersToCreate +=
-                    Transfer(
-                        id = feeTempId,
-                        timestamp = requireNotNull(t.timestamp),
-                        description = fee.description,
-                        sourceAccountId = requireId(fee.source),
-                        targetAccountId = requireId(fee.target),
-                        amount = fee.amount,
-                    )
-                // The fee inherits the main transfer's provenance source, resolved against its own row
-                // key when provided (so the audit trail points at the fee's source node), else the main's.
-                orderedSources += t.source.forRow(fee.rowKey ?: rowKey)
+                addLeg(feeTempId, fee.description, fee.source, fee.target, fee.amount, fee.rowKey)
             }
+            // The pass-through spend leg (conduit -> merchant), same amount as the funding leg (the main
+            // transfer, card -> conduit), linked via the pass-through relationship so the conduit nets to
+            // zero and the spend is counted once.
             if (passThrough != null && spendTempId != null) {
-                // The spend leg: conduit -> merchant, same amount as the funding leg (the main transfer,
-                // card -> conduit). Linked to the main via the pass-through relationship above; the
-                // conduit nets to zero so the spend is counted once.
-                transfersToCreate +=
-                    Transfer(
-                        id = spendTempId,
-                        timestamp = requireNotNull(t.timestamp),
-                        description = passThrough.spendDescription,
-                        sourceAccountId = requireId(passThrough.conduit),
-                        targetAccountId = requireId(passThrough.merchantTarget),
-                        amount = passThrough.amount,
-                    )
-                orderedSources += t.source.forRow(passThrough.rowKey ?: rowKey)
+                addLeg(
+                    spendTempId,
+                    passThrough.spendDescription,
+                    passThrough.conduit,
+                    passThrough.merchantTarget,
+                    passThrough.amount,
+                    passThrough.rowKey,
+                )
             }
         }
         return CreatePayload(transfersToCreate, newAttributes, newRelationships, orderedSources, mainResultIndices)

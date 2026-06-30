@@ -419,10 +419,10 @@ class CsvTransferMapper(
                     if (passThroughMatch == null) add(discoverNewAccount(targetMapping, values))
                 }
             val targetCategoryId =
-                when (val m = targetMapping) {
-                    is AccountLookupMapping -> m.defaultCategoryId
-                    is RegexAccountMapping -> m.defaultCategoryId
-                    is TemplateAccountMapping -> m.defaultCategoryId
+                when (targetMapping) {
+                    is AccountLookupMapping -> targetMapping.defaultCategoryId
+                    is RegexAccountMapping -> targetMapping.defaultCategoryId
+                    is TemplateAccountMapping -> targetMapping.defaultCategoryId
                     else -> Category.UNCATEGORIZED_ID
                 }
             val newAccounts =

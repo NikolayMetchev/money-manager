@@ -1870,13 +1870,8 @@ private suspend fun prepareValidTransactionItem(
                 ownAccountRef
             },
         target =
-            if (passThrough != null) {
-                passThrough.conduit
-            } else if (data.isIncoming) {
-                ownAccountRef
-            } else {
-                counterpartyRef!!
-            },
+            passThrough?.conduit
+                ?: if (data.isIncoming) ownAccountRef else counterpartyRef!!,
         timestamp = item.created,
         description = data.description,
         amount = amount,

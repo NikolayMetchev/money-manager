@@ -21,7 +21,6 @@ class PassThroughDetectorTest {
                     PassThroughRule(
                         detectionPattern = "(?i)^CRV\\*",
                         merchantPattern = "(?i)^CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$",
-                        merchantTemplate = "$1",
                     ),
                 ),
         )
