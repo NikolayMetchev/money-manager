@@ -161,6 +161,45 @@ class CsvTransferMapperTest {
     }
 
     @Test
+    fun `mapRow routes a Curve pass-through row through the conduit and cleans the merchant`() {
+        val strategy = createStrategy()
+        val curve =
+            com.moneymanager.domain.model.passthrough.PassThroughAccount(
+                id = com.moneymanager.domain.model.passthrough.PassThroughAccountId(1),
+                name = "Curve",
+                conduitAccountName = "Curve",
+                rules =
+                    listOf(
+                        com.moneymanager.domain.model.passthrough.PassThroughRule(
+                            detectionPattern = "(?i)^CRV\\*",
+                            merchantPattern = "(?i)^CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$",
+                            merchantTemplate = "$1",
+                        ),
+                    ),
+            )
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columns,
+                existingAccounts = emptyMap(),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                passThroughDetector = com.moneymanager.importengineapi.PassThroughDetector(listOf(curve)),
+            )
+
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Crv*Sainsburys", "-50.00", "Crv*Sainsburys"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        // The funding leg targets the conduit; the merchant is cleaned and carried on passThrough.
+        assertEquals("Sainsburys", result.passThrough?.merchantName)
+        assertEquals("Curve", result.passThrough?.conduitName)
+        // The conduit + cleaned merchant are created; the raw "Crv*Sainsburys" junk account is not.
+        val newNames = result.newAccounts.map { it.name }.toSet()
+        assertEquals(setOf("Curve", "Sainsburys"), newNames)
+    }
+
+    @Test
     fun `mapRow returns error for invalid date format`() {
         val strategy = createStrategy()
         val mapper =
