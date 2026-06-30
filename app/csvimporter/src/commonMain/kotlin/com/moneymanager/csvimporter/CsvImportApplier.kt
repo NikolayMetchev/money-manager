@@ -26,7 +26,6 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.importengineapi.AccountRef
-import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
@@ -36,6 +35,7 @@ import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createAccounts

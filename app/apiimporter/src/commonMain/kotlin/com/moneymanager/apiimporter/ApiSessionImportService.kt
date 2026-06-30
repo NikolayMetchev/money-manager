@@ -34,6 +34,7 @@ import com.moneymanager.domain.model.apistrategy.PredicateOp
 import com.moneymanager.domain.model.apistrategy.RulePredicate
 import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiResponseTransactionInsert
@@ -47,17 +48,16 @@ import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.importengineapi.ImportFee
-import com.moneymanager.importengineapi.ImportPassThrough
-import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.ImportOwnershipIntent
+import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.insertApiResponseTransactions
@@ -1861,8 +1861,22 @@ private suspend fun prepareValidTransactionItem(
         requestId = context.requestId,
         item = item,
         // Pass-through: funding leg own -> conduit. Otherwise the normal own/counterparty pairing.
-        source = if (passThrough != null) ownAccountRef else if (data.isIncoming) counterpartyRef!! else ownAccountRef,
-        target = if (passThrough != null) passThrough.conduit else if (data.isIncoming) ownAccountRef else counterpartyRef!!,
+        source =
+            if (passThrough != null) {
+                ownAccountRef
+            } else if (data.isIncoming) {
+                counterpartyRef!!
+            } else {
+                ownAccountRef
+            },
+        target =
+            if (passThrough != null) {
+                passThrough.conduit
+            } else if (data.isIncoming) {
+                ownAccountRef
+            } else {
+                counterpartyRef!!
+            },
         timestamp = item.created,
         description = data.description,
         amount = amount,

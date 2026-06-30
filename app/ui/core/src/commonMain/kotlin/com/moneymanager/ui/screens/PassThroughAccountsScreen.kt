@@ -181,8 +181,9 @@ private fun PassThroughAccountEditorDialog(
                             id = initial?.id ?: PassThroughAccountId(0),
                             name = name.trim(),
                             conduitAccountName = conduit.trim(),
-                            relationshipTypeId = initial?.relationshipTypeId
-                                ?: com.moneymanager.domain.model.WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID,
+                            relationshipTypeId =
+                                initial?.relationshipTypeId
+                                    ?: com.moneymanager.domain.model.WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID,
                             enabled = initial?.enabled ?: true,
                             rules =
                                 listOf(

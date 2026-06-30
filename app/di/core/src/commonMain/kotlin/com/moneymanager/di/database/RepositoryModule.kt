@@ -18,8 +18,6 @@ import com.moneymanager.database.repository.CategoryReadRepositoryImpl
 import com.moneymanager.database.repository.CategoryWriteRepositoryImpl
 import com.moneymanager.database.repository.CsvAccountMappingReadRepositoryImpl
 import com.moneymanager.database.repository.CsvAccountMappingWriteRepositoryImpl
-import com.moneymanager.database.repository.PassThroughAccountReadRepositoryImpl
-import com.moneymanager.database.repository.PassThroughAccountWriteRepositoryImpl
 import com.moneymanager.database.repository.CsvImportReadRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyReadRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyWriteRepositoryImpl
@@ -30,6 +28,8 @@ import com.moneymanager.database.repository.DeviceReadRepositoryImpl
 import com.moneymanager.database.repository.DeviceWriteRepositoryImpl
 import com.moneymanager.database.repository.ImportDirectoryReadRepositoryImpl
 import com.moneymanager.database.repository.ImportDirectoryWriteRepositoryImpl
+import com.moneymanager.database.repository.PassThroughAccountReadRepositoryImpl
+import com.moneymanager.database.repository.PassThroughAccountWriteRepositoryImpl
 import com.moneymanager.database.repository.PersonAccountOwnershipReadRepositoryImpl
 import com.moneymanager.database.repository.PersonAccountOwnershipWriteRepositoryImpl
 import com.moneymanager.database.repository.PersonAttributeReadRepositoryImpl
@@ -68,8 +68,6 @@ import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
 import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
-import com.moneymanager.domain.repository.PassThroughAccountReadRepository
-import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
@@ -80,6 +78,8 @@ import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.DeviceWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.PassThroughAccountReadRepository
+import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository

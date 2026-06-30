@@ -165,7 +165,9 @@ class CsvTransferMapperTest {
         val strategy = createStrategy()
         val curve =
             com.moneymanager.domain.model.passthrough.PassThroughAccount(
-                id = com.moneymanager.domain.model.passthrough.PassThroughAccountId(1),
+                id =
+                    com.moneymanager.domain.model.passthrough
+                        .PassThroughAccountId(1),
                 name = "Curve",
                 conduitAccountName = "Curve",
                 rules =
