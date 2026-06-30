@@ -1,3 +1,4 @@
+import dev.iurysouza.modulegraph.LinkText
 import dev.iurysouza.modulegraph.Orientation
 import dev.iurysouza.modulegraph.Theme
 
@@ -46,6 +47,9 @@ moduleGraphConfig {
     heading.set("## Module dependency graph")
     orientation.set(Orientation.LEFT_TO_RIGHT)
     theme.set(Theme.NEUTRAL)
+    // Label each edge with its originating Gradle configuration (e.g. commonMainImplementation,
+    // jvmTestImplementation) so the viewer can filter production vs. test dependencies.
+    linkText.set(LinkText.CONFIGURATION)
 }
 
 dependencyAnalysis {

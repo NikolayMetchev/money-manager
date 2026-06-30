@@ -71,6 +71,17 @@
     }
     .controls button:hover, .controls label:hover { border-color: var(--accent); }
     .controls label input { margin-right: 0.4em; vertical-align: middle; }
+    .controls select {
+      margin-left: 0.4em;
+      padding: 0.2em 0.4em;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg);
+      color: var(--fg);
+      font-size: 0.9rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      cursor: pointer;
+    }
 
     .tree { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9rem; }
     .tree ul { list-style: none; margin: 0; padding-left: 1.3rem; border-left: 1px solid var(--border); }
@@ -125,6 +136,9 @@
   <main>
     <div class="controls hidden" id="controls">
       <input type="search" id="filter" aria-label="Filter top-level modules" placeholder="Filter top-level modules…" autocomplete="off">
+      <label>Configuration
+        <select id="configFilter" aria-label="Filter dependencies by Gradle configuration"></select>
+      </label>
       <button id="expandAll" type="button">Expand all</button>
       <button id="collapseAll" type="button">Collapse all</button>
       <label><input type="checkbox" id="showAll"> Show all modules</label>
@@ -142,7 +156,11 @@
     const treeEl = document.getElementById('tree');
     const controlsEl = document.getElementById('controls');
 
-    // module -> sorted list of modules it directly depends on
+    // Every parsed edge: { from, to, config }. `config` is the Gradle configuration that
+    // declared the dependency (e.g. "commonMainImplementation", "jvmTestImplementation"),
+    // or null for an unlabeled edge. The graph is built with `linkText = CONFIGURATION`.
+    const rawEdges = [];
+    // module -> sorted list of modules it directly depends on (rebuilt per config selection)
     const deps = new Map();
     // every module that has at least one incoming edge (i.e. is depended upon)
     const depended = new Set();
@@ -152,12 +170,34 @@
       return id.replace(/^:/, '').replace(/:/g, '/');
     }
 
+    function isTestConfig(config) {
+      // commonTest/jvmTest/androidUnitTest/androidInstrumentedTest… all contain "test".
+      return /test/i.test(config || '');
+    }
+
     function parse(markdown) {
-      const edge = /^\s*(:[\w:.-]+)\s*-->\s*(:[\w:.-]+)\s*$/;
+      // Labeled edge: ":from -- configName --> :to" (module-graph LinkText.CONFIGURATION).
+      const labeled = /^\s*(:[\w:.-]+)\s+--\s+([\w-]+)\s+-->\s+(:[\w:.-]+)\s*$/;
+      // Fallback for unlabeled edges ":from --> :to" (if labels are ever disabled).
+      const plain = /^\s*(:[\w:.-]+)\s*-->\s*(:[\w:.-]+)\s*$/;
       for (const line of markdown.split('\n')) {
-        const m = line.match(edge);
-        if (!m) continue;
-        const [, from, to] = m;
+        let m = line.match(labeled);
+        if (m) {
+          rawEdges.push({ from: m[1], to: m[3], config: m[2] });
+          continue;
+        }
+        m = line.match(plain);
+        if (m) rawEdges.push({ from: m[1], to: m[2], config: null });
+      }
+    }
+
+    // (Re)build `deps`/`depended` from the edges matching the current config selection.
+    // `matches(config)` decides whether an edge is included.
+    function buildDeps(matches) {
+      deps.clear();
+      depended.clear();
+      for (const { from, to, config } of rawEdges) {
+        if (!matches(config)) continue;
         if (!deps.has(from)) deps.set(from, []);
         deps.get(from).push(to);
         depended.add(to);
@@ -248,24 +288,66 @@
       treeEl.querySelectorAll('details[open]').forEach(d => { d.open = false; });
     }
 
+    // Aggregate values can't collide with a Gradle config name ([\w-]+ never contains '@').
+    function matcherFor(value) {
+      if (value === '@all') return () => true;
+      if (value === '@main') return (config) => !isTestConfig(config);
+      if (value === '@test') return (config) => isTestConfig(config);
+      return (config) => config === value; // a specific configuration
+    }
+
+    // Build the dropdown: aggregates first (Main default), then every distinct config in the graph.
+    function populateConfigFilter() {
+      const select = document.getElementById('configFilter');
+      const configs = [...new Set(rawEdges.map(e => e.config).filter(Boolean))].sort();
+      const add = (value, label) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        select.appendChild(opt);
+      };
+      add('@main', 'Main (production)');
+      add('@test', 'Test');
+      add('@all', 'All configurations');
+      if (configs.length) {
+        const group = document.createElement('optgroup');
+        group.label = 'Individual configurations';
+        for (const c of configs) {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          group.appendChild(opt);
+        }
+        select.appendChild(group);
+      }
+      select.value = '@main'; // default to production-only dependencies
+    }
+
+    // Rebuild the graph for the current config selection, preserving the "Show all modules" state.
+    function rebuild() {
+      const value = document.getElementById('configFilter').value;
+      buildDeps(matcherFor(value));
+      render(!document.getElementById('showAll').checked);
+    }
+
     try {
       const res = await fetch('modules-graph.md', { cache: 'no-cache' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       parse(await res.text());
-      if (deps.size === 0) throw new Error('No module edges found in modules-graph.md');
+      if (rawEdges.length === 0) throw new Error('No module edges found in modules-graph.md');
 
+      populateConfigFilter();
       // Default to only the top-level modules (the entry points nothing depends on)
       // as roots; "Show all modules" lists every module at the top level instead.
-      render(true);
+      rebuild();
       statusEl.classList.add('hidden');
       controlsEl.classList.remove('hidden');
 
       document.getElementById('filter').addEventListener('input', applyFilter);
       document.getElementById('expandAll').addEventListener('click', expandAll);
       document.getElementById('collapseAll').addEventListener('click', collapseAll);
-      document.getElementById('showAll').addEventListener('change', (e) => {
-        render(!e.target.checked);
-      });
+      document.getElementById('configFilter').addEventListener('change', rebuild);
+      document.getElementById('showAll').addEventListener('change', rebuild);
     } catch (err) {
       statusEl.textContent =
         'Could not load the module tree. It is generated during deployment — ' +
