@@ -29,6 +29,7 @@ import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
@@ -55,6 +56,7 @@ fun CsvImportAllDialog(
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
+    passThroughAccountRepository: PassThroughAccountReadRepository,
     csvImportRepository: CsvImportReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -64,6 +66,7 @@ fun CsvImportAllDialog(
     val scope = rememberSchemaAwareCoroutineScope()
     val strategies by csvImportStrategyRepository.getAllStrategies().collectAsStateWithSchemaErrorHandling(emptyList())
     val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(emptyList())
+    val passThroughAccounts by passThroughAccountRepository.getEnabled().collectAsStateWithSchemaErrorHandling(emptyList())
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
@@ -150,6 +153,7 @@ fun CsvImportAllDialog(
                                         maintenance = maintenance,
                                         importEngine = importEngine,
                                         onProgress = { done, total -> progress = done to total },
+                                        passThroughAccounts = passThroughAccounts,
                                     )
                                 summary = result.toSummary()
                             } finally {
