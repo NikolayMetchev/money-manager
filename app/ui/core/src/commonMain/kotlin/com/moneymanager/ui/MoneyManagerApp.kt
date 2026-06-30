@@ -70,6 +70,7 @@ import com.moneymanager.ui.screens.CurrencyAuditScreen
 import com.moneymanager.ui.screens.DatabaseSizeBreakdownScreen
 import com.moneymanager.ui.screens.ImportDirectoryAuditScreen
 import com.moneymanager.ui.screens.ImportsScreen
+import com.moneymanager.ui.screens.PassThroughAccountsScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
 import com.moneymanager.ui.screens.QifImportDetailScreen
@@ -623,6 +624,16 @@ fun MoneyManagerApp(
                                                     Screen.CsvStrategyAuditHistory(strategy.id, strategy.name),
                                                 )
                                             },
+                                            onPassThroughAccountsClick = {
+                                                navigationHistory.navigateTo(Screen.PassThroughAccounts)
+                                            },
+                                        )
+                                    }
+                                    is Screen.PassThroughAccounts -> {
+                                        PassThroughAccountsScreen(
+                                            passThroughAccountRepository = services.imports.passThroughAccountRepository,
+                                            importEngine = services.transactions.importEngine,
+                                            onBack = { navigationHistory.navigateBack() },
                                         )
                                     }
                                     is Screen.CsvStrategyEditor -> {

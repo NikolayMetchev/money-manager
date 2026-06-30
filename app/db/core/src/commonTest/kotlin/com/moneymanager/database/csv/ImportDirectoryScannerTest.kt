@@ -66,6 +66,7 @@ class ImportDirectoryScannerTest : DbTest() {
             apiSessionRepository = repositories.apiSessionRepository,
             settingsRepository = repositories.settingsRepository,
             importDirectoryRepository = repositories.importDirectoryRepository,
+            passThroughAccountRepository = repositories.passThroughAccountRepository,
             editGate = EditGate.AlwaysWritable,
         )
 

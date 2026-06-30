@@ -433,6 +433,7 @@ interface RepositoryModule {
         apiSessionRepository: ApiSessionWriteRepository,
         settingsRepository: SettingsWriteRepository,
         importDirectoryRepository: ImportDirectoryWriteRepository,
+        passThroughAccountRepository: PassThroughAccountWriteRepository,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,
@@ -453,5 +454,6 @@ interface RepositoryModule {
             apiSessionRepository = apiSessionRepository,
             settingsRepository = settingsRepository,
             importDirectoryRepository = importDirectoryRepository,
+            passThroughAccountRepository = passThroughAccountRepository,
         )
 }

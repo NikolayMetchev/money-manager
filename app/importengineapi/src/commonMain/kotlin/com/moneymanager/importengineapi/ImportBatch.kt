@@ -380,6 +380,7 @@ data class ImportBatch(
     val currencies: List<ImportCurrencyIntent> = emptyList(),
     val csvStrategyMutations: List<CsvStrategyMutation> = emptyList(),
     val apiStrategyMutations: List<ApiStrategyMutation> = emptyList(),
+    val passThroughMutations: List<PassThroughMutation> = emptyList(),
     val csvMappingMutations: List<CsvMappingMutation> = emptyList(),
     val csvImportMutations: List<CsvImportMutation> = emptyList(),
     val qifImportMutations: List<QifImportMutation> = emptyList(),

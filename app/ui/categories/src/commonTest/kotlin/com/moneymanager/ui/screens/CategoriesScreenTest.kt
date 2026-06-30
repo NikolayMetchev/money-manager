@@ -25,6 +25,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.PersonWriteRepository
@@ -76,6 +77,7 @@ class CategoriesScreenTest {
             apiSessionRepository = mock<ApiSessionWriteRepository>(MockMode.autoUnit),
             settingsRepository = mock<SettingsWriteRepository>(MockMode.autoUnit),
             importDirectoryRepository = mock<ImportDirectoryWriteRepository>(MockMode.autoUnit),
+            passThroughAccountRepository = mock<PassThroughAccountWriteRepository>(MockMode.autoUnit),
         )
 
     private val fakeCurrencyRepository: CurrencyWriteRepository =

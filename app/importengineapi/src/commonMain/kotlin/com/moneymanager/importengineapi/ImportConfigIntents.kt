@@ -14,6 +14,8 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
+import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.qif.QifImportRecord
 import kotlin.time.Instant
@@ -24,6 +26,21 @@ import kotlin.time.Instant
  * write repository. Create variants carry a String `key` whose generated id is read back from the
  * matching map on ImportResult.
  */
+
+/** A write on the pass-through (conduit) account config table (e.g. Curve definitions). */
+sealed interface PassThroughMutation {
+    data class Create(
+        val account: PassThroughAccount,
+    ) : PassThroughMutation
+
+    data class Update(
+        val account: PassThroughAccount,
+    ) : PassThroughMutation
+
+    data class Delete(
+        val id: PassThroughAccountId,
+    ) : PassThroughMutation
+}
 
 /** A write on the CSV import-strategy table. */
 sealed interface CsvStrategyMutation {

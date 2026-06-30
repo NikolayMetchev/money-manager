@@ -153,6 +153,7 @@ class CsvAccountSourceAuditE2ETest {
                             apiSessionRepository = dc.apiSessionRepository,
                             settingsRepository = dc.settingsRepository,
                             importDirectoryRepository = dc.importDirectoryRepository,
+                            passThroughAccountRepository = dc.passThroughAccountRepository,
                         ),
                 )
             }

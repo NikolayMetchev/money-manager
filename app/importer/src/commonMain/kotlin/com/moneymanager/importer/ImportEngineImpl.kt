@@ -39,6 +39,7 @@ import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeWriteRepository
+import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.PersonWriteRepository
 import com.moneymanager.domain.repository.QifImportWriteRepository
 import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
@@ -54,6 +55,7 @@ import com.moneymanager.importengineapi.CsvMappingMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
+import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportDirectoryMutation
@@ -106,6 +108,7 @@ class ImportEngineImpl(
     private val apiSessionRepository: ApiSessionWriteRepository,
     private val settingsRepository: SettingsWriteRepository,
     private val importDirectoryRepository: ImportDirectoryWriteRepository,
+    private val passThroughAccountRepository: PassThroughAccountWriteRepository,
     private val editGate: EditGate = EditGate.AlwaysWritable,
 ) : ImportEngine {
     override suspend fun import(
@@ -1046,6 +1049,13 @@ class ImportEngineImpl(
     }
 
     private suspend fun applyConfigMutations(batch: ImportBatch): ConfigOutcome {
+        for (m in batch.passThroughMutations) {
+            when (m) {
+                is PassThroughMutation.Create -> passThroughAccountRepository.create(m.account)
+                is PassThroughMutation.Update -> passThroughAccountRepository.update(m.account)
+                is PassThroughMutation.Delete -> passThroughAccountRepository.delete(m.id)
+            }
+        }
         val csvStrategyIds = mutableMapOf<String, CsvImportStrategyId>()
         for (m in batch.csvStrategyMutations) {
             when (m) {

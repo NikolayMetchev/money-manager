@@ -39,6 +39,8 @@ sealed class Screen(
 
     data object CsvStrategies : Screen("Import Strategies")
 
+    data object PassThroughAccounts : Screen("Pass-through Accounts")
+
     data class CsvStrategyEditor(
         val csvImportId: CsvImportId,
         val strategyId: CsvImportStrategyId? = null,
