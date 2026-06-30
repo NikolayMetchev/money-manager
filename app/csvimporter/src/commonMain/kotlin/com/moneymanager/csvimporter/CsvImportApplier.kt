@@ -21,16 +21,19 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportFee
+import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.applyCsvImportMutations
@@ -74,6 +77,7 @@ suspend fun bulkApplyCsv(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit,
+    passThroughAccounts: List<PassThroughAccount> = emptyList(),
 ): CsvBulkResult {
     var filesImported = 0
     var transfers = 0
@@ -105,6 +109,7 @@ suspend fun bulkApplyCsv(
                     maintenance = maintenance,
                     importEngine = importEngine,
                     refreshViews = false,
+                    passThroughAccounts = passThroughAccounts,
                 ) ?: return@forEachIndexed
             filesImported++
             transfers += result.successCount
@@ -145,6 +150,7 @@ suspend fun applyStagedCsv(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean,
+    passThroughAccounts: List<PassThroughAccount> = emptyList(),
 ): CsvImportResult? {
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
     val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
@@ -158,7 +164,7 @@ suspend fun applyStagedCsv(
     val accounts = accountRepository.getAllAccounts().first()
     val mappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
     val basePrep =
-        buildCsvMapper(strategy, csvImport.columns, accounts, currencies, mappings, effectiveSource)
+        buildCsvMapper(strategy, csvImport.columns, accounts, currencies, mappings, effectiveSource, passThroughAccounts)
             .prepareImport(rows)
 
     return runCsvImport(
@@ -176,6 +182,7 @@ suspend fun applyStagedCsv(
         maintenance = maintenance,
         importEngine = importEngine,
         refreshViews = refreshViews,
+        passThroughAccounts = passThroughAccounts,
     )
 }
 
@@ -205,6 +212,7 @@ fun buildCsvMapper(
     currencies: List<Currency>,
     accountMappings: List<CsvAccountMapping>,
     sourceAccountOverride: AccountId?,
+    passThroughAccounts: List<PassThroughAccount> = emptyList(),
 ): CsvTransferMapper =
     CsvTransferMapper(
         strategy = strategy,
@@ -214,6 +222,7 @@ fun buildCsvMapper(
         existingCurrenciesByCode = currencies.associateBy { it.code.uppercase() },
         accountMappings = accountMappings,
         sourceAccountOverride = sourceAccountOverride,
+        passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
     )
 
 /**
@@ -390,6 +399,7 @@ suspend fun runCsvImport(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
+    passThroughAccounts: List<PassThroughAccount> = emptyList(),
 ): CsvImportResult {
     logger.info { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
 
@@ -452,6 +462,7 @@ suspend fun runCsvImport(
             existingCurrenciesByCode = currenciesByCode,
             accountMappings = latestAccountMappings,
             sourceAccountOverride = selectedSourceAccountId,
+            passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
         )
 
     // Handle case when all rows are already processed (rows is already filtered by the caller)
@@ -539,6 +550,24 @@ suspend fun runCsvImport(
                         relationshipTypeId = RelationshipTypeId(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID),
                     )
                 }
+            // Pass-through (conduit) row: the mapper already routed the transfer's target to the conduit
+            // (funding leg). Resolve the merchant account the mapper created and let the engine add the
+            // spend leg conduit -> merchant. accountsByName carries the created conduit + merchant ids.
+            val passThrough =
+                row.passThrough?.let { pt ->
+                    val merchantId = accountsByName[pt.merchantName]?.id
+                    if (merchantId == null) {
+                        null
+                    } else {
+                        ImportPassThrough(
+                            conduit = AccountRef.Existing(row.transfer.targetAccountId),
+                            merchantTarget = AccountRef.Existing(merchantId),
+                            amount = row.transfer.amount,
+                            spendDescription = pt.merchantName,
+                            relationshipTypeId = RelationshipTypeId(pt.relationshipTypeId),
+                        )
+                    }
+                }
             ImportTransfer(
                 rowKey = ImportRowKey.CsvRow(row.rowIndex),
                 fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
@@ -550,6 +579,7 @@ suspend fun runCsvImport(
                 attributes = attributesFor(row.attributes),
                 uniqueKey = uniqueKey,
                 fee = fee,
+                passThrough = passThrough,
             )
         }
 

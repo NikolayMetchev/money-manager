@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -39,6 +40,7 @@ import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.importengineapi.DESCRIPTION_SIMILARITY_THRESHOLD
+import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.StringSimilarity
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -76,6 +78,12 @@ sealed interface MappingResult {
          * the import can additionally create a Person + ownership link; null otherwise.
          */
         val personalCounterpartyName: String? = null,
+        /**
+         * Set when the row is a pass-through (conduit) charge (e.g. Curve): the transfer's target is the
+         * conduit account (funding leg) and [CsvPassThrough.merchantName] is the real merchant the engine
+         * routes the spend leg to. Null for ordinary rows.
+         */
+        val passThrough: CsvPassThrough? = null,
     ) : MappingResult {
         /** Convenience for flows where only the target side can discover a new account. */
         val newAccountName: String? get() = newAccounts.firstOrNull()?.name
@@ -96,6 +104,17 @@ sealed interface MappingResult {
 data class NewAccount(
     val name: String,
     val categoryId: Long,
+)
+
+/**
+ * Pass-through routing for a row whose charge passes through a conduit account (e.g. Curve). The
+ * transfer itself is the funding leg (card -> [conduitName]); the engine synthesises the spend leg
+ * ([conduitName] -> [merchantName]) and links them via [relationshipTypeId].
+ */
+data class CsvPassThrough(
+    val conduitName: String,
+    val merchantName: String,
+    val relationshipTypeId: Long,
 )
 
 /**
@@ -120,6 +139,8 @@ data class CsvTransferWithAttributes(
     val feeAmount: Money? = null,
     /** Counterparty account name when it is a person (drives Person + ownership creation); else null. */
     val personalCounterpartyName: String? = null,
+    /** Pass-through (conduit) routing for the row (e.g. Curve); null for ordinary rows. */
+    val passThrough: CsvPassThrough? = null,
 )
 
 /**
@@ -183,6 +204,8 @@ class CsvTransferMapper(
     accountMappings: List<CsvAccountMapping> = emptyList(),
     /** When set, overrides the strategy's SOURCE_ACCOUNT mapping for every row. */
     private val sourceAccountOverride: AccountId? = null,
+    /** Detects pass-through (conduit) charges (e.g. Curve) from the row description; null disables it. */
+    private val passThroughDetector: PassThroughDetector? = null,
 ) {
     private val columnIndexByName: Map<String, Int> =
         columns.associate { it.originalName to it.columnIndex }
@@ -226,6 +249,7 @@ class CsvTransferMapper(
                             discoveredMappings = result.discoveredMappings,
                             feeAmount = result.feeAmount,
                             personalCounterpartyName = result.personalCounterpartyName,
+                            passThrough = result.passThrough,
                         ),
                     )
                     // Count by status
@@ -335,9 +359,23 @@ class CsvTransferMapper(
             // Parse description
             val description = parseDescription(descriptionMapping, values)
 
+            // Detect a pass-through (conduit) charge, e.g. Curve, from the description. Only outgoing
+            // spends (target = merchant, i.e. no flip) are routed: the transfer becomes the funding leg
+            // card -> conduit, and the engine adds the spend leg conduit -> merchant. Detection + the
+            // conduit/merchant names come entirely from user-editable config (the engine stays agnostic).
+            val passThroughMatch = if (!flipAccounts) passThroughDetector?.detect(description) else null
+            val effectiveTargetAccountId =
+                if (passThroughMatch != null) {
+                    existingAccounts[passThroughMatch.account.conduitAccountName]?.id ?: AccountId(-1)
+                } else {
+                    targetAccountId
+                }
+
             // Detect a personal counterparty (resolved from the target mapping regardless of any
-            // account flip — the counterparty is the same account on whichever side it ends up).
-            val personalCounterpartyName = resolvePersonalCounterparty(targetMapping, values)
+            // account flip — the counterparty is the same account on whichever side it ends up). A
+            // pass-through merchant is never a person, so skip it there.
+            val personalCounterpartyName =
+                if (passThroughMatch != null) null else resolvePersonalCounterparty(targetMapping, values)
 
             // Create Money with absolute value (direction is indicated by source/target)
             val amount = Money.fromDisplayValue(rawAmount.abs(), currency)
@@ -354,7 +392,7 @@ class CsvTransferMapper(
                     timestamp = timestamp,
                     description = description,
                     sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
+                    targetAccountId = effectiveTargetAccountId,
                     amount = amount,
                 )
 
@@ -370,15 +408,33 @@ class CsvTransferMapper(
                 }
 
             // Determine which new accounts need to be created and capture mapping info.
-            // The source side participates only when it is resolved per-row (no UI override).
+            // The source side participates only when it is resolved per-row (no UI override). For a
+            // pass-through row the target side is replaced by the conduit + merchant accounts (so the
+            // raw "CRV*…" junk account is never discovered), and no account mapping is auto-captured.
             val discoveries =
                 buildList {
                     if (sourceAccountOverride == null) {
                         strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let { add(discoverNewAccount(it, values)) }
                     }
-                    add(discoverNewAccount(targetMapping, values))
+                    if (passThroughMatch == null) add(discoverNewAccount(targetMapping, values))
                 }
-            val newAccounts = discoveries.mapNotNull { it?.first }
+            val targetCategoryId =
+                when (val m = targetMapping) {
+                    is AccountLookupMapping -> m.defaultCategoryId
+                    is RegexAccountMapping -> m.defaultCategoryId
+                    is TemplateAccountMapping -> m.defaultCategoryId
+                    else -> Category.UNCATEGORIZED_ID
+                }
+            val newAccounts =
+                buildList {
+                    addAll(discoveries.mapNotNull { it?.first })
+                    if (passThroughMatch != null) {
+                        val conduitName = passThroughMatch.account.conduitAccountName
+                        val merchantName = passThroughMatch.merchantName
+                        if (!accountExists(conduitName)) add(NewAccount(conduitName, targetCategoryId))
+                        if (!accountExists(merchantName)) add(NewAccount(merchantName, targetCategoryId))
+                    }
+                }
             val discoveredMappings = discoveries.mapNotNull { it?.second }
 
             MappingResult.Success(
@@ -390,6 +446,14 @@ class CsvTransferMapper(
                 discoveredMappings = discoveredMappings,
                 feeAmount = feeAmount,
                 personalCounterpartyName = personalCounterpartyName,
+                passThrough =
+                    passThroughMatch?.let {
+                        CsvPassThrough(
+                            conduitName = it.account.conduitAccountName,
+                            merchantName = it.merchantName,
+                            relationshipTypeId = it.account.relationshipTypeId,
+                        )
+                    },
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
