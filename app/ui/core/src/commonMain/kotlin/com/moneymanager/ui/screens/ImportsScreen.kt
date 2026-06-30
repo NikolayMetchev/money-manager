@@ -1,19 +1,17 @@
 package com.moneymanager.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.DeviceId
@@ -72,18 +70,8 @@ fun ImportsScreen(
     onSessionClick: (ApiSession) -> Unit,
     onImportDirectoryAuditClick: (ImportDirectory) -> Unit,
     onTransactionsImported: () -> Unit,
-    onPassThroughAccountsClick: () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        // Pass-through (conduit) accounts, e.g. Curve, apply across every import type (CSV/QIF/API), so
-        // the entry lives at the top level rather than under any single import tab.
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onPassThroughAccountsClick) { Text("Pass-through Accounts") }
-        }
         PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
             Tab(
                 selected = selectedTab == ImportTab.DIRECTORIES,
@@ -106,9 +94,9 @@ fun ImportsScreen(
                 text = { Text("API") },
             )
             Tab(
-                selected = selectedTab == ImportTab.MANUAL,
-                onClick = { onTabSelected(ImportTab.MANUAL) },
-                text = { Text("Manual Entries") },
+                selected = selectedTab == ImportTab.MISC,
+                onClick = { onTabSelected(ImportTab.MISC) },
+                text = { Text("Misc") },
             )
         }
 
@@ -169,12 +157,47 @@ fun ImportsScreen(
                     onSessionClick = onSessionClick,
                     onTransactionsImported = onTransactionsImported,
                 )
-            ImportTab.MANUAL ->
+            ImportTab.MISC ->
+                MiscImportsTab(
+                    csvImportStrategyRepository = csvImportStrategyRepository,
+                    transactionRepository = transactionRepository,
+                    passThroughAccountRepository = passThroughAccountRepository,
+                    importEngine = importEngine,
+                    maintenance = maintenance,
+                    onTransactionsImported = onTransactionsImported,
+                )
+        }
+    }
+}
+
+/** Sub-tabs under the "Misc" import tab: manual transaction entry, and pass-through (conduit) config. */
+@Composable
+private fun MiscImportsTab(
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    transactionRepository: TransactionReadRepository,
+    passThroughAccountRepository: PassThroughAccountReadRepository,
+    importEngine: ImportEngine,
+    maintenance: Maintenance,
+    onTransactionsImported: () -> Unit,
+) {
+    var subTab by rememberSaveable { mutableStateOf(0) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        SecondaryTabRow(selectedTabIndex = subTab) {
+            Tab(selected = subTab == 0, onClick = { subTab = 0 }, text = { Text("Manual Entries") })
+            Tab(selected = subTab == 1, onClick = { subTab = 1 }, text = { Text("Pass-through") })
+        }
+        when (subTab) {
+            0 ->
                 ManualEntriesScreen(
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     transactionRepository = transactionRepository,
                     maintenance = maintenance,
                     onTransactionsImported = onTransactionsImported,
+                )
+            else ->
+                PassThroughAccountsScreen(
+                    passThroughAccountRepository = passThroughAccountRepository,
+                    importEngine = importEngine,
                 )
         }
     }

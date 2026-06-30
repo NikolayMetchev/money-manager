@@ -70,7 +70,6 @@ import com.moneymanager.ui.screens.CurrencyAuditScreen
 import com.moneymanager.ui.screens.DatabaseSizeBreakdownScreen
 import com.moneymanager.ui.screens.ImportDirectoryAuditScreen
 import com.moneymanager.ui.screens.ImportsScreen
-import com.moneymanager.ui.screens.PassThroughAccountsScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
 import com.moneymanager.ui.screens.QifImportDetailScreen
@@ -496,9 +495,6 @@ fun MoneyManagerApp(
                                             onQifImportClick = { importId ->
                                                 navigationHistory.navigateTo(Screen.QifImportDetail(importId))
                                             },
-                                            onPassThroughAccountsClick = {
-                                                navigationHistory.navigateTo(Screen.PassThroughAccounts)
-                                            },
                                             onAddCredentialClick = {
                                                 navigationHistory.navigateTo(Screen.ConnectApi)
                                             },
@@ -627,13 +623,6 @@ fun MoneyManagerApp(
                                                     Screen.CsvStrategyAuditHistory(strategy.id, strategy.name),
                                                 )
                                             },
-                                        )
-                                    }
-                                    is Screen.PassThroughAccounts -> {
-                                        PassThroughAccountsScreen(
-                                            passThroughAccountRepository = services.imports.passThroughAccountRepository,
-                                            importEngine = services.transactions.importEngine,
-                                            onBack = { navigationHistory.navigateBack() },
                                         )
                                     }
                                     is Screen.CsvStrategyEditor -> {

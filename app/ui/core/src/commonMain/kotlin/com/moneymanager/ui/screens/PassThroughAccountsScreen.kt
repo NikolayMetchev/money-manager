@@ -1,5 +1,3 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-
 package com.moneymanager.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
@@ -11,17 +9,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,54 +45,47 @@ import kotlinx.coroutines.launch
 fun PassThroughAccountsScreen(
     passThroughAccountRepository: PassThroughAccountReadRepository,
     importEngine: ImportEngine,
-    onBack: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val accounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
     var editing by remember { mutableStateOf<PassThroughAccount?>(null) }
     var showEditor by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Pass-through Accounts") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Text("<", style = MaterialTheme.typography.titleLarge) }
-                },
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = {
-                editing = null
-                showEditor = true
-            }) {
-                Text("+", style = MaterialTheme.typography.headlineMedium)
-            }
-        },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 "A pass-through account (e.g. Curve) is a wrapper card whose charges are forwarded to an " +
                     "underlying card. Matching charges are routed card → conduit → merchant.",
                 style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
-            LazyColumn(
-                Modifier.fillMaxSize().padding(top = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(accounts, key = { it.id.value }) { account ->
-                    PassThroughAccountCard(
-                        account = account,
-                        onToggleEnabled = {
-                            scope.launch { importEngine.updatePassThroughAccount(account.copy(enabled = !account.enabled)) }
-                        },
-                        onEdit = {
-                            editing = account
-                            showEditor = true
-                        },
-                        onDelete = { scope.launch { importEngine.deletePassThroughAccount(account.id) } },
-                    )
-                }
+            Button(onClick = {
+                editing = null
+                showEditor = true
+            }) {
+                Text("Add")
+            }
+        }
+        LazyColumn(
+            Modifier.fillMaxSize().padding(top = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(accounts, key = { it.id.value }) { account ->
+                PassThroughAccountCard(
+                    account = account,
+                    onToggleEnabled = {
+                        scope.launch { importEngine.updatePassThroughAccount(account.copy(enabled = !account.enabled)) }
+                    },
+                    onEdit = {
+                        editing = account
+                        showEditor = true
+                    },
+                    onDelete = { scope.launch { importEngine.deletePassThroughAccount(account.id) } },
+                )
             }
         }
     }
