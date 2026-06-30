@@ -48,9 +48,12 @@ INSERT INTO relationship_type (id, name) VALUES (3, 'pass-through');
 -- rule covers both Crypto.com ("Crv*Sainsburys") and Monzo ("CRV*NATIONAL LOTTERY   London   GBR"):
 -- detection (?i)^CRV\* , merchant (?i)^CRV\*\s*(.+?)(?:\s{2,}.*)?$ -> $1 . pass_through_account is in
 -- EXCLUDED_FROM_AUDIT (config table, no triggers). FK relationship_type_id -> the type seeded above.
+-- Seeded DISABLED (enabled = 0): the definition is visible/editable under Imports -> Misc -> Pass-through,
+-- but does not change any import's behaviour until the user turns it on. This keeps imports unchanged by
+-- default (a pass-through is a per-user card setup) and avoids rerouting unrelated "CRV*" rows.
 INSERT INTO pass_through_account (id, name, conduit_account_name, relationship_type_id, enabled, rules_json)
 VALUES (
-    1, 'Curve', 'Curve', 3, 1,
+    1, 'Curve', 'Curve', 3, 0,
     '[{"detectionPattern":"(?i)^CRV\\*","merchantPattern":"(?i)^CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$","merchantTemplate":"$1"}]'
 );
 

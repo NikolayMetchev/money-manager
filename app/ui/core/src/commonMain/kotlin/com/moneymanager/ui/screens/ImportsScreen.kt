@@ -9,7 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.moneymanager.domain.Maintenance
@@ -180,7 +180,7 @@ private fun MiscImportsTab(
     maintenance: Maintenance,
     onTransactionsImported: () -> Unit,
 ) {
-    var subTab by rememberSaveable { mutableStateOf(0) }
+    var subTab by remember { mutableStateOf(0) }
     Column(modifier = Modifier.fillMaxSize()) {
         SecondaryTabRow(selectedTabIndex = subTab) {
             Tab(selected = subTab == 0, onClick = { subTab = 0 }, text = { Text("Manual Entries") })
