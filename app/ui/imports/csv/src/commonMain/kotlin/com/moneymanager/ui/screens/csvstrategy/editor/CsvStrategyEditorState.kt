@@ -43,6 +43,20 @@ internal class CsvStrategyEditorState(
     var timeColumnName by mutableStateOf(initial?.timeColumnName)
     var timeFormat by mutableStateOf(initial?.timeFormat ?: "HH:mm:ss")
     var dateTimeFormat by mutableStateOf(initial?.dateTimeFormat.orEmpty())
+
+    /**
+     * When true, a single column holds both the date and time ([dateTimeFormat] drives parsing);
+     * when false, the date (and optional time) live in separate columns. Seeded from whether the
+     * loaded strategy had a combined format.
+     */
+    var dateTimeInOneColumn by mutableStateOf(!initial?.dateTimeFormat.isNullOrBlank())
+
+    // Whether the user has hand-edited a format field. While false, the editor auto-fills the format
+    // from the selected column's sample values (see AmountDateTab). Editing an existing strategy
+    // starts "touched" so a saved format is never silently overwritten.
+    var combinedFormatTouched by mutableStateOf(initial != null)
+    var dateFormatTouched by mutableStateOf(initial != null)
+    var timeFormatTouched by mutableStateOf(initial != null)
     var descriptionColumnName by mutableStateOf(initial?.descriptionColumnName)
     var descriptionFallbackColumns by mutableStateOf(initial?.descriptionFallbackColumns.orEmpty())
     var amountColumnName by mutableStateOf(initial?.amountColumnName)
@@ -132,9 +146,18 @@ internal class CsvStrategyEditorState(
     val accountsHasError: Boolean
         get() = !targetAccountValid
 
+    private val dateTimeFormatValid: Boolean
+        get() = if (dateTimeInOneColumn) dateTimeFormat.isNotBlank() else dateFormat.isNotBlank()
+
     /** Whether the Amount & Date tab has an unsatisfied required field. */
     val amountDateHasError: Boolean
-        get() = amountColumnName == null || dateColumnName == null || !feeValid || !currencyValid || !timezoneValid
+        get() =
+            amountColumnName == null ||
+                dateColumnName == null ||
+                !dateTimeFormatValid ||
+                !feeValid ||
+                !currencyValid ||
+                !timezoneValid
 
     /** Whether the Advanced tab has an unsatisfied required field. */
     val advancedHasError: Boolean
@@ -155,6 +178,7 @@ internal class CsvStrategyEditorState(
                 identificationColumns.isNotEmpty() &&
                 targetAccountValid &&
                 dateColumnName != null &&
+                dateTimeFormatValid &&
                 descriptionColumnName != null &&
                 amountColumnName != null &&
                 feeValid &&
@@ -169,7 +193,9 @@ internal class CsvStrategyEditorState(
             identificationColumns = identificationColumns,
             dateColumnName = dateColumnName,
             dateFormat = dateFormat,
-            timeColumnName = timeColumnName,
+            // The two modes are mutually exclusive: a combined format ignores any separate time
+            // column, so null it out to keep the saved mapping consistent with the chosen mode.
+            timeColumnName = if (dateTimeInOneColumn) null else timeColumnName,
             timeFormat = timeFormat,
             descriptionColumnName = descriptionColumnName,
             descriptionFallbackColumns = descriptionFallbackColumns,
@@ -177,7 +203,7 @@ internal class CsvStrategyEditorState(
             flipAccountsOnPositive = flipAccountsOnPositive,
             feeColumnName = feeColumnName,
             feeConditions = feeConditions,
-            dateTimeFormat = dateTimeFormat,
+            dateTimeFormat = if (dateTimeInOneColumn) dateTimeFormat else "",
             sourceAccountMode = sourceAccountMode,
             selectedAccountId = selectedAccountId,
             sourceTemplateColumnName = sourceTemplateColumnName,

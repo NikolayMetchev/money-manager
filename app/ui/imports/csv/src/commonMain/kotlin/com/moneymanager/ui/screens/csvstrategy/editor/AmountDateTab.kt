@@ -11,10 +11,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.DateFormatDetector
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -28,6 +31,7 @@ import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 internal fun AmountDateTab(
     state: CsvStrategyEditorState,
     csvColumns: List<CsvColumn>,
+    rows: List<CsvRow>,
     firstRow: CsvRow?,
     enabled: Boolean,
     currencyRepository: CurrencyReadRepository,
@@ -165,28 +169,101 @@ internal fun AmountDateTab(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Date Column", style = MaterialTheme.typography.titleSmall)
-        ColumnDropdown(
-            columns = csvColumns,
-            selectedColumn = state.dateColumnName,
-            onColumnSelected = { state.dateColumnName = it },
-            label = "Column containing transaction date",
-            sampleValue = getSampleValue(csvColumns, firstRow, state.dateColumnName),
+        DateTimeSection(state, csvColumns, rows, firstRow, enabled)
+    }
+}
+
+/**
+ * Date/time parsing controls. A single checkbox toggles between the two mutually exclusive layouts —
+ * a combined date+time column or separate date/time columns — so only the fields relevant to the
+ * chosen layout are shown. Format fields auto-fill from the selected column's sample values via
+ * [DateFormatDetector] until the user edits them; the "Auto-detect" action re-runs detection on demand.
+ */
+@Composable
+private fun DateTimeSection(
+    state: CsvStrategyEditorState,
+    csvColumns: List<CsvColumn>,
+    rows: List<CsvRow>,
+    firstRow: CsvRow?,
+    enabled: Boolean,
+) {
+    fun columnSamples(columnName: String?): List<String> {
+        val index = csvColumns.find { it.originalName == columnName }?.columnIndex ?: return emptyList()
+        return rows.mapNotNull { it.values.getOrNull(index) }
+    }
+
+    // The first value with content drives both the "Sample:" hint and the format validation, so an
+    // empty leading cell doesn't hide a format that fails to parse real rows.
+    fun firstNonBlankSample(columnName: String?): String? = columnSamples(columnName).firstOrNull { it.isNotBlank() }
+
+    // Auto-fill the active format from the chosen column's samples until the user takes over.
+    LaunchedEffect(state.dateColumnName, state.dateTimeInOneColumn, rows) {
+        if (state.dateTimeInOneColumn) {
+            if (!state.combinedFormatTouched) {
+                DateFormatDetector.detectDateTime(columnSamples(state.dateColumnName))?.let { state.dateTimeFormat = it }
+            }
+        } else if (!state.dateFormatTouched) {
+            DateFormatDetector.detectDate(columnSamples(state.dateColumnName))?.let { state.dateFormat = it }
+        }
+    }
+    LaunchedEffect(state.timeColumnName, rows) {
+        if (!state.dateTimeInOneColumn && state.timeColumnName != null && !state.timeFormatTouched) {
+            DateFormatDetector.detectTime(columnSamples(state.timeColumnName))?.let { state.timeFormat = it }
+        }
+    }
+
+    Text("Date & Time", style = MaterialTheme.typography.titleSmall)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(
+            checked = state.dateTimeInOneColumn,
+            onCheckedChange = { state.dateTimeInOneColumn = it },
             enabled = enabled,
-            isError = state.dateColumnName == null,
         )
-        Spacer(modifier = Modifier.height(4.dp))
-        OutlinedTextField(
-            value = state.dateFormat,
-            onValueChange = { state.dateFormat = it },
-            label = { Text("Date Format (e.g., dd/MM/yyyy)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
+        Text(
+            "Date and time are in a single column",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+
+    Spacer(modifier = Modifier.height(4.dp))
+    ColumnDropdown(
+        columns = csvColumns,
+        selectedColumn = state.dateColumnName,
+        onColumnSelected = { state.dateColumnName = it },
+        label = if (state.dateTimeInOneColumn) "Column containing date and time" else "Column containing transaction date",
+        sampleValue = getSampleValue(csvColumns, firstRow, state.dateColumnName),
+        enabled = enabled,
+        isError = state.dateColumnName == null,
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    if (state.dateTimeInOneColumn) {
+        FormatField(
+            value = state.dateTimeFormat,
+            onValueChange = {
+                state.dateTimeFormat = it
+                state.combinedFormatTouched = true
+            },
+            label = "Date+Time Format (e.g., yyyy-MM-dd HH:mm:ss)",
+            sample = firstNonBlankSample(state.dateColumnName),
             enabled = enabled,
-            supportingText = {
-                getSampleValue(csvColumns, firstRow, state.dateColumnName)?.let {
-                    Text("Sample: $it")
-                }
+            validate = DateFormatDetector::parsesAsDateTime,
+            onAutoDetect = {
+                DateFormatDetector.detectDateTime(columnSamples(state.dateColumnName))?.let { state.dateTimeFormat = it }
+            },
+        )
+    } else {
+        FormatField(
+            value = state.dateFormat,
+            onValueChange = {
+                state.dateFormat = it
+                state.dateFormatTouched = true
+            },
+            label = "Date Format (e.g., dd/MM/yyyy)",
+            sample = firstNonBlankSample(state.dateColumnName),
+            enabled = enabled,
+            validate = DateFormatDetector::parsesAsDate,
+            onAutoDetect = {
+                DateFormatDetector.detectDate(columnSamples(state.dateColumnName))?.let { state.dateFormat = it }
             },
         )
 
@@ -206,37 +283,64 @@ internal fun AmountDateTab(
             sampleValue = getSampleValue(csvColumns, firstRow, state.timeColumnName),
             enabled = enabled,
         )
-        if (state.timeColumnName != null && state.dateTimeFormat.isBlank()) {
+        if (state.timeColumnName != null) {
             Spacer(modifier = Modifier.height(4.dp))
-            OutlinedTextField(
+            FormatField(
                 value = state.timeFormat,
-                onValueChange = { state.timeFormat = it },
-                label = { Text("Time Format (e.g., HH:mm:ss)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+                onValueChange = {
+                    state.timeFormat = it
+                    state.timeFormatTouched = true
+                },
+                label = "Time Format (e.g., HH:mm:ss)",
+                sample = firstNonBlankSample(state.timeColumnName),
                 enabled = enabled,
-                supportingText = {
-                    getSampleValue(csvColumns, firstRow, state.timeColumnName)?.let {
-                        Text("Sample: $it")
-                    }
+                validate = DateFormatDetector::parsesAsTime,
+                onAutoDetect = {
+                    DateFormatDetector.detectTime(columnSamples(state.timeColumnName))?.let { state.timeFormat = it }
                 },
             )
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-        OutlinedTextField(
-            value = state.dateTimeFormat,
-            onValueChange = { state.dateTimeFormat = it },
-            label = { Text("Combined date+time format (optional)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            enabled = enabled,
-            supportingText = {
-                Text(
-                    "When set, the date column holds both date and time " +
-                        "(e.g., yyyy-MM-dd HH:mm:ss) and the separate time column is ignored.",
-                )
-            },
-        )
     }
+}
+
+/**
+ * A date/time format text field with a "Sample: …" hint and an inline "Auto-detect" action that
+ * re-guesses the pattern from the column's values.
+ *
+ * Turns red when the format is blank, or when it cannot parse the displayed sample value — so a
+ * mistyped or wrong pattern is caught immediately. [validate] reports whether the current format
+ * successfully parses a given sample.
+ */
+@Composable
+private fun FormatField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    sample: String?,
+    enabled: Boolean,
+    validate: (format: String, sample: String) -> Boolean,
+    onAutoDetect: () -> Unit,
+) {
+    val trimmedSample = sample?.trim().orEmpty()
+    val sampleUnparseable = value.isNotBlank() && trimmedSample.isNotEmpty() && !validate(value, trimmedSample)
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        enabled = enabled,
+        isError = value.isBlank() || sampleUnparseable,
+        trailingIcon = {
+            TextButton(onClick = onAutoDetect, enabled = enabled) {
+                Text("Auto-detect")
+            }
+        },
+        supportingText = {
+            when {
+                sampleUnparseable -> Text("Sample \"$trimmedSample\" does not match this format")
+                sample != null -> Text("Sample: $sample")
+            }
+        },
+    )
 }
