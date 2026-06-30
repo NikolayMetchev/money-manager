@@ -36,4 +36,11 @@ object WellKnownIds {
 
     /** "fee" relationship type: id1 is the main transaction, id2 its fee transfer. */
     const val FEE_RELATIONSHIP_TYPE_ID: Long = 2
+
+    /**
+     * "pass-through" relationship type: id1 is the funding leg (card → conduit), id2 the spend leg
+     * (conduit → merchant) of a charge routed through a conduit account (e.g. Curve). See
+     * [com.moneymanager.domain.model.passthrough.PassThroughAccount].
+     */
+    const val PASS_THROUGH_RELATIONSHIP_TYPE_ID: Long = 3
 }

@@ -349,6 +349,7 @@ class ImportEngineImpl(
         val resolvedTransfers =
             creates.map { transfer ->
                 val fee = transfer.fee
+                val passThrough = transfer.passThrough
                 transfer.copy(
                     rowKey = transfer.rowKey ?: ImportRowKey.Manual(manualRowIndex++),
                     fromAccount = resolveRef(requireNotNull(transfer.fromAccount), accountKeyToId),
@@ -357,6 +358,11 @@ class ImportEngineImpl(
                         fee?.copy(
                             source = resolveRef(fee.source, accountKeyToId),
                             target = resolveRef(fee.target, accountKeyToId),
+                        ),
+                    passThrough =
+                        passThrough?.copy(
+                            conduit = resolveRef(passThrough.conduit, accountKeyToId),
+                            merchantTarget = resolveRef(passThrough.merchantTarget, accountKeyToId),
                         ),
                 )
             }
@@ -897,11 +903,17 @@ class ImportEngineImpl(
             val mainTempId = TransferId(-(++tempCounter).toLong())
             val fee = t.fee
             val feeTempId = if (fee != null) TransferId(-(++tempCounter).toLong()) else null
+            val passThrough = t.passThrough
+            val spendTempId = if (passThrough != null) TransferId(-(++tempCounter).toLong()) else null
             val relationships =
-                if (fee != null && feeTempId != null) {
-                    t.relationships + NewRelationship(relatedTransferId = feeTempId, typeId = fee.relationshipTypeId)
-                } else {
-                    t.relationships
+                buildList {
+                    addAll(t.relationships)
+                    if (fee != null && feeTempId != null) {
+                        add(NewRelationship(relatedTransferId = feeTempId, typeId = fee.relationshipTypeId))
+                    }
+                    if (passThrough != null && spendTempId != null) {
+                        add(NewRelationship(relatedTransferId = spendTempId, typeId = passThrough.relationshipTypeId))
+                    }
                 }
             val rowKey = requireNotNull(t.rowKey)
             mainResultIndices += transfersToCreate.size
@@ -930,6 +942,21 @@ class ImportEngineImpl(
                 // The fee inherits the main transfer's provenance source, resolved against its own row
                 // key when provided (so the audit trail points at the fee's source node), else the main's.
                 orderedSources += t.source.forRow(fee.rowKey ?: rowKey)
+            }
+            if (passThrough != null && spendTempId != null) {
+                // The spend leg: conduit -> merchant, same amount as the funding leg (the main transfer,
+                // card -> conduit). Linked to the main via the pass-through relationship above; the
+                // conduit nets to zero so the spend is counted once.
+                transfersToCreate +=
+                    Transfer(
+                        id = spendTempId,
+                        timestamp = requireNotNull(t.timestamp),
+                        description = passThrough.spendDescription,
+                        sourceAccountId = requireId(passThrough.conduit),
+                        targetAccountId = requireId(passThrough.merchantTarget),
+                        amount = passThrough.amount,
+                    )
+                orderedSources += t.source.forRow(passThrough.rowKey ?: rowKey)
             }
         }
         return CreatePayload(transfersToCreate, newAttributes, newRelationships, orderedSources, mainResultIndices)

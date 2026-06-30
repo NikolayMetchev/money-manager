@@ -1,0 +1,15 @@
+-- Select all pass-through account definitions ordered by name.
+selectAll:
+SELECT * FROM pass_through_account ORDER BY name;
+
+-- Select only the enabled definitions (what importers consult).
+selectEnabled:
+SELECT * FROM pass_through_account WHERE enabled = 1 ORDER BY name;
+
+-- Select a definition by id.
+selectById:
+SELECT * FROM pass_through_account WHERE id = ?;
+
+-- Select a definition by name.
+selectByName:
+SELECT * FROM pass_through_account WHERE name = ?;

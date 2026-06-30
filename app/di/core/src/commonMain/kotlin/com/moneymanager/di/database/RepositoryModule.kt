@@ -18,6 +18,8 @@ import com.moneymanager.database.repository.CategoryReadRepositoryImpl
 import com.moneymanager.database.repository.CategoryWriteRepositoryImpl
 import com.moneymanager.database.repository.CsvAccountMappingReadRepositoryImpl
 import com.moneymanager.database.repository.CsvAccountMappingWriteRepositoryImpl
+import com.moneymanager.database.repository.PassThroughAccountReadRepositoryImpl
+import com.moneymanager.database.repository.PassThroughAccountWriteRepositoryImpl
 import com.moneymanager.database.repository.CsvImportReadRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyReadRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyWriteRepositoryImpl
@@ -66,6 +68,8 @@ import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
 import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.PassThroughAccountReadRepository
+import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
@@ -184,6 +188,18 @@ interface RepositoryModule {
         deviceId: DeviceId,
         reader: CategoryReadRepository,
     ): CategoryWriteRepository = CategoryWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun providePassThroughAccountReadRepository(database: MoneyManagerDatabaseWrapper): PassThroughAccountReadRepository =
+        PassThroughAccountReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun providePassThroughAccountWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: PassThroughAccountReadRepository,
+    ): PassThroughAccountWriteRepository = PassThroughAccountWriteRepositoryImpl(database, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
