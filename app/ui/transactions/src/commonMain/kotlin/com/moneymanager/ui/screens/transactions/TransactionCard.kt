@@ -168,6 +168,25 @@ fun AccountTransactionCard(
                         onClick = { onFeeLinkClick(linkedParentId) },
                     )
                 }
+                // Pass-through (conduit) links, e.g. Curve. The funding leg (card → conduit) shows
+                // "Pass-through" → its merchant spend; the spend leg (conduit → merchant) shows
+                // "Via conduit" → its funding leg. Clicking either jumps to the linked transfer.
+                runningBalance.passThroughSpendId?.let { linkedSpendId ->
+                    FeeBadge(
+                        text = "Pass-through",
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = mutedAlpha),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = mutedAlpha),
+                        onClick = { onFeeLinkClick(linkedSpendId) },
+                    )
+                }
+                runningBalance.passThroughFundingId?.let { linkedFundingId ->
+                    FeeBadge(
+                        text = "Via conduit",
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = mutedAlpha),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = mutedAlpha),
+                        onClick = { onFeeLinkClick(linkedFundingId) },
+                    )
+                }
                 if (runningBalance.description.isNotBlank()) {
                     Text(
                         text = runningBalance.description,

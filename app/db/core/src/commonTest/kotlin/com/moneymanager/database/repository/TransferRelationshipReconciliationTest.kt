@@ -141,6 +141,64 @@ class TransferRelationshipReconciliationTest : DbTest() {
         }
 
     @Test
+    fun passThroughTransfer_runningBalanceRowsLinkFundingAndSpendLegs() =
+        runTest {
+            val currency = gbp()
+            val cardId = createAccount("Crypto.com")
+            val conduitId = createAccount("Curve")
+            val merchantId = createAccount("National Lottery")
+            val passThroughTypeId = RelationshipTypeId(DatabaseConfig.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
+            // Funding leg (card -> conduit) is id1; spend leg (conduit -> merchant) is id2, linked via the
+            // pass-through relationship. Both created in one batch with temp ids resolved by the engine.
+            val funding =
+                Transfer(
+                    id = TransferId(-1),
+                    timestamp = baseTime,
+                    description = "Curve",
+                    sourceAccountId = cardId,
+                    targetAccountId = conduitId,
+                    amount = Money(1010, currency),
+                )
+            val spend =
+                Transfer(
+                    id = TransferId(-2),
+                    timestamp = baseTime,
+                    description = "National Lottery",
+                    sourceAccountId = conduitId,
+                    targetAccountId = merchantId,
+                    amount = Money(1010, currency),
+                )
+
+            val createdIds =
+                repositories.transactionRepository.importTransfers(
+                    transfers = listOf(funding, spend),
+                    newAttributes = emptyMap(),
+                    newRelationships =
+                        mapOf(
+                            TransferId(-1) to
+                                listOf(NewRelationship(relatedTransferId = TransferId(-2), typeId = passThroughTypeId)),
+                        ),
+                    sources = List(2) { Source.SampleGenerator },
+                    updates = emptyList(),
+                    updateSources = emptyList(),
+                )
+            val fundingId = createdIds[0]
+            val spendId = createdIds[1]
+
+            // The conduit account touches both legs; its running-balance rows link each leg to the other.
+            repositories.maintenanceService.fullRefreshMaterializedViews()
+            val conduitRows =
+                repositories.transactionRepository
+                    .getRunningBalanceByAccountPaginated(conduitId, pageSize = 50, pagingInfo = null)
+                    .items
+                    .associateBy { it.transactionId }
+            assertEquals(spendId, conduitRows.getValue(fundingId).passThroughSpendId)
+            assertEquals(null, conduitRows.getValue(fundingId).passThroughFundingId)
+            assertEquals(fundingId, conduitRows.getValue(spendId).passThroughFundingId)
+            assertEquals(null, conduitRows.getValue(spendId).passThroughSpendId)
+        }
+
+    @Test
     fun feeTransfer_inBatchRelationshipResolvesToSiblingsRealId() =
         runTest {
             val currency = gbp()

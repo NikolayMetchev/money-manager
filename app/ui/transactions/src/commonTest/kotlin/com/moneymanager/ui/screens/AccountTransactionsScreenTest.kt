@@ -388,6 +388,79 @@ class AccountTransactionsScreenTest {
         }
 
     @Test
+    fun passThroughBadges_distinguishFundingAndSpend_andEachLinksToTheOther() =
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val card = Account(id = AccountId(1L), name = "Crypto.com", openingDate = now)
+            val conduit = Account(id = AccountId(2L), name = "Curve", openingDate = now)
+            val merchant = Account(id = AccountId(3L), name = "National Lottery", openingDate = now)
+            val fundingId = TransferId(10L)
+            val spendId = TransferId(11L)
+
+            // Funding leg (card -> conduit) links forward to the spend leg; spend (conduit -> merchant) back.
+            val fundingRow =
+                AccountRow(
+                    transactionId = fundingId,
+                    timestamp = now,
+                    description = "Curve",
+                    accountId = conduit.id,
+                    transactionAmount = Money(1010, usd),
+                    runningBalance = Money(1010, usd),
+                    sourceAccountId = card.id,
+                    targetAccountId = conduit.id,
+                    passThroughSpendId = spendId,
+                )
+            val spendRow =
+                AccountRow(
+                    transactionId = spendId,
+                    timestamp = now,
+                    description = "National Lottery",
+                    accountId = conduit.id,
+                    transactionAmount = Money(-1010, usd),
+                    runningBalance = Money(0, usd),
+                    sourceAccountId = conduit.id,
+                    targetAccountId = merchant.id,
+                    passThroughFundingId = fundingId,
+                )
+
+            var linkClicked: TransferId? = null
+            setContent {
+                ProvideSchemaAwareScope {
+                    Column {
+                        AccountTransactionCard(
+                            runningBalance = fundingRow,
+                            accounts = listOf(card, conduit, merchant),
+                            screenSizeClass = ScreenSizeClass.Expanded,
+                            onFeeLinkClick = { linkClicked = it },
+                        )
+                        AccountTransactionCard(
+                            runningBalance = spendRow,
+                            accounts = listOf(card, conduit, merchant),
+                            screenSizeClass = ScreenSizeClass.Expanded,
+                            onFeeLinkClick = { linkClicked = it },
+                        )
+                    }
+                }
+            }
+            waitForIdle()
+
+            // "Pass-through" on the funding leg, "Via conduit" on the spend leg.
+            onNodeWithText("Pass-through").assertIsDisplayed()
+            onNodeWithText("Via conduit").assertIsDisplayed()
+
+            // Clicking the funding leg's badge jumps to the spend leg...
+            onNodeWithText("Pass-through").performClick()
+            waitForIdle()
+            assertEquals(spendId, linkClicked)
+
+            // ...and clicking the spend leg's badge jumps back to the funding leg.
+            onNodeWithText("Via conduit").performClick()
+            waitForIdle()
+            assertEquals(fundingId, linkClicked)
+        }
+
+    @Test
     fun clickingFeeBadge_whenLinkedTransferAlreadyInList_doesNotNavigate() =
         runMoneyManagerComposeUiTest {
             // Given: an account showing both a transaction and its linked fee (both fit on screen).
