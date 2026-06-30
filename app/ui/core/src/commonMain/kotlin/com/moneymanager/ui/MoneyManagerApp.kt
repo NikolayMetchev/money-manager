@@ -496,6 +496,9 @@ fun MoneyManagerApp(
                                             onQifImportClick = { importId ->
                                                 navigationHistory.navigateTo(Screen.QifImportDetail(importId))
                                             },
+                                            onPassThroughAccountsClick = {
+                                                navigationHistory.navigateTo(Screen.PassThroughAccounts)
+                                            },
                                             onAddCredentialClick = {
                                                 navigationHistory.navigateTo(Screen.ConnectApi)
                                             },
@@ -623,9 +626,6 @@ fun MoneyManagerApp(
                                                 navigationHistory.navigateTo(
                                                     Screen.CsvStrategyAuditHistory(strategy.id, strategy.name),
                                                 )
-                                            },
-                                            onPassThroughAccountsClick = {
-                                                navigationHistory.navigateTo(Screen.PassThroughAccounts)
                                             },
                                         )
                                     }

@@ -81,7 +81,6 @@ fun CsvStrategiesScreen(
     onEditStrategy: (CsvImportStrategyId, CsvImportId) -> Unit = { _, _ -> },
     onEditQifStrategy: (CsvImportStrategyId, QifImportId) -> Unit = { _, _ -> },
     onAuditHistoryClick: (CsvImportStrategy) -> Unit = {},
-    onPassThroughAccountsClick: () -> Unit = {},
 ) {
     val strategies by csvImportStrategyRepository
         .getAllStrategies()
@@ -195,18 +194,12 @@ fun CsvStrategiesScreen(
                         style = MaterialTheme.typography.headlineMedium,
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Pass-through (conduit) accounts config, e.g. Curve.
-                    androidx.compose.material3.TextButton(onClick = onPassThroughAccountsClick) {
-                        Text("Pass-through")
-                    }
-                    // Import button
-                    IconButton(onClick = { filePicker.launch() }) {
-                        Text(
-                            text = "\u2B73",
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                    }
+                // Import button
+                IconButton(onClick = { filePicker.launch() }) {
+                    Text(
+                        text = "\u2B73",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
                 }
             }
 
