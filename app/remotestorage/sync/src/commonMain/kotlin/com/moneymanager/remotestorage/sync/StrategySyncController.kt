@@ -86,7 +86,7 @@ class StrategySyncController(
     suspend fun connect(
         providerId: String,
         config: String?,
-    ) {
+    ) = clearingBusyOnFailure {
         resolveSignedIn(providerId, config)
         store.saveConnection(providerId, config)
         _state.value = _state.value.copy(connected = true)
@@ -104,6 +104,20 @@ class StrategySyncController(
     }
 
     /**
+     * Runs [block], clearing the [StrategyLibraryState.busy] flag before rethrowing on failure. The
+     * busy flag set by [beginBusy] is normally cleared by the wholesale state assignment at the end of
+     * [refresh]; a network/auth failure would otherwise skip that and leave the UI's actions disabled
+     * until restart.
+     */
+    private inline fun <T> clearingBusyOnFailure(block: () -> T): T =
+        try {
+            block()
+        } catch (expected: Throwable) {
+            _state.value = _state.value.copy(busy = false)
+            throw expected
+        }
+
+    /**
      * Recomputes the library view: cross-references the local artifacts (from [library]) against the
      * remote files and the persisted baselines. Performs network I/O (a remote `list`, plus a content
      * fetch only for never-synced artifacts present on both sides, to tell equal from conflicting).
@@ -111,10 +125,10 @@ class StrategySyncController(
     suspend fun refresh(
         library: StrategyLibrary,
         appVersion: AppVersion,
-    ) {
+    ) = clearingBusyOnFailure {
         if (!isConnected()) {
             _state.value = StrategyLibraryState()
-            return
+            return@clearingBusyOnFailure
         }
         val provider = resolveSignedIn()
         val remote = remoteByKey(provider)
@@ -140,46 +154,47 @@ class StrategySyncController(
         forceUpload: Set<StrategyKey> = emptySet(),
         resolutions: Map<StrategyKey, Map<CsvUnresolvedReference, CsvResolution>> = emptyMap(),
         onProgress: (SyncProgress) -> Unit = {},
-    ): StrategySyncSummary {
-        if (!isConnected()) return StrategySyncSummary(0, 0)
-        onProgress(SyncProgress("Checking the remote library…", 0f))
-        val provider = resolveSignedIn()
-        var remote = remoteByKey(provider)
-        val local = library.listLocal(appVersion).associateBy { it.key }
+    ): StrategySyncSummary =
+        clearingBusyOnFailure {
+            if (!isConnected()) return@clearingBusyOnFailure StrategySyncSummary(0, 0)
+            onProgress(SyncProgress("Checking the remote library…", 0f))
+            val provider = resolveSignedIn()
+            var remote = remoteByKey(provider)
+            val local = library.listLocal(appVersion).associateBy { it.key }
 
-        // One step per local artifact reconciled + per selected pull + the final view refresh.
-        val totalSteps = local.size + selectedToPull.size + 1
-        var completedSteps = 0
+            // One step per local artifact reconciled + per selected pull + the final view refresh.
+            val totalSteps = local.size + selectedToPull.size + 1
+            var completedSteps = 0
 
-        fun step(message: String) {
-            onProgress(SyncProgress(message, completedSteps.toFloat() / totalSteps))
-            completedSteps++
-        }
-
-        var uploaded = 0
-        for ((_, entry) in local) {
-            step("Syncing ${entry.key.name}…")
-            if (reconcileUpload(provider, library, entry, remote[entry.key], forceUpload)) uploaded++
-        }
-
-        var pulled = 0
-        if (selectedToPull.isNotEmpty()) {
-            remote = remoteByKey(provider) // refresh ids/revisions after uploads
-            for (key in selectedToPull) {
-                step("Importing ${key.name}…")
-                val remoteFile = remote[key] ?: continue
-                val json = provider.download(remoteFile.id).decodeToString()
-                library.applyIncoming(key, json, resolutions[key] ?: emptyMap())
-                store.putBaseline(key, StrategySyncedBaseline(remoteFile.id, remoteFile.revisionId, library.canonicalHash(key, json)))
-                pulled++
+            fun step(message: String) {
+                onProgress(SyncProgress(message, completedSteps.toFloat() / totalSteps))
+                completedSteps++
             }
-        }
 
-        step("Refreshing the library view…")
-        refresh(library, appVersion)
-        onProgress(SyncProgress("Done", 1f))
-        return StrategySyncSummary(uploaded, pulled)
-    }
+            var uploaded = 0
+            for ((_, entry) in local) {
+                step("Syncing ${entry.key.name}…")
+                if (reconcileUpload(provider, library, entry, remote[entry.key], forceUpload)) uploaded++
+            }
+
+            var pulled = 0
+            if (selectedToPull.isNotEmpty()) {
+                remote = remoteByKey(provider) // refresh ids/revisions after uploads
+                for (key in selectedToPull) {
+                    step("Importing ${key.name}…")
+                    val remoteFile = remote[key] ?: continue
+                    val json = provider.download(remoteFile.id).decodeToString()
+                    library.applyIncoming(key, json, resolutions[key] ?: emptyMap())
+                    store.putBaseline(key, StrategySyncedBaseline(remoteFile.id, remoteFile.revisionId, library.canonicalHash(key, json)))
+                    pulled++
+                }
+            }
+
+            step("Refreshing the library view…")
+            refresh(library, appVersion)
+            onProgress(SyncProgress("Done", 1f))
+            StrategySyncSummary(uploaded, pulled)
+        }
 
     /** Downloads the remote artifact [key] and reports its unresolved references (for a pull preview). */
     suspend fun previewPull(

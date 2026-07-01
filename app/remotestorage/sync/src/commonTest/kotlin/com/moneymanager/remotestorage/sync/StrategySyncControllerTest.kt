@@ -9,9 +9,14 @@ import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.StrategyLibrary
 import com.moneymanager.domain.StrategyParseResult
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.remotestorage.RemoteFile
+import com.moneymanager.remotestorage.RemoteStorageException
+import com.moneymanager.remotestorage.RemoteStorageProvider
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -223,6 +228,29 @@ class StrategySyncControllerTest {
             provider.externalPush(fileId, "wise-v1".encodeToByteArray())
             controller.refresh(library, version)
             assertEquals(StrategyItemStatus.IN_SYNC, statusOf(controller, "Wise"))
+        }
+
+    @Test
+    fun `busy flag is cleared when a sync operation fails`() =
+        runTest {
+            val base = InMemoryStorageProvider()
+            val provider =
+                object : RemoteStorageProvider by base {
+                    override suspend fun list(): List<RemoteFile> = throw RemoteStorageException("network down")
+                }
+            val library = FakeStrategyLibrary(listOf(entry("Wise", "wise-v1")))
+            val store = StrategyRemoteConnectionStore(InMemoryLocalSettings())
+            val controller = StrategySyncController(SingleProviderFactory(provider), store)
+            controller.connect(provider.id, null)
+
+            controller.beginBusy()
+            assertTrue(controller.state.value.busy)
+            assertFailsWith<RemoteStorageException> { controller.refresh(library, version) }
+            assertFalse(controller.state.value.busy, "a failed refresh must not leave the UI stuck busy")
+
+            controller.beginBusy()
+            assertFailsWith<RemoteStorageException> { controller.syncNow(library, version) }
+            assertFalse(controller.state.value.busy, "a failed sync must not leave the UI stuck busy")
         }
 
     @Test

@@ -13,18 +13,18 @@ import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.StrategyLibrary
 import com.moneymanager.domain.StrategyParseResult
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.isQifStrategy
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.importengineapi.AccountMappingMutation
+import com.moneymanager.importengineapi.CsvStrategyMutation
+import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.createAccountMappings
 import com.moneymanager.importengineapi.createApiStrategy
-import com.moneymanager.importengineapi.createCsvStrategy
-import com.moneymanager.importengineapi.deleteAccountMapping
 import com.moneymanager.importengineapi.updateApiStrategy
-import com.moneymanager.importengineapi.updateCsvStrategy
 import kotlinx.coroutines.flow.first
 
 /**
@@ -107,20 +107,40 @@ class StrategyLibraryService(
         val serviceResolutions = csvServiceResolutions(export, resolutions)
         val result = csvStrategyExportService.createStrategyFromExport(export, serviceResolutions)
 
+        // Apply the strategy and its per-strategy mapping replacement as ONE engine batch, so a failure
+        // can't leave the strategy without its mappings (or the old mappings deleted but not replaced).
+        // The engine processes CSV-strategy mutations before account-mapping mutations, and mapping
+        // mutations in list order (deletes before the create batch).
         val existing = csvStrategyRepository.getStrategyByName(name).first()
         if (existing == null) {
-            importEngine.createCsvStrategy(result.strategy)
-            if (result.accountMappings.isNotEmpty()) importEngine.createAccountMappings(result.accountMappings)
+            val mappingMutations =
+                if (result.accountMappings.isEmpty()) {
+                    emptyList()
+                } else {
+                    listOf(AccountMappingMutation.CreateBatch(result.accountMappings))
+                }
+            importEngine.import(
+                ImportBatch(
+                    csvStrategyMutations = listOf(CsvStrategyMutation.Create(name, result.strategy, Source.Manual)),
+                    accountMappingMutations = mappingMutations,
+                ),
+            )
         } else {
-            importEngine.updateCsvStrategy(result.strategy.copy(id = existing.id))
             // The file is authoritative for this strategy's per-strategy mappings: replace them.
-            accountMappingRepository
-                .getAllMappings()
-                .first()
-                .filter { it.strategyId == existing.id }
-                .forEach { importEngine.deleteAccountMapping(it.id) }
+            val deletes =
+                accountMappingRepository
+                    .getAllMappings()
+                    .first()
+                    .filter { it.strategyId == existing.id }
+                    .map { AccountMappingMutation.Delete(it.id) }
             val remapped = result.accountMappings.map { it.copy(strategyId = existing.id) }
-            if (remapped.isNotEmpty()) importEngine.createAccountMappings(remapped)
+            val creates = if (remapped.isEmpty()) emptyList() else listOf(AccountMappingMutation.CreateBatch(remapped))
+            importEngine.import(
+                ImportBatch(
+                    csvStrategyMutations = listOf(CsvStrategyMutation.Update(result.strategy.copy(id = existing.id), Source.Manual)),
+                    accountMappingMutations = deletes + creates,
+                ),
+            )
         }
     }
 

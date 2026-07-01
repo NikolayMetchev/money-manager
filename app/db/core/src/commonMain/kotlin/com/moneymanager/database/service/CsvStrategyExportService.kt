@@ -425,9 +425,13 @@ class CsvStrategyExportService(
 
         // Resolve the embedded per-strategy mappings against the same account lookup (existing +
         // created + MapToExisting). strategy.id is the id the engine will persist under, so scope to it.
+        // Fail loudly like the field-mapping path: silently dropping a mapping would import a strategy
+        // that's missing part of itself with no signal to the caller.
         val accountMappings =
-            export.accountMappings.mapNotNull { mappingExport ->
-                val account = accountsByName[mappingExport.accountName] ?: return@mapNotNull null
+            export.accountMappings.map { mappingExport ->
+                val account =
+                    accountsByName[mappingExport.accountName]
+                        ?: error("Account not found: ${mappingExport.accountName}")
                 AccountMapping(
                     id = 0,
                     strategyId = strategy.id,
