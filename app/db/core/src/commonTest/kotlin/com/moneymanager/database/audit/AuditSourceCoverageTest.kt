@@ -39,9 +39,9 @@ import kotlin.uuid.Uuid
  * Monzo strategy).
  *
  * At the end of the test the set of tables explicitly covered is compared against
- * `discoverAuditTables() - ATTRIBUTE_AUDIT_TABLES`. If a new `*_audit` table appears in the
- * schema without being covered here, **this test fails automatically** with a clear message
- * naming the uncovered table.
+ * `discoverAuditTables() - ATTRIBUTE_AUDIT_TABLES - SOURCELESS_AUDIT_TABLES`. If a new `*_audit`
+ * table appears in the schema without being covered here, **this test fails automatically** with a
+ * clear message naming the uncovered table.
  *
  * To add coverage for a new entity type:
  * 1. Create one instance via the repository, record its source.
@@ -57,6 +57,15 @@ class AuditSourceCoverageTest : DbTest() {
                 "transfer_attribute_audit",
                 "account_attribute_audit",
                 "person_attribute_audit",
+            )
+
+        // Audit tables for user-config entities that legitimately have no source attribution. Unlike
+        // imported/provenanced entities, pass_through_account is user-configured lookup data with no
+        // companion _source table; it is audited only so its row count feeds dataChangeToken() (and
+        // therefore sync). Its audit rows have no `source`, so they are excluded from the source check.
+        private val SOURCELESS_AUDIT_TABLES =
+            setOf(
+                "pass_through_account_audit",
             )
 
         // Well-known UUID seeded by DatabaseConfig for the built-in Monzo strategy.
@@ -206,7 +215,8 @@ class AuditSourceCoverageTest : DbTest() {
             // Structural check: every entity audit table in the schema must be covered above.
             // This fails automatically when a new *_audit table appears without test coverage.
             // ---------------------------------------------------------------
-            val entityAuditTables = discoverAuditTables() - ATTRIBUTE_AUDIT_TABLES
+            val entityAuditTables =
+                discoverAuditTables() - ATTRIBUTE_AUDIT_TABLES - SOURCELESS_AUDIT_TABLES
             assertEquals(
                 entityAuditTables,
                 coveredTables,

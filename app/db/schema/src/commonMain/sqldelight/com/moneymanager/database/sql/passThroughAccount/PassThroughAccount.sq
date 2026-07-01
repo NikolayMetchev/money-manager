@@ -1,8 +1,11 @@
 -- Stores "pass-through" (conduit) account definitions such as Curve: generic, user-editable config
 -- that tells importers how to detect a wrapper-card charge (e.g. a "CRV*" marker on the description)
 -- and route it through a conduit account (card -> conduit -> merchant). The detection rules are stored
--- as JSON. This is a config/lookup table: it is in EXCLUDED_FROM_AUDIT (no audit triggers fire on it),
--- so it has no _source / _audit companion tables, like relationship_type.
+-- as JSON. This is a config/lookup table: it is in EXCLUDED_FROM_AUDIT, so the generic attribute/audit
+-- mechanism ignores it. It carries no provenance, so there is no _source companion table (unlike
+-- csv_import_strategy / import_directory). It does, however, have a pass_through_account_audit table
+-- populated by dedicated triggers, so that user edits to this config register in dataChangeToken() (which
+-- counts audit rows) and therefore get synced. See Audit.sq / AuditTriggers.sq.
 CREATE TABLE pass_through_account (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE CHECK(length(trim(name)) > 0),
