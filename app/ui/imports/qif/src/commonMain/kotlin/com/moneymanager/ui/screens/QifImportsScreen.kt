@@ -36,9 +36,9 @@ import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportId
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -63,7 +63,7 @@ import kotlin.time.Clock
 fun QifImportsScreen(
     qifImportRepository: QifImportReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -223,7 +223,7 @@ fun QifImportsScreen(
                 QifImportAllDialog(
                     unimported = unimported,
                     csvImportStrategyRepository = csvImportStrategyRepository,
-                    csvAccountMappingRepository = csvAccountMappingRepository,
+                    accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,

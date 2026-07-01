@@ -1,0 +1,24 @@
+-- Maps CSV column value patterns to specific account IDs. A mapping is either global (strategy_id
+-- NULL, applies to every import strategy) or scoped to a single CSV import strategy.
+-- Applied BEFORE name lookup during import to handle pattern-based routing and consolidation.
+CREATE TABLE account_mapping (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    strategy_id TEXT,
+    column_name TEXT NOT NULL,
+    value_pattern TEXT NOT NULL,
+    account_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (strategy_id) REFERENCES csv_import_strategy(id) ON DELETE CASCADE,
+    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+    UNIQUE (strategy_id, column_name, value_pattern)
+);
+
+CREATE INDEX idx_account_mapping_account ON account_mapping(account_id);
+CREATE INDEX idx_account_mapping_strategy ON account_mapping(strategy_id);
+
+-- The table UNIQUE treats NULL strategy_id as distinct, so it wouldn't stop duplicate global mappings.
+-- Enforce uniqueness of global (strategy_id IS NULL) mappings with a partial unique index.
+CREATE UNIQUE INDEX idx_account_mapping_global_unique
+    ON account_mapping(column_name, value_pattern)
+    WHERE strategy_id IS NULL;

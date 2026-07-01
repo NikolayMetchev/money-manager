@@ -34,6 +34,7 @@ kotlin {
                 api(libs.androidx.compose.foundation.layout)
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
+                api(projects.app.db.core)
 
                 implementation(libs.androidx.compose.animation)
                 implementation(libs.androidx.compose.animation.core)
@@ -55,6 +56,7 @@ kotlin {
                 api(libs.compose.foundation.layout.desktop)
                 api(libs.compose.ui.desktop)
                 api(projects.app.csvimporter)
+                api(projects.app.db.core)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
 

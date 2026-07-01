@@ -15,12 +15,12 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountMappingWriteRepository
 import com.moneymanager.domain.repository.AccountWriteRepository
 import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
 import com.moneymanager.domain.repository.ApiSessionWriteRepository
 import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
@@ -71,7 +71,7 @@ class CategoriesScreenTest {
             relationshipTypeRepository = mock<RelationshipTypeWriteRepository>(MockMode.autoUnit),
             csvImportStrategyRepository = mock<CsvImportStrategyWriteRepository>(MockMode.autoUnit),
             apiImportStrategyRepository = mock<ApiImportStrategyWriteRepository>(MockMode.autoUnit),
-            csvAccountMappingRepository = mock<CsvAccountMappingWriteRepository>(MockMode.autoUnit),
+            accountMappingRepository = mock<AccountMappingWriteRepository>(MockMode.autoUnit),
             csvImportRepository = mock<CsvImportWriteRepository>(MockMode.autoUnit),
             qifImportRepository = mock<QifImportWriteRepository>(MockMode.autoUnit),
             apiSessionRepository = mock<ApiSessionWriteRepository>(MockMode.autoUnit),

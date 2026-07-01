@@ -22,13 +22,13 @@ class MoneyManagerDatabaseWrapper(
     private val writeDb = WriteDatabase(driver)
 
     val accountAttributeWriteQueries get() = writeDb.accountAttributeWriteQueries
+    val accountMappingWriteQueries get() = writeDb.accountMappingWriteQueries
     val accountMergeWriteQueries get() = writeDb.accountMergeWriteQueries
     val accountWriteQueries get() = writeDb.accountWriteQueries
     val apiImportStrategyWriteQueries get() = writeDb.apiImportStrategyWriteQueries
     val apiSessionWriteQueries get() = writeDb.apiSessionWriteQueries
     val attributeTypeWriteQueries get() = writeDb.attributeTypeWriteQueries
     val categoryWriteQueries get() = writeDb.categoryWriteQueries
-    val csvAccountMappingWriteQueries get() = writeDb.csvAccountMappingWriteQueries
     val csvImportStrategyWriteQueries get() = writeDb.csvImportStrategyWriteQueries
     val csvImportWriteQueries get() = writeDb.csvImportWriteQueries
     val currencyWriteQueries get() = writeDb.currencyWriteQueries
@@ -67,12 +67,14 @@ class MoneyManagerDatabaseWrapper(
 
     /**
      * A token reflecting how much logical, syncable state has changed since it was last captured. It
-     * folds together two things:
+     * folds together three things:
      *  - the total number of rows across the append-only `*_audit` tables (every entity
-     *    create/update/delete appends one), and
+     *    create/update/delete appends one),
      *  - the values of the singleton `settings` row (default currency, last QIF account), which is
      *    excluded from the audit trail but is still part of the synced database and must register as a
-     *    change — otherwise e.g. setting the default currency would never be detected as unsynced.
+     *    change — otherwise e.g. setting the default currency would never be detected as unsynced, and
+     *  - a rolling hash of the `account_mapping` table, which is user-managed first-class data but is
+     *    not audited (see EXCLUDED_FROM_AUDIT), so its edits must still register as a change.
      *
      * Derived materialized-view rebuilds append no audit rows and don't touch settings, so this stays a
      * stable "has the data changed since last sync?" signal that ignores our own view maintenance. Only
@@ -103,7 +105,29 @@ class MoneyManagerDatabaseWrapper(
                     0,
                 ).value
             }
-        return foldSettingsInto(auditRowCount)
+        return foldAccountMappingsInto(foldSettingsInto(auditRowCount))
+    }
+
+    /**
+     * Mixes the non-audited `account_mapping` table into [base] with a rolling hash. Row count catches
+     * inserts/deletes; summing ids catches which rows exist; summing updated_at catches in-place edits.
+     */
+    private fun foldAccountMappingsInto(base: Long): Long {
+        var token = base
+        executeQuery(
+            null,
+            "SELECT COUNT(*), COALESCE(SUM(id), 0), COALESCE(SUM(updated_at), 0) FROM account_mapping",
+            { cursor ->
+                if (cursor.next().value) {
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(2)!!
+                }
+                QueryResult.Unit
+            },
+            0,
+        )
+        return token
     }
 
     /**
@@ -331,7 +355,7 @@ class MoneyManagerDatabaseWrapper(
             "running_balance_materialized_view",
             "pending_materialized_view_changes",
             "sqlite_sequence",
-            "csv_account_mapping",
+            "account_mapping",
             "csv_column_metadata",
             "csv_import_error",
             "csv_import_metadata",

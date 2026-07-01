@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -24,7 +25,6 @@ import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -201,7 +201,13 @@ class CsvTransferMapper(
     private val existingCurrencies: Map<CurrencyId, Currency>,
     private val existingCurrenciesByCode: Map<String, Currency>,
     private val existingTransfers: List<ExistingTransferInfo> = emptyList(),
-    accountMappings: List<CsvAccountMapping> = emptyList(),
+    accountMappings: List<AccountMapping> = emptyList(),
+    /**
+     * Former account names (from audit history), keyed by lowercased name → the account that most
+     * recently bore it. Consulted as a fallback after current-name lookup so a renamed account still
+     * resolves when a row carries its old name. See [AccountReadRepository.getPreviousAccountNames].
+     */
+    private val historicalAccountNames: Map<String, AccountId> = emptyMap(),
     /** When set, overrides the strategy's SOURCE_ACCOUNT mapping for every row. */
     private val sourceAccountOverride: AccountId? = null,
     /** Detects pass-through (conduit) charges (e.g. Curve) from the row description; null disables it. */
@@ -222,9 +228,14 @@ class CsvTransferMapper(
             emptyMap()
         }
 
-    // Index account mappings by column name for fast lookup
-    private val accountMappingsByColumn: Map<String, List<CsvAccountMapping>> =
-        accountMappings.groupBy { it.columnName }
+    // Index account mappings by column name for fast lookup. Only global mappings (strategyId null)
+    // and mappings scoped to THIS strategy apply; a strategy-specific match is ordered ahead of a
+    // global one so it wins in findPersistedMapping (which returns the first match per column).
+    private val accountMappingsByColumn: Map<String, List<AccountMapping>> =
+        accountMappings
+            .filter { it.strategyId == null || it.strategyId == strategy.id }
+            .sortedWith(compareBy({ it.strategyId == null }, { it.id }))
+            .groupBy { it.columnName }
 
     /**
      * Prepares an import by mapping all rows and collecting new accounts to create.
@@ -644,7 +655,7 @@ class CsvTransferMapper(
                 }
 
                 val name = templatedAccountName(mapping, csvValue)
-                existingAccounts[name]?.id
+                resolveExistingAccountId(name)
                     ?: AccountId(-1) // Placeholder for new accounts
             }
             is ConditionalAccountMapping -> parseAccount(resolveConditional(mapping, values), values)
@@ -658,9 +669,9 @@ class CsvTransferMapper(
                     return persistedMatch
                 }
 
-                // Fall back to lookup by name
+                // Fall back to lookup by name (current, then historical for renamed accounts)
                 val name = getAccountName(mapping, values)
-                existingAccounts[name]?.id
+                resolveExistingAccountId(name)
                     ?: AccountId(-1) // Placeholder for new accounts
             }
             is RegexAccountMapping -> {
@@ -674,8 +685,8 @@ class CsvTransferMapper(
                     return persistedMatch
                 }
 
-                // Fall back to lookup by name
-                existingAccounts[result.accountName]?.id
+                // Fall back to lookup by name (current, then historical for renamed accounts)
+                resolveExistingAccountId(result.accountName)
                     ?: AccountId(-1) // Placeholder for new accounts
             }
             else -> throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
@@ -1038,7 +1049,13 @@ class CsvTransferMapper(
         return values.getOrNull(index).orEmpty()
     }
 
-    private fun accountExists(name: String): Boolean = name in existingAccounts
+    private fun accountExists(name: String): Boolean = name in existingAccounts || name.lowercase() in historicalAccountNames
+
+    /**
+     * Resolves an account name to an id: the current account by name first, then a renamed account via
+     * its former name (audit history). Returns null when neither matches (a new account is needed).
+     */
+    private fun resolveExistingAccountId(name: String): AccountId? = existingAccounts[name]?.id ?: historicalAccountNames[name.lowercase()]
 
     private fun parseBigDecimal(value: String): BigDecimal {
         val cleaned =

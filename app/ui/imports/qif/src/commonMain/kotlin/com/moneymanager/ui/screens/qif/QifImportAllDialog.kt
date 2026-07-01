@@ -19,9 +19,9 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.qif.QifImport
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -48,7 +48,7 @@ import kotlinx.coroutines.launch
 fun QifImportAllDialog(
     unimported: List<QifImport>,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -119,7 +119,7 @@ fun QifImportAllDialog(
                                         sourceAccountId = source,
                                         strategies = strategies,
                                         currencies = currencies,
-                                        csvAccountMappingRepository = csvAccountMappingRepository,
+                                        accountMappingRepository = accountMappingRepository,
                                         accountRepository = accountRepository,
                                         qifImportRepository = qifImportRepository,
                                         maintenance = maintenance,

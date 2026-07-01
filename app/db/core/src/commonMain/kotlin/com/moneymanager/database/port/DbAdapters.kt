@@ -13,7 +13,6 @@ import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.CsvUnresolvedReference
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AppVersion
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 
@@ -37,8 +36,7 @@ class DbCsvStrategyImportExport(
     override suspend fun toExport(
         strategy: CsvImportStrategy,
         appVersion: AppVersion,
-        accountMappings: List<CsvAccountMapping>?,
-    ): CsvStrategyExport = delegate.toExport(strategy, appVersion, accountMappings)
+    ): CsvStrategyExport = delegate.toExport(strategy, appVersion)
 
     override suspend fun parseExport(export: CsvStrategyExport): CsvImportParseResult = delegate.parseExport(export).toDomain()
 

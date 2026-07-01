@@ -1,7 +1,6 @@
 package com.moneymanager.domain
 
 import com.moneymanager.domain.model.AppVersion
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
@@ -42,7 +41,6 @@ interface CsvStrategyImportExport {
     suspend fun toExport(
         strategy: CsvImportStrategy,
         appVersion: AppVersion,
-        accountMappings: List<CsvAccountMapping>? = null,
     ): CsvStrategyExport
 
     suspend fun parseExport(export: CsvStrategyExport): CsvImportParseResult

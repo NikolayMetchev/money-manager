@@ -11,19 +11,18 @@ import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.CsvImportMutation
@@ -38,9 +37,9 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.importengineapi.createAccountMapping
+import com.moneymanager.importengineapi.createAccountMappings
 import com.moneymanager.importengineapi.createAccounts
-import com.moneymanager.importengineapi.createCsvMapping
-import com.moneymanager.importengineapi.createCsvMappings
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
@@ -71,7 +70,7 @@ suspend fun bulkApplyCsv(
     sourceAccountOverride: AccountId?,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     csvImportRepository: CsvImportReadRepository,
     maintenance: Maintenance,
@@ -103,7 +102,7 @@ suspend fun bulkApplyCsv(
                     strategy = matched,
                     sourceAccountOverride = sourceAccountOverride,
                     currencies = currencies,
-                    csvAccountMappingRepository = csvAccountMappingRepository,
+                    accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
                     csvImportRepository = csvImportRepository,
                     maintenance = maintenance,
@@ -144,7 +143,7 @@ suspend fun applyStagedCsv(
     strategy: CsvImportStrategy,
     sourceAccountOverride: AccountId?,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     csvImportRepository: CsvImportReadRepository,
     maintenance: Maintenance,
@@ -162,10 +161,19 @@ suspend fun applyStagedCsv(
 
     // Re-fetch accounts so payee accounts created by earlier files in the same scan are seen.
     val accounts = accountRepository.getAllAccounts().first()
-    val mappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+    val mappings = accountMappingRepository.getAllMappings().first()
+    val historicalAccountNames = accountRepository.getPreviousAccountNames()
     val basePrep =
-        buildCsvMapper(strategy, csvImport.columns, accounts, currencies, mappings, effectiveSource, passThroughAccounts)
-            .prepareImport(rows)
+        buildCsvMapper(
+            strategy,
+            csvImport.columns,
+            accounts,
+            currencies,
+            mappings,
+            effectiveSource,
+            passThroughAccounts,
+            historicalAccountNames,
+        ).prepareImport(rows)
 
     return runCsvImport(
         csvImport = csvImport,
@@ -177,7 +185,7 @@ suspend fun applyStagedCsv(
         selectedNewAccountNames = emptyMap(),
         selectedSourceAccountId = effectiveSource,
         currencies = currencies,
-        csvAccountMappingRepository = csvAccountMappingRepository,
+        accountMappingRepository = accountMappingRepository,
         accountRepository = accountRepository,
         maintenance = maintenance,
         importEngine = importEngine,
@@ -210,9 +218,10 @@ fun buildCsvMapper(
     columns: List<CsvColumn>,
     accounts: List<Account>,
     currencies: List<Currency>,
-    accountMappings: List<CsvAccountMapping>,
+    accountMappings: List<AccountMapping>,
     sourceAccountOverride: AccountId?,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
+    historicalAccountNames: Map<String, AccountId> = emptyMap(),
 ): CsvTransferMapper =
     CsvTransferMapper(
         strategy = strategy,
@@ -221,36 +230,37 @@ fun buildCsvMapper(
         existingCurrencies = currencies.associateBy { it.id },
         existingCurrenciesByCode = currencies.associateBy { it.code.uppercase() },
         accountMappings = accountMappings,
+        historicalAccountNames = historicalAccountNames,
         sourceAccountOverride = sourceAccountOverride,
         passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
     )
 
 /**
  * Saves [mappings] in a single batch, falling back to per-mapping saves if the atomic batch fails so
- * one bad mapping doesn't block the rest. [kind] just labels log messages ("selected"/"auto-captured").
+ * one bad mapping doesn't block the rest.
  */
 private suspend fun persistMappingsWithFallback(
     importEngine: ImportEngine,
-    mappings: List<CsvAccountMapping>,
-    kind: String,
+    mappings: List<AccountMapping>,
 ) {
     if (mappings.isEmpty()) return
     try {
-        importEngine.createCsvMappings(mappings)
-        logger.info { "Saved ${mappings.size} $kind account mappings" }
+        importEngine.createAccountMappings(mappings)
+        logger.info { "Saved ${mappings.size} account mappings" }
     } catch (expected: Exception) {
         // Batch is atomic, nothing was committed — retry per mapping so one bad mapping doesn't block the rest
-        logger.warn(expected) { "Bulk $kind mapping save failed, falling back to per-mapping save" }
+        logger.warn(expected) { "Bulk mapping save failed, falling back to per-mapping save" }
         for (mapping in mappings) {
             try {
-                importEngine.createCsvMapping(
-                    strategyId = mapping.strategyId,
+                importEngine.createAccountMapping(
                     columnName = mapping.columnName,
                     valuePattern = mapping.valuePattern,
                     accountId = mapping.accountId,
+                    strategyId = mapping.strategyId,
                 )
             } catch (expectedMappingError: Exception) {
-                logger.warn(expectedMappingError) { "Failed to save $kind mapping '${mapping.valuePattern.pattern}'" }
+                // Don't log the pattern itself — it's derived from bank-file payee/account values (PII).
+                logger.warn(expectedMappingError) { "Failed to save account mapping for column '${mapping.columnName}'" }
             }
         }
     }
@@ -329,55 +339,6 @@ fun buildFirstRowByAccountName(
 }
 
 /**
- * Builds account mappings for the just-created accounts from the rows' discovered mappings: regex
- * matches deduped by pattern, exact matches deduped by CSV value, so only one mapping is created per
- * rule. Only mappings whose target was actually created are kept.
- */
-private fun buildAutoCapturedMappings(
-    accountsByName: Map<String, Account>,
-    discoveredMappings: List<DiscoveredAccountMapping>,
-    createdAccountNames: Set<String>,
-    selectedNewAccountNames: Map<String, String>,
-    strategyId: CsvImportStrategyId,
-): List<CsvAccountMapping> {
-    // Regex matches (matchedPattern != null) deduped by pattern; exact matches deduped by csvValue
-    val regexMappings = discoveredMappings.filter { it.matchedPattern != null }.distinctBy { it.matchedPattern }
-    val exactMappings = discoveredMappings.filter { it.matchedPattern == null }.distinctBy { it.csvValue }
-    val mappingCreatedAt = Clock.System.now()
-    return (regexMappings + exactMappings).mapIndexedNotNull { index, discoveredMapping ->
-        val createdAccountName =
-            selectedNewAccountNames[discoveredMapping.targetAccountName]
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?: discoveredMapping.targetAccountName
-
-        // Look up the account by the final name created for this detected value
-        val createdAccount =
-            accountsByName[createdAccountName]
-                ?.takeIf { it.name in createdAccountNames }
-                ?: return@mapIndexedNotNull null
-
-        // Use the matched regex pattern if available, otherwise an exact-match pattern for the CSV value
-        val matchedPattern = discoveredMapping.matchedPattern
-        val pattern =
-            if (matchedPattern != null) {
-                Regex(matchedPattern, RegexOption.IGNORE_CASE)
-            } else {
-                Regex("^${Regex.escape(discoveredMapping.csvValue)}$", RegexOption.IGNORE_CASE)
-            }
-        CsvAccountMapping(
-            id = -(index + 1).toLong(),
-            strategyId = strategyId,
-            columnName = discoveredMapping.columnName,
-            valuePattern = pattern,
-            accountId = createdAccount.id,
-            createdAt = mappingCreatedAt,
-            updatedAt = mappingCreatedAt,
-        )
-    }
-}
-
-/**
  * Applies [strategy] to [rows] of a single [csvImport] and writes back per-row statuses. Creates new
  * accounts the user accepted, persists/auto-captures account mappings, runs the central import engine,
  * and records the strategy application. Shared by the single-file dialog and the bulk path; the bulk
@@ -394,7 +355,7 @@ suspend fun runCsvImport(
     selectedNewAccountNames: Map<String, String>,
     selectedSourceAccountId: AccountId?,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -412,34 +373,25 @@ suspend fun runCsvImport(
     val selectedMappingsToPersist =
         buildPendingAccountMappings(
             preparation = basePrep,
-            strategyId = strategy.id,
             accountSelections = selectedExistingAccounts,
+            accountsById = accountRepository.getAllAccounts().first().associateBy { it.id },
         )
-    persistMappingsWithFallback(importEngine, selectedMappingsToPersist, "selected")
+    persistMappingsWithFallback(importEngine, selectedMappingsToPersist)
 
     // Create new accounts first (skip failures - transfers using them will fail later).
     // Record CSV provenance pointing each account at the first row that referenced it.
     val firstRowByAccountName = buildFirstRowByAccountName(basePrep, selectedNewAccountNames)
-    val createdAccountNames =
-        createNewAccounts(
-            importEngine = importEngine,
-            accountsToCreate = accountsToCreate,
-            csvImportId = csvImport.id,
-            firstRowByAccountName = firstRowByAccountName,
-        )
+    createNewAccounts(
+        importEngine = importEngine,
+        accountsToCreate = accountsToCreate,
+        csvImportId = csvImport.id,
+        firstRowByAccountName = firstRowByAccountName,
+    )
 
-    // Auto-capture mappings for newly created accounts
-    if (createdAccountNames.isNotEmpty()) {
-        val mappingsToCapture =
-            buildAutoCapturedMappings(
-                accountsByName = accountRepository.getAllAccounts().first().associateBy { it.name },
-                discoveredMappings = basePrep.validTransfers.flatMap { it.discoveredMappings },
-                createdAccountNames = createdAccountNames,
-                selectedNewAccountNames = selectedNewAccountNames,
-                strategyId = strategy.id,
-            )
-        persistMappingsWithFallback(importEngine, mappingsToCapture, "auto-captured")
-    }
+    // No auto-capture of template/regex/exact mappings: the strategy re-derives the target account
+    // name on every import, and a later rename is resolved via audit history (getPreviousAccountNames),
+    // so these would be redundant (and, stored globally, would leak across strategies). Only explicit
+    // "map to existing account" selections are persisted (above), since those are not re-derivable.
 
     // Re-map with new account IDs
     logger.info { "Re-mapping transfers with updated account IDs" }
@@ -451,7 +403,8 @@ suspend fun runCsvImport(
     // Duplicate detection now happens inside the central import engine, which
     // loads existing transfers itself — the mapper only maps rows to transfers.
     val latestAccountMappings =
-        csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+        accountMappingRepository.getAllMappings().first()
+    val historicalAccountNames = accountRepository.getPreviousAccountNames()
 
     val mapper =
         CsvTransferMapper(
@@ -461,6 +414,7 @@ suspend fun runCsvImport(
             existingCurrencies = currenciesById,
             existingCurrenciesByCode = currenciesByCode,
             accountMappings = latestAccountMappings,
+            historicalAccountNames = historicalAccountNames,
             sourceAccountOverride = selectedSourceAccountId,
             passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
         )

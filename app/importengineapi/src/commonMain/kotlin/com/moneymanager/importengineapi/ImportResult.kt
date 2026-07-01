@@ -65,7 +65,7 @@ data class ImportResult(
     // Generated ids for config/staging/session Create mutations, keyed by the mutation's `key`.
     val createdCsvStrategyIds: Map<String, CsvImportStrategyId> = emptyMap(),
     val createdApiStrategyIds: Map<String, ApiImportStrategyId> = emptyMap(),
-    val createdCsvMappingIds: Map<String, Long> = emptyMap(),
+    val createdAccountMappingIds: Map<String, Long> = emptyMap(),
     val createdCsvImportIds: Map<String, CsvImportId> = emptyMap(),
     val createdQifImportIds: Map<String, QifImportId> = emptyMap(),
     val createdImportDirectoryIds: Map<String, ImportDirectoryId> = emptyMap(),

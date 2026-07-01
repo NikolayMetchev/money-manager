@@ -11,14 +11,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
-import com.moneymanager.ui.screens.csvstrategy.AccountMappingsSection
+import com.moneymanager.ui.screens.accountmapping.AccountMappingsSection
 
 /**
- * Advanced tab: attributes, row preprocessing rules, companion transaction rules, and the
- * edit-mode account mappings list.
+ * Advanced tab: attributes, row preprocessing rules, companion transaction rules, and (in edit mode)
+ * the account mappings scoped to this strategy. Global mappings are managed on the Account Mappings
+ * screen instead.
  */
 @Composable
 internal fun AdvancedTab(
@@ -28,10 +29,10 @@ internal fun AdvancedTab(
     enabled: Boolean,
     existingAttributeTypes: List<AttributeType>,
     isEditMode: Boolean,
-    accountMappings: List<CsvAccountMapping>,
+    accountMappings: List<AccountMapping>,
     accounts: List<Account>,
-    onEditAccountMapping: (CsvAccountMapping) -> Unit,
-    onDeleteAccountMapping: (CsvAccountMapping) -> Unit,
+    onEditAccountMapping: (AccountMapping) -> Unit,
+    onDeleteAccountMapping: (AccountMapping) -> Unit,
     onAddAccountMapping: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -106,9 +107,10 @@ internal fun AdvancedTab(
 
         if (isEditMode) {
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Account Mappings", style = MaterialTheme.typography.titleSmall)
+            Text("Account Mappings (this strategy)", style = MaterialTheme.typography.titleSmall)
             Text(
-                "CSV values mapped to existing accounts (auto-created during import)",
+                "Route this strategy's CSV values to specific accounts. Global mappings live on the " +
+                    "Account Mappings screen.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

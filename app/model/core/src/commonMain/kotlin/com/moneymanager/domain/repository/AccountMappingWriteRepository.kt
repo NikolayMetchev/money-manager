@@ -1,24 +1,24 @@
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 
-interface CsvAccountMappingWriteRepository : CsvAccountMappingReadRepository {
+interface AccountMappingWriteRepository : AccountMappingReadRepository {
     /**
      * Creates a new mapping.
      *
-     * @param strategyId The strategy this mapping belongs to
      * @param columnName The CSV column to match against
      * @param valuePattern Regex pattern for matching column values
      * @param accountId Target account when pattern matches
+     * @param strategyId The strategy to scope this mapping to, or null for a global mapping
      * @return The ID of the created mapping
      */
     suspend fun createMapping(
-        strategyId: CsvImportStrategyId,
         columnName: String,
         valuePattern: Regex,
         accountId: AccountId,
+        strategyId: CsvImportStrategyId? = null,
     ): Long
 
     /**
@@ -28,7 +28,7 @@ interface CsvAccountMappingWriteRepository : CsvAccountMappingReadRepository {
      *
      * @param mappings The mappings to create
      */
-    suspend fun createMappings(mappings: List<CsvAccountMapping>)
+    suspend fun createMappings(mappings: List<AccountMapping>)
 
     /**
      * Updates an existing mapping.
@@ -36,7 +36,7 @@ interface CsvAccountMappingWriteRepository : CsvAccountMappingReadRepository {
      *
      * @param mapping The mapping with updated values
      */
-    suspend fun updateMapping(mapping: CsvAccountMapping)
+    suspend fun updateMapping(mapping: AccountMapping)
 
     /**
      * Deletes a mapping by ID.
@@ -44,11 +44,4 @@ interface CsvAccountMappingWriteRepository : CsvAccountMappingReadRepository {
      * @param id The ID of the mapping to delete
      */
     suspend fun deleteMapping(id: Long)
-
-    /**
-     * Deletes all mappings for a strategy.
-     *
-     * @param strategyId The ID of the strategy
-     */
-    suspend fun deleteMappingsForStrategy(strategyId: CsvImportStrategyId)
 }

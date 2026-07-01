@@ -1,18 +1,19 @@
 package com.moneymanager.ui
 
 import com.moneymanager.database.Application
+import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -54,11 +55,12 @@ data class AccountsDomain(
 data class ImportsDomain(
     val apiImportStrategyRepository: ApiImportStrategyReadRepository,
     val apiSessionRepository: ApiSessionReadRepository,
-    val csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    val accountMappingRepository: AccountMappingReadRepository,
     val csvImportRepository: CsvImportReadRepository,
     val csvImportStrategyRepository: CsvImportStrategyReadRepository,
     val csvStrategyExportService: CsvStrategyExportService,
     val csvStrategyImportExport: CsvStrategyImportExport,
+    val accountMappingExportService: AccountMappingExportService,
     val qifImportRepository: QifImportReadRepository,
     val importDirectoryRepository: ImportDirectoryReadRepository,
     val passThroughAccountRepository: PassThroughAccountReadRepository,
@@ -104,11 +106,12 @@ fun Application.toAppServices(importEngine: ImportEngine) =
             ImportsDomain(
                 apiImportStrategyRepository = imports.apiImportStrategyRepository,
                 apiSessionRepository = imports.apiSessionRepository,
-                csvAccountMappingRepository = imports.csvAccountMappingRepository,
+                accountMappingRepository = imports.accountMappingRepository,
                 csvImportRepository = imports.csvImportRepository,
                 csvImportStrategyRepository = imports.csvImportStrategyRepository,
                 csvStrategyExportService = imports.csvStrategyExportService,
                 csvStrategyImportExport = imports.csvStrategyImportExport,
+                accountMappingExportService = imports.accountMappingExportService,
                 qifImportRepository = imports.qifImportRepository,
                 importDirectoryRepository = imports.importDirectoryRepository,
                 passThroughAccountRepository = imports.passThroughAccountRepository,

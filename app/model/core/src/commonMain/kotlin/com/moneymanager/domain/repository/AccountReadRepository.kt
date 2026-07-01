@@ -12,6 +12,13 @@ interface AccountReadRepository {
 
     fun getAccountById(id: AccountId): Flow<Account?>
 
+    /**
+     * Former names of still-existing accounts (from audit history), keyed by lowercased name, mapping
+     * to the account that most recently bore that name. Lets an import resolve a renamed account when a
+     * row still carries its old name, without persisting an exact-match account mapping.
+     */
+    suspend fun getPreviousAccountNames(): Map<String, AccountId>
+
     suspend fun countTransfersByAccount(accountId: AccountId): Long
 
     suspend fun getTransfersBetweenAccounts(

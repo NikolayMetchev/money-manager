@@ -12,18 +12,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -37,6 +39,7 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.ui.navigation.ImportTab
+import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
 
 @Composable
 fun ImportsScreen(
@@ -47,7 +50,9 @@ fun ImportsScreen(
     driveFolderBrowser: DriveFolderBrowser?,
     csvImportRepository: CsvImportReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
+    accountMappingExportService: AccountMappingExportService,
+    appVersion: AppVersion,
     qifImportRepository: QifImportReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
     categoryRepository: CategoryReadRepository,
@@ -116,7 +121,7 @@ fun ImportsScreen(
                 CsvImportsScreen(
                     csvImportRepository = csvImportRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,
-                    csvAccountMappingRepository = csvAccountMappingRepository,
+                    accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
@@ -131,7 +136,7 @@ fun ImportsScreen(
                 QifImportsScreen(
                     qifImportRepository = qifImportRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,
-                    csvAccountMappingRepository = csvAccountMappingRepository,
+                    accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
@@ -162,6 +167,10 @@ fun ImportsScreen(
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     transactionRepository = transactionRepository,
                     passThroughAccountRepository = passThroughAccountRepository,
+                    accountMappingRepository = accountMappingRepository,
+                    accountRepository = accountRepository,
+                    accountMappingExportService = accountMappingExportService,
+                    appVersion = appVersion,
                     importEngine = importEngine,
                     maintenance = maintenance,
                     onTransactionsImported = onTransactionsImported,
@@ -176,6 +185,10 @@ private fun MiscImportsTab(
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     transactionRepository: TransactionReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
+    accountMappingExportService: AccountMappingExportService,
+    appVersion: AppVersion,
     importEngine: ImportEngine,
     maintenance: Maintenance,
     onTransactionsImported: () -> Unit,
@@ -185,6 +198,7 @@ private fun MiscImportsTab(
         SecondaryTabRow(selectedTabIndex = subTab) {
             Tab(selected = subTab == 0, onClick = { subTab = 0 }, text = { Text("Manual Entries") })
             Tab(selected = subTab == 1, onClick = { subTab = 1 }, text = { Text("Pass-through") })
+            Tab(selected = subTab == 2, onClick = { subTab = 2 }, text = { Text("Account Mappings") })
         }
         when (subTab) {
             0 ->
@@ -194,10 +208,17 @@ private fun MiscImportsTab(
                     maintenance = maintenance,
                     onTransactionsImported = onTransactionsImported,
                 )
-            else ->
+            1 ->
                 PassThroughAccountsScreen(
                     passThroughAccountRepository = passThroughAccountRepository,
                     importEngine = importEngine,
+                )
+            else ->
+                AccountMappingsScreen(
+                    accountMappingRepository = accountMappingRepository,
+                    accountRepository = accountRepository,
+                    accountMappingExportService = accountMappingExportService,
+                    appVersion = appVersion,
                 )
         }
     }

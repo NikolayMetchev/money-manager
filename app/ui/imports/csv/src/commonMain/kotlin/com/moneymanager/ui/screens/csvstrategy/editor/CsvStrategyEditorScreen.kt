@@ -32,27 +32,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.createCsvStrategy
-import com.moneymanager.importengineapi.deleteCsvMapping
+import com.moneymanager.importengineapi.deleteAccountMapping
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.csvstrategy.AccountMappingEditorDialog
+import com.moneymanager.ui.screens.accountmapping.AccountMappingEditorDialog
 import com.moneymanager.ui.screens.csvstrategy.ColumnDetector
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -77,7 +77,7 @@ fun CsvStrategyEditorScreen(
     columnsOverride: List<CsvColumn>? = null,
     sampleRowsOverride: List<CsvRow>? = null,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -96,7 +96,6 @@ fun CsvStrategyEditorScreen(
             if (columnsOverride == null && csvImportId != null) csvImportRepository.getImport(csvImportId) else flowOf(null)
         }
     val csvImport by csvImportFlow.collectAsStateWithSchemaErrorHandling(null)
-    val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
     val existingAttributeTypes by attributeTypeRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
 
     // Wrap the strategy in a load state so "still loading" is distinct from "loaded but missing"
@@ -112,16 +111,17 @@ fun CsvStrategyEditorScreen(
     val existingStrategy = (strategyLoad as? StrategyLoad.Loaded)?.strategy
     val strategyLoaded = strategyLoad is StrategyLoad.Loaded
 
-    val accountMappingsFlow =
+    // Account mappings scoped to THIS strategy (edit mode only); global mappings are edited elsewhere.
+    val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
+    val strategyAccountMappings by
         remember(strategyId) {
-            strategyId?.let { csvAccountMappingRepository.getMappingsForStrategy(it) } ?: flowOf(emptyList())
-        }
-    val accountMappings by accountMappingsFlow.collectAsStateWithSchemaErrorHandling(emptyList())
+            accountMappingRepository.getAllMappings().map { list -> list.filter { it.strategyId == strategyId } }
+        }.collectAsStateWithSchemaErrorHandling(emptyList())
+    var editingAccountMapping by remember { mutableStateOf<AccountMapping?>(null) }
+    var showAddAccountMappingDialog by remember { mutableStateOf(false) }
 
     var rows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
     var rowsLoaded by remember { mutableStateOf(false) }
-    var editingAccountMapping by remember { mutableStateOf<CsvAccountMapping?>(null) }
-    var showAddAccountMappingDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(csvImportId, csvImport?.rowCount, columnsOverride) {
         if (columnsOverride != null) {
@@ -300,13 +300,13 @@ fun CsvStrategyEditorScreen(
                         enabled = !state.isSaving,
                         existingAttributeTypes = existingAttributeTypes,
                         isEditMode = isEditMode,
-                        accountMappings = accountMappings,
+                        accountMappings = strategyAccountMappings,
                         accounts = accounts,
                         onEditAccountMapping = { editingAccountMapping = it },
                         onDeleteAccountMapping = { mapping ->
                             scope.launch {
                                 try {
-                                    importEngine.deleteCsvMapping(mapping.id)
+                                    importEngine.deleteAccountMapping(mapping.id)
                                 } catch (expected: Exception) {
                                     state.errorMessage = "Failed to delete account mapping: ${expected.message}"
                                 }
@@ -328,17 +328,10 @@ fun CsvStrategyEditorScreen(
     }
 
     editingAccountMapping?.let { mapping ->
-        // Account mappings only exist in edit mode, so strategyId is non-null here; guard rather
-        // than force-unwrap so a parameter transition can never crash the dialog.
-        val currentStrategyId = strategyId
-        if (currentStrategyId == null) {
-            editingAccountMapping = null
-            return@let
-        }
         AccountMappingEditorDialog(
             existingMapping = mapping,
-            strategyId = currentStrategyId,
             accounts = accounts,
+            strategyId = strategyId,
             onDismiss = { editingAccountMapping = null },
         )
     }
@@ -346,8 +339,8 @@ fun CsvStrategyEditorScreen(
     if (showAddAccountMappingDialog && strategyId != null) {
         AccountMappingEditorDialog(
             existingMapping = null,
-            strategyId = strategyId,
             accounts = accounts,
+            strategyId = strategyId,
             onDismiss = { showAddAccountMappingDialog = false },
         )
     }

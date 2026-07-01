@@ -11,10 +11,10 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
@@ -101,32 +101,33 @@ suspend fun ImportEngine.deleteApiStrategy(id: ApiImportStrategyId) {
 
 // endregion
 
-// region CSV account mappings
+// region account mappings
 
-suspend fun ImportEngine.createCsvMapping(
-    strategyId: CsvImportStrategyId,
+suspend fun ImportEngine.createAccountMapping(
     columnName: String,
     valuePattern: Regex,
     accountId: AccountId,
+    strategyId: CsvImportStrategyId? = null,
 ): Long =
     requireNotNull(
         import(
             ImportBatch(
-                csvMappingMutations = listOf(CsvMappingMutation.Create(columnName, strategyId, columnName, valuePattern, accountId)),
+                accountMappingMutations =
+                    listOf(AccountMappingMutation.Create(columnName, columnName, valuePattern, accountId, strategyId)),
             ),
-        ).createdCsvMappingIds[columnName],
+        ).createdAccountMappingIds[columnName],
     )
 
-suspend fun ImportEngine.createCsvMappings(mappings: List<CsvAccountMapping>) {
-    import(ImportBatch(csvMappingMutations = listOf(CsvMappingMutation.CreateBatch(mappings))))
+suspend fun ImportEngine.createAccountMappings(mappings: List<AccountMapping>) {
+    import(ImportBatch(accountMappingMutations = listOf(AccountMappingMutation.CreateBatch(mappings))))
 }
 
-suspend fun ImportEngine.updateCsvMapping(mapping: CsvAccountMapping) {
-    import(ImportBatch(csvMappingMutations = listOf(CsvMappingMutation.Update(mapping))))
+suspend fun ImportEngine.updateAccountMapping(mapping: AccountMapping) {
+    import(ImportBatch(accountMappingMutations = listOf(AccountMappingMutation.Update(mapping))))
 }
 
-suspend fun ImportEngine.deleteCsvMapping(id: Long) {
-    import(ImportBatch(csvMappingMutations = listOf(CsvMappingMutation.Delete(id))))
+suspend fun ImportEngine.deleteAccountMapping(id: Long) {
+    import(ImportBatch(accountMappingMutations = listOf(AccountMappingMutation.Delete(id))))
 }
 
 // endregion

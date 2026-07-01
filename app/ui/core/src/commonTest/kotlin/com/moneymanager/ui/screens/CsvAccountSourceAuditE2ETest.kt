@@ -130,7 +130,7 @@ class CsvAccountSourceAuditE2ETest {
                     selectedNewAccountNames = emptyMap(),
                     selectedSourceAccountId = sourceAccountId,
                     currencies = currencies,
-                    csvAccountMappingRepository = dc.csvAccountMappingRepository,
+                    accountMappingRepository = dc.accountMappingRepository,
                     accountRepository = dc.accountRepository,
                     maintenance = DbMaintenance(dc.maintenanceService),
                     importEngine =
@@ -147,7 +147,7 @@ class CsvAccountSourceAuditE2ETest {
                             relationshipTypeRepository = dc.relationshipTypeRepository,
                             csvImportStrategyRepository = dc.csvImportStrategyRepository,
                             apiImportStrategyRepository = dc.apiImportStrategyRepository,
-                            csvAccountMappingRepository = dc.csvAccountMappingRepository,
+                            accountMappingRepository = dc.accountMappingRepository,
                             csvImportRepository = dc.csvImportRepository,
                             qifImportRepository = dc.qifImportRepository,
                             apiSessionRepository = dc.apiSessionRepository,

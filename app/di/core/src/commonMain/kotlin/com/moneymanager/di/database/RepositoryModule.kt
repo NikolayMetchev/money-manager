@@ -5,6 +5,8 @@ import com.moneymanager.database.DatabaseMaintenanceServiceImpl
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.repository.AccountAttributeReadRepositoryImpl
 import com.moneymanager.database.repository.AccountAttributeWriteRepositoryImpl
+import com.moneymanager.database.repository.AccountMappingReadRepositoryImpl
+import com.moneymanager.database.repository.AccountMappingWriteRepositoryImpl
 import com.moneymanager.database.repository.AccountReadRepositoryImpl
 import com.moneymanager.database.repository.AccountWriteRepositoryImpl
 import com.moneymanager.database.repository.ApiImportStrategyReadRepositoryImpl
@@ -16,8 +18,6 @@ import com.moneymanager.database.repository.AttributeTypeWriteRepositoryImpl
 import com.moneymanager.database.repository.AuditReadRepositoryImpl
 import com.moneymanager.database.repository.CategoryReadRepositoryImpl
 import com.moneymanager.database.repository.CategoryWriteRepositoryImpl
-import com.moneymanager.database.repository.CsvAccountMappingReadRepositoryImpl
-import com.moneymanager.database.repository.CsvAccountMappingWriteRepositoryImpl
 import com.moneymanager.database.repository.CsvImportReadRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyReadRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyWriteRepositoryImpl
@@ -50,11 +50,14 @@ import com.moneymanager.database.repository.TransferRelationshipReadRepositoryIm
 import com.moneymanager.database.repository.TransferRelationshipWriteRepositoryImpl
 import com.moneymanager.database.repository.TransferSourceReadRepositoryImpl
 import com.moneymanager.database.repository.TransferSourceWriteRepositoryImpl
+import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountMappingReadRepository
+import com.moneymanager.domain.repository.AccountMappingWriteRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AccountWriteRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
@@ -66,8 +69,6 @@ import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
@@ -203,15 +204,15 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideCsvAccountMappingReadRepository(database: MoneyManagerDatabaseWrapper): CsvAccountMappingReadRepository =
-        CsvAccountMappingReadRepositoryImpl(database)
+    fun provideAccountMappingReadRepository(database: MoneyManagerDatabaseWrapper): AccountMappingReadRepository =
+        AccountMappingReadRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideCsvAccountMappingWriteRepository(
+    fun provideAccountMappingWriteRepository(
         database: MoneyManagerDatabaseWrapper,
-        reader: CsvAccountMappingReadRepository,
-    ): CsvAccountMappingWriteRepository = CsvAccountMappingWriteRepositoryImpl(database, reader)
+        reader: AccountMappingReadRepository,
+    ): AccountMappingWriteRepository = AccountMappingWriteRepositoryImpl(database, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -364,6 +365,13 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
+    fun provideAccountMappingExportService(
+        accountRepository: AccountReadRepository,
+        importEngine: ImportEngine,
+    ): AccountMappingExportService = AccountMappingExportService(accountRepository, importEngine)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
     fun provideTransactionReadRepository(database: MoneyManagerDatabaseWrapper): TransactionReadRepository =
         TransactionReadRepositoryImpl(database)
 
@@ -427,7 +435,7 @@ interface RepositoryModule {
         relationshipTypeRepository: RelationshipTypeWriteRepository,
         csvImportStrategyRepository: CsvImportStrategyWriteRepository,
         apiImportStrategyRepository: ApiImportStrategyWriteRepository,
-        csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+        accountMappingRepository: AccountMappingWriteRepository,
         csvImportRepository: CsvImportWriteRepository,
         qifImportRepository: QifImportWriteRepository,
         apiSessionRepository: ApiSessionWriteRepository,
@@ -448,7 +456,7 @@ interface RepositoryModule {
             relationshipTypeRepository = relationshipTypeRepository,
             csvImportStrategyRepository = csvImportStrategyRepository,
             apiImportStrategyRepository = apiImportStrategyRepository,
-            csvAccountMappingRepository = csvAccountMappingRepository,
+            accountMappingRepository = accountMappingRepository,
             csvImportRepository = csvImportRepository,
             qifImportRepository = qifImportRepository,
             apiSessionRepository = apiSessionRepository,

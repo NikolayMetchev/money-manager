@@ -4,33 +4,33 @@ package com.moneymanager.database.repository
 
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
+import com.moneymanager.domain.repository.AccountMappingReadRepository
+import com.moneymanager.domain.repository.AccountMappingWriteRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
 
-class CsvAccountMappingWriteRepositoryImpl(
+class AccountMappingWriteRepositoryImpl(
     database: MoneyManagerDatabaseWrapper,
-    reader: CsvAccountMappingReadRepository,
+    reader: AccountMappingReadRepository,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
-) : CsvAccountMappingWriteRepository,
-    CsvAccountMappingReadRepository by reader {
-    private val writeQueries = database.csvAccountMappingWriteQueries
+) : AccountMappingWriteRepository,
+    AccountMappingReadRepository by reader {
+    private val writeQueries = database.accountMappingWriteQueries
 
     override suspend fun createMapping(
-        strategyId: CsvImportStrategyId,
         columnName: String,
         valuePattern: Regex,
         accountId: AccountId,
+        strategyId: CsvImportStrategyId?,
     ): Long =
         withContext(coroutineContext) {
             val now = Clock.System.now()
             writeQueries.insert(
-                strategy_id = strategyId.id.toString(),
+                strategy_id = strategyId?.id?.toString(),
                 column_name = columnName,
                 value_pattern = valuePattern.pattern,
                 account_id = accountId.id,
@@ -40,14 +40,14 @@ class CsvAccountMappingWriteRepositoryImpl(
             writeQueries.lastInsertRowId().executeAsOne()
         }
 
-    override suspend fun createMappings(mappings: List<CsvAccountMapping>): Unit =
+    override suspend fun createMappings(mappings: List<AccountMapping>): Unit =
         withContext(coroutineContext) {
             if (mappings.isEmpty()) return@withContext
 
             writeQueries.transaction {
                 mappings.forEach { mapping ->
                     writeQueries.insert(
-                        strategy_id = mapping.strategyId.id.toString(),
+                        strategy_id = mapping.strategyId?.id?.toString(),
                         column_name = mapping.columnName,
                         value_pattern = mapping.valuePattern.pattern,
                         account_id = mapping.accountId.id,
@@ -58,10 +58,11 @@ class CsvAccountMappingWriteRepositoryImpl(
             }
         }
 
-    override suspend fun updateMapping(mapping: CsvAccountMapping): Unit =
+    override suspend fun updateMapping(mapping: AccountMapping): Unit =
         withContext(coroutineContext) {
             val now = Clock.System.now()
             writeQueries.update(
+                strategy_id = mapping.strategyId?.id?.toString(),
                 column_name = mapping.columnName,
                 value_pattern = mapping.valuePattern.pattern,
                 account_id = mapping.accountId.id,
@@ -73,10 +74,5 @@ class CsvAccountMappingWriteRepositoryImpl(
     override suspend fun deleteMapping(id: Long): Unit =
         withContext(coroutineContext) {
             writeQueries.deleteById(id)
-        }
-
-    override suspend fun deleteMappingsForStrategy(strategyId: CsvImportStrategyId): Unit =
-        withContext(coroutineContext) {
-            writeQueries.deleteByStrategyId(strategyId.id.toString())
         }
 }

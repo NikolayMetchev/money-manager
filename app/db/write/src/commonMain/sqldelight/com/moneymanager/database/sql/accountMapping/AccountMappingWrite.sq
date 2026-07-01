@@ -1,0 +1,18 @@
+-- Insert a new mapping (strategy_id NULL = global)
+insert:
+INSERT INTO account_mapping (strategy_id, column_name, value_pattern, account_id, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+-- Get the last inserted row ID
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+-- Update an existing mapping
+update:
+UPDATE account_mapping
+SET strategy_id = ?, column_name = ?, value_pattern = ?, account_id = ?, updated_at = ?
+WHERE id = ?;
+
+-- Delete a mapping by ID
+deleteById:
+DELETE FROM account_mapping WHERE id = ?;

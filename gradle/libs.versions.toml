@@ -61,6 +61,7 @@ schemaspy = "7.0.2"
 slf4j = "2.0.18"
 sort-dependencies = "0.19.0"
 sqldelight = "2.4.0-SNAPSHOT"
+test-retry = "1.6.2"
 turbine = "1.2.1"
 # Build-tool transitive-alignment versions: pin tooling transitives (Gradle plugins, annotation
 # processors, AGP test platform) to one version across all build classpaths. Consumed via the
@@ -303,3 +304,4 @@ module-graph = { id = "dev.iurysouza.modulegraph", version.ref = "module-graph" 
 mokkery = { id = "dev.mokkery", version.ref = "mokkery" }
 sort-dependencies = { id = "com.squareup.sort-dependencies", version.ref = "sort-dependencies" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
+test-retry = { id = "org.gradle.test-retry", version.ref = "test-retry" }

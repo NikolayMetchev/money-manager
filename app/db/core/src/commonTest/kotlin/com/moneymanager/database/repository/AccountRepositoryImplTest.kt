@@ -27,6 +27,39 @@ import kotlin.time.Clock
 
 class AccountRepositoryImplTest : DbTest() {
     @Test
+    fun `getPreviousAccountNames maps a former name to the renamed account`() =
+        runTest {
+            val now = Clock.System.now()
+            val id =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "ACME LTD", openingDate = now),
+                )
+            repositories.accountRepository.updateAccount(Account(id = id, name = "Acme Corp", openingDate = now))
+
+            val previous = repositories.accountRepository.getPreviousAccountNames()
+
+            // The old name (lowercased) resolves to the renamed, still-existing account.
+            assertEquals(id, previous["acme ltd"])
+        }
+
+    @Test
+    fun `getPreviousAccountNames ignores a deleted account that shared a historical name`() =
+        runTest {
+            val now = Clock.System.now()
+            // Account A held "Shared" then was renamed away (audit row: name="Shared", account_id=A).
+            val a = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Shared", openingDate = now))
+            repositories.accountRepository.updateAccount(Account(id = a, name = "A Renamed", openingDate = now))
+
+            // Account B later also held "Shared" (a MORE RECENT audit row) then was deleted.
+            val b = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Shared", openingDate = now))
+            repositories.accountRepository.updateAccount(Account(id = b, name = "B Renamed", openingDate = now))
+            repositories.accountRepository.deleteAccount(b)
+
+            // "Shared" must resolve to the still-existing A, not be dropped because B's newer row won MAX(id).
+            assertEquals(a, repositories.accountRepository.getPreviousAccountNames()["shared"])
+        }
+
+    @Test
     fun `manual owner add and remove each bump the account revision and record an audit entry`() =
         runTest {
             val now = Clock.System.now()

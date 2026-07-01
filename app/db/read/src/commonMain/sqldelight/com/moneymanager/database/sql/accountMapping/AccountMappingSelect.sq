@@ -1,0 +1,7 @@
+-- Select all mappings ordered by id (first match wins)
+selectAll:
+SELECT * FROM account_mapping ORDER BY id;
+
+-- Select a mapping by ID
+selectById:
+SELECT * FROM account_mapping WHERE id = ?;
