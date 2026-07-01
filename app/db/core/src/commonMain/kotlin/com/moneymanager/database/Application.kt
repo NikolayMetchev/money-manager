@@ -1,17 +1,18 @@
 package com.moneymanager.database
 
+import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountMappingWriteRepository
 import com.moneymanager.domain.repository.AccountWriteRepository
 import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
 import com.moneymanager.domain.repository.ApiSessionWriteRepository
 import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
@@ -48,11 +49,12 @@ data class Accounts(
 data class Imports(
     val apiImportStrategyRepository: ApiImportStrategyWriteRepository,
     val apiSessionRepository: ApiSessionWriteRepository,
-    val csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    val accountMappingRepository: AccountMappingWriteRepository,
     val csvImportRepository: CsvImportWriteRepository,
     val csvImportStrategyRepository: CsvImportStrategyWriteRepository,
     val csvStrategyExportService: CsvStrategyExportService,
     val csvStrategyImportExport: CsvStrategyImportExport,
+    val accountMappingExportService: AccountMappingExportService,
     val qifImportRepository: QifImportWriteRepository,
     val importDirectoryRepository: ImportDirectoryReadRepository,
     val passThroughAccountRepository: PassThroughAccountReadRepository,

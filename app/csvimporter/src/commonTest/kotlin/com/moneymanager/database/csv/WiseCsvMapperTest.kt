@@ -11,12 +11,12 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.BuiltInCsvStrategies
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -127,7 +127,7 @@ class WiseCsvMapperTest {
     private fun mapper(
         accounts: Map<String, Account> = defaultAccounts,
         existingTransfers: List<ExistingTransferInfo> = emptyList(),
-        accountMappings: List<CsvAccountMapping> = emptyList(),
+        accountMappings: List<AccountMapping> = emptyList(),
     ): CsvTransferMapper =
         CsvTransferMapper(
             strategy = strategy,
@@ -381,9 +381,8 @@ class WiseCsvMapperTest {
     fun `persisted account mapping overrides the templated source account lookup`() {
         val renamedAccount = Account(AccountId(40), name = "My Euro Wallet", openingDate = Clock.System.now())
         val mapping =
-            CsvAccountMapping(
+            AccountMapping(
                 id = 1,
-                strategyId = strategy.id,
                 columnName = "Source currency",
                 valuePattern = Regex("^EUR$"),
                 accountId = renamedAccount.id,

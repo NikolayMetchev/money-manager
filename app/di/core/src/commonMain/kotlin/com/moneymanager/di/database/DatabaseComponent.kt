@@ -2,17 +2,18 @@ package com.moneymanager.di.database
 
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountMappingWriteRepository
 import com.moneymanager.domain.repository.AccountWriteRepository
 import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
 import com.moneymanager.domain.repository.ApiSessionWriteRepository
 import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
@@ -51,10 +52,11 @@ interface DatabaseComponent {
     val attributeTypeRepository: AttributeTypeWriteRepository
     val auditRepository: AuditReadRepository
     val categoryRepository: CategoryWriteRepository
-    val csvAccountMappingRepository: CsvAccountMappingWriteRepository
+    val accountMappingRepository: AccountMappingWriteRepository
     val csvImportRepository: CsvImportWriteRepository
     val csvImportStrategyRepository: CsvImportStrategyWriteRepository
     val csvStrategyExportService: CsvStrategyExportService
+    val accountMappingExportService: AccountMappingExportService
     val currencyRepository: CurrencyWriteRepository
     val deviceRepository: DeviceWriteRepository
     val importDirectoryRepository: ImportDirectoryWriteRepository

@@ -6,13 +6,13 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -115,9 +115,10 @@ class CsvAccountMappingTest {
         columnName: String,
         pattern: String,
         accountId: AccountId,
-    ): CsvAccountMapping {
+        strategyId: CsvImportStrategyId? = null,
+    ): AccountMapping {
         val now = Clock.System.now()
-        return CsvAccountMapping(
+        return AccountMapping(
             id = id,
             strategyId = strategyId,
             columnName = columnName,
@@ -126,6 +127,57 @@ class CsvAccountMappingTest {
             createdAt = now,
             updatedAt = now,
         )
+    }
+
+    private fun mapperWith(
+        accountMappings: List<AccountMapping>,
+        existingAccounts: Map<String, Account> = emptyMap(),
+    ): CsvTransferMapper =
+        CsvTransferMapper(
+            strategy = createStrategy(),
+            columns = columns,
+            existingAccounts = existingAccounts,
+            existingCurrencies = mapOf(testCurrencyId to testCurrency),
+            existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            accountMappings = accountMappings,
+        )
+
+    private fun payeeRow(payee: String) = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Transfer", "-50.00", payee))
+
+    @Test
+    fun `global mapping applies under any strategy`() {
+        val target = AccountId(30)
+        val mapper = mapperWith(listOf(createAccountMapping(1, "Payee", "^Foo$", target, strategyId = null)))
+        val result = mapper.mapRow(payeeRow("Foo"))
+        assertIs<MappingResult.Success>(result)
+        assertEquals(target, result.transfer.targetAccountId)
+    }
+
+    @Test
+    fun `mapping scoped to a different strategy is ignored`() {
+        val target = AccountId(30)
+        val otherStrategy = CsvImportStrategyId(Uuid.random())
+        val mapper = mapperWith(listOf(createAccountMapping(1, "Payee", "^Foo$", target, strategyId = otherStrategy)))
+        val result = mapper.mapRow(payeeRow("Foo"))
+        assertIs<MappingResult.Success>(result)
+        // Not matched: "Foo" is discovered as a new account instead of routing to the scoped target.
+        assertEquals("Foo", result.newAccountName)
+    }
+
+    @Test
+    fun `strategy-specific mapping wins over a global one for the same column and value`() {
+        val globalTarget = AccountId(30)
+        val strategyTarget = AccountId(31)
+        val mapper =
+            mapperWith(
+                listOf(
+                    createAccountMapping(1, "Payee", "^Foo$", globalTarget, strategyId = null),
+                    createAccountMapping(2, "Payee", "^Foo$", strategyTarget, strategyId = strategyId),
+                ),
+            )
+        val result = mapper.mapRow(payeeRow("Foo"))
+        assertIs<MappingResult.Success>(result)
+        assertEquals(strategyTarget, result.transfer.targetAccountId)
     }
 
     // ============= Scenario 1: Renamed Account =============
@@ -177,6 +229,44 @@ class CsvAccountMappingTest {
         // No new account should be created
         assertNull(result.newAccountName)
         // No discovered mapping since we used a persisted one
+        assertNull(result.discoveredMapping)
+    }
+
+    @Test
+    fun `historical name resolves renamed account without a persisted mapping`() {
+        // Account created as "Nikolay Metchev & Olga Zakharenko", later renamed to "Monzo Joint Account".
+        // No exact mapping is stored (redundant); the old name lives in audit history instead.
+        val renamedAccountId = AccountId(10)
+        val renamedAccount =
+            Account(
+                id = renamedAccountId,
+                name = "Monzo Joint Account",
+                openingDate = Clock.System.now(),
+            )
+
+        val mapper =
+            CsvTransferMapper(
+                strategy = createStrategy(),
+                columns = columns,
+                existingAccounts = mapOf("Monzo Joint Account" to renamedAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                accountMappings = emptyList(),
+                // getPreviousAccountNames() lowercases keys.
+                historicalAccountNames = mapOf("nikolay metchev & olga zakharenko" to renamedAccountId),
+            )
+
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Transfer", "-50.00", "Nikolay Metchev & Olga Zakharenko"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        // Resolves to the renamed account via history, not a new account.
+        assertEquals(renamedAccountId, result.transfer.targetAccountId)
+        assertNull(result.newAccountName)
         assertNull(result.discoveredMapping)
     }
 

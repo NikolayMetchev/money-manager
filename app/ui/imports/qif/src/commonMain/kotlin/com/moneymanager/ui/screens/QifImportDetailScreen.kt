@@ -28,9 +28,9 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.qif.QifImportRecord
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -51,7 +51,7 @@ fun QifImportDetailScreen(
     scrollToRecordIndex: Long? = null,
     qifImportRepository: QifImportReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -140,7 +140,7 @@ fun QifImportDetailScreen(
             qifImport = current,
             records = records,
             csvImportStrategyRepository = csvImportStrategyRepository,
-            csvAccountMappingRepository = csvAccountMappingRepository,
+            accountMappingRepository = accountMappingRepository,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,

@@ -20,7 +20,6 @@ import kotlinx.serialization.Serializable
  * @property identificationColumns Columns used to auto-identify this strategy
  * @property fieldMappings Map of transfer fields to their export-format mappings
  * @property attributeMappings Attribute column mappings (already portable, no IDs)
- * @property accountMappings Persisted account mappings (optional; empty for legacy exports)
  * @property rowPreprocessingRules Row preprocessing rules (already portable, no IDs)
  * @property companionTransactionRules Companion transaction rules (already portable, no IDs)
  */
@@ -31,24 +30,9 @@ data class CsvStrategyExport(
     val identificationColumns: Set<String>,
     val fieldMappings: Map<TransferField, FieldMappingExport>,
     val attributeMappings: List<AttributeColumnMapping> = emptyList(),
-    val accountMappings: List<CsvAccountMappingExport> = emptyList(),
     val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
     val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
     val contentMatchRules: List<ContentMatchRule> = emptyList(),
-)
-
-/**
- * Portable export format for a persisted account mapping.
- *
- * @property valuePattern Regex pattern string from CsvAccountMapping.valuePattern.
- * Consumers compile this with Regex(...), so it must be a valid regex with any
- * literal characters escaped as needed.
- */
-@Serializable
-data class CsvAccountMappingExport(
-    val columnName: String,
-    val valuePattern: String,
-    val accountName: String,
 )
 
 /**

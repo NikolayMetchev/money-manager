@@ -27,6 +27,22 @@ import kotlin.time.Clock
 
 class AccountRepositoryImplTest : DbTest() {
     @Test
+    fun `getPreviousAccountNames maps a former name to the renamed account`() =
+        runTest {
+            val now = Clock.System.now()
+            val id =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "ACME LTD", openingDate = now),
+                )
+            repositories.accountRepository.updateAccount(Account(id = id, name = "Acme Corp", openingDate = now))
+
+            val previous = repositories.accountRepository.getPreviousAccountNames()
+
+            // The old name (lowercased) resolves to the renamed, still-existing account.
+            assertEquals(id, previous["acme ltd"])
+        }
+
+    @Test
     fun `manual owner add and remove each bump the account revision and record an audit entry`() =
         runTest {
             val now = Clock.System.now()

@@ -28,15 +28,15 @@ import com.moneymanager.csvimporter.hasBlankNewAccountNames
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportRecord
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -78,7 +78,7 @@ fun QifApplyStrategyDialog(
     qifImport: QifImport,
     records: List<QifImportRecord>,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -106,7 +106,8 @@ fun QifApplyStrategyDialog(
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var baseImportPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
     var importPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
-    var accountMappings by remember { mutableStateOf<List<CsvAccountMapping>>(emptyList()) }
+    var accountMappings by remember { mutableStateOf<List<AccountMapping>>(emptyList()) }
+    var historicalAccountNames by remember { mutableStateOf<Map<String, AccountId>>(emptyMap()) }
     var selectedExistingAccounts by remember { mutableStateOf<Map<String, AccountId>>(emptyMap()) }
     var selectedNewAccountNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isImporting by remember { mutableStateOf(false) }
@@ -128,7 +129,7 @@ fun QifApplyStrategyDialog(
 
     LaunchedEffect(selectedStrategy) {
         selectedStrategy?.let { strategy ->
-            accountMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+            accountMappings = accountMappingRepository.getAllMappings().first()
             selectedExistingAccounts = emptyMap()
             selectedNewAccountNames = emptyMap()
             when (val strategySourceMapping = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]) {
@@ -137,6 +138,12 @@ fun QifApplyStrategyDialog(
                 else -> selectedSourceAccountId = null
             }
         }
+    }
+
+    // Load former account names (audit history) once so the preview resolves renamed accounts the
+    // same way the actual import will.
+    LaunchedEffect(Unit) {
+        historicalAccountNames = accountRepository.getPreviousAccountNames()
     }
 
     LaunchedEffect(qifStrategies, rows) {
@@ -180,7 +187,8 @@ fun QifApplyStrategyDialog(
         val strategy = selectedStrategy?.withQifCurrency(selectedCurrencyId)
         if (strategy != null && currencies.isNotEmpty() && rows.isNotEmpty()) {
             try {
-                val mapper = buildMapper(strategy, accounts, currencies, accountMappings, selectedSourceAccountId)
+                val mapper =
+                    buildMapper(strategy, accounts, currencies, accountMappings, selectedSourceAccountId, historicalAccountNames)
                 val base = mapper.prepareImport(rows)
                 baseImportPreparation = base
                 selectedNewAccountNames =
@@ -190,10 +198,16 @@ fun QifApplyStrategyDialog(
                 // Duplicate detection runs at import time (it queries existing transfers, which is
                 // too heavy for the reactive preview); the preview shows the mapped transfers.
                 val previewMappings =
-                    buildPendingAccountMappings(base, strategy.id, selectedExistingAccounts)
+                    buildPendingAccountMappings(base, selectedExistingAccounts, accounts.associateBy { it.id })
                 importPreparation =
-                    buildMapper(strategy, accounts, currencies, accountMappings + previewMappings, selectedSourceAccountId)
-                        .prepareImport(rows)
+                    buildMapper(
+                        strategy,
+                        accounts,
+                        currencies,
+                        accountMappings + previewMappings,
+                        selectedSourceAccountId,
+                        historicalAccountNames,
+                    ).prepareImport(rows)
                 errorMessage = null
             } catch (expected: Exception) {
                 errorMessage = "Failed to prepare import: ${expected.message}"
@@ -307,7 +321,7 @@ fun QifApplyStrategyDialog(
                                     selectedNewAccountNames = selectedNewAccountNames,
                                     selectedSourceAccountId = selectedSourceAccountId,
                                     currencies = currencies,
-                                    csvAccountMappingRepository = csvAccountMappingRepository,
+                                    accountMappingRepository = accountMappingRepository,
                                     accountRepository = accountRepository,
                                     maintenance = maintenance,
                                     importEngine = importEngine,

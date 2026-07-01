@@ -3,6 +3,7 @@
 package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
@@ -10,18 +11,15 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 class ApplyStrategyDialogTest {
     @Test
     fun `buildPendingAccountMappings creates exact and regex mappings for selected accounts`() {
-        val strategyId = CsvImportStrategyId(Uuid.random())
         val selectedAccountId = AccountId(42)
         val now = Instant.fromEpochMilliseconds(1_000)
 
@@ -51,7 +49,6 @@ class ApplyStrategyDialogTest {
                         newAccounts = emptySet(),
                         existingAccountMatches = emptyMap(),
                     ),
-                strategyId = strategyId,
                 accountSelections = mapOf("Acme" to selectedAccountId),
                 now = now,
             )
@@ -60,13 +57,11 @@ class ApplyStrategyDialogTest {
         assertTrue(mappings.any { it.columnName == "Payee" && it.valuePattern.pattern == "^\\QACME LTD\\E$" })
         assertTrue(mappings.any { it.columnName == "Description" && it.valuePattern.pattern == ".*ACME.*" })
         assertTrue(mappings.all { it.accountId == selectedAccountId })
-        assertTrue(mappings.all { it.strategyId == strategyId })
         assertTrue(mappings.all { it.createdAt == now && it.updatedAt == now })
     }
 
     @Test
     fun `buildPendingAccountMappings deduplicates duplicate discovered mappings`() {
-        val strategyId = CsvImportStrategyId(Uuid.random())
         val selectedAccountId = AccountId(99)
 
         val duplicateMapping =
@@ -89,12 +84,74 @@ class ApplyStrategyDialogTest {
                         newAccounts = emptySet(),
                         existingAccountMatches = emptyMap(),
                     ),
-                strategyId = strategyId,
                 accountSelections = mapOf("Coffee Shop" to selectedAccountId),
             )
 
         assertEquals(1, mappings.size)
         assertEquals("^\\QCoffee Shop\\E$", mappings.single().valuePattern.pattern)
+    }
+
+    @Test
+    fun `buildPendingAccountMappings skips exact match when value equals chosen account name`() {
+        val chosenId = AccountId(7)
+        val chosen = Account(id = chosenId, name = "Coffee Shop", openingDate = Instant.fromEpochMilliseconds(0))
+
+        val mappings =
+            buildPendingAccountMappings(
+                preparation =
+                    ImportPreparation(
+                        validTransfers =
+                            listOf(
+                                transferWithDiscoveredMapping(
+                                    DiscoveredAccountMapping(
+                                        columnName = "Payee",
+                                        csvValue = "Coffee Shop",
+                                        targetAccountName = "Coffee Shop",
+                                    ),
+                                ),
+                            ),
+                        errorRows = emptyList(),
+                        newAccounts = emptySet(),
+                        existingAccountMatches = emptyMap(),
+                    ),
+                accountSelections = mapOf("Coffee Shop" to chosenId),
+                accountsById = mapOf(chosenId to chosen),
+            )
+
+        // Redundant with plain name lookup, so no mapping is stored.
+        assertTrue(mappings.isEmpty())
+    }
+
+    @Test
+    fun `buildPendingAccountMappings keeps exact match when value differs from chosen account name`() {
+        val chosenId = AccountId(7)
+        val chosen = Account(id = chosenId, name = "Acme", openingDate = Instant.fromEpochMilliseconds(0))
+
+        val mappings =
+            buildPendingAccountMappings(
+                preparation =
+                    ImportPreparation(
+                        validTransfers =
+                            listOf(
+                                transferWithDiscoveredMapping(
+                                    DiscoveredAccountMapping(
+                                        columnName = "Payee",
+                                        csvValue = "ACME LTD",
+                                        targetAccountName = "Acme",
+                                    ),
+                                ),
+                            ),
+                        errorRows = emptyList(),
+                        newAccounts = emptySet(),
+                        existingAccountMatches = emptyMap(),
+                    ),
+                accountSelections = mapOf("Acme" to chosenId),
+                accountsById = mapOf(chosenId to chosen),
+            )
+
+        assertEquals(1, mappings.size)
+        assertEquals("^\\QACME LTD\\E$", mappings.single().valuePattern.pattern)
+        assertEquals(chosenId, mappings.single().accountId)
     }
 
     @Test

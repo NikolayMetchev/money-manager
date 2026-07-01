@@ -52,7 +52,6 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -60,7 +59,6 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
 
@@ -69,7 +67,6 @@ fun CsvStrategiesScreen(
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     csvImportRepository: CsvImportReadRepository,
     qifImportRepository: QifImportReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -92,9 +89,7 @@ fun CsvStrategiesScreen(
     var showSelectFileDialog by remember { mutableStateOf(false) }
 
     // Export state
-    var strategyPendingExportPrompt by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var strategyToExport by remember { mutableStateOf<CsvImportStrategy?>(null) }
-    var includeAccountMappingsInExport by remember { mutableStateOf<Boolean?>(null) }
     var exportJson by remember { mutableStateOf<String?>(null) }
     var exportError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -108,7 +103,6 @@ fun CsvStrategiesScreen(
         rememberFileSaver(
             onResult = {
                 strategyToExport = null
-                includeAccountMappingsInExport = null
                 exportJson = null
             },
         )
@@ -138,24 +132,16 @@ fun CsvStrategiesScreen(
         )
 
     // Handle export when strategy is selected
-    LaunchedEffect(strategyToExport, includeAccountMappingsInExport) {
+    LaunchedEffect(strategyToExport) {
         val strategy = strategyToExport
-        val includeAccountMappings = includeAccountMappingsInExport
-        if (strategy != null && includeAccountMappings != null && exportJson == null) {
+        if (strategy != null && exportJson == null) {
             @Suppress("TooGenericExceptionCaught")
             try {
                 exportError = null
-                val persistedAccountMappings =
-                    if (includeAccountMappings) {
-                        csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
-                    } else {
-                        emptyList()
-                    }
                 val export =
                     csvStrategyImportExport.toExport(
                         strategy = strategy,
                         appVersion = appVersion,
-                        accountMappings = persistedAccountMappings.takeIf { includeAccountMappings },
                     )
                 val json = CsvStrategyExportCodec.encode(export)
                 exportJson = json
@@ -163,7 +149,6 @@ fun CsvStrategiesScreen(
                 fileSaver.launch(fileName, json)
             } catch (expected: Exception) {
                 strategyToExport = null
-                includeAccountMappingsInExport = null
                 exportJson = null
                 exportError = "Failed to export: ${expected.message}"
             }
@@ -259,7 +244,9 @@ fun CsvStrategiesScreen(
                                     showSelectFileDialog = true
                                 },
                                 onExportClick = {
-                                    strategyPendingExportPrompt = strategy
+                                    exportJson = null
+                                    exportError = null
+                                    strategyToExport = strategy
                                 },
                                 onAuditClick = { onAuditHistoryClick(strategy) },
                             )
@@ -272,23 +259,6 @@ fun CsvStrategiesScreen(
                 }
             }
         }
-    }
-
-    val currentStrategyPendingExportPrompt = strategyPendingExportPrompt
-    if (currentStrategyPendingExportPrompt != null) {
-        ExportAccountMappingsDialog(
-            strategy = currentStrategyPendingExportPrompt,
-            onExport = { includeAccountMappings ->
-                strategyPendingExportPrompt = null
-                exportJson = null
-                exportError = null
-                strategyToExport = currentStrategyPendingExportPrompt
-                includeAccountMappingsInExport = includeAccountMappings
-            },
-            onDismiss = {
-                strategyPendingExportPrompt = null
-            },
-        )
     }
 
     // Show the sample-file selector, then navigate to the editor. QIF strategies (whose identification

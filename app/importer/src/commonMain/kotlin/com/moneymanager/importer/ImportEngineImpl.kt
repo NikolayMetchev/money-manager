@@ -28,12 +28,12 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
+import com.moneymanager.domain.repository.AccountMappingWriteRepository
 import com.moneymanager.domain.repository.AccountWriteRepository
 import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
 import com.moneymanager.domain.repository.ApiSessionWriteRepository
 import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
-import com.moneymanager.domain.repository.CsvAccountMappingWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
@@ -47,12 +47,12 @@ import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.SettingsWriteRepository
 import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.domain.repository.TransferUpdate
+import com.moneymanager.importengineapi.AccountMappingMutation
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.ApiStrategyMutation
 import com.moneymanager.importengineapi.CsvImportMutation
-import com.moneymanager.importengineapi.CsvMappingMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
@@ -103,7 +103,7 @@ class ImportEngineImpl(
     private val relationshipTypeRepository: RelationshipTypeWriteRepository,
     private val csvImportStrategyRepository: CsvImportStrategyWriteRepository,
     private val apiImportStrategyRepository: ApiImportStrategyWriteRepository,
-    private val csvAccountMappingRepository: CsvAccountMappingWriteRepository,
+    private val accountMappingRepository: AccountMappingWriteRepository,
     private val csvImportRepository: CsvImportWriteRepository,
     private val qifImportRepository: QifImportWriteRepository,
     private val apiSessionRepository: ApiSessionWriteRepository,
@@ -231,7 +231,7 @@ class ImportEngineImpl(
             relationshipTypeIds = relationshipTypeIds,
             createdCsvStrategyIds = config.csvStrategyIds,
             createdApiStrategyIds = config.apiStrategyIds,
-            createdCsvMappingIds = config.csvMappingIds,
+            createdAccountMappingIds = config.accountMappingIds,
             createdCsvImportIds = config.csvImportIds,
             createdQifImportIds = config.qifImportIds,
             createdImportDirectoryIds = config.importDirectoryIds,
@@ -1037,7 +1037,7 @@ class ImportEngineImpl(
     private class ConfigOutcome(
         val csvStrategyIds: Map<String, CsvImportStrategyId>,
         val apiStrategyIds: Map<String, ApiImportStrategyId>,
-        val csvMappingIds: Map<String, Long>,
+        val accountMappingIds: Map<String, Long>,
         val csvImportIds: Map<String, CsvImportId>,
         val qifImportIds: Map<String, QifImportId>,
         val importDirectoryIds: Map<String, ImportDirectoryId>,
@@ -1087,19 +1087,18 @@ class ImportEngineImpl(
             }
         }
 
-        val csvMappingIds = mutableMapOf<String, Long>()
-        for (m in batch.csvMappingMutations) {
+        val accountMappingIds = mutableMapOf<String, Long>()
+        for (m in batch.accountMappingMutations) {
             when (m) {
-                is CsvMappingMutation.Create ->
-                    csvMappingIds.putUnique(
+                is AccountMappingMutation.Create ->
+                    accountMappingIds.putUnique(
                         m.key,
-                        csvAccountMappingRepository.createMapping(m.strategyId, m.columnName, m.valuePattern, m.accountId),
-                        "CsvMapping",
+                        accountMappingRepository.createMapping(m.columnName, m.valuePattern, m.accountId, m.strategyId),
+                        "AccountMapping",
                     )
-                is CsvMappingMutation.CreateBatch -> csvAccountMappingRepository.createMappings(m.mappings)
-                is CsvMappingMutation.Update -> csvAccountMappingRepository.updateMapping(m.mapping)
-                is CsvMappingMutation.Delete -> csvAccountMappingRepository.deleteMapping(m.id)
-                is CsvMappingMutation.DeleteForStrategy -> csvAccountMappingRepository.deleteMappingsForStrategy(m.strategyId)
+                is AccountMappingMutation.CreateBatch -> accountMappingRepository.createMappings(m.mappings)
+                is AccountMappingMutation.Update -> accountMappingRepository.updateMapping(m.mapping)
+                is AccountMappingMutation.Delete -> accountMappingRepository.deleteMapping(m.id)
             }
         }
 
@@ -1246,7 +1245,7 @@ class ImportEngineImpl(
         return ConfigOutcome(
             csvStrategyIds = csvStrategyIds,
             apiStrategyIds = apiStrategyIds,
-            csvMappingIds = csvMappingIds,
+            accountMappingIds = accountMappingIds,
             csvImportIds = csvImportIds,
             qifImportIds = qifImportIds,
             importDirectoryIds = importDirectoryIds,

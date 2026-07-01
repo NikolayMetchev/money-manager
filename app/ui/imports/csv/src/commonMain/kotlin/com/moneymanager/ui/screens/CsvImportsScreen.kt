@@ -38,9 +38,9 @@ import com.moneymanager.csv.CsvParser
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -62,7 +62,7 @@ import kotlin.time.Clock
 fun CsvImportsScreen(
     csvImportRepository: CsvImportReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -230,7 +230,7 @@ fun CsvImportsScreen(
                 CsvImportAllDialog(
                     unimported = unimported,
                     csvImportStrategyRepository = csvImportStrategyRepository,
-                    csvAccountMappingRepository = csvAccountMappingRepository,
+                    accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,

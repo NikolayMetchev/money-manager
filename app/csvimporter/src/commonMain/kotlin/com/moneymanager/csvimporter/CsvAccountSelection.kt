@@ -2,9 +2,9 @@
 
 package com.moneymanager.csvimporter
 
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -12,13 +12,16 @@ import kotlin.time.Instant
  * Builds persistent account mappings for accounts the user chose to map to existing accounts, from the
  * discovered mappings in [preparation]. Regex matches keep their pattern; exact matches become an
  * anchored pattern over the CSV value. Deduplicated so one mapping is created per rule.
+ *
+ * An exact match whose CSV value equals the chosen account's current name is skipped: plain name
+ * lookup already resolves it, and a later rename is handled via audit history.
  */
 fun buildPendingAccountMappings(
     preparation: ImportPreparation,
-    strategyId: CsvImportStrategyId,
     accountSelections: Map<String, AccountId>,
+    accountsById: Map<AccountId, Account> = emptyMap(),
     now: Instant = Clock.System.now(),
-): List<CsvAccountMapping> {
+): List<AccountMapping> {
     if (accountSelections.isEmpty()) {
         return emptyList()
     }
@@ -27,21 +30,27 @@ fun buildPendingAccountMappings(
         .asSequence()
         .flatMap { it.discoveredMappings }
         .filter { discoveredMapping -> discoveredMapping.targetAccountName in accountSelections }
-        .map { discoveredMapping ->
+        .mapNotNull { discoveredMapping ->
             val selectedAccountId = accountSelections.getValue(discoveredMapping.targetAccountName)
-            PendingAccountMappingKey(
-                columnName = discoveredMapping.columnName,
-                pattern =
-                    discoveredMapping.matchedPattern
-                        ?: "^${Regex.escape(discoveredMapping.csvValue)}$",
-                accountId = selectedAccountId,
-            )
+            val isRedundantExactMatch =
+                discoveredMapping.matchedPattern == null &&
+                    discoveredMapping.csvValue.equals(accountsById[selectedAccountId]?.name, ignoreCase = true)
+            if (isRedundantExactMatch) {
+                null
+            } else {
+                PendingAccountMappingKey(
+                    columnName = discoveredMapping.columnName,
+                    pattern =
+                        discoveredMapping.matchedPattern
+                            ?: "^${Regex.escape(discoveredMapping.csvValue)}$",
+                    accountId = selectedAccountId,
+                )
+            }
         }.distinct()
         .toList()
         .mapIndexed { index, mapping ->
-            CsvAccountMapping(
+            AccountMapping(
                 id = -(index + 1).toLong(),
-                strategyId = strategyId,
                 columnName = mapping.columnName,
                 valuePattern = Regex(mapping.pattern, RegexOption.IGNORE_CASE),
                 accountId = mapping.accountId,

@@ -60,7 +60,7 @@ class ImportDirectoryScannerTest : DbTest() {
             relationshipTypeRepository = repositories.relationshipTypeRepository,
             csvImportStrategyRepository = repositories.csvImportStrategyRepository,
             apiImportStrategyRepository = repositories.apiImportStrategyRepository,
-            csvAccountMappingRepository = repositories.csvAccountMappingRepository,
+            accountMappingRepository = repositories.accountMappingRepository,
             csvImportRepository = repositories.csvImportRepository,
             qifImportRepository = repositories.qifImportRepository,
             apiSessionRepository = repositories.apiSessionRepository,

@@ -6,3 +6,12 @@ SELECT * FROM account WHERE id = ?;
 
 selectRevisionById:
 SELECT revision_id FROM account WHERE id = ?;
+
+-- Past names of still-existing accounts, from the account audit history (the update trigger records
+-- the OLD name). For each distinct historical name, the most recent audit row wins (MAX(id)). Used to
+-- resolve a renamed account when an import row still carries its former name.
+selectPreviousAccountNames:
+SELECT aa.name AS name, aa.account_id AS account_id
+FROM account_audit aa
+JOIN account a ON a.id = aa.account_id
+WHERE aa.id IN (SELECT MAX(id) FROM account_audit GROUP BY name);

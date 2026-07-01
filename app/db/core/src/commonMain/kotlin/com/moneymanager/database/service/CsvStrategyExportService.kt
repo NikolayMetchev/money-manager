@@ -12,7 +12,6 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -30,7 +29,6 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
 import com.moneymanager.domain.model.csvstrategy.export.ConditionalAccountExport
-import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.CurrencyLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport
@@ -152,7 +150,6 @@ class CsvStrategyExportService(
     suspend fun toExport(
         strategy: CsvImportStrategy,
         appVersion: AppVersion,
-        accountMappings: List<CsvAccountMapping>? = null,
     ): CsvStrategyExport {
         val referenceData = loadReferenceData()
 
@@ -165,18 +162,6 @@ class CsvStrategyExportService(
                     mapping.toExport(referenceData.accountsById, referenceData.currenciesById, referenceData.categoriesById)
                 },
             attributeMappings = strategy.attributeMappings,
-            accountMappings =
-                accountMappings
-                    ?.map { mapping ->
-                        val account =
-                            referenceData.accountsById[mapping.accountId]
-                                ?: error("Missing account for id ${mapping.accountId.id} in CsvAccountMapping")
-                        CsvAccountMappingExport(
-                            columnName = mapping.columnName,
-                            valuePattern = mapping.valuePattern.pattern,
-                            accountName = account.name,
-                        )
-                    }.orEmpty(),
             rowPreprocessingRules = strategy.rowPreprocessingRules,
             companionTransactionRules = strategy.companionTransactionRules,
             contentMatchRules = strategy.contentMatchRules,
@@ -194,18 +179,6 @@ class CsvStrategyExportService(
 
         for ((fieldType, mappingExport) in export.fieldMappings) {
             collectUnresolvedReferences(mappingExport, fieldType, referenceData, unresolvedReferences)
-        }
-
-        for (mapping in export.accountMappings) {
-            if (referenceData.accountsByName[mapping.accountName] == null) {
-                unresolvedReferences.add(
-                    UnresolvedReference(
-                        type = ReferenceType.ACCOUNT,
-                        name = mapping.accountName,
-                        fieldType = null,
-                    ),
-                )
-            }
         }
 
         return ImportParseResult(

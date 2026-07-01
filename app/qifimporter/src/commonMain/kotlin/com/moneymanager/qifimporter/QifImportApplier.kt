@@ -16,17 +16,17 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifImport
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
@@ -40,8 +40,8 @@ import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.QifImportMutation
 import com.moneymanager.importengineapi.applyQifImportMutations
+import com.moneymanager.importengineapi.createAccountMappings
 import com.moneymanager.importengineapi.createAccounts
-import com.moneymanager.importengineapi.createCsvMappings
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import com.moneymanager.importengineapi.normalizeNameKey
 import kotlinx.coroutines.flow.first
@@ -126,7 +126,7 @@ suspend fun bulkApplyQif(
     sourceAccountId: AccountId,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     qifImportRepository: QifImportReadRepository,
     maintenance: Maintenance,
@@ -159,8 +159,10 @@ suspend fun bulkApplyQif(
             val strategy = matched
             // Re-fetch accounts so payee accounts created by earlier files are seen.
             val accounts = accountRepository.getAllAccounts().first()
-            val mappings = csvAccountMappingRepository.getMappingsForStrategy(matched.id).first()
-            val basePrep = buildMapper(strategy, accounts, currencies, mappings, sourceAccountId).prepareImport(rows)
+            val mappings = accountMappingRepository.getAllMappings().first()
+            val historicalAccountNames = accountRepository.getPreviousAccountNames()
+            val basePrep =
+                buildMapper(strategy, accounts, currencies, mappings, sourceAccountId, historicalAccountNames).prepareImport(rows)
 
             val result =
                 runImport(
@@ -172,7 +174,7 @@ suspend fun bulkApplyQif(
                     selectedNewAccountNames = emptyMap(),
                     selectedSourceAccountId = sourceAccountId,
                     currencies = currencies,
-                    csvAccountMappingRepository = csvAccountMappingRepository,
+                    accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
@@ -224,8 +226,9 @@ fun buildMapper(
     strategy: CsvImportStrategy,
     accounts: List<Account>,
     currencies: List<Currency>,
-    accountMappings: List<CsvAccountMapping>,
+    accountMappings: List<AccountMapping>,
     sourceAccountOverride: AccountId?,
+    historicalAccountNames: Map<String, AccountId> = emptyMap(),
 ): CsvTransferMapper =
     CsvTransferMapper(
         strategy = strategy,
@@ -234,6 +237,7 @@ fun buildMapper(
         existingCurrencies = currencies.associateBy { it.id },
         existingCurrenciesByCode = currencies.associateBy { it.code.uppercase() },
         accountMappings = accountMappings,
+        historicalAccountNames = historicalAccountNames,
         sourceAccountOverride = sourceAccountOverride,
     )
 
@@ -260,16 +264,21 @@ suspend fun runImport(
     selectedNewAccountNames: Map<String, String>,
     selectedSourceAccountId: AccountId?,
     currencies: List<Currency>,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
 ): QifImportResult {
     // Persist any "map to existing account" selections so future imports reuse them.
-    val selectedMappingsToPersist = buildPendingAccountMappings(basePrep, strategy.id, selectedExistingAccounts)
+    val selectedMappingsToPersist =
+        buildPendingAccountMappings(
+            basePrep,
+            selectedExistingAccounts,
+            accountRepository.getAllAccounts().first().associateBy { it.id },
+        )
     if (selectedMappingsToPersist.isNotEmpty()) {
-        runCatching { importEngine.createCsvMappings(selectedMappingsToPersist) }
+        runCatching { importEngine.createAccountMappings(selectedMappingsToPersist) }
             .onFailure { logger.warn(it) { "Failed to persist account mappings" } }
     }
 
@@ -295,8 +304,10 @@ suspend fun runImport(
     // Rebuild the mapper against the now-current accounts/mappings. Duplicate detection happens inside
     // the central engine, so no existing transfers are loaded here.
     val latestAccounts = accountRepository.getAllAccounts().first()
-    val latestMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
-    val mapper = buildMapper(strategy, latestAccounts, currencies, latestMappings, selectedSourceAccountId)
+    val latestMappings = accountMappingRepository.getAllMappings().first()
+    val historicalAccountNames = accountRepository.getPreviousAccountNames()
+    val mapper =
+        buildMapper(strategy, latestAccounts, currencies, latestMappings, selectedSourceAccountId, historicalAccountNames)
     val finalPrep = mapper.prepareImport(rows)
 
     // Surface mapping errors on their records.

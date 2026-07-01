@@ -106,7 +106,7 @@ class SantanderQifE2ETest : DbTest() {
             sourceAccountId = sourceId,
             strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
             currencies = repositories.currencyRepository.getAllCurrencies().first(),
-            csvAccountMappingRepository = repositories.csvAccountMappingRepository,
+            accountMappingRepository = repositories.accountMappingRepository,
             accountRepository = repositories.accountRepository,
             qifImportRepository = repositories.qifImportRepository,
             maintenance = maintenance,

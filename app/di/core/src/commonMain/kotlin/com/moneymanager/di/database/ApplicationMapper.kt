@@ -23,11 +23,12 @@ fun DatabaseComponent.toApplication() =
             Imports(
                 apiImportStrategyRepository = apiImportStrategyRepository,
                 apiSessionRepository = apiSessionRepository,
-                csvAccountMappingRepository = csvAccountMappingRepository,
+                accountMappingRepository = accountMappingRepository,
                 csvImportRepository = csvImportRepository,
                 csvImportStrategyRepository = csvImportStrategyRepository,
                 csvStrategyExportService = csvStrategyExportService,
                 csvStrategyImportExport = DbCsvStrategyImportExport(csvStrategyExportService),
+                accountMappingExportService = accountMappingExportService,
                 qifImportRepository = qifImportRepository,
                 importDirectoryRepository = importDirectoryRepository,
                 passThroughAccountRepository = passThroughAccountRepository,

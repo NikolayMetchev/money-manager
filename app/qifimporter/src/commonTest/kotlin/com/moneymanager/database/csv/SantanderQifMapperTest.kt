@@ -8,9 +8,9 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.BuiltInCsvStrategies
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.qifCompatible
@@ -145,9 +145,8 @@ class SantanderQifMapperTest {
         // A user-persisted mapping remaps the FASTER PAYMENTS counterparty onto an existing account.
         val mapped = Account(id = AccountId(42), name = "My Savings", openingDate = now)
         val mapping =
-            CsvAccountMapping(
+            AccountMapping(
                 id = 1L,
-                strategyId = strategy.id,
                 columnName = QifColumns.COL_PAYEE,
                 valuePattern = Regex("ZAKHARENKO O"),
                 accountId = mapped.id,

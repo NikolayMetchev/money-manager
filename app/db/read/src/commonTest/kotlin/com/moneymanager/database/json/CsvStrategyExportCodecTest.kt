@@ -6,7 +6,6 @@ import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
-import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport
 import com.moneymanager.domain.model.csvstrategy.export.DirectColumnExport
@@ -213,33 +212,6 @@ class CsvStrategyExportCodecTest {
     }
 
     @Test
-    fun `encode and decode export with persisted account mappings`() {
-        val export =
-            CsvStrategyExport(
-                version = "1.0.0",
-                name = "With mappings",
-                identificationColumns = setOf("Name"),
-                fieldMappings = emptyMap(),
-                accountMappings =
-                    listOf(
-                        CsvAccountMappingExport(
-                            columnName = "Name",
-                            valuePattern = ".*Acme.*",
-                            accountName = "Acme Bank",
-                        ),
-                    ),
-            )
-
-        val json = CsvStrategyExportCodec.encode(export)
-        val decoded = CsvStrategyExportCodec.decode(json)
-
-        assertEquals(1, decoded.accountMappings.size)
-        assertEquals("Name", decoded.accountMappings.first().columnName)
-        assertEquals(".*Acme.*", decoded.accountMappings.first().valuePattern)
-        assertEquals("Acme Bank", decoded.accountMappings.first().accountName)
-    }
-
-    @Test
     fun `encode and decode export with companion transaction rules`() {
         val export =
             CsvStrategyExport(
@@ -285,22 +257,5 @@ class CsvStrategyExportCodecTest {
         val decoded = CsvStrategyExportCodec.decode(legacyJson)
 
         assertTrue(decoded.companionTransactionRules.isEmpty())
-    }
-
-    @Test
-    fun `decode legacy export without accountMappings defaults to empty list`() {
-        val legacyJson =
-            """
-            {
-                "version": "1.0.0",
-                "name": "Legacy",
-                "identificationColumns": ["Date"],
-                "fieldMappings": {}
-            }
-            """.trimIndent()
-
-        val decoded = CsvStrategyExportCodec.decode(legacyJson)
-
-        assertTrue(decoded.accountMappings.isEmpty())
     }
 }

@@ -14,10 +14,10 @@ import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.qif.QifImportId
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -38,7 +38,7 @@ fun QifStrategyEditorScreen(
     qifImportRepository: QifImportReadRepository,
     csvImportRepository: CsvImportReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -68,7 +68,7 @@ fun QifStrategyEditorScreen(
         columnsOverride = QifCsvAdapter.columns,
         sampleRowsOverride = rows,
         csvImportStrategyRepository = csvImportStrategyRepository,
-        csvAccountMappingRepository = csvAccountMappingRepository,
+        accountMappingRepository = accountMappingRepository,
         accountRepository = accountRepository,
         categoryRepository = categoryRepository,
         currencyRepository = currencyRepository,

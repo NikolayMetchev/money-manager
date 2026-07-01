@@ -42,6 +42,14 @@ class AccountReadRepositoryImpl(
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(AccountMapper::map) }
 
+    override suspend fun getPreviousAccountNames(): Map<String, AccountId> =
+        withContext(Dispatchers.Default) {
+            selectQueries
+                .selectPreviousAccountNames { name, accountId -> name.lowercase() to AccountId(accountId) }
+                .executeAsList()
+                .toMap()
+        }
+
     override suspend fun countTransfersByAccount(accountId: AccountId): Long =
         withContext(Dispatchers.Default) {
             transferSelectQueries.countTransfersByAccount(accountId.id).executeAsOne()

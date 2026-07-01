@@ -6,10 +6,10 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
@@ -78,31 +78,27 @@ sealed interface ApiStrategyMutation {
     ) : ApiStrategyMutation
 }
 
-/** A write on the CSV account-mapping table. */
-sealed interface CsvMappingMutation {
+/** A write on the account-mapping table (strategyId null = global, else scoped to that strategy). */
+sealed interface AccountMappingMutation {
     data class Create(
         val key: String,
-        val strategyId: CsvImportStrategyId,
         val columnName: String,
         val valuePattern: Regex,
         val accountId: AccountId,
-    ) : CsvMappingMutation
+        val strategyId: CsvImportStrategyId? = null,
+    ) : AccountMappingMutation
 
     data class CreateBatch(
-        val mappings: List<CsvAccountMapping>,
-    ) : CsvMappingMutation
+        val mappings: List<AccountMapping>,
+    ) : AccountMappingMutation
 
     data class Update(
-        val mapping: CsvAccountMapping,
-    ) : CsvMappingMutation
+        val mapping: AccountMapping,
+    ) : AccountMappingMutation
 
     data class Delete(
         val id: Long,
-    ) : CsvMappingMutation
-
-    data class DeleteForStrategy(
-        val strategyId: CsvImportStrategyId,
-    ) : CsvMappingMutation
+    ) : AccountMappingMutation
 }
 
 /** A write on the CSV staging tables (the stored file + per-row status write-back). */

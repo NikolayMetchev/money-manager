@@ -56,17 +56,17 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
@@ -91,7 +91,7 @@ fun ApplyStrategyDialog(
     csvImport: CsvImport,
     rows: List<CsvRow>,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -121,7 +121,8 @@ fun ApplyStrategyDialog(
     var selectedSourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var baseImportPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
     var importPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
-    var accountMappings by remember { mutableStateOf<List<CsvAccountMapping>>(emptyList()) }
+    var accountMappings by remember { mutableStateOf<List<AccountMapping>>(emptyList()) }
+    var historicalAccountNames by remember { mutableStateOf<Map<String, AccountId>>(emptyMap()) }
     var selectedExistingAccounts by remember { mutableStateOf<Map<String, AccountId>>(emptyMap()) }
     var selectedNewAccountNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isImporting by remember { mutableStateOf(false) }
@@ -135,7 +136,7 @@ fun ApplyStrategyDialog(
     // Load account mappings when strategy is selected and pre-populate source account from strategy
     LaunchedEffect(selectedStrategy) {
         selectedStrategy?.let { strategy ->
-            accountMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+            accountMappings = accountMappingRepository.getAllMappings().first()
             selectedExistingAccounts = emptyMap()
             selectedNewAccountNames = emptyMap()
             // Pre-populate source account from the strategy's SOURCE_ACCOUNT mapping if present.
@@ -148,6 +149,12 @@ fun ApplyStrategyDialog(
                 else -> selectedSourceAccountId = null
             }
         }
+    }
+
+    // Load former account names (audit history) once, so the preview resolves renamed accounts the
+    // same way the actual import will.
+    LaunchedEffect(Unit) {
+        historicalAccountNames = accountRepository.getPreviousAccountNames()
     }
 
     // Auto-select matching strategy when strategies load
@@ -180,6 +187,7 @@ fun ApplyStrategyDialog(
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
                             accountMappings = accountMappings,
+                            historicalAccountNames = historicalAccountNames,
                             sourceAccountOverride = selectedSourceAccountId,
                             passThroughDetector = passThroughDetector,
                         )
@@ -230,8 +238,8 @@ fun ApplyStrategyDialog(
                     val previewMappings =
                         buildPendingAccountMappings(
                             preparation = basePreparation,
-                            strategyId = strategy.id,
                             accountSelections = selectedExistingAccounts,
+                            accountsById = accounts.associateBy { it.id },
                         )
                     val mapper =
                         CsvTransferMapper(
@@ -241,6 +249,7 @@ fun ApplyStrategyDialog(
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
                             accountMappings = accountMappings + previewMappings,
+                            historicalAccountNames = historicalAccountNames,
                             sourceAccountOverride = selectedSourceAccountId,
                             passThroughDetector = passThroughDetector,
                         )
@@ -366,7 +375,7 @@ fun ApplyStrategyDialog(
                                     selectedNewAccountNames = selectedNewAccountNames,
                                     selectedSourceAccountId = selectedSourceAccountId,
                                     currencies = currencies,
-                                    csvAccountMappingRepository = csvAccountMappingRepository,
+                                    accountMappingRepository = accountMappingRepository,
                                     accountRepository = accountRepository,
                                     maintenance = maintenance,
                                     importEngine = importEngine,

@@ -23,9 +23,9 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 fun CsvImportAllDialog(
     unimported: List<CsvImport>,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvAccountMappingRepository: CsvAccountMappingReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -147,7 +147,7 @@ fun CsvImportAllDialog(
                                         sourceAccountOverride = sourceAccountId,
                                         strategies = strategies,
                                         currencies = currencies,
-                                        csvAccountMappingRepository = csvAccountMappingRepository,
+                                        accountMappingRepository = accountMappingRepository,
                                         accountRepository = accountRepository,
                                         csvImportRepository = csvImportRepository,
                                         maintenance = maintenance,

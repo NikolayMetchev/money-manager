@@ -22,13 +22,13 @@ class MoneyManagerDatabaseWrapper(
     private val writeDb = WriteDatabase(driver)
 
     val accountAttributeWriteQueries get() = writeDb.accountAttributeWriteQueries
+    val accountMappingWriteQueries get() = writeDb.accountMappingWriteQueries
     val accountMergeWriteQueries get() = writeDb.accountMergeWriteQueries
     val accountWriteQueries get() = writeDb.accountWriteQueries
     val apiImportStrategyWriteQueries get() = writeDb.apiImportStrategyWriteQueries
     val apiSessionWriteQueries get() = writeDb.apiSessionWriteQueries
     val attributeTypeWriteQueries get() = writeDb.attributeTypeWriteQueries
     val categoryWriteQueries get() = writeDb.categoryWriteQueries
-    val csvAccountMappingWriteQueries get() = writeDb.csvAccountMappingWriteQueries
     val csvImportStrategyWriteQueries get() = writeDb.csvImportStrategyWriteQueries
     val csvImportWriteQueries get() = writeDb.csvImportWriteQueries
     val currencyWriteQueries get() = writeDb.currencyWriteQueries
@@ -331,7 +331,7 @@ class MoneyManagerDatabaseWrapper(
             "running_balance_materialized_view",
             "pending_materialized_view_changes",
             "sqlite_sequence",
-            "csv_account_mapping",
+            "account_mapping",
             "csv_column_metadata",
             "csv_import_error",
             "csv_import_metadata",

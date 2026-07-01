@@ -7,9 +7,9 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
-import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -17,30 +17,30 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-class CsvAccountMappingReadRepositoryImpl(
+class AccountMappingReadRepositoryImpl(
     database: MoneyManagerDatabase,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
-) : CsvAccountMappingReadRepository {
-    private val selectQueries = database.csvAccountMappingSelectQueries
+) : AccountMappingReadRepository {
+    private val selectQueries = database.accountMappingSelectQueries
 
-    override fun getMappingsForStrategy(strategyId: CsvImportStrategyId): Flow<List<CsvAccountMapping>> =
+    override fun getAllMappings(): Flow<List<AccountMapping>> =
         selectQueries
-            .selectByStrategyId(strategyId.id.toString())
+            .selectAll()
             .asFlow()
             .mapToList(coroutineContext)
             .map { mappings -> mappings.map(::toDomain) }
 
-    override fun getMappingById(id: Long): Flow<CsvAccountMapping?> =
+    override fun getMappingById(id: Long): Flow<AccountMapping?> =
         selectQueries
             .selectById(id)
             .asFlow()
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }
 
-    private fun toDomain(entity: com.moneymanager.database.sql.csvAccountMapping.Csv_account_mapping): CsvAccountMapping =
-        CsvAccountMapping(
+    private fun toDomain(entity: com.moneymanager.database.sql.accountMapping.Account_mapping): AccountMapping =
+        AccountMapping(
             id = entity.id,
-            strategyId = CsvImportStrategyId(Uuid.parse(entity.strategy_id)),
+            strategyId = entity.strategy_id?.let { CsvImportStrategyId(Uuid.parse(it)) },
             columnName = entity.column_name,
             valuePattern = Regex(entity.value_pattern, RegexOption.IGNORE_CASE),
             accountId = AccountId(entity.account_id),
