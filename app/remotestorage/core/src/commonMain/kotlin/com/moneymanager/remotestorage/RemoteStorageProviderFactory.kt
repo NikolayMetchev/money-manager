@@ -19,10 +19,15 @@ interface RemoteStorageProviderFactory {
      * Creates the provider for [providerId], using the provider-specific [config] persisted in the
      * database binding (e.g. the Google Drive OAuth client credentials).
      *
+     * When [subfolder] is set, the provider scopes its files to that named namespace within the
+     * backend's app area (e.g. the Google Drive "Money Manager/[subfolder]" folder), isolating them
+     * from the top-level DB archives. Null uses the top-level app area.
+     *
      * @throws IllegalArgumentException if [providerId] is unknown to this build
      */
     fun create(
         providerId: String,
         config: String?,
+        subfolder: String? = null,
     ): RemoteStorageProvider
 }

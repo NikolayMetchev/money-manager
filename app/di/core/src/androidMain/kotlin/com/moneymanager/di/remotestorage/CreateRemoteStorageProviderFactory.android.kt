@@ -22,10 +22,11 @@ actual fun createRemoteStorageProviderFactory(
         override fun create(
             providerId: String,
             config: String?,
+            subfolder: String?,
         ): RemoteStorageProvider =
             when (providerId) {
                 // config is ignored on Android — auth is tied to the app's registered OAuth client.
-                GOOGLE_DRIVE_PROVIDER_ID -> googleDriveProvider(params.googleTokenSource)
+                GOOGLE_DRIVE_PROVIDER_ID -> googleDriveProvider(params.googleTokenSource, subfolder)
                 else -> throw IllegalArgumentException("Unknown remote storage provider: $providerId")
             }
     }

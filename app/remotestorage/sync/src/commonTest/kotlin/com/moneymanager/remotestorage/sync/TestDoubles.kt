@@ -83,6 +83,7 @@ class SingleProviderFactory(
     override fun create(
         providerId: String,
         config: String?,
+        subfolder: String?,
     ): RemoteStorageProvider {
         require(providerId == provider.id) { "Unknown providerId: $providerId" }
         return provider

@@ -1,6 +1,7 @@
 package com.moneymanager.domain
 
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
@@ -37,6 +38,16 @@ data class CsvImportParseResult(
     val unresolvedReferences: List<CsvUnresolvedReference>,
 )
 
+/**
+ * Outcome of building a strategy from an export: the (not-yet-persisted) strategy plus its resolved
+ * per-strategy account mappings (already scoped to [CsvImportStrategy.id], which is stable across
+ * persistence). The caller persists the strategy first, then the mappings (which FK-reference it).
+ */
+data class CsvStrategyImportResult(
+    val strategy: CsvImportStrategy,
+    val accountMappings: List<AccountMapping>,
+)
+
 interface CsvStrategyImportExport {
     suspend fun toExport(
         strategy: CsvImportStrategy,
@@ -48,5 +59,5 @@ interface CsvStrategyImportExport {
     suspend fun createStrategyFromExport(
         export: CsvStrategyExport,
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
-    ): CsvImportStrategy
+    ): CsvStrategyImportResult
 }

@@ -29,6 +29,7 @@ fun DatabaseComponent.toApplication() =
                 csvStrategyExportService = csvStrategyExportService,
                 csvStrategyImportExport = DbCsvStrategyImportExport(csvStrategyExportService),
                 accountMappingExportService = accountMappingExportService,
+                strategyLibrary = strategyLibrary,
                 qifImportRepository = qifImportRepository,
                 importDirectoryRepository = importDirectoryRepository,
                 passThroughAccountRepository = passThroughAccountRepository,

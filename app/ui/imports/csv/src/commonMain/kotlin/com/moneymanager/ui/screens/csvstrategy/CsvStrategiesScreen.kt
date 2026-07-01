@@ -49,6 +49,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.isQifStrategy
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -57,7 +58,6 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
-import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
@@ -401,10 +401,3 @@ fun CsvStrategyCard(
         )
     }
 }
-
-/**
- * A QIF strategy is a CSV strategy whose identification columns are (a non-empty subset of) the fixed
- * QIF fields, so it is edited against a QIF file rather than a CSV one.
- */
-private fun CsvImportStrategy.isQifStrategy(): Boolean =
-    identificationColumns.isNotEmpty() && identificationColumns.all { it in QifCsvAdapter.headers }

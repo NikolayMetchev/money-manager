@@ -2,6 +2,7 @@
 
 package com.moneymanager.database.service
 
+import com.moneymanager.domain.CsvStrategyImportResult
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
@@ -9,6 +10,8 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.accountmapping.AccountMapping
+import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
@@ -40,6 +43,7 @@ import com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport
 import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.TemplateAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.TimezoneLookupExport
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -138,6 +142,7 @@ class CsvStrategyExportService(
     private val accountRepository: AccountReadRepository,
     private val currencyRepository: CurrencyReadRepository,
     private val categoryRepository: CategoryReadRepository,
+    private val accountMappingRepository: AccountMappingReadRepository,
     private val importEngine: ImportEngine,
 ) {
     // Entities created while importing a strategy are a manual user action on this device.
@@ -165,8 +170,27 @@ class CsvStrategyExportService(
             rowPreprocessingRules = strategy.rowPreprocessingRules,
             companionTransactionRules = strategy.companionTransactionRules,
             contentMatchRules = strategy.contentMatchRules,
+            accountMappings = exportPerStrategyMappings(strategy.id, referenceData.accountsById),
         )
     }
+
+    // This strategy's own per-strategy account mappings, by account name, so they travel with the
+    // strategy file. Global mappings (strategyId == null) are exported separately.
+    private suspend fun exportPerStrategyMappings(
+        strategyId: CsvImportStrategyId,
+        accountsById: Map<AccountId, Account>,
+    ): List<AccountMappingExport> =
+        accountMappingRepository
+            .getAllMappings()
+            .first()
+            .filter { it.strategyId == strategyId }
+            .map { mapping ->
+                AccountMappingExport(
+                    columnName = mapping.columnName,
+                    valuePattern = mapping.valuePattern.pattern,
+                    accountName = accountsById[mapping.accountId]?.name ?: "Unknown Account",
+                )
+            }
 
     /**
      * Parses an export and identifies any unresolved references.
@@ -179,6 +203,16 @@ class CsvStrategyExportService(
 
         for ((fieldType, mappingExport) in export.fieldMappings) {
             collectUnresolvedReferences(mappingExport, fieldType, referenceData, unresolvedReferences)
+        }
+
+        // Per-strategy account mappings reference accounts by name; surface any that don't resolve so
+        // the caller can create/map them alongside the field-mapping references.
+        for (mapping in export.accountMappings) {
+            if (referenceData.accountsByName[mapping.accountName] == null) {
+                unresolvedReferences.add(
+                    UnresolvedReference(type = ReferenceType.ACCOUNT, name = mapping.accountName, fieldType = null),
+                )
+            }
         }
 
         return ImportParseResult(
@@ -265,16 +299,17 @@ class CsvStrategyExportService(
         )
 
     /**
-     * Creates a CsvImportStrategy from an export with resolved references.
+     * Creates a CsvImportStrategy from an export with resolved references, together with its resolved
+     * per-strategy account mappings (scoped to the new strategy's id).
      *
      * @param export The export to convert
      * @param resolutions Map of unresolved references to their resolutions
-     * @return The created strategy (not yet saved to database)
+     * @return The (not-yet-saved) strategy and its resolved per-strategy account mappings
      */
     suspend fun createStrategyFromExport(
         export: CsvStrategyExport,
         resolutions: Map<UnresolvedReference, Resolution>,
-    ): CsvImportStrategy {
+    ): CsvStrategyImportResult {
         // First, create any new entities that were requested — in one engine batch (the sole writer).
         val accountIntents = mutableMapOf<String, ImportAccountIntent>()
         val categoryIntents = mutableMapOf<String, ImportCategoryIntent>()
@@ -371,21 +406,44 @@ class CsvStrategyExportService(
 
         val now = Instant.fromEpochMilliseconds(System.currentTimeMillis())
 
-        return CsvImportStrategy(
-            id = CsvImportStrategyId(Uuid.random()),
-            name = export.name,
-            identificationColumns = export.identificationColumns,
-            fieldMappings =
-                export.fieldMappings.mapValues { (_, mappingExport) ->
-                    mappingExport.toDomain(accountsByName, currenciesByCode, categoriesByName)
-                },
-            attributeMappings = export.attributeMappings,
-            rowPreprocessingRules = export.rowPreprocessingRules,
-            companionTransactionRules = export.companionTransactionRules,
-            contentMatchRules = export.contentMatchRules,
-            createdAt = now,
-            updatedAt = now,
-        )
+        val strategy =
+            CsvImportStrategy(
+                id = CsvImportStrategyId(Uuid.random()),
+                name = export.name,
+                identificationColumns = export.identificationColumns,
+                fieldMappings =
+                    export.fieldMappings.mapValues { (_, mappingExport) ->
+                        mappingExport.toDomain(accountsByName, currenciesByCode, categoriesByName)
+                    },
+                attributeMappings = export.attributeMappings,
+                rowPreprocessingRules = export.rowPreprocessingRules,
+                companionTransactionRules = export.companionTransactionRules,
+                contentMatchRules = export.contentMatchRules,
+                createdAt = now,
+                updatedAt = now,
+            )
+
+        // Resolve the embedded per-strategy mappings against the same account lookup (existing +
+        // created + MapToExisting). strategy.id is the id the engine will persist under, so scope to it.
+        // Fail loudly like the field-mapping path: silently dropping a mapping would import a strategy
+        // that's missing part of itself with no signal to the caller.
+        val accountMappings =
+            export.accountMappings.map { mappingExport ->
+                val account =
+                    accountsByName[mappingExport.accountName]
+                        ?: error("Account not found: ${mappingExport.accountName}")
+                AccountMapping(
+                    id = 0,
+                    strategyId = strategy.id,
+                    columnName = mappingExport.columnName,
+                    valuePattern = Regex(mappingExport.valuePattern, RegexOption.IGNORE_CASE),
+                    accountId = account.id,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            }
+
+        return CsvStrategyImportResult(strategy = strategy, accountMappings = accountMappings)
     }
 
     // A new entity is created under its (possibly renamed) resolution name, but the export's field

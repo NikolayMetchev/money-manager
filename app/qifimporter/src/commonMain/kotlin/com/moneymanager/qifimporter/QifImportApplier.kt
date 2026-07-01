@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.csvstrategy.isQifStrategy
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -64,10 +65,7 @@ data class QifBulkResult(
  * Strategies usable for QIF imports: those whose identification columns are a (non-empty) subset of
  * QIF's fixed columns. Excludes CSV strategies (Wise/Monzo) whose columns aren't QIF columns.
  */
-fun List<CsvImportStrategy>.qifCompatible(): List<CsvImportStrategy> {
-    val qifHeaders = QifCsvAdapter.headers.toSet()
-    return filter { it.identificationColumns.isNotEmpty() && it.identificationColumns.all { col -> col in qifHeaders } }
-}
+fun List<CsvImportStrategy>.qifCompatible(): List<CsvImportStrategy> = filter { it.isQifStrategy() }
 
 /** Number of leading rows sampled when content-matching a QIF file against a strategy. */
 private const val QIF_CONTENT_SAMPLE_SIZE = 50

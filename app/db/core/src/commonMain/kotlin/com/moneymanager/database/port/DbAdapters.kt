@@ -10,6 +10,7 @@ import com.moneymanager.domain.CsvImportParseResult
 import com.moneymanager.domain.CsvReferenceType
 import com.moneymanager.domain.CsvResolution
 import com.moneymanager.domain.CsvStrategyImportExport
+import com.moneymanager.domain.CsvStrategyImportResult
 import com.moneymanager.domain.CsvUnresolvedReference
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AppVersion
@@ -43,7 +44,7 @@ class DbCsvStrategyImportExport(
     override suspend fun createStrategyFromExport(
         export: CsvStrategyExport,
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
-    ): CsvImportStrategy = delegate.createStrategyFromExport(export, resolutions.toDb())
+    ): CsvStrategyImportResult = delegate.createStrategyFromExport(export, resolutions.toDb())
 }
 
 private fun ImportParseResult.toDomain() =

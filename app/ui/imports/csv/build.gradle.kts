@@ -14,7 +14,6 @@ kotlin {
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)
-                implementation(projects.app.qifimporter)
                 implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
