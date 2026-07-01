@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.PassThroughRule
@@ -147,6 +148,17 @@ private fun PassThroughAccountEditorDialog(
     var merchant by remember { mutableStateOf(firstRule?.merchantPattern ?: "(?i)^CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$") }
     var template by remember { mutableStateOf(firstRule?.merchantTemplate ?: "$1") }
 
+    // Validate the patterns here so an invalid regex is caught at save time rather than surfacing much
+    // later, buried inside the detector at import time.
+    val detectionError = regexError(detection)
+    val merchantError = regexError(merchant)
+    val canSave =
+        name.isNotBlank() &&
+            conduit.isNotBlank() &&
+            detection.isNotBlank() &&
+            detectionError == null &&
+            merchantError == null
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "Add pass-through account" else "Edit pass-through account") },
@@ -154,15 +166,45 @@ private fun PassThroughAccountEditorDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
                 OutlinedTextField(conduit, { conduit = it }, label = { Text("Conduit account name") }, singleLine = true)
-                OutlinedTextField(detection, { detection = it }, label = { Text("Detection regex") }, singleLine = true)
-                OutlinedTextField(merchant, { merchant = it }, label = { Text("Merchant regex") }, singleLine = true)
+                OutlinedTextField(
+                    detection,
+                    { detection = it },
+                    label = { Text("Detection regex") },
+                    singleLine = true,
+                    isError = detectionError != null,
+                    supportingText = detectionError?.let { { Text(it) } },
+                )
+                OutlinedTextField(
+                    merchant,
+                    { merchant = it },
+                    label = { Text("Merchant regex") },
+                    singleLine = true,
+                    isError = merchantError != null,
+                    supportingText = merchantError?.let { { Text(it) } },
+                )
                 OutlinedTextField(template, { template = it }, label = { Text("Merchant template") }, singleLine = true)
+                if (initial != null && initial.rules.size > 1) {
+                    Text(
+                        "This account has ${initial.rules.size} rules; only the first is editable here. " +
+                            "The remaining ${initial.rules.size - 1} are preserved on save.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = name.isNotBlank() && conduit.isNotBlank() && detection.isNotBlank(),
+                enabled = canSave,
                 onClick = {
+                    val editedFirstRule =
+                        PassThroughRule(
+                            detectionPattern = detection.trim(),
+                            merchantPattern = merchant.trim(),
+                            merchantTemplate = template,
+                        )
+                    // Preserve any additional rules the editor doesn't expose so editing a multi-rule
+                    // account doesn't silently drop them.
+                    val remainingRules = initial?.rules?.drop(1).orEmpty()
                     onSave(
                         PassThroughAccount(
                             id = initial?.id ?: PassThroughAccountId(0),
@@ -170,16 +212,9 @@ private fun PassThroughAccountEditorDialog(
                             conduitAccountName = conduit.trim(),
                             relationshipTypeId =
                                 initial?.relationshipTypeId
-                                    ?: com.moneymanager.domain.model.WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID,
+                                    ?: WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID,
                             enabled = initial?.enabled ?: true,
-                            rules =
-                                listOf(
-                                    PassThroughRule(
-                                        detectionPattern = detection.trim(),
-                                        merchantPattern = merchant.trim(),
-                                        merchantTemplate = template,
-                                    ),
-                                ),
+                            rules = listOf(editedFirstRule) + remainingRules,
                         ),
                     )
                 },
@@ -188,3 +223,11 @@ private fun PassThroughAccountEditorDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+/** Returns a human-readable error if [pattern] is not a valid regex, or null when it compiles. */
+private fun regexError(pattern: String): String? =
+    if (pattern.isBlank()) {
+        null
+    } else {
+        runCatching { Regex(pattern) }.exceptionOrNull()?.let { "Invalid regex" }
+    }

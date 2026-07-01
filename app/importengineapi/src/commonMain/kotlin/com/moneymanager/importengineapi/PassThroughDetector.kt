@@ -26,13 +26,26 @@ class PassThroughDetector(
     private val enabled: List<PassThroughAccount> = accounts.filter { it.enabled && it.rules.isNotEmpty() }
 
     /**
+     * All patterns are compiled once, up front, into an immutable map. This keeps [detect] free of any
+     * shared mutable state so the same detector instance can be called safely from the API importer's
+     * parallel item-preparation coroutines. Invalid patterns map to null and are skipped at match time.
+     */
+    private val compiled: Map<String, Regex?> =
+        enabled
+            .asSequence()
+            .flatMap { it.rules.asSequence() }
+            .flatMap { sequenceOf(it.detectionPattern, it.merchantPattern) }
+            .distinct()
+            .associateWith { pattern -> runCatching { Regex(pattern, RegexOption.IGNORE_CASE) }.getOrNull() }
+
+    /**
      * Returns the first matching definition + cleaned merchant name for [description], or null when no
      * enabled definition's detection pattern matches. Patterns are matched case-insensitively.
      */
     fun detect(description: String): PassThroughMatch? {
         for (account in enabled) {
             for (rule in account.rules) {
-                val detection = compile(rule.detectionPattern) ?: continue
+                val detection = compiled[rule.detectionPattern] ?: continue
                 if (detection.containsMatchIn(description)) {
                     val merchant = extractMerchant(rule, description, detection)
                     if (merchant.isNotBlank()) {
@@ -49,7 +62,7 @@ class PassThroughDetector(
         description: String,
         detection: Regex,
     ): String {
-        val merchantRegex = compile(rule.merchantPattern)
+        val merchantRegex = compiled[rule.merchantPattern]
         val match = merchantRegex?.find(description)
         if (match != null) {
             return substituteTemplate(rule.merchantTemplate, match).trim()
@@ -57,13 +70,6 @@ class PassThroughDetector(
         // Fallback: strip the detection match (e.g. the "CRV*" prefix) and collapse whitespace.
         return detection.replaceFirst(description, "").trim().replace(MULTISPACE, " ")
     }
-
-    private fun compile(pattern: String): Regex? =
-        cache.getOrPut(pattern) {
-            runCatching { Regex(pattern, RegexOption.IGNORE_CASE) }.getOrNull()
-        }
-
-    private val cache = mutableMapOf<String, Regex?>()
 
     private companion object {
         val MULTISPACE = Regex("\\s+")

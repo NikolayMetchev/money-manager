@@ -357,6 +357,7 @@ class MoneyManagerDatabaseWrapper(
             "transfer_attribute",
             "relationship_type",
             "pass_through_account",
+            "pass_through_account_audit",
             "transfer_relationship",
             "account_attribute",
             "person_attribute",

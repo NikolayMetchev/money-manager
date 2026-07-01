@@ -25,6 +25,10 @@ import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.model.passthrough.PassThroughAccountId
+import com.moneymanager.domain.model.passthrough.PassThroughRule
+import com.moneymanager.importengineapi.PassThroughDetector
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -164,15 +168,13 @@ class CsvTransferMapperTest {
     fun `mapRow routes a Curve pass-through row through the conduit and cleans the merchant`() {
         val strategy = createStrategy()
         val curve =
-            com.moneymanager.domain.model.passthrough.PassThroughAccount(
-                id =
-                    com.moneymanager.domain.model.passthrough
-                        .PassThroughAccountId(1),
+            PassThroughAccount(
+                id = PassThroughAccountId(1),
                 name = "Curve",
                 conduitAccountName = "Curve",
                 rules =
                     listOf(
-                        com.moneymanager.domain.model.passthrough.PassThroughRule(
+                        PassThroughRule(
                             detectionPattern = "(?i)^CRV\\*",
                             merchantPattern = "(?i)^CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$",
                         ),
@@ -185,7 +187,7 @@ class CsvTransferMapperTest {
                 existingAccounts = emptyMap(),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
                 existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
-                passThroughDetector = com.moneymanager.importengineapi.PassThroughDetector(listOf(curve)),
+                passThroughDetector = PassThroughDetector(listOf(curve)),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Crv*Sainsburys", "-50.00", "Crv*Sainsburys"))

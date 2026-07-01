@@ -1777,8 +1777,14 @@ private suspend fun prepareValidTransactionItem(
     // A pass-through (conduit) charge such as Curve, detected from the description (e.g. "CRV*…"). Only
     // outgoing spends are routed: the transfer becomes the funding leg own -> conduit and the engine adds
     // the spend leg conduit -> merchant. Detection + the conduit/merchant names come from user-editable
-    // config; routing here also avoids creating a "CRV*…" junk counterparty account.
-    val passThroughMatch = if (!data.isIncoming) setup.passThroughDetector?.detect(data.description) else null
+    // config; routing here also avoids creating a "CRV*…" junk counterparty account. Declined items (no
+    // real movement) and zero-value items (handled as "Void") are never expanded into a spend leg.
+    val passThroughMatch =
+        if (!data.isIncoming && !item.isZeroAmount && item.declineReason.isNullOrBlank()) {
+            setup.passThroughDetector?.detect(data.description)
+        } else {
+            null
+        }
 
     val counterpartyKey =
         if (passThroughMatch != null) {
