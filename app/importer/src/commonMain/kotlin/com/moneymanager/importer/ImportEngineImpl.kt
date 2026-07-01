@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
@@ -37,6 +38,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.PersonWriteRepository
@@ -68,6 +70,7 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
 import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.QifImportMutation
 import com.moneymanager.importengineapi.RowOutcome
@@ -106,6 +109,7 @@ class ImportEngineImpl(
     private val apiSessionRepository: ApiSessionWriteRepository,
     private val settingsRepository: SettingsWriteRepository,
     private val importDirectoryRepository: ImportDirectoryWriteRepository,
+    private val passThroughAccountRepository: PassThroughAccountWriteRepository,
     private val editGate: EditGate = EditGate.AlwaysWritable,
 ) : ImportEngine {
     override suspend fun import(
@@ -349,6 +353,7 @@ class ImportEngineImpl(
         val resolvedTransfers =
             creates.map { transfer ->
                 val fee = transfer.fee
+                val passThrough = transfer.passThrough
                 transfer.copy(
                     rowKey = transfer.rowKey ?: ImportRowKey.Manual(manualRowIndex++),
                     fromAccount = resolveRef(requireNotNull(transfer.fromAccount), accountKeyToId),
@@ -357,6 +362,11 @@ class ImportEngineImpl(
                         fee?.copy(
                             source = resolveRef(fee.source, accountKeyToId),
                             target = resolveRef(fee.target, accountKeyToId),
+                        ),
+                    passThrough =
+                        passThrough?.copy(
+                            conduit = resolveRef(passThrough.conduit, accountKeyToId),
+                            merchantTarget = resolveRef(passThrough.merchantTarget, accountKeyToId),
                         ),
                 )
             }
@@ -897,39 +907,70 @@ class ImportEngineImpl(
             val mainTempId = TransferId(-(++tempCounter).toLong())
             val fee = t.fee
             val feeTempId = if (fee != null) TransferId(-(++tempCounter).toLong()) else null
+            val passThrough = t.passThrough
+            val spendTempId = if (passThrough != null) TransferId(-(++tempCounter).toLong()) else null
             val relationships =
-                if (fee != null && feeTempId != null) {
-                    t.relationships + NewRelationship(relatedTransferId = feeTempId, typeId = fee.relationshipTypeId)
-                } else {
-                    t.relationships
+                buildList {
+                    addAll(t.relationships)
+                    if (fee != null && feeTempId != null) {
+                        add(NewRelationship(relatedTransferId = feeTempId, typeId = fee.relationshipTypeId))
+                    }
+                    if (passThrough != null && spendTempId != null) {
+                        add(NewRelationship(relatedTransferId = spendTempId, typeId = passThrough.relationshipTypeId))
+                    }
                 }
             val rowKey = requireNotNull(t.rowKey)
-            mainResultIndices += transfersToCreate.size
-            transfersToCreate +=
-                Transfer(
-                    id = mainTempId,
-                    timestamp = requireNotNull(t.timestamp),
-                    description = t.description,
-                    sourceAccountId = requireId(t.fromAccount),
-                    targetAccountId = requireId(t.toAccount),
-                    amount = requireNotNull(t.amount),
-                )
-            if (t.attributes.isNotEmpty()) newAttributes[mainTempId] = t.attributes
-            if (relationships.isNotEmpty()) newRelationships[mainTempId] = relationships
-            orderedSources += t.source.forRow(rowKey)
-            if (fee != null && feeTempId != null) {
+
+            // Appends one leg created in this chunk, sharing the main transfer's timestamp and provenance
+            // (resolved against the leg's own row key when given, so a fee/spend leg's audit can point at
+            // its own source node). Used for the main transfer and its expanded fee / pass-through spend
+            // legs so the construction lives in one place.
+            fun addLeg(
+                tempId: TransferId,
+                description: String,
+                source: AccountRef,
+                target: AccountRef,
+                amount: Money,
+                legRowKey: ImportRowKey?,
+            ) {
                 transfersToCreate +=
                     Transfer(
-                        id = feeTempId,
+                        id = tempId,
                         timestamp = requireNotNull(t.timestamp),
-                        description = fee.description,
-                        sourceAccountId = requireId(fee.source),
-                        targetAccountId = requireId(fee.target),
-                        amount = fee.amount,
+                        description = description,
+                        sourceAccountId = requireId(source),
+                        targetAccountId = requireId(target),
+                        amount = amount,
                     )
-                // The fee inherits the main transfer's provenance source, resolved against its own row
-                // key when provided (so the audit trail points at the fee's source node), else the main's.
-                orderedSources += t.source.forRow(fee.rowKey ?: rowKey)
+                orderedSources += t.source.forRow(legRowKey ?: rowKey)
+            }
+            mainResultIndices += transfersToCreate.size
+            addLeg(
+                mainTempId,
+                t.description,
+                requireNotNull(t.fromAccount),
+                requireNotNull(t.toAccount),
+                requireNotNull(t.amount),
+                rowKey,
+            )
+            if (t.attributes.isNotEmpty()) newAttributes[mainTempId] = t.attributes
+            if (relationships.isNotEmpty()) newRelationships[mainTempId] = relationships
+            // The fee is a real movement out of the main transfer's account; counts in balances.
+            if (fee != null && feeTempId != null) {
+                addLeg(feeTempId, fee.description, fee.source, fee.target, fee.amount, fee.rowKey)
+            }
+            // The pass-through spend leg (conduit -> merchant), same amount as the funding leg (the main
+            // transfer, card -> conduit), linked via the pass-through relationship so the conduit nets to
+            // zero and the spend is counted once.
+            if (passThrough != null && spendTempId != null) {
+                addLeg(
+                    spendTempId,
+                    passThrough.spendDescription,
+                    passThrough.conduit,
+                    passThrough.merchantTarget,
+                    passThrough.amount,
+                    passThrough.rowKey,
+                )
             }
         }
         return CreatePayload(transfersToCreate, newAttributes, newRelationships, orderedSources, mainResultIndices)
@@ -1019,6 +1060,13 @@ class ImportEngineImpl(
     }
 
     private suspend fun applyConfigMutations(batch: ImportBatch): ConfigOutcome {
+        for (m in batch.passThroughMutations) {
+            when (m) {
+                is PassThroughMutation.Create -> passThroughAccountRepository.create(m.account)
+                is PassThroughMutation.Update -> passThroughAccountRepository.update(m.account)
+                is PassThroughMutation.Delete -> passThroughAccountRepository.delete(m.id)
+            }
+        }
         val csvStrategyIds = mutableMapOf<String, CsvImportStrategyId>()
         for (m in batch.csvStrategyMutations) {
             when (m) {

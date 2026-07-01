@@ -115,12 +115,13 @@ class ManualEntriesE2ETest {
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
 
-            // Navigate to the Manual Entries tab on the Imports screen
+            // Navigate to the "Misc" tab; Manual Entries is its default sub-tab, so its content shows
+            // immediately (no need to click the sub-tab, whose label would also match the screen header).
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
-            waitUntilAtLeastOneExists(hasText("Manual Entries"), timeoutMillis = 15000)
-            onNodeWithText("Manual Entries").performClick()
+            waitUntilAtLeastOneExists(hasText("Misc"), timeoutMillis = 15000)
+            onNodeWithText("Misc", useUnmergedTree = true).performClick()
             waitForIdle()
 
             // The assets fee is listed under the seeded Wise companion rule

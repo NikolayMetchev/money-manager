@@ -28,6 +28,8 @@ import com.moneymanager.database.repository.DeviceReadRepositoryImpl
 import com.moneymanager.database.repository.DeviceWriteRepositoryImpl
 import com.moneymanager.database.repository.ImportDirectoryReadRepositoryImpl
 import com.moneymanager.database.repository.ImportDirectoryWriteRepositoryImpl
+import com.moneymanager.database.repository.PassThroughAccountReadRepositoryImpl
+import com.moneymanager.database.repository.PassThroughAccountWriteRepositoryImpl
 import com.moneymanager.database.repository.PersonAccountOwnershipReadRepositoryImpl
 import com.moneymanager.database.repository.PersonAccountOwnershipWriteRepositoryImpl
 import com.moneymanager.database.repository.PersonAttributeReadRepositoryImpl
@@ -76,6 +78,8 @@ import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.DeviceWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.PassThroughAccountReadRepository
+import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
@@ -184,6 +188,18 @@ interface RepositoryModule {
         deviceId: DeviceId,
         reader: CategoryReadRepository,
     ): CategoryWriteRepository = CategoryWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun providePassThroughAccountReadRepository(database: MoneyManagerDatabaseWrapper): PassThroughAccountReadRepository =
+        PassThroughAccountReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun providePassThroughAccountWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: PassThroughAccountReadRepository,
+    ): PassThroughAccountWriteRepository = PassThroughAccountWriteRepositoryImpl(database, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -417,6 +433,7 @@ interface RepositoryModule {
         apiSessionRepository: ApiSessionWriteRepository,
         settingsRepository: SettingsWriteRepository,
         importDirectoryRepository: ImportDirectoryWriteRepository,
+        passThroughAccountRepository: PassThroughAccountWriteRepository,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,
@@ -437,5 +454,6 @@ interface RepositoryModule {
             apiSessionRepository = apiSessionRepository,
             settingsRepository = settingsRepository,
             importDirectoryRepository = importDirectoryRepository,
+            passThroughAccountRepository = passThroughAccountRepository,
         )
 }

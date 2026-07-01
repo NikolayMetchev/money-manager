@@ -19,4 +19,11 @@ data class AccountRow(
     val feeTransferId: TransferId? = null,
     /** When this row IS a fee transfer, the id of the main transaction it belongs to. */
     val feeParentTransferId: TransferId? = null,
+    /**
+     * When this row is the funding leg of a pass-through (conduit) charge (card → conduit), the id of its
+     * linked spend leg (conduit → merchant). See [com.moneymanager.domain.model.passthrough.PassThroughAccount].
+     */
+    val passThroughSpendId: TransferId? = null,
+    /** When this row IS the spend leg of a pass-through charge, the id of its funding leg. */
+    val passThroughFundingId: TransferId? = null,
 )

@@ -40,6 +40,7 @@ import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
@@ -62,6 +63,7 @@ fun CsvImportDetailScreen(
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
+    passThroughAccountRepository: PassThroughAccountReadRepository,
     maintenance: Maintenance,
     transferSourceRepository: TransferSourceReadRepository,
     importEngine: ImportEngine,
@@ -402,6 +404,7 @@ fun CsvImportDetailScreen(
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             personRepository = personRepository,
+            passThroughAccountRepository = passThroughAccountRepository,
             maintenance = maintenance,
             importEngine = importEngine,
             onDismiss = { showApplyStrategyDialog = false },

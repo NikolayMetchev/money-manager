@@ -18,6 +18,7 @@ import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.DeviceWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.PersonWriteRepository
@@ -60,6 +61,7 @@ interface DatabaseComponent {
     val maintenanceService: DatabaseMaintenanceService
     val personAccountOwnershipRepository: PersonAccountOwnershipWriteRepository
     val personAttributeRepository: PersonAttributeWriteRepository
+    val passThroughAccountRepository: PassThroughAccountWriteRepository
     val personRepository: PersonWriteRepository
     val qifImportRepository: QifImportWriteRepository
     val relationshipTypeRepository: RelationshipTypeWriteRepository

@@ -30,5 +30,6 @@ fun DatabaseComponent.createImportEngine(editGate: EditGate): ImportEngine =
         apiSessionRepository = apiSessionRepository,
         settingsRepository = settingsRepository,
         importDirectoryRepository = importDirectoryRepository,
+        passThroughAccountRepository = passThroughAccountRepository,
         editGate = editGate,
     )

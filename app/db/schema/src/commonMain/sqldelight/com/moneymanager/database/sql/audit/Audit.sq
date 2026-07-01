@@ -227,3 +227,29 @@ CREATE INDEX IF NOT EXISTS idx_import_directory_audit_directory_id ON import_dir
 CREATE INDEX IF NOT EXISTS idx_import_directory_audit_timestamp ON import_directory_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_import_directory_audit_type ON import_directory_audit(audit_type_id);
 CREATE INDEX IF NOT EXISTS idx_import_directory_audit_directory_id_timestamp ON import_directory_audit(import_directory_id, audit_timestamp DESC);
+
+-- pass_through_account_audit: Audit trail for pass_through_account table (full row snapshot per change,
+-- written by custom triggers because pass_through_account is excluded from the generic audit mechanism).
+-- User-editable config (like csv_import_strategy / import_directory) must be audited so create/update/delete
+-- register in dataChangeToken() and therefore sync. Unlike those, pass_through_account carries no
+-- provenance/source (it is user-configured lookup data, not imported), so there is no companion _source
+-- table and the audit rows are only ever counted (dataChangeToken() sums COUNT(*) across *_audit tables);
+-- the id PK is therefore never selected. See TriggerFlagTables.sq for the same noinspection rationale.
+-- noinspection UnusedColumn
+CREATE TABLE pass_through_account_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    pass_through_account_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    conduit_account_name TEXT NOT NULL,
+    relationship_type_id INTEGER NOT NULL,
+    enabled INTEGER NOT NULL,
+    rules_json TEXT NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pass_through_account_audit_account_id ON pass_through_account_audit(pass_through_account_id);
+CREATE INDEX IF NOT EXISTS idx_pass_through_account_audit_timestamp ON pass_through_account_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_pass_through_account_audit_type ON pass_through_account_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_pass_through_account_audit_account_id_timestamp ON pass_through_account_audit(pass_through_account_id, audit_timestamp DESC);

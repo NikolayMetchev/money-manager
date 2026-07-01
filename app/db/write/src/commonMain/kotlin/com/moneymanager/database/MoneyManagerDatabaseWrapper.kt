@@ -38,6 +38,7 @@ class MoneyManagerDatabaseWrapper(
     val maintenanceWriteQueries get() = writeDb.maintenanceWriteQueries
     val personAttributeWriteQueries get() = writeDb.personAttributeWriteQueries
     val personWriteQueries get() = writeDb.personWriteQueries
+    val passThroughAccountWriteQueries get() = writeDb.passThroughAccountWriteQueries
     val qifImportWriteQueries get() = writeDb.qifImportWriteQueries
     val relationshipTypeWriteQueries get() = writeDb.relationshipTypeWriteQueries
     val settingsWriteQueries get() = writeDb.settingsWriteQueries
@@ -355,6 +356,8 @@ class MoneyManagerDatabaseWrapper(
             "attribute_type",
             "transfer_attribute",
             "relationship_type",
+            "pass_through_account",
+            "pass_through_account_audit",
             "transfer_relationship",
             "account_attribute",
             "person_attribute",

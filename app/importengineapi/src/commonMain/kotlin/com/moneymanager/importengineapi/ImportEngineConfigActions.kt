@@ -19,6 +19,8 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
+import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.repository.ApiResponseTransactionInsert
@@ -30,6 +32,22 @@ import kotlin.time.Instant
  * repository, keeping the engine the sole writer. Each create reads its generated id back from the
  * result map under a per-call read-back key derived from the input.
  */
+
+// region Pass-through accounts
+
+suspend fun ImportEngine.createPassThroughAccount(account: PassThroughAccount) {
+    import(ImportBatch(passThroughMutations = listOf(PassThroughMutation.Create(account))))
+}
+
+suspend fun ImportEngine.updatePassThroughAccount(account: PassThroughAccount) {
+    import(ImportBatch(passThroughMutations = listOf(PassThroughMutation.Update(account))))
+}
+
+suspend fun ImportEngine.deletePassThroughAccount(id: PassThroughAccountId) {
+    import(ImportBatch(passThroughMutations = listOf(PassThroughMutation.Delete(id))))
+}
+
+// endregion
 
 // region CSV strategies
 

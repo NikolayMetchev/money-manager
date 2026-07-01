@@ -1,0 +1,17 @@
+-- Insert a new pass-through account definition; returns the generated id.
+insert:
+INSERT INTO pass_through_account (name, conduit_account_name, relationship_type_id, enabled, rules_json)
+VALUES (?, ?, ?, ?, ?);
+
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+-- Update an existing definition.
+update:
+UPDATE pass_through_account
+SET name = ?, conduit_account_name = ?, relationship_type_id = ?, enabled = ?, rules_json = ?
+WHERE id = ?;
+
+-- Delete a definition by id.
+deleteById:
+DELETE FROM pass_through_account WHERE id = ?;

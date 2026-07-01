@@ -29,6 +29,8 @@ object AccountRowMapper {
         isReconciled: Long,
         feeTransferId: Long?,
         feeParentTransferId: Long?,
+        passThroughSpendId: Long?,
+        passThroughFundingId: Long?,
     ): AccountRow =
         AccountRow(
             transactionId = TransferId(id),
@@ -61,5 +63,7 @@ object AccountRowMapper {
             isReconciled = isReconciled != 0L,
             feeTransferId = feeTransferId?.let { TransferId(it) },
             feeParentTransferId = feeParentTransferId?.let { TransferId(it) },
+            passThroughSpendId = passThroughSpendId?.let { TransferId(it) },
+            passThroughFundingId = passThroughFundingId?.let { TransferId(it) },
         )
 }

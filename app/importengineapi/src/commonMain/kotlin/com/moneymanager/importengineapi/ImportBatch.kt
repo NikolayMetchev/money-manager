@@ -274,6 +274,33 @@ data class ImportFee(
 )
 
 /**
+ * A charge routed through a conduit account (e.g. Curve), modelled as two linked movements of the same
+ * amount: a funding leg (the transfer's own `fromAccount` → [conduit]) and a spend leg
+ * ([conduit] → [merchantTarget]), linked via a [relationshipTypeId] (`pass-through`) relationship. The
+ * engine expands this into the second [Transfer] in the same batch — like [ImportFee], producers don't
+ * allocate ids. The conduit nets to zero, so the spend is counted once.
+ *
+ * This is fully generic: the engine never inspects the merchant text or knows the conduit's name —
+ * detection + extraction happen in the importers via [PassThroughDetector] and user-editable config.
+ *
+ * @property conduit The account money passes through (resolved by the producer to a real/created account).
+ * @property merchantTarget The real merchant the spend leg pays.
+ * @property amount The charge amount; identical on both legs.
+ * @property spendDescription Description for the spend leg (the cleaned merchant); the funding leg keeps
+ *   the main transfer's description.
+ * @property relationshipTypeId The `pass-through` relationship type linking funding (id1) to spend (id2).
+ * @property rowKey Provenance key for the spend leg; when null the engine falls back to the main row key.
+ */
+data class ImportPassThrough(
+    val conduit: AccountRef,
+    val merchantTarget: AccountRef,
+    val amount: Money,
+    val spendDescription: String,
+    val relationshipTypeId: RelationshipTypeId,
+    val rowKey: ImportRowKey? = null,
+)
+
+/**
  * A transfer to import. Account references may be [AccountRef.Existing] (resolved by the builder) or
  * [AccountRef.Local] (resolved by the engine from [ImportBatch.accountsToCreate]).
  *
@@ -302,6 +329,8 @@ data class ImportTransfer(
     val apiId: String? = null,
     val excludedFromBalances: Boolean = false,
     val fee: ImportFee? = null,
+    /** An optional conduit pass-through (e.g. Curve), expanded by the engine into a linked spend leg. */
+    val passThrough: ImportPassThrough? = null,
     /** [ImportOperation.CREATE] (default), or UPDATE/DELETE of [existingId]. */
     override val operation: ImportOperation = ImportOperation.CREATE,
     /** The transfer to UPDATE/DELETE (required for those operations). */
@@ -351,6 +380,7 @@ data class ImportBatch(
     val currencies: List<ImportCurrencyIntent> = emptyList(),
     val csvStrategyMutations: List<CsvStrategyMutation> = emptyList(),
     val apiStrategyMutations: List<ApiStrategyMutation> = emptyList(),
+    val passThroughMutations: List<PassThroughMutation> = emptyList(),
     val csvMappingMutations: List<CsvMappingMutation> = emptyList(),
     val csvImportMutations: List<CsvImportMutation> = emptyList(),
     val qifImportMutations: List<QifImportMutation> = emptyList(),

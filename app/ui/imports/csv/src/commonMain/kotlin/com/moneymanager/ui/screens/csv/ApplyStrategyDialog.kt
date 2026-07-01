@@ -69,8 +69,10 @@ import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvAccountMappingReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -94,6 +96,7 @@ fun ApplyStrategyDialog(
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
+    passThroughAccountRepository: PassThroughAccountReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
@@ -109,6 +112,10 @@ fun ApplyStrategyDialog(
     val currencies by currencyRepository
         .getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val passThroughAccounts by passThroughAccountRepository
+        .getEnabled()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) }
 
     var selectedStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var selectedSourceAccountId by remember { mutableStateOf<AccountId?>(null) }
@@ -174,6 +181,7 @@ fun ApplyStrategyDialog(
                             existingCurrenciesByCode = currenciesByCode,
                             accountMappings = accountMappings,
                             sourceAccountOverride = selectedSourceAccountId,
+                            passThroughDetector = passThroughDetector,
                         )
                     val preparation = mapper.prepareImport(rowsToProcess)
                     baseImportPreparation = preparation
@@ -234,6 +242,7 @@ fun ApplyStrategyDialog(
                             existingCurrenciesByCode = currenciesByCode,
                             accountMappings = accountMappings + previewMappings,
                             sourceAccountOverride = selectedSourceAccountId,
+                            passThroughDetector = passThroughDetector,
                         )
                     importPreparation = mapper.prepareImport(rowsToProcess)
                     errorMessage = null
@@ -361,6 +370,7 @@ fun ApplyStrategyDialog(
                                     accountRepository = accountRepository,
                                     maintenance = maintenance,
                                     importEngine = importEngine,
+                                    passThroughAccounts = passThroughAccounts,
                                 )
                             onImportComplete(result)
                         } catch (expected: Exception) {

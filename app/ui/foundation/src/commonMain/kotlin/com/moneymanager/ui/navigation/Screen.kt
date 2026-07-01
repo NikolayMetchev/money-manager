@@ -14,7 +14,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.qif.QifImportId
 
-enum class ImportTab { DIRECTORIES, CSV, QIF, API, MANUAL }
+enum class ImportTab { DIRECTORIES, CSV, QIF, API, MISC }
 
 sealed class Screen(
     val title: String,

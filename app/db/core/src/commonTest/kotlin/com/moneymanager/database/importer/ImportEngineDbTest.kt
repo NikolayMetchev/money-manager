@@ -7,7 +7,9 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountMergeRequest
 import com.moneymanager.importengineapi.AccountRef
@@ -17,6 +19,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
+import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
@@ -59,6 +62,7 @@ class ImportEngineDbTest : DbTest() {
             apiSessionRepository = repositories.apiSessionRepository,
             settingsRepository = repositories.settingsRepository,
             importDirectoryRepository = repositories.importDirectoryRepository,
+            passThroughAccountRepository = repositories.passThroughAccountRepository,
         )
 
     private suspend fun gbp(): Currency =
@@ -451,6 +455,99 @@ class ImportEngineDbTest : DbTest() {
                     .first()
             engine().import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
             assertTrue(repositories.accountRepository.getAccountById(dropId).first() != null)
+        }
+
+    @Test
+    fun passThrough_expandsIntoTwoLinkedLegs_conduitNetsToZero() =
+        runTest {
+            val cardId = createSourceAccount()
+            val currency = gbp()
+            val source = Source.SampleGenerator
+            val curve = LocalAccountKey("curve")
+            val merchant = LocalAccountKey("merchant")
+            val amount = Money(1010, currency)
+
+            val result =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(
+                                // The funding leg: card -> Curve. The engine synthesises the spend leg
+                                // (Curve -> merchant) from [passThrough] and links the two.
+                                ImportTransfer(
+                                    rowKey = ImportRowKey.CsvRow(0),
+                                    fromAccount = AccountRef.Existing(cardId),
+                                    toAccount = AccountRef.Local(curve),
+                                    source = source,
+                                    timestamp = baseTime,
+                                    description = "Curve",
+                                    amount = amount,
+                                    passThrough =
+                                        ImportPassThrough(
+                                            conduit = AccountRef.Local(curve),
+                                            merchantTarget = AccountRef.Local(merchant),
+                                            amount = amount,
+                                            spendDescription = "National Lottery",
+                                            relationshipTypeId =
+                                                RelationshipTypeId(WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID),
+                                        ),
+                                ),
+                            ),
+                        dedupePolicy = DedupePolicy.FuzzyAllFields(),
+                        accountsToCreate =
+                            listOf(
+                                ImportAccountIntent(
+                                    key = curve,
+                                    match = AccountMatchKey.ByName("Curve"),
+                                    name = "Curve",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                                ImportAccountIntent(
+                                    key = merchant,
+                                    match = AccountMatchKey.ByName("National Lottery"),
+                                    name = "National Lottery",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                            ),
+                    ),
+                )
+
+            // Only the funding leg counts as an imported transfer (the spend leg is interleaved like a fee).
+            assertEquals(2, result.accountsCreated)
+            assertEquals(1, result.transfersImported)
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val curveId = accounts.first { it.name == "Curve" }.id
+            val merchantId = accounts.first { it.name == "National Lottery" }.id
+
+            // The conduit nets to zero: one leg in (card -> Curve), one out (Curve -> merchant).
+            val curveRows = repositories.transactionRepository.getTransactionsByAccount(curveId).first()
+            assertEquals(2, curveRows.size)
+            val curveNet =
+                curveRows.sumOf { t ->
+                    when (curveId) {
+                        t.targetAccountId -> t.amount.amount
+                        t.sourceAccountId -> -t.amount.amount
+                        else -> 0L
+                    }
+                }
+            assertEquals(0L, curveNet)
+
+            // The merchant receives the spend exactly once.
+            val merchantRows = repositories.transactionRepository.getTransactionsByAccount(merchantId).first()
+            assertEquals(1, merchantRows.size)
+
+            // The funding leg (id1) links to the spend leg (id2) via the pass-through relationship.
+            val fundingId = result.createdTransferIds.getValue(ImportRowKey.CsvRow(0))
+            val relationship =
+                repositories.transferRelationshipRepository
+                    .getByTransfer(fundingId)
+                    .first()
+                    .single()
+            assertEquals(fundingId, relationship.id1)
+            assertEquals("pass-through", relationship.relationshipType.name)
         }
 
     @Test

@@ -40,6 +40,22 @@ INSERT INTO attribute_type (id, name) VALUES (-7, 'counterparty-name-key');
 
 INSERT INTO relationship_type (id, name) VALUES (1, 'reconciled');
 INSERT INTO relationship_type (id, name) VALUES (2, 'fee');
+INSERT INTO relationship_type (id, name) VALUES (3, 'pass-through');
+
+-- Built-in "Curve" pass-through (conduit) definition — the only Curve-specific data in the codebase.
+-- A wrapper card whose charges are forwarded to an underlying funding card (Crypto.com, Monzo); the
+-- underlying statement carries the real merchant behind a "CRV*" marker on the description. The single
+-- rule covers both Crypto.com ("Crv*Sainsburys") and Monzo ("CRV*NATIONAL LOTTERY   London   GBR"):
+-- detection (?i)^CRV\* , merchant (?i)^CRV\*\s*(.+?)(?:\s{2,}.*)?$ -> $1 . pass_through_account is in
+-- EXCLUDED_FROM_AUDIT (config table, no triggers). FK relationship_type_id -> the type seeded above.
+-- Seeded DISABLED (enabled = 0): the definition is visible/editable under Imports -> Misc -> Pass-through,
+-- but does not change any import's behaviour until the user turns it on. This keeps imports unchanged by
+-- default (a pass-through is a per-user card setup) and avoids rerouting unrelated "CRV*" rows.
+INSERT INTO pass_through_account (id, name, conduit_account_name, relationship_type_id, enabled, rules_json)
+VALUES (
+    1, 'Curve', 'Curve', 3, 0,
+    '[{"detectionPattern":"(?i)^CRV\\*","merchantPattern":"(?i)^CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$","merchantTemplate":"$1"}]'
+);
 
 -- GBP gets a fixed id (1) here so the build-time-generated QIF strategies can reference it as a
 -- constant. The remaining currencies are seeded at runtime from the platform list (Android exposes

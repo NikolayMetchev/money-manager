@@ -111,7 +111,11 @@ SELECT
     -- subqueries) so SQLDelight infers these as NULLABLE; there is at most one fee link per side, so the
     -- joins never multiply rows. FEE_RELATIONSHIP_TYPE_ID = 2.
     fee_as_main.id2 AS fee_transfer_id,
-    fee_as_child.id1 AS fee_parent_id
+    fee_as_child.id1 AS fee_parent_id,
+    -- Pass-through (conduit) link, e.g. Curve: the spend leg when this row is the funding leg (id1),
+    -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
+    pass_through_as_funding.id2 AS pass_through_spend_id,
+    pass_through_as_spend.id1 AS pass_through_funding_id
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id
@@ -119,6 +123,10 @@ LEFT JOIN transfer_relationship fee_as_main
     ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
 LEFT JOIN transfer_relationship fee_as_child
     ON fee_as_child.id2 = running_balance_materialized_view.id AND fee_as_child.relationship_type_id = 2
+LEFT JOIN transfer_relationship pass_through_as_funding
+    ON pass_through_as_funding.id1 = running_balance_materialized_view.id AND pass_through_as_funding.relationship_type_id = 3
+LEFT JOIN transfer_relationship pass_through_as_spend
+    ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
 WHERE running_balance_materialized_view.account_id = :accountId
   AND ((:lastTimestamp IS NULL AND :lastId IS NULL)
        OR running_balance_materialized_view.timestamp < :lastTimestamp
@@ -156,7 +164,11 @@ SELECT
     -- subqueries) so SQLDelight infers these as NULLABLE; there is at most one fee link per side, so the
     -- joins never multiply rows. FEE_RELATIONSHIP_TYPE_ID = 2.
     fee_as_main.id2 AS fee_transfer_id,
-    fee_as_child.id1 AS fee_parent_id
+    fee_as_child.id1 AS fee_parent_id,
+    -- Pass-through (conduit) link, e.g. Curve: the spend leg when this row is the funding leg (id1),
+    -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
+    pass_through_as_funding.id2 AS pass_through_spend_id,
+    pass_through_as_spend.id1 AS pass_through_funding_id
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id
@@ -164,6 +176,10 @@ LEFT JOIN transfer_relationship fee_as_main
     ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
 LEFT JOIN transfer_relationship fee_as_child
     ON fee_as_child.id2 = running_balance_materialized_view.id AND fee_as_child.relationship_type_id = 2
+LEFT JOIN transfer_relationship pass_through_as_funding
+    ON pass_through_as_funding.id1 = running_balance_materialized_view.id AND pass_through_as_funding.relationship_type_id = 3
+LEFT JOIN transfer_relationship pass_through_as_spend
+    ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
 WHERE running_balance_materialized_view.account_id = :accountId
   AND (running_balance_materialized_view.timestamp > :firstTimestamp
        OR (running_balance_materialized_view.timestamp = :firstTimestamp
@@ -208,7 +224,11 @@ SELECT
     -- subqueries) so SQLDelight infers these as NULLABLE; there is at most one fee link per side, so the
     -- joins never multiply rows. FEE_RELATIONSHIP_TYPE_ID = 2.
     fee_as_main.id2 AS fee_transfer_id,
-    fee_as_child.id1 AS fee_parent_id
+    fee_as_child.id1 AS fee_parent_id,
+    -- Pass-through (conduit) link, e.g. Curve: the spend leg when this row is the funding leg (id1),
+    -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
+    pass_through_as_funding.id2 AS pass_through_spend_id,
+    pass_through_as_spend.id1 AS pass_through_funding_id
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id
@@ -216,6 +236,10 @@ LEFT JOIN transfer_relationship fee_as_main
     ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
 LEFT JOIN transfer_relationship fee_as_child
     ON fee_as_child.id2 = running_balance_materialized_view.id AND fee_as_child.relationship_type_id = 2
+LEFT JOIN transfer_relationship pass_through_as_funding
+    ON pass_through_as_funding.id1 = running_balance_materialized_view.id AND pass_through_as_funding.relationship_type_id = 3
+LEFT JOIN transfer_relationship pass_through_as_spend
+    ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
 WHERE running_balance_materialized_view.account_id = :accountId
 ORDER BY running_balance_materialized_view.timestamp DESC, running_balance_materialized_view.id DESC
 LIMIT :limit OFFSET :offset;

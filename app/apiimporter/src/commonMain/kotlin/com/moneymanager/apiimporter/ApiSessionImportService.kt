@@ -34,6 +34,7 @@ import com.moneymanager.domain.model.apistrategy.PredicateOp
 import com.moneymanager.domain.model.apistrategy.RulePredicate
 import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiResponseTransactionInsert
@@ -49,12 +50,14 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportOwnershipIntent
+import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.insertApiResponseTransactions
@@ -637,6 +640,7 @@ suspend fun importApiSessionTransactions(
     strategy: ApiImportStrategy,
     importEngine: ImportEngine,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
+    passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (ApiSessionImportProgress) -> Unit = {},
 ): ApiSessionImportResult {
     val setup =
@@ -648,6 +652,7 @@ suspend fun importApiSessionTransactions(
             strategy = strategy,
             importEngine = importEngine,
             onProgress = onProgress,
+            passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
         )
     onProgress(ApiSessionImportProgress(detail = "Preparing import session...", progress = 0.05f))
     // Build the import model purely (no DB writes): allocate account/counterparty/people/ownership
@@ -763,6 +768,8 @@ private data class ImportSetup(
     val onProgress: (ApiSessionImportProgress) -> Unit,
     val apiSessionRepository: ApiSessionReadRepository,
     val importEngine: ImportEngine,
+    /** Detects pass-through (conduit) charges (e.g. Curve) from a transaction description; null disables it. */
+    val passThroughDetector: PassThroughDetector? = null,
 )
 
 private suspend fun setupImportSession(
@@ -773,6 +780,7 @@ private suspend fun setupImportSession(
     strategy: ApiImportStrategy,
     importEngine: ImportEngine,
     onProgress: (ApiSessionImportProgress) -> Unit,
+    passThroughDetector: PassThroughDetector? = null,
 ): ImportSetup {
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val responses = apiSessionRepository.getResponsesBySession(sessionId)
@@ -856,6 +864,7 @@ private suspend fun setupImportSession(
         onProgress = onProgress,
         apiSessionRepository = apiSessionRepository,
         importEngine = importEngine,
+        passThroughDetector = passThroughDetector,
     )
 }
 
@@ -1499,6 +1508,7 @@ private data class PreparedApiTransaction(
     val transactionApiId: String?,
     val uniqueKey: Map<String, String>?,
     val fee: ImportFee? = null,
+    val passThrough: ImportPassThrough? = null,
 )
 
 /** The prepared transfers plus the count of items that failed to parse/prepare (recorded as errors). */
@@ -1624,6 +1634,7 @@ private suspend fun runImportEngine(
                 apiId = p.transactionApiId,
                 excludedFromBalances = !p.item.declineReason.isNullOrBlank(),
                 fee = p.fee,
+                passThrough = p.passThrough,
             )
         }
 
@@ -1762,8 +1773,23 @@ private suspend fun prepareValidTransactionItem(
             requestId = context.requestId,
             jsonPath = item.counterpartyJsonPath(setup.strategy.peopleMappings),
         )
+    val data = item.toTransferData(currency)
+    // A pass-through (conduit) charge such as Curve, detected from the description (e.g. "CRV*…"). Only
+    // outgoing spends are routed: the transfer becomes the funding leg own -> conduit and the engine adds
+    // the spend leg conduit -> merchant. Detection + the conduit/merchant names come from user-editable
+    // config; routing here also avoids creating a "CRV*…" junk counterparty account. Declined items (no
+    // real movement) and zero-value items (handled as "Void") are never expanded into a spend leg.
+    val passThroughMatch =
+        if (!data.isIncoming && !item.isZeroAmount && item.declineReason.isNullOrBlank()) {
+            setup.passThroughDetector?.detect(data.description)
+        } else {
+            null
+        }
+
     val counterpartyKey =
-        if (item.isZeroAmount) {
+        if (passThroughMatch != null) {
+            null
+        } else if (item.isZeroAmount) {
             setup.accountResolver.resolveNamedAccount(
                 "Void",
                 source = counterpartyApiSource.toSource(),
@@ -1783,7 +1809,7 @@ private suspend fun prepareValidTransactionItem(
                 source = counterpartyApiSource.toSource(),
             )
         }
-    val counterpartyRef = AccountRef.Local(counterpartyKey)
+    val counterpartyRef = counterpartyKey?.let { AccountRef.Local(it) }
     val transactionApiId = item.rawJson?.resolveJsonPath(setup.strategy.transactionMappings.idField)?.takeIf { it.isNotBlank() }
     val uniqueKey =
         if (setup.uniqueIdTxFields.isNotEmpty() && item.rawJson != null) {
@@ -1803,7 +1829,6 @@ private suspend fun prepareValidTransactionItem(
             null
         }
 
-    val data = item.toTransferData(currency)
     // When the provider's amount is GROSS (already includes the fee, e.g. Monzo's ATM withdrawal where
     // amount = withdrawal_amount + fee_amount), carve the fee out of the main transfer so main + fee sum
     // back to the original amount instead of double-charging the fee.
@@ -1817,14 +1842,42 @@ private suspend fun prepareValidTransactionItem(
             data.money
         }
 
+    val passThrough =
+        passThroughMatch?.let { match ->
+            val source = counterpartyApiSource.toSource()
+            val conduitRef = AccountRef.Local(setup.accountResolver.resolveNamedAccount(match.account.conduitAccountName, source))
+            val merchantRef = AccountRef.Local(setup.accountResolver.resolveNamedAccount(match.merchantName, source))
+            ConduitRouting(
+                conduit = conduitRef,
+                passThrough =
+                    ImportPassThrough(
+                        conduit = conduitRef,
+                        merchantTarget = merchantRef,
+                        amount = amount,
+                        spendDescription = match.merchantName,
+                        relationshipTypeId = RelationshipTypeId(match.account.relationshipTypeId),
+                    ),
+            )
+        }
+
     return PreparedApiTransaction(
         pageIndex = context.index,
         itemIndex = itemIndex,
         responseId = responseId,
         requestId = context.requestId,
         item = item,
-        source = if (data.isIncoming) counterpartyRef else ownAccountRef,
-        target = if (data.isIncoming) ownAccountRef else counterpartyRef,
+        // Pass-through: funding leg own -> conduit. Otherwise the normal own/counterparty pairing.
+        source =
+            if (passThrough != null) {
+                ownAccountRef
+            } else if (data.isIncoming) {
+                counterpartyRef!!
+            } else {
+                ownAccountRef
+            },
+        target =
+            passThrough?.conduit
+                ?: if (data.isIncoming) ownAccountRef else counterpartyRef!!,
         timestamp = item.created,
         description = data.description,
         amount = amount,
@@ -1837,8 +1890,15 @@ private suspend fun prepareValidTransactionItem(
         transactionApiId = transactionApiId,
         uniqueKey = uniqueKey,
         fee = fee,
+        passThrough = passThrough?.passThrough,
     )
 }
+
+/** Conduit routing for a pass-through API transaction: the funding-leg conduit target + the spend leg. */
+private data class ConduitRouting(
+    val conduit: AccountRef,
+    val passThrough: ImportPassThrough,
+)
 
 /**
  * Builds the [ImportFee] for a transaction that carries a fee: resolves the fee currency (falling back

@@ -20,6 +20,7 @@ object DatabaseConfig {
     const val EXCLUDED_ATTR_TYPE_ID: Long = WellKnownIds.EXCLUDED_ATTR_TYPE_ID
     const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID
     const val FEE_RELATIONSHIP_TYPE_ID: Long = WellKnownIds.FEE_RELATIONSHIP_TYPE_ID
+    const val PASS_THROUGH_RELATIONSHIP_TYPE_ID: Long = WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID
 
     /**
      * SQL statements to execute when opening a database connection.
