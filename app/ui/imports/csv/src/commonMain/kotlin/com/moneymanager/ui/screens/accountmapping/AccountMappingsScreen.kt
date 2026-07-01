@@ -68,7 +68,8 @@ fun AccountMappingsScreen(
     accountRepository: AccountReadRepository,
     accountMappingExportService: AccountMappingExportService,
     appVersion: AppVersion,
-    onBack: () -> Unit = {},
+    // Null when embedded (e.g. as the Imports → Misc sub-tab) so no dead back arrow is shown.
+    onBack: (() -> Unit)? = null,
 ) {
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
@@ -121,8 +122,10 @@ fun AccountMappingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    IconButton(onClick = onBack) {
-                        Text("<", style = MaterialTheme.typography.titleLarge)
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Text("<", style = MaterialTheme.typography.titleLarge)
+                        }
                     }
                     Text(text = "Account Mappings", style = MaterialTheme.typography.headlineMedium)
                 }

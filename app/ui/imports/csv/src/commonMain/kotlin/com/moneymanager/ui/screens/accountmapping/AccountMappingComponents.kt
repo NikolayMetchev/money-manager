@@ -256,6 +256,11 @@ internal fun AccountMappingEditorDialog(
                             } catch (expected: IllegalArgumentException) {
                                 errorMessage = "Invalid pattern: ${expected.message}"
                                 isSaving = false
+                            } catch (expected: Exception) {
+                                // Any engine/DB failure must also reset isSaving, else the dialog (whose
+                                // dismiss + onDismissRequest are gated on !isSaving) becomes unclosable.
+                                errorMessage = "Failed to save mapping: ${expected.message}"
+                                isSaving = false
                             }
                         }
                     }

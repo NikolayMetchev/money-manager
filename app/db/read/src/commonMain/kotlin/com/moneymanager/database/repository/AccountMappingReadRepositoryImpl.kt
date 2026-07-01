@@ -5,6 +5,7 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.database.sql.accountMapping.Account_mapping
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
@@ -37,7 +38,7 @@ class AccountMappingReadRepositoryImpl(
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }
 
-    private fun toDomain(entity: com.moneymanager.database.sql.accountMapping.Account_mapping): AccountMapping =
+    private fun toDomain(entity: Account_mapping): AccountMapping =
         AccountMapping(
             id = entity.id,
             strategyId = entity.strategy_id?.let { CsvImportStrategyId(Uuid.parse(it)) },

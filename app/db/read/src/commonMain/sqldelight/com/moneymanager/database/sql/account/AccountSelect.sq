@@ -14,4 +14,11 @@ selectPreviousAccountNames:
 SELECT aa.name AS name, aa.account_id AS account_id
 FROM account_audit aa
 JOIN account a ON a.id = aa.account_id
-WHERE aa.id IN (SELECT MAX(id) FROM account_audit GROUP BY name);
+WHERE aa.id IN (
+    -- Restrict to still-existing accounts BEFORE picking the most recent row per name, so a deleted
+    -- account that once shared a name can't win the MAX(id) and shadow a live account's older row.
+    SELECT MAX(aa2.id)
+    FROM account_audit aa2
+    JOIN account a2 ON a2.id = aa2.account_id
+    GROUP BY aa2.name
+);

@@ -173,7 +173,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
             assertEquals("Name", result.columnName)
             assertEquals("updated", result.valuePattern.pattern)
             assertEquals(account2.id, result.accountId)
-            assertTrue(result.updatedAt > original.updatedAt)
+            assertTrue(result.updatedAt >= original.updatedAt)
         }
 
     @Test

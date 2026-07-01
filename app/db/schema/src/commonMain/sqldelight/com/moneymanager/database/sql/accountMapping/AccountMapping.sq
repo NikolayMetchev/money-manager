@@ -16,3 +16,9 @@ CREATE TABLE account_mapping (
 
 CREATE INDEX idx_account_mapping_account ON account_mapping(account_id);
 CREATE INDEX idx_account_mapping_strategy ON account_mapping(strategy_id);
+
+-- The table UNIQUE treats NULL strategy_id as distinct, so it wouldn't stop duplicate global mappings.
+-- Enforce uniqueness of global (strategy_id IS NULL) mappings with a partial unique index.
+CREATE UNIQUE INDEX idx_account_mapping_global_unique
+    ON account_mapping(column_name, value_pattern)
+    WHERE strategy_id IS NULL;

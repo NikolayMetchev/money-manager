@@ -15,7 +15,7 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.createAccountMappings
 import kotlinx.coroutines.flow.first
-import kotlin.time.Instant
+import kotlin.time.Clock
 
 /**
  * Result of parsing an account-mappings export file, before resolution.
@@ -96,7 +96,7 @@ class AccountMappingExportService(
                         source = source,
                         match = AccountMatchKey.AlwaysCreate,
                         name = (resolution as Resolution.CreateNew).name,
-                        openingDate = Instant.fromEpochMilliseconds(System.currentTimeMillis()),
+                        openingDate = Clock.System.now(),
                     )
                 }
         if (accountIntents.isNotEmpty()) {
@@ -116,7 +116,7 @@ class AccountMappingExportService(
             }
         }
 
-        val now = Instant.fromEpochMilliseconds(System.currentTimeMillis())
+        val now = Clock.System.now()
         val mappings =
             export.mappings.mapNotNull { mappingExport ->
                 val account = accountsByName[mappingExport.accountName] ?: return@mapNotNull null

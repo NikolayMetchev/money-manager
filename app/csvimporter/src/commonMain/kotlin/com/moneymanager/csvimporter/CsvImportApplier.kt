@@ -259,7 +259,8 @@ private suspend fun persistMappingsWithFallback(
                     strategyId = mapping.strategyId,
                 )
             } catch (expectedMappingError: Exception) {
-                logger.warn(expectedMappingError) { "Failed to save mapping '${mapping.valuePattern.pattern}'" }
+                // Don't log the pattern itself — it's derived from bank-file payee/account values (PII).
+                logger.warn(expectedMappingError) { "Failed to save account mapping for column '${mapping.columnName}'" }
             }
         }
     }

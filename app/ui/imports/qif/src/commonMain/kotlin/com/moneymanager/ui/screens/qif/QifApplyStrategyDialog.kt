@@ -183,6 +183,7 @@ fun QifApplyStrategyDialog(
         currencies,
         accountMappings,
         selectedExistingAccounts,
+        historicalAccountNames,
     ) {
         val strategy = selectedStrategy?.withQifCurrency(selectedCurrencyId)
         if (strategy != null && currencies.isNotEmpty() && rows.isNotEmpty()) {
