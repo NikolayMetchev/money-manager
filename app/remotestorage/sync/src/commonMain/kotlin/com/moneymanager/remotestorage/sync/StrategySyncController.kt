@@ -95,7 +95,7 @@ class StrategySyncController(
     /** Disconnects the library from remote storage (keeps local strategies and baselines). */
     fun disconnect() {
         store.clearConnection()
-        _state.value = StrategyLibraryState(connected = false)
+        _state.value = StrategyLibraryState()
     }
 
     /** Marks the state busy so the UI can disable actions the instant one is triggered. */
@@ -113,7 +113,7 @@ class StrategySyncController(
         appVersion: AppVersion,
     ) {
         if (!isConnected()) {
-            _state.value = StrategyLibraryState(connected = false)
+            _state.value = StrategyLibraryState()
             return
         }
         val provider = resolveSignedIn()

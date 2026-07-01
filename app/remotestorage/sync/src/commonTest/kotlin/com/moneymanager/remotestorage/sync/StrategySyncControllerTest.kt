@@ -31,7 +31,12 @@ private class FakeStrategyLibrary(
         entries[key] = LocalStrategyEntry(key, json, json)
     }
 
-    override suspend fun listLocal(appVersion: AppVersion): List<LocalStrategyEntry> = entries.values.toList()
+    var lastListVersion: AppVersion? = null
+
+    override suspend fun listLocal(appVersion: AppVersion): List<LocalStrategyEntry> {
+        lastListVersion = appVersion
+        return entries.values.toList()
+    }
 
     override fun canonicalHash(
         key: StrategyKey,
@@ -97,6 +102,7 @@ class StrategySyncControllerTest {
             val summary = controller.syncNow(library, version)
             assertEquals(1, summary.uploaded)
             assertEquals(StrategyItemStatus.IN_SYNC, statusOf(controller, "Wise"))
+            assertEquals(version, library.lastListVersion)
             // Uploaded under the kind-suffixed filename.
             assertTrue(provider.list().any { it.name == StrategyFileNaming.fileName(StrategyKey(StrategyKind.CSV, "Wise")) })
         }
