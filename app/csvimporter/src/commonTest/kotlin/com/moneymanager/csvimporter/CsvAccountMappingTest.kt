@@ -142,13 +142,13 @@ class CsvAccountMappingTest {
             accountMappings = accountMappings,
         )
 
-    private fun payeeRow(payee: String) = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Transfer", "-50.00", payee))
+    private fun payeeRow() = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Transfer", "-50.00", "Foo"))
 
     @Test
     fun `global mapping applies under any strategy`() {
         val target = AccountId(30)
-        val mapper = mapperWith(listOf(createAccountMapping(1, "Payee", "^Foo$", target, strategyId = null)))
-        val result = mapper.mapRow(payeeRow("Foo"))
+        val mapper = mapperWith(listOf(createAccountMapping(1, "Payee", "^Foo$", target)))
+        val result = mapper.mapRow(payeeRow())
         assertIs<MappingResult.Success>(result)
         assertEquals(target, result.transfer.targetAccountId)
     }
@@ -158,7 +158,7 @@ class CsvAccountMappingTest {
         val target = AccountId(30)
         val otherStrategy = CsvImportStrategyId(Uuid.random())
         val mapper = mapperWith(listOf(createAccountMapping(1, "Payee", "^Foo$", target, strategyId = otherStrategy)))
-        val result = mapper.mapRow(payeeRow("Foo"))
+        val result = mapper.mapRow(payeeRow())
         assertIs<MappingResult.Success>(result)
         // Not matched: "Foo" is discovered as a new account instead of routing to the scoped target.
         assertEquals("Foo", result.newAccountName)
@@ -171,11 +171,11 @@ class CsvAccountMappingTest {
         val mapper =
             mapperWith(
                 listOf(
-                    createAccountMapping(1, "Payee", "^Foo$", globalTarget, strategyId = null),
+                    createAccountMapping(1, "Payee", "^Foo$", globalTarget),
                     createAccountMapping(2, "Payee", "^Foo$", strategyTarget, strategyId = strategyId),
                 ),
             )
-        val result = mapper.mapRow(payeeRow("Foo"))
+        val result = mapper.mapRow(payeeRow())
         assertIs<MappingResult.Success>(result)
         assertEquals(strategyTarget, result.transfer.targetAccountId)
     }

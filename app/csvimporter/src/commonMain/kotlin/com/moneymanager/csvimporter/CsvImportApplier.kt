@@ -237,29 +237,29 @@ fun buildCsvMapper(
 
 /**
  * Saves [mappings] in a single batch, falling back to per-mapping saves if the atomic batch fails so
- * one bad mapping doesn't block the rest. [kind] just labels log messages ("selected"/"auto-captured").
+ * one bad mapping doesn't block the rest.
  */
 private suspend fun persistMappingsWithFallback(
     importEngine: ImportEngine,
     mappings: List<AccountMapping>,
-    kind: String,
 ) {
     if (mappings.isEmpty()) return
     try {
         importEngine.createAccountMappings(mappings)
-        logger.info { "Saved ${mappings.size} $kind account mappings" }
+        logger.info { "Saved ${mappings.size} account mappings" }
     } catch (expected: Exception) {
         // Batch is atomic, nothing was committed — retry per mapping so one bad mapping doesn't block the rest
-        logger.warn(expected) { "Bulk $kind mapping save failed, falling back to per-mapping save" }
+        logger.warn(expected) { "Bulk mapping save failed, falling back to per-mapping save" }
         for (mapping in mappings) {
             try {
                 importEngine.createAccountMapping(
                     columnName = mapping.columnName,
                     valuePattern = mapping.valuePattern,
                     accountId = mapping.accountId,
+                    strategyId = mapping.strategyId,
                 )
             } catch (expectedMappingError: Exception) {
-                logger.warn(expectedMappingError) { "Failed to save $kind mapping '${mapping.valuePattern.pattern}'" }
+                logger.warn(expectedMappingError) { "Failed to save mapping '${mapping.valuePattern.pattern}'" }
             }
         }
     }
@@ -375,18 +375,17 @@ suspend fun runCsvImport(
             accountSelections = selectedExistingAccounts,
             accountsById = accountRepository.getAllAccounts().first().associateBy { it.id },
         )
-    persistMappingsWithFallback(importEngine, selectedMappingsToPersist, "selected")
+    persistMappingsWithFallback(importEngine, selectedMappingsToPersist)
 
     // Create new accounts first (skip failures - transfers using them will fail later).
     // Record CSV provenance pointing each account at the first row that referenced it.
     val firstRowByAccountName = buildFirstRowByAccountName(basePrep, selectedNewAccountNames)
-    val createdAccountNames =
-        createNewAccounts(
-            importEngine = importEngine,
-            accountsToCreate = accountsToCreate,
-            csvImportId = csvImport.id,
-            firstRowByAccountName = firstRowByAccountName,
-        )
+    createNewAccounts(
+        importEngine = importEngine,
+        accountsToCreate = accountsToCreate,
+        csvImportId = csvImport.id,
+        firstRowByAccountName = firstRowByAccountName,
+    )
 
     // No auto-capture of template/regex/exact mappings: the strategy re-derives the target account
     // name on every import, and a later rename is resolved via audit history (getPreviousAccountNames),
