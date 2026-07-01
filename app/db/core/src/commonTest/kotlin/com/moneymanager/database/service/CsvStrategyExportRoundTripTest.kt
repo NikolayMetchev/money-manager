@@ -30,6 +30,7 @@ class CsvStrategyExportRoundTripTest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     categoryRepository = repositories.categoryRepository,
+                    accountMappingRepository = repositories.accountMappingRepository,
                     importEngine = repositories.importEngine,
                 )
             val appVersion = AppVersion("1.0.0-test")
@@ -53,7 +54,7 @@ class CsvStrategyExportRoundTripTest : DbTest() {
                     "Strategy '${strategy.name}' has unresolved references after import: ${parsed.unresolvedReferences}",
                 )
 
-                val imported = service.createStrategyFromExport(decoded, resolutions = emptyMap())
+                val imported = service.createStrategyFromExport(decoded, resolutions = emptyMap()).strategy
                 val reExport = service.toExport(imported, appVersion)
                 assertEquals(
                     export,

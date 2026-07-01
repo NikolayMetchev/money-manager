@@ -44,6 +44,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
+import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
 import com.moneymanager.ui.background.BackgroundTaskPanel
@@ -99,6 +100,7 @@ fun MoneyManagerApp(
     onReloadFromRemote: () -> Unit = {},
     remoteController: RemoteDatabaseController? = null,
     database: MoneyManagerDatabaseWrapper? = null,
+    strategySyncController: StrategySyncController? = null,
     importFileSourceFactory: ImportFileSourceFactory? = null,
     driveFolderBrowser: DriveFolderBrowser? = null,
 ) {
@@ -395,6 +397,12 @@ fun MoneyManagerApp(
                                             },
                                             remoteController = remoteController,
                                             database = database,
+                                            strategySyncController = strategySyncController,
+                                            strategyLibrary = services.imports.strategyLibrary,
+                                            appVersion = appVersion,
+                                            accountRepository = services.accounts.accountRepository,
+                                            categoryRepository = services.accounts.categoryRepository,
+                                            personRepository = services.people.personRepository,
                                         )
                                     }
                                     is Screen.DatabaseSizeBreakdown -> {

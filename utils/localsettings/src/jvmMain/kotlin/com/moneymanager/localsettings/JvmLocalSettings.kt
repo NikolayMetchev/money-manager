@@ -22,6 +22,11 @@ class JvmLocalSettings : LocalSettings {
         value: String,
     ) {
         try {
+            // Preferences persists this node as prefs.xml, and XML 1.0 cannot represent control
+            // characters below 0x20 (other than tab/newline/CR). A single such character doesn't just
+            // lose this value — it makes the WHOLE node fail to flush, silently discarding every
+            // setting written this session. Refuse the write instead of poisoning the node.
+            if (value.any { it.code < ' '.code && it != '\t' && it != '\n' && it != '\r' }) return
             preferences.put(key, value)
         } catch (_: Exception) {
             // Persisting a preference is best-effort; never fail the operation over it.

@@ -51,8 +51,11 @@ import com.moneymanager.database.repository.TransferRelationshipWriteRepositoryI
 import com.moneymanager.database.repository.TransferSourceReadRepositoryImpl
 import com.moneymanager.database.repository.TransferSourceWriteRepositoryImpl
 import com.moneymanager.database.service.AccountMappingExportService
+import com.moneymanager.database.service.ApiStrategyExportService
 import com.moneymanager.database.service.CsvStrategyExportService
+import com.moneymanager.database.service.StrategyLibraryService
 import com.moneymanager.di.DatabaseScope
+import com.moneymanager.domain.StrategyLibrary
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
@@ -360,8 +363,10 @@ interface RepositoryModule {
         accountRepository: AccountReadRepository,
         currencyRepository: CurrencyReadRepository,
         categoryRepository: CategoryReadRepository,
+        accountMappingRepository: AccountMappingReadRepository,
         importEngine: ImportEngine,
-    ): CsvStrategyExportService = CsvStrategyExportService(accountRepository, currencyRepository, categoryRepository, importEngine)
+    ): CsvStrategyExportService =
+        CsvStrategyExportService(accountRepository, currencyRepository, categoryRepository, accountMappingRepository, importEngine)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -369,6 +374,31 @@ interface RepositoryModule {
         accountRepository: AccountReadRepository,
         importEngine: ImportEngine,
     ): AccountMappingExportService = AccountMappingExportService(accountRepository, importEngine)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideApiStrategyExportService(): ApiStrategyExportService = ApiStrategyExportService()
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideStrategyLibrary(
+        csvStrategyRepository: CsvImportStrategyReadRepository,
+        apiStrategyRepository: ApiImportStrategyReadRepository,
+        accountMappingRepository: AccountMappingReadRepository,
+        csvStrategyExportService: CsvStrategyExportService,
+        apiStrategyExportService: ApiStrategyExportService,
+        accountMappingExportService: AccountMappingExportService,
+        importEngine: ImportEngine,
+    ): StrategyLibrary =
+        StrategyLibraryService(
+            csvStrategyRepository,
+            apiStrategyRepository,
+            accountMappingRepository,
+            csvStrategyExportService,
+            apiStrategyExportService,
+            accountMappingExportService,
+            importEngine,
+        )
 
     @Provides
     @SingleIn(DatabaseScope::class)

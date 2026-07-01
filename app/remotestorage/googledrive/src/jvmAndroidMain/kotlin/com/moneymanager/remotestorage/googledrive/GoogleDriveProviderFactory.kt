@@ -16,7 +16,10 @@ private val tokenHttpClient by lazy { HttpClient(CIO) }
 private val driveClients = mutableMapOf<String, HttpClient>()
 
 /** Builds a [GoogleDriveProvider] over a platform [tokenSource] (Android's native auth path). */
-fun googleDriveProvider(tokenSource: GoogleAccessTokenSource): GoogleDriveProvider = GoogleDriveProvider(tokenSource)
+fun googleDriveProvider(
+    tokenSource: GoogleAccessTokenSource,
+    subfolder: String? = null,
+): GoogleDriveProvider = GoogleDriveProvider(tokenSource, subfolderName = subfolder)
 
 /**
  * A Drive REST [HttpClient] that attaches a bearer token from [loadToken] and, on a 401, re-fetches via
@@ -49,6 +52,7 @@ fun googleDriveProvider(
     config: String?,
     localSettings: LocalSettings,
     browser: BrowserLauncher,
+    subfolder: String? = null,
 ): GoogleDriveProvider {
     val credentials =
         GoogleDriveCredentials.fromConfig(
@@ -60,7 +64,10 @@ fun googleDriveProvider(
         synchronized(driveClients) {
             driveClients.getOrPut(credentials.clientId) { buildDriveClient(credentials, accountStore, oauth) }
         }
-    return GoogleDriveProvider(JvmGoogleAccessTokenSource(credentials, accountStore, browser, oauth, driveClient))
+    return GoogleDriveProvider(
+        JvmGoogleAccessTokenSource(credentials, accountStore, browser, oauth, driveClient),
+        subfolderName = subfolder,
+    )
 }
 
 /**

@@ -44,6 +44,9 @@ class GoogleDriveProvider(
     private val tokenSource: GoogleAccessTokenSource,
     override val id: String = GOOGLE_DRIVE_PROVIDER_ID,
     override val displayName: String = "Google Drive",
+    // When set, files live in this child folder under "[GOOGLE_DRIVE_FOLDER_NAME]" (e.g. "Strategies"),
+    // isolating a namespace (like the strategy library) from the top-level DB archives.
+    private val subfolderName: String? = null,
 ) : RemoteStorageProvider {
     private val httpClient: HttpClient = tokenSource.httpClient
     private var cachedFolderId: String? = null
@@ -133,10 +136,24 @@ class GoogleDriveProvider(
 
     override suspend fun accessTokenExpiresAtEpochMs(): Long? = tokenSource.accessTokenExpiresAtEpochMs()
 
-    /** Finds (or creates on first use) the app's "Money Manager" Drive folder and returns its id. */
+    /**
+     * Finds (or creates on first use) the folder files live in: the app's "Money Manager" folder, or,
+     * when [subfolderName] is set, that child folder under it. Returns its id (cached for the session).
+     */
     private suspend fun folderId(): String {
         cachedFolderId?.let { return it }
-        val driveQuery = "mimeType = '$FOLDER_MIME_TYPE' and name = '$GOOGLE_DRIVE_FOLDER_NAME' and trashed = false"
+        val base = findOrCreateFolder(GOOGLE_DRIVE_FOLDER_NAME, parentId = null)
+        val target = if (subfolderName == null) base else findOrCreateFolder(subfolderName, parentId = base)
+        cachedFolderId = target
+        return target
+    }
+
+    private suspend fun findOrCreateFolder(
+        name: String,
+        parentId: String?,
+    ): String {
+        val parentClause = if (parentId != null) " and '$parentId' in parents" else ""
+        val driveQuery = "mimeType = '$FOLDER_MIME_TYPE' and name = '$name' and trashed = false$parentClause"
         val body =
             httpClient
                 .get(FILES_ENDPOINT) {
@@ -146,19 +163,24 @@ class GoogleDriveProvider(
                         parameters.append("fields", "files(id)")
                     }
                 }.requireBody("find Drive folder")
-        val id =
-            json
-                .decodeFromString<DriveFileList>(body)
-                .files
-                .firstOrNull()
-                ?.id ?: createFolder()
-        cachedFolderId = id
-        return id
+        return json
+            .decodeFromString<DriveFileList>(body)
+            .files
+            .firstOrNull()
+            ?.id ?: createFolder(name, parentId)
     }
 
-    private suspend fun createFolder(): String {
+    private suspend fun createFolder(
+        name: String,
+        parentId: String?,
+    ): String {
         val metadata =
-            DriveFileMetadata(name = GOOGLE_DRIVE_FOLDER_NAME, mimeType = FOLDER_MIME_TYPE, appProperties = APP_PROPERTIES)
+            DriveFileMetadata(
+                name = name,
+                mimeType = FOLDER_MIME_TYPE,
+                parents = parentId?.let { listOf(it) },
+                appProperties = APP_PROPERTIES,
+            )
         val response =
             httpClient.post(FILES_ENDPOINT) {
                 url { parameters.append("fields", "id") }

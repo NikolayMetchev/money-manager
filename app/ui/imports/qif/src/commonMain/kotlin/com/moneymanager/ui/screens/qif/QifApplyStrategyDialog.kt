@@ -32,6 +32,7 @@ import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.csvstrategy.isQifStrategy
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.repository.AccountMappingReadRepository
@@ -115,14 +116,7 @@ fun QifApplyStrategyDialog(
 
     val rows = remember(records) { QifCsvAdapter.toRows(records) }
 
-    // A strategy is QIF-compatible when it only references QIF's fixed columns. Exact column-set
-    // equality is too brittle (a user may identify on a subset), so use a subset check; this also
-    // excludes CSV strategies (Wise/Monzo) whose columns aren't a subset of QIF's.
-    val qifStrategies =
-        remember(strategies) {
-            val qifHeaders = QifCsvAdapter.headers.toSet()
-            strategies.filter { it.identificationColumns.isNotEmpty() && it.identificationColumns.all { col -> col in qifHeaders } }
-        }
+    val qifStrategies = remember(strategies) { strategies.filter { it.isQifStrategy() } }
 
     val sourceAccountMapping = selectedStrategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
     val strategyHasPerRowSource = sourceAccountMapping != null && sourceAccountMapping !is HardCodedAccountMapping

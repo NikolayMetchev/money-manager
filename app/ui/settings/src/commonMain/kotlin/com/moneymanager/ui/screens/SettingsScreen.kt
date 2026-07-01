@@ -36,11 +36,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.StrategyLibrary
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.importengineapi.setDefaultCurrency
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
+import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.ui.DatabasePickerMode
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CurrencyPicker
@@ -160,6 +166,12 @@ fun SettingsScreen(
     onShowDbSizeBreakdown: () -> Unit = {},
     remoteController: RemoteDatabaseController? = null,
     database: MoneyManagerDatabaseWrapper? = null,
+    strategySyncController: StrategySyncController? = null,
+    strategyLibrary: StrategyLibrary? = null,
+    appVersion: AppVersion? = null,
+    accountRepository: AccountReadRepository? = null,
+    categoryRepository: CategoryReadRepository? = null,
+    personRepository: PersonReadRepository? = null,
 ) {
     val importEngine = LocalImportEngine.current
     var showWarningDialog by remember { mutableStateOf(false) }
@@ -234,6 +246,25 @@ fun SettingsScreen(
                 currentDatabaseLocation = currentDatabaseLocation,
                 onRequestSwitchDatabase = onRequestSwitchDatabase,
                 onReloadFromRemote = onReloadFromRemote,
+            )
+        }
+
+        // Strategy Library Section — independent of the database's own cloud binding.
+        if (strategySyncController != null &&
+            strategyLibrary != null &&
+            appVersion != null &&
+            accountRepository != null &&
+            categoryRepository != null &&
+            personRepository != null
+        ) {
+            StrategyCloudCard(
+                controller = strategySyncController,
+                library = strategyLibrary,
+                appVersion = appVersion,
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                currencyRepository = currencyRepository,
+                personRepository = personRepository,
             )
         }
 

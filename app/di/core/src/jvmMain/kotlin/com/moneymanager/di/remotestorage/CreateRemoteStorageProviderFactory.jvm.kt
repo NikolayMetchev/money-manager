@@ -32,10 +32,11 @@ actual fun createRemoteStorageProviderFactory(
         override fun create(
             providerId: String,
             config: String?,
+            subfolder: String?,
         ): RemoteStorageProvider =
             when (providerId) {
                 GOOGLE_DRIVE_PROVIDER_ID ->
-                    googleDriveProvider(config ?: googleDriveDefaultConfig(), localSettings, DesktopBrowserLauncher())
+                    googleDriveProvider(config ?: googleDriveDefaultConfig(), localSettings, DesktopBrowserLauncher(), subfolder)
                 else -> throw IllegalArgumentException("Unknown remote storage provider: $providerId")
             }
     }

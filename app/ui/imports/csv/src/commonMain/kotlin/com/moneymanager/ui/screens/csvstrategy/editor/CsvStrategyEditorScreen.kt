@@ -333,6 +333,10 @@ fun CsvStrategyEditorScreen(
             accounts = accounts,
             strategyId = strategyId,
             onDismiss = { editingAccountMapping = null },
+            csvColumns = csvColumns,
+            sampleRows = rows,
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
         )
     }
 
@@ -342,6 +346,10 @@ fun CsvStrategyEditorScreen(
             accounts = accounts,
             strategyId = strategyId,
             onDismiss = { showAddAccountMappingDialog = false },
+            csvColumns = csvColumns,
+            sampleRows = rows,
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
         )
     }
 }

@@ -1,5 +1,6 @@
 package com.moneymanager.domain.model.csvstrategy.export
 
+import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
@@ -22,6 +23,8 @@ import kotlinx.serialization.Serializable
  * @property attributeMappings Attribute column mappings (already portable, no IDs)
  * @property rowPreprocessingRules Row preprocessing rules (already portable, no IDs)
  * @property companionTransactionRules Companion transaction rules (already portable, no IDs)
+ * @property accountMappings This strategy's own per-strategy account mappings (by account name),
+ * so they travel with the strategy. Global mappings are exported separately.
  */
 @Serializable
 data class CsvStrategyExport(
@@ -33,6 +36,7 @@ data class CsvStrategyExport(
     val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
     val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
     val contentMatchRules: List<ContentMatchRule> = emptyList(),
+    val accountMappings: List<AccountMappingExport> = emptyList(),
 )
 
 /**
