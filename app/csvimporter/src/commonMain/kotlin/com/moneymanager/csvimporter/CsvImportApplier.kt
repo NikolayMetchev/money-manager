@@ -253,14 +253,13 @@ private suspend fun persistMappingsWithFallback(
         for (mapping in mappings) {
             try {
                 importEngine.createAccountMapping(
-                    columnName = mapping.columnName,
                     valuePattern = mapping.valuePattern,
                     accountId = mapping.accountId,
                     strategyId = mapping.strategyId,
                 )
             } catch (expectedMappingError: Exception) {
                 // Don't log the pattern itself — it's derived from bank-file payee/account values (PII).
-                logger.warn(expectedMappingError) { "Failed to save account mapping for column '${mapping.columnName}'" }
+                logger.warn(expectedMappingError) { "Failed to save account mapping for account id ${mapping.accountId.id}" }
             }
         }
     }

@@ -14,8 +14,8 @@ class AccountMappingExportCodecTest {
                 version = "1.0.0",
                 mappings =
                     listOf(
-                        AccountMappingExport(columnName = "Name", valuePattern = ".*Acme.*", accountName = "Acme Bank"),
-                        AccountMappingExport(columnName = "Payee", valuePattern = "^Paxos.*$", accountName = "Paxos"),
+                        AccountMappingExport(valuePattern = ".*Acme.*", accountName = "Acme Bank"),
+                        AccountMappingExport(valuePattern = "^Paxos.*$", accountName = "Paxos"),
                     ),
             )
 
@@ -40,5 +40,26 @@ class AccountMappingExportCodecTest {
 
         assertEquals("9.9.9", decoded.version)
         assertTrue(decoded.mappings.isEmpty())
+    }
+
+    @Test
+    fun `decode tolerates legacy exports carrying a columnName per mapping`() {
+        val json =
+            """
+            {
+                "version": "1.0.0",
+                "mappings": [
+                    {"columnName": "Name", "valuePattern": ".*Acme.*", "accountName": "Acme Bank"},
+                    {"columnName": "Payee", "valuePattern": ".*Acme.*", "accountName": "Acme Bank"}
+                ]
+            }
+            """.trimIndent()
+
+        val decoded = AccountMappingExportCodec.decode(json)
+
+        // columnName is ignored; the two legacy per-column entries decode to equal mappings.
+        assertEquals(2, decoded.mappings.size)
+        assertEquals(AccountMappingExport(valuePattern = ".*Acme.*", accountName = "Acme Bank"), decoded.mappings.first())
+        assertEquals(decoded.mappings[0], decoded.mappings[1])
     }
 }

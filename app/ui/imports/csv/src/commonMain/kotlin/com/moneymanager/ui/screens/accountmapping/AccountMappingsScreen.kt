@@ -51,6 +51,8 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.deleteAccountMapping
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -66,6 +68,8 @@ import kotlinx.coroutines.launch
 fun AccountMappingsScreen(
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
     accountMappingExportService: AccountMappingExportService,
     appVersion: AppVersion,
     // Null when embedded (e.g. as the Imports → Misc sub-tab) so no dead back arrow is shown.
@@ -211,6 +215,8 @@ fun AccountMappingsScreen(
             accounts = accounts,
             strategyId = null,
             onDismiss = { editingMapping = null },
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
         )
     }
 
@@ -220,6 +226,8 @@ fun AccountMappingsScreen(
             accounts = accounts,
             strategyId = null,
             onDismiss = { showAddDialog = false },
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
         )
     }
 

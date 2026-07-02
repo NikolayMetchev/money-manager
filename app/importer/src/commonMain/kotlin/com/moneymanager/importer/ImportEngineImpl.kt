@@ -1093,7 +1093,7 @@ class ImportEngineImpl(
                 is AccountMappingMutation.Create ->
                     accountMappingIds.putUnique(
                         m.key,
-                        accountMappingRepository.createMapping(m.columnName, m.valuePattern, m.accountId, m.strategyId),
+                        accountMappingRepository.createMapping(m.valuePattern, m.accountId, m.strategyId),
                         "AccountMapping",
                     )
                 is AccountMappingMutation.CreateBatch -> accountMappingRepository.createMappings(m.mappings)

@@ -372,7 +372,6 @@ class WiseCsvMapperTest {
         assertEquals(AccountId(-1), result.transfer.sourceAccountId)
         assertEquals(listOf(NewAccount("Wise: BGN", -1L)), result.newAccounts)
         val discovered = result.discoveredMappings.single()
-        assertEquals("Source currency", discovered.columnName)
         assertEquals("BGN", discovered.csvValue)
         assertEquals("Wise: BGN", discovered.targetAccountName)
     }
@@ -383,7 +382,6 @@ class WiseCsvMapperTest {
         val mapping =
             AccountMapping(
                 id = 1,
-                columnName = "Source currency",
                 valuePattern = Regex("^EUR$"),
                 accountId = renamedAccount.id,
                 createdAt = Clock.System.now(),

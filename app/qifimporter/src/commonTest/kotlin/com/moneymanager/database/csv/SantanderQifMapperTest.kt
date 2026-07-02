@@ -11,7 +11,6 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.BuiltInCsvStrategies
-import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.qifCompatible
 import com.moneymanager.qifimporter.selectForQifContent
@@ -147,7 +146,6 @@ class SantanderQifMapperTest {
         val mapping =
             AccountMapping(
                 id = 1L,
-                columnName = QifColumns.COL_PAYEE,
                 valuePattern = Regex("ZAKHARENKO O"),
                 accountId = mapped.id,
                 createdAt = now,

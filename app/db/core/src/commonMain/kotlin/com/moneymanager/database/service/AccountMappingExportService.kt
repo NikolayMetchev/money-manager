@@ -56,7 +56,6 @@ class AccountMappingExportService(
                         accountsById[mapping.accountId]
                             ?: error("Missing account for id ${mapping.accountId.id} in AccountMapping")
                     AccountMappingExport(
-                        columnName = mapping.columnName,
                         valuePattern = mapping.valuePattern.pattern,
                         accountName = account.name,
                     )
@@ -118,17 +117,20 @@ class AccountMappingExportService(
 
         val now = Clock.System.now()
         val mappings =
-            export.mappings.mapNotNull { mappingExport ->
-                val account = accountsByName[mappingExport.accountName] ?: return@mapNotNull null
-                AccountMapping(
-                    id = 0,
-                    columnName = mappingExport.columnName,
-                    valuePattern = Regex(mappingExport.valuePattern, RegexOption.IGNORE_CASE),
-                    accountId = account.id,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-            }
+            export.mappings
+                // Legacy exports carried a column per mapping, so the same pattern could appear once
+                // per column; without columns those would collide on the unique constraint. First wins.
+                .distinctBy { it.valuePattern }
+                .mapNotNull { mappingExport ->
+                    val account = accountsByName[mappingExport.accountName] ?: return@mapNotNull null
+                    AccountMapping(
+                        id = 0,
+                        valuePattern = Regex(mappingExport.valuePattern, RegexOption.IGNORE_CASE),
+                        accountId = account.id,
+                        createdAt = now,
+                        updatedAt = now,
+                    )
+                }
         if (mappings.isNotEmpty()) {
             importEngine.createAccountMappings(mappings)
         }

@@ -169,6 +169,8 @@ fun ImportsScreen(
                     passThroughAccountRepository = passThroughAccountRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
                     accountMappingExportService = accountMappingExportService,
                     appVersion = appVersion,
                     importEngine = importEngine,
@@ -187,6 +189,8 @@ private fun MiscImportsTab(
     passThroughAccountRepository: PassThroughAccountReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
     accountMappingExportService: AccountMappingExportService,
     appVersion: AppVersion,
     importEngine: ImportEngine,
@@ -217,6 +221,8 @@ private fun MiscImportsTab(
                 AccountMappingsScreen(
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
                     accountMappingExportService = accountMappingExportService,
                     appVersion = appVersion,
                 )

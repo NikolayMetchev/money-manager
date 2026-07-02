@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.CsvResolution
 import com.moneymanager.domain.CsvUnresolvedReference
 import com.moneymanager.domain.StrategyKey
+import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.StrategyLibrary
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -204,7 +205,7 @@ fun StrategyCloudCard(
                                     // Any references the selected pulls can't resolve locally need the user first.
                                     val unresolved = mutableMapOf<StrategyKey, List<CsvUnresolvedReference>>()
                                     pull.forEachIndexed { index, key ->
-                                        syncProgress = SyncProgress("Checking ${key.name}…", index.toFloat() / pull.size)
+                                        syncProgress = SyncProgress("Checking ${key.displayLabel()}…", index.toFloat() / pull.size)
                                         val references = controller.previewPull(library, key).unresolvedReferences
                                         if (references.isNotEmpty()) unresolved[key] = references
                                     }
@@ -322,7 +323,7 @@ private fun StrategyItemList(
                     Spacer(Modifier.width(48.dp))
                 }
                 Text(
-                    text = "${item.key.name} (${item.key.kind.name.lowercase()})",
+                    text = item.key.displayLabel(),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
@@ -369,4 +370,16 @@ private fun statusLabel(status: StrategyItemStatus): String =
         StrategyItemStatus.REMOTE_AHEAD -> "Update available"
         StrategyItemStatus.AVAILABLE -> "New on Drive"
         StrategyItemStatus.CONFLICT -> "Conflict"
+    }
+
+/**
+ * Human-readable label for a library artifact. Strategies show their name plus the kind; the single
+ * global-mappings artifact has a fixed technical name, so it gets a friendly title instead.
+ */
+private fun StrategyKey.displayLabel(): String =
+    when (kind) {
+        StrategyKind.GLOBAL_MAPPINGS -> "Global account mappings"
+        StrategyKind.CSV -> "$name (CSV)"
+        StrategyKind.QIF -> "$name (QIF)"
+        StrategyKind.API -> "$name (API)"
     }

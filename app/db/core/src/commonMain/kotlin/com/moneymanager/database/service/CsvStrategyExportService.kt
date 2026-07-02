@@ -186,7 +186,6 @@ class CsvStrategyExportService(
             .filter { it.strategyId == strategyId }
             .map { mapping ->
                 AccountMappingExport(
-                    columnName = mapping.columnName,
                     valuePattern = mapping.valuePattern.pattern,
                     accountName = accountsById[mapping.accountId]?.name ?: "Unknown Account",
                 )
@@ -428,20 +427,23 @@ class CsvStrategyExportService(
         // Fail loudly like the field-mapping path: silently dropping a mapping would import a strategy
         // that's missing part of itself with no signal to the caller.
         val accountMappings =
-            export.accountMappings.map { mappingExport ->
-                val account =
-                    accountsByName[mappingExport.accountName]
-                        ?: error("Account not found: ${mappingExport.accountName}")
-                AccountMapping(
-                    id = 0,
-                    strategyId = strategy.id,
-                    columnName = mappingExport.columnName,
-                    valuePattern = Regex(mappingExport.valuePattern, RegexOption.IGNORE_CASE),
-                    accountId = account.id,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-            }
+            export.accountMappings
+                // Legacy exports carried a column per mapping, so the same pattern could appear once
+                // per column; without columns those would collide on the unique constraint. First wins.
+                .distinctBy { it.valuePattern }
+                .map { mappingExport ->
+                    val account =
+                        accountsByName[mappingExport.accountName]
+                            ?: error("Account not found: ${mappingExport.accountName}")
+                    AccountMapping(
+                        id = 0,
+                        strategyId = strategy.id,
+                        valuePattern = Regex(mappingExport.valuePattern, RegexOption.IGNORE_CASE),
+                        accountId = account.id,
+                        createdAt = now,
+                        updatedAt = now,
+                    )
+                }
 
         return CsvStrategyImportResult(strategy = strategy, accountMappings = accountMappings)
     }

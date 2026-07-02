@@ -8,14 +8,12 @@ interface AccountMappingWriteRepository : AccountMappingReadRepository {
     /**
      * Creates a new mapping.
      *
-     * @param columnName The CSV column to match against
-     * @param valuePattern Regex pattern for matching column values
+     * @param valuePattern Regex pattern for matching account source values
      * @param accountId Target account when pattern matches
      * @param strategyId The strategy to scope this mapping to, or null for a global mapping
      * @return The ID of the created mapping
      */
     suspend fun createMapping(
-        columnName: String,
         valuePattern: Regex,
         accountId: AccountId,
         strategyId: CsvImportStrategyId? = null,

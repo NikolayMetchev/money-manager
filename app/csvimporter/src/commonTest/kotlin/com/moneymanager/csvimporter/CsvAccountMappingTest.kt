@@ -112,7 +112,6 @@ class CsvAccountMappingTest {
 
     private fun createAccountMapping(
         id: Long,
-        columnName: String,
         pattern: String,
         accountId: AccountId,
         strategyId: CsvImportStrategyId? = null,
@@ -121,7 +120,6 @@ class CsvAccountMappingTest {
         return AccountMapping(
             id = id,
             strategyId = strategyId,
-            columnName = columnName,
             valuePattern = Regex(pattern, RegexOption.IGNORE_CASE),
             accountId = accountId,
             createdAt = now,
@@ -147,7 +145,7 @@ class CsvAccountMappingTest {
     @Test
     fun `global mapping applies under any strategy`() {
         val target = AccountId(30)
-        val mapper = mapperWith(listOf(createAccountMapping(1, "Payee", "^Foo$", target)))
+        val mapper = mapperWith(listOf(createAccountMapping(1, "^Foo$", target)))
         val result = mapper.mapRow(payeeRow())
         assertIs<MappingResult.Success>(result)
         assertEquals(target, result.transfer.targetAccountId)
@@ -157,7 +155,7 @@ class CsvAccountMappingTest {
     fun `mapping scoped to a different strategy is ignored`() {
         val target = AccountId(30)
         val otherStrategy = CsvImportStrategyId(Uuid.random())
-        val mapper = mapperWith(listOf(createAccountMapping(1, "Payee", "^Foo$", target, strategyId = otherStrategy)))
+        val mapper = mapperWith(listOf(createAccountMapping(1, "^Foo$", target, strategyId = otherStrategy)))
         val result = mapper.mapRow(payeeRow())
         assertIs<MappingResult.Success>(result)
         // Not matched: "Foo" is discovered as a new account instead of routing to the scoped target.
@@ -165,14 +163,14 @@ class CsvAccountMappingTest {
     }
 
     @Test
-    fun `strategy-specific mapping wins over a global one for the same column and value`() {
+    fun `strategy-specific mapping wins over a global one for the same value`() {
         val globalTarget = AccountId(30)
         val strategyTarget = AccountId(31)
         val mapper =
             mapperWith(
                 listOf(
-                    createAccountMapping(1, "Payee", "^Foo$", globalTarget),
-                    createAccountMapping(2, "Payee", "^Foo$", strategyTarget, strategyId = strategyId),
+                    createAccountMapping(1, "^Foo$", globalTarget),
+                    createAccountMapping(2, "^Foo$", strategyTarget, strategyId = strategyId),
                 ),
             )
         val result = mapper.mapRow(payeeRow())
@@ -200,7 +198,6 @@ class CsvAccountMappingTest {
         val mapping =
             createAccountMapping(
                 id = 1,
-                columnName = "Payee",
                 pattern = "^Nikolay Metchev & Olga Zakharenko$",
                 accountId = renamedAccountId,
             )
@@ -288,7 +285,6 @@ class CsvAccountMappingTest {
         val mapping =
             createAccountMapping(
                 id = 1,
-                columnName = "Payee",
                 pattern = ".*paxos.*",
                 accountId = paxosAccountId,
             )
@@ -329,7 +325,6 @@ class CsvAccountMappingTest {
         val mapping =
             createAccountMapping(
                 id = 1,
-                columnName = "Payee",
                 pattern = ".*paxos.*",
                 accountId = paxosAccountId,
             )
@@ -380,14 +375,12 @@ class CsvAccountMappingTest {
         val mapping1 =
             createAccountMapping(
                 id = 1,
-                columnName = "Payee",
                 pattern = ".*test.*",
                 accountId = account1Id,
             )
         val mapping2 =
             createAccountMapping(
                 id = 2,
-                columnName = "Payee",
                 pattern = ".*corp.*",
                 accountId = account2Id,
             )
@@ -434,7 +427,6 @@ class CsvAccountMappingTest {
         val mapping =
             createAccountMapping(
                 id = 1,
-                columnName = "Payee",
                 pattern = ".*paxos.*",
                 accountId = AccountId(99),
             )
@@ -484,7 +476,6 @@ class CsvAccountMappingTest {
         assertIs<MappingResult.Success>(result)
         assertEquals("New Vendor Inc", result.newAccountName)
         // Discovered mapping should be captured for auto-capture
-        assertEquals("Payee", result.discoveredMapping?.columnName)
         assertEquals("New Vendor Inc", result.discoveredMapping?.csvValue)
     }
 
@@ -506,7 +497,6 @@ class CsvAccountMappingTest {
         val mapping =
             createAccountMapping(
                 id = 1,
-                columnName = "Payee",
                 pattern = "^Vendor XYZ$",
                 accountId = targetAccountId,
             )
@@ -559,13 +549,11 @@ class CsvAccountMappingTest {
             listOf(
                 createAccountMapping(
                     id = 1,
-                    columnName = "Payee",
                     pattern = "^Nikolay Metchev & Olga Zakharenko$",
                     accountId = monzoAccountId,
                 ),
                 createAccountMapping(
                     id = 2,
-                    columnName = "Payee",
                     pattern = ".*paxos.*",
                     accountId = paxosAccountId,
                 ),
@@ -687,7 +675,6 @@ class CsvAccountMappingTest {
         val mapping =
             createAccountMapping(
                 id = 1,
-                columnName = "Name",
                 pattern = "^Generic Corp$",
                 accountId = specificAccountId,
             )
@@ -715,23 +702,23 @@ class CsvAccountMappingTest {
         assertEquals(specificAccountId, result.transfer.targetAccountId)
     }
 
-    // ============= Column-Specific Mappings =============
+    // ============= Column-Agnostic Mappings =============
 
     @Test
-    fun `mappings are column-specific and only match their designated column`() {
-        val payeeAccountId = AccountId(40)
+    fun `mapping matches whatever column the strategy reads accounts from`() {
+        // Mappings carry no column: the value tested is whatever the strategy's account
+        // field-mapping resolves. A global mapping therefore works across strategies that
+        // read accounts from differently named columns ("Payee" here, "Name" elsewhere).
+        val vendorAccountId = AccountId(40)
 
-        // Mapping for "Name" column, not "Payee"
         val mapping =
             createAccountMapping(
                 id = 1,
-                // Different column!
-                columnName = "Name",
-                pattern = ".*",
-                accountId = payeeAccountId,
+                pattern = "^Some Vendor$",
+                accountId = vendorAccountId,
             )
 
-        // Uses "Payee" column for target account
+        // This strategy reads the target account from the "Payee" column
         val mapper =
             CsvTransferMapper(
                 strategy = createStrategy(),
@@ -750,8 +737,43 @@ class CsvAccountMappingTest {
         val result = mapper.mapRow(row)
 
         assertIs<MappingResult.Success>(result)
-        // Mapping shouldn't match because it's for "Name" column, not "Payee"
-        assertEquals("Some Vendor", result.newAccountName)
+        assertEquals(vendorAccountId, result.transfer.targetAccountId)
+        assertNull(result.newAccountName)
+    }
+
+    @Test
+    fun `same global mapping fires for a strategy reading accounts from a different column`() {
+        // The same mapping as above, but under a strategy whose account source is the
+        // "Name" column (with "Type" fallback) instead of "Payee".
+        val vendorAccountId = AccountId(40)
+
+        val mapping =
+            createAccountMapping(
+                id = 1,
+                pattern = "^Some Vendor$",
+                accountId = vendorAccountId,
+            )
+
+        val mapper =
+            CsvTransferMapper(
+                strategy = createStrategyWithRegex(),
+                columns = columnsWithType,
+                existingAccounts = emptyMap(),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                accountMappings = listOf(mapping),
+            )
+
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Payment", "-100.00", "Some Vendor", "Card payment"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(vendorAccountId, result.transfer.targetAccountId)
+        assertNull(result.newAccountName)
     }
 
     // ============= DiscoveredAccountMapping for Auto-Capture =============
@@ -789,7 +811,6 @@ class CsvAccountMappingTest {
         assertEquals("Generic", result.newAccountName)
         // Discovered mapping should contain enough info for auto-capture
         val discovered = result.discoveredMapping
-        assertEquals("Name", discovered?.columnName)
         // CSV value is "Some generic vendor"
         assertEquals("Some generic vendor", discovered?.csvValue)
         // Target account name should be "Generic" so auto-capture can find the right account
@@ -822,7 +843,6 @@ class CsvAccountMappingTest {
         assertIs<MappingResult.Success>(result)
         assertEquals("New Payee Account", result.newAccountName)
         val discovered = result.discoveredMapping
-        assertEquals("Payee", discovered?.columnName)
         assertEquals("New Payee Account", discovered?.csvValue)
         // For AccountLookupMapping, csvValue == targetAccountName
         assertEquals("New Payee Account", discovered?.targetAccountName)
@@ -860,7 +880,6 @@ class CsvAccountMappingTest {
         // Fallback uses first non-blank from allColumns, which is the primary column value
         assertEquals("Special Vendor", result.newAccountName)
         val discovered = result.discoveredMapping
-        assertEquals("Name", discovered?.columnName)
         assertEquals("Special Vendor", discovered?.csvValue)
         // targetAccountName equals the fallback value (same as csvValue in this case)
         assertEquals("Special Vendor", discovered?.targetAccountName)
@@ -869,10 +888,10 @@ class CsvAccountMappingTest {
     }
 
     @Test
-    fun `RegexAccountMapping fallback to secondary column captures correct column and value`() {
+    fun `RegexAccountMapping fallback to secondary column captures the fallback value`() {
         // When the primary column is blank and fallback to a secondary column is used,
-        // the discovered mapping should capture the FALLBACK column name and value,
-        // not the primary column.
+        // the discovered mapping should capture the FALLBACK column's value,
+        // not the primary column's.
         val mapper =
             CsvTransferMapper(
                 strategy = createStrategyWithRegex(),
@@ -895,8 +914,6 @@ class CsvAccountMappingTest {
         // Account name comes from fallback column "Type"
         assertEquals("Card payment", result.newAccountName)
         val discovered = result.discoveredMapping
-        // Column should be "Type" (the fallback column that was used), NOT "Name"
-        assertEquals("Type", discovered?.columnName)
         // CSV value should be "Card payment" (the value from the fallback column)
         assertEquals("Card payment", discovered?.csvValue)
         assertEquals("Card payment", discovered?.targetAccountName)
@@ -911,7 +928,7 @@ class CsvAccountMappingTest {
         // Scenario:
         // 1. First import: Primary "Name" is blank, fallback "Type" = "Card payment" → creates account
         // 2. User renames account "Card payment" → "Credit Card Payments"
-        // 3. Mapping exists: columnName="Type", pattern="^Card payment$", accountId=renamedAccountId
+        // 3. Mapping exists: pattern="^Card payment$", accountId=renamedAccountId
         // 4. Second import: Same CSV with blank "Name" and "Type" = "Card payment"
         // 5. Should reuse the renamed account via the persisted mapping
 
@@ -923,11 +940,10 @@ class CsvAccountMappingTest {
                 openingDate = Clock.System.now(),
             )
 
-        // Persisted mapping for the fallback column "Type"
+        // Persisted mapping for the value the fallback column carries
         val mapping =
             createAccountMapping(
                 id = 1,
-                columnName = "Type",
                 pattern = "^Card payment$",
                 accountId = renamedAccountId,
             )

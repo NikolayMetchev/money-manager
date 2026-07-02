@@ -54,7 +54,7 @@ class StrategyLibraryServiceTest : DbTest() {
                     updatedAt = now,
                 )
             engine.createCsvStrategy(strategy)
-            engine.createAccountMapping("Name", Regex("PAXOS.*", RegexOption.IGNORE_CASE), accountId, strategy.id)
+            engine.createAccountMapping(Regex("PAXOS.*", RegexOption.IGNORE_CASE), accountId, strategy.id)
 
             val key = StrategyKey(StrategyKind.CSV, "WiseTest")
             val entry = library.listLocal(version).first { it.key == key }
@@ -68,7 +68,7 @@ class StrategyLibraryServiceTest : DbTest() {
             val recreated = csvRepo.getStrategyByName("WiseTest").first()!!
             val mappings = mappingRepo.getAllMappings().first().filter { it.strategyId == recreated.id }
             assertEquals(1, mappings.size)
-            assertEquals("Name", mappings.single().columnName)
+            assertEquals("PAXOS.*", mappings.single().valuePattern.pattern)
 
             // Applying the same artifact again updates in place (keyed by name) — never a duplicate.
             library.applyIncoming(key, entry.json, emptyMap())

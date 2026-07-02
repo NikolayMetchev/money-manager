@@ -139,15 +139,8 @@ internal fun AccountMappingRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Column: ${mapping.columnName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
                     text = "Pattern: ${mapping.valuePattern.pattern}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -173,10 +166,9 @@ internal fun AccountMappingRow(
  * Dialog for creating or editing an account mapping. On create, the mapping is scoped to [strategyId]
  * (null = global). On edit, the existing mapping's own scope is preserved.
  *
- * When editing inside a strategy editor, [csvColumns]/[sampleRows] supply the CSV context: the column
- * name becomes a dropdown of the file's columns and the pattern is previewed against the sample rows
- * (same semantics as import: case-insensitive containsMatchIn). [categoryRepository]/[personRepository]
- * additionally enable creating the target account inline.
+ * When editing inside a strategy editor, [csvColumns]/[sampleRows] supply the CSV context: the pattern
+ * is previewed against the sample rows (same semantics as import: case-insensitive containsMatchIn).
+ * The target account can always be created inline via [categoryRepository]/[personRepository].
  */
 @Suppress("LongParameterList")
 @Composable
@@ -185,14 +177,13 @@ internal fun AccountMappingEditorDialog(
     accounts: List<Account>,
     strategyId: CsvImportStrategyId?,
     onDismiss: () -> Unit,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
     csvColumns: List<CsvColumn>? = null,
     sampleRows: List<CsvRow> = emptyList(),
-    categoryRepository: CategoryReadRepository? = null,
-    personRepository: PersonReadRepository? = null,
 ) {
     val importEngine = LocalImportEngine.current
     val isEditMode = existingMapping != null
-    var columnName by remember { mutableStateOf(existingMapping?.columnName.orEmpty()) }
     var patternText by remember { mutableStateOf(existingMapping?.valuePattern?.pattern.orEmpty()) }
     var selectedAccountId by remember { mutableStateOf(existingMapping?.accountId) }
     var isSaving by remember { mutableStateOf(false) }
@@ -200,33 +191,13 @@ internal fun AccountMappingEditorDialog(
     var showCreateAccountDialog by remember { mutableStateOf(false) }
     val scope = rememberSchemaAwareCoroutineScope()
 
-    val isFormValid = columnName.isNotBlank() && patternText.isNotBlank() && selectedAccountId != null
+    val isFormValid = patternText.isNotBlank() && selectedAccountId != null
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
         title = { Text(if (isEditMode) "Edit Account Mapping" else "Add Account Mapping") },
         text = {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (csvColumns != null) {
-                    ColumnNameDropdown(
-                        columns = csvColumns,
-                        columnName = columnName,
-                        onColumnSelected = { columnName = it },
-                        enabled = !isSaving,
-                    )
-                } else {
-                    OutlinedTextField(
-                        value = columnName,
-                        onValueChange = { columnName = it },
-                        label = { Text("Column Name") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = !isSaving,
-                        isError = columnName.isBlank(),
-                        supportingText = { Text("CSV column to match against (e.g., Name, Payee)") },
-                    )
-                }
-
                 OutlinedTextField(
                     value = patternText,
                     onValueChange = { patternText = it },
@@ -236,8 +207,12 @@ internal fun AccountMappingEditorDialog(
                     enabled = !isSaving,
                     isError = patternText.isBlank(),
                     supportingText = {
-                        val preview = matchPreview(csvColumns, sampleRows, columnName, patternText)
-                        Text(preview ?: "Use ^value$ for exact match, or .*keyword.* for contains")
+                        val preview = matchPreview(csvColumns, sampleRows, patternText)
+                        Text(
+                            preview
+                                ?: "Matched against the account value the strategy reads. " +
+                                "Use ^value$ for exact match, or .*keyword.* for contains",
+                        )
                     },
                 )
 
@@ -247,19 +222,14 @@ internal fun AccountMappingEditorDialog(
                     selectedAccountId = selectedAccountId,
                     onAccountSelected = { selectedAccountId = it },
                     enabled = !isSaving,
-                    onCreateAccount =
-                        if (categoryRepository != null && personRepository != null) {
-                            { showCreateAccountDialog = true }
-                        } else {
-                            null
-                        },
+                    onCreateAccount = { showCreateAccountDialog = true },
                 )
 
                 errorMessage?.let {
                     Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
 
-                if (showCreateAccountDialog && categoryRepository != null && personRepository != null) {
+                if (showCreateAccountDialog) {
                     CreateAccountDialog(
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
@@ -282,14 +252,12 @@ internal fun AccountMappingEditorDialog(
                                 if (existingMapping != null) {
                                     importEngine.updateAccountMapping(
                                         existingMapping.copy(
-                                            columnName = columnName,
                                             valuePattern = pattern,
                                             accountId = accountId,
                                         ),
                                     )
                                 } else {
                                     importEngine.createAccountMapping(
-                                        columnName = columnName,
                                         valuePattern = pattern,
                                         accountId = accountId,
                                         strategyId = strategyId,
@@ -323,81 +291,29 @@ internal fun AccountMappingEditorDialog(
 }
 
 /**
- * Dropdown of the CSV file's columns for the mapping's column name. An existing mapping may reference
- * a column that is no longer in the file; its name is still shown (flagged) so editing doesn't wipe it.
- */
-@Composable
-private fun ColumnNameDropdown(
-    columns: List<CsvColumn>,
-    columnName: String,
-    onColumnSelected: (String) -> Unit,
-    enabled: Boolean,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val known = columns.any { it.originalName == columnName }
-
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { if (enabled) expanded = it }) {
-        OutlinedTextField(
-            value = columnName.ifBlank { "Select column..." },
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Column Name") },
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-            enabled = enabled,
-            isError = columnName.isBlank(),
-            supportingText = {
-                if (columnName.isNotBlank() && !known) {
-                    Text("Not a column of this file", color = MaterialTheme.colorScheme.error)
-                } else {
-                    Text("CSV column to match against")
-                }
-            },
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            columns.forEach { column ->
-                DropdownMenuItem(
-                    text = { Text(column.originalName) },
-                    onClick = {
-                        onColumnSelected(column.originalName)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
-}
-
-/**
- * Human-readable preview of how many sample rows [patternText] would match in [columnName], mirroring
- * import semantics (case-insensitive [Regex.containsMatchIn]). Null when there is no CSV context to
- * preview against; a message for an invalid pattern.
+ * Human-readable preview of how many sample rows [patternText] would match in any column, mirroring
+ * import semantics (case-insensitive [Regex.containsMatchIn]). The import only tests the value the
+ * strategy's account field-mappings resolve, so this is an upper bound. Null when there is no CSV
+ * context to preview against; a message for an invalid pattern.
  */
 private fun matchPreview(
     csvColumns: List<CsvColumn>?,
     sampleRows: List<CsvRow>,
-    columnName: String,
     patternText: String,
 ): String? {
-    if (csvColumns == null || sampleRows.isEmpty() || columnName.isBlank() || patternText.isBlank()) return null
-    val columnIndex = csvColumns.firstOrNull { it.originalName == columnName }?.columnIndex ?: return null
+    if (csvColumns == null || sampleRows.isEmpty() || patternText.isBlank()) return null
     val regex =
         try {
             Regex(patternText, RegexOption.IGNORE_CASE)
         } catch (_: IllegalArgumentException) {
             return "Invalid regex pattern"
         }
-    val matches = sampleRows.count { row -> regex.containsMatchIn(row.values.getOrNull(columnIndex).orEmpty()) }
+    val matches = sampleRows.count { row -> row.values.any { regex.containsMatchIn(it) } }
     return "Matches $matches of ${sampleRows.size} rows"
 }
 
 /**
- * Simple dropdown for selecting an account. When [onCreateAccount] is provided, offers creating a new
- * account inline.
+ * Simple dropdown for selecting an account, with an inline "Create new account…" entry.
  */
 @Composable
 internal fun AccountDropdown(
@@ -405,7 +321,7 @@ internal fun AccountDropdown(
     selectedAccountId: AccountId?,
     onAccountSelected: (AccountId) -> Unit,
     enabled: Boolean,
-    onCreateAccount: (() -> Unit)? = null,
+    onCreateAccount: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selectedAccount = accounts.find { it.id == selectedAccountId }
@@ -424,15 +340,13 @@ internal fun AccountDropdown(
             enabled = enabled,
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            if (onCreateAccount != null) {
-                DropdownMenuItem(
-                    text = { Text("Create new account…", color = MaterialTheme.colorScheme.primary) },
-                    onClick = {
-                        onCreateAccount()
-                        expanded = false
-                    },
-                )
-            }
+            DropdownMenuItem(
+                text = { Text("Create new account…", color = MaterialTheme.colorScheme.primary) },
+                onClick = {
+                    onCreateAccount()
+                    expanded = false
+                },
+            )
             accounts.sortedBy { it.name }.forEach { account ->
                 DropdownMenuItem(
                     text = { Text(account.name) },

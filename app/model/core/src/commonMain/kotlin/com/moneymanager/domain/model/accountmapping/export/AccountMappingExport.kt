@@ -25,7 +25,6 @@ data class AccountMappingsExport(
  */
 @Serializable
 data class AccountMappingExport(
-    val columnName: String,
     val valuePattern: String,
     val accountName: String,
 )
