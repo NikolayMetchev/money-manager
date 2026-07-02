@@ -42,7 +42,6 @@ class AccountMappingReadRepositoryImpl(
         AccountMapping(
             id = entity.id,
             strategyId = entity.strategy_id?.let { CsvImportStrategyId(Uuid.parse(it)) },
-            columnName = entity.column_name,
             valuePattern = Regex(entity.value_pattern, RegexOption.IGNORE_CASE),
             accountId = AccountId(entity.account_id),
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),

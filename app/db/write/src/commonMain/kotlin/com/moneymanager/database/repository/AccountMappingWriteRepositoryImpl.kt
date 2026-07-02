@@ -22,7 +22,6 @@ class AccountMappingWriteRepositoryImpl(
     private val writeQueries = database.accountMappingWriteQueries
 
     override suspend fun createMapping(
-        columnName: String,
         valuePattern: Regex,
         accountId: AccountId,
         strategyId: CsvImportStrategyId?,
@@ -31,7 +30,6 @@ class AccountMappingWriteRepositoryImpl(
             val now = Clock.System.now()
             writeQueries.insert(
                 strategy_id = strategyId?.id?.toString(),
-                column_name = columnName,
                 value_pattern = valuePattern.pattern,
                 account_id = accountId.id,
                 created_at = now.toEpochMilliseconds(),
@@ -48,7 +46,6 @@ class AccountMappingWriteRepositoryImpl(
                 mappings.forEach { mapping ->
                     writeQueries.insert(
                         strategy_id = mapping.strategyId?.id?.toString(),
-                        column_name = mapping.columnName,
                         value_pattern = mapping.valuePattern.pattern,
                         account_id = mapping.accountId.id,
                         created_at = mapping.createdAt.toEpochMilliseconds(),
@@ -63,7 +60,6 @@ class AccountMappingWriteRepositoryImpl(
             val now = Clock.System.now()
             writeQueries.update(
                 strategy_id = mapping.strategyId?.id?.toString(),
-                column_name = mapping.columnName,
                 value_pattern = mapping.valuePattern.pattern,
                 account_id = mapping.accountId.id,
                 updated_at = now.toEpochMilliseconds(),

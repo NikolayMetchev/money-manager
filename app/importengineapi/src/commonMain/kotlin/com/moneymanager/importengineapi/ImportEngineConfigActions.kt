@@ -104,7 +104,6 @@ suspend fun ImportEngine.deleteApiStrategy(id: ApiImportStrategyId) {
 // region account mappings
 
 suspend fun ImportEngine.createAccountMapping(
-    columnName: String,
     valuePattern: Regex,
     accountId: AccountId,
     strategyId: CsvImportStrategyId? = null,
@@ -113,9 +112,9 @@ suspend fun ImportEngine.createAccountMapping(
         import(
             ImportBatch(
                 accountMappingMutations =
-                    listOf(AccountMappingMutation.Create(columnName, columnName, valuePattern, accountId, strategyId)),
+                    listOf(AccountMappingMutation.Create(valuePattern.pattern, valuePattern, accountId, strategyId)),
             ),
-        ).createdAccountMappingIds[columnName],
+        ).createdAccountMappingIds[valuePattern.pattern],
     )
 
 suspend fun ImportEngine.createAccountMappings(mappings: List<AccountMapping>) {

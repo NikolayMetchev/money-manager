@@ -175,9 +175,9 @@ class StrategyLibraryService(
                 .getAllMappings()
                 .first()
                 .filter { it.strategyId == null }
-                .map { it.columnName to it.valuePattern.pattern }
+                .map { it.valuePattern.pattern }
                 .toSet()
-        val fresh = export.copy(mappings = export.mappings.filter { (it.columnName to it.valuePattern) !in existing })
+        val fresh = export.copy(mappings = export.mappings.filter { it.valuePattern !in existing })
         if (fresh.mappings.isNotEmpty()) {
             accountMappingExportService.importMappings(fresh, serviceResolutions)
         }

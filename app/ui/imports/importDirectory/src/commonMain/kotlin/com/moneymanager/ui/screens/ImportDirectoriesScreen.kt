@@ -84,6 +84,8 @@ fun ImportDirectoriesScreen(
 
     var showAddDialog by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+    // Per-file scan failures ("file name: reason") from the last download, shown under the status line.
+    var scanFailures by remember { mutableStateOf<List<String>>(emptyList()) }
     var scanningId by remember { mutableStateOf<ImportDirectoryId?>(null) }
     // done / total of the in-progress download, for the per-directory progress bar.
     var scanProgress by remember { mutableStateOf(0 to 0) }
@@ -148,17 +150,20 @@ fun ImportDirectoriesScreen(
         scanningId = directory.id
         scanProgress = 0 to 0
         statusMessage = null
+        scanFailures = emptyList()
         scope.launch {
             try {
-                if (directory.topLevel) {
-                    val downloaded = downloadFolder(directory).filesDownloaded
-                    val created = createSubdirectories(directory, directories.associateByTo(mutableMapOf()) { it.folderRef })
-                    statusMessage =
-                        "${directory.name}: downloaded $downloaded file(s); " +
-                        "created $created subfolder director${if (created == 1) "y" else "ies"}."
-                } else {
-                    statusMessage = "${directory.name}: downloaded ${downloadFolder(directory).filesDownloaded} file(s)."
-                }
+                val result = downloadFolder(directory)
+                scanFailures = result.failures
+                val failedSuffix = if (result.filesFailed > 0) ", ${result.filesFailed} failed" else ""
+                statusMessage =
+                    if (directory.topLevel) {
+                        val created = createSubdirectories(directory, directories.associateByTo(mutableMapOf()) { it.folderRef })
+                        "${directory.name}: downloaded ${result.filesDownloaded} file(s)$failedSuffix; " +
+                            "created $created subfolder director${if (created == 1) "y" else "ies"}."
+                    } else {
+                        "${directory.name}: downloaded ${result.filesDownloaded} file(s)$failedSuffix."
+                    }
             } catch (expected: Exception) {
                 statusMessage = "${directory.name}: failed — ${expected.message}"
             } finally {
@@ -169,6 +174,7 @@ fun ImportDirectoriesScreen(
 
     fun downloadAll() {
         statusMessage = null
+        scanFailures = emptyList()
         scope.launch {
             try {
                 val dirsByRef = directories.associateByTo(mutableMapOf()) { it.folderRef }
@@ -181,12 +187,21 @@ fun ImportDirectoriesScreen(
                 }
                 // Phase 2: download each included directory's own importable files (top-levels + leaves).
                 var downloaded = 0
+                var failed = 0
+                val failures = mutableListOf<String>()
                 for (dir in dirsByRef.values.filter { scannable(it) && !it.excluded }) {
                     scanningId = dir.id
                     scanProgress = 0 to 0
-                    downloaded += downloadFolder(dir).filesDownloaded
+                    val result = downloadFolder(dir)
+                    downloaded += result.filesDownloaded
+                    failed += result.filesFailed
+                    // Prefix with the directory so the same filename in two folders stays tellable apart.
+                    failures += result.failures.map { "${dir.name} — $it" }
                 }
-                statusMessage = "Created $created new director${if (created == 1) "y" else "ies"}; downloaded $downloaded file(s)."
+                scanFailures = failures
+                val failedSuffix = if (failed > 0) "; $failed failed" else ""
+                statusMessage =
+                    "Created $created new director${if (created == 1) "y" else "ies"}; downloaded $downloaded file(s)$failedSuffix."
             } catch (expected: Exception) {
                 statusMessage = "Download all failed — ${expected.message}"
             } finally {
@@ -225,6 +240,13 @@ fun ImportDirectoriesScreen(
         )
 
         statusMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        scanFailures.forEach { failure ->
+            Text(
+                text = failure,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
 
         if (directories.isEmpty()) {
             Text("No import directories configured yet.", style = MaterialTheme.typography.bodyMedium)

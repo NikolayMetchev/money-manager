@@ -56,11 +56,12 @@ class DriveImportFileSource(
             if (!response.status.isSuccess()) {
                 val hint =
                     if (response.status.value == HTTP_FORBIDDEN) {
-                        " — the file's owner may have disabled downloads for viewers"
+                        " — this is usually a Google Docs/Sheets file (which has no raw content to download)" +
+                            " or the file's owner has disabled downloads for viewers"
                     } else {
                         ""
                     }
-                throw RemoteStorageException("Failed to download $fileRef from Google Drive (${response.status.value})$hint")
+                throw RemoteStorageException("Failed to download from Google Drive (${response.status.value})$hint")
             }
             response.body<ByteArray>()
         }

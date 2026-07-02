@@ -82,7 +82,6 @@ sealed interface ApiStrategyMutation {
 sealed interface AccountMappingMutation {
     data class Create(
         val key: String,
-        val columnName: String,
         val valuePattern: Regex,
         val accountId: AccountId,
         val strategyId: CsvImportStrategyId? = null,

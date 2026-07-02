@@ -41,7 +41,6 @@ fun buildPendingAccountMappings(
                 null
             } else {
                 PendingAccountMappingKey(
-                    columnName = discoveredMapping.columnName,
                     pattern =
                         discoveredMapping.matchedPattern
                             ?: "^${Regex.escape(discoveredMapping.csvValue)}$",
@@ -53,7 +52,6 @@ fun buildPendingAccountMappings(
         .mapIndexed { index, mapping ->
             AccountMapping(
                 id = -(index + 1).toLong(),
-                columnName = mapping.columnName,
                 valuePattern = Regex(mapping.pattern, RegexOption.IGNORE_CASE),
                 accountId = mapping.accountId,
                 createdAt = now,
@@ -111,7 +109,6 @@ fun hasBlankNewAccountNames(
 }
 
 private data class PendingAccountMappingKey(
-    val columnName: String,
     val pattern: String,
     val accountId: AccountId,
 )

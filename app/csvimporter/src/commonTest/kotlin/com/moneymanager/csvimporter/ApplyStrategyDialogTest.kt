@@ -31,14 +31,12 @@ class ApplyStrategyDialogTest {
                             listOf(
                                 transferWithDiscoveredMapping(
                                     DiscoveredAccountMapping(
-                                        columnName = "Payee",
                                         csvValue = "ACME LTD",
                                         targetAccountName = "Acme",
                                     ),
                                 ),
                                 transferWithDiscoveredMapping(
                                     DiscoveredAccountMapping(
-                                        columnName = "Description",
                                         csvValue = "PAYMENT TO ACME",
                                         targetAccountName = "Acme",
                                         matchedPattern = ".*ACME.*",
@@ -54,8 +52,8 @@ class ApplyStrategyDialogTest {
             )
 
         assertEquals(2, mappings.size)
-        assertTrue(mappings.any { it.columnName == "Payee" && it.valuePattern.pattern == "^\\QACME LTD\\E$" })
-        assertTrue(mappings.any { it.columnName == "Description" && it.valuePattern.pattern == ".*ACME.*" })
+        assertTrue(mappings.any { it.valuePattern.pattern == "^\\QACME LTD\\E$" })
+        assertTrue(mappings.any { it.valuePattern.pattern == ".*ACME.*" })
         assertTrue(mappings.all { it.accountId == selectedAccountId })
         assertTrue(mappings.all { it.createdAt == now && it.updatedAt == now })
     }
@@ -66,7 +64,6 @@ class ApplyStrategyDialogTest {
 
         val duplicateMapping =
             DiscoveredAccountMapping(
-                columnName = "Payee",
                 csvValue = "Coffee Shop",
                 targetAccountName = "Coffee Shop",
             )
@@ -104,7 +101,6 @@ class ApplyStrategyDialogTest {
                             listOf(
                                 transferWithDiscoveredMapping(
                                     DiscoveredAccountMapping(
-                                        columnName = "Payee",
                                         csvValue = "Coffee Shop",
                                         targetAccountName = "Coffee Shop",
                                     ),
@@ -135,7 +131,6 @@ class ApplyStrategyDialogTest {
                             listOf(
                                 transferWithDiscoveredMapping(
                                     DiscoveredAccountMapping(
-                                        columnName = "Payee",
                                         csvValue = "ACME LTD",
                                         targetAccountName = "Acme",
                                     ),

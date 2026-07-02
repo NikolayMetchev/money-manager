@@ -174,7 +174,6 @@ data class ExistingTransferInfo(
  * Represents a mapping discovered during import that can be persisted.
  * Used for auto-capturing mappings when new accounts are created.
  *
- * @property columnName The CSV column that was matched
  * @property csvValue The actual value from the CSV that led to this account
  * @property targetAccountName The name of the account that will be/was created from this value.
  *           For AccountLookupMapping, this equals csvValue. For RegexAccountMapping, this is the
@@ -185,7 +184,6 @@ data class ExistingTransferInfo(
  *           creating an exact-match pattern for csvValue.
  */
 data class DiscoveredAccountMapping(
-    val columnName: String,
     val csvValue: String,
     val targetAccountName: String,
     val matchedPattern: String? = null,
@@ -228,14 +226,13 @@ class CsvTransferMapper(
             emptyMap()
         }
 
-    // Index account mappings by column name for fast lookup. Only global mappings (strategyId null)
-    // and mappings scoped to THIS strategy apply; a strategy-specific match is ordered ahead of a
-    // global one so it wins in findPersistedMapping (which returns the first match per column).
-    private val accountMappingsByColumn: Map<String, List<AccountMapping>> =
+    // Only global mappings (strategyId null) and mappings scoped to THIS strategy apply; a
+    // strategy-specific match is ordered ahead of a global one so it wins in findPersistedMapping
+    // (which returns the first match).
+    private val scopedAccountMappings: List<AccountMapping> =
         accountMappings
             .filter { it.strategyId == null || it.strategyId == strategy.id }
             .sortedWith(compareBy({ it.strategyId == null }, { it.id }))
-            .groupBy { it.columnName }
 
     /**
      * Prepares an import by mapping all rows and collecting new accounts to create.
@@ -649,7 +646,7 @@ class CsvTransferMapper(
                 val csvValue = getColumnValue(mapping.columnName, values).trim()
 
                 // Check persisted mappings FIRST - this handles renamed accounts
-                val persistedMatch = findPersistedMapping(mapping.columnName, csvValue)
+                val persistedMatch = findPersistedMapping(csvValue)
                 if (persistedMatch != null) {
                     return persistedMatch
                 }
@@ -660,11 +657,10 @@ class CsvTransferMapper(
             }
             is ConditionalAccountMapping -> parseAccount(resolveConditional(mapping, values), values)
             is AccountLookupMapping -> {
-                val columnName = mapping.columnName
-                val csvValue = getColumnValue(columnName, values)
+                val csvValue = getColumnValue(mapping.columnName, values)
 
                 // Check persisted mappings FIRST - this handles renamed accounts
-                val persistedMatch = findPersistedMapping(columnName, csvValue)
+                val persistedMatch = findPersistedMapping(csvValue)
                 if (persistedMatch != null) {
                     return persistedMatch
                 }
@@ -679,8 +675,8 @@ class CsvTransferMapper(
                 // will actually be used (could be fallback column)
                 val result = getAccountNameFromRegexWithPattern(mapping, values)
 
-                // Check persisted mappings using the ACTUAL column/value that was resolved
-                val persistedMatch = findPersistedMapping(result.sourceColumnName, result.sourceColumnValue)
+                // Check persisted mappings using the ACTUAL value that was resolved
+                val persistedMatch = findPersistedMapping(result.sourceColumnValue)
                 if (persistedMatch != null) {
                     return persistedMatch
                 }
@@ -694,19 +690,16 @@ class CsvTransferMapper(
     }
 
     /**
-     * Finds a persisted account mapping that matches the given column and value.
-     * First matching mapping wins (ordered by id).
+     * Finds a persisted account mapping whose pattern matches the given account source value
+     * (the value the strategy's account field-mapping resolved for this row). First matching
+     * mapping wins: strategy-scoped mappings are tried before global ones, then id order — so
+     * mappings that share a pattern resolve deterministically.
      *
-     * @param columnName The CSV column name
      * @param value The value to match against
      * @return The mapped AccountId, or null if no match found
      */
-    private fun findPersistedMapping(
-        columnName: String,
-        value: String,
-    ): AccountId? {
-        val mappings = accountMappingsByColumn[columnName] ?: return null
-        for (mapping in mappings) {
+    private fun findPersistedMapping(value: String): AccountId? {
+        for (mapping in scopedAccountMappings) {
             if (mapping.valuePattern.containsMatchIn(value)) {
                 return mapping.accountId
             }
@@ -727,14 +720,14 @@ class CsvTransferMapper(
             is AccountLookupMapping -> {
                 val csvValue = getColumnValue(mapping.columnName, values)
                 // If a persisted mapping matched, don't create a new account
-                if (findPersistedMapping(mapping.columnName, csvValue) != null) {
+                if (findPersistedMapping(csvValue) != null) {
                     null
                 } else {
                     val name = getAccountName(mapping, values)
                     if (name.isNotBlank() && !accountExists(name)) {
                         // For AccountLookupMapping, csvValue == name (account name)
                         NewAccount(name, mapping.defaultCategoryId) to
-                            DiscoveredAccountMapping(mapping.columnName, csvValue, name)
+                            DiscoveredAccountMapping(csvValue, name)
                     } else {
                         null
                     }
@@ -743,15 +736,13 @@ class CsvTransferMapper(
             is RegexAccountMapping -> {
                 val result = getAccountNameFromRegexWithPattern(mapping, values)
                 // If a persisted mapping matched, don't create a new account
-                if (findPersistedMapping(result.sourceColumnName, result.sourceColumnValue) != null) {
+                if (findPersistedMapping(result.sourceColumnValue) != null) {
                     null
                 } else if (result.accountName.isNotBlank() && !accountExists(result.accountName)) {
                     // For RegexAccountMapping, accountName differs from sourceColumnValue
                     // (e.g., sourceColumnValue="Paxos Technology LTD", accountName="Paxos")
-                    // Use the actual source column that produced the value (important for fallback)
                     NewAccount(result.accountName, mapping.defaultCategoryId) to
                         DiscoveredAccountMapping(
-                            columnName = result.sourceColumnName,
                             csvValue = result.sourceColumnValue,
                             targetAccountName = result.accountName,
                             matchedPattern = result.matchedPattern,
@@ -763,14 +754,14 @@ class CsvTransferMapper(
             is TemplateAccountMapping -> {
                 val csvValue = getColumnValue(mapping.columnName, values).trim()
                 val name = templatedAccountName(mapping, csvValue)
-                if (findPersistedMapping(mapping.columnName, csvValue) != null ||
+                if (findPersistedMapping(csvValue) != null ||
                     name.isBlank() ||
                     accountExists(name)
                 ) {
                     null
                 } else {
                     NewAccount(name, mapping.defaultCategoryId) to
-                        DiscoveredAccountMapping(mapping.columnName, csvValue, name)
+                        DiscoveredAccountMapping(csvValue, name)
                 }
             }
             is ConditionalAccountMapping -> discoverNewAccount(resolveConditional(mapping, values), values)
@@ -962,7 +953,7 @@ class CsvTransferMapper(
                     !result.counterpartyIsPerson || result.accountName.isBlank() -> null
                     // A persisted account mapping intentionally remaps this counterparty (e.g. onto an
                     // existing account), so don't auto-create a Person/ownership from the regex name.
-                    findPersistedMapping(result.sourceColumnName, result.sourceColumnValue) != null -> null
+                    findPersistedMapping(result.sourceColumnValue) != null -> null
                     else -> result.accountName
                 }
             }

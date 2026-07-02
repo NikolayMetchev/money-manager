@@ -60,13 +60,11 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val strategyId = createTestStrategy()
 
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("global"),
                 accountId = account.id,
                 strategyId = null,
             )
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("scoped"),
                 accountId = account.id,
                 strategyId = strategyId,
@@ -83,7 +81,6 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account = createTestAccount()
             val strategyId = createTestStrategy()
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("scoped"),
                 accountId = account.id,
                 strategyId = strategyId,
@@ -107,14 +104,12 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("^Test Pattern$", RegexOption.IGNORE_CASE),
                 accountId = account.id,
             )
 
             val mappings = repositories.accountMappingRepository.getAllMappings().first()
             assertEquals(1, mappings.size)
-            assertEquals("Payee", mappings[0].columnName)
             assertEquals("^Test Pattern$", mappings[0].valuePattern.pattern)
             assertEquals(account.id, mappings[0].accountId)
         }
@@ -126,12 +121,10 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account2 = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("pattern1"),
                 accountId = account1.id,
             )
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("pattern2"),
                 accountId = account2.id,
             )
@@ -151,7 +144,6 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account2 = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("original"),
                 accountId = account1.id,
             )
@@ -162,7 +154,6 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
             val updated =
                 original.copy(
-                    columnName = "Name",
                     valuePattern = Regex("updated"),
                     accountId = account2.id,
                 )
@@ -170,7 +161,6 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
             val result = repositories.accountMappingRepository.getMappingById(original.id).first()
             assertNotNull(result)
-            assertEquals("Name", result.columnName)
             assertEquals("updated", result.valuePattern.pattern)
             assertEquals(account2.id, result.accountId)
             assertTrue(result.updatedAt >= original.updatedAt)
@@ -182,7 +172,6 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("test"),
                 accountId = account.id,
             )
@@ -205,7 +194,6 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("test"),
                 accountId = account.id,
             )
@@ -228,7 +216,6 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
             val complexPattern = "^Nikolay Metchev & Olga Zakharenko$"
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex(complexPattern),
                 accountId = account.id,
             )
@@ -244,7 +231,6 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("paxos"),
                 accountId = account.id,
             )
@@ -267,18 +253,16 @@ class AccountMappingRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `multiple mappings for same column with different patterns are allowed`() =
+    fun `multiple mappings with different patterns are allowed`() =
         runTest {
             val account1 = createTestAccount()
             val account2 = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("pattern1"),
                 accountId = account1.id,
             )
             repositories.accountMappingRepository.createMapping(
-                columnName = "Payee",
                 valuePattern = Regex("pattern2"),
                 accountId = account2.id,
             )
