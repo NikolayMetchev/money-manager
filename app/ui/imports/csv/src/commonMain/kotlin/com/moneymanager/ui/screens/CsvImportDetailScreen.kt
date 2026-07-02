@@ -470,10 +470,15 @@ fun CsvImportDetailScreen(
                     }
                 importFailedRows =
                     result.skipped.map { skip -> "${skip.accountName}: ${skip.detail}" } +
-                        result.importResult?.failedRows.orEmpty().map { failed ->
-                            "Row ${failed.rowIndex}: ${failed.errorMessage}"
-                        }
-                failedRowIndexes = result.importResult?.failedRows.orEmpty().map { it.rowIndex }.toSet()
+                    result.importResult?.failedRows.orEmpty().map { failed ->
+                        "Row ${failed.rowIndex}: ${failed.errorMessage}"
+                    }
+                failedRowIndexes =
+                    result.importResult
+                        ?.failedRows
+                        .orEmpty()
+                        .map { it.rowIndex }
+                        .toSet()
                 rowsRefreshTrigger++
             },
         )

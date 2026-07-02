@@ -259,7 +259,9 @@ private fun ReimportPlanPreview(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Merges move ALL of the duplicate's transactions (from any import) and can be undone from the account merge history.",
+                text =
+                    "Merges move ALL of the duplicate's transactions (from any import) and can be undone " +
+                        "from the account merge history.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
