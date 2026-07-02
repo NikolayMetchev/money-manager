@@ -682,11 +682,13 @@ class ImportEngineDbTest : DbTest() {
                 assertEquals(0L, net, "account $accountId should net to zero")
             }
 
-            // The refund's spend leg (id1) links to the original charge's spend leg (id2).
+            // The refund's spend leg (id1) links to the original charge's spend leg (id2) via the
+            // seeded reversal relationship type.
             val chargeSpendId = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(0)))
             val reversal = reversalLinksOf(refundSpendId).single()
             assertEquals(refundSpendId, reversal.id1)
             assertEquals(chargeSpendId, reversal.id2)
+            assertEquals(RelationshipTypeId(WellKnownIds.REVERSAL_RELATIONSHIP_TYPE_ID), reversal.relationshipType.id)
         }
 
     @Test
