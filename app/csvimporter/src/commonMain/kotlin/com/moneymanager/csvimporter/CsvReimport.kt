@@ -158,6 +158,7 @@ suspend fun planCsvReimport(
     val candidates = computeReimportMerges(prep(emptyList()), prep(mappings), importCreated)
 
     val accountsById = accounts.associateBy { it.id }
+
     fun nameOf(id: AccountId): String = accountsById[id]?.name ?: "#${id.id}"
 
     val merges = mutableListOf<ReimportMerge>()
