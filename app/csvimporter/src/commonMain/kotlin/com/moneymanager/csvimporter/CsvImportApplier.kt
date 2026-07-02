@@ -503,9 +503,11 @@ suspend fun runCsvImport(
                         relationshipTypeId = RelationshipTypeId(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID),
                     )
                 }
-            // Pass-through (conduit) row: the mapper already routed the transfer's target to the conduit
-            // (funding leg). Resolve the merchant account the mapper created and let the engine add the
-            // spend leg conduit -> merchant. accountsByName carries the created conduit + merchant ids.
+            // Pass-through (conduit) row: the mapper already routed the transfer's conduit side — the
+            // target for an outgoing charge, the source for an incoming refund/cancellation. Resolve the
+            // merchant account the mapper created and let the engine add the spend leg (conduit ->
+            // merchant, or merchant -> conduit when incoming). accountsByName carries the created
+            // conduit + merchant ids.
             val passThrough =
                 row.passThrough?.let { pt ->
                     val merchantId = accountsByName[pt.merchantName]?.id
@@ -513,11 +515,15 @@ suspend fun runCsvImport(
                         null
                     } else {
                         ImportPassThrough(
-                            conduit = AccountRef.Existing(row.transfer.targetAccountId),
+                            conduit =
+                                AccountRef.Existing(
+                                    if (pt.incoming) row.transfer.sourceAccountId else row.transfer.targetAccountId,
+                                ),
                             merchantTarget = AccountRef.Existing(merchantId),
                             amount = row.transfer.amount,
                             spendDescription = pt.merchantName,
                             relationshipTypeId = RelationshipTypeId(pt.relationshipTypeId),
+                            incoming = pt.incoming,
                         )
                     }
                 }

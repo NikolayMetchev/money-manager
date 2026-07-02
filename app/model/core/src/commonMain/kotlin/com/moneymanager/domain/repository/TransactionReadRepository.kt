@@ -5,9 +5,11 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -44,6 +46,19 @@ interface TransactionReadRepository {
         matchValuePattern: String,
         linkAttributeName: String,
     ): Flow<List<TransferMissingCompanion>>
+
+    /**
+     * Directed transfers [sourceAccountId] → [targetAccountId] of exactly [amount] at or before
+     * [maxTimestamp] that are not yet the target (id2) of a [reversalTypeId] relationship, newest
+     * first. Used by the import engine to pair a refund/cancellation with the movement it reverses.
+     */
+    suspend fun getUnreversedTransfersBetween(
+        sourceAccountId: AccountId,
+        targetAccountId: AccountId,
+        amount: Money,
+        maxTimestamp: Instant,
+        reversalTypeId: RelationshipTypeId,
+    ): List<Transfer>
 
     suspend fun getRunningBalanceByAccountPaginated(
         accountId: AccountId,

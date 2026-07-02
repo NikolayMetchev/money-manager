@@ -15,9 +15,11 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAttribute
@@ -108,6 +110,26 @@ class TransactionReadRepositoryImpl(
             ).asFlow()
             .mapToList(Dispatchers.Default)
             .map { loadAttributesForTransfers(it) }
+
+    override suspend fun getUnreversedTransfersBetween(
+        sourceAccountId: AccountId,
+        targetAccountId: AccountId,
+        amount: Money,
+        maxTimestamp: Instant,
+        reversalTypeId: RelationshipTypeId,
+    ): List<Transfer> =
+        withContext(Dispatchers.Default) {
+            transferSelectQueries
+                .selectUnreversedTransfersBetweenAccountsByAmount(
+                    sourceAccountId = sourceAccountId.id,
+                    targetAccountId = targetAccountId.id,
+                    amount = amount.amount,
+                    currencyId = amount.currency.id.id,
+                    maxTimestamp = maxTimestamp.toEpochMilliseconds(),
+                    reversalTypeId = reversalTypeId.id,
+                    TransferMapper::mapRaw,
+                ).executeAsList()
+        }
 
     override fun getTransfersMissingCompanion(
         matchAttributeName: String,

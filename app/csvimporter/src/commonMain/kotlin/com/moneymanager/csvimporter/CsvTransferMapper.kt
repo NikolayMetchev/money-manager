@@ -79,9 +79,10 @@ sealed interface MappingResult {
          */
         val personalCounterpartyName: String? = null,
         /**
-         * Set when the row is a pass-through (conduit) charge (e.g. Curve): the transfer's target is the
-         * conduit account (funding leg) and [CsvPassThrough.merchantName] is the real merchant the engine
-         * routes the spend leg to. Null for ordinary rows.
+         * Set when the row is a pass-through (conduit) charge (e.g. Curve): the transfer's counterparty
+         * side (target, or source when [CsvPassThrough.incoming]) is the conduit account (funding leg)
+         * and [CsvPassThrough.merchantName] is the real merchant the engine routes the spend leg to.
+         * Null for ordinary rows.
          */
         val passThrough: CsvPassThrough? = null,
     ) : MappingResult {
@@ -109,12 +110,15 @@ data class NewAccount(
 /**
  * Pass-through routing for a row whose charge passes through a conduit account (e.g. Curve). The
  * transfer itself is the funding leg (card -> [conduitName]); the engine synthesises the spend leg
- * ([conduitName] -> [merchantName]) and links them via [relationshipTypeId].
+ * ([conduitName] -> [merchantName]) and links them via [relationshipTypeId]. When [incoming] (a
+ * refund/cancellation back onto the card) both legs run the other way: funding [conduitName] -> card,
+ * spend [merchantName] -> [conduitName].
  */
 data class CsvPassThrough(
     val conduitName: String,
     val merchantName: String,
     val relationshipTypeId: Long,
+    val incoming: Boolean = false,
 )
 
 /**
@@ -367,17 +371,19 @@ class CsvTransferMapper(
             // Parse description
             val description = parseDescription(descriptionMapping, values)
 
-            // Detect a pass-through (conduit) charge, e.g. Curve, from the description. Only outgoing
-            // spends (target = merchant, i.e. no flip) are routed: the transfer becomes the funding leg
-            // card -> conduit, and the engine adds the spend leg conduit -> merchant. Detection + the
-            // conduit/merchant names come entirely from user-editable config (the engine stays agnostic).
-            val passThroughMatch = if (!flipAccounts) passThroughDetector?.detect(description) else null
+            // Detect a pass-through (conduit) charge, e.g. Curve, from the description. An outgoing
+            // spend (no flip) becomes the funding leg card -> conduit and the engine adds the spend leg
+            // conduit -> merchant; an incoming refund/cancellation (flipAccounts) runs both legs the
+            // other way, so the conduit replaces the row's counterparty on whichever side it sits.
+            // Detection + the conduit/merchant names come entirely from user-editable config (the
+            // engine stays agnostic).
+            val passThroughMatch = passThroughDetector?.detect(description)
+            val conduitAccountId =
+                passThroughMatch?.let { existingAccounts[it.account.conduitAccountName]?.id ?: AccountId(-1) }
+            val effectiveSourceAccountId =
+                if (conduitAccountId != null && flipAccounts) conduitAccountId else sourceAccountId
             val effectiveTargetAccountId =
-                if (passThroughMatch != null) {
-                    existingAccounts[passThroughMatch.account.conduitAccountName]?.id ?: AccountId(-1)
-                } else {
-                    targetAccountId
-                }
+                if (conduitAccountId != null && !flipAccounts) conduitAccountId else targetAccountId
 
             // Detect a personal counterparty (resolved from the target mapping regardless of any
             // account flip — the counterparty is the same account on whichever side it ends up). A
@@ -399,7 +405,7 @@ class CsvTransferMapper(
                     id = TransferId(0L),
                     timestamp = timestamp,
                     description = description,
-                    sourceAccountId = sourceAccountId,
+                    sourceAccountId = effectiveSourceAccountId,
                     targetAccountId = effectiveTargetAccountId,
                     amount = amount,
                 )
@@ -417,8 +423,8 @@ class CsvTransferMapper(
 
             // Determine which new accounts need to be created and capture mapping info.
             // The source side participates only when it is resolved per-row (no UI override). For a
-            // pass-through row the target side is replaced by the conduit + merchant accounts (so the
-            // raw "CRV*…" junk account is never discovered), and no account mapping is auto-captured.
+            // pass-through row the counterparty side is replaced by the conduit + merchant accounts (so
+            // the raw "CRV*…" junk account is never discovered), and no account mapping is auto-captured.
             val discoveries =
                 buildList {
                     if (sourceAccountOverride == null) {
@@ -460,6 +466,7 @@ class CsvTransferMapper(
                             conduitName = it.account.conduitAccountName,
                             merchantName = it.merchantName,
                             relationshipTypeId = it.account.relationshipTypeId,
+                            incoming = flipAccounts,
                         )
                     },
             )

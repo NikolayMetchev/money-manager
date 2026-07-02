@@ -43,4 +43,12 @@ object WellKnownIds {
      * [com.moneymanager.domain.model.passthrough.PassThroughAccount].
      */
     const val PASS_THROUGH_RELATIONSHIP_TYPE_ID: Long = 3
+
+    /**
+     * "reversal" relationship type (seeded id 4): id1 is the reversing movement (a refund/cancellation)
+     * and id2 the earlier movement it reverses — for pass-through rows, the two spend legs on the
+     * merchant account. The engine resolves it by name (get-or-create), so databases seeded before the
+     * type existed self-heal on first use.
+     */
+    const val REVERSAL_RELATIONSHIP_TYPE_NAME: String = "reversal"
 }
