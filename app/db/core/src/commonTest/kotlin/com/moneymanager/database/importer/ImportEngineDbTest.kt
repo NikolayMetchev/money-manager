@@ -804,6 +804,48 @@ class ImportEngineDbTest : DbTest() {
         }
 
     @Test
+    fun passThrough_refundInLaterChunk_linksAcrossChunkBoundary() =
+        runTest {
+            val cardId = createSourceAccount()
+            val currency = gbp()
+            val curve = LocalAccountKey("curve")
+            val merchant = LocalAccountKey("merchant")
+            val amount = Money(36358, currency)
+
+            // batchSize = 1 puts every row in its own chunk (own transaction), so the refund's in-batch
+            // reversal target lives in an earlier chunk and must resolve to the already-created real id.
+            val result =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(
+                                passThroughRow(0, cardId, curve, merchant, amount, baseTime, "Crv*Navan", incoming = false),
+                                passThroughRow(
+                                    1,
+                                    cardId,
+                                    curve,
+                                    merchant,
+                                    amount,
+                                    baseTime.plus(1.hours),
+                                    "Refund: Crv*Navan",
+                                    incoming = true,
+                                ),
+                            ),
+                        dedupePolicy = DedupePolicy.None,
+                        accountsToCreate = passThroughAccountIntents(curve, merchant),
+                    ),
+                    batchSize = 1,
+                )
+            assertEquals(2, result.transfersImported)
+
+            val chargeSpendId = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(0)))
+            val refundSpendId = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(1)))
+            val reversal = reversalLinksOf(refundSpendId).single()
+            assertEquals(refundSpendId, reversal.id1)
+            assertEquals(chargeSpendId, reversal.id2)
+        }
+
+    @Test
     fun passThrough_refundWithDifferentAmount_getsNoReversalLink() =
         runTest {
             val cardId = createSourceAccount()

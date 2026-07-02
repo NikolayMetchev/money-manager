@@ -924,9 +924,12 @@ class ImportEngineImpl(
 
         val total = toImport.size
         val createdIds = mutableListOf<TransferId>()
+        // Spend-leg real ids from already-written chunks, keyed by to-import index, so later chunks can
+        // resolve reversal targets that point across a chunk boundary.
+        val resolvedSpendLegIds = mutableMapOf<Int, TransferId>()
         var written = 0
         chunks.forEachIndexed { index, chunk ->
-            val payload = buildCreatePayload(chunk, chunkStartIndex = index * effectiveBatchSize)
+            val payload = buildCreatePayload(chunk, chunkStartIndex = index * effectiveBatchSize, resolvedSpendLegIds)
             // Updates ride with the final create chunk (one transaction in the common single-chunk case).
             val (updates, updateSources) =
                 if (index == chunks.lastIndex) buildUpdates(toUpdate) else emptyList<TransferUpdate>() to emptyList()
@@ -941,6 +944,9 @@ class ImportEngineImpl(
                 )
             // Keep only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
             createdIds += payload.mainResultIndices.map { allCreatedIds[it] }
+            payload.spendResultIndices.forEach { (importIndex, resultIndex) ->
+                resolvedSpendLegIds[importIndex] = allCreatedIds[resultIndex]
+            }
             written += chunk.size
             onProgress?.invoke(
                 ImportProgress(
@@ -963,11 +969,17 @@ class ImportEngineImpl(
         val sources: List<Source>,
         // Indices into [transfers] of each main transfer, so callers map results back to chunk order.
         val mainResultIndices: List<Int>,
+        // Pass-through spend legs: to-import index -> index into [transfers], so callers can record the
+        // created spend-leg ids and later chunks can resolve cross-chunk reversal targets to real ids.
+        val spendResultIndices: Map<Int, Int>,
     )
 
     private fun buildCreatePayload(
         chunk: List<Classified>,
         chunkStartIndex: Int,
+        // Real spend-leg ids created by earlier chunks, keyed by to-import index, so a reversal target
+        // that landed in a previous chunk (its temp id is no longer resolvable) still links by real id.
+        priorSpendLegIds: Map<Int, TransferId>,
     ): CreatePayload {
         // Assign negative temp ids so newAttributes/newRelationships can be keyed before real ids exist.
         // A main transfer carrying a fee expands into two transfers (main + fee) created in this same
@@ -979,9 +991,10 @@ class ImportEngineImpl(
         val orderedSources = mutableListOf<Source>()
         val mainResultIndices = mutableListOf<Int>()
         // Spend-leg temp ids keyed by to-import index, for reversal links targeting an earlier row of
-        // this chunk. Temp ids only resolve within one importTransfers call, so a link whose target
-        // landed in an earlier chunk is dropped (only possible with an explicit small batchSize).
+        // this chunk; targets from earlier chunks resolve through [priorSpendLegIds] instead (temp ids
+        // only resolve within one importTransfers call).
         val spendTempIdByImportIndex = mutableMapOf<Int, TransferId>()
+        val spendResultIndices = mutableMapOf<Int, Int>()
         var tempCounter = 0
         chunk.forEachIndexed { chunkIndex, classified ->
             val t = classified.transfer
@@ -1054,14 +1067,18 @@ class ImportEngineImpl(
                     passThrough.rowKey,
                 )
                 spendTempIdByImportIndex[chunkStartIndex + chunkIndex] = spendTempId
-                // Reversal pairing: this spend leg (id1) reverses an earlier one (id2) — either an
-                // existing transfer or an earlier row's spend leg created in this same chunk.
+                spendResultIndices[chunkStartIndex + chunkIndex] = transfersToCreate.lastIndex
+                // Reversal pairing: this spend leg (id1) reverses an earlier one (id2) — an existing
+                // transfer, an earlier row's spend leg in this chunk (temp id), or an earlier chunk's
+                // spend leg (already-created real id).
                 val reversalLink = classified.reversalLink
                 if (reversalLink != null) {
                     val reversalTargetId =
                         when (val target = reversalLink.target) {
                             is ReversalTarget.Existing -> target.id
-                            is ReversalTarget.BatchRow -> spendTempIdByImportIndex[target.toImportIndex]
+                            is ReversalTarget.BatchRow ->
+                                spendTempIdByImportIndex[target.toImportIndex]
+                                    ?: priorSpendLegIds[target.toImportIndex]
                         }
                     if (reversalTargetId != null) {
                         newRelationships[spendTempId] = listOf(NewRelationship(reversalTargetId, reversalLink.typeId))
@@ -1069,7 +1086,7 @@ class ImportEngineImpl(
                 }
             }
         }
-        return CreatePayload(transfersToCreate, newAttributes, newRelationships, orderedSources, mainResultIndices)
+        return CreatePayload(transfersToCreate, newAttributes, newRelationships, orderedSources, mainResultIndices, spendResultIndices)
     }
 
     private fun buildUpdates(toUpdate: List<Classified>): Pair<List<TransferUpdate>, List<Source>> {
