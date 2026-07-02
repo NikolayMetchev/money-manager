@@ -615,7 +615,7 @@ class ImportEngineDbTest : DbTest() {
         repositories.transferRelationshipRepository
             .getByTransfer(transferId)
             .first()
-            .filter { it.relationshipType.name == "reversal" }
+            .filter { it.relationshipType.name == WellKnownIds.REVERSAL_RELATIONSHIP_TYPE_NAME }
 
     @Test
     fun passThrough_incomingRefund_reversesLegsAndLinksToChargeInSameBatch() =
@@ -688,7 +688,8 @@ class ImportEngineDbTest : DbTest() {
             val reversal = reversalLinksOf(refundSpendId).single()
             assertEquals(refundSpendId, reversal.id1)
             assertEquals(chargeSpendId, reversal.id2)
-            assertEquals(RelationshipTypeId(WellKnownIds.REVERSAL_RELATIONSHIP_TYPE_ID), reversal.relationshipType.id)
+            // The seeded reversal relationship type carries id 4 (see StaticSeed.sq).
+            assertEquals(RelationshipTypeId(4), reversal.relationshipType.id)
         }
 
     @Test

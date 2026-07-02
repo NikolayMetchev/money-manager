@@ -82,9 +82,6 @@ import com.moneymanager.importengineapi.personalCounterpartyKey
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 
-/** The seeded `relationship_type` name linking a reversing movement (id1) to the one it reverses (id2). */
-private const val REVERSAL_RELATIONSHIP_TYPE_NAME = "reversal"
-
 /**
  * Database-backed [ImportEngine]. Takes a fully-built [ImportBatch] and performs the whole import:
  * creates (or reuses) accounts, people and ownerships, resolves transfer account references,
@@ -431,7 +428,7 @@ class ImportEngineImpl(
      */
     private suspend fun resolveReversalLinks(toImport: List<Classified>): List<Classified> {
         if (toImport.none { it.transfer.passThrough != null }) return toImport
-        val reversalTypeId = relationshipTypeRepository.getOrCreate(REVERSAL_RELATIONSHIP_TYPE_NAME)
+        val reversalTypeId = relationshipTypeRepository.getOrCreate(WellKnownIds.REVERSAL_RELATIONSHIP_TYPE_NAME)
         val claimedExisting = mutableSetOf<TransferId>()
         val claimedInBatch = mutableSetOf<Int>()
         val batchSpendLegs = mutableListOf<BatchSpendLeg>()
