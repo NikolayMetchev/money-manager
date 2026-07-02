@@ -21,6 +21,7 @@ exclude:
     paths:
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/MonzoImportAuditE2ETest.kt
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/CsvAccountSourceAuditE2ETest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/CsvReimportE2ETest.kt
   - name: UnnecessaryModuleDependencyInspection
   - name: RedundantSuppression
     paths:

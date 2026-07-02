@@ -1,3 +1,11 @@
+-- Accounts (entity_type_id = 1) whose creation was recorded against the given CSV import — the
+-- accounts the import auto-created, used by re-import to scope merges/deletes to them.
+selectAccountIdsCreatedByCsvImport:
+SELECT DISTINCT entity_source.entity_id
+FROM entity_source
+JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+WHERE csv_entity_source.csv_import_id = ? AND entity_source.entity_type_id = 1;
+
 selectEntitySourceForRevision:
 SELECT id, source_type_id
 FROM entity_source

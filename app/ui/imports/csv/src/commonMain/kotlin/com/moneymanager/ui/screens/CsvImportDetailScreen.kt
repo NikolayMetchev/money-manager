@@ -49,6 +49,7 @@ import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.ApplyStrategyDialog
+import com.moneymanager.ui.screens.csv.ReimportDialog
 import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
 
@@ -81,6 +82,7 @@ fun CsvImportDetailScreen(
     var isLoading by remember { mutableStateOf(true) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showApplyStrategyDialog by remember { mutableStateOf(false) }
+    var showReimportDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     var importSuccessMessage by remember { mutableStateOf<String?>(null) }
     var importFailedRows by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -174,6 +176,21 @@ fun CsvImportDetailScreen(
                         text = "Apply Strategy",
                         color =
                             if (hasMatchingStrategy) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            },
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(
+                    onClick = { showReimportDialog = true },
+                    enabled = !isDeleting && import?.lastAppliedStrategyId != null && rows.isNotEmpty(),
+                ) {
+                    Text(
+                        text = "Re-import",
+                        color =
+                            if (import?.lastAppliedStrategyId != null) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
@@ -416,6 +433,52 @@ fun CsvImportDetailScreen(
                     result.failedRows.map { failed ->
                         "Row ${failed.rowIndex}: ${failed.errorMessage}"
                     }
+                rowsRefreshTrigger++
+            },
+        )
+    }
+
+    // Re-import dialog: applies newly added account mappings retroactively (merge duplicates,
+    // import remaining rows, delete emptied import-created accounts).
+    if (showReimportDialog && import != null) {
+        ReimportDialog(
+            csvImport = import!!,
+            rows = rows,
+            csvImportRepository = csvImportRepository,
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            accountMappingRepository = accountMappingRepository,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            currencyRepository = currencyRepository,
+            personRepository = personRepository,
+            passThroughAccountRepository = passThroughAccountRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+            onDismiss = { showReimportDialog = false },
+            onComplete = { result ->
+                showReimportDialog = false
+                importSuccessMessage =
+                    buildString {
+                        append("Re-import complete: ")
+                        append("${result.mergedAccounts.size} account(s) merged")
+                        val moved = result.mergedAccounts.sumOf { it.transferCount }
+                        if (moved > 0) append(" ($moved transaction(s) moved)")
+                        result.importResult?.let { append(", ${it.successCount} row(s) imported") }
+                        if (result.deletedEmptyAccounts.isNotEmpty()) {
+                            append(", ${result.deletedEmptyAccounts.size} empty account(s) deleted")
+                        }
+                    }
+                importFailedRows =
+                    result.skipped.map { skip -> "${skip.accountName}: ${skip.detail}" } +
+                    result.importResult?.failedRows.orEmpty().map { failed ->
+                        "Row ${failed.rowIndex}: ${failed.errorMessage}"
+                    }
+                failedRowIndexes =
+                    result.importResult
+                        ?.failedRows
+                        .orEmpty()
+                        .map { it.rowIndex }
+                        .toSet()
                 rowsRefreshTrigger++
             },
         )
