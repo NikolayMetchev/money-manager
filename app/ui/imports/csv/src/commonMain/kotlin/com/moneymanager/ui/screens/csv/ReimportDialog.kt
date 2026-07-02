@@ -47,6 +47,7 @@ import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -128,6 +129,8 @@ fun ReimportDialog(
                     passThroughAccounts = passThroughAccounts,
                 )
             errorMessage = null
+        } catch (expected: CancellationException) {
+            throw expected
         } catch (expected: Exception) {
             logger.error(expected) { "Re-import preview failed: ${expected.message}" }
             errorMessage = "Failed to prepare re-import: ${expected.message}"
@@ -214,6 +217,8 @@ fun ReimportDialog(
                                     passThroughAccounts = passThroughAccounts,
                                 )
                             onComplete(result)
+                        } catch (expected: CancellationException) {
+                            throw expected
                         } catch (expected: Exception) {
                             logger.error(expected) { "Re-import failed: ${expected.message}" }
                             errorMessage = "Re-import failed: ${expected.message}"
