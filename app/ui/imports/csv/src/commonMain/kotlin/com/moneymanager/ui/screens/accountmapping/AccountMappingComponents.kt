@@ -55,6 +55,11 @@ import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 
+/** Shown under the pattern field when there is no CSV sample to preview against. */
+private const val PATTERN_HINT =
+    "Matched against the account value the strategy reads. " +
+        "Use ^value$ for exact match, or .*keyword.* for contains"
+
 /**
  * Collapsible list of account mappings with add/edit/delete actions. Reused by the strategy editor
  * (strategy-scoped mappings) and, implicitly, mirrors the global Account Mappings screen's list.
@@ -208,11 +213,7 @@ internal fun AccountMappingEditorDialog(
                     isError = patternText.isBlank(),
                     supportingText = {
                         val preview = matchPreview(csvColumns, sampleRows, patternText)
-                        Text(
-                            preview
-                                ?: "Matched against the account value the strategy reads. " +
-                                "Use ^value$ for exact match, or .*keyword.* for contains",
-                        )
+                        Text(preview ?: PATTERN_HINT)
                     },
                 )
 
