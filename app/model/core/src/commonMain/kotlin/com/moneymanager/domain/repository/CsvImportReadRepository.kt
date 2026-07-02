@@ -2,6 +2,7 @@
 
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -32,6 +33,12 @@ interface CsvImportReadRepository {
         limit: Int,
         offset: Int,
     ): List<CsvRow>
+
+    /**
+     * Ids of the accounts this import auto-created (from CSV provenance). Used by re-import to
+     * scope account merges/deletions to import-created accounts only.
+     */
+    suspend fun getAccountsCreatedByImport(id: CsvImportId): Set<AccountId>
 
     /**
      * Finds imports that match the given file checksum.

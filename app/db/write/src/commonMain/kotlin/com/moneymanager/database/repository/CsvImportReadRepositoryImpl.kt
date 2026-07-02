@@ -7,6 +7,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.csv.CsvTableManager
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -30,6 +31,7 @@ class CsvImportReadRepositoryImpl(
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : CsvImportReadRepository {
     private val csvImportSelectQueries = database.csvImportSelectQueries
+    private val entitySourceSelectQueries = database.entitySourceSelectQueries
     private val tableManager = CsvTableManager(database)
 
     override fun getAllImports(): Flow<List<CsvImport>> =
@@ -88,6 +90,15 @@ class CsvImportReadRepositoryImpl(
                 limit = limit,
                 offset = offset,
             )
+        }
+
+    override suspend fun getAccountsCreatedByImport(id: CsvImportId): Set<AccountId> =
+        withContext(coroutineContext) {
+            entitySourceSelectQueries
+                .selectAccountIdsCreatedByCsvImport(id.id.toString())
+                .executeAsList()
+                .map { AccountId(it) }
+                .toSet()
         }
 
     override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =
