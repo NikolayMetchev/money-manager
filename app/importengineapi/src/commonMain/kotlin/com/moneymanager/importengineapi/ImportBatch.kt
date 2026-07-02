@@ -278,7 +278,7 @@ data class ImportFee(
  * amount: a funding leg (the transfer's own `fromAccount` → [conduit]) and a spend leg
  * ([conduit] → [merchantTarget]), linked via a [relationshipTypeId] (`pass-through`) relationship. The
  * engine expands this into the second [Transfer] in the same batch — like [ImportFee], producers don't
- * allocate ids. The conduit nets to zero, so the spend is counted once.
+ * allocate ids. The conduit nets to zero, so the spend is counted once (in either direction).
  *
  * This is fully generic: the engine never inspects the merchant text or knows the conduit's name —
  * detection + extraction happen in the importers via [PassThroughDetector] and user-editable config.
@@ -290,6 +290,9 @@ data class ImportFee(
  *   the main transfer's description.
  * @property relationshipTypeId The `pass-through` relationship type linking funding (id1) to spend (id2).
  * @property rowKey Provenance key for the spend leg; when null the engine falls back to the main row key.
+ * @property incoming True for a refund/cancellation arriving back on the card: the funding leg (the main
+ *   transfer, built by the producer) is [conduit] → card and the engine's spend leg is
+ *   [merchantTarget] → [conduit].
  */
 data class ImportPassThrough(
     val conduit: AccountRef,
@@ -298,6 +301,7 @@ data class ImportPassThrough(
     val spendDescription: String,
     val relationshipTypeId: RelationshipTypeId,
     val rowKey: ImportRowKey? = null,
+    val incoming: Boolean = false,
 )
 
 /**

@@ -202,6 +202,79 @@ class CsvTransferMapperTest {
         assertEquals(setOf("Curve", "Sainsburys"), newNames)
     }
 
+    // Mirrors the seeded Curve rule incl. Crypto.com's cancellation prefixes.
+    private val curveWithCancellations =
+        PassThroughAccount(
+            id = PassThroughAccountId(1),
+            name = "Curve",
+            conduitAccountName = "Curve",
+            rules =
+                listOf(
+                    PassThroughRule(
+                        detectionPattern = "(?i)^(?:Refund: |Refund reversal: |Cancellation: )?CRV\\*",
+                        merchantPattern = "(?i)^(?:Refund: |Refund reversal: |Cancellation: )?CRV\\*\\s*(.+?)(?:\\s{2,}.*)?\$",
+                    ),
+                ),
+        )
+
+    @Test
+    fun `mapRow routes an incoming Curve refund through the conduit on the source side`() {
+        val strategy = createStrategy(flipAccountsOnPositive = true)
+        val curveAccountId = AccountId(5)
+        val curveAccount = Account(id = curveAccountId, name = "Curve", openingDate = Clock.System.now())
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columns,
+                existingAccounts = mapOf("Curve" to curveAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                passThroughDetector = PassThroughDetector(listOf(curveWithCancellations)),
+            )
+
+        // A cancelled charge refunded onto the card: positive amount, so the row is incoming (flipped).
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Refund: Crv*Navan", "363.58", "Refund: Crv*Navan"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        // The funding leg runs conduit -> card: the conduit replaces the row's source account.
+        assertEquals(curveAccountId, result.transfer.sourceAccountId)
+        assertEquals(testSourceAccountId, result.transfer.targetAccountId)
+        assertEquals(true, result.passThrough?.incoming)
+        // The merchant is the bare name, so the refund hits the same account as the original charge.
+        assertEquals("Navan", result.passThrough?.merchantName)
+        // Only the merchant is new; no junk "Refund: Crv*Navan" account is created.
+        assertEquals(setOf("Navan"), result.newAccounts.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `mapRow routes an outgoing Curve refund reversal through the conduit like an ordinary charge`() {
+        val strategy = createStrategy(flipAccountsOnPositive = true)
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columns,
+                existingAccounts = emptyMap(),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                passThroughDetector = PassThroughDetector(listOf(curveWithCancellations)),
+            )
+
+        // A refund reversal is negative (money leaves the card again), so it takes the outgoing path.
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Refund reversal: Crv*Navan", "-363.58", "Refund reversal: Crv*Navan"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(testSourceAccountId, result.transfer.sourceAccountId)
+        assertEquals(false, result.passThrough?.incoming)
+        assertEquals("Navan", result.passThrough?.merchantName)
+        assertEquals(setOf("Curve", "Navan"), result.newAccounts.map { it.name }.toSet())
+    }
+
     @Test
     fun `mapRow returns error for invalid date format`() {
         val strategy = createStrategy()

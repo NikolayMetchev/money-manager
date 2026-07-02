@@ -274,6 +274,36 @@ WHERE (source_account_id = :accountA AND target_account_id = :accountB)
    OR (source_account_id = :accountB AND target_account_id = :accountA)
 ORDER BY timestamp DESC;
 
+-- Candidate originals for a reversal (refund/cancellation) link: directed transfers of the same amount
+-- not yet reversed (never id2 of a :reversalTypeId relationship), newest first. Used by the import
+-- engine to pair a pass-through refund's spend leg with the charge it reverses.
+selectUnreversedTransfersBetweenAccountsByAmount:
+SELECT
+    transfer.id,
+    transfer.revision_id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    transfer.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer
+JOIN currency ON transfer.currency_id = currency.id
+WHERE transfer.source_account_id = :sourceAccountId
+  AND transfer.target_account_id = :targetAccountId
+  AND transfer.amount = :amount
+  AND transfer.currency_id = :currencyId
+  AND transfer.timestamp <= :maxTimestamp
+  AND NOT EXISTS (
+      SELECT 1 FROM transfer_relationship
+      WHERE transfer_relationship.id2 = transfer.id
+        AND transfer_relationship.relationship_type_id = :reversalTypeId
+  )
+ORDER BY transfer.timestamp DESC, transfer.id DESC;
+
 -- Current revision of a single transfer, for recording its source after a merge/unmerge reassignment.
 selectRevisionById:
 SELECT revision_id FROM transfer WHERE id = ?;

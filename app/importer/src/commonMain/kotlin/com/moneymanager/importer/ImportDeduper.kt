@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -37,13 +38,41 @@ data class ExistingTransferInfo(
  * @property inBatchMatchIndex For an in-batch DUPLICATE (it matched an earlier accepted transfer in the
  *   same batch that has no id yet), the index of that earlier transfer in the classified list; the
  *   engine resolves it to the earlier transfer's created id. Null otherwise.
+ * @property reversalLink For a pass-through row that reverses an earlier movement (a refund/cancellation,
+ *   or a re-booking that undoes one), the spend leg it reverses. Resolved by the engine after
+ *   classification; the deduper never sets it.
  */
 data class Classified(
     val transfer: ImportTransfer,
     val status: ImportStatus,
     val existing: TransferId?,
     val inBatchMatchIndex: Int? = null,
+    val reversalLink: ReversalLink? = null,
 )
+
+/**
+ * A `reversal` relationship to create from a new pass-through spend leg (id1) to the spend leg it
+ * reverses (id2).
+ *
+ * @property target The reversed spend leg: an existing (persisted) transfer, or the spend leg of an
+ *   earlier row in the same to-import list (index into that list), resolved to its temp id at write time.
+ * @property typeId The `reversal` relationship type id.
+ */
+data class ReversalLink(
+    val target: ReversalTarget,
+    val typeId: RelationshipTypeId,
+)
+
+/** See [ReversalLink.target]. */
+sealed interface ReversalTarget {
+    data class Existing(
+        val id: TransferId,
+    ) : ReversalTarget
+
+    data class BatchRow(
+        val toImportIndex: Int,
+    ) : ReversalTarget
+}
 
 /**
  * Deduplicates incoming transfers against existing ones according to a [DedupePolicy]. Account

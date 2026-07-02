@@ -80,6 +80,10 @@ import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.personalCounterpartyKey
 import kotlinx.coroutines.flow.first
+import kotlin.time.Instant
+
+/** The seeded `relationship_type` name linking a reversing movement (id1) to the one it reverses (id2). */
+private const val REVERSAL_RELATIONSHIP_TYPE_NAME = "reversal"
 
 /**
  * Database-backed [ImportEngine]. Takes a fully-built [ImportBatch] and performs the whole import:
@@ -375,7 +379,7 @@ class ImportEngineImpl(
         val existing = loadExisting(resolvedTransfers, batch)
         val classified = ImportDeduper(batch.dedupePolicy, existing).classify(resolvedTransfers)
 
-        val toImport = classified.filter { it.status == ImportStatus.IMPORTED }
+        val toImport = resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })
         val toUpdate = classified.filter { it.status == ImportStatus.UPDATED }
         val duplicates = classified.count { it.status == ImportStatus.DUPLICATE }
         val excluded = resolvedTransfers.count { it.excludedFromBalances }
@@ -414,6 +418,79 @@ class ImportEngineImpl(
             orderedRowOutcomes = orderedRowOutcomes,
         )
     }
+
+    /**
+     * Pairs each pass-through row with the movement it reverses: the nearest not-yet-reversed spend leg
+     * running in the OPPOSITE direction between the same conduit and merchant accounts with the same
+     * amount, at or before the row's timestamp. An incoming refund thus links to the original charge, a
+     * subsequent "refund reversal" (outgoing again) links to the refund it undoes, and so on — each pair
+     * consumes one earlier leg (a leg is reversed at most once, enforced against the DB via the query's
+     * NOT EXISTS and within this batch via the claimed sets). Candidates come from the DB and from
+     * earlier rows in [toImport]; on a timestamp tie the in-batch leg wins (it is the later write).
+     * Rows without a match are imported unlinked.
+     */
+    private suspend fun resolveReversalLinks(toImport: List<Classified>): List<Classified> {
+        if (toImport.none { it.transfer.passThrough != null }) return toImport
+        val reversalTypeId = relationshipTypeRepository.getOrCreate(REVERSAL_RELATIONSHIP_TYPE_NAME)
+        val claimedExisting = mutableSetOf<TransferId>()
+        val claimedInBatch = mutableSetOf<Int>()
+        val batchSpendLegs = mutableListOf<BatchSpendLeg>()
+        return toImport.mapIndexed { index, classified ->
+            val t = classified.transfer
+            val passThrough = t.passThrough ?: return@mapIndexed classified
+            val conduit = passThrough.conduit.requireExistingId()
+            val merchant = passThrough.merchantTarget.requireExistingId()
+            val spendSource = if (passThrough.incoming) merchant else conduit
+            val spendTarget = if (passThrough.incoming) conduit else merchant
+            val timestamp = requireNotNull(t.timestamp)
+            val amount = passThrough.amount
+
+            // The reversed candidate runs the opposite way: its source/target are this leg's swapped.
+            val inBatchMatch =
+                batchSpendLegs
+                    .filter { leg ->
+                        leg.toImportIndex !in claimedInBatch &&
+                            leg.source == spendTarget &&
+                            leg.target == spendSource &&
+                            leg.amount == amount &&
+                            leg.timestamp <= timestamp
+                    }.maxWithOrNull(compareBy({ it.timestamp }, { it.toImportIndex }))
+            val existingMatch =
+                transactionRepository
+                    .getUnreversedTransfersBetween(spendTarget, spendSource, amount, timestamp, reversalTypeId)
+                    .firstOrNull { it.id !in claimedExisting }
+
+            val link =
+                when {
+                    inBatchMatch != null && (existingMatch == null || existingMatch.timestamp <= inBatchMatch.timestamp) -> {
+                        claimedInBatch += inBatchMatch.toImportIndex
+                        ReversalLink(ReversalTarget.BatchRow(inBatchMatch.toImportIndex), reversalTypeId)
+                    }
+                    existingMatch != null -> {
+                        claimedExisting += existingMatch.id
+                        ReversalLink(ReversalTarget.Existing(existingMatch.id), reversalTypeId)
+                    }
+                    else -> null
+                }
+            batchSpendLegs += BatchSpendLeg(index, spendSource, spendTarget, amount, timestamp)
+            if (link == null) classified else classified.copy(reversalLink = link)
+        }
+    }
+
+    /** A pass-through spend leg produced by an earlier row in the current to-import list. */
+    private class BatchSpendLeg(
+        val toImportIndex: Int,
+        val source: AccountId,
+        val target: AccountId,
+        val amount: Money,
+        val timestamp: Instant,
+    )
+
+    private fun AccountRef.requireExistingId(): AccountId =
+        when (this) {
+            is AccountRef.Existing -> id
+            is AccountRef.Local -> error("Unresolved account reference: $key")
+        }
 
     // endregion
 
@@ -852,7 +929,7 @@ class ImportEngineImpl(
         val createdIds = mutableListOf<TransferId>()
         var written = 0
         chunks.forEachIndexed { index, chunk ->
-            val payload = buildCreatePayload(chunk)
+            val payload = buildCreatePayload(chunk, chunkStartIndex = index * effectiveBatchSize)
             // Updates ride with the final create chunk (one transaction in the common single-chunk case).
             val (updates, updateSources) =
                 if (index == chunks.lastIndex) buildUpdates(toUpdate) else emptyList<TransferUpdate>() to emptyList()
@@ -891,7 +968,10 @@ class ImportEngineImpl(
         val mainResultIndices: List<Int>,
     )
 
-    private fun buildCreatePayload(chunk: List<Classified>): CreatePayload {
+    private fun buildCreatePayload(
+        chunk: List<Classified>,
+        chunkStartIndex: Int,
+    ): CreatePayload {
         // Assign negative temp ids so newAttributes/newRelationships can be keyed before real ids exist.
         // A main transfer carrying a fee expands into two transfers (main + fee) created in this same
         // chunk; the fee is linked to the main via a `fee` relationship resolved by the repository's
@@ -901,8 +981,12 @@ class ImportEngineImpl(
         val newRelationships = mutableMapOf<TransferId, List<NewRelationship>>()
         val orderedSources = mutableListOf<Source>()
         val mainResultIndices = mutableListOf<Int>()
+        // Spend-leg temp ids keyed by to-import index, for reversal links targeting an earlier row of
+        // this chunk. Temp ids only resolve within one importTransfers call, so a link whose target
+        // landed in an earlier chunk is dropped (only possible with an explicit small batchSize).
+        val spendTempIdByImportIndex = mutableMapOf<Int, TransferId>()
         var tempCounter = 0
-        chunk.forEach { classified ->
+        chunk.forEachIndexed { chunkIndex, classified ->
             val t = classified.transfer
             val mainTempId = TransferId(-(++tempCounter).toLong())
             val fee = t.fee
@@ -959,18 +1043,33 @@ class ImportEngineImpl(
             if (fee != null && feeTempId != null) {
                 addLeg(feeTempId, fee.description, fee.source, fee.target, fee.amount, fee.rowKey)
             }
-            // The pass-through spend leg (conduit -> merchant), same amount as the funding leg (the main
-            // transfer, card -> conduit), linked via the pass-through relationship so the conduit nets to
-            // zero and the spend is counted once.
+            // The pass-through spend leg, same amount as the funding leg (the main transfer), linked via
+            // the pass-through relationship so the conduit nets to zero and the spend is counted once.
+            // Outgoing charge: funding card -> conduit, spend conduit -> merchant. Incoming
+            // refund/cancellation: funding conduit -> card, spend merchant -> conduit.
             if (passThrough != null && spendTempId != null) {
                 addLeg(
                     spendTempId,
                     passThrough.spendDescription,
-                    passThrough.conduit,
-                    passThrough.merchantTarget,
+                    if (passThrough.incoming) passThrough.merchantTarget else passThrough.conduit,
+                    if (passThrough.incoming) passThrough.conduit else passThrough.merchantTarget,
                     passThrough.amount,
                     passThrough.rowKey,
                 )
+                spendTempIdByImportIndex[chunkStartIndex + chunkIndex] = spendTempId
+                // Reversal pairing: this spend leg (id1) reverses an earlier one (id2) — either an
+                // existing transfer or an earlier row's spend leg created in this same chunk.
+                val reversalLink = classified.reversalLink
+                if (reversalLink != null) {
+                    val reversalTargetId =
+                        when (val target = reversalLink.target) {
+                            is ReversalTarget.Existing -> target.id
+                            is ReversalTarget.BatchRow -> spendTempIdByImportIndex[target.toImportIndex]
+                        }
+                    if (reversalTargetId != null) {
+                        newRelationships[spendTempId] = listOf(NewRelationship(reversalTargetId, reversalLink.typeId))
+                    }
+                }
             }
         }
         return CreatePayload(transfersToCreate, newAttributes, newRelationships, orderedSources, mainResultIndices)

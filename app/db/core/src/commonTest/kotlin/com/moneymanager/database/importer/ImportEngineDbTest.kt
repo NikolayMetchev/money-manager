@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountMergeRequest
@@ -37,6 +38,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 class ImportEngineDbTest : DbTest() {
@@ -548,6 +550,325 @@ class ImportEngineDbTest : DbTest() {
                     .single()
             assertEquals(fundingId, relationship.id1)
             assertEquals("pass-through", relationship.relationshipType.name)
+        }
+
+    /** A pass-through row: the funding leg card <-> Curve plus the [ImportPassThrough] spend leg. */
+    private fun passThroughRow(
+        rowIndex: Long,
+        cardId: AccountId,
+        curve: LocalAccountKey,
+        merchant: LocalAccountKey,
+        amount: Money,
+        timestamp: Instant,
+        description: String,
+        incoming: Boolean,
+        merchantName: String = "Navan",
+    ) = ImportTransfer(
+        rowKey = ImportRowKey.CsvRow(rowIndex),
+        fromAccount = if (incoming) AccountRef.Local(curve) else AccountRef.Existing(cardId),
+        toAccount = if (incoming) AccountRef.Existing(cardId) else AccountRef.Local(curve),
+        source = Source.SampleGenerator,
+        timestamp = timestamp,
+        description = description,
+        amount = amount,
+        passThrough =
+            ImportPassThrough(
+                conduit = AccountRef.Local(curve),
+                merchantTarget = AccountRef.Local(merchant),
+                amount = amount,
+                spendDescription = merchantName,
+                relationshipTypeId = RelationshipTypeId(WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID),
+                incoming = incoming,
+            ),
+    )
+
+    private fun passThroughAccountIntents(
+        curve: LocalAccountKey,
+        merchant: LocalAccountKey,
+        merchantName: String = "Navan",
+    ) = listOf(
+        ImportAccountIntent(
+            key = curve,
+            match = AccountMatchKey.ByName("Curve"),
+            name = "Curve",
+            openingDate = baseTime,
+            source = Source.SampleGenerator,
+        ),
+        ImportAccountIntent(
+            key = merchant,
+            match = AccountMatchKey.ByName(merchantName),
+            name = merchantName,
+            openingDate = baseTime,
+            source = Source.SampleGenerator,
+        ),
+    )
+
+    /** The spend leg linked to [fundingId] via its pass-through relationship. */
+    private suspend fun spendLegOf(fundingId: TransferId): TransferId =
+        repositories.transferRelationshipRepository
+            .getByTransfer(fundingId)
+            .first()
+            .single { it.relationshipType.name == "pass-through" }
+            .id2
+
+    private suspend fun reversalLinksOf(transferId: TransferId) =
+        repositories.transferRelationshipRepository
+            .getByTransfer(transferId)
+            .first()
+            .filter { it.relationshipType.name == "reversal" }
+
+    @Test
+    fun passThrough_incomingRefund_reversesLegsAndLinksToChargeInSameBatch() =
+        runTest {
+            val cardId = createSourceAccount()
+            val currency = gbp()
+            val curve = LocalAccountKey("curve")
+            val merchant = LocalAccountKey("merchant")
+            val amount = Money(36358, currency)
+
+            val result =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(
+                                passThroughRow(0, cardId, curve, merchant, amount, baseTime, "Crv*Navan", incoming = false),
+                                passThroughRow(
+                                    1,
+                                    cardId,
+                                    curve,
+                                    merchant,
+                                    amount,
+                                    baseTime.plus(1.hours),
+                                    "Refund: Crv*Navan",
+                                    incoming = true,
+                                ),
+                            ),
+                        dedupePolicy = DedupePolicy.None,
+                        accountsToCreate = passThroughAccountIntents(curve, merchant),
+                    ),
+                )
+            assertEquals(2, result.transfersImported)
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val curveId = accounts.first { it.name == "Curve" }.id
+            val merchantId = accounts.first { it.name == "Navan" }.id
+
+            // The refund's funding leg runs conduit -> card and its spend leg merchant -> conduit.
+            val refundFundingId = result.createdTransferIds.getValue(ImportRowKey.CsvRow(1))
+            val refundFunding =
+                repositories.transactionRepository
+                    .getTransactionById(refundFundingId.id)
+                    .first()!!
+            assertEquals(curveId, refundFunding.sourceAccountId)
+            assertEquals(cardId, refundFunding.targetAccountId)
+            val refundSpendId = spendLegOf(refundFundingId)
+            val refundSpend = repositories.transactionRepository.getTransactionById(refundSpendId.id).first()!!
+            assertEquals(merchantId, refundSpend.sourceAccountId)
+            assertEquals(curveId, refundSpend.targetAccountId)
+
+            // Charge + refund cancel out on both the conduit and the merchant.
+            listOf(curveId, merchantId).forEach { accountId ->
+                val net =
+                    repositories.transactionRepository
+                        .getTransactionsByAccount(accountId)
+                        .first()
+                        .sumOf { t ->
+                            when (accountId) {
+                                t.targetAccountId -> t.amount.amount
+                                t.sourceAccountId -> -t.amount.amount
+                                else -> 0L
+                            }
+                        }
+                assertEquals(0L, net, "account $accountId should net to zero")
+            }
+
+            // The refund's spend leg (id1) links to the original charge's spend leg (id2).
+            val chargeSpendId = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(0)))
+            val reversal = reversalLinksOf(refundSpendId).single()
+            assertEquals(refundSpendId, reversal.id1)
+            assertEquals(chargeSpendId, reversal.id2)
+        }
+
+    @Test
+    fun passThrough_refundInLaterImport_linksToPersistedCharge() =
+        runTest {
+            val cardId = createSourceAccount()
+            val currency = gbp()
+            val curve = LocalAccountKey("curve")
+            val merchant = LocalAccountKey("merchant")
+            val amount = Money(36358, currency)
+
+            val first =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(passThroughRow(0, cardId, curve, merchant, amount, baseTime, "Crv*Navan", incoming = false)),
+                        dedupePolicy = DedupePolicy.None,
+                        accountsToCreate = passThroughAccountIntents(curve, merchant),
+                    ),
+                )
+            val second =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(
+                                passThroughRow(
+                                    0,
+                                    cardId,
+                                    curve,
+                                    merchant,
+                                    amount,
+                                    baseTime.plus(1.hours),
+                                    "Refund: Crv*Navan",
+                                    incoming = true,
+                                ),
+                            ),
+                        dedupePolicy = DedupePolicy.None,
+                        accountsToCreate = passThroughAccountIntents(curve, merchant),
+                    ),
+                )
+
+            val chargeSpendId = spendLegOf(first.createdTransferIds.getValue(ImportRowKey.CsvRow(0)))
+            val refundSpendId = spendLegOf(second.createdTransferIds.getValue(ImportRowKey.CsvRow(0)))
+            val reversal = reversalLinksOf(refundSpendId).single()
+            assertEquals(refundSpendId, reversal.id1)
+            assertEquals(chargeSpendId, reversal.id2)
+        }
+
+    @Test
+    fun passThrough_chainOfRefundsAndReversals_linksPairwiseConsumingEachLegOnce() =
+        runTest {
+            val cardId = createSourceAccount()
+            val currency = gbp()
+            val curve = LocalAccountKey("curve")
+            val merchant = LocalAccountKey("merchant")
+            val amount = Money(36358, currency)
+
+            // The observed Crypto.com sequence: charge, refund, refund reversal, refund again.
+            val result =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(
+                                passThroughRow(0, cardId, curve, merchant, amount, baseTime, "Crv*Navan", incoming = false),
+                                passThroughRow(
+                                    1,
+                                    cardId,
+                                    curve,
+                                    merchant,
+                                    amount,
+                                    baseTime.plus(1.hours),
+                                    "Refund: Crv*Navan",
+                                    incoming = true,
+                                ),
+                                passThroughRow(
+                                    2,
+                                    cardId,
+                                    curve,
+                                    merchant,
+                                    amount,
+                                    baseTime.plus(2.hours),
+                                    "Refund reversal: Crv*Navan",
+                                    incoming = false,
+                                ),
+                                passThroughRow(
+                                    3,
+                                    cardId,
+                                    curve,
+                                    merchant,
+                                    amount,
+                                    baseTime.plus(3.hours),
+                                    "Refund: Crv*Navan",
+                                    incoming = true,
+                                ),
+                            ),
+                        dedupePolicy = DedupePolicy.None,
+                        accountsToCreate = passThroughAccountIntents(curve, merchant),
+                    ),
+                )
+
+            val spendIds =
+                (0L..3L).map { spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(it))) }
+            // Pairwise: refund -> charge, reversal -> refund, second refund -> reversal.
+            (1..3).forEach { i ->
+                val reversal = reversalLinksOf(spendIds[i]).single { it.id1 == spendIds[i] }
+                assertEquals(spendIds[i - 1], reversal.id2, "row $i should reverse row ${i - 1}")
+            }
+            // Each leg is consumed at most once: exactly 3 links, all id2s distinct.
+            val allLinks = spendIds.flatMap { reversalLinksOf(it) }.distinct()
+            assertEquals(3, allLinks.size)
+            assertEquals(3, allLinks.map { it.id2 }.toSet().size)
+        }
+
+    @Test
+    fun passThrough_refundWithDifferentAmount_getsNoReversalLink() =
+        runTest {
+            val cardId = createSourceAccount()
+            val currency = gbp()
+            val curve = LocalAccountKey("curve")
+            val merchant = LocalAccountKey("merchant")
+
+            val result =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(
+                                passThroughRow(0, cardId, curve, merchant, Money(36358, currency), baseTime, "Crv*Navan", incoming = false),
+                                passThroughRow(
+                                    1,
+                                    cardId,
+                                    curve,
+                                    merchant,
+                                    Money(12345, currency),
+                                    baseTime.plus(1.hours),
+                                    "Refund: Crv*Navan",
+                                    incoming = true,
+                                ),
+                            ),
+                        dedupePolicy = DedupePolicy.None,
+                        accountsToCreate = passThroughAccountIntents(curve, merchant),
+                    ),
+                )
+
+            val refundSpendId = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(1)))
+            assertTrue(reversalLinksOf(refundSpendId).isEmpty())
+        }
+
+    @Test
+    fun passThrough_repeatChargesSameDirection_getNoReversalLink() =
+        runTest {
+            val cardId = createSourceAccount()
+            val currency = gbp()
+            val curve = LocalAccountKey("curve")
+            val merchant = LocalAccountKey("merchant")
+            val amount = Money(1400, currency)
+
+            val result =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(
+                                passThroughRow(0, cardId, curve, merchant, amount, baseTime, "Crv*Zipcar Trip Oct05", incoming = false),
+                                passThroughRow(
+                                    1,
+                                    cardId,
+                                    curve,
+                                    merchant,
+                                    amount,
+                                    baseTime.plus(1.hours),
+                                    "Crv*Zipcar Trip Oct05",
+                                    incoming = false,
+                                ),
+                            ),
+                        dedupePolicy = DedupePolicy.None,
+                        accountsToCreate = passThroughAccountIntents(curve, merchant),
+                    ),
+                )
+
+            (0L..1L).forEach { row ->
+                val spendId = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(row)))
+                assertTrue(reversalLinksOf(spendId).isEmpty(), "row $row must not link")
+            }
         }
 
     @Test

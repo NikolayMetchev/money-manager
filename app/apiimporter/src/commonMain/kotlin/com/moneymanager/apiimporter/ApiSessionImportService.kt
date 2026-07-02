@@ -1774,13 +1774,14 @@ private suspend fun prepareValidTransactionItem(
             jsonPath = item.counterpartyJsonPath(setup.strategy.peopleMappings),
         )
     val data = item.toTransferData(currency)
-    // A pass-through (conduit) charge such as Curve, detected from the description (e.g. "CRV*…"). Only
-    // outgoing spends are routed: the transfer becomes the funding leg own -> conduit and the engine adds
-    // the spend leg conduit -> merchant. Detection + the conduit/merchant names come from user-editable
-    // config; routing here also avoids creating a "CRV*…" junk counterparty account. Declined items (no
-    // real movement) and zero-value items (handled as "Void") are never expanded into a spend leg.
+    // A pass-through (conduit) charge such as Curve, detected from the description (e.g. "CRV*…"). An
+    // outgoing spend becomes the funding leg own -> conduit and the engine adds the spend leg conduit ->
+    // merchant; an incoming refund/cancellation ("Refund: CRV*…") runs both legs the other way. Detection
+    // + the conduit/merchant names come from user-editable config; routing here also avoids creating a
+    // "CRV*…" junk counterparty account. Declined items (no real movement) and zero-value items (handled
+    // as "Void") are never expanded into a spend leg.
     val passThroughMatch =
-        if (!data.isIncoming && !item.isZeroAmount && item.declineReason.isNullOrBlank()) {
+        if (!item.isZeroAmount && item.declineReason.isNullOrBlank()) {
             setup.passThroughDetector?.detect(data.description)
         } else {
             null
@@ -1856,6 +1857,7 @@ private suspend fun prepareValidTransactionItem(
                         amount = amount,
                         spendDescription = match.merchantName,
                         relationshipTypeId = RelationshipTypeId(match.account.relationshipTypeId),
+                        incoming = data.isIncoming,
                     ),
             )
         }
@@ -1866,18 +1868,20 @@ private suspend fun prepareValidTransactionItem(
         responseId = responseId,
         requestId = context.requestId,
         item = item,
-        // Pass-through: funding leg own -> conduit. Otherwise the normal own/counterparty pairing.
+        // Pass-through: funding leg own -> conduit (or conduit -> own for an incoming
+        // refund/cancellation). Otherwise the normal own/counterparty pairing.
         source =
-            if (passThrough != null) {
-                ownAccountRef
-            } else if (data.isIncoming) {
-                counterpartyRef!!
-            } else {
-                ownAccountRef
+            when {
+                passThrough != null -> if (data.isIncoming) passThrough.conduit else ownAccountRef
+                data.isIncoming -> counterpartyRef!!
+                else -> ownAccountRef
             },
         target =
-            passThrough?.conduit
-                ?: if (data.isIncoming) ownAccountRef else counterpartyRef!!,
+            when {
+                passThrough != null -> if (data.isIncoming) ownAccountRef else passThrough.conduit
+                data.isIncoming -> ownAccountRef
+                else -> counterpartyRef!!
+            },
         timestamp = item.created,
         description = data.description,
         amount = amount,

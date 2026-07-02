@@ -43,4 +43,10 @@ object WellKnownIds {
      * [com.moneymanager.domain.model.passthrough.PassThroughAccount].
      */
     const val PASS_THROUGH_RELATIONSHIP_TYPE_ID: Long = 3
+
+    /**
+     * "reversal" relationship type: id1 is the reversing movement (a refund/cancellation) and id2 the
+     * earlier movement it reverses — for pass-through rows, the two spend legs on the merchant account.
+     */
+    const val REVERSAL_RELATIONSHIP_TYPE_ID: Long = 4
 }
