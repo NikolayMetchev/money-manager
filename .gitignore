@@ -37,8 +37,10 @@ secrets/google-oauth.properties
 # Generated VERSION file (copied during build)
 app/main/android/src/main/assets/VERSION
 
-# Claude
-.claude/
+# Claude — commands/skills are shared; only local session state is ignored
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
 /hs_err_*.log
 .qodana
 # Monzo API session transcript fixtures

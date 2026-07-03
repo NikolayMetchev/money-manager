@@ -126,6 +126,7 @@ class PassThroughDetector(
                 }
             }
 
-        val TOKEN = Regex("\\$\\{([^}]+)}|\\$(\\d)")
+        // The closing brace must be escaped: Android's ICU regex engine rejects a bare `}`.
+        val TOKEN = Regex("\\$\\{([^}]+)\\}|\\$(\\d)")
     }
 }
