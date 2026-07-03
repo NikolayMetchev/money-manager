@@ -162,7 +162,8 @@ jobs:
       # system image explicitly before the emulator runner (whose sdkmanager call is pinned to
       # the stable channel and would fail to find it). The emulator itself stays on stable.
       - name: Install aosp_atd system image (dev channel)
-        run: sdkmanager --install 'system-images;android-36;aosp_atd;x86_64' --channel=2
+        # sdkmanager is not on PATH in plain steps (the emulator runner sets it up internally).
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'system-images;android-36;aosp_atd;x86_64' --channel=2
 
       - name: AVD cache
         uses: actions/cache@v6
