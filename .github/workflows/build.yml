@@ -158,6 +158,12 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
+      # The API-36 ATD images are only published on the dev channel (channel-2), so install the
+      # system image explicitly before the emulator runner (whose sdkmanager call is pinned to
+      # the stable channel and would fail to find it). The emulator itself stays on stable.
+      - name: Install aosp_atd system image (dev channel)
+        run: sdkmanager --install 'system-images;android-36;aosp_atd;x86_64' --channel=2
+
       - name: AVD cache
         uses: actions/cache@v6
         id: avd-cache
