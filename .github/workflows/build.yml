@@ -241,6 +241,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
 
       - name: Run buildHealth with Gradle
         uses: ./.github/actions/gradle-run
@@ -269,6 +271,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
 
       - name: Build release APK with Gradle
         uses: ./.github/actions/gradle-run
