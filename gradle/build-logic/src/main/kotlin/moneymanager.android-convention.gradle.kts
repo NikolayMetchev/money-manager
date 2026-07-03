@@ -29,8 +29,9 @@ fun KotlinMultiplatformExtension.configureAndroidTarget() {
 
         // Enable instrumented tests with Gradle Managed Device
         withDeviceTest {
-            // Enable code coverage for instrumented tests
-            enableCoverage = true
+            // JaCoCo instrumentation slows every instrumented test run, so coverage is opt-in:
+            // the main-branch CI job passes -PandroidCoverage=true; PR runs skip it.
+            enableCoverage = providers.gradleProperty("androidCoverage").map(String::toBoolean).getOrElse(false)
 
             managedDevices {
                 localDevices {

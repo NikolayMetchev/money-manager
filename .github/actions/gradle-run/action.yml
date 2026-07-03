@@ -9,6 +9,10 @@ inputs:
     description: 'Whether the Gradle cache should be read-only'
     required: false
     default: 'false'
+  cache-encryption-key:
+    description: 'AES key for configuration-cache data; empty disables config-cache save/restore'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -17,6 +21,7 @@ runs:
       uses: ./.github/actions/gradle-setup
       with:
         cache-read-only: ${{ inputs.cache-read-only }}
+        cache-encryption-key: ${{ inputs.cache-encryption-key }}
 
     - name: Run Gradle
       shell: bash
