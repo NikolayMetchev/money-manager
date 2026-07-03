@@ -1363,7 +1363,6 @@ class CsvTransferMapperTest {
 
     private fun accountMapping(
         id: Long,
-        pattern: String,
         accountId: AccountId,
         strategyId: CsvImportStrategyId? = null,
     ): AccountMapping {
@@ -1371,7 +1370,7 @@ class CsvTransferMapperTest {
         return AccountMapping(
             id = id,
             strategyId = strategyId,
-            valuePattern = Regex(pattern, RegexOption.IGNORE_CASE),
+            valuePattern = Regex(".*Amazoncouk.*", RegexOption.IGNORE_CASE),
             accountId = accountId,
             createdAt = now,
             updatedAt = now,
@@ -1404,7 +1403,7 @@ class CsvTransferMapperTest {
             passThroughMapper(
                 strategy = strategy,
                 existingAccounts = mapOf("Amazon" to amazonAccount, "Curve" to curveAccount),
-                accountMappings = listOf(accountMapping(1, ".*Amazoncouk.*", amazonAccount.id)),
+                accountMappings = listOf(accountMapping(1, amazonAccount.id)),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Crv*Amazoncouk 1234", "-50.00", "Crv*Amazoncouk 1234"))
@@ -1433,8 +1432,8 @@ class CsvTransferMapperTest {
                     ),
                 accountMappings =
                     listOf(
-                        accountMapping(1, ".*Amazoncouk.*", amazonAccount.id),
-                        accountMapping(2, ".*Amazoncouk.*", otherAccount.id, strategyId = strategy.id),
+                        accountMapping(1, amazonAccount.id),
+                        accountMapping(2, otherAccount.id, strategyId = strategy.id),
                     ),
             )
 
@@ -1452,7 +1451,7 @@ class CsvTransferMapperTest {
             passThroughMapper(
                 strategy = strategy,
                 existingAccounts = mapOf("Curve" to curveAccount),
-                accountMappings = listOf(accountMapping(1, ".*Amazoncouk.*", curveAccount.id)),
+                accountMappings = listOf(accountMapping(1, curveAccount.id)),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Crv*Amazoncouk 1234", "-50.00", "Crv*Amazoncouk 1234"))
@@ -1489,7 +1488,7 @@ class CsvTransferMapperTest {
             passThroughMapper(
                 strategy = strategy,
                 existingAccounts = mapOf("Amazon" to amazonAccount, "Curve" to curveAccount),
-                accountMappings = listOf(accountMapping(1, ".*Amazoncouk.*", amazonAccount.id)),
+                accountMappings = listOf(accountMapping(1, amazonAccount.id)),
             )
 
         val row =
