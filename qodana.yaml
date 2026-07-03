@@ -32,6 +32,12 @@ exclude:
       - app/ui/.editorconfig
   - name: unused
     paths:
+      # Metro DI modules/providers and the DB-free catalog factory are consumed by the Metro
+      # compiler plugin / DI wiring, which qodana can't see.
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/strategycatalog/StrategyCatalogModule.kt
+      - app/strategycatalog/src/commonMain/kotlin/com/moneymanager/strategycatalog/StrategyCatalogFactory.kt
+      # Fake StrategyLibrary: interface-mandated override parameters its stub bodies don't read.
+      - app/strategycatalog/src/commonTest/kotlin/com/moneymanager/strategycatalog/StrategyCatalogControllerTest.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
