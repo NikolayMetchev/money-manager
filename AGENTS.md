@@ -19,7 +19,7 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 
 | Command | Description |
 |---------|-------------|
-| `./gradlew build` | Build all, run tests, coverage, dependency health |
+| `./gradlew build` | Build all and run tests (coverage/dependency health run as separate CI jobs) |
 | `./gradlew :app:main:jvm:run` | Run JVM application |
 | `./gradlew :app:main:android:installDebug` | Install Android debug APK |
 | `./gradlew :app:ui:core:pixel6api36AndroidDeviceTest` | Run Android UI tests on managed device |
@@ -30,9 +30,10 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 Build-speed flags (off by default): the Android release variant (R8/minified) only exists with
 `-PbuildRelease=true` (CI main/release workflows pass it), and `build` only compiles Android
 device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compiles them anyway).
-`-PtestMaxParallelForks=N` overrides the parallel test-fork default (e.g. `=1` to serialize).
+`-PtestMaxParallelForks=N` overrides the parallel test-fork default (e.g. `=1` to serialize), and
+`-PandroidCoverage=true` enables JaCoCo coverage for instrumented tests (main-branch CI passes it).
 
-**Pre-push**: Always run `./gradlew build` locally before pushing.
+**Pre-push**: Always run `./gradlew build buildHealth` locally before pushing.
 
 ## Project Structure
 

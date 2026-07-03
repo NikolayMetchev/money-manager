@@ -55,10 +55,15 @@ jobs:
   build:
     name: Build and Test
     runs-on: ubuntu-latest
-    needs: changes
-    # Runs on PRs and pushes to main (not on releases/* pushes).
+    needs: [changes, lint-format]
+    # Runs on PRs and pushes to main (not on releases/* pushes). Heavy jobs wait for the cheap
+    # lint-format job: when it pushes formatting fixes, the resulting `synchronize` event cancels
+    # this run before the heavy jobs have burned minutes. `!cancelled()` is required so a SKIPPED
+    # lint-format (push/dispatch events) doesn't auto-skip this job.
     if: >-
+      !cancelled() &&
       needs.changes.outputs.code == 'true' &&
+      (needs.lint-format.result == 'success' || needs.lint-format.result == 'skipped') &&
       (github.event_name == 'pull_request' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
 
@@ -75,10 +80,13 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         with:
-          # The slow :app:db:core:jvmTest is split into its own parallel `db-core-test`
-          # job below so it no longer serializes the main build. Keep the two in sync.
-          command: build --stacktrace -x :app:db:core:jvmTest
+          # The slow :app:db:core:jvmTest is split into its own parallel `db-core-test` job below
+          # so it no longer serializes the main build (that job also produces db:core's coverage
+          # XML, hence the koverXmlReport exclusion). Keep the two in sync. `koverXmlReport`
+          # name-matches into every module and produces the per-module unit-coverage XMLs.
+          command: build koverXmlReport --stacktrace -x :app:db:core:jvmTest -x :app:db:core:koverXmlReport
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
       - name: Upload coverage and test results to Codecov
         uses: ./.github/actions/codecov-upload
@@ -89,11 +97,13 @@ jobs:
   db-core-test:
     name: db:core Tests
     runs-on: ubuntu-latest
-    needs: changes
-    # The :app:db:core:jvmTest suite is slow (~12 min), so it runs here in parallel
-    # with the main build (which excludes it via `-x :app:db:core:jvmTest`).
+    needs: [changes, lint-format]
+    # The :app:db:core:jvmTest suite is the slowest single test task, so it runs here in
+    # parallel with the main build (which excludes it via `-x :app:db:core:jvmTest`).
     if: >-
+      !cancelled() &&
       needs.changes.outputs.code == 'true' &&
+      (needs.lint-format.result == 'success' || needs.lint-format.result == 'skipped') &&
       (github.event_name == 'pull_request' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
 
@@ -111,6 +121,7 @@ jobs:
           # per-module coverage XML that Codecov merges with the main build's report.
           command: :app:db:core:koverXmlReport --stacktrace
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
       - name: Upload coverage and test results to Codecov
         uses: ./.github/actions/codecov-upload
@@ -122,9 +133,11 @@ jobs:
     name: Android Instrumented Tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: changes
+    needs: [changes, lint-format]
     if: >-
+      !cancelled() &&
       needs.changes.outputs.code == 'true' &&
+      (needs.lint-format.result == 'success' || needs.lint-format.result == 'skipped') &&
       (github.event_name == 'pull_request' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
 
@@ -143,6 +156,7 @@ jobs:
         uses: ./.github/actions/gradle-setup
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
       - name: AVD cache
         uses: actions/cache@v6
@@ -153,7 +167,7 @@ jobs:
             ~/.android/adb*
           # Android emulator API level sync: update with the Gradle managed device,
           # .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
-          key: avd-pixel6-api36-${{ runner.os }}
+          key: avd-pixel6-api36-aosp-atd-${{ runner.os }}
 
       - name: Create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
@@ -161,10 +175,12 @@ jobs:
         with:
           # Android emulator API level sync: update with the Gradle managed device,
           # .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
+          # aosp_atd is the headless test-optimized image — same source as the local
+          # Gradle managed device (systemImageSource = "aosp-atd").
           api-level: 36
           arch: x86_64
           profile: pixel_6
-          target: google_apis
+          target: aosp_atd
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
@@ -179,14 +195,16 @@ jobs:
           api-level: 36
           arch: x86_64
           profile: pixel_6
-          target: google_apis
+          target: aosp_atd
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: ./gradlew connectedAndroidDeviceTest createAndroidDeviceTestCoverageReport --stacktrace --console=plain
+          # JaCoCo coverage instrumentation slows every instrumented test, so PRs run the tests
+          # uninstrumented; pushes to main collect and upload the instrumented coverage.
+          script: ./gradlew connectedAndroidDeviceTest${{ github.ref == 'refs/heads/main' && ' createAndroidDeviceTestCoverageReport -PandroidCoverage=true' || '' }} --stacktrace --console=plain
 
       - name: Upload coverage and test results to Codecov
-        if: always()
+        if: always() && github.ref == 'refs/heads/main'
         uses: ./.github/actions/codecov-upload
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -203,11 +221,71 @@ jobs:
             **/build/outputs/androidTest-results/**
           retention-days: 7
 
+  build-health:
+    name: Dependency Health
+    runs-on: ubuntu-latest
+    needs: [changes, lint-format]
+    # DAGP's buildHealth aggregation over every module used to run inside the main build job
+    # (root `build` depended on it); as its own job it gates PRs off the critical path.
+    if: >-
+      !cancelled() &&
+      needs.changes.outputs.code == 'true' &&
+      (needs.lint-format.result == 'success' || needs.lint-format.result == 'skipped') &&
+      (github.event_name == 'pull_request' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Run buildHealth with Gradle
+        uses: ./.github/actions/gradle-run
+        env:
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+        with:
+          command: buildHealth --stacktrace
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+
+  android-release:
+    name: Android Release Build
+    runs-on: ubuntu-latest
+    needs: [changes, lint-format]
+    # The R8/minified release APK is no longer built on PRs (-PbuildRelease gates the variant),
+    # so build it on every push to main: R8 breakage surfaces there, and release.yml's
+    # check-build gate then blocks tagging a broken commit. Keep the command identical to
+    # release.yml's Android matrix entry so they share a configuration-cache entry.
+    if: >-
+      !cancelled() &&
+      needs.changes.outputs.code == 'true' &&
+      (needs.lint-format.result == 'success' || needs.lint-format.result == 'skipped') &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Build release APK with Gradle
+        uses: ./.github/actions/gradle-run
+        env:
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+        with:
+          command: :app:main:android:assembleRelease -PbuildRelease=true --stacktrace
+          cache-read-only: false
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+
   qodana:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
+    needs: [changes, lint-format]
+    # Unlike the other heavy jobs this one also runs on workflow_dispatch, so it has no
+    # event-name condition.
+    if: >-
+      !cancelled() &&
+      needs.changes.outputs.code == 'true' &&
+      (needs.lint-format.result == 'success' || needs.lint-format.result == 'skipped')
     permissions:
       contents: write
       pull-requests: write
@@ -226,6 +304,7 @@ jobs:
         with:
           command: jvmMainClasses
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
       - name: Restore Qodana cache (read-only on non-main branches)
         if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/releases/')
         uses: actions/cache/restore@v6
@@ -286,10 +365,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
-        with:
-          # Gradle version sync: keep this aligned with gradle/wrapper/gradle-wrapper.properties
-          # and .github/actions/gradle-setup/action.yml.
-          gradle-version: 9.5.0
+        # No gradle-version pin: ./gradlew uses the wrapper's version, so a pin here only
+        # downloads a second, unused distribution.
 
       - name: Run lintFormat
         run: ./gradlew lintFormat --no-daemon -Dktlint.ignoreFailures=true --continue

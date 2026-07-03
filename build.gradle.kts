@@ -27,13 +27,6 @@ if (providers.gradleProperty("org.gradle.unsafe.isolated-projects").orNull != "t
     pluginManager.apply("com.osacky.doctor")
 }
 
-tasks.register("build") {
-    description = "Builds all subprojects and runs buildHealth"
-    group = "build"
-    dependsOn("buildHealth")
-    dependsOn("koverXmlReport")
-}
-
 tasks.register("lintFormat") {
     description = "Runs all formatting tasks"
     group = "formatting"

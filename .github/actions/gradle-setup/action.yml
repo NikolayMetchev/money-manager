@@ -6,6 +6,10 @@ inputs:
     description: 'Whether the Gradle cache should be read-only'
     required: false
     default: 'false'
+  cache-encryption-key:
+    description: 'AES key for configuration-cache data; empty disables config-cache save/restore'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -29,7 +33,7 @@ runs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v6
       with:
-        # Gradle version sync: keep this aligned with gradle/wrapper/gradle-wrapper.properties
-        # and .github/workflows/build.yml.
-        gradle-version: 9.6.1
+        # No gradle-version pin: ./gradlew uses the wrapper's version anyway, so a pin here only
+        # downloads a second, unused distribution.
         cache-read-only: ${{ inputs.cache-read-only }}
+        cache-encryption-key: ${{ inputs.cache-encryption-key }}
