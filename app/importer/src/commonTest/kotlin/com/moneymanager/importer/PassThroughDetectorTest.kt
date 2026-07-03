@@ -108,6 +108,14 @@ class PassThroughDetectorTest {
     }
 
     @Test
+    fun doubledMarker_doesNotChainAConduitOntoItself() {
+        // A malformed doubled marker must not produce a Curve→Curve leg; peeling stops after one hop.
+        val match = PassThroughDetector(listOf(curve())).detect("CRV*CRV*Sainsburys")
+        assertEquals(1, match?.hops?.size)
+        assertEquals("CRV*Sainsburys", match?.merchantName)
+    }
+
+    @Test
     fun selfMatchingRule_terminates() {
         // A rule whose merchant equals its input must not loop: detection matches but nothing is peeled.
         val identity =

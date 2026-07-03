@@ -297,8 +297,8 @@ private fun ReimportPlanPreview(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text =
-                    "Each row's old transaction(s) are deleted and the row is re-imported through the " +
-                        "conduit chain (including any edits made to the old transaction).",
+                    "Each row's old transaction(s) are deleted — including any manual edits made to " +
+                        "them — and the row is re-imported through the conduit chain.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

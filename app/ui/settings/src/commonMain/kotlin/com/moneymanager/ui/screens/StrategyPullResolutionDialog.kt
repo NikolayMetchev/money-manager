@@ -30,8 +30,7 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
  * Collects resolutions for the references that the selected remote strategies need before they can be
  * imported. References are de-duplicated across artifacts (the same account name resolves once and is
  * applied to every artifact that uses it). Every reference defaults to being created on import; the user
- * can override any of them to map to an existing entity. Confirms only when every reference has been
- * resolved.
+ * can override any of them to map to an existing entity.
  */
 @Composable
 fun StrategyPullResolutionDialog(
@@ -53,7 +52,6 @@ fun StrategyPullResolutionDialog(
             allReferences.associateWith { CsvResolution.CreateNew(it.name) },
         )
     }
-    val allResolved = allReferences.all { it in resolutions }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -90,7 +88,6 @@ fun StrategyPullResolutionDialog(
                     val byKey = unresolvedByKey.mapValues { (_, refs) -> refs.associateWith { resolutions.getValue(it) } }
                     onConfirm(byKey)
                 },
-                enabled = allResolved,
             ) {
                 Text("Import")
             }

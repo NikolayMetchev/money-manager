@@ -55,9 +55,13 @@ data class ReimportMerge(
     val transferCount: Long,
 )
 
-/** A duplicate account the re-import detected but will not (or could not) merge. */
+/**
+ * Something the re-import detected but will not (or could not) act on: a duplicate account it cannot
+ * merge, or a row rewrite that failed. [accountId] is null for row-level (rewrite) entries, where
+ * [accountName] carries the row's description instead.
+ */
 data class ReimportSkippedAccount(
-    val accountId: AccountId,
+    val accountId: AccountId?,
     val accountName: String,
     val reason: ReimportSkipReason,
     val detail: String,
@@ -392,7 +396,7 @@ suspend fun executeCsvReimport(
             logger.warn(expected) { "Re-import rewrite of row ${rewrite.rowIndex} ('${rewrite.description}') failed" }
             skipped +=
                 ReimportSkippedAccount(
-                    accountId = AccountId(-1),
+                    accountId = null,
                     accountName = rewrite.description,
                     reason = ReimportSkipReason.REWRITE_FAILED,
                     detail = expected.message ?: "Rewrite failed",

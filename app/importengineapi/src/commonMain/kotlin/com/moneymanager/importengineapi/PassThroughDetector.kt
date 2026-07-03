@@ -67,7 +67,9 @@ class PassThroughDetector(
         val hops = mutableListOf<PassThroughHop>()
         var text = description
         var hop = detectOne(text)
-        while (hop != null && hop.merchantText != text && hops.size < MAX_HOPS) {
+        // The same-account guard stops a definition re-matching its own remainder (malformed doubled
+        // markers), which would otherwise synthesise a conduit→itself spend leg.
+        while (hop != null && hop.merchantText != text && hop.account != hops.lastOrNull()?.account && hops.size < MAX_HOPS) {
             hops += hop
             text = hop.merchantText
             hop = detectOne(text)
