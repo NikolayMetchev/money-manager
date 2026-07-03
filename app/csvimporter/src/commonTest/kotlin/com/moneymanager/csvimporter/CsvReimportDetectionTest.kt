@@ -21,6 +21,10 @@ import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.model.passthrough.PassThroughAccountId
+import com.moneymanager.domain.model.passthrough.PassThroughRule
+import com.moneymanager.importengineapi.PassThroughDetector
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -46,7 +50,7 @@ class CsvReimportDetectionTest {
             CsvColumn(CsvColumnId(Uuid.random()), 3, "Payee"),
         )
 
-    private fun strategy(): CsvImportStrategy {
+    private fun strategy(flipAccountsOnPositive: Boolean = false): CsvImportStrategy {
         val now = Clock.System.now()
         return CsvImportStrategy(
             id = strategyId,
@@ -85,6 +89,7 @@ class CsvReimportDetectionTest {
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
                             amountColumnName = "Amount",
+                            flipAccountsOnPositive = flipAccountsOnPositive,
                         ),
                     TransferField.CURRENCY to
                         HardCodedCurrencyMapping(
@@ -125,21 +130,26 @@ class CsvReimportDetectionTest {
         accounts: List<Account>,
         accountMappings: List<AccountMapping>,
         historicalAccountNames: Map<String, AccountId> = emptyMap(),
+        passThroughAccounts: List<PassThroughAccount> = emptyList(),
+        flipAccountsOnPositive: Boolean = false,
     ): ImportPreparation =
         CsvTransferMapper(
-            strategy = strategy(),
+            strategy = strategy(flipAccountsOnPositive),
             columns = columns,
             existingAccounts = accounts.associateBy { it.name },
             existingCurrencies = mapOf(currencyId to currency),
             existingCurrenciesByCode = mapOf(currency.code.uppercase() to currency),
             accountMappings = accountMappings,
             historicalAccountNames = historicalAccountNames,
+            passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
         ).prepareImport(rows)
 
     private fun row(
         index: Long,
         payee: String,
-    ) = CsvRow(rowIndex = index, values = listOf("15/12/2024", "Payment", "-50.00", payee))
+        description: String = "Payment",
+        amount: String = "-50.00",
+    ) = CsvRow(rowIndex = index, values = listOf("15/12/2024", description, amount, payee))
 
     @Test
     fun `new global mapping consolidating an import-created account yields a merge candidate`() {
@@ -271,5 +281,120 @@ class CsvReimportDetectionTest {
         // Tesco resolves identically in both preparations, so only Amazon.com is a candidate.
         assertEquals(mapOf(duplicate.id to trueAccount.id), candidates.merges)
         assertTrue(candidates.conflicts.isEmpty())
+    }
+
+    // ============= Pass-through merchant detection =============
+
+    // Mirrors the seeded Curve rule: the transfer routes through the conduit on both preps, so a
+    // mapping applied to the stripped merchant is only visible on the pass-through merchant account.
+    private val curve =
+        PassThroughAccount(
+            id = PassThroughAccountId(1),
+            name = "Curve",
+            conduitAccountName = "Curve",
+            rules =
+                listOf(
+                    PassThroughRule(
+                        detectionPattern = "(?i)^(?:Refund: )?CRV\\*",
+                        merchantPattern = "(?i)^(?:Refund: )?CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$",
+                    ),
+                ),
+        )
+
+    @Test
+    fun `new mapping consolidating an import-created pass-through merchant yields a merge candidate`() {
+        val conduit = account(5, "Curve")
+        val merchantDup = account(10, "Amazoncouk 1234")
+        val amazon = account(20, "Amazon")
+        val accounts = listOf(conduit, merchantDup, amazon)
+        val rows = listOf(row(1, "Crv*Amazoncouk 1234", description = "Crv*Amazoncouk 1234"))
+        val mappings = listOf(mapping(1, ".*Amazoncouk.*", amazon.id))
+
+        val candidates =
+            computeReimportMerges(
+                baselinePrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve)),
+                mappedPrep = prep(rows, accounts, mappings, passThroughAccounts = listOf(curve)),
+                importCreatedAccounts = setOf(merchantDup.id),
+            )
+
+        assertEquals(mapOf(merchantDup.id to amazon.id), candidates.merges)
+        assertTrue(candidates.conflicts.isEmpty())
+    }
+
+    @Test
+    fun `pass-through merchant rows resolving to different targets are a conflict`() {
+        val conduit = account(5, "Curve")
+        val merchantDup = account(10, "Amazoncouk")
+        val targetA = account(20, "Amazon")
+        val targetB = account(30, "Amazon Prime")
+        val accounts = listOf(conduit, merchantDup, targetA, targetB)
+        val rows =
+            listOf(
+                row(1, "Crv*Amazoncouk order", description = "Crv*Amazoncouk order"),
+                row(2, "Crv*Amazoncouk subscription", description = "Crv*Amazoncouk subscription"),
+            )
+        val mappings =
+            listOf(
+                mapping(1, "order", targetA.id),
+                mapping(2, "subscription", targetB.id),
+            )
+        // Both stripped merchant strings were historical names of the same import-created account.
+        val historical =
+            mapOf(
+                "amazoncouk order" to merchantDup.id,
+                "amazoncouk subscription" to merchantDup.id,
+            )
+
+        val candidates =
+            computeReimportMerges(
+                baselinePrep = prep(rows, accounts, emptyList(), historical, passThroughAccounts = listOf(curve)),
+                mappedPrep = prep(rows, accounts, mappings, historical, passThroughAccounts = listOf(curve)),
+                importCreatedAccounts = setOf(merchantDup.id),
+            )
+
+        assertTrue(candidates.merges.isEmpty())
+        assertEquals(mapOf(merchantDup.id to setOf(targetA.id, targetB.id)), candidates.conflicts)
+    }
+
+    @Test
+    fun `pass-through merchant not created by this import produces no candidate`() {
+        val conduit = account(5, "Curve")
+        val merchant = account(10, "Amazoncouk 1234")
+        val amazon = account(20, "Amazon")
+        val accounts = listOf(conduit, merchant, amazon)
+        val rows = listOf(row(1, "Crv*Amazoncouk 1234", description = "Crv*Amazoncouk 1234"))
+        val mappings = listOf(mapping(1, ".*Amazoncouk.*", amazon.id))
+
+        val candidates =
+            computeReimportMerges(
+                baselinePrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve)),
+                mappedPrep = prep(rows, accounts, mappings, passThroughAccounts = listOf(curve)),
+                importCreatedAccounts = emptySet(),
+            )
+
+        assertTrue(candidates.merges.isEmpty())
+        assertTrue(candidates.conflicts.isEmpty())
+    }
+
+    @Test
+    fun `incoming pass-through refund still yields the merchant merge candidate`() {
+        val conduit = account(5, "Curve")
+        val merchantDup = account(10, "Amazoncouk 1234")
+        val amazon = account(20, "Amazon")
+        val accounts = listOf(conduit, merchantDup, amazon)
+        // Positive amount + flipAccountsOnPositive marks the row incoming (refund onto the card).
+        val rows = listOf(row(1, "Refund: Crv*Amazoncouk 1234", description = "Refund: Crv*Amazoncouk 1234", amount = "50.00"))
+        val mappings = listOf(mapping(1, ".*Amazoncouk.*", amazon.id))
+
+        val candidates =
+            computeReimportMerges(
+                baselinePrep =
+                    prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve), flipAccountsOnPositive = true),
+                mappedPrep =
+                    prep(rows, accounts, mappings, passThroughAccounts = listOf(curve), flipAccountsOnPositive = true),
+                importCreatedAccounts = setOf(merchantDup.id),
+            )
+
+        assertEquals(mapOf(merchantDup.id to amazon.id), candidates.merges)
     }
 }

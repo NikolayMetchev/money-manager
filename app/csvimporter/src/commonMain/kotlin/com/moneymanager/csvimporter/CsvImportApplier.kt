@@ -510,7 +510,7 @@ suspend fun runCsvImport(
             // conduit + merchant ids.
             val passThrough =
                 row.passThrough?.let { pt ->
-                    val merchantId = accountsByName[pt.merchantName]?.id
+                    val merchantId = pt.merchantAccountId ?: accountsByName[pt.merchantName]?.id
                     if (merchantId == null) {
                         null
                     } else {
@@ -521,7 +521,7 @@ suspend fun runCsvImport(
                                 ),
                             merchantTarget = AccountRef.Existing(merchantId),
                             amount = row.transfer.amount,
-                            spendDescription = pt.merchantName,
+                            spendDescription = pt.rawMerchantName,
                             relationshipTypeId = RelationshipTypeId(pt.relationshipTypeId),
                             incoming = pt.incoming,
                         )

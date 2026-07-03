@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -1356,5 +1357,147 @@ class CsvTransferMapperTest {
         assertEquals(3, preparation.validTransfers.size)
         assertEquals(0, preparation.errorRows.size)
         assertEquals(0, preparation.newAccounts.size) // All map to existing accounts
+    }
+
+    // ============= Pass-through merchant + persisted account mapping tests =============
+
+    private fun accountMapping(
+        id: Long,
+        accountId: AccountId,
+        strategyId: CsvImportStrategyId? = null,
+    ): AccountMapping {
+        val now = Clock.System.now()
+        return AccountMapping(
+            id = id,
+            strategyId = strategyId,
+            valuePattern = Regex(".*Amazoncouk.*", RegexOption.IGNORE_CASE),
+            accountId = accountId,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    private fun passThroughMapper(
+        strategy: CsvImportStrategy,
+        existingAccounts: Map<String, Account>,
+        accountMappings: List<AccountMapping> = emptyList(),
+        historicalAccountNames: Map<String, AccountId> = emptyMap(),
+    ) = CsvTransferMapper(
+        strategy = strategy,
+        columns = columns,
+        existingAccounts = existingAccounts,
+        existingCurrencies = mapOf(testCurrencyId to testCurrency),
+        existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+        accountMappings = accountMappings,
+        historicalAccountNames = historicalAccountNames,
+        passThroughDetector = PassThroughDetector(listOf(curveWithCancellations)),
+    )
+
+    private val amazonAccount = Account(id = AccountId(7), name = "Amazon", openingDate = Clock.System.now())
+    private val curveAccount = Account(id = AccountId(5), name = "Curve", openingDate = Clock.System.now())
+
+    @Test
+    fun `mapRow applies persisted mapping to the stripped pass-through merchant`() {
+        val strategy = createStrategy()
+        val mapper =
+            passThroughMapper(
+                strategy = strategy,
+                existingAccounts = mapOf("Amazon" to amazonAccount, "Curve" to curveAccount),
+                accountMappings = listOf(accountMapping(1, amazonAccount.id)),
+            )
+
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Crv*Amazoncouk 1234", "-50.00", "Crv*Amazoncouk 1234"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals("Amazon", result.passThrough?.merchantName)
+        assertEquals(amazonAccount.id, result.passThrough?.merchantAccountId)
+        assertEquals("Amazoncouk 1234", result.passThrough?.rawMerchantName)
+        // No junk "Amazoncouk 1234" account is created — the mapping routed the spend leg to Amazon.
+        assertEquals(emptySet(), result.newAccounts.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `mapRow prefers a strategy-scoped mapping over a global one for the merchant`() {
+        val strategy = createStrategy()
+        val otherAccount = Account(id = AccountId(8), name = "Amazon Business", openingDate = Clock.System.now())
+        val mapper =
+            passThroughMapper(
+                strategy = strategy,
+                existingAccounts =
+                    mapOf(
+                        "Amazon" to amazonAccount,
+                        "Amazon Business" to otherAccount,
+                        "Curve" to curveAccount,
+                    ),
+                accountMappings =
+                    listOf(
+                        accountMapping(1, amazonAccount.id),
+                        accountMapping(2, otherAccount.id, strategyId = strategy.id),
+                    ),
+            )
+
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Crv*Amazoncouk 1234", "-50.00", "Crv*Amazoncouk 1234"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(otherAccount.id, result.passThrough?.merchantAccountId)
+    }
+
+    @Test
+    fun `mapRow ignores a merchant mapping that targets the conduit account`() {
+        val strategy = createStrategy()
+        val mapper =
+            passThroughMapper(
+                strategy = strategy,
+                existingAccounts = mapOf("Curve" to curveAccount),
+                accountMappings = listOf(accountMapping(1, curveAccount.id)),
+            )
+
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Crv*Amazoncouk 1234", "-50.00", "Crv*Amazoncouk 1234"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals("Amazoncouk 1234", result.passThrough?.merchantName)
+        assertEquals(null, result.passThrough?.merchantAccountId)
+        assertEquals(setOf("Amazoncouk 1234"), result.newAccounts.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `mapRow resolves an unmapped merchant through historical account names`() {
+        val strategy = createStrategy()
+        val mapper =
+            passThroughMapper(
+                strategy = strategy,
+                existingAccounts = mapOf("Amazon" to amazonAccount, "Curve" to curveAccount),
+                historicalAccountNames = mapOf("amazoncouk 1234" to amazonAccount.id),
+            )
+
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Crv*Amazoncouk 1234", "-50.00", "Crv*Amazoncouk 1234"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(amazonAccount.id, result.passThrough?.merchantAccountId)
+        assertEquals(emptySet(), result.newAccounts.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `mapRow applies the merchant mapping to an incoming Curve refund`() {
+        val strategy = createStrategy(flipAccountsOnPositive = true)
+        val mapper =
+            passThroughMapper(
+                strategy = strategy,
+                existingAccounts = mapOf("Amazon" to amazonAccount, "Curve" to curveAccount),
+                accountMappings = listOf(accountMapping(1, amazonAccount.id)),
+            )
+
+        val row =
+            CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Refund: Crv*Amazoncouk 1234", "50.00", "Refund: Crv*Amazoncouk 1234"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(true, result.passThrough?.incoming)
+        assertEquals("Amazon", result.passThrough?.merchantName)
+        assertEquals(amazonAccount.id, result.passThrough?.merchantAccountId)
     }
 }

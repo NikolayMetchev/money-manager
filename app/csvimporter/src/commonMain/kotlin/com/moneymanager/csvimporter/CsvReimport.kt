@@ -107,6 +107,11 @@ fun computeReimportMerges(
         val mapped = mappedByRow[baseline.rowIndex] ?: continue
         collect(baseline.transfer.sourceAccountId, mapped.transfer.sourceAccountId)
         collect(baseline.transfer.targetAccountId, mapped.transfer.targetAccountId)
+        // Pass-through rows carry the conduit on both transfer sides, so a mapping applied to the
+        // stripped merchant name is only visible on the merchant account itself.
+        val baselineMerchant = baseline.passThrough?.merchantAccountId
+        val mappedMerchant = mapped.passThrough?.merchantAccountId
+        if (baselineMerchant != null && mappedMerchant != null) collect(baselineMerchant, mappedMerchant)
     }
 
     return ReimportMergeCandidates(
