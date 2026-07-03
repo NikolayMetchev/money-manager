@@ -30,8 +30,8 @@ kotlin {
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.model.core)
                 implementation(projects.app.qifimporter)
+                implementation(projects.app.strategies)
                 implementation(projects.test.app.db)
-                implementation(projects.test.app.strategies)
             }
         }
 
@@ -90,8 +90,8 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.sqldelight.runtime)
                 implementation(projects.app.di.core)
+                implementation(projects.app.strategies)
                 implementation(projects.test.app.db)
-                implementation(projects.test.app.strategies)
 
                 runtimeOnly(libs.androidx.test.runner)
             }

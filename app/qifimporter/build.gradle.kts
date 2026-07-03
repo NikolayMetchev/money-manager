@@ -38,7 +38,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.test.app.strategies)
+                implementation(projects.app.strategies)
             }
         }
     }

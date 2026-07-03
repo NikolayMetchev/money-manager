@@ -3,9 +3,9 @@ plugins {
     id("moneymanager.android-convention")
 }
 
-// DB-free built-in strategy definitions (Kotlin is the authoring source; the shipped JSON artifacts in
-// strategy-library/ are exported from these by :tools:strategy-catalog and kept in lockstep by its
-// tests). Consumed by importer mapper tests, DbTest installer helpers, and the catalog tool.
+// DB-free built-in strategy definitions — the source of the strategy catalog. Nothing is checked in
+// or seeded: :tools:strategy-catalog renders these to webpage/strategy-library on each Pages deploy.
+// Consumed by the catalog tool, importer mapper tests, and the DbTest installer helpers.
 kotlin {
     sourceSets {
         getByName("commonMain") {

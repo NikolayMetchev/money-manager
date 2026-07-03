@@ -32,18 +32,15 @@ private const val LIBRARY_VERSION = ""
 private val GBP_CURRENCY_ID = CurrencyId(1)
 private const val GBP_CURRENCY_CODE = "GBP"
 
+/**
+ * Generates the strategy catalog for the GitHub Pages site: renders every Kotlin built-in definition
+ * (app/strategies) to its portable JSON artifact and writes `<webpageDir>/strategy-library/` —
+ * index.json plus one file per artifact. Nothing is checked in; CI runs this before uploading the
+ * `webpage/` directory to Pages.
+ */
 fun main(args: Array<String>) {
-    when (args.firstOrNull()) {
-        "export" -> {
-            require(args.size == 2) { "usage: export <strategyLibraryDir>" }
-            exportBuiltIns(File(args[1]))
-        }
-        "index" -> {
-            require(args.size == 3) { "usage: index <strategyLibraryDir> <outputDir>" }
-            generateCatalogSite(File(args[1]), File(args[2]))
-        }
-        else -> error("usage: (export <strategyLibraryDir> | index <strategyLibraryDir> <outputDir>)")
-    }
+    require(args.size == 2 && args[0] == "generate") { "usage: generate <webpageDir>" }
+    generateCatalogSite(File(args[1]))
 }
 
 /** Every built-in definition rendered to its portable artifact, keyed for StrategyFileNaming. */
@@ -84,51 +81,35 @@ private fun PassThroughAccount.toExport(): PassThroughExport =
         rules = rules,
     )
 
-internal fun exportBuiltIns(libraryDir: File) {
-    libraryDir.mkdirs()
-    for ((key, json) in builtInArtifacts()) {
-        File(libraryDir, StrategyFileNaming.fileName(key)).writeText(json)
-    }
-}
-
 /**
- * Validates every artifact in [libraryDir] (decodable by its kind's codec, embedded name matching the
- * filename stem) and writes the deployable site — index.json + a copy of each artifact — into
- * [outputDir]/strategy-library.
+ * Renders every built-in to `<webpageDir>/strategy-library/` and writes index.json next to the
+ * artifacts. Validates each artifact on the way out (decodable by its kind's codec, embedded name
+ * matching the file name stem) so a bad definition fails the build rather than deploying.
  */
-internal fun generateCatalogSite(
-    libraryDir: File,
-    outputDir: File,
-) {
-    val entries =
-        libraryDir
-            .listFiles { file -> file.isFile && file.extension == "json" }
-            .orEmpty()
-            .sortedBy { it.name }
-            .map { file ->
-                val key =
-                    StrategyFileNaming.parse(file.name)
-                        ?: error("${file.name}: not a valid strategy-library file name")
-                require(key.kind != StrategyKind.GLOBAL_MAPPINGS) {
-                    "${file.name}: global account mappings are personal data and don't belong in the catalog"
-                }
-                val json = file.readText()
-                val embeddedName = StrategyArtifactCodec.embeddedName(key.kind, json)
-                require(embeddedName == key.name) {
-                    "${file.name}: embedded name \"$embeddedName\" doesn't match the file name stem \"${key.name}\""
-                }
-                CatalogEntry(
-                    name = key.name,
-                    kind = key.kind,
-                    fileName = file.name,
-                    contentHash = StrategyArtifactCodec.canonicalHash(key.kind, json),
-                )
-            }
-    require(entries.isNotEmpty()) { "no artifacts found in $libraryDir" }
+internal fun generateCatalogSite(webpageDir: File) {
+    val siteDir = File(webpageDir, "strategy-library")
+    siteDir.deleteRecursively()
+    siteDir.mkdirs()
 
-    val siteDir = File(outputDir, "strategy-library").apply { mkdirs() }
-    File(siteDir, "index.json").writeText(CatalogManifestCodec.encode(CatalogManifest(entries)))
-    for (entry in entries) {
-        File(libraryDir, entry.fileName).copyTo(File(siteDir, entry.fileName), overwrite = true)
-    }
+    val entries =
+        builtInArtifacts().map { (key, json) ->
+            require(key.kind != StrategyKind.GLOBAL_MAPPINGS) {
+                "${key.name}: global account mappings are personal data and don't belong in the catalog"
+            }
+            val fileName = StrategyFileNaming.fileName(key)
+            val embeddedName = StrategyArtifactCodec.embeddedName(key.kind, json)
+            require(embeddedName == key.name) {
+                "$fileName: embedded name \"$embeddedName\" doesn't match the file name stem \"${key.name}\""
+            }
+            File(siteDir, fileName).writeText(json)
+            CatalogEntry(
+                name = key.name,
+                kind = key.kind,
+                fileName = fileName,
+                contentHash = StrategyArtifactCodec.canonicalHash(key.kind, json),
+            )
+        }
+    require(entries.isNotEmpty()) { "no built-in artifacts were generated" }
+
+    File(siteDir, "index.json").writeText(CatalogManifestCodec.encode(CatalogManifest(entries.sortedBy { it.fileName })))
 }

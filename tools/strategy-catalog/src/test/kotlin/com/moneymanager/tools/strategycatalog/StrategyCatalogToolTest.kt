@@ -11,73 +11,57 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class StrategyCatalogToolTest {
-    private val libraryDir = repoRoot().resolve("strategy-library")
-
-    // Walks up from the working directory to the repo root (the dir holding settings.gradle.kts), so
-    // the test is independent of Gradle's test working dir.
-    private fun repoRoot(): File {
-        var dir = File(System.getProperty("user.dir")).absoluteFile
-        while (!File(dir, "settings.gradle.kts").exists()) {
-            dir = dir.parentFile ?: fail("repo root not found above ${System.getProperty("user.dir")}")
-        }
-        return dir
-    }
-
     @Test
-    fun `every checked-in artifact validates and its name matches the file name stem`() {
-        val files = libraryDir.listFiles { file -> file.isFile && file.extension == "json" }.orEmpty()
-        assertTrue(files.isNotEmpty(), "strategy-library/ contains artifacts")
-        for (file in files) {
-            val key = StrategyFileNaming.parse(file.name) ?: fail("${file.name}: not a valid library file name")
-            val embeddedName = StrategyArtifactCodec.embeddedName(key.kind, file.readText())
-            assertEquals(key.name, embeddedName, "${file.name}: embedded name matches file name stem")
+    fun `every built-in artifact round-trips its codec and matches its file name`() {
+        val artifacts = builtInArtifacts()
+        assertTrue(artifacts.isNotEmpty())
+        for ((key, json) in artifacts) {
+            assertEquals(key.name, StrategyArtifactCodec.embeddedName(key.kind, json))
+            assertEquals(key, StrategyFileNaming.parse(StrategyFileNaming.fileName(key)) ?: fail("unparseable file name for $key"))
         }
     }
 
     @Test
-    fun `checked-in artifacts are in lockstep with the Kotlin built-in definitions`() {
-        // Fails in either direction: an edited Kotlin definition without a re-export, or a hand-edited
-        // built-in JSON. Run :tools:strategy-catalog:exportStrategyLibrary to regenerate.
-        for ((key, expectedJson) in builtInArtifacts()) {
-            val file = File(libraryDir, StrategyFileNaming.fileName(key))
-            assertTrue(file.exists(), "${file.name} exists in strategy-library/")
-            assertEquals(expectedJson, file.readText(), "${file.name} matches the export of its Kotlin definition")
-        }
-    }
-
-    @Test
-    fun `generated index lists every artifact with its canonical hash`() {
-        val outputDir = createTempDir()
+    fun `generated site lists every artifact with its canonical hash`() {
+        val webpageDir = createTempDir()
         try {
-            generateCatalogSite(libraryDir, outputDir)
-            val siteDir = File(outputDir, "strategy-library")
+            generateCatalogSite(webpageDir)
+            val siteDir = File(webpageDir, "strategy-library")
             val manifest = CatalogManifestCodec.decode(File(siteDir, "index.json").readText())
 
-            val jsonFiles = libraryDir.listFiles { file -> file.isFile && file.extension == "json" }.orEmpty()
-            assertEquals(jsonFiles.size, manifest.entries.size, "one manifest entry per artifact")
+            assertEquals(builtInArtifacts().size, manifest.entries.size, "one manifest entry per built-in")
             for (entry in manifest.entries) {
-                val copied = File(siteDir, entry.fileName)
-                assertTrue(copied.exists(), "${entry.fileName} copied next to index.json")
+                val artifact = File(siteDir, entry.fileName)
+                assertTrue(artifact.exists(), "${entry.fileName} generated next to index.json")
                 assertEquals(
-                    StrategyArtifactCodec.canonicalHash(entry.kind, copied.readText()),
+                    StrategyArtifactCodec.canonicalHash(entry.kind, artifact.readText()),
                     entry.contentHash,
                     "${entry.fileName}: manifest hash is the canonical content hash",
                 )
+                assertEquals(entry.name, StrategyArtifactCodec.embeddedName(entry.kind, artifact.readText()))
             }
         } finally {
-            outputDir.deleteRecursively()
+            webpageDir.deleteRecursively()
         }
     }
 
     @Test
     fun `the catalog covers all built-in kinds`() {
-        val kinds =
-            libraryDir
-                .listFiles { file -> file.isFile && file.extension == "json" }
-                .orEmpty()
-                .mapNotNull { StrategyFileNaming.parse(it.name)?.kind }
-                .toSet()
+        val kinds = builtInArtifacts().keys.map { it.kind }.toSet()
         assertEquals(setOf(StrategyKind.CSV, StrategyKind.QIF, StrategyKind.API, StrategyKind.PASS_THROUGH), kinds)
+    }
+
+    @Test
+    fun `regenerating replaces stale artifacts`() {
+        val webpageDir = createTempDir()
+        try {
+            val siteDir = File(webpageDir, "strategy-library").apply { mkdirs() }
+            val stale = File(siteDir, "Removed.csv.json").apply { writeText("{}") }
+            generateCatalogSite(webpageDir)
+            assertTrue(!stale.exists(), "stale artifacts from a previous run are cleared")
+        } finally {
+            webpageDir.deleteRecursively()
+        }
     }
 
     private fun createTempDir(): File =
