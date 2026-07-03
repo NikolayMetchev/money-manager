@@ -13,5 +13,10 @@ kotlin {
                 api(projects.app.model.core)
             }
         }
+        getByName("jvmMain") {
+            dependencies {
+                api(projects.app.model.core)
+            }
+        }
     }
 }

@@ -91,6 +91,7 @@ kotlin {
                 implementation(libs.sqldelight.runtime)
                 implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
+                implementation(projects.test.app.strategies)
 
                 runtimeOnly(libs.androidx.test.runner)
             }

@@ -27,7 +27,6 @@ object BuiltInPassThroughs {
                     PassThroughRule(
                         detectionPattern = "(?i)^(?:Refund: |Refund reversal: |Cancellation: )?CRV\\*",
                         merchantPattern = "(?i)^(?:Refund: |Refund reversal: |Cancellation: )?CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$",
-                        merchantTemplate = "$1",
                     ),
                 ),
         )
@@ -47,7 +46,6 @@ object BuiltInPassThroughs {
                     PassThroughRule(
                         detectionPattern = "(?i)^(?:Refund: |Refund reversal: |Cancellation: )?PAYPAL\\s*\\*",
                         merchantPattern = "(?i)^(?:Refund: |Refund reversal: |Cancellation: )?PAYPAL\\s*\\*\\s*(.+?)(?:\\s{2,}.*)?$",
-                        merchantTemplate = "$1",
                     ),
                 ),
         )

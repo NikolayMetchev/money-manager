@@ -25,6 +25,7 @@ kotlin {
                 api(projects.app.model.core)
 
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(projects.app.importengineapi)
             }
         }
         getByName("androidMain") {
@@ -34,6 +35,7 @@ kotlin {
 
                 implementation(libs.androidx.test.monitor)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(projects.app.importengineapi)
             }
         }
     }

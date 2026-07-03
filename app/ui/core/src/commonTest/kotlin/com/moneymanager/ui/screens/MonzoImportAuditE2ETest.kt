@@ -22,9 +22,9 @@ import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.createTestDatabaseLocation
-import com.moneymanager.test.database.installBuiltInApiStrategies
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.installBuiltInApiStrategies
 import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import io.ktor.client.engine.mock.MockEngine

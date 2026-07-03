@@ -47,6 +47,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.strategycatalog)
 
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.charts.desktop)

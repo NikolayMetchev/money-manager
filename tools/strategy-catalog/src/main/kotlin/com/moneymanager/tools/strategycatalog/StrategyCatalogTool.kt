@@ -75,9 +75,9 @@ internal fun builtInArtifacts(): Map<StrategyKey, String> {
     return artifacts
 }
 
+// PassThroughExport.version already defaults to the blank library version.
 private fun PassThroughAccount.toExport(): PassThroughExport =
     PassThroughExport(
-        version = LIBRARY_VERSION,
         name = name,
         conduitAccountName = conduitAccountName,
         relationshipTypeId = relationshipTypeId,

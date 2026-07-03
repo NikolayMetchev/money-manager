@@ -12,7 +12,6 @@ kotlin {
                 api(projects.app.importengineapi)
                 api(projects.app.importer)
                 api(projects.app.model.core)
-                api(projects.app.strategycatalog)
                 api(projects.utils.localsettings)
             }
         }

@@ -85,6 +85,7 @@ kotlin {
                 api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.strategycatalog)
                 api(projects.app.ui.foundation)
                 api(projects.utils.localsettings)
 

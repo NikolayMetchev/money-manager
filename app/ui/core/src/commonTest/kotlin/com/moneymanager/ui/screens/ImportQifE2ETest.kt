@@ -35,9 +35,9 @@ import com.moneymanager.qif.QifParser
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
-import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.upsertCurrencyByCode
 import com.moneymanager.ui.screens.qif.dominantAccountType
 import com.moneymanager.ui.screens.qif.toImportRecords
