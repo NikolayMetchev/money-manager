@@ -24,14 +24,7 @@ fun KotlinMultiplatformExtension.configureAndroidTarget() {
         }
 
         lint {
-            warningsAsErrors = true
-            abortOnError = true
-            // Lint on test sources and re-linting of dependencies added ~2 lintAnalyze* tasks per
-            // module across 40+ Android modules for little signal; lint main sources only.
-            checkTestSources = false
-            ignoreTestSources = true
-            checkDependencies = false
-            checkReleaseBuilds = false
+            moneyManagerLintPolicy()
         }
 
         // Enable instrumented tests with Gradle Managed Device

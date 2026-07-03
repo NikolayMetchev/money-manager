@@ -47,12 +47,7 @@ configure<ApplicationExtension> {
     }
 
     lint {
-        warningsAsErrors = true
-        abortOnError = true
-        checkTestSources = false
-        ignoreTestSources = true
-        checkDependencies = false
-        checkReleaseBuilds = false
+        moneyManagerLintPolicy()
         // API 37 is currently beta, so stay on the latest stable SDK while keeping other lint warnings fatal.
         disable += "GradleDependency"
         disable += "OldTargetApi"

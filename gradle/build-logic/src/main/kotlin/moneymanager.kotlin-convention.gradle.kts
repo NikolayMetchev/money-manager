@@ -123,7 +123,8 @@ tasks {
         // DBs, no shared state). Compose Desktop UI modules override this back to 1 in
         // moneymanager.compose-multiplatform-convention (Skiko/AWT tests flake under contention).
         // -PtestMaxParallelForks=N overrides for debugging (e.g. =1 to serialize).
-        maxParallelForks = providers.gradleProperty("testMaxParallelForks").orNull?.toInt()
+        maxParallelForks = providers.gradleProperty("testMaxParallelForks").orNull
+            ?.let { it.toIntOrNull() ?: error("Invalid -PtestMaxParallelForks value '$it': expected an integer") }
             ?: Runtime.getRuntime().availableProcessors().coerceAtMost(8)
     }
 
