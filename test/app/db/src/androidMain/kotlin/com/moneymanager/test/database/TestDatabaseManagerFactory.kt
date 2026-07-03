@@ -4,7 +4,11 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.moneymanager.database.AndroidDatabaseManager
 import com.moneymanager.database.DatabaseManager
 
-actual fun createTestDatabaseManager(): DatabaseManager {
+actual fun createTestDatabaseManager(seedAllCurrencies: Boolean): DatabaseManager {
     val context = InstrumentationRegistry.getInstrumentation().targetContext
-    return AndroidDatabaseManager(context)
+    return if (seedAllCurrencies) {
+        AndroidDatabaseManager(context)
+    } else {
+        AndroidDatabaseManager(context, currenciesToSeed = { minimalTestCurrencies })
+    }
 }

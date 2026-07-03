@@ -12,6 +12,7 @@ kotlin {
                 api(projects.app.model.core)
 
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(projects.utils.currency)
             }
         }
         getByName("jvmMain") {
@@ -30,13 +31,8 @@ kotlin {
                 api(kotlin("test-junit"))
                 api(projects.app.db.write)
 
-                implementation(libs.androidx.test.core)
                 implementation(libs.androidx.test.monitor)
                 implementation(libs.kotlinx.coroutines.core)
-                // The Android AppComponentParams carries a GoogleAccessTokenSource (googledrive) whose
-                // httpClient is a Ktor client — both referenced by the test double in TestDatabaseHelper.
-                implementation(libs.ktor.client.core)
-                implementation(projects.app.remotestorage.googledrive)
             }
         }
     }

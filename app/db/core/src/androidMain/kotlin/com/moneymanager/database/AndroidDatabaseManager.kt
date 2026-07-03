@@ -3,6 +3,7 @@ package com.moneymanager.database
 import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
+import com.moneymanager.currency.Currency
 import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
 import com.moneymanager.domain.model.DbLocation
@@ -19,6 +20,9 @@ private val DEFAULT_DB_LOCATION = DbLocation(DEFAULT_DATABASE_NAME)
  */
 class AndroidDatabaseManager(
     private val context: Context,
+    // Deferred so the platform currency list is only computed when a fresh database is seeded;
+    // tests inject a minimal list (see :test:app:db's createTestDatabaseManager).
+    private val currenciesToSeed: () -> List<Currency> = { DatabaseConfig.allCurrencies },
 ) : DatabaseManager {
     override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper = openDatabaseWithProgress(location) {}
 
@@ -86,7 +90,7 @@ class AndroidDatabaseManager(
             onProgress(DatabaseInitializationProgress("Applying database settings...", 4, 6))
             if (isNewDatabase) {
                 onProgress(DatabaseInitializationProgress("Adding default currencies...", 5, 6))
-                DatabaseConfig.seedCurrencies(database)
+                DatabaseConfig.seedCurrencies(database, currenciesToSeed())
             } else {
                 onProgress(DatabaseInitializationProgress("Preparing repositories...", 5, 6))
             }

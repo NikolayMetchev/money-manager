@@ -43,15 +43,19 @@ object DatabaseConfig {
     private const val GBP_CODE = "GBP"
 
     /**
-     * Seeds the platform's currencies (every code except [GBP_CODE]) for a freshly created database,
-     * recording SYSTEM provenance for each. Uses the runtime platform currency list (java.util.Currency)
+     * Seeds [currencies] (every code except [GBP_CODE]) for a freshly created database, recording
+     * SYSTEM provenance for each. Defaults to the runtime platform currency list (java.util.Currency)
      * so the seeded set matches the device — Android exposes more ISO 4217 codes than the JVM, so this
-     * cannot be frozen at build time. Runs after Schema.create (which already seeded the lookups,
-     * the system device, and GBP).
+     * cannot be frozen at build time. Tests pass a minimal list instead: seeding ~230 currencies
+     * (with audit triggers) per test dominated DB-test setup time. Runs after Schema.create (which
+     * already seeded the lookups, the system device, and GBP).
      */
-    fun seedCurrencies(database: MoneyManagerDatabaseWrapper) {
+    fun seedCurrencies(
+        database: MoneyManagerDatabaseWrapper,
+        currencies: List<Currency> = allCurrencies,
+    ) {
         with(database) {
-            allCurrencies.forEach { currency ->
+            currencies.forEach { currency ->
                 if (currency.code == GBP_CODE) return@forEach
                 val scaleFactor = CurrencyScaleFactors.getScaleFactor(currency.code)
                 currencyWriteQueries.insert(currency.code, currency.displayName, scaleFactor.toLong())

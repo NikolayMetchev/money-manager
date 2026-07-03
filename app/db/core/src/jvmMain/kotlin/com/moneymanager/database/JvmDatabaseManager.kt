@@ -1,6 +1,7 @@
 package com.moneymanager.database
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import com.moneymanager.currency.Currency
 import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.domain.model.DEFAULT_DATABASE_PATH
 import com.moneymanager.domain.model.DbLocation
@@ -19,7 +20,11 @@ private val DbLocation.jdbcUrl: String
  * Manages SQLite database files on the file system.
  * Stateless - does not track open databases.
  */
-class JvmDatabaseManager : DatabaseManager {
+class JvmDatabaseManager(
+    // Deferred so the platform currency list is only computed when a fresh database is seeded;
+    // tests inject a minimal list (see :test:app:db's createTestDatabaseManager).
+    private val currenciesToSeed: () -> List<Currency> = { DatabaseConfig.allCurrencies },
+) : DatabaseManager {
     override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper = openDatabaseWithProgress(location) {}
 
     override suspend fun openDatabaseWithProgress(
@@ -75,7 +80,7 @@ class JvmDatabaseManager : DatabaseManager {
 
             if (isNewDatabase) {
                 onProgress(DatabaseInitializationProgress("Adding default currencies...", 6, 7))
-                DatabaseConfig.seedCurrencies(database)
+                DatabaseConfig.seedCurrencies(database, currenciesToSeed())
             } else {
                 onProgress(DatabaseInitializationProgress("Preparing repositories...", 6, 7))
             }
