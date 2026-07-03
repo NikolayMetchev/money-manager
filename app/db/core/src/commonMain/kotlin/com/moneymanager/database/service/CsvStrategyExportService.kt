@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
@@ -33,6 +32,7 @@ import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
 import com.moneymanager.domain.model.csvstrategy.export.ConditionalAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
+import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExportMapper
 import com.moneymanager.domain.model.csvstrategy.export.CurrencyLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport
 import com.moneymanager.domain.model.csvstrategy.export.DirectColumnExport
@@ -158,18 +158,12 @@ class CsvStrategyExportService(
     ): CsvStrategyExport {
         val referenceData = loadReferenceData()
 
-        return CsvStrategyExport(
+        return CsvStrategyExportMapper.toExport(
+            strategy = strategy,
             version = appVersion.value,
-            name = strategy.name,
-            identificationColumns = strategy.identificationColumns,
-            fieldMappings =
-                strategy.fieldMappings.mapValues { (_, mapping) ->
-                    mapping.toExport(referenceData.accountsById, referenceData.currenciesById, referenceData.categoriesById)
-                },
-            attributeMappings = strategy.attributeMappings,
-            rowPreprocessingRules = strategy.rowPreprocessingRules,
-            companionTransactionRules = strategy.companionTransactionRules,
-            contentMatchRules = strategy.contentMatchRules,
+            accountNameById = { referenceData.accountsById[it]?.name },
+            currencyCodeById = { referenceData.currenciesById[it]?.code },
+            categoryNameById = { referenceData.categoriesById[it]?.name },
             accountMappings = exportPerStrategyMappings(strategy.id, referenceData.accountsById),
         )
     }
@@ -477,104 +471,6 @@ class CsvStrategyExportService(
             }
         }
     }
-
-    private fun FieldMapping.toExport(
-        accountsById: Map<AccountId, Account>,
-        currenciesById: Map<CurrencyId, Currency>,
-        categoriesById: Map<Long, Category>,
-    ): FieldMappingExport =
-        when (this) {
-            is HardCodedAccountMapping ->
-                HardCodedAccountExport(
-                    fieldType = fieldType,
-                    accountName = accountsById[accountId]?.name ?: "Unknown Account",
-                )
-            is AccountLookupMapping ->
-                AccountLookupExport(
-                    fieldType = fieldType,
-                    columnName = columnName,
-                    fallbackColumns = fallbackColumns,
-                    defaultCategoryName =
-                        categoriesById[defaultCategoryId]?.name
-                            ?: Category.UNCATEGORIZED_NAME,
-                )
-            is RegexAccountMapping ->
-                RegexAccountExport(
-                    fieldType = fieldType,
-                    columnName = columnName,
-                    rules = rules,
-                    fallbackColumns = fallbackColumns,
-                    defaultCategoryName =
-                        categoriesById[defaultCategoryId]?.name
-                            ?: Category.UNCATEGORIZED_NAME,
-                )
-            is TemplateAccountMapping ->
-                TemplateAccountExport(
-                    fieldType = fieldType,
-                    columnName = columnName,
-                    prefix = prefix,
-                    suffix = suffix,
-                    defaultCategoryName =
-                        categoriesById[defaultCategoryId]?.name
-                            ?: Category.UNCATEGORIZED_NAME,
-                )
-            is ConditionalAccountMapping ->
-                ConditionalAccountExport(
-                    fieldType = fieldType,
-                    conditions = conditions,
-                    whenTrue = whenTrue.toExport(accountsById, currenciesById, categoriesById),
-                    whenFalse = whenFalse.toExport(accountsById, currenciesById, categoriesById),
-                )
-            is DateTimeParsingMapping ->
-                DateTimeParsingExport(
-                    fieldType = fieldType,
-                    dateColumnName = dateColumnName,
-                    dateFormat = dateFormat,
-                    timeColumnName = timeColumnName,
-                    timeFormat = timeFormat,
-                    defaultTime = defaultTime,
-                    dateTimeFormat = dateTimeFormat,
-                )
-            is DirectColumnMapping ->
-                DirectColumnExport(
-                    fieldType = fieldType,
-                    columnName = columnName,
-                    fallbackColumns = fallbackColumns,
-                    extraction = extraction,
-                )
-            is AmountParsingMapping ->
-                AmountParsingExport(
-                    fieldType = fieldType,
-                    mode = mode,
-                    amountColumnName = amountColumnName,
-                    creditColumnName = creditColumnName,
-                    debitColumnName = debitColumnName,
-                    negateValues = negateValues,
-                    flipAccountsOnPositive = flipAccountsOnPositive,
-                    feeColumnName = feeColumnName,
-                    feeConditions = feeConditions,
-                )
-            is HardCodedCurrencyMapping ->
-                HardCodedCurrencyExport(
-                    fieldType = fieldType,
-                    currencyCode = currenciesById[currencyId]?.code ?: "XXX",
-                )
-            is CurrencyLookupMapping ->
-                CurrencyLookupExport(
-                    fieldType = fieldType,
-                    columnName = columnName,
-                )
-            is HardCodedTimezoneMapping ->
-                HardCodedTimezoneExport(
-                    fieldType = fieldType,
-                    timezoneId = timezoneId,
-                )
-            is TimezoneLookupMapping ->
-                TimezoneLookupExport(
-                    fieldType = fieldType,
-                    columnName = columnName,
-                )
-        }
 
     private fun FieldMappingExport.toDomain(
         accountsByName: Map<String, Account>,

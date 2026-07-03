@@ -23,6 +23,7 @@ import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.createCsvStrategy
 import com.moneymanager.importengineapi.deleteCsvStrategy
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.installBuiltInPassThroughs
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -131,7 +132,8 @@ class StrategyLibraryServiceTest : DbTest() {
     fun `pass-through definition round-trips and re-applies by name without duplicating`() =
         runTest {
             val library = repositories.strategyLibrary
-            // The seeded Curve definition is listed as its own artifact.
+            // The installed Curve definition is listed as its own artifact.
+            repositories.installBuiltInPassThroughs()
             val key = StrategyKey(StrategyKind.PASS_THROUGH, "Curve")
             val entry = library.listLocal(version).first { it.key == key }
             assertTrue(entry.json.contains("CRV"))

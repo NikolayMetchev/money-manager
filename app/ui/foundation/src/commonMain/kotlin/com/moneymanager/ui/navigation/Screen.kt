@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.navigation
 
+import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
@@ -45,6 +46,10 @@ sealed class Screen(
     ) : Screen(if (strategyId == null) "Create Strategy" else "Edit Strategy")
 
     data object ApiStrategies : Screen("API Import Strategies")
+
+    data class StrategyCatalog(
+        val kindFilter: StrategyKind? = null,
+    ) : Screen("Strategy Catalog")
 
     data class ApiStrategyEditor(
         val strategyId: ApiImportStrategyId? = null,

@@ -4,6 +4,7 @@ import com.moneymanager.database.json.AccountMappingExportCodec
 import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.database.json.PassThroughExportCodec
+import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.CsvReferenceType
 import com.moneymanager.domain.CsvResolution
 import com.moneymanager.domain.CsvUnresolvedReference
@@ -233,38 +234,12 @@ class StrategyLibraryService(
     override fun canonicalHash(
         key: StrategyKey,
         json: String,
-    ): String {
-        // Re-encode with the version stamp blanked so semantically-equal artifacts exported under
-        // different app versions hash identically.
-        val canonical =
-            when (key.kind) {
-                StrategyKind.CSV, StrategyKind.QIF ->
-                    CsvStrategyExportCodec.encode(CsvStrategyExportCodec.decode(json).copy(version = ""))
-                StrategyKind.API ->
-                    ApiStrategyExportCodec.encode(ApiStrategyExportCodec.decode(json).copy(version = ""))
-                StrategyKind.GLOBAL_MAPPINGS ->
-                    AccountMappingExportCodec.encode(AccountMappingExportCodec.decode(json).copy(version = ""))
-                StrategyKind.PASS_THROUGH ->
-                    PassThroughExportCodec.encode(PassThroughExportCodec.decode(json).copy(version = ""))
-            }
-        return contentHash(canonical)
-    }
+    ): String = StrategyArtifactCodec.canonicalHash(key, json)
 
     private fun entry(
         key: StrategyKey,
         json: String,
     ): LocalStrategyEntry = LocalStrategyEntry(key, json, canonicalHash(key, json))
-
-    // Stable, platform-independent content hash (FNV-1a 64-bit) used to detect local changes since the
-    // last sync without a network round-trip.
-    private fun contentHash(text: String): String {
-        var hash = FNV_OFFSET_BASIS
-        for (byte in text.encodeToByteArray()) {
-            hash = hash xor (byte.toLong() and 0xff)
-            hash *= FNV_PRIME
-        }
-        return hash.toULong().toString(HEX_RADIX)
-    }
 
     private fun PassThroughAccount.toExport(appVersion: AppVersion): PassThroughExport =
         PassThroughExport(
@@ -293,10 +268,4 @@ class StrategyLibraryService(
             is CsvResolution.MapToExisting -> Resolution.MapToExisting(id)
             is CsvResolution.MapToExistingCurrency -> Resolution.MapToExistingCurrency(id)
         }
-
-    private companion object {
-        const val FNV_OFFSET_BASIS: Long = -3750763034362895579L // 0xcbf29ce484222325
-        const val FNV_PRIME: Long = 1099511628211L
-        const val HEX_RADIX: Int = 16
-    }
 }

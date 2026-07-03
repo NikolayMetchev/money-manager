@@ -1,0 +1,139 @@
+{
+    "version": "",
+    "name": "Wise",
+    "baseUrl": "https://api.wise.com",
+    "authType": "BEARER_TOKEN",
+    "accountsEndpoint": {
+        "path": "/v4/profiles/{ancestor[0].id}/balances",
+        "responseArrayKey": "",
+        "queryParams": [
+            {
+                "name": "types",
+                "value": "STANDARD",
+                "dynamicSource": null
+            }
+        ],
+        "pagination": null
+    },
+    "transactionsEndpoint": {
+        "path": "/v1/profiles/{ancestor[0].id}/balance-statements/{account.id}/statement.json",
+        "responseArrayKey": "transactions",
+        "queryParams": [
+            {
+                "name": "currency",
+                "value": null,
+                "dynamicSource": "account.currency"
+            },
+            {
+                "name": "type",
+                "value": "FLAT",
+                "dynamicSource": null
+            }
+        ],
+        "pagination": {
+            "mode": "DATE_WINDOW",
+            "limitParam": "limit",
+            "limitValue": 100,
+            "cursorParam": "before",
+            "cursorResponseField": "created",
+            "startParam": "intervalStart",
+            "endParam": "intervalEnd",
+            "windowDays": 469,
+            "lookbackDays": 2190,
+            "extraParams": []
+        }
+    },
+    "accountMappings": {
+        "idField": "id",
+        "descriptionField": "currency",
+        "ownerNameField": null,
+        "ownersArrayField": null,
+        "ownerUserIdField": "user_id",
+        "ownerNameFallbackField": "name",
+        "sortCodeField": "sort_code",
+        "accountNumberField": "account_number",
+        "currencyField": "currency",
+        "customFields": {},
+        "uniqueIdentifierFields": []
+    },
+    "transactionMappings": {
+        "amountField": "amount.value",
+        "timestampField": "date",
+        "currencyField": "amount.currency",
+        "descriptionField": "details.description",
+        "amountFormat": "DECIMAL_MAJOR_UNITS",
+        "signSource": "FIELD",
+        "signField": "type",
+        "creditValues": [
+            "CREDIT"
+        ],
+        "idField": "referenceNumber",
+        "merchantNameField": "details.merchant.name",
+        "counterpartyNameField": "details.senderName",
+        "counterpartyIdField": null,
+        "declineReasonField": null,
+        "declineStatusField": null,
+        "declinedStatusValues": [],
+        "localAmountField": null,
+        "localCurrencyField": null,
+        "feeAmountField": null,
+        "feeCurrencyField": null,
+        "feeDescriptionField": null,
+        "feeIncludedInAmount": false,
+        "customFields": {},
+        "uniqueIdentifierFields": []
+    },
+    "peopleMappings": {
+        "counterpartyObjectField": "counterparty",
+        "beneficiaryAccountTypeField": "beneficiary_account_type",
+        "personalBeneficiaryAccountTypeValue": "Personal",
+        "personalBeneficiaryAccountTypeValues": [],
+        "counterpartyNameField": "name",
+        "counterpartyUserIdField": "user_id",
+        "counterpartySortCodeField": "sort_code",
+        "counterpartyAccountNumberField": "account_number",
+        "counterpartyServiceUserNumberField": "service_user_number",
+        "fallbackCounterpartyAccountIdSuffix": ".account_id",
+        "ephemeralCounterpartyIdPrefixes": [],
+        "preferBankIdentity": false
+    },
+    "accountIdentifiersEndpoint": null,
+    "ancestorEndpoints": [
+        {
+            "path": "/v1/profiles",
+            "responseArrayKey": "",
+            "queryParams": [],
+            "pagination": null
+        }
+    ],
+    "builtInCounterpartyRules": [],
+    "signing": {
+        "challengeHeader": "x-2fa-approval",
+        "signatureHeader": "X-Signature",
+        "triggerStatus": 403,
+        "statementCountries": [
+            "US",
+            "CA",
+            "AU",
+            "NZ",
+            "SG",
+            "MY"
+        ]
+    },
+    "peopleDownload": {
+        "endpoint": {
+            "path": "/v1/profiles",
+            "responseArrayKey": "",
+            "queryParams": [],
+            "pagination": null
+        },
+        "externalIdField": "id",
+        "firstNameField": "details.firstName",
+        "lastNameField": "details.lastName",
+        "preferredNameField": "details.preferredName",
+        "fallbackNameField": "details.name",
+        "accountOwnerAncestorExpr": "ancestor[0].id",
+        "ownsAllAccounts": false
+    },
+    "personExternalIdAttribute": "wise-external-id"
+}

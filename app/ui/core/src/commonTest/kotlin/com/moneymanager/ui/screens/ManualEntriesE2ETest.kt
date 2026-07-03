@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
+import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -67,6 +68,7 @@ class ManualEntriesE2ETest {
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 databaseComponent = DatabaseComponent.create(db)
+                databaseComponent.installBuiltInCsvStrategies()
 
                 val wiseEur =
                     databaseComponent.accountRepository.createAccount(

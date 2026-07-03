@@ -1,0 +1,112 @@
+{
+    "version": "",
+    "name": "Starling",
+    "baseUrl": "https://api.starlingbank.com",
+    "authType": "BEARER_TOKEN",
+    "accountsEndpoint": {
+        "path": "/api/v2/accounts",
+        "responseArrayKey": "accounts",
+        "queryParams": [],
+        "pagination": null
+    },
+    "transactionsEndpoint": {
+        "path": "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
+        "responseArrayKey": "feedItems",
+        "queryParams": [
+            {
+                "name": "changesSince",
+                "value": "1970-01-01T00:00:00.000Z",
+                "dynamicSource": null
+            }
+        ],
+        "pagination": null
+    },
+    "accountMappings": {
+        "idField": "accountUid",
+        "descriptionField": "name",
+        "ownerNameField": null,
+        "ownersArrayField": null,
+        "ownerUserIdField": "user_id",
+        "ownerNameFallbackField": "name",
+        "sortCodeField": "bankIdentifier",
+        "accountNumberField": "accountIdentifier",
+        "currencyField": "currency",
+        "customFields": {},
+        "uniqueIdentifierFields": []
+    },
+    "transactionMappings": {
+        "amountField": "amount.minorUnits",
+        "timestampField": "transactionTime",
+        "currencyField": "amount.currency",
+        "descriptionField": "reference",
+        "amountFormat": "MINOR_UNITS_INTEGER",
+        "signSource": "FIELD",
+        "signField": "direction",
+        "creditValues": [
+            "IN"
+        ],
+        "idField": "feedItemUid",
+        "merchantNameField": null,
+        "counterpartyNameField": "counterPartyName",
+        "counterpartyIdField": "counterPartyUid",
+        "declineReasonField": null,
+        "declineStatusField": "status",
+        "declinedStatusValues": [
+            "DECLINED"
+        ],
+        "localAmountField": null,
+        "localCurrencyField": null,
+        "feeAmountField": null,
+        "feeCurrencyField": null,
+        "feeDescriptionField": null,
+        "feeIncludedInAmount": false,
+        "customFields": {
+            "starling-transaction-id": "feedItemUid"
+        },
+        "uniqueIdentifierFields": [
+            "starling-transaction-id"
+        ]
+    },
+    "peopleMappings": {
+        "counterpartyObjectField": "",
+        "beneficiaryAccountTypeField": "counterPartyType",
+        "personalBeneficiaryAccountTypeValue": "Personal",
+        "personalBeneficiaryAccountTypeValues": [
+            "PAYEE",
+            "SENDER"
+        ],
+        "counterpartyNameField": "counterPartyName",
+        "counterpartyUserIdField": "counterPartyUid",
+        "counterpartySortCodeField": "counterPartySubEntityIdentifier",
+        "counterpartyAccountNumberField": "counterPartySubEntitySubIdentifier",
+        "counterpartyServiceUserNumberField": "service_user_number",
+        "fallbackCounterpartyAccountIdSuffix": ".account_id",
+        "ephemeralCounterpartyIdPrefixes": [],
+        "preferBankIdentity": true
+    },
+    "accountIdentifiersEndpoint": {
+        "path": "/api/v2/accounts/{account.id}/identifiers",
+        "responseArrayKey": "",
+        "queryParams": [],
+        "pagination": null
+    },
+    "ancestorEndpoints": [],
+    "builtInCounterpartyRules": [],
+    "signing": null,
+    "peopleDownload": {
+        "endpoint": {
+            "path": "/api/v2/account-holder/individual",
+            "responseArrayKey": "",
+            "queryParams": [],
+            "pagination": null
+        },
+        "externalIdField": "id",
+        "firstNameField": "firstName",
+        "lastNameField": "lastName",
+        "preferredNameField": null,
+        "fallbackNameField": null,
+        "accountOwnerAncestorExpr": null,
+        "ownsAllAccounts": true
+    },
+    "personExternalIdAttribute": "starling-external-id"
+}

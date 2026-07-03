@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.createTestDatabaseLocation
+import com.moneymanager.test.database.installBuiltInApiStrategies
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.MoneyManagerTestApp
@@ -145,6 +146,7 @@ class MonzoImportAuditE2ETest {
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val dc = DatabaseComponent.create(db)
+                dc.installBuiltInApiStrategies()
 
                 val deviceId =
                     dc.deviceRepository.getOrCreateDevice(

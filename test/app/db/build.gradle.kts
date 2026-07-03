@@ -10,6 +10,7 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.di.core)
                 api(projects.app.model.core)
+                api(projects.test.app.strategies)
 
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.utils.currency)

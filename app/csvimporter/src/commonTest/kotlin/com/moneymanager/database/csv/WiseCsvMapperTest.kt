@@ -2,6 +2,7 @@
 
 package com.moneymanager.database.csv
 
+import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ExistingTransferInfo
 import com.moneymanager.csvimporter.MappingResult
@@ -16,7 +17,6 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.BuiltInCsvStrategies
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant

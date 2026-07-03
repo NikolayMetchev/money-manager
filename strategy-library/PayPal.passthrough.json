@@ -1,0 +1,13 @@
+{
+    "version": "",
+    "name": "PayPal",
+    "conduitAccountName": "PayPal",
+    "relationshipTypeId": 3,
+    "rules": [
+        {
+            "detectionPattern": "(?i)^(?:Refund: |Refund reversal: |Cancellation: )?PAYPAL\\s*\\*",
+            "merchantPattern": "(?i)^(?:Refund: |Refund reversal: |Cancellation: )?PAYPAL\\s*\\*\\s*(.+?)(?:\\s{2,}.*)?$",
+            "merchantTemplate": "$1"
+        }
+    ]
+}

@@ -12,6 +12,7 @@ kotlin {
                 api(projects.app.importengineapi)
                 api(projects.app.importer)
                 api(projects.app.model.core)
+                api(projects.app.strategycatalog)
                 api(projects.utils.localsettings)
             }
         }
@@ -26,6 +27,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.strategycatalog)
                 api(projects.utils.localsettings)
 
                 implementation(projects.app.db.read)
@@ -45,6 +47,7 @@ kotlin {
                 // AppComponentParams, so it's part of this module's ABI.
                 api(projects.app.remotestorage.googledrive)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.strategycatalog)
 
                 implementation(projects.app.db.read)
                 implementation(projects.app.importfilesource.localfolder)

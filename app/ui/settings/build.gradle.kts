@@ -10,6 +10,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.strategycatalog)
                 api(projects.app.ui.foundation)
 
                 implementation(libs.compose.charts)

@@ -31,6 +31,7 @@ kotlin {
                 implementation(projects.app.model.core)
                 implementation(projects.app.qifimporter)
                 implementation(projects.test.app.db)
+                implementation(projects.test.app.strategies)
             }
         }
 

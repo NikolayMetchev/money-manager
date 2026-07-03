@@ -1,0 +1,428 @@
+{
+    "version": "",
+    "name": "Santander (QIF)",
+    "identificationColumns": [
+        "Date",
+        "Amount",
+        "Payee",
+        "Memo",
+        "Category",
+        "Transfer Account",
+        "Check Number",
+        "Cleared",
+        "Account"
+    ],
+    "fieldMappings": {
+        "TARGET_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport",
+            "fieldType": "TARGET_ACCOUNT",
+            "columnName": "Payee",
+            "rules": [
+                {
+                    "pattern": "^\\d+ Direct Debit Payments?\\b",
+                    "accountName": "Santander Cashback",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^MY OFFERS\\b",
+                    "accountName": "Santander Cashback",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^DIRECT DEBIT INDEMNITY\\b",
+                    "accountName": "Santander Direct Debit Indemnity",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^DIRECT DEBIT REVERSAL\\b",
+                    "accountName": "Santander Direct Debit Reversal",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^DIRECT DEBIT PAYMENT TO\\s+(.+?)(?:\\s+REF\\b|\\s+MANDATE\\b|,)",
+                    "accountName": "Santander Direct Debit",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^CARD PAYMENT TO\\s+(.+?)(?:,|\\s+ON\\b)",
+                    "accountName": "Santander Card Payment",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^FASTER PAYMENTS RECEIPT\\b.*?\\bFROM\\s+([^,]+?)\\s*,",
+                    "accountName": "Santander Faster Payment",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": true
+                },
+                {
+                    "pattern": "^PAYM\\b.*?\\bFROM\\s+([^,]+?)\\s*(?:,|\\s+REFERENCE\\b)",
+                    "accountName": "Santander Paym",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": true
+                },
+                {
+                    "pattern": "^PAYM\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
+                    "accountName": "Santander Paym",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": true
+                },
+                {
+                    "pattern": "^BILL PAYMENT\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|\\s+MANDATE\\b|,)",
+                    "accountName": "Santander Bill Payment",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": true
+                },
+                {
+                    "pattern": "^BILL PAYMENT\\b.*?\\bFROM\\s+([^,]+?)\\s*(?:,|\\s+REFERENCE\\b)",
+                    "accountName": "Santander Bill Payment",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": true
+                },
+                {
+                    "pattern": "^PENDED\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
+                    "accountName": "Santander Pended Payment",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": true
+                },
+                {
+                    "pattern": "^STANDING ORDER\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|\\s+MANDATE\\b|,)",
+                    "accountName": "Santander Standing Order",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": true
+                },
+                {
+                    "pattern": "^Third party payment\\b.*?\\bto\\s+(.+?)(?:\\s+Reference\\b|,)",
+                    "accountName": "Santander Third Party Payment",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": true
+                },
+                {
+                    "pattern": "^TRANSFER\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
+                    "accountName": "Santander Transfer",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": true
+                },
+                {
+                    "pattern": "^TRANSFER\\b.*?\\bFROM\\s+([^,.]+?)\\s*(?:,|\\.|\\s+REFERENCE\\b)",
+                    "accountName": "Santander Transfer",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": true
+                },
+                {
+                    "pattern": "^CASH\\b",
+                    "accountName": "Cash",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^WITHDRAWAL\\b",
+                    "accountName": "Cash",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^CHEQUE\\b",
+                    "accountName": "Cheque",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^BANK GIRO CREDIT REF\\s+\\d*([^,]+?)\\s*,",
+                    "accountName": "Santander Bank Giro Credit",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^CREDIT FROM\\s+(.+?)(?:\\s+ON\\b|,)",
+                    "accountName": "Santander Credit",
+                    "accountNameTemplate": "$1",
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^INTEREST\\b",
+                    "accountName": "Santander Interest",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^LOAN\\b",
+                    "accountName": "Santander Loan",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false
+                },
+                {
+                    "pattern": "^(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT|UNARRANGED|NON-STERLING|PENDED|PENDING)\\b",
+                    "accountName": "Santander Fees",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false
+                }
+            ],
+            "fallbackColumns": [
+                "Transfer Account",
+                "Category"
+            ],
+            "defaultCategoryName": "Uncategorized"
+        },
+        "TIMESTAMP": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport",
+            "fieldType": "TIMESTAMP",
+            "dateColumnName": "Date",
+            "dateFormat": "dd/MM/yyyy",
+            "timeColumnName": null,
+            "timeFormat": null,
+            "defaultTime": "12:00:00",
+            "dateTimeFormat": null
+        },
+        "DESCRIPTION": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.DirectColumnExport",
+            "fieldType": "DESCRIPTION",
+            "columnName": "Payee",
+            "fallbackColumns": [
+                "Memo"
+            ],
+            "extraction": {
+                "pattern": "^(.*?),\\s*[\\d][\\d.,]*\\s*(?:GBP)?\\s*$",
+                "outputTemplate": "$1"
+            }
+        },
+        "AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport",
+            "fieldType": "AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "Amount",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": true,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.HardCodedCurrencyExport",
+            "fieldType": "CURRENCY",
+            "currencyCode": "GBP"
+        },
+        "TIMEZONE": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport",
+            "fieldType": "TIMEZONE",
+            "timezoneId": "UTC"
+        }
+    },
+    "attributeMappings": [
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^\\d+ Direct Debit",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "CASHBACK"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^MY OFFERS",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "CASHBACK"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^CARD PAYMENT TO",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "CARD_PAYMENT"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^DIRECT DEBIT",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "DIRECT_DEBIT"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^FASTER PAYMENTS RECEIPT",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "FASTER_PAYMENT_IN"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^PAYM\\b",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "PAYM"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^BILL PAYMENT",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "BILL_PAYMENT"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^STANDING ORDER",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "STANDING_ORDER"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^Third party payment",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "THIRD_PARTY_PAYMENT"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^TRANSFER\\b",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "TRANSFER"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^CASH\\b",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "CASH"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^CHEQUE\\b",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "CHEQUE"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^BANK GIRO CREDIT",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "BANK_GIRO_CREDIT"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^CREDIT FROM",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "CREDIT"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^INTEREST",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "INTEREST"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^LOAN\\b",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "LOAN"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-transaction-type",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT)",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "ACCOUNT_FEE"
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-reference",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "(?:REFERENCE|REF)\\b\\.?\\s*(.+?)\\s*(?:,|\\s+MANDATE\\b)",
+                "outputTemplate": "$1"
+            },
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-mandate",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "MANDATE NO\\s*(\\d+)",
+                "outputTemplate": "$1"
+            },
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Payee",
+            "attributeTypeName": "santander-posted-date",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "\\bON\\s+(\\d{2}-\\d{2}-\\d{4})",
+                "outputTemplate": "$1"
+            },
+            "emitWhenMatched": null
+        }
+    ],
+    "rowPreprocessingRules": [],
+    "companionTransactionRules": [],
+    "contentMatchRules": [
+        {
+            "columnName": "Payee",
+            "pattern": "^(CARD PAYMENT|DIRECT DEBIT|\\d+ DIRECT DEBIT|FASTER PAYMENTS RECEIPT|PAYM|BILL PAYMENT|STANDING ORDER|Third party payment|CASH |CHEQUE|BANK GIRO CREDIT|MONTHLY ACCOUNT FEE|INTEREST|MAINTAINING THE ACCOUNT|CREDIT FROM|TRANSFER)"
+        }
+    ],
+    "accountMappings": []
+}

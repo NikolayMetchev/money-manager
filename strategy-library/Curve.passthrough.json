@@ -1,0 +1,13 @@
+{
+    "version": "",
+    "name": "Curve",
+    "conduitAccountName": "Curve",
+    "relationshipTypeId": 3,
+    "rules": [
+        {
+            "detectionPattern": "(?i)^(?:Refund: |Refund reversal: |Cancellation: )?CRV\\*",
+            "merchantPattern": "(?i)^(?:Refund: |Refund reversal: |Cancellation: )?CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$",
+            "merchantTemplate": "$1"
+        }
+    ]
+}

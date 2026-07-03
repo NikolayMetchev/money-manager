@@ -27,6 +27,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
+import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -110,6 +111,7 @@ class ImportMonzoCsvE2ETest {
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val databaseComponent = DatabaseComponent.create(db)
+                databaseComponent.installBuiltInCsvStrategies()
 
                 // Parse and inject CSV data
                 val csvContent = loadTestCsvContent()
@@ -259,6 +261,7 @@ class ImportMonzoCsvE2ETest {
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val databaseComponent = DatabaseComponent.create(db)
+                databaseComponent.installBuiltInCsvStrategies()
 
                 val csvContent = loadTestCsvContent()
                 val lines = csvContent.lines().filter { it.isNotBlank() }
@@ -338,6 +341,7 @@ class ImportMonzoCsvE2ETest {
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val databaseComponent = DatabaseComponent.create(db)
+                databaseComponent.installBuiltInCsvStrategies()
 
                 val csvContent = loadTestCsvContent()
                 val lines = csvContent.lines().filter { it.isNotBlank() }
@@ -421,6 +425,7 @@ class ImportMonzoCsvE2ETest {
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val databaseComponent = DatabaseComponent.create(db)
+                databaseComponent.installBuiltInCsvStrategies()
 
                 databaseComponent.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
                 // A source account for the bulk dialog (the built-in Monzo CSV strategy has no source mapping).

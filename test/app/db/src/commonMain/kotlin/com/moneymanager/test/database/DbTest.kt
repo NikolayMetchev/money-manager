@@ -22,6 +22,13 @@ open class DbTest {
     /** Override (= true) in tests that assert against the full platform currency list. */
     protected open val seedAllCurrencies: Boolean = false
 
+    /**
+     * Override (= true) in tests that exercise the built-in strategies/pass-throughs. Fresh databases
+     * no longer seed them (they are installed on demand from the strategy-library catalog), so opting
+     * in installs all of them through the engine before the test body runs.
+     */
+    protected open val installBuiltInStrategies: Boolean = false
+
     @BeforeTest
     fun setup() =
         runTest {
@@ -29,6 +36,11 @@ open class DbTest {
             database = createTestDatabaseManager(seedAllCurrencies).openDatabase(testDbLocation)
             repositories = DatabaseComponent.create(database)
             entitySourceQueries = database.entitySourceWriteQueries
+            if (installBuiltInStrategies) {
+                repositories.installBuiltInCsvStrategies()
+                repositories.installBuiltInApiStrategies()
+                repositories.installBuiltInPassThroughs()
+            }
         }
 
     @AfterTest

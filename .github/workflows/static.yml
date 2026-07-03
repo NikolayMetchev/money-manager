@@ -9,6 +9,8 @@ on:
     branches: ["main"]
     paths:
       - 'webpage/**'
+      - 'strategy-library/**'
+      - 'tools/strategy-catalog/**'
       - 'app/db/core/src/commonMain/sqldelight/**'
       - '.github/workflows/static.yml'
       - 'settings.gradle.kts'
@@ -58,6 +60,16 @@ jobs:
         with:
           command: 'createModuleGraph -Dorg.gradle.unsafe.isolated-projects=false --no-configuration-cache --stacktrace'
           cache-read-only: true
+      - name: Generate strategy catalog site
+        # Validates strategy-library/ and writes index.json + artifact copies into
+        # tools/strategy-catalog/build/catalog-site/strategy-library (the app fetches
+        # <pages-url>/strategy-library/index.json).
+        uses: ./.github/actions/gradle-run
+        with:
+          command: ':tools:strategy-catalog:generateCatalogSite --stacktrace'
+          cache-read-only: true
+      - name: Merge strategy catalog into site
+        run: cp -r tools/strategy-catalog/build/catalog-site/strategy-library webpage/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:

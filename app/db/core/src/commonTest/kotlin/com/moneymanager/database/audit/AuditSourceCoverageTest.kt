@@ -2,6 +2,7 @@
 
 package com.moneymanager.database.audit
 import app.cash.sqldelight.db.QueryResult
+import com.moneymanager.builtin.BuiltInApiStrategies
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
@@ -22,6 +23,7 @@ import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createCategory
 import com.moneymanager.test.database.createOwnership
 import com.moneymanager.test.database.createPerson
+import com.moneymanager.test.database.installBuiltInApiStrategies
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -68,9 +70,9 @@ class AuditSourceCoverageTest : DbTest() {
                 "pass_through_account_audit",
             )
 
-        // Well-known UUID seeded by DatabaseConfig for the built-in Monzo strategy.
+        // Fixed UUID of the built-in Monzo strategy (installed from the fixture in this test).
         private val MONZO_STRATEGY_ID =
-            ApiImportStrategyId(Uuid.parse("00000000-0000-0000-0000-000000000001"))
+            ApiImportStrategyId(BuiltInApiStrategies.monzoStrategyId)
     }
 
     @Test
@@ -88,7 +90,9 @@ class AuditSourceCoverageTest : DbTest() {
             assertAllHaveSource("Uncategorized category", uncategorizedAudit) { it.source }
             coveredTables.add("category_audit")
 
-            // Monzo strategy is inserted with a fixed UUID during database initialisation.
+            // Strategies are no longer seeded; installing the built-in Monzo strategy through the
+            // engine must record its audit source like any other write.
+            repositories.installBuiltInApiStrategies()
             val strategyAudit =
                 repositories.auditRepository.getAuditHistoryForApiImportStrategy(MONZO_STRATEGY_ID)
             assertAllHaveSource("Monzo strategy", strategyAudit) { it.source }

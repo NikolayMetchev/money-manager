@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
+import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.MoneyManagerTestApp
@@ -61,6 +62,7 @@ class ImportWiseCsvE2ETest {
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val databaseComponent = DatabaseComponent.create(db)
+                databaseComponent.installBuiltInCsvStrategies()
 
                 // The Wise API import would normally have created the per-currency accounts
                 for (name in listOf("Wise: EUR", "Wise: GBP")) {
@@ -159,6 +161,7 @@ class ImportWiseCsvE2ETest {
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 databaseComponent = DatabaseComponent.create(db)
+                databaseComponent.installBuiltInCsvStrategies()
 
                 // No accounts are created up front - the import must discover all of them
                 val csvContent = wiseCsvContent()
