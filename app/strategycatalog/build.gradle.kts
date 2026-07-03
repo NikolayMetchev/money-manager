@@ -38,6 +38,7 @@ kotlin {
         androidMain {
             dependencies {
                 api(libs.kotlinx.serialization.core)
+                api(projects.app.model.core)
 
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)

@@ -98,14 +98,23 @@ class StrategyCatalogController(
         resolutions: Map<StrategyKey, Map<CsvUnresolvedReference, CsvResolution>> = emptyMap(),
     ): Int {
         var installed = 0
-        clearingBusyOnFailure {
+        var failure: Throwable? = null
+        try {
             for (entry in entriesFor(keys)) {
                 val json = client.fetchArtifact(entry.fileName)
                 library.applyIncoming(entry.key, json, resolutions[entry.key] ?: emptyMap())
                 installed++
             }
+        } catch (expected: Throwable) {
+            failure = expected
         }
+        // Refresh even after a partial failure so entries applied before the error show as installed
+        // (a successful refresh clears `error`, so republish the failure after it).
         refresh(library, appVersion)
+        failure?.let {
+            _state.value = _state.value.copy(busy = false, error = it.message ?: "Catalog action failed")
+            throw it
+        }
         return installed
     }
 

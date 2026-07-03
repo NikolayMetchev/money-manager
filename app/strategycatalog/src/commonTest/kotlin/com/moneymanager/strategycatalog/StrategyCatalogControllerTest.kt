@@ -30,6 +30,7 @@ class StrategyCatalogControllerTest {
     private class FakeLibrary : StrategyLibrary {
         val installed = mutableMapOf<StrategyKey, String>()
         var failOnApply = false
+        var failOnKey: StrategyKey? = null
 
         override suspend fun listLocal(appVersion: AppVersion): List<LocalStrategyEntry> =
             installed.map { (key, json) -> LocalStrategyEntry(key, json, canonicalHash(key, json)) }
@@ -49,7 +50,7 @@ class StrategyCatalogControllerTest {
             json: String,
             resolutions: Map<CsvUnresolvedReference, CsvResolution>,
         ) {
-            check(!failOnApply) { "apply failed" }
+            check(!failOnApply && key != failOnKey) { "apply failed" }
             installed[key] = json
         }
     }
@@ -187,6 +188,29 @@ class StrategyCatalogControllerTest {
             }
             assertNotNull(controller.state.value.error)
             assertEquals(false, controller.state.value.busy)
+        }
+
+    @Test
+    fun partialInstallFailureStillRefreshesAppliedEntries() =
+        runTest {
+            val library = FakeLibrary()
+            val controller = controller()
+            controller.refresh(library, version)
+
+            // Curve applies (sorts first); Monzo fails. The refresh must still surface Curve as
+            // installed, with the failure republished on top of the fresh state.
+            library.failOnKey = monzoKey
+            assertFailsWith<IllegalStateException> {
+                controller.install(library, version, setOf(monzoKey, curveKey))
+            }
+            val state = controller.state.value
+            assertNotNull(state.error)
+            assertEquals(
+                CatalogItemStatus.INSTALLED,
+                state.items.first { it.entry.key == curveKey }.status,
+                "the entry applied before the failure shows as installed",
+            )
+            assertEquals(CatalogItemStatus.NOT_INSTALLED, state.items.first { it.entry.key == monzoKey }.status)
         }
 
     @Test
