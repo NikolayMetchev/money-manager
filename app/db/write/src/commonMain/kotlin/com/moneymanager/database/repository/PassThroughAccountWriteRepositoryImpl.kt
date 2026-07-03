@@ -25,7 +25,6 @@ class PassThroughAccountWriteRepositoryImpl(
                     name = account.name,
                     conduit_account_name = account.conduitAccountName,
                     relationship_type_id = account.relationshipTypeId,
-                    enabled = if (account.enabled) 1L else 0L,
                     rules_json = PassThroughRulesJsonCodec.encode(account.rules),
                 )
                 PassThroughAccountId(writeQueries.lastInsertRowId().executeAsOne())
@@ -38,7 +37,6 @@ class PassThroughAccountWriteRepositoryImpl(
                 name = account.name,
                 conduit_account_name = account.conduitAccountName,
                 relationship_type_id = account.relationshipTypeId,
-                enabled = if (account.enabled) 1L else 0L,
                 rules_json = PassThroughRulesJsonCodec.encode(account.rules),
                 id = account.id.value,
             )

@@ -27,13 +27,6 @@ class PassThroughAccountReadRepositoryImpl(
             .mapToList(coroutineContext)
             .map { rows -> rows.map(::toDomain) }
 
-    override fun getEnabled(): Flow<List<PassThroughAccount>> =
-        selectQueries
-            .selectEnabled()
-            .asFlow()
-            .mapToList(coroutineContext)
-            .map { rows -> rows.map(::toDomain) }
-
     override fun getById(id: PassThroughAccountId): Flow<PassThroughAccount?> =
         selectQueries
             .selectById(id.value)
@@ -47,7 +40,6 @@ class PassThroughAccountReadRepositoryImpl(
             name = entity.name,
             conduitAccountName = entity.conduit_account_name,
             relationshipTypeId = entity.relationship_type_id,
-            enabled = entity.enabled != 0L,
             rules = PassThroughRulesJsonCodec.decode(entity.rules_json),
         )
 }

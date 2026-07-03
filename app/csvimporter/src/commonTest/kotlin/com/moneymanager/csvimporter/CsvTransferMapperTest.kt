@@ -203,6 +203,57 @@ class CsvTransferMapperTest {
         assertEquals(setOf("Curve", "Sainsburys"), newNames)
     }
 
+    @Test
+    fun `mapRow routes a chained Curve-PayPal row through both conduits`() {
+        val strategy = createStrategy()
+        val curve =
+            PassThroughAccount(
+                id = PassThroughAccountId(1),
+                name = "Curve",
+                conduitAccountName = "Curve",
+                rules =
+                    listOf(
+                        PassThroughRule(
+                            detectionPattern = "(?i)^CRV\\*",
+                            merchantPattern = "(?i)^CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$",
+                        ),
+                    ),
+            )
+        val paypal =
+            PassThroughAccount(
+                id = PassThroughAccountId(2),
+                name = "PayPal",
+                conduitAccountName = "PayPal",
+                rules =
+                    listOf(
+                        PassThroughRule(
+                            detectionPattern = "(?i)^PAYPAL\\s*\\*",
+                            merchantPattern = "(?i)^PAYPAL\\s*\\*\\s*(.+?)(?:\\s{2,}.*)?$",
+                        ),
+                    ),
+            )
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columns,
+                existingAccounts = emptyMap(),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                passThroughDetector = PassThroughDetector(listOf(curve, paypal)),
+            )
+
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "CRV*PAYPAL *THEPIHUT 0", "-27.00", "CRV*PAYPAL *THEPIHUT 0"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        // The whole chain is carried, outermost first; the merchant is fully stripped.
+        assertEquals(listOf("Curve", "PayPal"), result.passThrough?.conduitNames)
+        assertEquals("THEPIHUT 0", result.passThrough?.merchantName)
+        assertEquals(listOf("PAYPAL *THEPIHUT 0", "THEPIHUT 0"), result.passThrough?.spendDescriptions)
+        // The transfer's own counterparty side is the FIRST conduit; every chain account is created.
+        assertEquals(setOf("Curve", "PayPal", "THEPIHUT 0"), result.newAccounts.map { it.name }.toSet())
+    }
+
     // Mirrors the seeded Curve rule incl. Crypto.com's cancellation prefixes.
     private val curveWithCancellations =
         PassThroughAccount(
@@ -1412,7 +1463,7 @@ class CsvTransferMapperTest {
         assertIs<MappingResult.Success>(result)
         assertEquals("Amazon", result.passThrough?.merchantName)
         assertEquals(amazonAccount.id, result.passThrough?.merchantAccountId)
-        assertEquals("Amazoncouk 1234", result.passThrough?.rawMerchantName)
+        assertEquals(listOf("Amazoncouk 1234"), result.passThrough?.spendDescriptions)
         // No junk "Amazoncouk 1234" account is created — the mapping routed the spend leg to Amazon.
         assertEquals(emptySet(), result.newAccounts.map { it.name }.toSet())
     }

@@ -348,8 +348,8 @@ CREATE TRIGGER trigger_pass_through_account_delete_audit
 AFTER DELETE ON pass_through_account
 FOR EACH ROW
 BEGIN
-    INSERT INTO pass_through_account_audit (audit_timestamp, audit_type_id, pass_through_account_id, name, conduit_account_name, relationship_type_id, enabled, rules_json)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.name, old.conduit_account_name, old.relationship_type_id, old.enabled, old.rules_json);
+    INSERT INTO pass_through_account_audit (audit_timestamp, audit_type_id, pass_through_account_id, name, conduit_account_name, relationship_type_id, rules_json)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.name, old.conduit_account_name, old.relationship_type_id, old.rules_json);
 END;
 
 -- trigger_pass_through_account_insert_audit
@@ -357,8 +357,8 @@ CREATE TRIGGER trigger_pass_through_account_insert_audit
 AFTER INSERT ON pass_through_account
 FOR EACH ROW
 BEGIN
-    INSERT INTO pass_through_account_audit (audit_timestamp, audit_type_id, pass_through_account_id, name, conduit_account_name, relationship_type_id, enabled, rules_json)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.name, new.conduit_account_name, new.relationship_type_id, new.enabled, new.rules_json);
+    INSERT INTO pass_through_account_audit (audit_timestamp, audit_type_id, pass_through_account_id, name, conduit_account_name, relationship_type_id, rules_json)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.name, new.conduit_account_name, new.relationship_type_id, new.rules_json);
 END;
 
 -- trigger_pass_through_account_update_audit
@@ -366,8 +366,8 @@ CREATE TRIGGER trigger_pass_through_account_update_audit
 AFTER UPDATE ON pass_through_account
 FOR EACH ROW
 BEGIN
-    INSERT INTO pass_through_account_audit (audit_timestamp, audit_type_id, pass_through_account_id, name, conduit_account_name, relationship_type_id, enabled, rules_json)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.id, new.name, new.conduit_account_name, new.relationship_type_id, new.enabled, new.rules_json);
+    INSERT INTO pass_through_account_audit (audit_timestamp, audit_type_id, pass_through_account_id, name, conduit_account_name, relationship_type_id, rules_json)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.id, new.name, new.conduit_account_name, new.relationship_type_id, new.rules_json);
 END;
 
 -- trigger_person_account_ownership_delete_audit

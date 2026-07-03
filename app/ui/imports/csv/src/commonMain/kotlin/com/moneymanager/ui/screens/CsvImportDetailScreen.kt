@@ -42,6 +42,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.deleteCsvImport
@@ -67,6 +68,7 @@ fun CsvImportDetailScreen(
     passThroughAccountRepository: PassThroughAccountReadRepository,
     maintenance: Maintenance,
     transferSourceRepository: TransferSourceReadRepository,
+    transferRelationshipRepository: TransferRelationshipReadRepository,
     importEngine: ImportEngine,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
@@ -452,6 +454,7 @@ fun CsvImportDetailScreen(
             currencyRepository = currencyRepository,
             personRepository = personRepository,
             passThroughAccountRepository = passThroughAccountRepository,
+            transferRelationshipRepository = transferRelationshipRepository,
             maintenance = maintenance,
             importEngine = importEngine,
             onDismiss = { showReimportDialog = false },
@@ -463,6 +466,9 @@ fun CsvImportDetailScreen(
                         append("${result.mergedAccounts.size} account(s) merged")
                         val moved = result.mergedAccounts.sumOf { it.transferCount }
                         if (moved > 0) append(" ($moved transaction(s) moved)")
+                        if (result.rewrittenRows.isNotEmpty()) {
+                            append(", ${result.rewrittenRows.size} row(s) rerouted through pass-through accounts")
+                        }
                         result.importResult?.let { append(", ${it.successCount} row(s) imported") }
                         if (result.deletedEmptyAccounts.isNotEmpty()) {
                             append(", ${result.deletedEmptyAccounts.size} empty account(s) deleted")

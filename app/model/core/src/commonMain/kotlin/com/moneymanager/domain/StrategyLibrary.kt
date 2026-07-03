@@ -6,13 +6,15 @@ import com.moneymanager.domain.model.AppVersion
  * The kinds of strategy artifact stored in the shared library, one file per artifact on the remote.
  * CSV and QIF are both `csv_import_strategy` rows (QIF rides the CSV engine); they are separated here
  * only so the filename suffix records which kind a file is. [GLOBAL_MAPPINGS] is the single combined
- * file holding all global account mappings.
+ * file holding all global account mappings. [PASS_THROUGH] is one pass-through (conduit) account
+ * definition per file.
  */
 enum class StrategyKind {
     CSV,
     QIF,
     API,
     GLOBAL_MAPPINGS,
+    PASS_THROUGH,
 }
 
 /**
@@ -50,6 +52,7 @@ object StrategyFileNaming {
     private const val CSV_INFIX = ".csv"
     private const val QIF_INFIX = ".qif"
     private const val API_INFIX = ".api"
+    private const val PASS_THROUGH_INFIX = ".passthrough"
 
     fun fileName(key: StrategyKey): String =
         when (key.kind) {
@@ -57,6 +60,7 @@ object StrategyFileNaming {
             StrategyKind.QIF -> "${key.name}$QIF_INFIX$SUFFIX"
             StrategyKind.API -> "${key.name}$API_INFIX$SUFFIX"
             StrategyKind.GLOBAL_MAPPINGS -> "$GLOBAL_MAPPINGS_NAME$SUFFIX"
+            StrategyKind.PASS_THROUGH -> "${key.name}$PASS_THROUGH_INFIX$SUFFIX"
         }
 
     /** Parses a remote filename back into a [StrategyKey], or null if it isn't a library file. */
@@ -70,6 +74,7 @@ object StrategyFileNaming {
             stem.endsWith(CSV_INFIX) -> StrategyKey(StrategyKind.CSV, stem.removeSuffix(CSV_INFIX))
             stem.endsWith(QIF_INFIX) -> StrategyKey(StrategyKind.QIF, stem.removeSuffix(QIF_INFIX))
             stem.endsWith(API_INFIX) -> StrategyKey(StrategyKind.API, stem.removeSuffix(API_INFIX))
+            stem.endsWith(PASS_THROUGH_INFIX) -> StrategyKey(StrategyKind.PASS_THROUGH, stem.removeSuffix(PASS_THROUGH_INFIX))
             else -> null
         }?.takeIf { it.name.isNotBlank() }
     }

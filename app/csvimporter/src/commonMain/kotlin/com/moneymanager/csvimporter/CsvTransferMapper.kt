@@ -108,23 +108,31 @@ data class NewAccount(
 )
 
 /**
- * Pass-through routing for a row whose charge passes through a conduit account (e.g. Curve). The
- * transfer itself is the funding leg (card -> [conduitName]); the engine synthesises the spend leg
- * ([conduitName] -> [merchantName]) and links them via [relationshipTypeId]. When [incoming] (a
- * refund/cancellation back onto the card) both legs run the other way: funding [conduitName] -> card,
- * spend [merchantName] -> [conduitName].
+ * Pass-through routing for a row whose charge passes through a chain of conduit accounts (e.g. card →
+ * Curve → PayPal → merchant). The transfer itself is the funding leg (card -> first conduit); the
+ * engine synthesises one spend leg per adjacent chain pair (C1 -> C2, …, Cn -> [merchantName]) and
+ * links each movement to the next via [relationshipTypeId]. When [incoming] (a refund/cancellation
+ * back onto the card) every leg runs the other way: funding first-conduit -> card, spend legs
+ * [merchantName] -> Cn, …, C2 -> C1.
  */
 data class CsvPassThrough(
-    val conduitName: String,
+    /** Conduit account names, outermost first; the row's counterparty side is the first one. */
+    val conduitNames: List<String>,
     /** Effective merchant account name — the mapping target when a persisted mapping matched, else the stripped text. */
     val merchantName: String,
     /** Resolved existing merchant account; null when a new account will be created for [merchantName]. */
     val merchantAccountId: AccountId?,
-    /** The stripped statement text (e.g. "Amazoncouk 1234"), kept as the spend-leg description. */
-    val rawMerchantName: String,
+    /**
+     * One spend-leg description per conduit: the statement text remaining after that conduit's prefix
+     * was peeled (the last is the fully stripped merchant text, e.g. "Amazoncouk 1234").
+     */
+    val spendDescriptions: List<String>,
     val relationshipTypeId: Long,
     val incoming: Boolean = false,
-)
+) {
+    /** The conduit the row's own transfer moves money to/from. */
+    val conduitName: String get() = conduitNames.first()
+}
 
 /**
  * A transfer with its associated attributes extracted from CSV.
@@ -387,27 +395,29 @@ class CsvTransferMapper(
             // Detection + the conduit/merchant names come entirely from user-editable config (the
             // engine stays agnostic).
             val passThroughMatch = passThroughDetector?.detect(description)
+            val chainConduitIds =
+                passThroughMatch?.accounts?.mapNotNull { existingAccounts[it.conduitAccountName]?.id }.orEmpty()
             val conduitAccountId =
-                passThroughMatch?.let { existingAccounts[it.account.conduitAccountName]?.id ?: AccountId(-1) }
-            // Persisted account mappings apply to the merchant AFTER prefix stripping (e.g.
-            // "Crv*Amazoncouk 1234" → "Amazoncouk 1234" → mapping ".*Amazoncouk.*" → Amazon). A mapping
-            // that targets the conduit itself (or a deleted account) is ignored — the engine must never
-            // synthesise a conduit→conduit spend leg.
+                passThroughMatch?.let { existingAccounts[it.accounts.first().conduitAccountName]?.id ?: AccountId(-1) }
+            // Persisted account mappings apply to the merchant AFTER the full chain of prefixes was
+            // peeled (e.g. "Crv*Paypal *Amazoncouk 1234" → "Amazoncouk 1234" → mapping ".*Amazoncouk.*"
+            // → Amazon). A mapping that targets any conduit of the chain (or a deleted account) is
+            // ignored — the engine must never synthesise a conduit→conduit spend leg.
             val passThrough =
                 passThroughMatch?.let { match ->
                     val mapped = findPersistedMapping(match.merchantName)?.let { accountsById[it] }
                     val (merchantName, merchantAccountId) =
-                        if (mapped != null && mapped.id != conduitAccountId) {
+                        if (mapped != null && mapped.id !in chainConduitIds) {
                             mapped.name to mapped.id
                         } else {
                             match.merchantName to resolveExistingAccountId(match.merchantName)
                         }
                     CsvPassThrough(
-                        conduitName = match.account.conduitAccountName,
+                        conduitNames = match.accounts.map { it.conduitAccountName },
                         merchantName = merchantName,
                         merchantAccountId = merchantAccountId,
-                        rawMerchantName = match.merchantName,
-                        relationshipTypeId = match.account.relationshipTypeId,
+                        spendDescriptions = match.hops.map { it.merchantText },
+                        relationshipTypeId = match.accounts.first().relationshipTypeId,
                         incoming = flipAccounts,
                     )
                 }
@@ -474,7 +484,9 @@ class CsvTransferMapper(
                 buildList {
                     addAll(discoveries.mapNotNull { it?.first })
                     if (passThrough != null) {
-                        if (!accountExists(passThrough.conduitName)) add(NewAccount(passThrough.conduitName, targetCategoryId))
+                        passThrough.conduitNames
+                            .filterNot { accountExists(it) }
+                            .forEach { add(NewAccount(it, targetCategoryId)) }
                         if (passThrough.merchantAccountId == null) add(NewAccount(passThrough.merchantName, targetCategoryId))
                     }
                 }

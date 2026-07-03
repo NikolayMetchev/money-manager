@@ -139,6 +139,15 @@ sealed interface CsvImportMutation {
         val rowTransferMap: Map<Long, TransferId?>,
     ) : CsvImportMutation
 
+    /**
+     * Clears the rows' import status + transfer link so a re-import re-runs them from scratch (used
+     * after their previously-imported transfers were deleted, e.g. a pass-through rewrite).
+     */
+    data class ResetRowStatuses(
+        val id: CsvImportId,
+        val rowIndexes: Collection<Long>,
+    ) : CsvImportMutation
+
     data class SaveError(
         val id: CsvImportId,
         val rowIndex: Long,

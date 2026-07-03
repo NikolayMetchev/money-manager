@@ -6,10 +6,15 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.RelationshipType
+import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.TransferRelationship
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -24,7 +29,11 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.PassThroughRule
+import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.PassThroughDetector
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -397,4 +406,117 @@ class CsvReimportDetectionTest {
 
         assertEquals(mapOf(merchantDup.id to amazon.id), candidates.merges)
     }
+
+    // ============= Retroactive pass-through rewrites =============
+
+    /** In-memory relationship store: transferId -> outgoing relationships (id1 = that transfer). */
+    private class FakeRelationshipRepository(
+        private val byTransfer: Map<TransferId, List<TransferRelationship>>,
+    ) : TransferRelationshipReadRepository {
+        override fun getByTransfer(transferId: TransferId): Flow<List<TransferRelationship>> = flowOf(byTransfer[transferId].orEmpty())
+    }
+
+    private val passThroughType = RelationshipType(RelationshipTypeId(3), "pass-through")
+
+    private fun importedRow(
+        index: Long,
+        payee: String,
+        transferId: Long,
+    ) = CsvRow(
+        rowIndex = index,
+        values = listOf("15/12/2024", payee, "-50.00", payee),
+        transferId = TransferId(transferId),
+        importStatus = ImportStatus.IMPORTED,
+    )
+
+    @Test
+    fun `imported row without pass-through legs is rewritten when detection now routes it`() =
+        runTest {
+            val accounts = listOf(account(5, "Curve"), account(10, "Crv*Amazoncouk 1234"))
+            // The row was imported flat (card -> raw merchant, no legs) before the definition existed.
+            val rows = listOf(importedRow(1, "Crv*Amazoncouk 1234", transferId = 100))
+            val mappedPrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve))
+
+            val rewrites =
+                computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(emptyMap()))
+
+            val rewrite = rewrites.single()
+            assertEquals(1L, rewrite.rowIndex)
+            assertEquals(listOf(TransferId(100)), rewrite.transferIdsToDelete)
+            assertEquals(listOf("Curve"), rewrite.conduitNames)
+            assertEquals("Amazoncouk 1234", rewrite.merchantName)
+        }
+
+    @Test
+    fun `imported row whose legs already match the chain is left alone`() =
+        runTest {
+            val accounts = listOf(account(5, "Curve"), account(10, "Amazoncouk 1234"))
+            val rows = listOf(importedRow(1, "Crv*Amazoncouk 1234", transferId = 100))
+            val mappedPrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve))
+            // The funding transfer already carries its single pass-through spend leg.
+            val relationships =
+                mapOf(
+                    TransferId(100) to listOf(TransferRelationship(TransferId(100), TransferId(101), passThroughType)),
+                )
+
+            val rewrites = computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(relationships))
+
+            assertTrue(rewrites.isEmpty())
+        }
+
+    @Test
+    fun `single-hop row is rewritten when the chain is now longer, deleting the old leg too`() =
+        runTest {
+            val paypal =
+                PassThroughAccount(
+                    id = PassThroughAccountId(2),
+                    name = "PayPal",
+                    conduitAccountName = "PayPal",
+                    rules =
+                        listOf(
+                            PassThroughRule(
+                                detectionPattern = "(?i)^PAYPAL\\s*\\*",
+                                merchantPattern = "(?i)^PAYPAL\\s*\\*\\s*(.+?)(?:\\s{2,}.*)?$",
+                            ),
+                        ),
+                )
+            val accounts = listOf(account(5, "Curve"), account(6, "PayPal"), account(10, "Paypal *Thepihut 0"))
+            val rows = listOf(importedRow(1, "Crv*Paypal *Thepihut 0", transferId = 100))
+            val mappedPrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve, paypal))
+            // Previously imported as a single hop: funding -> one spend leg only.
+            val relationships =
+                mapOf(
+                    TransferId(100) to listOf(TransferRelationship(TransferId(100), TransferId(101), passThroughType)),
+                )
+
+            val rewrites = computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(relationships))
+
+            val rewrite = rewrites.single()
+            assertEquals(listOf("Curve", "PayPal"), rewrite.conduitNames)
+            // Both the funding transfer and its old spend leg are deleted before the re-run.
+            assertEquals(listOf(TransferId(100), TransferId(101)), rewrite.transferIdsToDelete)
+        }
+
+    @Test
+    fun `duplicate and unimported rows are never rewritten`() =
+        runTest {
+            val accounts = listOf(account(5, "Curve"))
+            val rows =
+                listOf(
+                    // DUPLICATE: its transfer belongs to another row and must not be deleted.
+                    CsvRow(
+                        rowIndex = 1,
+                        values = listOf("15/12/2024", "Crv*Amazoncouk 1234", "-50.00", "Crv*Amazoncouk 1234"),
+                        transferId = TransferId(100),
+                        importStatus = ImportStatus.DUPLICATE,
+                    ),
+                    // Never imported: applyStagedCsv picks it up anyway.
+                    row(2, "Crv*Amazoncouk 1234", description = "Crv*Amazoncouk 1234"),
+                )
+            val mappedPrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve))
+
+            val rewrites = computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(emptyMap()))
+
+            assertTrue(rewrites.isEmpty())
+        }
 }

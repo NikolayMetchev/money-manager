@@ -38,24 +38,26 @@ data class ExistingTransferInfo(
  * @property inBatchMatchIndex For an in-batch DUPLICATE (it matched an earlier accepted transfer in the
  *   same batch that has no id yet), the index of that earlier transfer in the classified list; the
  *   engine resolves it to the earlier transfer's created id. Null otherwise.
- * @property reversalLink For a pass-through row that reverses an earlier movement (a refund/cancellation,
- *   or a re-booking that undoes one), the spend leg it reverses. Resolved by the engine after
- *   classification; the deduper never sets it.
+ * @property reversalLinks For a pass-through row that reverses an earlier movement (a
+ *   refund/cancellation, or a re-booking that undoes one), the spend legs it reverses, keyed by this
+ *   row's spend-leg index within its conduit chain. Resolved by the engine after classification; the
+ *   deduper never sets it.
  */
 data class Classified(
     val transfer: ImportTransfer,
     val status: ImportStatus,
     val existing: TransferId?,
     val inBatchMatchIndex: Int? = null,
-    val reversalLink: ReversalLink? = null,
+    val reversalLinks: Map<Int, ReversalLink> = emptyMap(),
 )
 
 /**
  * A `reversal` relationship to create from a new pass-through spend leg (id1) to the spend leg it
  * reverses (id2).
  *
- * @property target The reversed spend leg: an existing (persisted) transfer, or the spend leg of an
- *   earlier row in the same to-import list (index into that list), resolved to its temp id at write time.
+ * @property target The reversed spend leg: an existing (persisted) transfer, or a spend leg of an
+ *   earlier row in the same to-import list (index into that list + leg index within that row's chain),
+ *   resolved to its temp id at write time.
  * @property typeId The `reversal` relationship type id.
  */
 data class ReversalLink(
@@ -71,6 +73,7 @@ sealed interface ReversalTarget {
 
     data class BatchRow(
         val toImportIndex: Int,
+        val legIndex: Int,
     ) : ReversalTarget
 }
 
