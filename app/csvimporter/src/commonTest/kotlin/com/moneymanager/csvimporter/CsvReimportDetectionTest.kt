@@ -418,23 +418,20 @@ class CsvReimportDetectionTest {
 
     private val passThroughType = RelationshipType(RelationshipTypeId(3), "pass-through")
 
-    private fun importedRow(
-        index: Long,
-        payee: String,
-        transferId: Long,
-    ) = CsvRow(
-        rowIndex = index,
-        values = listOf("15/12/2024", payee, "-50.00", payee),
-        transferId = TransferId(transferId),
-        importStatus = ImportStatus.IMPORTED,
-    )
+    private fun importedRow(payee: String) =
+        CsvRow(
+            rowIndex = 1,
+            values = listOf("15/12/2024", payee, "-50.00", payee),
+            transferId = TransferId(100),
+            importStatus = ImportStatus.IMPORTED,
+        )
 
     @Test
     fun `imported row without pass-through legs is rewritten when detection now routes it`() =
         runTest {
             val accounts = listOf(account(5, "Curve"), account(10, "Crv*Amazoncouk 1234"))
             // The row was imported flat (card -> raw merchant, no legs) before the definition existed.
-            val rows = listOf(importedRow(1, "Crv*Amazoncouk 1234", transferId = 100))
+            val rows = listOf(importedRow("Crv*Amazoncouk 1234"))
             val mappedPrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve))
 
             val rewrites =
@@ -451,7 +448,7 @@ class CsvReimportDetectionTest {
     fun `imported row whose legs already match the chain is left alone`() =
         runTest {
             val accounts = listOf(account(5, "Curve"), account(10, "Amazoncouk 1234"))
-            val rows = listOf(importedRow(1, "Crv*Amazoncouk 1234", transferId = 100))
+            val rows = listOf(importedRow("Crv*Amazoncouk 1234"))
             val mappedPrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve))
             // The funding transfer already carries its single pass-through spend leg.
             val relationships =
@@ -481,7 +478,7 @@ class CsvReimportDetectionTest {
                         ),
                 )
             val accounts = listOf(account(5, "Curve"), account(6, "PayPal"), account(10, "Paypal *Thepihut 0"))
-            val rows = listOf(importedRow(1, "Crv*Paypal *Thepihut 0", transferId = 100))
+            val rows = listOf(importedRow("Crv*Paypal *Thepihut 0"))
             val mappedPrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve, paypal))
             // Previously imported as a single hop: funding -> one spend leg only.
             val relationships =
