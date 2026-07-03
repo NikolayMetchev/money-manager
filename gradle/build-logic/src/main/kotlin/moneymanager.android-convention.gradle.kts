@@ -24,8 +24,7 @@ fun KotlinMultiplatformExtension.configureAndroidTarget() {
         }
 
         lint {
-            warningsAsErrors = true
-            abortOnError = true
+            moneyManagerLintPolicy()
         }
 
         // Enable instrumented tests with Gradle Managed Device
@@ -87,9 +86,13 @@ ktlint {
     android.set(true)
 }
 
-// Include instrumented test compilation in the build task to catch compile errors early
-tasks.named("build") {
-    dependsOn("compileAndroidDeviceTest")
+// Instrumented test sources are compiled by the CI emulator job (connectedAndroidDeviceTest) on
+// every PR, so `build` skips them by default; opt in locally with -PcompileDeviceTests=true to
+// catch device-test compile errors early.
+if (providers.gradleProperty("compileDeviceTests").map(String::toBoolean).getOrElse(false)) {
+    tasks.named("build") {
+        dependsOn("compileAndroidDeviceTest")
+    }
 }
 
 // Configure build scan integration for Android device tests

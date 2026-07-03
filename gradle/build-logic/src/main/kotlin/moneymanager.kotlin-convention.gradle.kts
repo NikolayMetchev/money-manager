@@ -118,6 +118,16 @@ tasks {
         exclude { it.file.absolutePath.contains("/build/generated/") }
     }
 
+    withType<Test>().configureEach {
+        // Test classes are distributed across forked JVMs; suites here are isolated (own temp-dir
+        // DBs, no shared state). Compose Desktop UI modules override this back to 1 in
+        // moneymanager.compose-multiplatform-convention (Skiko/AWT tests flake under contention).
+        // -PtestMaxParallelForks=N overrides for debugging (e.g. =1 to serialize).
+        maxParallelForks = providers.gradleProperty("testMaxParallelForks").orNull
+            ?.let { it.toIntOrNull() ?: error("Invalid -PtestMaxParallelForks value '$it': expected an integer") }
+            ?: Runtime.getRuntime().availableProcessors().coerceAtMost(8)
+    }
+
     withType<JavaCompile>().configureEach {
         targetCompatibility = jvmTargetVersion
         options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))

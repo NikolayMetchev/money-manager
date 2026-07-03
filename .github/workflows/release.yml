@@ -95,7 +95,7 @@ jobs:
             artifact-path: app/main/jvm/build/compose/binaries/main-release/deb/*.deb
           - platform: Android
             os: ubuntu-latest
-            task: :app:main:android:assembleRelease
+            task: :app:main:android:assembleRelease -PbuildRelease=true
             artifact-name: android-apk
             artifact-path: app/main/android/build/outputs/apk/release/*.apk
 

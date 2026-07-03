@@ -19,6 +19,10 @@ tasks.matching {
 // (they pass in isolation). Retry a failed test a couple of times so a load-induced flake doesn't
 // fail the build; a test that only ever fails still fails after its retries are exhausted.
 tasks.withType<Test>().configureEach {
+    // Keep Compose Desktop tests in a single fork, overriding the parallel-forks default from
+    // moneymanager.kotlin-convention (this plugin applies after it, so this action runs last):
+    // parallel Skiko/AWT test JVMs make the CPU-starvation flakes above much more likely.
+    maxParallelForks = 1
     retry {
         maxRetries.set(2)
         // A test that passes on retry is treated as passed (the point of retrying flakes).

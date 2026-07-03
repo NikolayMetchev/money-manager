@@ -1,4 +1,5 @@
 import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.jlleitschuh.gradle.ktlint.KtlintExtension
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -46,11 +47,20 @@ configure<ApplicationExtension> {
     }
 
     lint {
-        warningsAsErrors = true
-        abortOnError = true
+        moneyManagerLintPolicy()
         // API 37 is currently beta, so stay on the latest stable SDK while keeping other lint warnings fatal.
         disable += "GradleDependency"
         disable += "OldTargetApi"
+    }
+}
+
+// R8 minification + resource shrinking of the release variant costs minutes on every build, so the
+// variant only exists when explicitly requested: the release workflow and the main-branch CI job
+// pass -PbuildRelease=true; PR and local builds assemble debug only.
+val buildRelease = providers.gradleProperty("buildRelease").map(String::toBoolean).getOrElse(false)
+configure<ApplicationAndroidComponentsExtension> {
+    beforeVariants(selector().withBuildType("release")) { variant ->
+        variant.enable = buildRelease
     }
 }
 

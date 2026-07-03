@@ -60,8 +60,3 @@ dependencies {
     implementation(projects.app.ui.foundation)
     implementation(projects.utils.localsettings)
 }
-
-// Run release build as part of build to catch release issues early
-tasks.named("build") {
-    dependsOn("assembleRelease")
-}

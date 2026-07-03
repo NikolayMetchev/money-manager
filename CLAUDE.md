@@ -27,6 +27,11 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 | `./gradlew buildHealth` | Check dependency health |
 | `./gradlew detekt` | Static analysis |
 
+Build-speed flags (off by default): the Android release variant (R8/minified) only exists with
+`-PbuildRelease=true` (CI main/release workflows pass it), and `build` only compiles Android
+device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compiles them anyway).
+`-PtestMaxParallelForks=N` overrides the parallel test-fork default (e.g. `=1` to serialize).
+
 **Pre-push**: Always run `./gradlew build` locally before pushing.
 
 ## Project Structure
