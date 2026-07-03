@@ -126,7 +126,9 @@ class PassThroughDetector(
                 }
             }
 
-        // The closing brace must be escaped: Android's ICU regex engine rejects a bare `}`.
+        // The escape is NOT redundant (qodana false positive): the JVM regex engine accepts a bare
+        // `}`, but Android's ICU engine rejects it with a PatternSyntaxException at class-init.
+        @Suppress("RegExpRedundantEscape")
         val TOKEN = Regex("\\$\\{([^}]+)\\}|\\$(\\d)")
     }
 }
