@@ -12,6 +12,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CurrencyRepositoryImplTest : DbTest() {
+    // These tests assert against the full platform currency list, so opt out of the
+    // minimal test seeding.
+    override val seedAllCurrencies: Boolean = true
+
     // Number of seeded currencies from DatabaseConfig
     private val seededCurrencyCount = DatabaseConfig.allCurrencies.size
 

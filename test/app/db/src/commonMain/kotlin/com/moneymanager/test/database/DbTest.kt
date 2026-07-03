@@ -4,7 +4,6 @@ package com.moneymanager.test.database
 
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.sql.entitySource.EntitySourceWriteQueries
-import com.moneymanager.di.AppComponent
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Source
@@ -20,13 +19,14 @@ open class DbTest {
     protected lateinit var repositories: DatabaseComponent
     protected lateinit var entitySourceQueries: EntitySourceWriteQueries
 
+    /** Override (= true) in tests that assert against the full platform currency list. */
+    protected open val seedAllCurrencies: Boolean = false
+
     @BeforeTest
     fun setup() =
         runTest {
             testDbLocation = createTestDatabaseLocation()
-            val component = AppComponent.create(createTestAppComponentParams())
-            val databaseManager = component.databaseManager
-            database = databaseManager.openDatabase(testDbLocation)
+            database = createTestDatabaseManager(seedAllCurrencies).openDatabase(testDbLocation)
             repositories = DatabaseComponent.create(database)
             entitySourceQueries = database.entitySourceWriteQueries
         }
