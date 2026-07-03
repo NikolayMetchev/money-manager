@@ -61,7 +61,7 @@ schemaspy = "7.0.2"
 slf4j = "2.0.18"
 sort-dependencies = "0.19.0"
 sqldelight = "2.4.0-SNAPSHOT"
-test-retry = "1.6.2"
+test-retry = "1.6.5"
 turbine = "1.2.1"
 # Build-tool transitive-alignment versions: pin tooling transitives (Gradle plugins, annotation
 # processors, AGP test platform) to one version across all build classpaths. Consumed via the
