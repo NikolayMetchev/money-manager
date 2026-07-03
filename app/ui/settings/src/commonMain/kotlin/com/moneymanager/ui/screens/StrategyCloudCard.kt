@@ -382,4 +382,5 @@ private fun StrategyKey.displayLabel(): String =
         StrategyKind.CSV -> "$name (CSV)"
         StrategyKind.QIF -> "$name (QIF)"
         StrategyKind.API -> "$name (API)"
+        StrategyKind.PASS_THROUGH -> "$name (Pass-through)"
     }

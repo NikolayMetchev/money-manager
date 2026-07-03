@@ -216,6 +216,7 @@ private fun MiscImportsTab(
                 PassThroughAccountsScreen(
                     passThroughAccountRepository = passThroughAccountRepository,
                     importEngine = importEngine,
+                    appVersion = appVersion,
                 )
             else ->
                 AccountMappingsScreen(

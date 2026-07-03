@@ -33,7 +33,9 @@ kotlin {
                 api(projects.utils.localsettings)
                 api(projects.utils.rest)
 
+                implementation(projects.app.db.read)
                 implementation(projects.app.remotestorage.googledrive)
+                implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.parsers.qif)
             }
         }

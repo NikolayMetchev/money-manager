@@ -53,13 +53,23 @@ INSERT INTO relationship_type (id, name) VALUES (4, 'reversal');
 -- extracts the bare merchant so refunds hit the same merchant account as the original charge.
 -- pass_through_account is in EXCLUDED_FROM_AUDIT (config table, no triggers). FK relationship_type_id ->
 -- the type seeded above.
--- Seeded DISABLED (enabled = 0): the definition is visible/editable under Imports -> Misc -> Pass-through,
--- but does not change any import's behaviour until the user turns it on. This keeps imports unchanged by
--- default (a pass-through is a per-user card setup) and avoids rerouting unrelated "CRV*" rows.
-INSERT INTO pass_through_account (id, name, conduit_account_name, relationship_type_id, enabled, rules_json)
+-- Definitions are always active: deleting one (Imports -> Misc -> Pass-through) is how a user turns it
+-- off. Detection is iterative, so chained conduits peel in sequence (e.g. "CRV*PAYPAL *THEPIHUT" routes
+-- card -> Curve -> PayPal -> merchant, in whichever order the markers appear).
+INSERT INTO pass_through_account (id, name, conduit_account_name, relationship_type_id, rules_json)
 VALUES (
-    1, 'Curve', 'Curve', 3, 0,
+    1, 'Curve', 'Curve', 3,
     '[{"detectionPattern":"(?i)^(?:Refund: |Refund reversal: |Cancellation: )?CRV\\*","merchantPattern":"(?i)^(?:Refund: |Refund reversal: |Cancellation: )?CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$","merchantTemplate":"$1"}]'
+);
+
+-- Built-in "PayPal" pass-through definition: statement rows carry the real merchant behind a
+-- "PAYPAL *" / "Paypal *" marker. Carries the same optional Refund/Cancellation prefix group as Curve
+-- so it works as the outermost hop too (the prefix only ever appears at the very start of a raw
+-- description; when PayPal is an inner hop of a chain the outer rule has already stripped it).
+INSERT INTO pass_through_account (id, name, conduit_account_name, relationship_type_id, rules_json)
+VALUES (
+    2, 'PayPal', 'PayPal', 3,
+    '[{"detectionPattern":"(?i)^(?:Refund: |Refund reversal: |Cancellation: )?PAYPAL\\s*\\*","merchantPattern":"(?i)^(?:Refund: |Refund reversal: |Cancellation: )?PAYPAL\\s*\\*\\s*(.+?)(?:\\s{2,}.*)?$","merchantTemplate":"$1"}]'
 );
 
 -- GBP gets a fixed id (1) here so the build-time-generated QIF strategies can reference it as a

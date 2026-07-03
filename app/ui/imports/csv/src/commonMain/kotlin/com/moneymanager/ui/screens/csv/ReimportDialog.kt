@@ -42,6 +42,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
@@ -73,6 +74,7 @@ fun ReimportDialog(
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
+    transferRelationshipRepository: TransferRelationshipReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
@@ -83,7 +85,7 @@ fun ReimportDialog(
         .getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val passThroughAccounts by passThroughAccountRepository
-        .getEnabled()
+        .getAll()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var strategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
@@ -126,6 +128,7 @@ fun ReimportDialog(
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
                     csvImportRepository = csvImportRepository,
+                    relationshipRepository = transferRelationshipRepository,
                     passThroughAccounts = passThroughAccounts,
                 )
             errorMessage = null
@@ -273,6 +276,29 @@ private fun ReimportPlanPreview(
         } else {
             Text(
                 text = "No duplicate accounts to merge under the current account mappings.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (plan.rewrites.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Rows to reroute through pass-through accounts:",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            plan.rewrites.forEach { rewrite ->
+                Text(
+                    text = "• ${rewrite.description} → ${(rewrite.conduitNames + rewrite.merchantName).joinToString(" → ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text =
+                    "Each row's old transaction(s) are deleted — including any manual edits made to " +
+                        "them — and the row is re-imported through the conduit chain.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

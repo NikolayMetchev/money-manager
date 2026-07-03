@@ -20,7 +20,6 @@ import kotlin.jvm.JvmInline
  * @property conduitAccountName The account every matched charge passes through; resolved/created on import.
  * @property relationshipTypeId The relationship type linking the funding and spend legs; defaults to the
  *   seeded `pass-through` type.
- * @property enabled Whether importers consult this definition.
  * @property rules Ordered detection rules; the first whose [PassThroughRule.detectionPattern] matches wins.
  */
 @Serializable
@@ -29,7 +28,6 @@ data class PassThroughAccount(
     val name: String,
     val conduitAccountName: String,
     val relationshipTypeId: Long = WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID,
-    val enabled: Boolean = true,
     val rules: List<PassThroughRule> = emptyList(),
 )
 

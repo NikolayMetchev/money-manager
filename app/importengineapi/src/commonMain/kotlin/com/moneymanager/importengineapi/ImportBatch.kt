@@ -274,35 +274,49 @@ data class ImportFee(
 )
 
 /**
- * A charge routed through a conduit account (e.g. Curve), modelled as two linked movements of the same
- * amount: a funding leg (the transfer's own `fromAccount` → [conduit]) and a spend leg
- * ([conduit] → [merchantTarget]), linked via a [relationshipTypeId] (`pass-through`) relationship. The
- * engine expands this into the second [Transfer] in the same batch — like [ImportFee], producers don't
- * allocate ids. The conduit nets to zero, so the spend is counted once (in either direction).
+ * A charge routed through a chain of conduit accounts (e.g. card → Curve → PayPal → merchant),
+ * modelled as linked movements of the same amount: a funding leg (the transfer's own `fromAccount` →
+ * first conduit, built by the producer) and one spend leg per adjacent pair of the chain
+ * (C1 → C2, …, Cn → [merchantTarget]), each linked to the previous movement via a
+ * [relationshipTypeId] (`pass-through`) relationship. The engine expands the spend legs in the same
+ * batch — like [ImportFee], producers don't allocate ids. Every conduit nets to zero, so the spend is
+ * counted once (in either direction).
  *
- * This is fully generic: the engine never inspects the merchant text or knows the conduit's name —
+ * This is fully generic: the engine never inspects the merchant text or knows any conduit's name —
  * detection + extraction happen in the importers via [PassThroughDetector] and user-editable config.
  *
- * @property conduit The account money passes through (resolved by the producer to a real/created account).
- * @property merchantTarget The real merchant the spend leg pays.
- * @property amount The charge amount; identical on both legs.
- * @property spendDescription Description for the spend leg (the cleaned merchant); the funding leg keeps
- *   the main transfer's description.
- * @property relationshipTypeId The `pass-through` relationship type linking funding (id1) to spend (id2).
- * @property rowKey Provenance key for the spend leg; when null the engine falls back to the main row key.
+ * @property conduits The accounts money passes through, ordered outermost first (resolved by the
+ *   producer to real/created accounts); the main transfer's conduit side is `conduits.first()`.
+ * @property merchantTarget The real merchant the final spend leg pays.
+ * @property amount The charge amount; identical on every leg.
+ * @property spendDescriptions One description per spend leg (the remainder after each conduit's prefix
+ *   was peeled; the last is the cleaned merchant). The funding leg keeps the main transfer's description.
+ * @property relationshipTypeId The `pass-through` relationship type linking each movement (id1) to the
+ *   next leg (id2).
+ * @property rowKey Provenance key for the spend legs; when null the engine falls back to the main row key.
  * @property incoming True for a refund/cancellation arriving back on the card: the funding leg (the main
- *   transfer, built by the producer) is [conduit] → card and the engine's spend leg is
- *   [merchantTarget] → [conduit].
+ *   transfer, built by the producer) is `conduits.first()` → card and each engine spend leg runs
+ *   in reverse (C2 → C1, …, [merchantTarget] → Cn).
  */
 data class ImportPassThrough(
-    val conduit: AccountRef,
+    val conduits: List<AccountRef>,
     val merchantTarget: AccountRef,
     val amount: Money,
-    val spendDescription: String,
+    val spendDescriptions: List<String>,
     val relationshipTypeId: RelationshipTypeId,
     val rowKey: ImportRowKey? = null,
     val incoming: Boolean = false,
-)
+) {
+    init {
+        require(conduits.isNotEmpty()) { "ImportPassThrough needs at least one conduit" }
+        require(spendDescriptions.size == conduits.size) {
+            "spendDescriptions must have one entry per spend leg (got ${spendDescriptions.size} for ${conduits.size} conduits)"
+        }
+    }
+
+    /** The conduit the main (funding) transfer moves money to/from. */
+    val conduit: AccountRef get() = conduits.first()
+}
 
 /**
  * A transfer to import. Account references may be [AccountRef.Existing] (resolved by the builder) or

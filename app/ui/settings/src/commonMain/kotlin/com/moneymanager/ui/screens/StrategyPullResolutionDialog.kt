@@ -29,7 +29,8 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 /**
  * Collects resolutions for the references that the selected remote strategies need before they can be
  * imported. References are de-duplicated across artifacts (the same account name resolves once and is
- * applied to every artifact that uses it). Confirms only when every reference has been resolved.
+ * applied to every artifact that uses it). Every reference defaults to being created on import; the user
+ * can override any of them to map to an existing entity.
  */
 @Composable
 fun StrategyPullResolutionDialog(
@@ -46,8 +47,11 @@ fun StrategyPullResolutionDialog(
     val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     val allReferences = remember(unresolvedByKey) { unresolvedByKey.values.flatten().distinct() }
-    var resolutions by remember { mutableStateOf<Map<CsvUnresolvedReference, CsvResolution>>(emptyMap()) }
-    val allResolved = allReferences.all { it in resolutions }
+    var resolutions by remember(allReferences) {
+        mutableStateOf<Map<CsvUnresolvedReference, CsvResolution>>(
+            allReferences.associateWith { CsvResolution.CreateNew(it.name) },
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -59,7 +63,7 @@ fun StrategyPullResolutionDialog(
             ) {
                 Text(
                     "These strategies reference accounts, categories or currencies that don't exist here yet. " +
-                        "Map each to an existing one or create it.",
+                        "Each will be created on import unless you map it to an existing one.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -84,7 +88,6 @@ fun StrategyPullResolutionDialog(
                     val byKey = unresolvedByKey.mapValues { (_, refs) -> refs.associateWith { resolutions.getValue(it) } }
                     onConfirm(byKey)
                 },
-                enabled = allResolved,
             ) {
                 Text("Import")
             }

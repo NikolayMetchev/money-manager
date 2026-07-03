@@ -504,24 +504,25 @@ suspend fun runCsvImport(
                     )
                 }
             // Pass-through (conduit) row: the mapper already routed the transfer's conduit side — the
-            // target for an outgoing charge, the source for an incoming refund/cancellation. Resolve the
-            // merchant account the mapper created and let the engine add the spend leg (conduit ->
-            // merchant, or merchant -> conduit when incoming). accountsByName carries the created
-            // conduit + merchant ids.
+            // target for an outgoing charge, the source for an incoming refund/cancellation; that side
+            // is the chain's first conduit. Resolve the remaining chain conduits + the merchant account
+            // the mapper created and let the engine add the spend legs (C1 -> C2, …, Cn -> merchant, or
+            // reversed when incoming). accountsByName carries the created conduit + merchant ids.
             val passThrough =
                 row.passThrough?.let { pt ->
                     val merchantId = pt.merchantAccountId ?: accountsByName[pt.merchantName]?.id
-                    if (merchantId == null) {
+                    val firstConduitId = if (pt.incoming) row.transfer.sourceAccountId else row.transfer.targetAccountId
+                    val innerConduitIds = pt.conduitNames.drop(1).map { accountsByName[it]?.id }
+                    if (merchantId == null || innerConduitIds.any { it == null }) {
                         null
                     } else {
                         ImportPassThrough(
-                            conduit =
-                                AccountRef.Existing(
-                                    if (pt.incoming) row.transfer.sourceAccountId else row.transfer.targetAccountId,
-                                ),
+                            conduits =
+                                (listOf(firstConduitId) + innerConduitIds.filterNotNull())
+                                    .map { AccountRef.Existing(it) },
                             merchantTarget = AccountRef.Existing(merchantId),
                             amount = row.transfer.amount,
-                            spendDescription = pt.rawMerchantName,
+                            spendDescriptions = pt.spendDescriptions,
                             relationshipTypeId = RelationshipTypeId(pt.relationshipTypeId),
                             incoming = pt.incoming,
                         )

@@ -1846,17 +1846,20 @@ private suspend fun prepareValidTransactionItem(
     val passThrough =
         passThroughMatch?.let { match ->
             val source = counterpartyApiSource.toSource()
-            val conduitRef = AccountRef.Local(setup.accountResolver.resolveNamedAccount(match.account.conduitAccountName, source))
+            val conduitRefs =
+                match.accounts.map { account ->
+                    AccountRef.Local(setup.accountResolver.resolveNamedAccount(account.conduitAccountName, source))
+                }
             val merchantRef = AccountRef.Local(setup.accountResolver.resolveNamedAccount(match.merchantName, source))
             ConduitRouting(
-                conduit = conduitRef,
+                conduit = conduitRefs.first(),
                 passThrough =
                     ImportPassThrough(
-                        conduit = conduitRef,
+                        conduits = conduitRefs,
                         merchantTarget = merchantRef,
                         amount = amount,
-                        spendDescription = match.merchantName,
-                        relationshipTypeId = RelationshipTypeId(match.account.relationshipTypeId),
+                        spendDescriptions = match.hops.map { it.merchantText },
+                        relationshipTypeId = RelationshipTypeId(match.accounts.first().relationshipTypeId),
                         incoming = data.isIncoming,
                     ),
             )

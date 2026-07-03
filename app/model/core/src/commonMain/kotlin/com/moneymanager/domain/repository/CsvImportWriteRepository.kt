@@ -86,6 +86,18 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     )
 
     /**
+     * Clears the import status and transfer link for the given rows so a re-run of the strategy picks
+     * them up again (used after their previously-imported transfers were deleted).
+     *
+     * @param id The import ID
+     * @param rowIndexes The row indexes to reset
+     */
+    suspend fun resetRowStatuses(
+        id: CsvImportId,
+        rowIndexes: Collection<Long>,
+    )
+
+    /**
      * Saves an error message for a specific row.
      * Replaces any existing error for the same row.
      *

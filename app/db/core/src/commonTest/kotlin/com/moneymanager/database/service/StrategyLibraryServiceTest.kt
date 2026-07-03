@@ -2,6 +2,7 @@
 
 package com.moneymanager.database.service
 
+import com.moneymanager.domain.StrategyFileNaming
 import com.moneymanager.domain.StrategyKey
 import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.model.Account
@@ -124,5 +125,27 @@ class StrategyLibraryServiceTest : DbTest() {
             library.applyIncoming(key, entry.json, emptyMap())
             val apiStrategies = repositories.apiImportStrategyRepository.getAllStrategies().first()
             assertEquals(1, apiStrategies.count { it.name == "MonzoTest" })
+        }
+
+    @Test
+    fun `pass-through definition round-trips and re-applies by name without duplicating`() =
+        runTest {
+            val library = repositories.strategyLibrary
+            // The seeded Curve definition is listed as its own artifact.
+            val key = StrategyKey(StrategyKind.PASS_THROUGH, "Curve")
+            val entry = library.listLocal(version).first { it.key == key }
+            assertTrue(entry.json.contains("CRV"))
+
+            // Applying it back updates in place (never duplicates), preserving the definition.
+            library.applyIncoming(key, entry.json, emptyMap())
+            val definitions = repositories.passThroughAccountRepository.getAll().first()
+            assertEquals(1, definitions.count { it.name == "Curve" })
+            val curve = definitions.first { it.name == "Curve" }
+            assertEquals("Curve", curve.conduitAccountName)
+            assertTrue(curve.rules.isNotEmpty())
+
+            // The artifact hash ignores the version stamp, and the filename round-trips.
+            assertEquals(entry.contentHash, library.canonicalHash(key, entry.json))
+            assertEquals(key, StrategyFileNaming.parse(StrategyFileNaming.fileName(key)))
         }
 }

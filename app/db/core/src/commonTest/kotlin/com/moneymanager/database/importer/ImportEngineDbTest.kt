@@ -486,10 +486,10 @@ class ImportEngineDbTest : DbTest() {
                                     amount = amount,
                                     passThrough =
                                         ImportPassThrough(
-                                            conduit = AccountRef.Local(curve),
+                                            conduits = listOf(AccountRef.Local(curve)),
                                             merchantTarget = AccountRef.Local(merchant),
                                             amount = amount,
-                                            spendDescription = "National Lottery",
+                                            spendDescriptions = listOf("National Lottery"),
                                             relationshipTypeId =
                                                 RelationshipTypeId(WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID),
                                         ),
@@ -552,6 +552,253 @@ class ImportEngineDbTest : DbTest() {
             assertEquals("pass-through", relationship.relationshipType.name)
         }
 
+    @Test
+    fun passThrough_chainExpandsIntoLinkedLegs_everyConduitNetsToZero() =
+        runTest {
+            val cardId = createSourceAccount()
+            val currency = gbp()
+            val source = Source.SampleGenerator
+            val curve = LocalAccountKey("curve")
+            val paypal = LocalAccountKey("paypal")
+            val merchant = LocalAccountKey("merchant")
+            val amount = Money(2700, currency)
+
+            val result =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(
+                                // Funding leg card -> Curve; the engine synthesises Curve -> PayPal and
+                                // PayPal -> merchant, chained via pass-through relationships.
+                                ImportTransfer(
+                                    rowKey = ImportRowKey.CsvRow(0),
+                                    fromAccount = AccountRef.Existing(cardId),
+                                    toAccount = AccountRef.Local(curve),
+                                    source = source,
+                                    timestamp = baseTime,
+                                    description = "CRV*PAYPAL *THEPIHUT 0",
+                                    amount = amount,
+                                    passThrough =
+                                        ImportPassThrough(
+                                            conduits = listOf(AccountRef.Local(curve), AccountRef.Local(paypal)),
+                                            merchantTarget = AccountRef.Local(merchant),
+                                            amount = amount,
+                                            spendDescriptions = listOf("PAYPAL *THEPIHUT 0", "THEPIHUT 0"),
+                                            relationshipTypeId =
+                                                RelationshipTypeId(WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID),
+                                        ),
+                                ),
+                            ),
+                        dedupePolicy = DedupePolicy.FuzzyAllFields(),
+                        accountsToCreate =
+                            listOf(
+                                ImportAccountIntent(
+                                    key = curve,
+                                    match = AccountMatchKey.ByName("Curve"),
+                                    name = "Curve",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                                ImportAccountIntent(
+                                    key = paypal,
+                                    match = AccountMatchKey.ByName("PayPal"),
+                                    name = "PayPal",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                                ImportAccountIntent(
+                                    key = merchant,
+                                    match = AccountMatchKey.ByName("THEPIHUT 0"),
+                                    name = "THEPIHUT 0",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                            ),
+                    ),
+                )
+
+            assertEquals(3, result.accountsCreated)
+            assertEquals(1, result.transfersImported)
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val curveId = accounts.first { it.name == "Curve" }.id
+            val paypalId = accounts.first { it.name == "PayPal" }.id
+            val merchantId = accounts.first { it.name == "THEPIHUT 0" }.id
+
+            // Every intermediate conduit nets to zero; the merchant receives the spend exactly once.
+            for (conduitId in listOf(curveId, paypalId)) {
+                val rows = repositories.transactionRepository.getTransactionsByAccount(conduitId).first()
+                assertEquals(2, rows.size)
+                val net =
+                    rows.sumOf { t ->
+                        when (conduitId) {
+                            t.targetAccountId -> t.amount.amount
+                            t.sourceAccountId -> -t.amount.amount
+                            else -> 0L
+                        }
+                    }
+                assertEquals(0L, net)
+            }
+            val merchantRows = repositories.transactionRepository.getTransactionsByAccount(merchantId).first()
+            assertEquals(1, merchantRows.size)
+
+            // Relationships chain main -> leg1 -> leg2 (each id1 links to the next leg as id2).
+            val fundingId2 = result.createdTransferIds.getValue(ImportRowKey.CsvRow(0))
+            val leg1 = spendLegOf(fundingId2)
+            val leg2 = spendLegOf(leg1)
+            val leg1Transfer = repositories.transactionRepository.getTransactionById(leg1.id).first()
+            val leg2Transfer = repositories.transactionRepository.getTransactionById(leg2.id).first()
+            assertEquals("PAYPAL *THEPIHUT 0", leg1Transfer?.description)
+            assertEquals(curveId, leg1Transfer?.sourceAccountId)
+            assertEquals(paypalId, leg1Transfer?.targetAccountId)
+            assertEquals("THEPIHUT 0", leg2Transfer?.description)
+            assertEquals(paypalId, leg2Transfer?.sourceAccountId)
+            assertEquals(merchantId, leg2Transfer?.targetAccountId)
+        }
+
+    @Test
+    fun passThrough_chainCancellation_linksEachLegToItsOriginal() =
+        runTest {
+            val cardId = createSourceAccount()
+            val currency = gbp()
+            val source = Source.SampleGenerator
+            val curve = LocalAccountKey("curve")
+            val paypal = LocalAccountKey("paypal")
+            val merchant = LocalAccountKey("merchant")
+            val amount = Money(2700, currency)
+
+            fun chainRow(
+                rowIndex: Long,
+                timestamp: Instant,
+                description: String,
+                incoming: Boolean,
+            ) = ImportTransfer(
+                rowKey = ImportRowKey.CsvRow(rowIndex),
+                fromAccount = if (incoming) AccountRef.Local(curve) else AccountRef.Existing(cardId),
+                toAccount = if (incoming) AccountRef.Existing(cardId) else AccountRef.Local(curve),
+                source = source,
+                timestamp = timestamp,
+                description = description,
+                amount = amount,
+                passThrough =
+                    ImportPassThrough(
+                        conduits = listOf(AccountRef.Local(curve), AccountRef.Local(paypal)),
+                        merchantTarget = AccountRef.Local(merchant),
+                        amount = amount,
+                        spendDescriptions = listOf("PAYPAL *THEPIHUT 0", "THEPIHUT 0"),
+                        relationshipTypeId = RelationshipTypeId(WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID),
+                        incoming = incoming,
+                    ),
+            )
+
+            val result =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(
+                                chainRow(0, baseTime, "CRV*PAYPAL *THEPIHUT 0", incoming = false),
+                                chainRow(1, baseTime.plus(1.hours), "Cancellation: Crv*Paypal *Thepihut 0", incoming = true),
+                            ),
+                        dedupePolicy = DedupePolicy.None,
+                        accountsToCreate =
+                            listOf(
+                                ImportAccountIntent(
+                                    key = curve,
+                                    match = AccountMatchKey.ByName("Curve"),
+                                    name = "Curve",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                                ImportAccountIntent(
+                                    key = paypal,
+                                    match = AccountMatchKey.ByName("PayPal"),
+                                    name = "PayPal",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                                ImportAccountIntent(
+                                    key = merchant,
+                                    match = AccountMatchKey.ByName("THEPIHUT 0"),
+                                    name = "THEPIHUT 0",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                            ),
+                    ),
+                )
+            assertEquals(2, result.transfersImported)
+
+            val chargeLeg1 = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(0)))
+            val chargeLeg2 = spendLegOf(chargeLeg1)
+            val cancelLeg1 = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(1)))
+            val cancelLeg2 = spendLegOf(cancelLeg1)
+
+            // Each cancellation leg reverses the corresponding original leg (per-hop pairing), and
+            // every chain account nets to zero across charge + cancellation.
+            val cancelLeg1Reversal = reversalLinksOf(cancelLeg1).single()
+            assertEquals(cancelLeg1, cancelLeg1Reversal.id1)
+            assertEquals(chargeLeg1, cancelLeg1Reversal.id2)
+            val cancelLeg2Reversal = reversalLinksOf(cancelLeg2).single()
+            assertEquals(cancelLeg2, cancelLeg2Reversal.id1)
+            assertEquals(chargeLeg2, cancelLeg2Reversal.id2)
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            for (name in listOf("Curve", "PayPal", "THEPIHUT 0")) {
+                val accountId = accounts.first { it.name == name }.id
+                val net =
+                    repositories.transactionRepository
+                        .getTransactionsByAccount(accountId)
+                        .first()
+                        .sumOf { t ->
+                            when (accountId) {
+                                t.targetAccountId -> t.amount.amount
+                                t.sourceAccountId -> -t.amount.amount
+                                else -> 0L
+                            }
+                        }
+                assertEquals(0L, net, "account $name should net to zero")
+            }
+
+            // The originals are consumed: a second identical cancellation finds nothing to reverse.
+            // The account intents resolve to the already-created accounts by name (nothing new is made).
+            val second =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            listOf(chainRow(2, baseTime.plus(2.hours), "Cancellation: Crv*Paypal *Thepihut 0", incoming = true)),
+                        dedupePolicy = DedupePolicy.None,
+                        accountsToCreate =
+                            listOf(
+                                ImportAccountIntent(
+                                    key = curve,
+                                    match = AccountMatchKey.ByName("Curve"),
+                                    name = "Curve",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                                ImportAccountIntent(
+                                    key = paypal,
+                                    match = AccountMatchKey.ByName("PayPal"),
+                                    name = "PayPal",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                                ImportAccountIntent(
+                                    key = merchant,
+                                    match = AccountMatchKey.ByName("THEPIHUT 0"),
+                                    name = "THEPIHUT 0",
+                                    openingDate = baseTime,
+                                    source = source,
+                                ),
+                            ),
+                    ),
+                )
+            val secondCancelLeg1 = spendLegOf(second.createdTransferIds.getValue(ImportRowKey.CsvRow(2)))
+            val secondCancelLeg2 = spendLegOf(secondCancelLeg1)
+            assertEquals(emptyList(), reversalLinksOf(secondCancelLeg1))
+            assertEquals(emptyList(), reversalLinksOf(secondCancelLeg2))
+        }
+
     /** A pass-through row: the funding leg card <-> Curve plus the [ImportPassThrough] spend leg. */
     private fun passThroughRow(
         rowIndex: Long,
@@ -573,10 +820,10 @@ class ImportEngineDbTest : DbTest() {
         amount = amount,
         passThrough =
             ImportPassThrough(
-                conduit = AccountRef.Local(curve),
+                conduits = listOf(AccountRef.Local(curve)),
                 merchantTarget = AccountRef.Local(merchant),
                 amount = amount,
-                spendDescription = merchantName,
+                spendDescriptions = listOf(merchantName),
                 relationshipTypeId = RelationshipTypeId(WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID),
                 incoming = incoming,
             ),
@@ -603,12 +850,12 @@ class ImportEngineDbTest : DbTest() {
         ),
     )
 
-    /** The spend leg linked to [fundingId] via its pass-through relationship. */
+    /** The next leg linked FROM [fundingId] via its outgoing pass-through relationship (chains walk leg by leg). */
     private suspend fun spendLegOf(fundingId: TransferId): TransferId =
         repositories.transferRelationshipRepository
             .getByTransfer(fundingId)
             .first()
-            .single { it.relationshipType.name == "pass-through" }
+            .single { it.relationshipType.name == "pass-through" && it.id1 == fundingId }
             .id2
 
     private suspend fun reversalLinksOf(transferId: TransferId) =

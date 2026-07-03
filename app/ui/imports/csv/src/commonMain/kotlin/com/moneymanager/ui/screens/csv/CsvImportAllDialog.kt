@@ -66,7 +66,7 @@ fun CsvImportAllDialog(
     val scope = rememberSchemaAwareCoroutineScope()
     val strategies by csvImportStrategyRepository.getAllStrategies().collectAsStateWithSchemaErrorHandling(emptyList())
     val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(emptyList())
-    val passThroughAccounts by passThroughAccountRepository.getEnabled().collectAsStateWithSchemaErrorHandling(emptyList())
+    val passThroughAccounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isImporting by remember { mutableStateOf(false) }

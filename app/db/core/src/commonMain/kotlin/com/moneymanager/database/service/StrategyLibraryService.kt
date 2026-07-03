@@ -3,6 +3,7 @@ package com.moneymanager.database.service
 import com.moneymanager.database.json.AccountMappingExportCodec
 import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
+import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.domain.CsvReferenceType
 import com.moneymanager.domain.CsvResolution
 import com.moneymanager.domain.CsvUnresolvedReference
@@ -16,15 +17,21 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.isQifStrategy
+import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.model.passthrough.PassThroughAccountId
+import com.moneymanager.domain.model.passthrough.export.PassThroughExport
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.importengineapi.AccountMappingMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createApiStrategy
+import com.moneymanager.importengineapi.createPassThroughAccount
 import com.moneymanager.importengineapi.updateApiStrategy
+import com.moneymanager.importengineapi.updatePassThroughAccount
 import kotlinx.coroutines.flow.first
 
 /**
@@ -36,6 +43,7 @@ class StrategyLibraryService(
     private val csvStrategyRepository: CsvImportStrategyReadRepository,
     private val apiStrategyRepository: ApiImportStrategyReadRepository,
     private val accountMappingRepository: AccountMappingReadRepository,
+    private val passThroughAccountRepository: PassThroughAccountReadRepository,
     private val csvStrategyExportService: CsvStrategyExportService,
     private val apiStrategyExportService: ApiStrategyExportService,
     private val accountMappingExportService: AccountMappingExportService,
@@ -53,6 +61,11 @@ class StrategyLibraryService(
         for (strategy in apiStrategyRepository.getAllStrategies().first()) {
             val json = ApiStrategyExportCodec.encode(apiStrategyExportService.toExport(strategy, appVersion))
             entries += entry(StrategyKey(StrategyKind.API, strategy.name), json)
+        }
+
+        for (definition in passThroughAccountRepository.getAll().first()) {
+            val json = PassThroughExportCodec.encode(definition.toExport(appVersion))
+            entries += entry(StrategyKey(StrategyKind.PASS_THROUGH, definition.name), json)
         }
 
         val globalMappings = accountMappingRepository.getAllMappings().first().filter { it.strategyId == null }
@@ -74,7 +87,8 @@ class StrategyLibraryService(
                 val refs = csvStrategyExportService.parseExport(export).unresolvedReferences.map { it.toDomain() }
                 StrategyParseResult(key, refs)
             }
-            StrategyKind.API -> StrategyParseResult(key, emptyList())
+            // API strategies and pass-through definitions carry no entity references to resolve.
+            StrategyKind.API, StrategyKind.PASS_THROUGH -> StrategyParseResult(key, emptyList())
             StrategyKind.GLOBAL_MAPPINGS -> {
                 val export = AccountMappingExportCodec.decode(json)
                 val refs =
@@ -93,6 +107,7 @@ class StrategyLibraryService(
         when (key.kind) {
             StrategyKind.CSV, StrategyKind.QIF -> applyCsv(key.name, json, resolutions)
             StrategyKind.API -> applyApi(key.name, json)
+            StrategyKind.PASS_THROUGH -> applyPassThrough(key.name, json)
             StrategyKind.GLOBAL_MAPPINGS -> applyGlobalMappings(json, resolutions)
         }
     }
@@ -158,6 +173,28 @@ class StrategyLibraryService(
         }
     }
 
+    private suspend fun applyPassThrough(
+        name: String,
+        json: String,
+    ) {
+        // Keep the definition's name aligned with its filename key (the file is authoritative).
+        val export = PassThroughExportCodec.decode(json).copy(name = name)
+        val existing = passThroughAccountRepository.getAll().first().find { it.name == name }
+        val account =
+            PassThroughAccount(
+                id = existing?.id ?: PassThroughAccountId(0),
+                name = export.name,
+                conduitAccountName = export.conduitAccountName,
+                relationshipTypeId = export.relationshipTypeId,
+                rules = export.rules,
+            )
+        if (existing == null) {
+            importEngine.createPassThroughAccount(account)
+        } else {
+            importEngine.updatePassThroughAccount(account)
+        }
+    }
+
     private suspend fun applyGlobalMappings(
         json: String,
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
@@ -207,6 +244,8 @@ class StrategyLibraryService(
                     ApiStrategyExportCodec.encode(ApiStrategyExportCodec.decode(json).copy(version = ""))
                 StrategyKind.GLOBAL_MAPPINGS ->
                     AccountMappingExportCodec.encode(AccountMappingExportCodec.decode(json).copy(version = ""))
+                StrategyKind.PASS_THROUGH ->
+                    PassThroughExportCodec.encode(PassThroughExportCodec.decode(json).copy(version = ""))
             }
         return contentHash(canonical)
     }
@@ -226,6 +265,15 @@ class StrategyLibraryService(
         }
         return hash.toULong().toString(HEX_RADIX)
     }
+
+    private fun PassThroughAccount.toExport(appVersion: AppVersion): PassThroughExport =
+        PassThroughExport(
+            version = appVersion.value,
+            name = name,
+            conduitAccountName = conduitAccountName,
+            relationshipTypeId = relationshipTypeId,
+            rules = rules,
+        )
 
     private fun UnresolvedReference.toDomain(): CsvUnresolvedReference =
         CsvUnresolvedReference(

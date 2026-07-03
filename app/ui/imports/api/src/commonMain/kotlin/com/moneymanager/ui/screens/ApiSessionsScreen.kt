@@ -136,7 +136,7 @@ fun ApiSessionsScreen(
     val scope = rememberSchemaAwareCoroutineScope()
     val backgroundTasks = LocalBackgroundTaskManager.current
     val clipboard = LocalClipboard.current
-    val passThroughAccounts by passThroughAccountRepository.getEnabled().collectAsStateWithSchemaErrorHandling(emptyList())
+    val passThroughAccounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
 
     var credentials by remember { mutableStateOf<List<MonzoCredential>>(emptyList()) }
     var sessionsByCredential by remember { mutableStateOf<Map<MonzoCredentialId, List<ApiSession>>>(emptyMap()) }

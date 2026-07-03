@@ -13,7 +13,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,10 +23,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.compose.filepicker.rememberFilePicker
+import com.moneymanager.compose.filepicker.rememberFileSaver
+import com.moneymanager.database.json.PassThroughExportCodec
+import com.moneymanager.domain.StrategyFileNaming
+import com.moneymanager.domain.StrategyKey
+import com.moneymanager.domain.StrategyKind
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.PassThroughRule
+import com.moneymanager.domain.model.passthrough.export.PassThroughExport
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createPassThroughAccount
@@ -46,11 +53,48 @@ import kotlinx.coroutines.launch
 fun PassThroughAccountsScreen(
     passThroughAccountRepository: PassThroughAccountReadRepository,
     importEngine: ImportEngine,
+    appVersion: AppVersion,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val accounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
     var editing by remember { mutableStateOf<PassThroughAccount?>(null) }
     var showEditor by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val fileSaver = rememberFileSaver(onResult = {})
+    // Import a definition from a .passthrough.json file: create-or-update keyed by name, so importing
+    // the same file twice never duplicates.
+    val filePicker =
+        rememberFilePicker(
+            mimeTypes = listOf("application/json"),
+            onResult = { result ->
+                if (result != null) {
+                    scope.launch {
+                        @Suppress("TooGenericExceptionCaught")
+                        try {
+                            errorMessage = null
+                            val export = PassThroughExportCodec.decode(result.content)
+                            val existing = accounts.find { it.name == export.name }
+                            val account =
+                                PassThroughAccount(
+                                    id = existing?.id ?: PassThroughAccountId(0),
+                                    name = export.name,
+                                    conduitAccountName = export.conduitAccountName,
+                                    relationshipTypeId = export.relationshipTypeId,
+                                    rules = export.rules,
+                                )
+                            if (existing == null) {
+                                importEngine.createPassThroughAccount(account)
+                            } else {
+                                importEngine.updatePassThroughAccount(account)
+                            }
+                        } catch (expected: Exception) {
+                            errorMessage = "Failed to import: ${expected.message}"
+                        }
+                    }
+                }
+            },
+        )
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(
@@ -59,17 +103,22 @@ fun PassThroughAccountsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "A pass-through account (e.g. Curve) is a wrapper card whose charges are forwarded to an " +
-                    "underlying card. Matching charges are routed card → conduit → merchant.",
+                "A pass-through account (e.g. Curve or PayPal) is a conduit whose charges are forwarded to " +
+                    "the real merchant. Matching charges are routed card → conduit(s) → merchant; chained " +
+                    "conduits are peeled in sequence. Definitions are always active — delete one to turn it off.",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
+            TextButton(onClick = { filePicker.launch() }) { Text("Import") }
             Button(onClick = {
                 editing = null
                 showEditor = true
             }) {
                 Text("Add")
             }
+        }
+        errorMessage?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
         LazyColumn(
             Modifier.fillMaxSize().padding(top = 12.dp),
@@ -78,12 +127,23 @@ fun PassThroughAccountsScreen(
             items(accounts, key = { it.id.value }) { account ->
                 PassThroughAccountCard(
                     account = account,
-                    onToggleEnabled = {
-                        scope.launch { importEngine.updatePassThroughAccount(account.copy(enabled = !account.enabled)) }
-                    },
                     onEdit = {
                         editing = account
                         showEditor = true
+                    },
+                    onExport = {
+                        val export =
+                            PassThroughExport(
+                                version = appVersion.value,
+                                name = account.name,
+                                conduitAccountName = account.conduitAccountName,
+                                relationshipTypeId = account.relationshipTypeId,
+                                rules = account.rules,
+                            )
+                        fileSaver.launch(
+                            StrategyFileNaming.fileName(StrategyKey(StrategyKind.PASS_THROUGH, account.name)),
+                            PassThroughExportCodec.encode(export),
+                        )
                     },
                     onDelete = { scope.launch { importEngine.deletePassThroughAccount(account.id) } },
                 )
@@ -112,8 +172,8 @@ fun PassThroughAccountsScreen(
 @Composable
 private fun PassThroughAccountCard(
     account: PassThroughAccount,
-    onToggleEnabled: () -> Unit,
     onEdit: () -> Unit,
+    onExport: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
@@ -128,8 +188,8 @@ private fun PassThroughAccountCard(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            Switch(checked = account.enabled, onCheckedChange = { onToggleEnabled() })
             TextButton(onClick = onEdit) { Text("Edit") }
+            TextButton(onClick = onExport) { Text("Export") }
             TextButton(onClick = onDelete) { Text("Delete") }
         }
     }
@@ -213,7 +273,6 @@ private fun PassThroughAccountEditorDialog(
                             relationshipTypeId =
                                 initial?.relationshipTypeId
                                     ?: WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID,
-                            enabled = initial?.enabled ?: true,
                             rules = listOf(editedFirstRule) + remainingRules,
                         ),
                     )

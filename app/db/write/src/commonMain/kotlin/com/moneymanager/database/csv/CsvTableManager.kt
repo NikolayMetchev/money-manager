@@ -225,4 +225,24 @@ class CsvTableManager(
             0,
         )
     }
+
+    /**
+     * Clears the import status + transfer link for the given rows, returning them to the
+     * never-imported state so a strategy re-run picks them up again.
+     *
+     * @param tableName The name of the table
+     * @param rowIndexes The row indexes to reset
+     */
+    fun resetRowStatuses(
+        tableName: String,
+        rowIndexes: Collection<Long>,
+    ) {
+        if (rowIndexes.isEmpty()) return
+        database.execute(
+            null,
+            "UPDATE $tableName SET import_status = NULL, transaction_id = NULL " +
+                "WHERE row_index IN (${rowIndexes.joinToString(",")})",
+            0,
+        )
+    }
 }

@@ -113,7 +113,7 @@ fun ApplyStrategyDialog(
         .getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val passThroughAccounts by passThroughAccountRepository
-        .getEnabled()
+        .getAll()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) }
 

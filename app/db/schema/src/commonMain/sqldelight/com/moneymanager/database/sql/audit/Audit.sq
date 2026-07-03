@@ -244,7 +244,6 @@ CREATE TABLE pass_through_account_audit (
     name TEXT NOT NULL,
     conduit_account_name TEXT NOT NULL,
     relationship_type_id INTEGER NOT NULL,
-    enabled INTEGER NOT NULL,
     rules_json TEXT NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
