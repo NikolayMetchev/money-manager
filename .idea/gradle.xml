@@ -30,7 +30,6 @@
             <option value="$PROJECT_DIR$/app/db/schema" />
             <option value="$PROJECT_DIR$/app/db/schemaspy" />
             <option value="$PROJECT_DIR$/app/db/seed" />
-            <option value="$PROJECT_DIR$/app/db/seed/generator" />
             <option value="$PROJECT_DIR$/app/db/write" />
             <option value="$PROJECT_DIR$/app/di" />
             <option value="$PROJECT_DIR$/app/di/core" />
@@ -49,6 +48,8 @@
             <option value="$PROJECT_DIR$/app/remotestorage/core" />
             <option value="$PROJECT_DIR$/app/remotestorage/googledrive" />
             <option value="$PROJECT_DIR$/app/remotestorage/sync" />
+            <option value="$PROJECT_DIR$/app/strategies" />
+            <option value="$PROJECT_DIR$/app/strategycatalog" />
             <option value="$PROJECT_DIR$/app/ui" />
             <option value="$PROJECT_DIR$/app/ui/accounts" />
             <option value="$PROJECT_DIR$/app/ui/audit" />
@@ -70,6 +71,8 @@
             <option value="$PROJECT_DIR$/test/app" />
             <option value="$PROJECT_DIR$/test/app/db" />
             <option value="$PROJECT_DIR$/test/app/ui" />
+            <option value="$PROJECT_DIR$/tools" />
+            <option value="$PROJECT_DIR$/tools/strategy-catalog" />
             <option value="$PROJECT_DIR$/utils" />
             <option value="$PROJECT_DIR$/utils/archive" />
             <option value="$PROJECT_DIR$/utils/bigdecimal" />
