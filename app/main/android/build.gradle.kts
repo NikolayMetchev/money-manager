@@ -56,6 +56,7 @@ dependencies {
     // Native Android Google Drive auth (AndroidGoogleAccessTokenSource) implements the googledrive seam.
     implementation(projects.app.remotestorage.googledrive)
     implementation(projects.app.remotestorage.sync)
+    implementation(projects.app.strategycatalog)
     implementation(projects.app.ui.core)
     implementation(projects.app.ui.foundation)
     implementation(projects.utils.localsettings)

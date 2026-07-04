@@ -24,6 +24,7 @@ dependencies {
     implementation(projects.app.importfilesource.core)
     implementation(projects.app.model.core)
     implementation(projects.app.remotestorage.sync)
+    implementation(projects.app.strategycatalog)
     implementation(projects.app.ui.components)
     implementation(projects.app.ui.core)
     implementation(projects.app.ui.foundation)

@@ -1,43 +1,44 @@
 package com.moneymanager.ui.navigation
 
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 
 /**
  * Manages navigation history with back/forward stack support.
+ *
+ * [backStack] always contains the current screen as its last element (it is never empty), so it
+ * can be handed directly to Navigation 3's `NavDisplay`.
  */
 @Stable
 class NavigationHistory(
     initialScreen: Screen,
 ) {
-    private val backStack = mutableListOf<Screen>()
-    private val forwardStack = mutableListOf<Screen>()
+    /** The navigation back stack; the last element is the current screen. Never empty. */
+    val backStack: SnapshotStateList<Screen> = mutableStateListOf(initialScreen)
 
-    var currentScreen by mutableStateOf(initialScreen)
-        private set
+    private val forwardStack = mutableStateListOf<Screen>()
+
+    val currentScreen: Screen
+        get() = backStack.last()
 
     val canGoBack: Boolean
-        get() = backStack.isNotEmpty()
+        get() = backStack.size > 1
 
     val canGoForward: Boolean
         get() = forwardStack.isNotEmpty()
 
     /**
-     * Navigate to a new screen, adding current screen to back stack.
+     * Navigate to a new screen, adding it to the back stack.
      */
     fun navigateTo(screen: Screen) {
         // Don't navigate if it's the same screen
         if (currentScreen == screen) return
 
-        // Add current screen to back stack
-        backStack.add(currentScreen)
-
         // Clear forward stack when navigating to a new screen
         forwardStack.clear()
 
-        currentScreen = screen
+        backStack.add(screen)
     }
 
     /**
@@ -47,11 +48,10 @@ class NavigationHistory(
     fun navigateBack(): Boolean {
         if (!canGoBack) return false
 
-        // Move current screen to forward stack
-        forwardStack.add(currentScreen)
-
-        // Pop from back stack
-        currentScreen = backStack.removeLast()
+        // Move current screen to forward stack. removeAt instead of removeLast: on Android
+        // compileSdk >= 35, removeLast() binds to the JDK 21 SequencedCollection method, which
+        // crashes with NoSuchMethodError on devices below API 35.
+        forwardStack.add(backStack.removeAt(backStack.lastIndex))
 
         return true
     }
@@ -63,11 +63,7 @@ class NavigationHistory(
     fun navigateForward(): Boolean {
         if (!canGoForward) return false
 
-        // Move current screen to back stack
-        backStack.add(currentScreen)
-
-        // Pop from forward stack
-        currentScreen = forwardStack.removeLast()
+        backStack.add(forwardStack.removeAt(forwardStack.lastIndex))
 
         return true
     }
@@ -77,6 +73,6 @@ class NavigationHistory(
      * Useful for updating screen parameters (e.g., scrollToTransferId).
      */
     fun replaceCurrentScreen(screen: Screen) {
-        currentScreen = screen
+        backStack[backStack.lastIndex] = screen
     }
 }

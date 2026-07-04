@@ -13,8 +13,8 @@ androidx-activity-compose = "1.13.0"
 androidx-annotation = "1.9.1"
 androidx-collection = "1.5.0"
 androidx-concurrent-futures = "1.2.0"
-androidx-lifecycle = "2.9.4"
-androidx-navigationevent = "1.0.1"
+androidx-lifecycle = "2.10.0"
+androidx-navigationevent = "1.0.2"
 androidx-savedstate = "1.4.0"
 androidx-test-services-storage = "1.6.0"
 androidx-tracing = "1.2.0"
@@ -23,6 +23,8 @@ jetbrains-annotations = "23.0.0"
 androidx-compose = "1.11.3"
 androidx-compose-material-icons = "1.7.8"
 androidx-compose-material3 = "1.4.0"
+androidx-navigation3 = "1.1.1"
+jetbrains-navigation3 = "1.1.1"
 androidx-sqlite = "2.6.2"
 androidx-test-core = "1.7.0"
 androidx-test-monitor = "1.8.0"
@@ -108,6 +110,10 @@ androidx-compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics", ver
 androidx-compose-ui-test = { module = "androidx.compose.ui:ui-test", version.ref = "androidx-compose" }
 androidx-compose-ui-text = { module = "androidx.compose.ui:ui-text", version.ref = "androidx-compose" }
 androidx-compose-ui-unit = { module = "androidx.compose.ui:ui-unit", version.ref = "androidx-compose" }
+androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "androidx-navigation3" }
+androidx-navigation3-runtime-desktop = { module = "androidx.navigation3:navigation3-runtime-desktop", version.ref = "androidx-navigation3" }
+androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "androidx-navigation3" }
+jetbrains-navigation3-ui-desktop = { module = "org.jetbrains.androidx.navigation3:navigation3-ui-desktop", version.ref = "jetbrains-navigation3" }
 androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidx-sqlite" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test-core" }
 androidx-test-monitor = { module = "androidx.test:monitor", version.ref = "androidx-test-monitor" }
