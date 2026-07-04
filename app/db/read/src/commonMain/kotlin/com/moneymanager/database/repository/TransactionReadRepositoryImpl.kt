@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
@@ -156,12 +157,14 @@ class TransactionReadRepositoryImpl(
         accountId: AccountId,
         pageSize: Int,
         pagingInfo: PagingInfo?,
+        currencyId: CurrencyId?,
     ): PagingResult<AccountRow> =
         withContext(Dispatchers.Default) {
             val items =
                 transferSelectQueries
                     .selectRunningBalanceByAccountPaginated(
                         accountId.id,
+                        currencyId?.id,
                         pagingInfo?.lastTimestamp?.toEpochMilliseconds(),
                         pagingInfo?.lastId?.id,
                         (pageSize + 1).toLong(),
@@ -198,12 +201,14 @@ class TransactionReadRepositoryImpl(
         pageSize: Int,
         firstTimestamp: Instant,
         firstId: TransactionId,
+        currencyId: CurrencyId?,
     ): PagingResult<AccountRow> =
         withContext(Dispatchers.Default) {
             val items =
                 transferSelectQueries
                     .selectRunningBalanceByAccountPaginatedBackward(
                         accountId.id,
+                        currencyId?.id,
                         firstTimestamp.toEpochMilliseconds(),
                         firstId.id,
                         (pageSize + 1).toLong(),
@@ -241,6 +246,7 @@ class TransactionReadRepositoryImpl(
         accountId: AccountId,
         transactionId: TransferId,
         pageSize: Int,
+        currencyId: CurrencyId?,
     ): PageWithTargetIndex<AccountRow> =
         withContext(Dispatchers.Default) {
             // First, get the transaction to find its timestamp
@@ -255,6 +261,7 @@ class TransactionReadRepositoryImpl(
                 transferSelectQueries
                     .getTransactionRowPosition(
                         accountId = accountId.id,
+                        currencyId = currencyId?.id,
                         targetTimestamp = transaction.timestamp.toEpochMilliseconds(),
                         targetId = transactionId.id,
                     ).executeAsOne()
@@ -262,7 +269,7 @@ class TransactionReadRepositoryImpl(
             // Get total count to know if there are more items
             val totalCount =
                 transferSelectQueries
-                    .countTransactionsByAccount(accountId.id)
+                    .countTransactionsByAccount(accountId.id, currencyId?.id)
                     .executeAsOne()
 
             // Calculate offset to center the transaction in the page
@@ -279,6 +286,7 @@ class TransactionReadRepositoryImpl(
                 transferSelectQueries
                     .selectRunningBalanceByAccountOffset(
                         accountId = accountId.id,
+                        currencyId = currencyId?.id,
                         limit = pageSize.toLong(),
                         offset = offset,
                         mapper = AccountRowMapper::mapRaw,

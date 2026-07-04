@@ -128,6 +128,7 @@ LEFT JOIN transfer_relationship pass_through_as_funding
 LEFT JOIN transfer_relationship pass_through_as_spend
     ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
 WHERE running_balance_materialized_view.account_id = :accountId
+  AND (:currencyId IS NULL OR running_balance_materialized_view.currency_id = :currencyId)
   AND ((:lastTimestamp IS NULL AND :lastId IS NULL)
        OR running_balance_materialized_view.timestamp < :lastTimestamp
        OR (running_balance_materialized_view.timestamp = :lastTimestamp
@@ -181,6 +182,7 @@ LEFT JOIN transfer_relationship pass_through_as_funding
 LEFT JOIN transfer_relationship pass_through_as_spend
     ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
 WHERE running_balance_materialized_view.account_id = :accountId
+  AND (:currencyId IS NULL OR running_balance_materialized_view.currency_id = :currencyId)
   AND (running_balance_materialized_view.timestamp > :firstTimestamp
        OR (running_balance_materialized_view.timestamp = :firstTimestamp
            AND running_balance_materialized_view.id > :firstId))
@@ -193,6 +195,7 @@ getTransactionRowPosition:
 SELECT COUNT(*)
 FROM running_balance_materialized_view
 WHERE account_id = :accountId
+  AND (:currencyId IS NULL OR currency_id = :currencyId)
   AND (timestamp > :targetTimestamp
        OR (timestamp = :targetTimestamp AND id > :targetId));
 
@@ -241,6 +244,7 @@ LEFT JOIN transfer_relationship pass_through_as_funding
 LEFT JOIN transfer_relationship pass_through_as_spend
     ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
 WHERE running_balance_materialized_view.account_id = :accountId
+  AND (:currencyId IS NULL OR running_balance_materialized_view.currency_id = :currencyId)
 ORDER BY running_balance_materialized_view.timestamp DESC, running_balance_materialized_view.id DESC
 LIMIT :limit OFFSET :offset;
 
@@ -248,7 +252,8 @@ LIMIT :limit OFFSET :offset;
 countTransactionsByAccount:
 SELECT COUNT(*)
 FROM running_balance_materialized_view
-WHERE account_id = :accountId;
+WHERE account_id = :accountId
+  AND (:currencyId IS NULL OR currency_id = :currencyId);
 
 countTransfersByAccount:
 SELECT COUNT(*)

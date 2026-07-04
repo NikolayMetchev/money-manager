@@ -5,6 +5,7 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
@@ -64,6 +65,8 @@ interface TransactionReadRepository {
         accountId: AccountId,
         pageSize: Int,
         pagingInfo: PagingInfo?,
+        /** When set, only transactions in this currency are returned (and counted for paging). */
+        currencyId: CurrencyId? = null,
     ): PagingResult<AccountRow>
 
     /**
@@ -81,6 +84,8 @@ interface TransactionReadRepository {
         pageSize: Int,
         firstTimestamp: Instant,
         firstId: TransactionId,
+        /** When set, only transactions in this currency are returned (and counted for paging). */
+        currencyId: CurrencyId? = null,
     ): PagingResult<AccountRow>
 
     /**
@@ -97,5 +102,7 @@ interface TransactionReadRepository {
         accountId: AccountId,
         transactionId: TransferId,
         pageSize: Int,
+        /** When set, positions and pages within only this currency's transactions. */
+        currencyId: CurrencyId? = null,
     ): PageWithTargetIndex<AccountRow>
 }

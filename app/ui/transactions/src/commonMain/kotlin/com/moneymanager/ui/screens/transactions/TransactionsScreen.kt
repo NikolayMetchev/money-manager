@@ -193,8 +193,13 @@ fun AccountTransactionsScreen(
     val isMatrixLoading = !hasLoadedMatrix
     val isTransactionsLoading = !hasLoadedFirstPage
 
-    // Get unique currency IDs from running balances for this account
-    val accountCurrencyIds = runningBalances.map { it.transactionAmount.currency.id }.distinct()
+    // The currencies this account holds, from its balances — NOT from the loaded pages, which are
+    // server-filtered to the selected currency (and empty while a reload is in flight).
+    val accountCurrencyIds =
+        accountBalances
+            .filter { it.accountId == selectedAccountId }
+            .map { it.balance.currency.id }
+            .distinct()
     val accountCurrencies = currencies.filter { it.id in accountCurrencyIds }
 
     // Selected currency state - initialized from parameter
@@ -224,16 +229,11 @@ fun AccountTransactionsScreen(
         }
     }
 
-    // Filter running balances by selected currency (or show all if no currency selected)
-    val filteredRunningBalances =
-        selectedCurrencyId?.let { currencyId ->
-            runningBalances.filter { it.transactionAmount.currency.id == currencyId }
-        } ?: runningBalances
-
+    // Pages are already filtered to the selected currency by the repository queries.
     // Whether to show transactions marked as excluded
     var showExcluded by remember { mutableStateOf(false) }
     val displayedRunningBalances =
-        if (showExcluded) filteredRunningBalances else filteredRunningBalances.filter { !it.isExcluded }
+        if (showExcluded) runningBalances else runningBalances.filter { !it.isExcluded }
 
     // Get all unique currencies from account balances for matrix
     val uniqueCurrencyIds = accountBalances.map { it.balance.currency.id }.distinct()
@@ -277,7 +277,7 @@ fun AccountTransactionsScreen(
 
         // Load first page when account changes or after edits (via refreshTrigger or externalRefreshTrigger)
         // If scrollToTransferId is provided, load the page containing that transaction
-        LaunchedEffect(selectedAccountId, pageSize, scrollToTransferId, refreshTrigger, externalRefreshTrigger) {
+        LaunchedEffect(selectedAccountId, selectedCurrencyId, pageSize, scrollToTransferId, refreshTrigger, externalRefreshTrigger) {
             runningBalances = emptyList()
             currentPagingInfo = null
             hasLoadedFirstPage = false
@@ -292,6 +292,7 @@ fun AccountTransactionsScreen(
                             accountId = selectedAccountId,
                             transactionId = scrollToTransferId,
                             pageSize = pageSize,
+                            currencyId = selectedCurrencyId,
                         )
                     runningBalances = pageResult.items
                     currentPagingInfo = pageResult.pagingInfo
@@ -304,6 +305,7 @@ fun AccountTransactionsScreen(
                             accountId = selectedAccountId,
                             pageSize = pageSize,
                             pagingInfo = null,
+                            currencyId = selectedCurrencyId,
                         )
                     runningBalances = result.items
                     currentPagingInfo = result.pagingInfo
@@ -331,6 +333,7 @@ fun AccountTransactionsScreen(
                         accountId = selectedAccountId,
                         pageSize = pageSize,
                         pagingInfo = currentPagingInfo,
+                        currencyId = selectedCurrencyId,
                     )
                 runningBalances = runningBalances + result.items
                 currentPagingInfo = result.pagingInfo
@@ -358,6 +361,7 @@ fun AccountTransactionsScreen(
                         pageSize = pageSize,
                         firstTimestamp = firstItem.timestamp,
                         firstId = firstItem.transactionId,
+                        currencyId = selectedCurrencyId,
                     )
                 if (result.items.isNotEmpty()) {
                     runningBalances = result.items + runningBalances
@@ -659,18 +663,12 @@ fun AccountTransactionsScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "No transactions yet for this account.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else if (filteredRunningBalances.isEmpty() && selectedCurrencyId != null) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "No transactions for selected currency.",
+                        text =
+                            if (selectedCurrencyId != null) {
+                                "No transactions for selected currency."
+                            } else {
+                                "No transactions yet for this account."
+                            },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

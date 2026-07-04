@@ -459,11 +459,11 @@ class AccountsScreenTest {
             every { getTransactionsByDateRange(any(), any()) } returns flowOf(emptyList())
             every { getTransactionsByAccountAndDateRange(any(), any(), any()) } returns flowOf(emptyList())
             every { getAccountBalances() } returns flowOf(emptyList())
-            everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any()) } returns
+            everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any(), any()) } returns
                 PagingResult(emptyList(), PagingInfo(null, null, false))
-            everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any()) } returns
+            everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any(), any()) } returns
                 PagingResult(emptyList(), PagingInfo(null, null, false))
-            everySuspend { getPageContainingTransaction(any(), any(), any()) } returns
+            everySuspend { getPageContainingTransaction(any(), any(), any(), any()) } returns
                 PageWithTargetIndex(emptyList(), -1, PagingInfo(null, null, false), false)
         }
 

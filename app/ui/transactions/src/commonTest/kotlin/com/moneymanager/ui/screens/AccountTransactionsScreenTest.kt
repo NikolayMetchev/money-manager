@@ -1121,7 +1121,7 @@ class AccountTransactionsScreenTest {
             every { getTransactionsByDateRange(any(), any()) } returns flowOf(emptyList())
             every { getTransactionsByAccountAndDateRange(any(), any(), any()) } returns flowOf(emptyList())
             every { getAccountBalances() } returns flowOf(emptyList())
-            everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any()) } calls
+            everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any(), any()) } calls
                 { (accountId: AccountId, pageSize: Int, _: PagingInfo?) ->
                     val allRows = buildAccountRows(transfers, accountId, feeLinks)
                     val items = allRows.take(pageSize)
@@ -1135,9 +1135,9 @@ class AccountTransactionsScreenTest {
                             ),
                     )
                 }
-            everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any()) } returns
+            everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any(), any()) } returns
                 PagingResult(emptyList(), PagingInfo(null, null, false))
-            everySuspend { getPageContainingTransaction(any(), any(), any()) } calls
+            everySuspend { getPageContainingTransaction(any(), any(), any(), any()) } calls
                 { (accountId: AccountId, transactionId: TransferId, pageSize: Int) ->
                     val allRows = buildAccountRows(transfers, accountId, feeLinks)
                     val targetIndex = allRows.indexOfFirst { it.transactionId.id == transactionId.id }
