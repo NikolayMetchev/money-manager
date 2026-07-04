@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
@@ -238,7 +239,10 @@ suspend fun planCsvReimport(
 
     val mappedPrep = prep(mappings)
     val candidates = computeReimportMerges(prep(emptyList()), mappedPrep, importCreated)
-    val rewrites = computeReimportRewrites(allRows, mappedPrep, relationshipRepository)
+    val rewrites =
+        computeReimportRewrites(allRows, mappedPrep, relationshipRepository) { transferId ->
+            transactionRepository.getTransactionById(transferId.id).first()
+        }
     val valueUpdates =
         computeReimportValueUpdates(
             allRows = allRows,
@@ -292,7 +296,8 @@ suspend fun planCsvReimport(
  * the strategy's amount/currency/date/description mappings changed since the row was imported. Only
  * value fields are compared; account differences are the domain of merges (and a persisted transfer
  * whose account was mapped away is matched pre-merge, so comparing accounts here would misfire).
- * Pass-through rows are excluded — their shape is owned by the rewrite path.
+ * Pass-through rows are excluded — value changes there invalidate every leg of the chain, so they
+ * are handled by the rewrite path instead (see [computeReimportRewrites]).
  */
 internal suspend fun computeReimportValueUpdates(
     allRows: List<CsvRow>,
@@ -338,31 +343,48 @@ private fun Money.display(): String = "${toDisplayValue()} ${currency.code}"
 
 /**
  * Finds already-imported rows whose current preparation routes them through a pass-through conduit
- * chain their existing transfer does not reflect (imported before the definitions existed, or with a
- * shorter chain). Compares the number of pass-through legs hanging off the row's transfer with the
- * chain length the current configuration produces. Only IMPORTED rows are considered — a DUPLICATE
- * row's transfer belongs to another row and must not be deleted.
+ * chain their existing transfer does not reflect: imported before the definitions existed, with a
+ * shorter chain (compared via the number of pass-through legs hanging off the row's transfer), or —
+ * when the chain itself still matches — with transfer values (amount/currency/date/description) the
+ * current strategy now computes differently, which invalidates every leg of the chain. Only IMPORTED
+ * rows are considered — a DUPLICATE row's transfer belongs to another row and must not be deleted.
+ * [existingTransferLookup] loads a row's persisted funding transfer for the value comparison; a null
+ * result skips that comparison.
  */
 internal suspend fun computeReimportRewrites(
     allRows: List<CsvRow>,
     mappedPrep: ImportPreparation,
     relationshipRepository: TransferRelationshipReadRepository,
+    existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): List<ReimportRewrite> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
-    return mappedPrep.validTransfers.mapNotNull { mapped -> rewriteFor(mapped, rowsByIndex, relationshipRepository) }
+    return mappedPrep.validTransfers.mapNotNull { mapped ->
+        rewriteFor(mapped, rowsByIndex, relationshipRepository, existingTransferLookup)
+    }
 }
 
 private suspend fun rewriteFor(
     mapped: CsvTransferWithAttributes,
     rowsByIndex: Map<Long, CsvRow>,
     relationshipRepository: TransferRelationshipReadRepository,
+    existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): ReimportRewrite? {
     val passThrough = mapped.passThrough ?: return null
     val row = rowsByIndex[mapped.rowIndex] ?: return null
     if (row.importStatus != ImportStatus.IMPORTED) return null
     val transferId = row.transferId ?: return null
     val linked = collectLinkedLegs(transferId, relationshipRepository)
-    if (linked.passThroughLegCount == passThrough.conduitNames.size) return null
+    val chainChanged = linked.passThroughLegCount != passThrough.conduitNames.size
+    // A value change (e.g. the strategy's amount/currency columns moved) must propagate to every
+    // spend leg of the chain, so the row is rewritten rather than updated in place.
+    val valuesChanged =
+        !chainChanged &&
+            existingTransferLookup(transferId)?.let { existing ->
+                existing.amount != mapped.transfer.amount ||
+                    existing.timestamp != mapped.transfer.timestamp ||
+                    existing.description != mapped.transfer.description
+            } == true
+    if (!chainChanged && !valuesChanged) return null
     return ReimportRewrite(
         rowIndex = row.rowIndex,
         transferIdsToDelete = linked.transferIds,
