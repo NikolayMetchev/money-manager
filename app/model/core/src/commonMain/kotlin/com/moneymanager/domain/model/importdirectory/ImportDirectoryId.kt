@@ -2,8 +2,10 @@
 
 package com.moneymanager.domain.model.importdirectory
 
+import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
+@Serializable
 @JvmInline
 value class ImportDirectoryId(
     val id: Uuid,

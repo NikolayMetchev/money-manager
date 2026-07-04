@@ -4,12 +4,14 @@ package com.moneymanager.domain.model.csv
 
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmInline
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+@Serializable
 @JvmInline
 value class CsvImportId
     @OptIn(ExperimentalUuidApi::class)

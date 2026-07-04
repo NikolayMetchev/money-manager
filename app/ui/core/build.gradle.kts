@@ -70,6 +70,7 @@ kotlin {
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.androidx.navigation3.ui)
+                implementation(libs.androidx.savedstate)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
@@ -94,6 +95,7 @@ kotlin {
 
                 implementation(libs.androidx.compose.runtime.annotation)
                 implementation(libs.androidx.navigation3.runtime.desktop)
+                implementation(libs.androidx.savedstate.desktop)
                 implementation(libs.compose.animation.desktop)
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material3.desktop)

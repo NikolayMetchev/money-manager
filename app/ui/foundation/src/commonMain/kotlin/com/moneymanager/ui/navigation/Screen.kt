@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.navigation
 
+import androidx.navigation3.runtime.NavKey
 import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
@@ -14,119 +15,206 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.qif.QifImportId
+import kotlinx.serialization.Serializable
 
 enum class ImportTab { DIRECTORIES, CSV, QIF, API, MISC }
 
-sealed class Screen(
-    val title: String,
-) {
+/**
+ * Navigation destinations. Serializable [NavKey]s so the back stack survives process death via
+ * `rememberNavBackStack` (titles are computed properties, not serialized state).
+ */
+@Serializable
+sealed class Screen : NavKey {
+    abstract val title: String
+
+    @Serializable
     data class Accounts(
         val scrollToAccountId: AccountId? = null,
-    ) : Screen("Accounts")
+    ) : Screen() {
+        override val title: String get() = "Accounts"
+    }
 
-    data object Currencies : Screen("Currencies")
+    @Serializable
+    data object Currencies : Screen() {
+        override val title: String get() = "Currencies"
+    }
 
-    data object Categories : Screen("Categories")
+    @Serializable
+    data object Categories : Screen() {
+        override val title: String get() = "Categories"
+    }
 
-    data object People : Screen("People")
+    @Serializable
+    data object People : Screen() {
+        override val title: String get() = "People"
+    }
 
+    @Serializable
     data class PeopleScroll(
         val personId: PersonId,
-    ) : Screen("People")
+    ) : Screen() {
+        override val title: String get() = "People"
+    }
 
+    @Serializable
     data class Imports(
         val tab: ImportTab = ImportTab.DIRECTORIES,
-    ) : Screen("Imports")
+    ) : Screen() {
+        override val title: String get() = "Imports"
+    }
 
-    data object CsvStrategies : Screen("Import Strategies")
+    @Serializable
+    data object CsvStrategies : Screen() {
+        override val title: String get() = "Import Strategies"
+    }
 
+    @Serializable
     data class CsvStrategyEditor(
         val csvImportId: CsvImportId,
         val strategyId: CsvImportStrategyId? = null,
-    ) : Screen(if (strategyId == null) "Create Strategy" else "Edit Strategy")
+    ) : Screen() {
+        override val title: String get() = if (strategyId == null) "Create Strategy" else "Edit Strategy"
+    }
 
-    data object ApiStrategies : Screen("API Import Strategies")
+    @Serializable
+    data object ApiStrategies : Screen() {
+        override val title: String get() = "API Import Strategies"
+    }
 
+    @Serializable
     data class StrategyCatalog(
         val kindFilter: StrategyKind? = null,
-    ) : Screen("Strategy Catalog")
+    ) : Screen() {
+        override val title: String get() = "Strategy Catalog"
+    }
 
+    @Serializable
     data class ApiStrategyEditor(
         val strategyId: ApiImportStrategyId? = null,
-    ) : Screen(if (strategyId == null) "Create API Strategy" else "Edit API Strategy")
+    ) : Screen() {
+        override val title: String get() = if (strategyId == null) "Create API Strategy" else "Edit API Strategy"
+    }
 
-    data object Settings : Screen("Settings")
+    @Serializable
+    data object Settings : Screen() {
+        override val title: String get() = "Settings"
+    }
 
-    data object DatabaseSizeBreakdown : Screen("Database Size Breakdown")
+    @Serializable
+    data object DatabaseSizeBreakdown : Screen() {
+        override val title: String get() = "Database Size Breakdown"
+    }
 
+    @Serializable
     data class AccountTransactions(
         val accountId: AccountId,
         val accountName: String,
         val scrollToTransferId: TransferId? = null,
         val selectedCurrencyId: CurrencyId? = null,
-    ) : Screen(accountName)
+    ) : Screen() {
+        override val title: String get() = accountName
+    }
 
+    @Serializable
     data class CsvImportDetail(
         val importId: CsvImportId,
         val scrollToRowIndex: Long? = null,
-    ) : Screen("CSV Import")
+    ) : Screen() {
+        override val title: String get() = "CSV Import"
+    }
 
+    @Serializable
     data class QifImportDetail(
         val importId: QifImportId,
         val scrollToRecordIndex: Long? = null,
-    ) : Screen("QIF Import")
+    ) : Screen() {
+        override val title: String get() = "QIF Import"
+    }
 
+    @Serializable
     data class QifStrategyEditor(
         val qifImportId: QifImportId,
         val strategyId: CsvImportStrategyId? = null,
-    ) : Screen(if (strategyId == null) "Create Strategy" else "Edit Strategy")
+    ) : Screen() {
+        override val title: String get() = if (strategyId == null) "Create Strategy" else "Edit Strategy"
+    }
 
+    @Serializable
     data class AuditHistory(
         val transferId: TransferId,
-    ) : Screen("Audit History")
+    ) : Screen() {
+        override val title: String get() = "Audit History"
+    }
 
+    @Serializable
     data class AccountAuditHistory(
         val accountId: AccountId,
         val accountName: String,
-    ) : Screen("Account Audit: $accountName")
+    ) : Screen() {
+        override val title: String get() = "Account Audit: $accountName"
+    }
 
+    @Serializable
     data class PersonAuditHistory(
         val personId: PersonId,
         val personName: String,
-    ) : Screen("Person Audit: $personName")
+    ) : Screen() {
+        override val title: String get() = "Person Audit: $personName"
+    }
 
+    @Serializable
     data class CurrencyAuditHistory(
         val currencyId: CurrencyId,
         val currencyCode: String,
-    ) : Screen("Currency Audit: $currencyCode")
+    ) : Screen() {
+        override val title: String get() = "Currency Audit: $currencyCode"
+    }
 
+    @Serializable
     data class CategoryAuditHistory(
         val categoryId: Long,
         val categoryName: String,
-    ) : Screen("Category Audit: $categoryName")
+    ) : Screen() {
+        override val title: String get() = "Category Audit: $categoryName"
+    }
 
+    @Serializable
     data class ApiStrategyAuditHistory(
         val strategyId: ApiImportStrategyId,
         val strategyName: String,
-    ) : Screen("API Strategy Audit: $strategyName")
+    ) : Screen() {
+        override val title: String get() = "API Strategy Audit: $strategyName"
+    }
 
+    @Serializable
     data class CsvStrategyAuditHistory(
         val strategyId: CsvImportStrategyId,
         val strategyName: String,
-    ) : Screen("CSV Strategy Audit: $strategyName")
+    ) : Screen() {
+        override val title: String get() = "CSV Strategy Audit: $strategyName"
+    }
 
+    @Serializable
     data class ImportDirectoryAuditHistory(
         val directoryId: ImportDirectoryId,
         val directoryName: String,
-    ) : Screen("Import Directory Audit: $directoryName")
+    ) : Screen() {
+        override val title: String get() = "Import Directory Audit: $directoryName"
+    }
 
-    data object ConnectApi : Screen("Connect API Account")
+    @Serializable
+    data object ConnectApi : Screen() {
+        override val title: String get() = "Connect API Account"
+    }
 
+    @Serializable
     data class ApiSessionTraffic(
         val sessionId: ApiSessionId,
         /** When non-null the traffic screen should scroll to this request/response pair. */
         val highlightRequestId: ApiRequestId? = null,
         /** When non-null the traffic screen should expand and highlight this JSONPath. */
         val highlightJsonPath: String? = null,
-    ) : Screen("API Traffic")
+    ) : Screen() {
+        override val title: String get() = "API Traffic"
+    }
 }

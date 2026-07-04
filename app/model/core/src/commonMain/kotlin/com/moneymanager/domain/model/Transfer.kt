@@ -2,6 +2,7 @@
 
 package com.moneymanager.domain.model
 
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 data class Transfer(
@@ -15,6 +16,7 @@ data class Transfer(
     val attributes: List<TransferAttribute> = emptyList(),
 )
 
+@Serializable
 @JvmInline
 value class TransferId(
     override val id: Long,

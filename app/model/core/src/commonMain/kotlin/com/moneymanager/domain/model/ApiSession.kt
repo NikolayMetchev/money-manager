@@ -3,6 +3,7 @@
 package com.moneymanager.domain.model
 
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import kotlinx.serialization.Serializable
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
@@ -63,6 +64,7 @@ data class ApiRequest(
     val headers: List<ApiRequestHeader>,
 )
 
+@Serializable
 @JvmInline
 value class ApiRequestId(
     val id: Long,
@@ -99,6 +101,7 @@ value class ApiResponseId(
     override fun toString() = id.toString()
 }
 
+@Serializable
 @JvmInline
 value class ApiSessionId(
     val id: Long,
