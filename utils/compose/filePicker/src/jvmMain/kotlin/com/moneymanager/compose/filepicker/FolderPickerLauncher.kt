@@ -8,15 +8,17 @@ import kotlinx.coroutines.launch
 import javax.swing.JFileChooser
 
 @Composable
-actual fun rememberFolderPicker(onResult: (String?) -> Unit): FolderPickerLauncher {
+actual fun rememberFolderPicker(onResult: (PickedFolder?) -> Unit): FolderPickerLauncher {
     val scope = rememberCoroutineScope()
     return remember(onResult) {
-        FolderPickerLauncher(onResult = { path -> scope.launch { onResult(path) } })
+        FolderPickerLauncher(onResult = { picked -> scope.launch { onResult(picked) } })
     }
 }
 
+actual val manualFolderEntrySupported: Boolean = true
+
 actual class FolderPickerLauncher(
-    private val onResult: (String?) -> Unit,
+    private val onResult: (PickedFolder?) -> Unit,
 ) {
     actual fun launch() {
         val chooser =
@@ -32,6 +34,6 @@ actual class FolderPickerLauncher(
                 null
             }
         chosen?.let { localSettings.putString(KEY_LAST_DIRECTORY, it) }
-        onResult(chosen)
+        onResult(chosen?.let { PickedFolder(ref = it, displayName = it) })
     }
 }

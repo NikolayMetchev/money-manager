@@ -140,9 +140,10 @@ fun main() {
 @Suppress("FunctionName")
 private fun MainWindow(onExit: () -> Unit) {
     // Initialize DI component once
+    val params = remember { AppComponentParams() }
     val component =
         remember {
-            AppComponent.create(AppComponentParams()).also {
+            AppComponent.create(params).also {
                 logger.info { "DI component created successfully" }
             }
         }
@@ -151,8 +152,8 @@ private fun MainWindow(onExit: () -> Unit) {
     val appVersion = component.appVersion
     val localSettings = component.localSettings
     val remoteController = component.remoteDatabaseController
-    val importFileSourceFactory = createImportFileSourceFactory(localSettings)
-    val driveFolderBrowser = createDriveFolderBrowser(localSettings)
+    val importFileSourceFactory = createImportFileSourceFactory(params, localSettings)
+    val driveFolderBrowser = createDriveFolderBrowser(params, localSettings)
     // The currently open database, tracked so we can push it and clean up on app close.
     val openDatabase = remember { arrayOfNulls<MoneyManagerDatabaseWrapper>(1) }
     val scope = rememberCoroutineScope()

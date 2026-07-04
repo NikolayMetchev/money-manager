@@ -52,4 +52,32 @@ class ImportDirectoryDiscoveryTest {
                 "only folders that directly contain .csv/.qif files are discovered (root and txt-only folder excluded)",
             )
         }
+
+    @Test
+    fun `refs are opaque - Android SAF document-tree URIs flow through discovery untouched`() =
+        runTest {
+            val root = "content://com.android.externalstorage.documents/tree/primary%3AStatements"
+            val child = "$root/document/primary%3AStatements%2F2024"
+            val tree =
+                mapOf(
+                    root to FakeNode(files = listOf("jan.csv"), subfolders = listOf(ImportSubfolder(child, "2024"))),
+                    child to FakeNode(files = listOf("feb.csv"), subfolders = emptyList()),
+                )
+
+            val discovered =
+                discoverImportableFolders(
+                    rootFolderRef = root,
+                    rootDisplayPath = "Statements",
+                    openFolder = { ref -> FakeTreeSource(tree.getValue(ref)) },
+                )
+
+            assertEquals(
+                listOf(
+                    root to "Statements",
+                    child to "Statements / 2024",
+                ),
+                discovered.map { it.folderRef to it.displayPath },
+                "URI-shaped refs must be passed through verbatim and display paths joined with ' / '",
+            )
+        }
 }

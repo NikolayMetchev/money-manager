@@ -18,7 +18,9 @@ import kotlin.coroutines.resumeWithException
 /**
  * Android [GoogleAccessTokenSource] backed by Google Identity Services' `AuthorizationClient`. Sign-in
  * shows a native account/consent sheet (no browser, no loopback) and GMS re-issues short-lived access
- * tokens silently once the `drive.file` scope is granted — so there is no refresh token and no backend.
+ * tokens silently once the requested [scopes] are granted — so there is no refresh token and no backend.
+ * DB sync uses the default `drive.file`; import directories need an instance with `drive.readonly` on
+ * top (user-dropped files are invisible to `drive.file`).
  *
  * Requires Google Play Services and an Android-type OAuth client registered for this app's package +
  * signing SHA-1 in the Cloud Console (no client id is passed in code; GMS matches by package/signature).
@@ -26,6 +28,7 @@ import kotlin.coroutines.resumeWithException
 class AndroidGoogleAccessTokenSource(
     context: Context,
     private val consentLauncher: GoogleAuthConsentLauncher,
+    private val scopes: List<String> = listOf(DRIVE_FILE_SCOPE),
 ) : GoogleAccessTokenSource {
     private val authorizationClient = Identity.getAuthorizationClient(context)
 
@@ -43,6 +46,11 @@ class AndroidGoogleAccessTokenSource(
         )
 
     override suspend fun isSignedIn(): Boolean = runCatching { authorizeSilently() != null }.getOrDefault(false)
+
+    // authorize() carries this instance's scopes, so a silent grant covering them all means no consent
+    // sheet is needed; anything else (no grant, or a narrower earlier grant) must go through signIn().
+    override suspend fun isSignedInWithRequiredScopes(): Boolean =
+        runCatching { authorizeSilently()?.grantedScopes?.containsAll(scopes) == true }.getOrDefault(false)
 
     override suspend fun signIn() {
         cachedToken =
@@ -64,7 +72,7 @@ class AndroidGoogleAccessTokenSource(
     private fun request(): AuthorizationRequest =
         AuthorizationRequest
             .builder()
-            .setRequestedScopes(listOf(Scope(DRIVE_FILE_SCOPE)))
+            .setRequestedScopes(scopes.map(::Scope))
             .build()
 
     /** Returns a result only when a token is available without UI; null when consent would be required. */

@@ -5,7 +5,7 @@ plugins {
 
 // Local-folder backend for ImportFileSource: lists + reads files from a filesystem folder via
 // java.io.File. JVM and Android share one jvmAndroidMain source set (java.io is available on both for
-// real filesystem paths). Database-free.
+// real filesystem paths); androidMain adds the SAF document-tree variant on top. Database-free.
 kotlin {
     sourceSets {
         val jvmAndroidMain =

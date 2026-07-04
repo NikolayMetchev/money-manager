@@ -28,11 +28,10 @@ enum class ImportDirectoryProvider(
  * lists the folder and stages new/changed importable files (.csv/.qif) into the Imports tabs, tracked
  * per file via [ImportDirectoryFile].
  *
- * @property folderRef Local absolute filesystem path, or Drive folder id (used to access it). LOCAL
- *   directories are filesystem paths only — Android Storage Access Framework tree URIs are not
- *   supported (the local backend reads via java.io.File).
+ * @property folderRef Whatever the platform backend needs to open the folder: a local absolute
+ *   filesystem path (JVM), an Android Storage Access Framework tree/document URI, or a Drive folder id.
  * @property displayPath Human-readable full path shown in the UI (e.g. "My Drive / Statements"); null
- *   falls back to [folderRef] (e.g. local folders, whose ref is already readable).
+ *   falls back to [folderRef] (e.g. JVM local folders, whose path ref is already readable).
  * @property providerConfig Provider-specific config (e.g. Drive OAuth client JSON); null for LOCAL.
  * @property deviceId Set for LOCAL directories (scanned only on that device); null for shared GDRIVE.
  * @property topLevel True for a user-picked folder (download discovers + creates child directories);
