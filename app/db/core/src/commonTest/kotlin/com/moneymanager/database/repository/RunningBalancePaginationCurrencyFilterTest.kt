@@ -113,5 +113,21 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
             assertEquals(2, page.items.size)
             assertTrue(page.targetIndex >= 0)
             assertTrue(page.items.all { it.transactionAmount.currency.code == "USD" })
+
+            // Backward pagination from the older USD row: only the newer USD row is returned —
+            // the GBP rows between them are skipped by the filter.
+            val oldest = usdPage.items.last()
+            val backward =
+                repositories.transactionRepository
+                    .getRunningBalanceByAccountPaginatedBackward(
+                        card,
+                        pageSize = 5,
+                        firstTimestamp = oldest.timestamp,
+                        firstId = oldest.transactionId,
+                        currencyId = usd.id,
+                    )
+            assertEquals(listOf("Old USD 2"), backward.items.map { it.description })
+            assertEquals(listOf(-3000L), backward.items.map { it.runningBalance.amount })
+            assertEquals(false, backward.pagingInfo.hasMore)
         }
 }
