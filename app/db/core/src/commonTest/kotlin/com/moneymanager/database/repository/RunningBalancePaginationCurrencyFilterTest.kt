@@ -26,11 +26,11 @@ import kotlin.time.Instant
 class RunningBalancePaginationCurrencyFilterTest : DbTest() {
     private val baseTime = Instant.fromEpochMilliseconds(1_700_000_000_000)
 
-    private suspend fun currency(code: String): Currency =
+    private suspend fun currency(currencyCode: String): Currency =
         repositories.currencyRepository
             .getAllCurrencies()
             .first()
-            .first { it.code == code }
+            .first { it.code == currencyCode }
 
     private suspend fun createAccount(name: String): AccountId {
         repositories.accountRepository.createAccount(Account(id = AccountId(0), name = name, openingDate = baseTime))
@@ -69,7 +69,7 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
             ).single()
 
     @Test
-    fun `currency-filtered pagination returns only that currency's rows even when they are older than a page`() =
+    fun `currency filtered pagination returns only matching rows even when they are older than a page`() =
         runTest {
             val gbp = currency("GBP")
             val usd = currency("USD")
