@@ -124,6 +124,7 @@ class MainActivity : ComponentActivity() {
                 onErrorLog = { message, error -> Log.e(TAG, message, error) },
                 remoteController = controller,
                 strategySyncController = component.strategySyncController,
+                strategyCatalogController = component.strategyCatalogController,
                 importFileSourceFactory = importFileSourceFactory,
                 driveFolderBrowser = driveFolderBrowser,
                 onDatabaseReady = { database, _ -> openDatabase = database },

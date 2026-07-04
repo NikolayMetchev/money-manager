@@ -10,6 +10,7 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.di.core)
                 api(projects.app.model.core)
+                api(projects.app.strategies)
 
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.utils.currency)
@@ -24,6 +25,7 @@ kotlin {
                 api(projects.app.model.core)
 
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(projects.app.importengineapi)
             }
         }
         getByName("androidMain") {
@@ -33,6 +35,7 @@ kotlin {
 
                 implementation(libs.androidx.test.monitor)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(projects.app.importengineapi)
             }
         }
     }

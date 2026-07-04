@@ -575,6 +575,8 @@ private val TRANSACTIONS_WITH_LOCAL_CURRENCY_JSON =
     """.trimIndent()
 
 class MonzoImportE2ETest : DbTest() {
+    override val installBuiltInStrategies: Boolean = true
+
     @Test
     fun `downloaded transactions are imported with correct API audit source on accounts and transfers`() =
         runTest {

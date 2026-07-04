@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
@@ -47,6 +48,7 @@ import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
+import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.background.BackgroundTaskPanel
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.rememberBackgroundTaskManager
@@ -75,6 +77,7 @@ import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
 import com.moneymanager.ui.screens.QifImportDetailScreen
 import com.moneymanager.ui.screens.SettingsScreen
+import com.moneymanager.ui.screens.StrategyCatalogScreen
 import com.moneymanager.ui.screens.apistrategy.ApiImportStrategyAuditScreen
 import com.moneymanager.ui.screens.apistrategy.ApiStrategiesScreen
 import com.moneymanager.ui.screens.apistrategy.editor.ApiStrategyEditorScreen
@@ -101,6 +104,7 @@ fun MoneyManagerApp(
     remoteController: RemoteDatabaseController? = null,
     database: MoneyManagerDatabaseWrapper? = null,
     strategySyncController: StrategySyncController? = null,
+    strategyCatalogController: StrategyCatalogController? = null,
     importFileSourceFactory: ImportFileSourceFactory? = null,
     driveFolderBrowser: DriveFolderBrowser? = null,
 ) {
@@ -522,7 +526,31 @@ fun MoneyManagerApp(
                                             onTransactionsImported = {
                                                 transactionRefreshTrigger++
                                             },
+                                            onBrowsePassThroughCatalog = {
+                                                navigationHistory.navigateTo(Screen.StrategyCatalog(StrategyKind.PASS_THROUGH))
+                                            },
                                         )
+                                    }
+                                    is Screen.StrategyCatalog -> {
+                                        LaunchedEffect(Unit) {
+                                            currentlyViewedAccountId = null
+                                            currentlyViewedCurrencyId = null
+                                        }
+                                        if (strategyCatalogController != null) {
+                                            StrategyCatalogScreen(
+                                                controller = strategyCatalogController,
+                                                library = services.imports.strategyLibrary,
+                                                appVersion = appVersion,
+                                                accountRepository = services.accounts.accountRepository,
+                                                categoryRepository = services.accounts.categoryRepository,
+                                                currencyRepository = services.accounts.currencyRepository,
+                                                personRepository = services.people.personRepository,
+                                                initialKindFilter = screen.kindFilter,
+                                                onBack = { navigationHistory.navigateBack() },
+                                            )
+                                        } else {
+                                            LaunchedEffect(Unit) { navigationHistory.navigateBack() }
+                                        }
                                     }
                                     is Screen.ApiStrategies -> {
                                         LaunchedEffect(Unit) {
@@ -531,6 +559,9 @@ fun MoneyManagerApp(
                                         }
                                         ApiStrategiesScreen(
                                             apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
+                                            onBrowseCatalog = {
+                                                navigationHistory.navigateTo(Screen.StrategyCatalog(StrategyKind.API))
+                                            },
                                             onBack = { navigationHistory.navigateBack() },
                                             onCreateStrategy = {
                                                 navigationHistory.navigateTo(Screen.ApiStrategyEditor())
@@ -612,6 +643,9 @@ fun MoneyManagerApp(
                                             currentlyViewedCurrencyId = null
                                         }
                                         CsvStrategiesScreen(
+                                            onBrowseCatalog = {
+                                                navigationHistory.navigateTo(Screen.StrategyCatalog(StrategyKind.CSV))
+                                            },
                                             csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                             csvImportRepository = services.imports.csvImportRepository,
                                             qifImportRepository = services.imports.qifImportRepository,

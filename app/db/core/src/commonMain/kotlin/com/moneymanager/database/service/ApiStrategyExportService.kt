@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport
+import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -19,24 +20,7 @@ class ApiStrategyExportService {
     fun toExport(
         strategy: ApiImportStrategy,
         appVersion: AppVersion,
-    ): ApiStrategyExport =
-        ApiStrategyExport(
-            version = appVersion.value,
-            name = strategy.name,
-            baseUrl = strategy.baseUrl,
-            authType = strategy.authType,
-            accountsEndpoint = strategy.accountsEndpoint,
-            transactionsEndpoint = strategy.transactionsEndpoint,
-            accountMappings = strategy.accountMappings,
-            transactionMappings = strategy.transactionMappings,
-            peopleMappings = strategy.peopleMappings,
-            accountIdentifiersEndpoint = strategy.accountIdentifiersEndpoint,
-            ancestorEndpoints = strategy.ancestorEndpoints,
-            builtInCounterpartyRules = strategy.builtInCounterpartyRules,
-            signing = strategy.signing,
-            peopleDownload = strategy.peopleDownload,
-            personExternalIdAttribute = strategy.personExternalIdAttribute,
-        )
+    ): ApiStrategyExport = ApiStrategyExportMapper.toExport(strategy, appVersion.value)
 
     /**
      * Builds a (not-yet-saved) [ApiImportStrategy] from an export, with a fresh id and timestamps.

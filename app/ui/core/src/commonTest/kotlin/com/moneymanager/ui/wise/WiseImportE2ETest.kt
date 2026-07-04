@@ -80,6 +80,8 @@ private val STATEMENT_JSON =
     """.trimIndent()
 
 class WiseImportE2ETest : DbTest() {
+    override val installBuiltInStrategies: Boolean = true
+
     @Test
     fun `wise profiles balances and statements import into accounts and transactions`() =
         runTest {

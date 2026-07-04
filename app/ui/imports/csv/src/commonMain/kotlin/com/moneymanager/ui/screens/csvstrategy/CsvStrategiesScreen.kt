@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -74,6 +75,7 @@ fun CsvStrategiesScreen(
     csvStrategyImportExport: CsvStrategyImportExport,
     appVersion: AppVersion,
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
+    onBrowseCatalog: () -> Unit = {},
     onBack: () -> Unit = {},
     onEditStrategy: (CsvImportStrategyId, CsvImportId) -> Unit = { _, _ -> },
     onEditQifStrategy: (CsvImportStrategyId, QifImportId) -> Unit = { _, _ -> },
@@ -179,12 +181,20 @@ fun CsvStrategiesScreen(
                         style = MaterialTheme.typography.headlineMedium,
                     )
                 }
-                // Import button
-                IconButton(onClick = { filePicker.launch() }) {
-                    Text(
-                        text = "\u2B73",
-                        style = MaterialTheme.typography.titleLarge,
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(onClick = onBrowseCatalog) {
+                        Text("Browse catalog")
+                    }
+                    // Import button
+                    IconButton(onClick = { filePicker.launch() }) {
+                        Text(
+                            text = "\u2B73",
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                    }
                 }
             }
 
@@ -226,6 +236,10 @@ fun CsvStrategiesScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(onClick = onBrowseCatalog) {
+                            Text("Browse the strategy catalog")
+                        }
                     }
                 }
             } else {

@@ -43,37 +43,11 @@ INSERT INTO relationship_type (id, name) VALUES (2, 'fee');
 INSERT INTO relationship_type (id, name) VALUES (3, 'pass-through');
 INSERT INTO relationship_type (id, name) VALUES (4, 'reversal');
 
--- Built-in "Curve" pass-through (conduit) definition — the only Curve-specific data in the codebase.
--- A wrapper card whose charges are forwarded to an underlying funding card (Crypto.com, Monzo); the
--- underlying statement carries the real merchant behind a "CRV*" marker on the description. The single
--- rule covers both Crypto.com ("Crv*Sainsburys") and Monzo ("CRV*NATIONAL LOTTERY   London   GBR"),
--- including the cancellation rows Crypto.com emits with a prefixed description ("Refund: Crv*Navan",
--- "Refund reversal: Crv*Navan", "Cancellation: Crv*Zipcar Annual Plan") — these are routed back through
--- the conduit in the opposite direction (merchant -> conduit -> card) and the merchant pattern still
--- extracts the bare merchant so refunds hit the same merchant account as the original charge.
--- pass_through_account is in EXCLUDED_FROM_AUDIT (config table, no triggers). FK relationship_type_id ->
--- the type seeded above.
--- Definitions are always active: deleting one (Imports -> Misc -> Pass-through) is how a user turns it
--- off. Detection is iterative, so chained conduits peel in sequence (e.g. "CRV*PAYPAL *THEPIHUT" routes
--- card -> Curve -> PayPal -> merchant, in whichever order the markers appear).
-INSERT INTO pass_through_account (id, name, conduit_account_name, relationship_type_id, rules_json)
-VALUES (
-    1, 'Curve', 'Curve', 3,
-    '[{"detectionPattern":"(?i)^(?:Refund: |Refund reversal: |Cancellation: )?CRV\\*","merchantPattern":"(?i)^(?:Refund: |Refund reversal: |Cancellation: )?CRV\\*\\s*(.+?)(?:\\s{2,}.*)?$","merchantTemplate":"$1"}]'
-);
+-- Pass-through (conduit) definitions are NOT seeded: the built-in Curve/PayPal definitions live in
+-- the strategy-library/ catalog and are installed on demand from the UI.
 
--- Built-in "PayPal" pass-through definition: statement rows carry the real merchant behind a
--- "PAYPAL *" / "Paypal *" marker. Carries the same optional Refund/Cancellation prefix group as Curve
--- so it works as the outermost hop too (the prefix only ever appears at the very start of a raw
--- description; when PayPal is an inner hop of a chain the outer rule has already stripped it).
-INSERT INTO pass_through_account (id, name, conduit_account_name, relationship_type_id, rules_json)
-VALUES (
-    2, 'PayPal', 'PayPal', 3,
-    '[{"detectionPattern":"(?i)^(?:Refund: |Refund reversal: |Cancellation: )?PAYPAL\\s*\\*","merchantPattern":"(?i)^(?:Refund: |Refund reversal: |Cancellation: )?PAYPAL\\s*\\*\\s*(.+?)(?:\\s{2,}.*)?$","merchantTemplate":"$1"}]'
-);
-
--- GBP gets a fixed id (1) here so the build-time-generated QIF strategies can reference it as a
--- constant. The remaining currencies are seeded at runtime from the platform list (Android exposes
+-- GBP gets a fixed id (1) here so catalog QIF strategies referencing "GBP" always resolve on a fresh
+-- database. The remaining currencies are seeded at runtime from the platform list (Android exposes
 -- more ISO 4217 codes than the JVM, so the full set cannot be frozen at build time). currency IS
 -- audited, so this fires the currency insert audit trigger; its SYSTEM provenance (entity_type
 -- CURRENCY=3, source_type SYSTEM=4, device 1) is recorded explicitly.

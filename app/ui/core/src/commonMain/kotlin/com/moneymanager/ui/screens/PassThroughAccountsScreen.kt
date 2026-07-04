@@ -54,6 +54,7 @@ fun PassThroughAccountsScreen(
     passThroughAccountRepository: PassThroughAccountReadRepository,
     importEngine: ImportEngine,
     appVersion: AppVersion,
+    onBrowseCatalog: () -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val accounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
@@ -109,6 +110,7 @@ fun PassThroughAccountsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
+            TextButton(onClick = onBrowseCatalog) { Text("Browse catalog") }
             TextButton(onClick = { filePicker.launch() }) { Text("Import") }
             Button(onClick = {
                 editing = null

@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.qifimporter.bulkApplyQif
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
+import com.moneymanager.test.database.installBuiltInCsvStrategies
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -23,7 +24,7 @@ import kotlin.time.Duration
 
 /**
  * End-to-end regression guard for the Santander QIF import. Drives the full pipeline (auto-detect the
- * seeded Santander strategy, parse Payee sub-components, pre-create counterparty accounts, run the
+ * installed Santander strategy, parse Payee sub-components, pre-create counterparty accounts, run the
  * import engine) and asserts the account explosion is gone: one source account + one account per
  * distinct clean counterparty (not one per transaction), with person-to-person payees additionally
  * modelled as People + ownership links. Re-importing the same file produces only duplicates.
@@ -94,6 +95,14 @@ class SantanderQifE2ETest : DbTest() {
     )
 
     private suspend fun apply(qifImport: QifImport) {
+        // Strategies are no longer seeded; the pipeline auto-detects among the installed ones.
+        if (repositories.csvImportStrategyRepository
+                .getAllStrategies()
+                .first()
+                .isEmpty()
+        ) {
+            repositories.installBuiltInCsvStrategies()
+        }
         val sourceId =
             repositories.accountRepository
                 .getAllAccounts()

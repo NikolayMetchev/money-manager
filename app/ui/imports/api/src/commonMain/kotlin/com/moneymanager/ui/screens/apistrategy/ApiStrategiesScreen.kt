@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ApiStrategiesScreen(
     apiImportStrategyRepository: ApiImportStrategyReadRepository,
+    onBrowseCatalog: () -> Unit = {},
     onBack: () -> Unit = {},
     onCreateStrategy: () -> Unit = {},
     onEditStrategy: (ApiImportStrategyId) -> Unit = {},
@@ -76,17 +77,23 @@ fun ApiStrategiesScreen(
                     text = "API Import Strategies",
                     style = MaterialTheme.typography.headlineSmall,
                 )
-                TextButton(onClick = onCreateStrategy) { Text("+ New") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onBrowseCatalog) { Text("Browse catalog") }
+                    TextButton(onClick = onCreateStrategy) { Text("+ New") }
+                }
             }
 
             if (strategies.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "No API import strategies yet.\nClick '+ New' to create one.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No API import strategies yet.\nInstall one from the catalog or click '+ New'.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        TextButton(onClick = onBrowseCatalog) { Text("Browse the strategy catalog") }
+                    }
                 }
             } else {
                 val lazyListState = rememberLazyListState()

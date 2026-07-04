@@ -75,6 +75,7 @@ fun ImportsScreen(
     onSessionClick: (ApiSession) -> Unit,
     onImportDirectoryAuditClick: (ImportDirectory) -> Unit,
     onTransactionsImported: () -> Unit,
+    onBrowsePassThroughCatalog: () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
@@ -176,6 +177,7 @@ fun ImportsScreen(
                     importEngine = importEngine,
                     maintenance = maintenance,
                     onTransactionsImported = onTransactionsImported,
+                    onBrowsePassThroughCatalog = onBrowsePassThroughCatalog,
                 )
         }
     }
@@ -196,6 +198,7 @@ private fun MiscImportsTab(
     importEngine: ImportEngine,
     maintenance: Maintenance,
     onTransactionsImported: () -> Unit,
+    onBrowsePassThroughCatalog: () -> Unit,
 ) {
     var subTab by remember { mutableStateOf(0) }
     Column(modifier = Modifier.fillMaxSize()) {
@@ -217,6 +220,7 @@ private fun MiscImportsTab(
                     passThroughAccountRepository = passThroughAccountRepository,
                     importEngine = importEngine,
                     appVersion = appVersion,
+                    onBrowseCatalog = onBrowsePassThroughCatalog,
                 )
             else ->
                 AccountMappingsScreen(

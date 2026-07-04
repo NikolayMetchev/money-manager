@@ -48,6 +48,7 @@ app/db/core/src/commonTest/resources/monzo/sample-apis/
 
 # Generated SchemaSpy database docs (regenerated and published by CI)
 webpage/database/
+webpage/strategy-library/
 
 # Generated module dependency graph (regenerated and published by CI)
 webpage/modules-graph.md

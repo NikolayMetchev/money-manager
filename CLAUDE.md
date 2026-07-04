@@ -50,6 +50,7 @@ device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compil
 | `app/importengineapi/` | `ImportEngine` interface + `ImportBatch`/`ImportResult` model + `ImportEngine.*` write helpers (DB-free) |
 | `app/importer/` | `ImportEngineImpl` — the **sole** DB writer (consumes write repositories) |
 | `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Parse/download sources and build an `ImportBatch` (DB-free, enforced) |
+| `app/strategies/` | Built-in strategy/pass-through definitions in Kotlin — rendered to the `webpage/strategy-library` catalog site by `tools/strategy-catalog` on Pages deploys (DB-free, nothing checked in or seeded) |
 | `app/remotestorage/core/` | Generic `RemoteStorageProvider` interface + factory (DB-free, backend-agnostic) |
 | `app/remotestorage/googledrive/` | Google Drive backend — Drive REST v3 over Ktor (JVM + Android) |
 | `app/remotestorage/sync/` | Hydrate/push orchestration (`RemoteDatabaseSyncService`/`RemoteDatabaseController`) |
@@ -184,6 +185,11 @@ different databases can use different Google accounts.
 
 ### Testing
 
+- **`test/` is for test support only**: modules under `test/` hold test fixtures and helpers consumed
+  exclusively by test source sets. Production code (anything compiled into the shipped app, or main
+  sources that production modules depend on) must never live under `test/` — give it its own module
+  under `app/`, `utils/`, or `tools/` instead (e.g. the built-in strategy definitions live in
+  `app/strategies`, not `test/app/strategies`).
 - Tests in `commonTest` run on both JVM and Android
 - Use `runComposeUiTest` for UI tests
 - Android tests require manifest with `ComponentActivity` declaration

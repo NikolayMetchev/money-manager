@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
+import com.moneymanager.strategycatalog.StrategyCatalogController
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 
@@ -15,6 +16,7 @@ interface AppComponent {
     val localSettings: LocalSettings
     val remoteDatabaseController: RemoteDatabaseController
     val strategySyncController: StrategySyncController
+    val strategyCatalogController: StrategyCatalogController
 
     @DependencyGraph.Factory
     interface Factory {

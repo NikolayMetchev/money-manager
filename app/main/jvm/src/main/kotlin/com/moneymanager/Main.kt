@@ -234,6 +234,7 @@ private fun MainWindow(onExit: () -> Unit) {
                 onErrorLog = { message, error -> logger.error(error) { message } },
                 remoteController = remoteController,
                 strategySyncController = component.strategySyncController,
+                strategyCatalogController = component.strategyCatalogController,
                 importFileSourceFactory = importFileSourceFactory,
                 driveFolderBrowser = driveFolderBrowser,
                 onDatabaseReady = { database, _ -> openDatabase[0] = database },

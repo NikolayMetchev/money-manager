@@ -18,6 +18,7 @@ kotlin {
                 api(projects.app.qifimporter)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.strategycatalog)
                 api(projects.app.ui.accounts)
                 api(projects.app.ui.categories)
                 api(projects.app.ui.components)
@@ -84,6 +85,7 @@ kotlin {
                 api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.strategycatalog)
                 api(projects.app.ui.foundation)
                 api(projects.utils.localsettings)
 

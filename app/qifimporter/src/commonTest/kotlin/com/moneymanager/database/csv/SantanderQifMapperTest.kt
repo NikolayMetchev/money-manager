@@ -2,6 +2,7 @@
 
 package com.moneymanager.database.csv
 
+import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
 import com.moneymanager.domain.model.Account
@@ -10,7 +11,6 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.model.csvstrategy.BuiltInCsvStrategies
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.qifCompatible
 import com.moneymanager.qifimporter.selectForQifContent

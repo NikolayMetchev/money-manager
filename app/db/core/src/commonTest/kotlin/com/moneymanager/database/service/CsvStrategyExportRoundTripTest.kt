@@ -2,10 +2,11 @@
 
 package com.moneymanager.database.service
 
+import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.domain.model.AppVersion
-import com.moneymanager.domain.model.csvstrategy.BuiltInCsvStrategies
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.installBuiltInCsvStrategies
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -16,8 +17,8 @@ import kotlin.time.Clock
 /**
  * Verifies that exporting a strategy to JSON and importing it back is lossless.
  *
- * Parameterised over every CSV strategy seeded into a fresh database, so any
- * strategy added to [com.moneymanager.database.BuiltInCsvStrategies.builtInCsvStrategies]
+ * Parameterised over every built-in CSV strategy, so any strategy added to
+ * [com.moneymanager.builtin.BuiltInCsvStrategies.builtInCsvStrategies]
  * is covered automatically. Equality is checked on the export representation,
  * which is id-free, so freshly generated mapping/strategy ids don't interfere.
  */
@@ -35,9 +36,10 @@ class CsvStrategyExportRoundTripTest : DbTest() {
                 )
             val appVersion = AppVersion("1.0.0-test")
 
+            repositories.installBuiltInCsvStrategies()
             val strategies = repositories.csvImportStrategyRepository.getAllStrategies().first()
-            assertTrue(strategies.isNotEmpty(), "Expected built-in CSV strategies to be seeded")
-            // Compare against the authoritative seed list so new strategies are picked up automatically
+            assertTrue(strategies.isNotEmpty(), "Expected built-in CSV strategies to be installed")
+            // Compare against the authoritative built-in list so new strategies are picked up automatically
             assertEquals(
                 BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now()).map { it.name }.toSet(),
                 strategies.map { it.name }.toSet(),

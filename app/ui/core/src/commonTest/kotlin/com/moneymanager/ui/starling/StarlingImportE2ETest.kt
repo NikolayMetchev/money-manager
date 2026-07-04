@@ -213,6 +213,8 @@ private val ACCOUNT_HOLDER_JSON =
     """.trimIndent()
 
 class StarlingImportE2ETest : DbTest() {
+    override val installBuiltInStrategies: Boolean = true
+
     // Pass a per-test list to capture feed request URLs; kept local so tests stay isolated.
     private fun mockEngine(
         feedJson: String = FEED_JSON,

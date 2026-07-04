@@ -35,6 +35,7 @@ import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
+import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.components.DatabaseProgressScreen
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.error.GlobalSchemaErrorState
@@ -92,6 +93,7 @@ fun AppStartupHost(
     onErrorLog: (String, Throwable) -> Unit,
     remoteController: RemoteDatabaseController? = null,
     strategySyncController: StrategySyncController? = null,
+    strategyCatalogController: StrategyCatalogController? = null,
     importFileSourceFactory: ImportFileSourceFactory? = null,
     driveFolderBrowser: DriveFolderBrowser? = null,
     onDatabaseReady: (MoneyManagerDatabaseWrapper?, DbLocation?) -> Unit = { _, _ -> },
@@ -188,6 +190,7 @@ fun AppStartupHost(
                 remoteController = remoteController,
                 database = state.database,
                 strategySyncController = strategySyncController,
+                strategyCatalogController = strategyCatalogController,
                 importFileSourceFactory = importFileSourceFactory,
                 driveFolderBrowser = driveFolderBrowser,
                 onRequestSwitchDatabase = { target ->
