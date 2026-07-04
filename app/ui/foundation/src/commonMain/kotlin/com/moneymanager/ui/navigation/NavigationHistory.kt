@@ -48,8 +48,10 @@ class NavigationHistory(
     fun navigateBack(): Boolean {
         if (!canGoBack) return false
 
-        // Move current screen to forward stack
-        forwardStack.add(backStack.removeLast())
+        // Move current screen to forward stack. removeAt instead of removeLast: on Android
+        // compileSdk >= 35, removeLast() binds to the JDK 21 SequencedCollection method, which
+        // crashes with NoSuchMethodError on devices below API 35.
+        forwardStack.add(backStack.removeAt(backStack.lastIndex))
 
         return true
     }
@@ -61,7 +63,7 @@ class NavigationHistory(
     fun navigateForward(): Boolean {
         if (!canGoForward) return false
 
-        backStack.add(forwardStack.removeLast())
+        backStack.add(forwardStack.removeAt(forwardStack.lastIndex))
 
         return true
     }
