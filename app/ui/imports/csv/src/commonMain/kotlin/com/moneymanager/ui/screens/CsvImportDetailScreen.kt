@@ -42,6 +42,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
@@ -67,6 +68,7 @@ fun CsvImportDetailScreen(
     personRepository: PersonReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
     maintenance: Maintenance,
+    transactionRepository: TransactionReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
     importEngine: ImportEngine,
@@ -454,6 +456,7 @@ fun CsvImportDetailScreen(
             currencyRepository = currencyRepository,
             personRepository = personRepository,
             passThroughAccountRepository = passThroughAccountRepository,
+            transactionRepository = transactionRepository,
             transferRelationshipRepository = transferRelationshipRepository,
             maintenance = maintenance,
             importEngine = importEngine,
@@ -468,6 +471,9 @@ fun CsvImportDetailScreen(
                         if (moved > 0) append(" ($moved transaction(s) moved)")
                         if (result.rewrittenRows.isNotEmpty()) {
                             append(", ${result.rewrittenRows.size} row(s) rerouted through pass-through accounts")
+                        }
+                        if (result.updatedRows.isNotEmpty()) {
+                            append(", ${result.updatedRows.size} transaction(s) updated to new values")
                         }
                         result.importResult?.let { append(", ${it.successCount} row(s) imported") }
                         if (result.deletedEmptyAccounts.isNotEmpty()) {

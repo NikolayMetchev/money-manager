@@ -1,9 +1,13 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
@@ -15,8 +19,10 @@ import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.AccountMergeRequest
+import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportAccountIntent
@@ -27,6 +33,8 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 private val logger = logging()
 
@@ -43,6 +51,9 @@ enum class ReimportSkipReason {
 
     /** Deleting a row's old transfers for a pass-through rewrite failed; the row was left as-is. */
     REWRITE_FAILED,
+
+    /** Updating a row's transfer to its recomputed values failed; the transfer was left as-is. */
+    UPDATE_FAILED,
 }
 
 /** One duplicate-account merge the re-import will perform (or performed). */
@@ -84,14 +95,37 @@ data class ReimportRewrite(
     val merchantName: String,
 )
 
+/**
+ * One already-imported row whose recomputed values under the current strategy differ from its
+ * persisted transfer (e.g. the strategy's amount/currency columns changed): the transfer is updated
+ * in place. Accounts are deliberately NOT part of the update — account changes are the domain of
+ * merges (and pass-through rewrites), so the persisted accounts are re-sent unchanged.
+ */
+data class ReimportValueUpdate(
+    val rowIndex: Long,
+    val transferId: TransferId,
+    /** The row's statement description, for the preview. */
+    val description: String,
+    /** Human-readable "field: old → new" lines, for the preview. */
+    val changes: List<String>,
+    val newTimestamp: Instant,
+    val newDescription: String,
+    val newAmount: Money,
+    /** The persisted transfer's accounts, re-sent unchanged (the engine update requires them). */
+    val sourceAccountId: AccountId,
+    val targetAccountId: AccountId,
+)
+
 /** The read-only preview of what a re-import would do, shown for confirmation before executing. */
 data class ReimportPlan(
     val merges: List<ReimportMerge>,
     val skipped: List<ReimportSkippedAccount>,
     /** Already-imported rows to reroute through a pass-through conduit chain. */
     val rewrites: List<ReimportRewrite> = emptyList(),
+    /** Already-imported rows whose transfer values (amount/currency/date/description) changed. */
+    val valueUpdates: List<ReimportValueUpdate> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = merges.isEmpty() && skipped.isEmpty() && rewrites.isEmpty()
+    val isEmpty: Boolean get() = merges.isEmpty() && skipped.isEmpty() && rewrites.isEmpty() && valueUpdates.isEmpty()
 }
 
 /** The outcome of an executed re-import. */
@@ -104,6 +138,8 @@ data class CsvReimportResult(
     val importResult: CsvImportResult?,
     /** Rows rewritten through a pass-through conduit chain (old transfers deleted + row re-imported). */
     val rewrittenRows: List<ReimportRewrite> = emptyList(),
+    /** Rows whose transfers were updated in place to the recomputed values. */
+    val updatedRows: List<ReimportValueUpdate> = emptyList(),
 )
 
 /** Raw merge detection output: duplicate → single target, plus duplicates with competing targets. */
@@ -161,9 +197,11 @@ fun computeReimportMerges(
 
 /**
  * Builds the read-only [ReimportPlan] for [csvImport] under [strategy]: which import-created accounts
- * the current mappings consolidate away (as merges), which detected duplicates cannot be merged, and
+ * the current mappings consolidate away (as merges), which detected duplicates cannot be merged,
  * which already-imported rows the current pass-through configuration reroutes through a conduit chain
- * (as rewrites). Safe to call from the UI to preview a re-import before [executeCsvReimport].
+ * (as rewrites), and which already-imported rows now map to different transfer values — a changed
+ * amount/currency/date/description column — and will be updated in place (as value updates).
+ * Safe to call from the UI to preview a re-import before [executeCsvReimport].
  */
 @Suppress("LongParameterList")
 suspend fun planCsvReimport(
@@ -174,6 +212,7 @@ suspend fun planCsvReimport(
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     csvImportRepository: CsvImportReadRepository,
+    transactionRepository: TransactionReadRepository,
     relationshipRepository: TransferRelationshipReadRepository,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
 ): ReimportPlan {
@@ -200,7 +239,17 @@ suspend fun planCsvReimport(
 
     val mappedPrep = prep(mappings)
     val candidates = computeReimportMerges(prep(emptyList()), mappedPrep, importCreated)
-    val rewrites = computeReimportRewrites(allRows, mappedPrep, relationshipRepository)
+    val rewrites =
+        computeReimportRewrites(allRows, mappedPrep, relationshipRepository) { transferId ->
+            transactionRepository.getTransactionById(transferId.id).first()
+        }
+    val valueUpdates =
+        computeReimportValueUpdates(
+            allRows = allRows,
+            mappedPrep = mappedPrep,
+            rewrittenRowIndexes = rewrites.map { it.rowIndex }.toSet(),
+            transactionRepository = transactionRepository,
+        )
 
     val accountsById = accounts.associateBy { it.id }
 
@@ -239,36 +288,103 @@ suspend fun planCsvReimport(
                 transferCount = accountRepository.countTransfersByAccount(duplicate),
             )
     }
-    return ReimportPlan(merges = merges, skipped = skipped, rewrites = rewrites)
+    return ReimportPlan(merges = merges, skipped = skipped, rewrites = rewrites, valueUpdates = valueUpdates)
 }
 
 /**
+ * Finds already-imported rows whose recomputed transfer values differ from the persisted transfer —
+ * the strategy's amount/currency/date/description mappings changed since the row was imported. Only
+ * value fields are compared; account differences are the domain of merges (and a persisted transfer
+ * whose account was mapped away is matched pre-merge, so comparing accounts here would misfire).
+ * Pass-through rows are excluded — value changes there invalidate every leg of the chain, so they
+ * are handled by the rewrite path instead (see [computeReimportRewrites]).
+ */
+internal suspend fun computeReimportValueUpdates(
+    allRows: List<CsvRow>,
+    mappedPrep: ImportPreparation,
+    rewrittenRowIndexes: Set<Long>,
+    transactionRepository: TransactionReadRepository,
+): List<ReimportValueUpdate> {
+    val rowsByIndex = allRows.associateBy { it.rowIndex }
+    return mappedPrep.validTransfers.mapNotNull { mapped ->
+        if (mapped.passThrough != null || mapped.rowIndex in rewrittenRowIndexes) return@mapNotNull null
+        val row = rowsByIndex[mapped.rowIndex] ?: return@mapNotNull null
+        if (row.importStatus != ImportStatus.IMPORTED && row.importStatus != ImportStatus.UPDATED) return@mapNotNull null
+        val transferId = row.transferId ?: return@mapNotNull null
+        val existing = transactionRepository.getTransactionById(transferId.id).first() ?: return@mapNotNull null
+        val changes =
+            buildList {
+                if (mapped.transfer.amount != existing.amount) {
+                    add("amount ${existing.amount.display()} → ${mapped.transfer.amount.display()}")
+                }
+                if (mapped.transfer.timestamp != existing.timestamp) {
+                    add("date ${existing.timestamp} → ${mapped.transfer.timestamp}")
+                }
+                if (mapped.transfer.description != existing.description) {
+                    add("description '${existing.description}' → '${mapped.transfer.description}'")
+                }
+            }
+        if (changes.isEmpty()) return@mapNotNull null
+        ReimportValueUpdate(
+            rowIndex = mapped.rowIndex,
+            transferId = transferId,
+            description = mapped.transfer.description,
+            changes = changes,
+            newTimestamp = mapped.transfer.timestamp,
+            newDescription = mapped.transfer.description,
+            newAmount = mapped.transfer.amount,
+            sourceAccountId = existing.sourceAccountId,
+            targetAccountId = existing.targetAccountId,
+        )
+    }
+}
+
+private fun Money.display(): String = "${toDisplayValue()} ${currency.code}"
+
+/**
  * Finds already-imported rows whose current preparation routes them through a pass-through conduit
- * chain their existing transfer does not reflect (imported before the definitions existed, or with a
- * shorter chain). Compares the number of pass-through legs hanging off the row's transfer with the
- * chain length the current configuration produces. Only IMPORTED rows are considered — a DUPLICATE
- * row's transfer belongs to another row and must not be deleted.
+ * chain their existing transfer does not reflect: imported before the definitions existed, with a
+ * shorter chain (compared via the number of pass-through legs hanging off the row's transfer), or —
+ * when the chain itself still matches — with transfer values (amount/currency/date/description) the
+ * current strategy now computes differently, which invalidates every leg of the chain. Only IMPORTED
+ * rows are considered — a DUPLICATE row's transfer belongs to another row and must not be deleted.
+ * [existingTransferLookup] loads a row's persisted funding transfer for the value comparison; a null
+ * result skips that comparison.
  */
 internal suspend fun computeReimportRewrites(
     allRows: List<CsvRow>,
     mappedPrep: ImportPreparation,
     relationshipRepository: TransferRelationshipReadRepository,
+    existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): List<ReimportRewrite> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
-    return mappedPrep.validTransfers.mapNotNull { mapped -> rewriteFor(mapped, rowsByIndex, relationshipRepository) }
+    return mappedPrep.validTransfers.mapNotNull { mapped ->
+        rewriteFor(mapped, rowsByIndex, relationshipRepository, existingTransferLookup)
+    }
 }
 
 private suspend fun rewriteFor(
     mapped: CsvTransferWithAttributes,
     rowsByIndex: Map<Long, CsvRow>,
     relationshipRepository: TransferRelationshipReadRepository,
+    existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): ReimportRewrite? {
     val passThrough = mapped.passThrough ?: return null
     val row = rowsByIndex[mapped.rowIndex] ?: return null
     if (row.importStatus != ImportStatus.IMPORTED) return null
     val transferId = row.transferId ?: return null
     val linked = collectLinkedLegs(transferId, relationshipRepository)
-    if (linked.passThroughLegCount == passThrough.conduitNames.size) return null
+    val chainChanged = linked.passThroughLegCount != passThrough.conduitNames.size
+    // A value change (e.g. the strategy's amount/currency columns moved) must propagate to every
+    // spend leg of the chain, so the row is rewritten rather than updated in place.
+    val valuesChanged =
+        !chainChanged &&
+            existingTransferLookup(transferId)?.let { existing ->
+                existing.amount != mapped.transfer.amount ||
+                    existing.timestamp != mapped.transfer.timestamp ||
+                    existing.description != mapped.transfer.description
+            } == true
+    if (!chainChanged && !valuesChanged) return null
     return ReimportRewrite(
         rowIndex = row.rowIndex,
         transferIdsToDelete = linked.transferIds,
@@ -323,15 +439,18 @@ private suspend fun collectLinkedLegs(
 
 /**
  * Executes a re-import of [csvImport] under [strategy] following a confirmed [plan]:
- * 1. merges each planned duplicate into its target (reversible via the account-merge history) —
+ * 1. updates each planned value-changed row's transfer in place (amount/currency/date/description) —
+ *    BEFORE the merges, while the persisted account ids the updates re-send still exist (a merge
+ *    deletes the duplicate account and moves its transfers, updated ones included);
+ * 2. merges each planned duplicate into its target (reversible via the account-merge history) —
  *    merging BEFORE re-running rows is required, otherwise dedupe would look for existing transfers
  *    on the newly-mapped accounts, miss the ones still sitting on the duplicates, and import them twice;
- * 2. rewrites each planned pass-through row: deletes its old transfer(s) and resets the row's status —
+ * 3. rewrites each planned pass-through row: deletes its old transfer(s) and resets the row's status —
  *    deleting BEFORE re-running rows for the same reason (dedupe must not match the stale transfer);
- * 3. re-runs the strategy over rows never imported, errored, or just reset, which now resolve via the
+ * 4. re-runs the strategy over rows never imported, errored, or just reset, which now resolve via the
  *    new mappings and route through the current pass-through chains;
- * 4. deletes import-created accounts left with no transfers (e.g. the raw "CRV*…" merchants);
- * 5. refreshes materialized views.
+ * 5. deletes import-created accounts left with no transfers (e.g. the raw "CRV*…" merchants);
+ * 6. refreshes materialized views.
  */
 @Suppress("LongParameterList")
 suspend fun executeCsvReimport(
@@ -349,6 +468,8 @@ suspend fun executeCsvReimport(
 ): CsvReimportResult {
     val merged = mutableListOf<ReimportMerge>()
     val skipped = plan.skipped.toMutableList()
+
+    val updatedRows = applyValueUpdates(plan.valueUpdates, csvImport, importEngine, skipped)
 
     // One batch per merge so a surprise failure (races past the read-only pre-checks) downgrades to a
     // per-account skip instead of aborting the remaining merges.
@@ -429,7 +550,73 @@ suspend fun executeCsvReimport(
         deletedEmptyAccounts = deletedEmptyAccounts,
         importResult = importResult,
         rewrittenRows = rewritten,
+        updatedRows = updatedRows,
     )
+}
+
+/**
+ * Applies the planned in-place transfer updates: one atomic batch (updates + row-status writeback to
+ * UPDATED) with a per-row fallback so one bad row downgrades to a skip instead of blocking the rest.
+ * Returns the updates that were applied; failures are appended to [skipped].
+ */
+private suspend fun applyValueUpdates(
+    valueUpdates: List<ReimportValueUpdate>,
+    csvImport: CsvImport,
+    importEngine: ImportEngine,
+    skipped: MutableList<ReimportSkippedAccount>,
+): List<ReimportValueUpdate> {
+    if (valueUpdates.isEmpty()) return emptyList()
+
+    fun batchFor(updates: List<ReimportValueUpdate>) =
+        ImportBatch(
+            transfers =
+                updates.map { update ->
+                    ImportTransfer(
+                        source = Source.Csv(csvImport.id, update.rowIndex),
+                        operation = ImportOperation.UPDATE,
+                        existingId = update.transferId,
+                        fromAccount = AccountRef.Existing(update.sourceAccountId),
+                        toAccount = AccountRef.Existing(update.targetAccountId),
+                        timestamp = update.newTimestamp,
+                        description = update.newDescription,
+                        amount = update.newAmount,
+                    )
+                },
+            dedupePolicy = DedupePolicy.None,
+            csvImportMutations =
+                listOf(
+                    CsvImportMutation.UpdateRowStatuses(
+                        id = csvImport.id,
+                        status = ImportStatus.UPDATED.name,
+                        rowTransferMap = updates.associate { it.rowIndex to it.transferId },
+                    ),
+                ),
+        )
+
+    try {
+        importEngine.import(batchFor(valueUpdates))
+        return valueUpdates
+    } catch (expected: Exception) {
+        logger.warn(expected) { "Bulk re-import value update failed, falling back to per-row updates" }
+    }
+
+    val updated = mutableListOf<ReimportValueUpdate>()
+    for (update in valueUpdates) {
+        try {
+            importEngine.import(batchFor(listOf(update)))
+            updated += update
+        } catch (expected: Exception) {
+            logger.warn(expected) { "Re-import value update of row ${update.rowIndex} ('${update.description}') failed" }
+            skipped +=
+                ReimportSkippedAccount(
+                    accountId = null,
+                    accountName = update.description,
+                    reason = ReimportSkipReason.UPDATE_FAILED,
+                    detail = expected.message ?: "Update failed",
+                )
+        }
+    }
+    return updated
 }
 
 /**

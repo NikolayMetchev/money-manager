@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -90,15 +91,15 @@ class CsvReimportE2ETest {
                 Account(id = AccountId(0), name = "Amazon", openingDate = Clock.System.now()),
             )
 
-        val headers = listOf("Date", "Description", "Amount", "Payee")
+        val headers = listOf("Date", "Description", "Amount", "Payee", "Local Amount")
         val csvImportId =
             dc.csvImportRepository.createImport(
                 fileName = "reimport_test.csv",
                 headers = headers,
                 rows =
                     listOf(
-                        listOf("15/12/2024", "Order 1", "-50.00", DUPLICATE_NAME),
-                        listOf("16/12/2024", "Order 2", "-25.00", DUPLICATE_NAME),
+                        listOf("15/12/2024", "Order 1", "-50.00", DUPLICATE_NAME, "-40.00"),
+                        listOf("16/12/2024", "Order 2", "-25.00", DUPLICATE_NAME, "-20.00"),
                     ),
                 fileChecksum = "reimport_test_checksum",
                 fileLastModified = Instant.fromEpochMilliseconds(1_700_000_000_000L),
@@ -175,6 +176,7 @@ class CsvReimportE2ETest {
                     accountMappingRepository = dc.accountMappingRepository,
                     accountRepository = dc.accountRepository,
                     csvImportRepository = dc.csvImportRepository,
+                    transactionRepository = dc.transactionRepository,
                     relationshipRepository = dc.transferRelationshipRepository,
                 )
             assertEquals(1, plan.merges.size)
@@ -253,6 +255,7 @@ class CsvReimportE2ETest {
                     accountMappingRepository = dc.accountMappingRepository,
                     accountRepository = dc.accountRepository,
                     csvImportRepository = dc.csvImportRepository,
+                    transactionRepository = dc.transactionRepository,
                     relationshipRepository = dc.transferRelationshipRepository,
                 )
             assertTrue(plan.merges.isEmpty())
@@ -278,6 +281,107 @@ class CsvReimportE2ETest {
             // The duplicate keeps its transactions and must not be deleted.
             assertEquals(duplicateId, fixture.duplicateAccountId())
             assertEquals(3L, dc.accountRepository.countTransfersByAccount(duplicateId))
+        }
+
+    @Test
+    fun `re-import updates transfers in place when amount and currency mappings changed`() =
+        runBlocking {
+            val fixture = setUpImportedCsv()
+            val dc = fixture.dc
+
+            val rowsBefore = dc.csvImportRepository.getImportRows(fixture.csvImport.id, limit = 1000, offset = 0)
+            val transferIdsBefore = rowsBefore.mapNotNull { it.transferId }
+            assertEquals(2, transferIdsBefore.size)
+
+            // The user edits the strategy to read the amount from a different column in a different currency.
+            val currencies = dc.currencyRepository.getAllCurrencies().first()
+            val usd = currencies.first { it.code == "USD" }
+            val changedStrategy =
+                fixture.strategy.copy(
+                    fieldMappings =
+                        fixture.strategy.fieldMappings +
+                            mapOf(
+                                TransferField.AMOUNT to
+                                    AmountParsingMapping(
+                                        id = FieldMappingId(Uuid.random()),
+                                        fieldType = TransferField.AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "Local Amount",
+                                    ),
+                                TransferField.CURRENCY to
+                                    HardCodedCurrencyMapping(
+                                        id = FieldMappingId(Uuid.random()),
+                                        fieldType = TransferField.CURRENCY,
+                                        currencyId = usd.id,
+                                    ),
+                            ),
+                )
+
+            val plan =
+                planCsvReimport(
+                    csvImport = fixture.csvImport,
+                    strategy = changedStrategy,
+                    sourceAccountOverride = fixture.sourceAccountId,
+                    currencies = currencies,
+                    accountMappingRepository = dc.accountMappingRepository,
+                    accountRepository = dc.accountRepository,
+                    csvImportRepository = dc.csvImportRepository,
+                    transactionRepository = dc.transactionRepository,
+                    relationshipRepository = dc.transferRelationshipRepository,
+                )
+            assertTrue(plan.merges.isEmpty())
+            assertTrue(plan.skipped.isEmpty())
+            assertEquals(2, plan.valueUpdates.size)
+            assertTrue(plan.valueUpdates.all { it.changes.isNotEmpty() })
+
+            val result =
+                executeCsvReimport(
+                    plan = plan,
+                    csvImport = fixture.csvImport,
+                    strategy = changedStrategy,
+                    sourceAccountOverride = fixture.sourceAccountId,
+                    currencies = currencies,
+                    accountMappingRepository = dc.accountMappingRepository,
+                    accountRepository = dc.accountRepository,
+                    csvImportRepository = dc.csvImportRepository,
+                    maintenance = DbMaintenance(dc.maintenanceService),
+                    importEngine = fixture.importEngine,
+                )
+            assertEquals(2, result.updatedRows.size)
+            assertTrue(result.skipped.isEmpty())
+            // All rows were already imported, so nothing was re-imported (no duplicates created).
+            assertNull(result.importResult)
+
+            // The same transfers now carry the new column's values in the new currency.
+            val rowsAfter = dc.csvImportRepository.getImportRows(fixture.csvImport.id, limit = 1000, offset = 0)
+            assertEquals(transferIdsBefore, rowsAfter.mapNotNull { it.transferId })
+            assertTrue(rowsAfter.all { it.importStatus == ImportStatus.UPDATED })
+            val amountsById =
+                transferIdsBefore.associateWith { id ->
+                    dc.transactionRepository
+                        .getTransactionById(id.id)
+                        .first()
+                        ?.amount
+                }
+            assertEquals(
+                setOf(Money(4000, usd), Money(2000, usd)),
+                amountsById.values.filterNotNull().toSet(),
+            )
+
+            // Re-planning right after finds nothing left to update.
+            val secondPlan =
+                planCsvReimport(
+                    csvImport = fixture.csvImport,
+                    strategy = changedStrategy,
+                    sourceAccountOverride = fixture.sourceAccountId,
+                    currencies = currencies,
+                    accountMappingRepository = dc.accountMappingRepository,
+                    accountRepository = dc.accountRepository,
+                    csvImportRepository = dc.csvImportRepository,
+                    transactionRepository = dc.transactionRepository,
+                    relationshipRepository = dc.transferRelationshipRepository,
+                )
+            assertTrue(secondPlan.valueUpdates.isEmpty())
         }
 
     private fun createImportEngine(dc: DatabaseComponent): ImportEngine =

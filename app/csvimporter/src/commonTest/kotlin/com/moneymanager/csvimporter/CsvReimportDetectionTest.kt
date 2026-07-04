@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.RelationshipType
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TransferId
@@ -435,7 +436,7 @@ class CsvReimportDetectionTest {
             val mappedPrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve))
 
             val rewrites =
-                computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(emptyMap()))
+                computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(emptyMap())) { null }
 
             val rewrite = rewrites.single()
             assertEquals(1L, rewrite.rowIndex)
@@ -456,9 +457,39 @@ class CsvReimportDetectionTest {
                     TransferId(100) to listOf(TransferRelationship(TransferId(100), TransferId(101), passThroughType)),
                 )
 
-            val rewrites = computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(relationships))
+            val rewrites = computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(relationships)) { null }
 
             assertTrue(rewrites.isEmpty())
+        }
+
+    @Test
+    fun `pass-through row with matching chain but changed transfer values is rewritten`() =
+        runTest {
+            val accounts = listOf(account(5, "Curve"), account(10, "Amazoncouk 1234"))
+            val rows = listOf(importedRow("Crv*Amazoncouk 1234"))
+            val mappedPrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve))
+            val relationships =
+                mapOf(
+                    TransferId(100) to listOf(TransferRelationship(TransferId(100), TransferId(101), passThroughType)),
+                )
+            val recomputed = mappedPrep.validTransfers.single().transfer
+
+            // Persisted funding leg identical to the recomputed row → nothing to rewrite.
+            val unchanged =
+                computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(relationships)) {
+                    recomputed.copy(id = TransferId(100))
+                }
+            assertTrue(unchanged.isEmpty())
+
+            // Persisted funding leg carries a different amount (e.g. the strategy's amount/currency
+            // columns changed) → the whole chain is rewritten, old legs deleted.
+            val staleExisting = recomputed.copy(id = TransferId(100), amount = Money(9999, currency))
+            val rewrites =
+                computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(relationships)) { staleExisting }
+
+            val rewrite = rewrites.single()
+            assertEquals(listOf(TransferId(100), TransferId(101)), rewrite.transferIdsToDelete)
+            assertEquals(listOf("Curve"), rewrite.conduitNames)
         }
 
     @Test
@@ -486,7 +517,7 @@ class CsvReimportDetectionTest {
                     TransferId(100) to listOf(TransferRelationship(TransferId(100), TransferId(101), passThroughType)),
                 )
 
-            val rewrites = computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(relationships))
+            val rewrites = computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(relationships)) { null }
 
             val rewrite = rewrites.single()
             assertEquals(listOf("Curve", "PayPal"), rewrite.conduitNames)
@@ -512,7 +543,7 @@ class CsvReimportDetectionTest {
                 )
             val mappedPrep = prep(rows, accounts, emptyList(), passThroughAccounts = listOf(curve))
 
-            val rewrites = computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(emptyMap()))
+            val rewrites = computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(emptyMap())) { null }
 
             assertTrue(rewrites.isEmpty())
         }
