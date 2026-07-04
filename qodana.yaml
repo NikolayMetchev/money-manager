@@ -266,11 +266,12 @@ exclude:
     paths:
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/ImportDirectoryScanner.kt
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/QifStagingConversion.kt
-  # Per-platform capability stubs intentionally return a constant: JVM supports every provider, and
-  # Android can't browse Drive yet (returns null so the UI hides it). Not a simplifiable code smell.
+  # Per-platform capability methods intentionally return a constant: both platforms now support every
+  # import-directory provider, so supportsProvider() is always true. Not a simplifiable code smell.
   - name: SameReturnValue
     paths:
       - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource/CreateImportFileSourceFactory.jvm.kt
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource/CreateImportFileSourceFactory.android.kt
       - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource/CreateDriveFolderBrowser.android.kt
   - name: unused
     paths:
