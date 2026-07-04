@@ -22,7 +22,7 @@ private fun googleDriveDefaultConfig(): String? =
         null
     }
 
-@Suppress("ktlint:standard:function-naming", "UnusedParameter")
+@Suppress("ktlint:standard:function-naming")
 actual fun createImportFileSourceFactory(
     params: AppComponentParams,
     localSettings: LocalSettings,

@@ -17,7 +17,7 @@ private fun googleDriveDefaultConfig(): String? =
         null
     }
 
-@Suppress("ktlint:standard:function-naming", "UnusedParameter")
+@Suppress("ktlint:standard:function-naming")
 actual fun createDriveFolderBrowser(
     params: AppComponentParams,
     localSettings: LocalSettings,

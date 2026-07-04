@@ -42,7 +42,14 @@ private fun pickedFolderFromTreeUri(
     context: Context,
     treeUri: Uri,
 ): PickedFolder {
-    context.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    // Persist the grant so the import scanner can re-open the folder after process death. A provider
+    // that doesn't offer persistable grants throws SecurityException; don't crash the picker over it —
+    // the transient activity-result grant still covers this session, and a later scan surfaces the
+    // revoked-access error with a re-pick hint.
+    try {
+        context.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    } catch (_: SecurityException) {
+    }
     val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
     val documentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeDocId)
     val displayName = queryDisplayName(context, documentUri) ?: displayNameFromDocumentId(treeDocId)
