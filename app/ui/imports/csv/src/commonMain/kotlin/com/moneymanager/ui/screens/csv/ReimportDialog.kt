@@ -42,6 +42,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
@@ -55,11 +56,14 @@ import org.lighthousegames.logging.logging
 
 private val logger = logging()
 
+private const val VALUE_UPDATE_PREVIEW_LIMIT = 20
+
 /**
- * Re-imports an already-imported CSV so newly added account mappings take effect retroactively:
- * shows a read-only preview of the duplicate-account merges the current mappings imply, then (on
- * confirm) merges them, re-runs the strategy over never-imported/errored rows, and deletes
- * import-created accounts left empty.
+ * Re-imports an already-imported CSV so strategy/mapping changes take effect retroactively: shows a
+ * read-only preview of the duplicate-account merges the current mappings imply and the transactions
+ * whose values the current strategy now computes differently, then (on confirm) merges/updates them,
+ * re-runs the strategy over never-imported/errored rows, and deletes import-created accounts left
+ * empty.
  */
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 @Composable
@@ -74,6 +78,7 @@ fun ReimportDialog(
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
+    transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -128,6 +133,7 @@ fun ReimportDialog(
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
                     csvImportRepository = csvImportRepository,
+                    transactionRepository = transactionRepository,
                     relationshipRepository = transferRelationshipRepository,
                     passThroughAccounts = passThroughAccounts,
                 )
@@ -276,6 +282,36 @@ private fun ReimportPlanPreview(
         } else {
             Text(
                 text = "No duplicate accounts to merge under the current account mappings.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (plan.valueUpdates.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Transactions to update to the strategy's current values (${plan.valueUpdates.size}):",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            plan.valueUpdates.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { update ->
+                Text(
+                    text = "• ${update.description}: ${update.changes.joinToString("; ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (plan.valueUpdates.size > VALUE_UPDATE_PREVIEW_LIMIT) {
+                Text(
+                    text = "…and ${plan.valueUpdates.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text =
+                    "Each transaction is updated in place — including over any manual edits made to " +
+                        "its amount, date or description.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
