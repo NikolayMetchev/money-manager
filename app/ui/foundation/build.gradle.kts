@@ -37,7 +37,6 @@ kotlin {
                 api(libs.androidx.compose.ui)
                 api(libs.androidx.compose.ui.unit)
 
-                implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.compose.material.icons.core)
                 implementation(libs.androidx.compose.material3)
                 implementation(libs.androidx.compose.runtime.annotation)
