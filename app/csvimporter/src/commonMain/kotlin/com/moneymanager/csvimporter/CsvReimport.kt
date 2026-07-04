@@ -29,6 +29,7 @@ import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import kotlinx.coroutines.flow.first
@@ -37,6 +38,15 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 private val logger = logging()
+
+/** How often the per-row plan-phase scans report progress. */
+private const val PLAN_PROGRESS_EVERY_ROWS = 25
+
+/** Engine write-chunk size for the re-run of remaining rows, so it reports per-chunk progress. */
+private const val REIMPORT_ENGINE_BATCH_SIZE = 250
+
+/** Default number of in-place transfer updates applied per engine batch. */
+internal const val REIMPORT_VALUE_UPDATE_CHUNK = 100
 
 /** Why a duplicate account detected during re-import was not merged. */
 enum class ReimportSkipReason {
@@ -202,6 +212,7 @@ fun computeReimportMerges(
  * (as rewrites), and which already-imported rows now map to different transfer values — a changed
  * amount/currency/date/description column — and will be updated in place (as value updates).
  * Safe to call from the UI to preview a re-import before [executeCsvReimport].
+ * [onProgress] reports the plan phases (with per-row counts for the row scans) for a progress UI.
  */
 @Suppress("LongParameterList")
 suspend fun planCsvReimport(
@@ -215,7 +226,9 @@ suspend fun planCsvReimport(
     transactionRepository: TransactionReadRepository,
     relationshipRepository: TransferRelationshipReadRepository,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): ReimportPlan {
+    onProgress?.invoke(ImportProgress("Loading rows"))
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
     if (allRows.isEmpty()) return ReimportPlan(emptyList(), emptyList())
 
@@ -237,10 +250,12 @@ suspend fun planCsvReimport(
             historicalAccountNames,
         ).prepareImport(allRows)
 
+    onProgress?.invoke(ImportProgress("Analyzing rows (pass 1 of 2)"))
     val mappedPrep = prep(mappings)
+    onProgress?.invoke(ImportProgress("Analyzing rows (pass 2 of 2)"))
     val candidates = computeReimportMerges(prep(emptyList()), mappedPrep, importCreated)
     val rewrites =
-        computeReimportRewrites(allRows, mappedPrep, relationshipRepository) { transferId ->
+        computeReimportRewrites(allRows, mappedPrep, relationshipRepository, onProgress) { transferId ->
             transactionRepository.getTransactionById(transferId.id).first()
         }
     val valueUpdates =
@@ -249,6 +264,7 @@ suspend fun planCsvReimport(
             mappedPrep = mappedPrep,
             rewrittenRowIndexes = rewrites.map { it.rowIndex }.toSet(),
             transactionRepository = transactionRepository,
+            onProgress = onProgress,
         )
 
     val accountsById = accounts.associateBy { it.id }
@@ -258,6 +274,7 @@ suspend fun planCsvReimport(
     val merges = mutableListOf<ReimportMerge>()
     val skipped = mutableListOf<ReimportSkippedAccount>()
 
+    onProgress?.invoke(ImportProgress("Checking duplicate accounts"))
     for ((duplicate, targets) in candidates.conflicts) {
         skipped +=
             ReimportSkippedAccount(
@@ -304,42 +321,70 @@ internal suspend fun computeReimportValueUpdates(
     mappedPrep: ImportPreparation,
     rewrittenRowIndexes: Set<Long>,
     transactionRepository: TransactionReadRepository,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): List<ReimportValueUpdate> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
-    return mappedPrep.validTransfers.mapNotNull { mapped ->
-        if (mapped.passThrough != null || mapped.rowIndex in rewrittenRowIndexes) return@mapNotNull null
-        val row = rowsByIndex[mapped.rowIndex] ?: return@mapNotNull null
-        if (row.importStatus != ImportStatus.IMPORTED && row.importStatus != ImportStatus.UPDATED) return@mapNotNull null
-        val transferId = row.transferId ?: return@mapNotNull null
-        val existing = transactionRepository.getTransactionById(transferId.id).first() ?: return@mapNotNull null
-        val changes =
-            buildList {
-                if (mapped.transfer.amount != existing.amount) {
-                    add("amount ${existing.amount.display()} → ${mapped.transfer.amount.display()}")
-                }
-                if (mapped.transfer.timestamp != existing.timestamp) {
-                    add("date ${existing.timestamp} → ${mapped.transfer.timestamp}")
-                }
-                if (mapped.transfer.description != existing.description) {
-                    add("description '${existing.description}' → '${mapped.transfer.description}'")
-                }
-            }
-        if (changes.isEmpty()) return@mapNotNull null
-        ReimportValueUpdate(
-            rowIndex = mapped.rowIndex,
-            transferId = transferId,
-            description = mapped.transfer.description,
-            changes = changes,
-            newTimestamp = mapped.transfer.timestamp,
-            newDescription = mapped.transfer.description,
-            newAmount = mapped.transfer.amount,
-            sourceAccountId = existing.sourceAccountId,
-            targetAccountId = existing.targetAccountId,
-        )
+    val updates = mutableListOf<ReimportValueUpdate>()
+    val total = mappedPrep.validTransfers.size
+    mappedPrep.validTransfers.forEachIndexed { index, mapped ->
+        emitRowProgress(onProgress, "Checking rows for value changes", index, total)
+        valueUpdateFor(mapped, rowsByIndex, rewrittenRowIndexes, transactionRepository)?.let { updates += it }
     }
+    return updates
+}
+
+private suspend fun valueUpdateFor(
+    mapped: CsvTransferWithAttributes,
+    rowsByIndex: Map<Long, CsvRow>,
+    rewrittenRowIndexes: Set<Long>,
+    transactionRepository: TransactionReadRepository,
+): ReimportValueUpdate? {
+    if (mapped.passThrough != null || mapped.rowIndex in rewrittenRowIndexes) return null
+    val row = rowsByIndex[mapped.rowIndex] ?: return null
+    if (row.importStatus != ImportStatus.IMPORTED && row.importStatus != ImportStatus.UPDATED) return null
+    val transferId = row.transferId ?: return null
+    val existing = transactionRepository.getTransactionById(transferId.id).first() ?: return null
+    val changes =
+        buildList {
+            if (mapped.transfer.amount != existing.amount) {
+                add("amount ${existing.amount.display()} → ${mapped.transfer.amount.display()}")
+            }
+            if (mapped.transfer.timestamp != existing.timestamp) {
+                add("date ${existing.timestamp} → ${mapped.transfer.timestamp}")
+            }
+            if (mapped.transfer.description != existing.description) {
+                add("description '${existing.description}' → '${mapped.transfer.description}'")
+            }
+        }
+    if (changes.isEmpty()) return null
+    return ReimportValueUpdate(
+        rowIndex = mapped.rowIndex,
+        transferId = transferId,
+        description = mapped.transfer.description,
+        changes = changes,
+        newTimestamp = mapped.transfer.timestamp,
+        newDescription = mapped.transfer.description,
+        newAmount = mapped.transfer.amount,
+        sourceAccountId = existing.sourceAccountId,
+        targetAccountId = existing.targetAccountId,
+    )
 }
 
 private fun Money.display(): String = "${toDisplayValue()} ${currency.code}"
+
+/** Emits a throttled per-row [ImportProgress] (every [PLAN_PROGRESS_EVERY_ROWS] rows and at the end). */
+private suspend fun emitRowProgress(
+    onProgress: (suspend (ImportProgress) -> Unit)?,
+    detail: String,
+    index: Int,
+    total: Int,
+) {
+    if (onProgress == null) return
+    val processed = index + 1
+    if (processed % PLAN_PROGRESS_EVERY_ROWS == 0 || processed == total) {
+        onProgress(ImportProgress(detail, fraction = processed.toFloat() / total, processed = processed, total = total))
+    }
+}
 
 /**
  * Finds already-imported rows whose current preparation routes them through a pass-through conduit
@@ -355,12 +400,17 @@ internal suspend fun computeReimportRewrites(
     allRows: List<CsvRow>,
     mappedPrep: ImportPreparation,
     relationshipRepository: TransferRelationshipReadRepository,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
     existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): List<ReimportRewrite> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
-    return mappedPrep.validTransfers.mapNotNull { mapped ->
-        rewriteFor(mapped, rowsByIndex, relationshipRepository, existingTransferLookup)
+    val rewrites = mutableListOf<ReimportRewrite>()
+    val total = mappedPrep.validTransfers.size
+    mappedPrep.validTransfers.forEachIndexed { index, mapped ->
+        emitRowProgress(onProgress, "Checking pass-through rows", index, total)
+        rewriteFor(mapped, rowsByIndex, relationshipRepository, existingTransferLookup)?.let { rewrites += it }
     }
+    return rewrites
 }
 
 private suspend fun rewriteFor(
@@ -451,6 +501,9 @@ private suspend fun collectLinkedLegs(
  *    new mappings and route through the current pass-through chains;
  * 5. deletes import-created accounts left with no transfers (e.g. the raw "CRV*…" merchants);
  * 6. refreshes materialized views.
+ *
+ * [onProgress] reports each step (with counts where known) for a progress UI. [valueUpdateChunkSize]
+ * is exposed for tests to force multiple update chunks with a small fixture.
  */
 @Suppress("LongParameterList")
 suspend fun executeCsvReimport(
@@ -465,15 +518,25 @@ suspend fun executeCsvReimport(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    valueUpdateChunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
 ): CsvReimportResult {
     val merged = mutableListOf<ReimportMerge>()
     val skipped = plan.skipped.toMutableList()
 
-    val updatedRows = applyValueUpdates(plan.valueUpdates, csvImport, importEngine, skipped)
+    val updatedRows = applyValueUpdates(plan.valueUpdates, csvImport, importEngine, skipped, onProgress, valueUpdateChunkSize)
 
     // One batch per merge so a surprise failure (races past the read-only pre-checks) downgrades to a
     // per-account skip instead of aborting the remaining merges.
-    for (merge in plan.merges) {
+    for ((index, merge) in plan.merges.withIndex()) {
+        onProgress?.invoke(
+            ImportProgress(
+                "Merging accounts",
+                fraction = index.toFloat() / plan.merges.size,
+                processed = index,
+                total = plan.merges.size,
+            ),
+        )
         try {
             importEngine.import(
                 ImportBatch.manualEdits(
@@ -496,7 +559,15 @@ suspend fun executeCsvReimport(
     // One batch per rewrite so a failure downgrades to a per-row skip; the deletes and the row-status
     // reset ride in the same batch, so a row never loses its transfers without being queued for re-run.
     val rewritten = mutableListOf<ReimportRewrite>()
-    for (rewrite in plan.rewrites) {
+    for ((index, rewrite) in plan.rewrites.withIndex()) {
+        onProgress?.invoke(
+            ImportProgress(
+                "Rewriting pass-through rows",
+                fraction = index.toFloat() / plan.rewrites.size,
+                processed = index,
+                total = plan.rewrites.size,
+            ),
+        )
         try {
             importEngine.import(
                 ImportBatch(
@@ -538,10 +609,14 @@ suspend fun executeCsvReimport(
             importEngine = importEngine,
             refreshViews = false,
             passThroughAccounts = passThroughAccounts,
+            onProgress = onProgress,
+            engineBatchSize = REIMPORT_ENGINE_BATCH_SIZE,
         )
 
+    onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))
     val deletedEmptyAccounts = deleteEmptyImportCreatedAccounts(csvImport, accountRepository, csvImportRepository, importEngine)
 
+    onProgress?.invoke(ImportProgress("Refreshing views"))
     maintenance.refreshMaterializedViews()
 
     return CsvReimportResult(
@@ -555,15 +630,21 @@ suspend fun executeCsvReimport(
 }
 
 /**
- * Applies the planned in-place transfer updates: one atomic batch (updates + row-status writeback to
- * UPDATED) with a per-row fallback so one bad row downgrades to a skip instead of blocking the rest.
- * Returns the updates that were applied; failures are appended to [skipped].
+ * Applies the planned in-place transfer updates in chunks of [chunkSize], each an engine batch of
+ * UPDATE intents plus the matching row-status writeback to UPDATED. Chunking exists for progress
+ * reporting and costs nothing in atomicity: the engine's UPDATE phase applies intents one repository
+ * call at a time (it never wraps them in a single transaction), so even a single big batch was never
+ * all-or-nothing. A failing chunk falls back to per-row updates so one bad row downgrades to a skip
+ * instead of blocking the rest. Returns the updates that were applied; failures are appended to
+ * [skipped].
  */
 private suspend fun applyValueUpdates(
     valueUpdates: List<ReimportValueUpdate>,
     csvImport: CsvImport,
     importEngine: ImportEngine,
     skipped: MutableList<ReimportSkippedAccount>,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    chunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
 ): List<ReimportValueUpdate> {
     if (valueUpdates.isEmpty()) return emptyList()
 
@@ -593,28 +674,38 @@ private suspend fun applyValueUpdates(
                 ),
         )
 
-    try {
-        importEngine.import(batchFor(valueUpdates))
-        return valueUpdates
-    } catch (expected: Exception) {
-        logger.warn(expected) { "Bulk re-import value update failed, falling back to per-row updates" }
-    }
-
+    val total = valueUpdates.size
     val updated = mutableListOf<ReimportValueUpdate>()
-    for (update in valueUpdates) {
+    var done = 0
+    onProgress?.invoke(ImportProgress("Updating transactions", fraction = 0f, processed = 0, total = total))
+    for (chunk in valueUpdates.chunked(chunkSize.coerceAtLeast(1))) {
         try {
-            importEngine.import(batchFor(listOf(update)))
-            updated += update
+            importEngine.import(batchFor(chunk))
+            updated += chunk
         } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import value update of row ${update.rowIndex} ('${update.description}') failed" }
-            skipped +=
-                ReimportSkippedAccount(
-                    accountId = null,
-                    accountName = update.description,
-                    reason = ReimportSkipReason.UPDATE_FAILED,
-                    detail = expected.message ?: "Update failed",
-                )
+            logger.warn(expected) { "Re-import value update chunk failed, falling back to per-row updates" }
+            for (update in chunk) {
+                try {
+                    importEngine.import(batchFor(listOf(update)))
+                    updated += update
+                } catch (expectedRowError: Exception) {
+                    logger.warn(expectedRowError) {
+                        "Re-import value update of row ${update.rowIndex} ('${update.description}') failed"
+                    }
+                    skipped +=
+                        ReimportSkippedAccount(
+                            accountId = null,
+                            accountName = update.description,
+                            reason = ReimportSkipReason.UPDATE_FAILED,
+                            detail = expectedRowError.message ?: "Update failed",
+                        )
+                }
+            }
         }
+        done += chunk.size
+        onProgress?.invoke(
+            ImportProgress("Updating transactions", fraction = done.toFloat() / total, processed = done, total = total),
+        )
     }
     return updated
 }

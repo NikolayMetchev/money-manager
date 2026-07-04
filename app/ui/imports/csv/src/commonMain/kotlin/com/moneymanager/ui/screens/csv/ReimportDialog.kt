@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +46,7 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -99,6 +101,8 @@ fun ReimportDialog(
     var plan by remember { mutableStateOf<ReimportPlan?>(null) }
     var isRunning by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var planProgress by remember { mutableStateOf<ImportProgress?>(null) }
+    var executeProgress by remember { mutableStateOf<ImportProgress?>(null) }
 
     // Resolve the strategy that was last applied; fall back to column matching if it was deleted.
     LaunchedEffect(csvImport.id) {
@@ -136,6 +140,7 @@ fun ReimportDialog(
                     transactionRepository = transactionRepository,
                     relationshipRepository = transferRelationshipRepository,
                     passThroughAccounts = passThroughAccounts,
+                    onProgress = { planProgress = it },
                 )
             errorMessage = null
         } catch (expected: CancellationException) {
@@ -144,6 +149,8 @@ fun ReimportDialog(
             logger.error(expected) { "Re-import preview failed: ${expected.message}" }
             errorMessage = "Failed to prepare re-import: ${expected.message}"
             plan = null
+        } finally {
+            planProgress = null
         }
     }
 
@@ -186,8 +193,17 @@ fun ReimportDialog(
                         }
 
                         when (val currentPlan = plan) {
-                            null -> if (errorMessage == null) CircularProgressIndicator()
-                            else -> ReimportPlanPreview(currentPlan, hasUnimportedRows)
+                            null ->
+                                if (errorMessage == null) {
+                                    ReimportProgressIndicator(planProgress ?: ImportProgress("Preparing preview"))
+                                }
+                            else -> {
+                                if (isRunning) {
+                                    ReimportProgressIndicator(executeProgress ?: ImportProgress("Starting re-import"))
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                                ReimportPlanPreview(currentPlan, hasUnimportedRows)
+                            }
                         }
                     }
                 }
@@ -224,6 +240,7 @@ fun ReimportDialog(
                                     maintenance = maintenance,
                                     importEngine = importEngine,
                                     passThroughAccounts = passThroughAccounts,
+                                    onProgress = { executeProgress = it },
                                 )
                             onComplete(result)
                         } catch (expected: CancellationException) {
@@ -232,6 +249,8 @@ fun ReimportDialog(
                             logger.error(expected) { "Re-import failed: ${expected.message}" }
                             errorMessage = "Re-import failed: ${expected.message}"
                             isRunning = false
+                        } finally {
+                            executeProgress = null
                         }
                     }
                 },
@@ -251,6 +270,33 @@ fun ReimportDialog(
             }
         },
     )
+}
+
+/**
+ * Phase label (plus "x of y" when counts are known) over a linear progress bar — determinate when
+ * the phase reports a fraction, indeterminate otherwise.
+ */
+@Composable
+private fun ReimportProgressIndicator(progress: ImportProgress) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        val counts =
+            progress.processed
+                ?.let { processed ->
+                    progress.total?.let { total -> " — $processed of $total" }
+                }.orEmpty()
+        Text(
+            text = "${progress.detail}$counts…",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        val fraction = progress.fraction
+        if (fraction != null) {
+            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+        } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+    }
 }
 
 @Composable

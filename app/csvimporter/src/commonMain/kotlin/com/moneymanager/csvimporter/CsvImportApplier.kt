@@ -32,6 +32,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportPassThrough
+import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.PassThroughDetector
@@ -136,6 +137,7 @@ suspend fun bulkApplyCsv(
  * run result (null when there are no rows left to import). Unlike [bulkApplyCsv] the strategy is given,
  * not auto-matched — used by the import-directory scanner, which pins one strategy per directory.
  * [refreshViews] = false lets a caller batch many files and refresh once at the end.
+ * [onProgress]/[engineBatchSize] are forwarded to the engine so a caller can show per-chunk progress.
  */
 @Suppress("LongParameterList")
 suspend fun applyStagedCsv(
@@ -150,6 +152,8 @@ suspend fun applyStagedCsv(
     importEngine: ImportEngine,
     refreshViews: Boolean,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    engineBatchSize: Int = Int.MAX_VALUE,
 ): CsvImportResult? {
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
     val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
@@ -191,6 +195,8 @@ suspend fun applyStagedCsv(
         importEngine = importEngine,
         refreshViews = refreshViews,
         passThroughAccounts = passThroughAccounts,
+        onProgress = onProgress,
+        engineBatchSize = engineBatchSize,
     )
 }
 
@@ -360,6 +366,8 @@ suspend fun runCsvImport(
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    engineBatchSize: Int = Int.MAX_VALUE,
 ): CsvImportResult {
     logger.info { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
 
@@ -564,7 +572,7 @@ suspend fun runCsvImport(
                 },
         )
 
-    val importResult = importEngine.import(batch)
+    val importResult = importEngine.import(batch, onProgress = onProgress, batchSize = engineBatchSize)
 
     // Write back per-row CSV statuses from the engine outcome.
     val importedStatuses = mutableMapOf<Long, TransferId?>()
