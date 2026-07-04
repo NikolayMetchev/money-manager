@@ -1121,9 +1121,12 @@ class AccountTransactionsScreenTest {
             every { getTransactionsByDateRange(any(), any()) } returns flowOf(emptyList())
             every { getTransactionsByAccountAndDateRange(any(), any(), any()) } returns flowOf(emptyList())
             every { getAccountBalances() } returns flowOf(emptyList())
-            everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any()) } calls
-                { (accountId: AccountId, pageSize: Int, _: PagingInfo?) ->
-                    val allRows = buildAccountRows(transfers, accountId, feeLinks)
+            everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any(), any()) } calls
+                { args ->
+                    val accountId = args.arg<AccountId>(0)
+                    val pageSize = args.arg<Int>(1)
+                    val currencyId = args.arg<CurrencyId?>(3)
+                    val allRows = buildAccountRows(transfers, accountId, feeLinks).filterByCurrency(currencyId)
                     val items = allRows.take(pageSize)
                     PagingResult(
                         items = items,
@@ -1135,11 +1138,15 @@ class AccountTransactionsScreenTest {
                             ),
                     )
                 }
-            everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any()) } returns
+            everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any(), any()) } returns
                 PagingResult(emptyList(), PagingInfo(null, null, false))
-            everySuspend { getPageContainingTransaction(any(), any(), any()) } calls
-                { (accountId: AccountId, transactionId: TransferId, pageSize: Int) ->
-                    val allRows = buildAccountRows(transfers, accountId, feeLinks)
+            everySuspend { getPageContainingTransaction(any(), any(), any(), any()) } calls
+                { args ->
+                    val accountId = args.arg<AccountId>(0)
+                    val transactionId = args.arg<TransferId>(1)
+                    val pageSize = args.arg<Int>(2)
+                    val currencyId = args.arg<CurrencyId?>(3)
+                    val allRows = buildAccountRows(transfers, accountId, feeLinks).filterByCurrency(currencyId)
                     val targetIndex = allRows.indexOfFirst { it.transactionId.id == transactionId.id }
                     val items = allRows.take(pageSize)
                     PageWithTargetIndex(
@@ -1155,6 +1162,10 @@ class AccountTransactionsScreenTest {
                     )
                 }
         }
+
+    /** Mirrors the repository's SQL currency filter so the test double matches production semantics. */
+    private fun List<AccountRow>.filterByCurrency(currencyId: CurrencyId?): List<AccountRow> =
+        if (currencyId == null) this else filter { it.transactionAmount.currency.id == currencyId }
 
     private fun buildAccountRows(
         transfers: List<Transfer>,

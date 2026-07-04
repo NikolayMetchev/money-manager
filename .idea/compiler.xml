@@ -85,6 +85,12 @@
       <module name="money-manager.app.remotestorage.sync" options="-Xlint:all -Werror" />
       <module name="money-manager.app.remotestorage.sync.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.remotestorage.sync.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.strategies" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.strategies.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.strategies.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.strategycatalog" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.strategycatalog.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.strategycatalog.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.accounts" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.accounts.jvmDev" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.accounts.jvmMain" options="-Xlint:all -Werror" />
@@ -148,6 +154,9 @@
       <module name="money-manager.test.app.ui.jvmDev" options="-Xlint:all -Werror" />
       <module name="money-manager.test.app.ui.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.test.app.ui.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.tools.strategy-catalog" options="-Xlint:all -Werror" />
+      <module name="money-manager.tools.strategy-catalog.main" options="-Xlint:all -Werror" />
+      <module name="money-manager.tools.strategy-catalog.test" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.archive" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.archive.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.archive.jvmTest" options="-Xlint:all -Werror" />

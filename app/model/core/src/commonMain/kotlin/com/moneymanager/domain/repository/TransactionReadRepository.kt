@@ -5,6 +5,7 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
@@ -60,10 +61,14 @@ interface TransactionReadRepository {
         reversalTypeId: RelationshipTypeId,
     ): List<Transfer>
 
+    /**
+     * @param currencyId When set, only transactions in this currency are returned (and counted for paging).
+     */
     suspend fun getRunningBalanceByAccountPaginated(
         accountId: AccountId,
         pageSize: Int,
         pagingInfo: PagingInfo?,
+        currencyId: CurrencyId? = null,
     ): PagingResult<AccountRow>
 
     /**
@@ -74,6 +79,7 @@ interface TransactionReadRepository {
      * @param pageSize The number of transactions to load
      * @param firstTimestamp Timestamp of the first item in the current list
      * @param firstId ID of the first item in the current list
+     * @param currencyId When set, only transactions in this currency are returned (and counted for paging)
      * @return A PagingResult containing items to prepend (in correct display order)
      */
     suspend fun getRunningBalanceByAccountPaginatedBackward(
@@ -81,6 +87,7 @@ interface TransactionReadRepository {
         pageSize: Int,
         firstTimestamp: Instant,
         firstId: TransactionId,
+        currencyId: CurrencyId? = null,
     ): PagingResult<AccountRow>
 
     /**
@@ -91,11 +98,13 @@ interface TransactionReadRepository {
      * @param accountId The account to load transactions for
      * @param transactionId The transaction to center the page around
      * @param pageSize The number of transactions to load
+     * @param currencyId When set, positions and pages within only this currency's transactions
      * @return A PagingResult containing the transactions and the index of the target transaction within the page
      */
     suspend fun getPageContainingTransaction(
         accountId: AccountId,
         transactionId: TransferId,
         pageSize: Int,
+        currencyId: CurrencyId? = null,
     ): PageWithTargetIndex<AccountRow>
 }
