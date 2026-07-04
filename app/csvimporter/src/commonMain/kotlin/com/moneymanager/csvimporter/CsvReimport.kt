@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class)
 
 package com.moneymanager.csvimporter
 
@@ -32,6 +32,7 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 private val logger = logging()
