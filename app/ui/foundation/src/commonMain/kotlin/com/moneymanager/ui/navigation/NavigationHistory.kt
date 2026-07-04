@@ -2,25 +2,30 @@ package com.moneymanager.ui.navigation
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.navigation3.runtime.NavKey
 
 /**
  * Manages navigation history with back/forward stack support.
  *
  * [backStack] always contains the current screen as its last element (it is never empty), so it
- * can be handed directly to Navigation 3's `NavDisplay`.
+ * can be handed directly to Navigation 3's `NavDisplay`. Pass a `rememberNavBackStack`-created
+ * stack to make the history survive process death; every element must be a [Screen].
  */
 @Stable
 class NavigationHistory(
-    initialScreen: Screen,
-) {
     /** The navigation back stack; the last element is the current screen. Never empty. */
-    val backStack: SnapshotStateList<Screen> = mutableStateListOf(initialScreen)
+    val backStack: MutableList<NavKey>,
+) {
+    constructor(initialScreen: Screen) : this(mutableStateListOf<NavKey>(initialScreen))
+
+    init {
+        require(backStack.isNotEmpty()) { "backStack must contain the initial screen" }
+    }
 
     private val forwardStack = mutableStateListOf<Screen>()
 
     val currentScreen: Screen
-        get() = backStack.last()
+        get() = backStack.last() as Screen
 
     val canGoBack: Boolean
         get() = backStack.size > 1
@@ -51,7 +56,7 @@ class NavigationHistory(
         // Move current screen to forward stack. removeAt instead of removeLast: on Android
         // compileSdk >= 35, removeLast() binds to the JDK 21 SequencedCollection method, which
         // crashes with NoSuchMethodError on devices below API 35.
-        forwardStack.add(backStack.removeAt(backStack.lastIndex))
+        forwardStack.add(backStack.removeAt(backStack.lastIndex) as Screen)
 
         return true
     }

@@ -2,8 +2,10 @@
 
 package com.moneymanager.domain.model.csvstrategy
 
+import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
+@Serializable
 @JvmInline
 value class CsvImportStrategyId(
     val id: Uuid,

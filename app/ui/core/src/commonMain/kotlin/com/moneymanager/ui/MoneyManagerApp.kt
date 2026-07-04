@@ -2,9 +2,6 @@
 
 package com.moneymanager.ui
 
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.StrategyKind
@@ -65,6 +63,7 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.navigation.NavigationHistory
 import com.moneymanager.ui.navigation.Screen
+import com.moneymanager.ui.navigation.ScreenSavedStateConfiguration
 import com.moneymanager.ui.navigation.mouseButtonNavigation
 import com.moneymanager.ui.screens.AccountAuditScreen
 import com.moneymanager.ui.screens.AccountsScreen
@@ -116,7 +115,8 @@ fun MoneyManagerApp(
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
         val backgroundTaskManager = rememberBackgroundTaskManager(scope)
-        val navigationHistory = remember { NavigationHistory(Screen.Accounts()) }
+        val backStack = rememberNavBackStack(ScreenSavedStateConfiguration, Screen.Accounts())
+        val navigationHistory = remember(backStack) { NavigationHistory(backStack) }
         val currentScreen = navigationHistory.currentScreen
         var showTransactionDialog by remember { mutableStateOf(false) }
         var preSelectedAccountId by remember { mutableStateOf<AccountId?>(null) }
@@ -318,11 +318,6 @@ fun MoneyManagerApp(
                             NavDisplay(
                                 backStack = navigationHistory.backStack,
                                 onBack = { navigationHistory.navigateBack() },
-                                // No-op transitions keep behavior identical to the previous switcher
-                                // and navigation deterministic for UI tests.
-                                transitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
-                                popTransitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
-                                predictivePopTransitionSpec = { _ -> EnterTransition.None togetherWith ExitTransition.None },
                                 entryProvider =
                                     entryProvider {
                                         // Content keys deliberately ignore volatile params (scroll targets, tabs):

@@ -1,14 +1,18 @@
 plugins {
     id("moneymanager.compose-ui-feature-convention")
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                api(libs.androidx.navigation3.runtime)
+                api(libs.androidx.savedstate)
                 api(libs.kotlinx.coroutines.core)
                 api(libs.kotlinx.datetime)
+                api(libs.kotlinx.serialization.core)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.utils.bigdecimal)
@@ -25,6 +29,7 @@ kotlin {
         getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
+                implementation(libs.kotlinx.serialization.json)
                 implementation(projects.test.app.ui)
             }
         }
@@ -49,6 +54,8 @@ kotlin {
             dependsOn(jvmAndroidMain)
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
+                api(libs.androidx.navigation3.runtime.desktop)
+                api(libs.androidx.savedstate.desktop)
                 api(libs.compose.foundation.desktop)
                 api(libs.compose.ui.desktop)
                 api(projects.app.importengineapi)
@@ -70,6 +77,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(compose.desktop.currentOs)
+                implementation(libs.androidx.navigation3.runtime.desktop)
+                implementation(libs.androidx.savedstate.desktop)
                 implementation(libs.compose.ui.test.desktop)
             }
         }
@@ -77,6 +86,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.androidx.compose.ui.test)
+                implementation(libs.kotlinx.serialization.json)
                 implementation(projects.test.app.ui)
             }
         }
