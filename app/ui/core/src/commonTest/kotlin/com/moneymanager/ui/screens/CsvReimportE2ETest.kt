@@ -31,6 +31,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.test.database.createAccount
@@ -317,6 +318,7 @@ class CsvReimportE2ETest {
                             ),
                 )
 
+            val planProgress = mutableListOf<ImportProgress>()
             val plan =
                 planCsvReimport(
                     csvImport = fixture.csvImport,
@@ -328,12 +330,19 @@ class CsvReimportE2ETest {
                     csvImportRepository = dc.csvImportRepository,
                     transactionRepository = dc.transactionRepository,
                     relationshipRepository = dc.transferRelationshipRepository,
+                    onProgress = { planProgress += it },
                 )
             assertTrue(plan.merges.isEmpty())
             assertTrue(plan.skipped.isEmpty())
             assertEquals(2, plan.valueUpdates.size)
             assertTrue(plan.valueUpdates.all { it.changes.isNotEmpty() })
+            // The plan reports its phases, ending the value-change scan at 2 of 2.
+            assertTrue(planProgress.any { it.detail == "Analyzing rows (pass 1 of 2)" })
+            val valueScan = planProgress.filter { it.detail == "Checking rows for value changes" }
+            assertEquals(2, valueScan.last().processed)
+            assertEquals(2, valueScan.last().total)
 
+            val executeProgress = mutableListOf<ImportProgress>()
             val result =
                 executeCsvReimport(
                     plan = plan,
@@ -346,9 +355,17 @@ class CsvReimportE2ETest {
                     csvImportRepository = dc.csvImportRepository,
                     maintenance = DbMaintenance(dc.maintenanceService),
                     importEngine = fixture.importEngine,
+                    onProgress = { executeProgress += it },
+                    // Force one chunk per update so per-chunk progress is exercised with 2 rows.
+                    valueUpdateChunkSize = 1,
                 )
             assertEquals(2, result.updatedRows.size)
             assertTrue(result.skipped.isEmpty())
+            // Chunked updates report 0 → 1 → 2 of 2, and the run ends with the view refresh phase.
+            val updating = executeProgress.filter { it.detail == "Updating transactions" }
+            assertEquals(listOf(0, 1, 2), updating.mapNotNull { it.processed })
+            assertTrue(updating.all { it.total == 2 })
+            assertEquals("Refreshing views", executeProgress.last().detail)
             // All rows were already imported, so nothing was re-imported (no duplicates created).
             assertNull(result.importResult)
 

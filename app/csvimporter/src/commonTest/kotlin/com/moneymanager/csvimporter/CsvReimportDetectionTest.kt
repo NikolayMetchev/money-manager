@@ -31,6 +31,7 @@ import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.PassThroughRule
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
+import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.PassThroughDetector
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -523,6 +524,22 @@ class CsvReimportDetectionTest {
             assertEquals(listOf("Curve", "PayPal"), rewrite.conduitNames)
             // Both the funding transfer and its old spend leg are deleted before the re-run.
             assertEquals(listOf(TransferId(100), TransferId(101)), rewrite.transferIdsToDelete)
+        }
+
+    @Test
+    fun `row scans emit throttled monotonic progress ending at the total`() =
+        runTest {
+            // 30 plain rows (no pass-through): progress still ticks per row scanned.
+            val rows = (1L..30L).map { row(it, "Payee $it") }
+            val mappedPrep = prep(rows, emptyList(), emptyList())
+            val progress = mutableListOf<ImportProgress>()
+
+            computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(emptyMap()), { progress += it }) { null }
+
+            // Emissions every 25 rows plus the final one; monotonic and complete.
+            assertEquals(listOf(25, 30), progress.mapNotNull { it.processed })
+            assertTrue(progress.all { it.total == 30 })
+            assertTrue(progress.all { it.detail == "Checking pass-through rows" })
         }
 
     @Test
