@@ -209,13 +209,17 @@ class TransactionWriteRepositoryImpl(
                                 .toMap()
                         database.beginCreationMode()
                         try {
-                            update.newAttributes.forEach { attr ->
-                                val existing = existingByType[attr.typeId.id]
+                            // Deduplicate by type first: a transfer holds one value per attribute type, and
+                            // [existingByType] is a snapshot, so two incoming attributes of the same type would
+                            // both take the insert path and hit the UNIQUE(transaction_id, attribute_type_id)
+                            // constraint. Last value wins, matching how the attribute would be stored.
+                            update.newAttributes.associateBy { it.typeId.id }.forEach { (typeId, attr) ->
+                                val existing = existingByType[typeId]
                                 when {
                                     existing == null ->
                                         transferAttributeWriteQueries.insert(
                                             transaction_id = updatedTransfer.id.id,
-                                            attribute_type_id = attr.typeId.id,
+                                            attribute_type_id = typeId,
                                             attribute_value = attr.value,
                                         )
                                     existing.second != attr.value ->

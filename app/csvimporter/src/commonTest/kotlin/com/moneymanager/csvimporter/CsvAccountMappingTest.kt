@@ -27,6 +27,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -752,6 +753,28 @@ class CsvAccountMappingTest {
         // The counterparty mapping applies to the target; the source falls back to its fixed "My Card".
         assertEquals(card.id, result.transfer.sourceAccountId)
         assertEquals(vendor.id, result.transfer.targetAccountId)
+    }
+
+    @Test
+    fun `a source re-resolved off a collision is still discovered as a new account`() {
+        // No "My Card" account exists yet: the re-resolved source is genuinely new. It must be discovered
+        // for creation despite the persisted counterparty mapping that hijacked (and still matches) the row.
+        val vendor = Account(id = AccountId(71), name = "Vendor", openingDate = Clock.System.now())
+        val mapper =
+            CsvTransferMapper(
+                strategy = createStrategySharingDescriptionColumn(),
+                columns = columnsWithType,
+                existingAccounts = mapOf("Vendor" to vendor),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                accountMappings = listOf(createAccountMapping(1, "Amazon", vendor.id)),
+            )
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Amazon purchase", "-10.00", "", ""))
+
+        val result = mapper.mapRow(row)
+        assertIs<MappingResult.Success>(result)
+        assertEquals(vendor.id, result.transfer.targetAccountId)
+        assertTrue(result.newAccounts.any { it.name == "My Card" }, "the re-resolved source account must be discovered")
     }
 
     @Test

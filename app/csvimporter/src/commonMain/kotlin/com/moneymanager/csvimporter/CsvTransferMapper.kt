@@ -377,12 +377,14 @@ class CsvTransferMapper(
             // came from the strategy's own SOURCE_ACCOUNT mapping (no UI override) and now collides with the
             // target, re-resolve the source ignoring persisted mappings — its rule/historical name only —
             // which restores the intended own-account (e.g. "Crypto.com Card").
+            var sourceUsedPersistedMappings = true
             if (sourceAccountOverride == null &&
                 sourceAccountId == targetAccountId &&
                 sourceAccountId != AccountId(-1)
             ) {
                 strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
                     sourceAccountId = parseAccount(it, values, applyPersistedMappings = false)
+                    sourceUsedPersistedMappings = false
                 }
             }
 
@@ -500,7 +502,13 @@ class CsvTransferMapper(
             val discoveries =
                 buildList {
                     if (sourceAccountOverride == null) {
-                        strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let { add(discoverNewAccount(it, values)) }
+                        // Discover the source under the same persisted-mapping rule its id was resolved with:
+                        // if the source leg was re-resolved without persisted mappings (collision above), a
+                        // genuinely new source account must still be discovered/created rather than suppressed
+                        // by a persisted mapping — otherwise it would dangle as AccountId(-1).
+                        strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
+                            add(discoverNewAccount(it, values, applyPersistedMappings = sourceUsedPersistedMappings))
+                        }
                     }
                     if (passThroughMatch == null) add(discoverNewAccount(targetMapping, values))
                 }
@@ -791,12 +799,13 @@ class CsvTransferMapper(
     private fun discoverNewAccount(
         mapping: FieldMapping,
         values: List<String>,
+        applyPersistedMappings: Boolean = true,
     ): Pair<NewAccount, DiscoveredAccountMapping>? =
         when (mapping) {
             is AccountLookupMapping -> {
                 val csvValue = getColumnValue(mapping.columnName, values)
                 // If a persisted mapping matched, don't create a new account
-                if (findPersistedMapping(csvValue) != null) {
+                if (applyPersistedMappings && findPersistedMapping(csvValue) != null) {
                     null
                 } else {
                     val name = getAccountName(mapping, values)
@@ -812,7 +821,7 @@ class CsvTransferMapper(
             is RegexAccountMapping -> {
                 val result = getAccountNameFromRegexWithPattern(mapping, values)
                 // If a persisted mapping matched, don't create a new account
-                if (findPersistedMapping(result.sourceColumnValue) != null) {
+                if (applyPersistedMappings && findPersistedMapping(result.sourceColumnValue) != null) {
                     null
                 } else if (result.accountName.isNotBlank() && !accountExists(result.accountName)) {
                     // For RegexAccountMapping, accountName differs from sourceColumnValue
@@ -830,7 +839,7 @@ class CsvTransferMapper(
             is TemplateAccountMapping -> {
                 val csvValue = getColumnValue(mapping.columnName, values).trim()
                 val name = templatedAccountName(mapping, csvValue)
-                if (findPersistedMapping(csvValue) != null ||
+                if ((applyPersistedMappings && findPersistedMapping(csvValue) != null) ||
                     name.isBlank() ||
                     accountExists(name)
                 ) {
@@ -840,7 +849,7 @@ class CsvTransferMapper(
                         DiscoveredAccountMapping(csvValue, name)
                 }
             }
-            is ConditionalAccountMapping -> discoverNewAccount(resolveConditional(mapping, values), values)
+            is ConditionalAccountMapping -> discoverNewAccount(resolveConditional(mapping, values), values, applyPersistedMappings)
             else -> null
         }
 
