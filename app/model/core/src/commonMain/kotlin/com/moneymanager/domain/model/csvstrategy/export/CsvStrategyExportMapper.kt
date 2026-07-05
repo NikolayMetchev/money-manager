@@ -46,6 +46,8 @@ object CsvStrategyExportMapper {
             companionTransactionRules = strategy.companionTransactionRules,
             contentMatchRules = strategy.contentMatchRules,
             accountMappings = accountMappings,
+            fileNamePattern = strategy.fileNamePattern,
+            crossSourceReconcileWindowSeconds = strategy.crossSourceReconcileWindowSeconds,
         )
 
     private fun FieldMapping.toExport(

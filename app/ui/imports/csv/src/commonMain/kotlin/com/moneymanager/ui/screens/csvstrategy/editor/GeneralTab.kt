@@ -53,6 +53,19 @@ internal fun GeneralTab(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+        OutlinedTextField(
+            value = state.fileNamePattern,
+            onValueChange = { state.fileNamePattern = it },
+            label = { Text("File name pattern (regex, optional)") },
+            supportingText = {
+                Text("Matches this strategy by file name when several strategies share the same columns")
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = enabled,
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
         Text("Description Column", style = MaterialTheme.typography.titleSmall)
         ColumnDropdown(
             columns = csvColumns,

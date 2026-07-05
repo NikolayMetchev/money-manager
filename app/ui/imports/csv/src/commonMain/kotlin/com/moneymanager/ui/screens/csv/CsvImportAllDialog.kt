@@ -16,9 +16,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.csvimporter.StrategyMatcher
+import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.needsSourceAccountOverride
+import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -73,9 +74,9 @@ fun CsvImportAllDialog(
     var progress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
-    // Match each file's strategy by its columns, so we can tell how many files will be skipped (no
-    // matching strategy) and whether any matched strategy needs a user-chosen source account.
-    // getAllImports() doesn't populate columns, so load each file's columns before matching.
+    // Match each file's strategy (filename + content aware), so we can tell how many files will be
+    // skipped (no matching strategy) and whether any matched strategy needs a user-chosen source
+    // account. getAllImports() doesn't populate columns, so load each file's columns before matching.
     var matchedStrategies by remember { mutableStateOf<List<CsvImportStrategy?>?>(null) }
     LaunchedEffect(unimported, strategies) {
         if (strategies.isEmpty()) {
@@ -84,9 +85,9 @@ fun CsvImportAllDialog(
         }
         matchedStrategies =
             unimported.map { listedImport ->
-                val fullImport = csvImportRepository.getImport(listedImport.id).first()
-                val columnNames = fullImport?.columns.orEmpty().map { it.originalName }
-                StrategyMatcher.findMatchingStrategy(columnNames, strategies)
+                val fullImport = csvImportRepository.getImport(listedImport.id).first() ?: return@map null
+                val sampleRows = csvImportRepository.getImportRows(listedImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
+                strategies.selectForCsv(fullImport.originalFileName, fullImport.columns, sampleRows)
             }
     }
     val matches = matchedStrategies

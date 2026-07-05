@@ -33,6 +33,15 @@ data class ContentMatchRule(
  *                                     entered companion transaction (see [CompanionTransactionRule])
  * @property contentMatchRules Rules that auto-detect this strategy from row content when the column
  *                             set is fixed and cannot distinguish formats (see [ContentMatchRule]).
+ * @property fileNamePattern Optional regex matched (case-insensitively, anywhere) against the
+ *                           imported file's original name. The strongest selection signal for
+ *                           sources whose exports share a column set but differ by filename
+ *                           (e.g. crypto.com's card_/fiat_/crypto_transactions_record files).
+ * @property crossSourceReconcileWindowSeconds When set, a row that fuzzy-matches an existing
+ *                                             transfer from a different source (same accounts and
+ *                                             amount, timestamps within this window) is imported
+ *                                             but tagged excluded and linked as reconciled instead
+ *                                             of counting twice. Null disables reconciliation.
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
  */
@@ -45,6 +54,8 @@ data class CsvImportStrategy(
     val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
     val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
     val contentMatchRules: List<ContentMatchRule> = emptyList(),
+    val fileNamePattern: String? = null,
+    val crossSourceReconcileWindowSeconds: Long? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

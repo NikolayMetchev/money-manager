@@ -25,6 +25,10 @@ import kotlinx.serialization.Serializable
  * @property companionTransactionRules Companion transaction rules (already portable, no IDs)
  * @property accountMappings This strategy's own per-strategy account mappings (by account name),
  * so they travel with the strategy. Global mappings are exported separately.
+ * @property fileNamePattern Optional regex matched against the imported file's original name
+ * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fileNamePattern])
+ * @property crossSourceReconcileWindowSeconds Cross-source reconciliation window
+ * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.crossSourceReconcileWindowSeconds])
  */
 @Serializable
 data class CsvStrategyExport(
@@ -37,6 +41,8 @@ data class CsvStrategyExport(
     val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
     val contentMatchRules: List<ContentMatchRule> = emptyList(),
     val accountMappings: List<AccountMappingExport> = emptyList(),
+    val fileNamePattern: String? = null,
+    val crossSourceReconcileWindowSeconds: Long? = null,
 )
 
 /**

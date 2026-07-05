@@ -87,6 +87,11 @@ internal class CsvStrategyEditorState(
     var attributeMappings by mutableStateOf(initial?.attributeMappings.orEmpty())
     var rowPreprocessingRules by mutableStateOf(initial?.rowPreprocessingRules.orEmpty())
     var companionTransactionRules by mutableStateOf(initial?.companionTransactionRules.orEmpty())
+    var fileNamePattern by mutableStateOf(initial?.fileNamePattern.orEmpty())
+
+    // Not yet editable in the UI; carried through so saving never drops them.
+    var contentMatchRules by mutableStateOf(initial?.contentMatchRules.orEmpty())
+    var crossSourceReconcileWindowSeconds by mutableStateOf(initial?.crossSourceReconcileWindowSeconds)
 
     // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialTargetAccountColumnName: String? = initial?.targetAccountColumnName
@@ -228,6 +233,9 @@ internal class CsvStrategyEditorState(
             attributeMappings = attributeMappings,
             rowPreprocessingRules = rowPreprocessingRules,
             companionTransactionRules = companionTransactionRules,
+            contentMatchRules = contentMatchRules,
+            fileNamePattern = fileNamePattern.takeIf { it.isNotBlank() },
+            crossSourceReconcileWindowSeconds = crossSourceReconcileWindowSeconds,
         )
 }
 
