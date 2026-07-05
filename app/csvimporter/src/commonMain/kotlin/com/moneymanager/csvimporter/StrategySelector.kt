@@ -8,6 +8,16 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 const val STRATEGY_CONTENT_SAMPLE_SIZE = 50
 
 /**
+ * Ranks a scored strategy `(strategy, contentScore)`: highest score first, ties broken
+ * deterministically by name then id. Shared by the CSV ([selectForCsv]) and QIF
+ * (`selectForQifContent`) selectors so both resolve a tie the same way.
+ */
+val byContentScoreThenNameThenId: Comparator<Pair<CsvImportStrategy, Int>> =
+    compareByDescending<Pair<CsvImportStrategy, Int>> { it.second }
+        .thenBy { it.first.name }
+        .thenBy { it.first.id.toString() }
+
+/**
  * Counts sampled rows with a value matching any of this strategy's
  * [CsvImportStrategy.contentMatchRules] (case-insensitive regex per named column). Shared by the
  * CSV selector below and the QIF selector. A strategy with no content rules scores 0.
@@ -55,16 +65,12 @@ fun List<CsvImportStrategy>.selectForCsv(
 
     val indexByName = columns.associate { it.originalName to it.columnIndex }
     val sample = rows.take(STRATEGY_CONTENT_SAMPLE_SIZE)
-    val byScoreThenNameThenId =
-        compareByDescending<Pair<CsvImportStrategy, Int>> { it.second }
-            .thenBy { it.first.name }
-            .thenBy { it.first.id.toString() }
 
     val fileNameMatches = candidates.filter { it.matchesFileName(fileName) }
     if (fileNameMatches.isNotEmpty()) {
         return fileNameMatches
             .map { it to it.contentScore(sample, indexByName) }
-            .minWithOrNull(byScoreThenNameThenId)
+            .minWithOrNull(byContentScoreThenNameThenId)
             ?.first
     }
 
@@ -73,7 +79,7 @@ fun List<CsvImportStrategy>.selectForCsv(
         candidates
             .map { it to it.contentScore(sample, indexByName) }
             .filter { it.second >= minScore }
-            .minWithOrNull(byScoreThenNameThenId)
+            .minWithOrNull(byContentScoreThenNameThenId)
     if (contentMatch != null) return contentMatch.first
 
     return candidates

@@ -9,6 +9,7 @@ import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.buildAccountsToCreate
 import com.moneymanager.csvimporter.buildFirstRowByAccountName
 import com.moneymanager.csvimporter.buildPendingAccountMappings
+import com.moneymanager.csvimporter.byContentScoreThenNameThenId
 import com.moneymanager.csvimporter.contentScore
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
@@ -86,14 +87,10 @@ fun List<CsvImportStrategy>.selectForQifContent(
     val indexByName = columns.associate { it.originalName to it.columnIndex }
     val sample = rows.take(STRATEGY_CONTENT_SAMPLE_SIZE)
 
-    val byScore =
-        compareByDescending<Pair<CsvImportStrategy, Int>> { it.second }
-            .thenBy { it.first.name }
-            .thenBy { it.first.id.toString() }
     val best =
         map { it to it.contentScore(sample, indexByName) }
             .filter { it.second > 0 }
-            .minWithOrNull(byScore)
+            .minWithOrNull(byContentScoreThenNameThenId)
     if (best != null) return best.first
 
     return filter { it.contentMatchRules.isEmpty() }
