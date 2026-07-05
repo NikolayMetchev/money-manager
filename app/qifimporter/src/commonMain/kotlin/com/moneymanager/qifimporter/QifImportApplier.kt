@@ -7,10 +7,10 @@ import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ImportPreparation
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.buildAccountsToCreate
-import com.moneymanager.csvimporter.contentScore
-import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.csvimporter.buildFirstRowByAccountName
 import com.moneymanager.csvimporter.buildPendingAccountMappings
+import com.moneymanager.csvimporter.contentScore
+import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
