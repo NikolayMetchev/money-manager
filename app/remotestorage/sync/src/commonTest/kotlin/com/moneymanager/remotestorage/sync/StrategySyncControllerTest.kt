@@ -254,6 +254,37 @@ class StrategySyncControllerTest {
         }
 
     @Test
+    fun `reconnect forces a fresh sign-in even when already signed in`() =
+        runTest {
+            // A stored-but-revoked refresh token still reports isSignedIn() == true, so recovery must
+            // re-run consent unconditionally (unlike the normal resolve path, which would short-circuit).
+            val base = InMemoryStorageProvider()
+            var signInCount = 0
+            val provider =
+                object : RemoteStorageProvider by base {
+                    override suspend fun signIn() {
+                        signInCount++
+                        base.signIn()
+                    }
+                }
+            val store = StrategyRemoteConnectionStore(InMemoryLocalSettings())
+            val controller = StrategySyncController(SingleProviderFactory(provider), store)
+            controller.connect(provider.id, null)
+            // connect resolves via isSignedIn() (true here), so it must not have re-consented.
+            assertEquals(0, signInCount)
+
+            controller.reconnect()
+            assertEquals(1, signInCount, "reconnect must re-consent even when isSignedIn() is true")
+        }
+
+    @Test
+    fun `reconnect fails when the library is not connected`() =
+        runTest {
+            val controller = controllerWith(InMemoryStorageProvider())
+            assertFailsWith<IllegalStateException> { controller.reconnect() }
+        }
+
+    @Test
     fun `identical content on both sides with no baseline is IN_SYNC not conflict`() =
         runTest {
             val provider = InMemoryStorageProvider()

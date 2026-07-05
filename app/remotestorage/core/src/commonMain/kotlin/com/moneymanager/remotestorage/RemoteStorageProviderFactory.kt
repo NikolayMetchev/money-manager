@@ -31,3 +31,19 @@ interface RemoteStorageProviderFactory {
         subfolder: String? = null,
     ): RemoteStorageProvider
 }
+
+/**
+ * Forces fresh interactive consent for [providerId]/[config], minting a new refresh token. Unlike a
+ * normal resolve (create-then-`signIn()`-only-if-not-`isSignedIn()`), this does NOT short-circuit on an
+ * existing stored token: a token the provider still reports as "signed in" can be expired or revoked
+ * (Google only rejects it with `invalid_grant` when it is actually used), so recovering from such a
+ * failure requires re-running consent unconditionally. Reusable by any remote-storage connection (DB
+ * archives, the strategy library, future backends).
+ *
+ * [subfolder] is irrelevant to the OAuth consent itself but accepted for a uniform call surface.
+ */
+suspend fun RemoteStorageProviderFactory.reconnect(
+    providerId: String,
+    config: String?,
+    subfolder: String? = null,
+) = create(providerId, config, subfolder).signIn()
