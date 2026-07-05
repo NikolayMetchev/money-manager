@@ -2,6 +2,7 @@
 
 package com.moneymanager.csvimporter
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -12,7 +13,6 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.bigdecimal.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

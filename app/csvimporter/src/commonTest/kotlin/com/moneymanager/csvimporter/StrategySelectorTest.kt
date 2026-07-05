@@ -105,7 +105,9 @@ class StrategySelectorTest {
     fun `content ties between filename matches break by score`() {
         val fiat = strategy("Fiat", contentMatchRules = listOf(kindRule), fileNamePattern = "transactions_record")
         val card = strategy("Card", contentMatchRules = listOf(blankKindRule), fileNamePattern = "transactions_record")
-        val selected = listOf(card, fiat).selectForCsv("fiat_transactions_record_1.csv", columns, rows("viban_deposit", "viban_card_top_up"))
+        val selected =
+            listOf(card, fiat)
+                .selectForCsv("fiat_transactions_record_1.csv", columns, rows("viban_deposit", "viban_card_top_up"))
         assertEquals("Fiat", selected?.name)
     }
 
