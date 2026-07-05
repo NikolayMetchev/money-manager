@@ -5,7 +5,10 @@ package com.moneymanager.qifimporter
 import com.moneymanager.csvimporter.BulkImportResult
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ImportPreparation
+import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.buildAccountsToCreate
+import com.moneymanager.csvimporter.contentScore
+import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.csvimporter.buildFirstRowByAccountName
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.domain.Maintenance
@@ -67,15 +70,13 @@ data class QifBulkResult(
  */
 fun List<CsvImportStrategy>.qifCompatible(): List<CsvImportStrategy> = filter { it.isQifStrategy() }
 
-/** Number of leading rows sampled when content-matching a QIF file against a strategy. */
-private const val QIF_CONTENT_SAMPLE_SIZE = 50
-
 /**
  * Picks the QIF strategy whose [CsvImportStrategy.contentMatchRules] best fit the given [rows], so a
  * bank-specific strategy is auto-detected from the data (QIF's fixed columns can't distinguish banks).
  * A strategy with no content rules acts as the fallback: when nothing positively matches, the
  * rule-less strategy is returned. Ties are broken deterministically by score, then name, then id.
- * Returns null only when the receiver is empty.
+ * Returns null only when the receiver is empty. Unlike [selectForCsv] there is no filename tier and
+ * no minimum-score threshold: QIF files always import with *some* strategy.
  */
 fun List<CsvImportStrategy>.selectForQifContent(
     rows: List<CsvRow>,
@@ -83,25 +84,14 @@ fun List<CsvImportStrategy>.selectForQifContent(
 ): CsvImportStrategy? {
     if (isEmpty()) return null
     val indexByName = columns.associate { it.originalName to it.columnIndex }
-    val sample = rows.take(QIF_CONTENT_SAMPLE_SIZE)
-
-    fun CsvImportStrategy.contentScore(): Int {
-        if (contentMatchRules.isEmpty()) return 0
-        val compiled = contentMatchRules.map { it.columnName to Regex(it.pattern, RegexOption.IGNORE_CASE) }
-        return sample.count { row ->
-            compiled.any { (columnName, regex) ->
-                val idx = indexByName[columnName] ?: return@any false
-                row.values.getOrNull(idx)?.let { regex.containsMatchIn(it) } == true
-            }
-        }
-    }
+    val sample = rows.take(STRATEGY_CONTENT_SAMPLE_SIZE)
 
     val byScore =
         compareByDescending<Pair<CsvImportStrategy, Int>> { it.second }
             .thenBy { it.first.name }
             .thenBy { it.first.id.toString() }
     val best =
-        map { it to it.contentScore() }
+        map { it to it.contentScore(sample, indexByName) }
             .filter { it.second > 0 }
             .minWithOrNull(byScore)
     if (best != null) return best.first

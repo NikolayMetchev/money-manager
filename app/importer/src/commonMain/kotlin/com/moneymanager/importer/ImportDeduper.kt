@@ -129,12 +129,13 @@ class ImportDeduper(
             is DedupePolicy.None -> Classified(transfer, ImportStatus.IMPORTED, null)
             is DedupePolicy.UniqueIdentifier -> classifyByUniqueId(transfer)
             is DedupePolicy.FuzzyAllFields -> classifyByAllFields(transfer, policy)
-            is DedupePolicy.ApiMultiKey -> classifyByApiMultiKey(index, transfer)
+            is DedupePolicy.ApiMultiKey -> classifyByApiMultiKey(index, transfer, policy)
         }
 
     private fun classifyByApiMultiKey(
         index: Int,
         transfer: ImportTransfer,
+        policy: DedupePolicy.ApiMultiKey,
     ): Classified {
         // Match an existing DB transfer first (yields its real id) ...
         val existingId =
@@ -145,7 +146,12 @@ class ImportDeduper(
 
         // Cross-source reconciliation: the same real movement seen from another provider. Keep this
         // record but tag it excluded-and-linked so the movement is counted once (see ApiMultiKey docs).
-        classifyAsReconciled(transfer)?.let { return it }
+        classifyAsReconciled(
+            transfer,
+            policy.reconcileWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
 
         // ... then an earlier accepted transfer in this same batch (resolved to its created id later).
         val batchMatchIndex =
@@ -169,12 +175,17 @@ class ImportDeduper(
      * reconcile window. The returned transfer carries a plain exclusion attribute (value "reconciled")
      * so it is kept but excluded from balance totals, plus a `reconciled` relationship linking it
      * (id1) to the existing transfer (id2). Null when reconciliation is disabled or no match is found.
+     *
+     * Known imperfection: matches are not consumed, so two identical incoming rows within the window
+     * both link to the same existing transfer. Balances stay correct (both are excluded).
      */
-    private fun classifyAsReconciled(transfer: ImportTransfer): Classified? {
-        val apiPolicy = policy as? DedupePolicy.ApiMultiKey ?: return null
-        val window = apiPolicy.reconcileWindow ?: return null
-        val exclusionTypeId = apiPolicy.reconciledExclusionAttributeTypeId ?: return null
-        val relationshipTypeId = apiPolicy.reconciledRelationshipTypeId ?: return null
+    private fun classifyAsReconciled(
+        transfer: ImportTransfer,
+        window: Duration?,
+        exclusionTypeId: AttributeTypeId?,
+        relationshipTypeId: RelationshipTypeId?,
+    ): Classified? {
+        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
         val matchId =
             reconcileCandidates.firstOrNull { (_, existing) -> reconcileMatches(transfer, existing, window) }?.first
                 ?: return null
@@ -263,6 +274,15 @@ class ImportDeduper(
                 return Classified(transfer, ImportStatus.DUPLICATE, existing.transferId)
             }
         }
+        // Third pass: cross-source reconciliation (opt-in per strategy) — the same real movement
+        // recorded by another export with a different description (e.g. a crypto.com top-up seen as
+        // "Top Up Card" in the fiat CSV and "GBP Deposit" in the card CSV). Imported but excluded+linked.
+        classifyAsReconciled(
+            transfer,
+            policy.reconcileWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
         return Classified(transfer, ImportStatus.IMPORTED, null)
     }
 

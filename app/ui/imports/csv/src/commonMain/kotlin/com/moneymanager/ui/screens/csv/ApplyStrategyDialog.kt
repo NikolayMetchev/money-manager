@@ -47,11 +47,11 @@ import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.DiscoveredAccountMapping
 import com.moneymanager.csvimporter.ImportPreparation
 import com.moneymanager.csvimporter.NewAccount
-import com.moneymanager.csvimporter.StrategyMatcher
 import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.csvimporter.hasBlankNewAccountNames
 import com.moneymanager.csvimporter.runCsvImport
+import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -157,11 +157,10 @@ fun ApplyStrategyDialog(
         historicalAccountNames = accountRepository.getPreviousAccountNames()
     }
 
-    // Auto-select matching strategy when strategies load
-    LaunchedEffect(strategies, csvImport.columns) {
+    // Auto-select matching strategy when strategies load (filename/content-aware selection)
+    LaunchedEffect(strategies, csvImport.columns, rows) {
         if (selectedStrategy == null && strategies.isNotEmpty()) {
-            val columnNames = csvImport.columns.map { it.originalName }
-            val matching = StrategyMatcher.findMatchingStrategy(columnNames, strategies)
+            val matching = strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, rows)
             selectedStrategy = matching ?: strategies.firstOrNull()
         }
     }
