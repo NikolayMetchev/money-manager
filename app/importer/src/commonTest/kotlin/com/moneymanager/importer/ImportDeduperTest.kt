@@ -277,6 +277,84 @@ class ImportDeduperTest {
         assertEquals(ImportStatus.IMPORTED, result[2].status)
     }
 
+    private val reconcilingFuzzyPolicy =
+        DedupePolicy.FuzzyAllFields(
+            reconcileWindow = 60.minutes,
+            reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+            reconciledRelationshipTypeId = RelationshipTypeId(1),
+        )
+
+    @Test
+    fun fuzzy_reconcilesCrossSourceMirrorWithinWindow() {
+        // The crypto.com case: the same top-up recorded as "GBP Deposit" (card CSV, already imported)
+        // and "Top Up Card" (fiat CSV, incoming). Descriptions are too different for the fuzzy pass,
+        // but the account pair + amount match within the window: import it excluded + linked.
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(existing(9, description = "GBP Deposit")))
+        val result =
+            deduper
+                .classify(listOf(importTransfer(0, description = "Top Up Card", timestamp = baseTime + 1.minutes)))
+                .single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertEquals(
+            NewAttribute(AttributeTypeId(-1), "reconciled"),
+            result.transfer.attributes.single { it.typeId == AttributeTypeId(-1) },
+        )
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(9), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
+        )
+    }
+
+    @Test
+    fun fuzzy_exactMatchWinsOverReconciliation() {
+        // Re-importing the same file must stay a plain DUPLICATE, never an excluded+linked copy.
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(existing(3)))
+        val result = deduper.classify(listOf(importTransfer(0))).single()
+        assertEquals(ImportStatus.DUPLICATE, result.status)
+        assertEquals(TransferId(3), result.existing)
+    }
+
+    @Test
+    fun fuzzy_doesNotReconcileOutsideWindow() {
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(existing(9, description = "GBP Deposit")))
+        val result =
+            deduper
+                .classify(listOf(importTransfer(0, description = "Top Up Card", timestamp = baseTime + 90.minutes)))
+                .single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun fuzzy_doesNotReconcileOppositeDirection() {
+        // Direction-sensitive: a Cash->Card top-up must not reconcile against a Card->Cash movement.
+        val deduper =
+            ImportDeduper(
+                reconcilingFuzzyPolicy,
+                existing = listOf(existing(9, description = "GBP Deposit", src = target, tgt = source)),
+            )
+        val result =
+            deduper
+                .classify(listOf(importTransfer(0, description = "Top Up Card", timestamp = baseTime + 1.minutes)))
+                .single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun fuzzy_withoutReconcileConfigNeverReconciles() {
+        // Defaults keep the pre-existing behavior: a same-pair same-amount row with a different
+        // description within the window is simply imported.
+        val deduper = ImportDeduper(DedupePolicy.FuzzyAllFields(), existing = listOf(existing(9, description = "GBP Deposit")))
+        val result =
+            deduper
+                .classify(listOf(importTransfer(0, description = "Top Up Card", timestamp = baseTime + 1.minutes)))
+                .single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.isEmpty())
+        assertTrue(result.transfer.relationships.isEmpty())
+    }
+
     @Test
     fun fuzzy_sameCoreDifferentAttributesIsUpdated() {
         val typeId = AttributeTypeId(42)

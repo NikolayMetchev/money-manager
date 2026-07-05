@@ -38,6 +38,20 @@ object BuiltInCsvStrategies {
     val monzoCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000004")
     val qifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000005")
     val santanderQifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000006")
+    val cryptoComCardStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000007")
+    val cryptoComFiatStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000008")
+
+    /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
+    private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
+    private const val CRYPTO_COM_CASH_ACCOUNT = "Crypto.com Cash"
+    private const val CRYPTO_COM_WALLET_PREFIX = "Crypto.com "
+
+    /**
+     * Cross-source reconciliation window for the crypto.com strategies. The same top-up appears in
+     * both the card export ("GBP Deposit") and the fiat export (viban_card_top_up) with near-identical
+     * timestamps, but statement exports are less precise than API feeds, so allow up to an hour.
+     */
+    private const val CRYPTO_COM_RECONCILE_WINDOW_SECONDS = 3600L
 
     /** Account name prefix shared with the Wise API import strategy ("Wise: " + currency code). */
     private const val WISE_ACCOUNT_PREFIX = "Wise: "
@@ -60,6 +74,10 @@ object BuiltInCsvStrategies {
 
     private fun santanderQifMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 4, index = index)
 
+    private fun cryptoComCardMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 5, index = index)
+
+    private fun cryptoComFiatMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 6, index = index)
+
     /**
      * All built-in CSV import strategies seeded into a fresh database. [qifCurrencyId] is the fixed
      * currency the QIF strategies carry (the default the QIF import dialog pre-selects); it is resolved
@@ -74,7 +92,261 @@ object BuiltInCsvStrategies {
             buildSantanderQifStrategy(now, qifCurrencyId),
             buildWiseCsvStrategy(now),
             buildMonzoCsvStrategy(now),
+            buildCryptoComCardStrategy(now),
+            buildCryptoComFiatStrategy(now),
         )
+
+    /**
+     * The column header shared by all three crypto.com exports (card_transactions_record_*,
+     * fiat_transactions_record_* and crypto_transactions_record_*). Because the sets are identical,
+     * the crypto.com strategies rely on [CsvImportStrategy.fileNamePattern] and content rules over
+     * the Transaction Kind column to tell the files apart; crypto_* files match neither built-in
+     * strategy and are skipped.
+     */
+    private val cryptoComIdentificationColumns =
+        setOf(
+            "Timestamp (UTC)",
+            "Transaction Description",
+            "Currency",
+            "Amount",
+            "To Currency",
+            "To Amount",
+            "Native Currency",
+            "Native Amount",
+            "Native Amount (in USD)",
+            "Transaction Kind",
+            "Transaction Hash",
+        )
+
+    /**
+     * Built-in strategy for crypto.com's card_transactions_record_*.csv export (the Visa card
+     * statement). Every row has a blank Transaction Kind — the content rule that identifies the file
+     * when it has been renamed. Spends are negative Native Amounts to a merchant account looked up
+     * from the description; "GBP Deposit" rows are card top-ups arriving from the crypto.com Cash
+     * account (the fiat export records the same movement as viban_card_top_up, which cross-source
+     * reconciliation links instead of double-counting).
+     */
+    fun buildCryptoComCardStrategy(now: Instant): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                // Fixed-name source so the card and fiat strategies resolve the same account pair,
+                // which direction-sensitive reconciliation requires. The catch-all pattern always
+                // matches; users with an existing differently-named card account remap once.
+                TransferField.SOURCE_ACCOUNT to
+                    RegexAccountMapping(
+                        id = cryptoComCardMappingId(1),
+                        fieldType = TransferField.SOURCE_ACCOUNT,
+                        columnName = "Transaction Description",
+                        rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CARD_ACCOUNT)),
+                    ),
+                TransferField.TARGET_ACCOUNT to
+                    RegexAccountMapping(
+                        id = cryptoComCardMappingId(2),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = "Transaction Description",
+                        rules =
+                            listOf(
+                                // Top-ups ("GBP Deposit", "EUR Deposit", …) come from the Cash account.
+                                RegexRule(pattern = "^[A-Z]{3,5} Deposit$", accountName = CRYPTO_COM_CASH_ACCOUNT),
+                            ),
+                        // Everything else looks up/creates a merchant account from the raw description.
+                    ),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        id = cryptoComCardMappingId(3),
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = "Timestamp (UTC)",
+                        dateFormat = "yyyy-MM-dd",
+                        dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        id = cryptoComCardMappingId(4),
+                        fieldType = TransferField.DESCRIPTION,
+                        columnName = "Transaction Description",
+                    ),
+                // Negative = money out of the card; positive (top-ups, refunds) flows in, so flip.
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        id = cryptoComCardMappingId(5),
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "Native Amount",
+                        flipAccountsOnPositive = true,
+                    ),
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(
+                        id = cryptoComCardMappingId(6),
+                        fieldType = TransferField.CURRENCY,
+                        columnName = "Native Currency",
+                    ),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(
+                        id = cryptoComCardMappingId(7),
+                        fieldType = TransferField.TIMEZONE,
+                        timezoneId = "UTC",
+                    ),
+            )
+        val attributeMappings =
+            listOf(
+                AttributeColumnMapping("Currency", "cryptocom-txn-currency"),
+                AttributeColumnMapping("Amount", "cryptocom-txn-amount"),
+                AttributeColumnMapping("Native Amount (in USD)", "cryptocom-usd-amount"),
+                AttributeColumnMapping("Transaction Hash", "cryptocom-hash"),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(cryptoComCardStrategyId),
+            name = "Crypto.com Card",
+            identificationColumns = cryptoComIdentificationColumns,
+            fieldMappings = fieldMappings,
+            attributeMappings = attributeMappings,
+            contentMatchRules = listOf(ContentMatchRule(columnName = "Transaction Kind", pattern = "^$")),
+            fileNamePattern = "^card_transactions_record_",
+            crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in strategy for crypto.com's fiat_transactions_record_*.csv export (the fiat "Cash"
+     * wallet). The sign of the amount does NOT encode direction — the Transaction Kind does:
+     *
+     * - viban_deposit ("GBP Deposit (via FPS)", positive): external bank → Cash.
+     * - viban_withdrawal ("GBP Withdrawal (via FPS)", negative): Cash → external bank.
+     * - viban_card_top_up ("Top Up Card", POSITIVE but money leaves Cash): Cash → Card. A row rule
+     *   flips source/target to cancel the positive-amount flip.
+     * - viban_purchase ("GBP -> TGBP", positive, To Currency = wallet code): Cash → per-currency
+     *   wallet, same cancelled flip.
+     * - crypto_viban ("TGBP -> GBP", positive, Currency = wallet code): wallet → Cash. A column swap
+     *   moves the wallet code into To Currency so the conversion target mapping below sees it; the
+     *   positive-amount flip then puts the wallet on the source side.
+     *
+     * Amount/currency always read the Native columns (the Cash-side fiat value, present on every row
+     * including conversions), so no crypto-token currencies are required in the database.
+     * To Currency is populated on every row; conversions are detected by Currency != To Currency.
+     */
+    fun buildCryptoComFiatStrategy(now: Instant): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                TransferField.SOURCE_ACCOUNT to
+                    RegexAccountMapping(
+                        id = cryptoComFiatMappingId(1),
+                        fieldType = TransferField.SOURCE_ACCOUNT,
+                        columnName = "Transaction Description",
+                        rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CASH_ACCOUNT)),
+                    ),
+                TransferField.TARGET_ACCOUNT to
+                    ConditionalAccountMapping(
+                        id = cryptoComFiatMappingId(2),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        conditions =
+                            listOf(
+                                RowCondition("Currency", RowConditionOperator.NOT_EQUALS_COLUMN, otherColumnName = "To Currency"),
+                            ),
+                        // Conversion rows target the per-currency wallet ("Crypto.com TGBP").
+                        whenTrue =
+                            TemplateAccountMapping(
+                                id = cryptoComFiatMappingId(3),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "To Currency",
+                                prefix = CRYPTO_COM_WALLET_PREFIX,
+                            ),
+                        whenFalse =
+                            RegexAccountMapping(
+                                id = cryptoComFiatMappingId(4),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Transaction Description",
+                                rules =
+                                    listOf(
+                                        // Card top-ups route to the Card account (the card export's
+                                        // "GBP Deposit" side of the same movement).
+                                        RegexRule(pattern = "^Top Up Card$", accountName = CRYPTO_COM_CARD_ACCOUNT),
+                                    ),
+                                // Deposits/withdrawals create a counterparty account from the description.
+                            ),
+                    ),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        id = cryptoComFiatMappingId(5),
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = "Timestamp (UTC)",
+                        dateFormat = "yyyy-MM-dd",
+                        dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        id = cryptoComFiatMappingId(6),
+                        fieldType = TransferField.DESCRIPTION,
+                        columnName = "Transaction Description",
+                    ),
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        id = cryptoComFiatMappingId(7),
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "Native Amount",
+                        flipAccountsOnPositive = true,
+                    ),
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(
+                        id = cryptoComFiatMappingId(8),
+                        fieldType = TransferField.CURRENCY,
+                        columnName = "Native Currency",
+                    ),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(
+                        id = cryptoComFiatMappingId(9),
+                        fieldType = TransferField.TIMEZONE,
+                        timezoneId = "UTC",
+                    ),
+            )
+        val rowRules =
+            listOf(
+                // crypto_viban rows are wallet → Cash ("TGBP -> GBP"): move the wallet code into
+                // To Currency so the conversion target mapping resolves the wallet account. The
+                // positive amount then flips it onto the source side.
+                RowPreprocessingRule(
+                    conditions = listOf(RowCondition("Transaction Kind", RowConditionOperator.EQUALS_VALUE, value = "crypto_viban")),
+                    columnSwaps = listOf(ColumnPairSwap("Currency", "To Currency")),
+                ),
+                // Top-ups and purchases are positive but money LEAVES Cash: flipping source/target
+                // here cancels the positive-amount flip (the two flips are XORed), keeping Cash as
+                // the source.
+                RowPreprocessingRule(
+                    conditions =
+                        listOf(RowCondition("Transaction Kind", RowConditionOperator.EQUALS_VALUE, value = "viban_card_top_up")),
+                    flipSourceAndTarget = true,
+                ),
+                RowPreprocessingRule(
+                    conditions = listOf(RowCondition("Transaction Kind", RowConditionOperator.EQUALS_VALUE, value = "viban_purchase")),
+                    flipSourceAndTarget = true,
+                ),
+            )
+        val attributeMappings =
+            listOf(
+                AttributeColumnMapping("Transaction Kind", "cryptocom-kind"),
+                AttributeColumnMapping("Currency", "cryptocom-txn-currency"),
+                AttributeColumnMapping("Amount", "cryptocom-txn-amount"),
+                AttributeColumnMapping("To Currency", "cryptocom-to-currency"),
+                AttributeColumnMapping("To Amount", "cryptocom-to-amount"),
+                AttributeColumnMapping("Native Amount (in USD)", "cryptocom-usd-amount"),
+                AttributeColumnMapping("Transaction Hash", "cryptocom-hash"),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(cryptoComFiatStrategyId),
+            name = "Crypto.com Fiat",
+            identificationColumns = cryptoComIdentificationColumns,
+            fieldMappings = fieldMappings,
+            attributeMappings = attributeMappings,
+            rowPreprocessingRules = rowRules,
+            contentMatchRules = listOf(ContentMatchRule(columnName = "Transaction Kind", pattern = "^(viban_|crypto_viban)")),
+            fileNamePattern = "^fiat_transactions_record_",
+            crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
 
     /**
      * Builds the built-in Wise CSV import strategy for Wise's transaction-history.csv export.

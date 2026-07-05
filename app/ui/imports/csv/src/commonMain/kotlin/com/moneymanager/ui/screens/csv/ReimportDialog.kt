@@ -25,10 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.CsvReimportResult
 import com.moneymanager.csvimporter.ReimportPlan
-import com.moneymanager.csvimporter.StrategyMatcher
 import com.moneymanager.csvimporter.executeCsvReimport
 import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.planCsvReimport
+import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -104,17 +104,17 @@ fun ReimportDialog(
     var planProgress by remember { mutableStateOf<ImportProgress?>(null) }
     var executeProgress by remember { mutableStateOf<ImportProgress?>(null) }
 
-    // Resolve the strategy that was last applied; fall back to column matching if it was deleted.
+    // Resolve the strategy that was last applied; fall back to auto-selection if it was deleted.
     LaunchedEffect(csvImport.id) {
         val byId =
             csvImport.lastAppliedStrategyId?.let { strategyId ->
                 csvImportStrategyRepository.getStrategyById(strategyId).first()
             }
         strategy = byId
-            ?: StrategyMatcher.findMatchingStrategy(
-                csvImport.columns.map { it.originalName },
-                csvImportStrategyRepository.getAllStrategies().first(),
-            )
+            ?: csvImportStrategyRepository
+                .getAllStrategies()
+                .first()
+                .selectForCsv(csvImport.originalFileName, csvImport.columns, rows)
         strategyResolved = true
     }
 

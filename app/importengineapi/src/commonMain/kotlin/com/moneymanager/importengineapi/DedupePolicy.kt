@@ -29,10 +29,21 @@ sealed interface DedupePolicy {
      * within the same batch. Used by CSV/QIF strategies without unique-identifier columns.
      *
      * The default [similarityThreshold] is [DESCRIPTION_SIMILARITY_THRESHOLD].
+     *
+     * Cross-source reconciliation: when [reconcileWindow], [reconciledExclusionAttributeTypeId] and
+     * [reconciledRelationshipTypeId] are all set, an incoming transfer that neither exactly nor
+     * fuzzily matches but does match an existing transfer on the same source+target+amount with a
+     * timestamp within [reconcileWindow] is still IMPORTED — tagged with the exclusion attribute and
+     * linked via a `reconciled` relationship, so a movement two exports both record (e.g. a
+     * crypto.com card top-up present in both the card and fiat CSVs) is counted once. Defaults are
+     * null: reconciliation is opt-in per strategy and off for all pre-existing behavior.
      */
     data class FuzzyAllFields(
         val dateTolerance: Duration = 3.days,
         val similarityThreshold: Double = DESCRIPTION_SIMILARITY_THRESHOLD,
+        val reconcileWindow: Duration? = null,
+        val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
+        val reconciledRelationshipTypeId: RelationshipTypeId? = null,
     ) : DedupePolicy
 
     /**

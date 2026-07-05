@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
@@ -99,12 +100,11 @@ fun CsvImportDetailScreen(
         .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
-    // Check if there's a matching strategy for this import's columns
-    // Re-runs when import changes OR when strategies list changes (e.g., after import)
-    LaunchedEffect(import, strategies) {
+    // Check if there's a matching strategy for this import (filename/content-aware selection).
+    // Re-runs when the import, the strategies list, or the loaded rows change.
+    LaunchedEffect(import, strategies, rows) {
         import?.let { csvImport ->
-            val columnNames = csvImport.columns.map { it.originalName }.toSet()
-            val matchingStrategy = csvImportStrategyRepository.findMatchingStrategy(columnNames)
+            val matchingStrategy = strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, rows)
             hasMatchingStrategy = matchingStrategy != null
         }
     }

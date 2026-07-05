@@ -5,6 +5,7 @@ package com.moneymanager.csvimporter
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
@@ -45,6 +46,7 @@ import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = logging()
 
@@ -88,10 +90,10 @@ suspend fun bulkApplyCsv(
     imports.forEachIndexed { index, listedImport ->
         onProgress(index, imports.size)
         // getAllImports() doesn't populate columns, so re-fetch the full import (which loads them)
-        // for the column-based strategy match below.
+        // for the strategy match below.
         val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
-        val columnNames = csvImport.columns.map { it.originalName }
-        val matched = StrategyMatcher.findMatchingStrategy(columnNames, strategies)
+        val sampleRows = csvImportRepository.getImportRows(csvImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
+        val matched = strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, sampleRows)
         if (matched == null) {
             skippedNoStrategy++
             return@forEachIndexed
@@ -135,7 +137,7 @@ suspend fun bulkApplyCsv(
 /**
  * Applies a fixed [strategy] to all importable rows of an already-staged [csvImport] and returns the
  * run result (null when there are no rows left to import). Unlike [bulkApplyCsv] the strategy is given,
- * not auto-matched — used by the import-directory scanner, which pins one strategy per directory.
+ * not auto-matched — used by re-import and by [bulkApplyCsv] itself after it selects one.
  * [refreshViews] = false lets a caller batch many files and refresh once at the end.
  * [onProgress]/[engineBatchSize] are forwarded to the engine so a caller can show per-chunk progress.
  */
@@ -556,7 +558,17 @@ suspend fun runCsvImport(
             transfers = importTransfers,
             dedupePolicy =
                 if (uniqueIdTypeNames.isEmpty()) {
-                    DedupePolicy.FuzzyAllFields()
+                    // Cross-source reconciliation is opt-in per strategy: rows recording a movement
+                    // another export already imported (same accounts+amount within the window) are
+                    // kept but excluded+linked instead of double-counting. Mirrors the API importer.
+                    val reconcileWindow = strategy.crossSourceReconcileWindowSeconds?.seconds
+                    DedupePolicy.FuzzyAllFields(
+                        reconcileWindow = reconcileWindow,
+                        reconciledExclusionAttributeTypeId =
+                            reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
+                        reconciledRelationshipTypeId =
+                            reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
+                    )
                 } else {
                     DedupePolicy.UniqueIdentifier
                 },
