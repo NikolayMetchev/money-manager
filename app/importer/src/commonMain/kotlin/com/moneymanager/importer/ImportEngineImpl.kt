@@ -1044,13 +1044,21 @@ class ImportEngineImpl(
                 amount: Money,
                 legRowKey: ImportRowKey?,
             ) {
+                val sourceId = requireId(source)
+                val targetId = requireId(target)
+                // A transfer must move between two distinct accounts (enforced by a DB CHECK). The CSV path
+                // collapses degenerate pass-through chains upstream (collapsePassThroughChain); this guards
+                // the invariant for every producer with a clear error instead of an opaque SQLite failure.
+                require(sourceId != targetId) {
+                    "Refusing to create a self-transfer on account ${sourceId.id} for \"$description\""
+                }
                 transfersToCreate +=
                     Transfer(
                         id = tempId,
                         timestamp = requireNotNull(t.timestamp),
                         description = description,
-                        sourceAccountId = requireId(source),
-                        targetAccountId = requireId(target),
+                        sourceAccountId = sourceId,
+                        targetAccountId = targetId,
                         amount = amount,
                     )
                 orderedSources += t.source.forRow(legRowKey ?: rowKey)

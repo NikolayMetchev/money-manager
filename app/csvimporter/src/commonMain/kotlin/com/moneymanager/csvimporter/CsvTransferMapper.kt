@@ -370,6 +370,22 @@ class CsvTransferMapper(
             // Parse accounts with potential flipping
             var sourceAccountId = resolvedSourceAccountId
             var targetAccountId = parseAccount(targetMapping, values)
+
+            // Both account fields can read the same column (e.g. Crypto.com's card strategy resolves both
+            // legs from "Transaction Description"), so a persisted counterparty mapping that matches the
+            // description can hijack the source leg too and collapse both onto one account. When the source
+            // came from the strategy's own SOURCE_ACCOUNT mapping (no UI override) and now collides with the
+            // target, re-resolve the source ignoring persisted mappings — its rule/historical name only —
+            // which restores the intended own-account (e.g. "Crypto.com Card").
+            if (sourceAccountOverride == null &&
+                sourceAccountId == targetAccountId &&
+                sourceAccountId != AccountId(-1)
+            ) {
+                strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
+                    sourceAccountId = parseAccount(it, values, applyPersistedMappings = false)
+                }
+            }
+
             if (flipAccounts) {
                 val temp = sourceAccountId
                 sourceAccountId = targetAccountId
@@ -425,6 +441,21 @@ class CsvTransferMapper(
                 if (conduitAccountId != null && flipAccounts) conduitAccountId else sourceAccountId
             val effectiveTargetAccountId =
                 if (conduitAccountId != null && !flipAccounts) conduitAccountId else targetAccountId
+
+            // A transfer must move between two distinct accounts (enforced by a DB CHECK). If both legs
+            // resolved to the same real account (e.g. an account mapping that matches this row on both
+            // sides), surface it as a per-row error instead of letting one bad row abort the whole file.
+            // AccountId(-1) is the "new account" placeholder; two not-yet-created accounts stay distinct.
+            if (effectiveSourceAccountId == effectiveTargetAccountId && effectiveSourceAccountId != AccountId(-1)) {
+                val accountName =
+                    existingAccounts.entries.firstOrNull { it.value.id == effectiveSourceAccountId }?.key
+                return MappingResult.Error(
+                    row.rowIndex,
+                    "Source and target resolved to the same account" +
+                        (accountName?.let { " (\"$it\")" } ?: "") +
+                        "; a transfer must move between two different accounts. Check your account mappings.",
+                )
+            }
 
             // Detect a personal counterparty (resolved from the target mapping regardless of any
             // account flip — the counterparty is the same account on whichever side it ends up). A
@@ -672,9 +703,17 @@ class CsvTransferMapper(
         csvValue: String,
     ): String = if (csvValue.isBlank()) "" else mapping.prefix + csvValue + mapping.suffix
 
+    /**
+     * Resolves a field mapping to an account id. Persisted account mappings (the user's "map this CSV
+     * value to that account" choices) are consulted first — they redirect a **counterparty** and handle
+     * renamed accounts. [applyPersistedMappings] can be set false to bypass them when re-resolving the
+     * **source** leg after a persisted counterparty mapping hijacked it into a self-transfer (both legs
+     * read the same column, so a merchant mapping can match the source too); see [mapRow].
+     */
     private fun parseAccount(
         mapping: FieldMapping,
         values: List<String>,
+        applyPersistedMappings: Boolean = true,
     ): AccountId {
         // For hardcoded accounts, return immediately
         if (mapping is HardCodedAccountMapping) {
@@ -686,23 +725,21 @@ class CsvTransferMapper(
                 val csvValue = getColumnValue(mapping.columnName, values).trim()
 
                 // Check persisted mappings FIRST - this handles renamed accounts
-                val persistedMatch = findPersistedMapping(csvValue)
-                if (persistedMatch != null) {
-                    return persistedMatch
+                if (applyPersistedMappings) {
+                    findPersistedMapping(csvValue)?.let { return it }
                 }
 
                 val name = templatedAccountName(mapping, csvValue)
                 resolveExistingAccountId(name)
                     ?: AccountId(-1) // Placeholder for new accounts
             }
-            is ConditionalAccountMapping -> parseAccount(resolveConditional(mapping, values), values)
+            is ConditionalAccountMapping -> parseAccount(resolveConditional(mapping, values), values, applyPersistedMappings)
             is AccountLookupMapping -> {
                 val csvValue = getColumnValue(mapping.columnName, values)
 
                 // Check persisted mappings FIRST - this handles renamed accounts
-                val persistedMatch = findPersistedMapping(csvValue)
-                if (persistedMatch != null) {
-                    return persistedMatch
+                if (applyPersistedMappings) {
+                    findPersistedMapping(csvValue)?.let { return it }
                 }
 
                 // Fall back to lookup by name (current, then historical for renamed accounts)
@@ -716,9 +753,8 @@ class CsvTransferMapper(
                 val result = getAccountNameFromRegexWithPattern(mapping, values)
 
                 // Check persisted mappings using the ACTUAL value that was resolved
-                val persistedMatch = findPersistedMapping(result.sourceColumnValue)
-                if (persistedMatch != null) {
-                    return persistedMatch
+                if (applyPersistedMappings) {
+                    findPersistedMapping(result.sourceColumnValue)?.let { return it }
                 }
 
                 // Fall back to lookup by name (current, then historical for renamed accounts)
