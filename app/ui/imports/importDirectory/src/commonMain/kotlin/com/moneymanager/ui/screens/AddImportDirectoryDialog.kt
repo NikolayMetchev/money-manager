@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.compose.filepicker.manualFolderEntrySupported
 import com.moneymanager.compose.filepicker.rememberFolderPicker
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.importfilesource.DriveFolderBrowser
@@ -39,14 +40,18 @@ fun AddImportDirectoryDialog(
     var name by remember { mutableStateOf("") }
     var provider by remember { mutableStateOf(ImportDirectoryProvider.LOCAL) }
     var folderRef by remember { mutableStateOf("") }
+    var localFolderName by remember { mutableStateOf<String?>(null) }
     var driveFolderName by remember { mutableStateOf<String?>(null) }
     var showDrivePicker by remember { mutableStateOf(false) }
 
     val folderPicker =
-        rememberFolderPicker { path ->
-            if (path != null) {
-                folderRef = path
+        rememberFolderPicker { picked ->
+            if (picked != null) {
+                folderRef = picked.ref
+                localFolderName = picked.displayName
                 driveFolderName = null
+                // Pre-fill the directory name with the folder name (only if the user hasn't typed one).
+                if (name.isBlank()) name = picked.displayName
             }
         }
 
@@ -89,6 +94,7 @@ fun AddImportDirectoryDialog(
                         onClick = {
                             provider = ImportDirectoryProvider.LOCAL
                             folderRef = ""
+                            localFolderName = null
                             driveFolderName = null
                         },
                         label = { Text("Local folder") },
@@ -98,6 +104,7 @@ fun AddImportDirectoryDialog(
                         onClick = {
                             provider = ImportDirectoryProvider.GDRIVE
                             folderRef = ""
+                            localFolderName = null
                         },
                         enabled = driveFolderBrowser != null,
                         label = { Text("Google Drive") },
@@ -105,14 +112,27 @@ fun AddImportDirectoryDialog(
                 }
 
                 if (provider == ImportDirectoryProvider.LOCAL) {
-                    OutlinedTextField(
-                        value = folderRef,
-                        onValueChange = { folderRef = it },
-                        label = { Text("Folder path") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedButton(onClick = { folderPicker.launch() }) { Text("Browse…") }
+                    if (manualFolderEntrySupported) {
+                        OutlinedTextField(
+                            value = folderRef,
+                            onValueChange = {
+                                folderRef = it
+                                // A hand-typed path is its own display; drop any stale picked name.
+                                localFolderName = null
+                            },
+                            label = { Text("Folder path") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedButton(onClick = { folderPicker.launch() }) { Text("Browse…") }
+                    } else {
+                        // SAF-only platforms: the folder ref is an opaque content:// URI, so never show
+                        // or edit it — mirror the Drive branch and show the picked folder's name instead.
+                        OutlinedButton(onClick = { folderPicker.launch() }) {
+                            Text(if (localFolderName == null) "Choose folder…" else "Change folder")
+                        }
+                        localFolderName?.let { Text("Selected: $it", style = MaterialTheme.typography.bodyMedium) }
+                    }
                 } else {
                     OutlinedButton(
                         enabled = driveFolderBrowser != null,
@@ -125,8 +145,17 @@ fun AddImportDirectoryDialog(
         confirmButton = {
             TextButton(
                 enabled = canCreate,
-                // driveFolderName holds the full Drive path; null for local (folderRef is already readable).
-                onClick = { onCreate(name.trim(), provider, folderRef.trim(), driveFolderName) },
+                onClick = {
+                    // Drive: the full Drive path. Local: the picked folder's name when the ref is an
+                    // opaque URI; null when the ref is a readable path (typed, or JVM picker where
+                    // displayName == ref).
+                    val displayPath =
+                        when (provider) {
+                            ImportDirectoryProvider.GDRIVE -> driveFolderName
+                            ImportDirectoryProvider.LOCAL -> localFolderName?.takeIf { it != folderRef }
+                        }
+                    onCreate(name.trim(), provider, folderRef.trim(), displayPath)
+                },
             ) { Text("Add") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },

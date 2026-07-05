@@ -1,5 +1,6 @@
 package com.moneymanager.di.importfilesource
 
+import com.moneymanager.di.AppComponentParams
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFolder
 import com.moneymanager.localsettings.LocalSettings
@@ -17,7 +18,10 @@ private fun googleDriveDefaultConfig(): String? =
     }
 
 @Suppress("ktlint:standard:function-naming")
-actual fun createDriveFolderBrowser(localSettings: LocalSettings): DriveFolderBrowser? =
+actual fun createDriveFolderBrowser(
+    params: AppComponentParams,
+    localSettings: LocalSettings,
+): DriveFolderBrowser? =
     object : DriveFolderBrowser {
         override val rootFolderId: String = DriveImportFileSource.ROOT_FOLDER_ID
         override val sharedWithMeFolderId: String = DriveImportFileSource.SHARED_WITH_ME_FOLDER_ID

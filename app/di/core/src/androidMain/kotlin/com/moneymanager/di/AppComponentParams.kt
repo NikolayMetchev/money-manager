@@ -11,4 +11,10 @@ actual data class AppComponentParams(
      * library module (no manifest/Activity). See `MainActivity`.
      */
     val googleTokenSource: GoogleAccessTokenSource,
+    /**
+     * A second token source scoped to `drive.readonly`, used only by import directories: files the
+     * user drops into a Drive folder aren't app-created, so [googleTokenSource]'s `drive.file` grant
+     * can't see them. Kept separate so browsing imports never widens (or re-prompts) the DB-sync grant.
+     */
+    val googleDriveImportTokenSource: GoogleAccessTokenSource,
 )

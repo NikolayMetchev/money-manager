@@ -1,5 +1,6 @@
 package com.moneymanager.di.importfilesource
 
+import com.moneymanager.di.AppComponentParams
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.importfilesource.ImportFileSource
@@ -22,7 +23,10 @@ private fun googleDriveDefaultConfig(): String? =
     }
 
 @Suppress("ktlint:standard:function-naming")
-actual fun createImportFileSourceFactory(localSettings: LocalSettings): ImportFileSourceFactory =
+actual fun createImportFileSourceFactory(
+    params: AppComponentParams,
+    localSettings: LocalSettings,
+): ImportFileSourceFactory =
     object : ImportFileSourceFactory {
         // Desktop reads both local folders and Google Drive.
         override fun supportsProvider(provider: ImportDirectoryProvider): Boolean = true

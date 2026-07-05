@@ -1,12 +1,14 @@
 @file:OptIn(
     kotlin.time.ExperimentalTime::class,
     kotlin.uuid.ExperimentalUuidApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
 )
 
 package com.moneymanager.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -218,12 +220,18 @@ fun ImportDirectoriesScreen(
                 .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(
+        // FlowRow so the buttons wrap below the title on narrow (phone) screens instead of being
+        // pushed off the right edge.
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Import Directories", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                "Import Directories",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.align(Alignment.CenterVertically),
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = scanningId == null && directories.any(::scannable),
@@ -394,7 +402,8 @@ private fun ImportDirectoryRow(
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // FlowRow: the download button plus four links don't fit one line on phones.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = canDownload && !onWrongDevice && !directory.excluded,
                     onClick = onDownload,

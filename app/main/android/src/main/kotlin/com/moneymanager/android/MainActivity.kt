@@ -17,6 +17,8 @@ import com.moneymanager.di.importfilesource.createDriveFolderBrowser
 import com.moneymanager.di.importfilesource.createImportFileSourceFactory
 import com.moneymanager.di.initializeVersionReader
 import com.moneymanager.importengineapi.EditingLockedException
+import com.moneymanager.remotestorage.googledrive.DRIVE_FILE_SCOPE
+import com.moneymanager.remotestorage.googledrive.DRIVE_READONLY_SCOPE
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncResult
 import com.moneymanager.ui.AppStartupHost
@@ -98,12 +100,18 @@ class MainActivity : ComponentActivity() {
             AppComponentParams(
                 context = applicationContext,
                 googleTokenSource = AndroidGoogleAccessTokenSource(applicationContext, googleAuthConsentLauncher),
+                googleDriveImportTokenSource =
+                    AndroidGoogleAccessTokenSource(
+                        applicationContext,
+                        googleAuthConsentLauncher,
+                        scopes = listOf(DRIVE_FILE_SCOPE, DRIVE_READONLY_SCOPE),
+                    ),
             )
         val component: AppComponent = AppComponent.create(params)
         val controller = component.remoteDatabaseController
         remoteController = controller
-        val importFileSourceFactory = createImportFileSourceFactory(component.localSettings)
-        val driveFolderBrowser = createDriveFolderBrowser(component.localSettings)
+        val importFileSourceFactory = createImportFileSourceFactory(params, component.localSettings)
+        val driveFolderBrowser = createDriveFolderBrowser(params, component.localSettings)
 
         setContent {
             AppStartupHost(
