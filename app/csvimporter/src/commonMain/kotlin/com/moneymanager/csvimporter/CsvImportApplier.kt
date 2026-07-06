@@ -187,12 +187,12 @@ suspend fun applyStagedCsv(
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
     val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
     if (rows.isEmpty()) {
-        // A file with no data rows is nonetheless "done". Leaving it without an application record keeps
-        // it in the Unimported tab, so it reappears on every "Import all". Record the strategy application
-        // to mark it imported — but only when the file is genuinely empty (allRows empty). When allRows is
-        // non-empty, every row was already imported on an earlier run (its application is already recorded),
-        // so return null and leave it untouched.
-        if (allRows.isEmpty()) {
+        // A genuinely empty file (a header-only export with no data rows) has nothing to import, but
+        // must still be marked applied or it reappears in the Unimported tab on every "Import all".
+        // Record the strategy application once (the lastAppliedAt guard keeps repeated runs a no-op).
+        // Scoped to allRows.isEmpty() so it never fires on re-import, which always has rows and whose
+        // "nothing new to import" outcome must stay a null result.
+        if (allRows.isEmpty() && csvImport.lastAppliedAt == null) {
             recordCsvApplication(importEngine, csvImport.id, strategy)
             return CsvImportResult(successCount = 0, failedRows = emptyList())
         }

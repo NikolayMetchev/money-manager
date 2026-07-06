@@ -246,10 +246,16 @@ class CryptoComCsvE2ETest : DbTest() {
                 "the empty file has an application record (out of the Unimported tab)",
             )
 
-            // Idempotent: a second "Import all" keeps it imported and imports nothing new.
+            // Idempotent: once applied, a second "Import all" is a no-op — it neither re-records nor
+            // re-imports, and the file stays imported.
             val second = applyAll(listOf(applied))
-            assertEquals(1, second.filesImported)
+            assertEquals(0, second.filesImported, "already-applied empty file is not re-recorded")
             assertEquals(0, second.transfersCreated)
             assertEquals(0, second.filesFailed)
+            val stillApplied = repositories.csvImportRepository.getImport(emptyFiat.id).first()!!
+            assertTrue(
+                stillApplied.lastAppliedAt != null,
+                "the empty file stays imported after a second run",
+            )
         }
 }
