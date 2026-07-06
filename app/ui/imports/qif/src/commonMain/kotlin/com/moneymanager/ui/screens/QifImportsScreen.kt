@@ -44,12 +44,15 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createQifImport
 import com.moneymanager.qif.QifParser
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.qif.QifImportAllDialog
+import com.moneymanager.ui.screens.qif.QifReimportAllDialog
 import com.moneymanager.ui.screens.qif.dominantAccountType
 import com.moneymanager.ui.screens.qif.toImportRecords
 import com.moneymanager.ui.util.displayDateTime
@@ -69,6 +72,8 @@ fun QifImportsScreen(
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     settingsRepository: SettingsReadRepository,
+    transactionRepository: TransactionReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onImportClick: (QifImportId) -> Unit,
@@ -219,6 +224,17 @@ fun QifImportsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
+            var showReimportAll by remember { mutableStateOf(false) }
+            if (selectedTab == 1 && importedList.isNotEmpty()) {
+                Button(
+                    onClick = { showReimportAll = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Re-import all (${importedList.size})")
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             if (showImportAll) {
                 QifImportAllDialog(
                     unimported = unimported,
@@ -234,6 +250,26 @@ fun QifImportsScreen(
                     importEngine = importEngine,
                     onDismiss = { showImportAll = false },
                     onComplete = { showImportAll = false },
+                )
+            }
+
+            if (showReimportAll) {
+                QifReimportAllDialog(
+                    imported = importedList,
+                    csvImportStrategyRepository = csvImportStrategyRepository,
+                    accountMappingRepository = accountMappingRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    currencyRepository = currencyRepository,
+                    personRepository = personRepository,
+                    qifImportRepository = qifImportRepository,
+                    transactionRepository = transactionRepository,
+                    transferSourceRepository = transferSourceRepository,
+                    settingsRepository = settingsRepository,
+                    maintenance = maintenance,
+                    importEngine = importEngine,
+                    onDismiss = { showReimportAll = false },
+                    onComplete = { showReimportAll = false },
                 )
             }
 

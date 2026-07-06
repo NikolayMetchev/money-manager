@@ -4,6 +4,8 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
 import com.moneymanager.domain.model.AccountMergeContext
+import com.moneymanager.domain.model.MergeId
+import com.moneymanager.domain.model.MergeMovedTransfer
 import com.moneymanager.domain.model.Transfer
 import kotlinx.coroutines.flow.Flow
 
@@ -34,4 +36,7 @@ interface AccountReadRepository {
 
     /** Merges in which [accountId] was the merged-away account, to label its audit trail. */
     suspend fun getMergesForDeletedAccount(accountId: AccountId): List<AccountMergeContext>
+
+    /** The transfers a given merge moved onto the survivor, so re-import can trace them to source rows. */
+    suspend fun getMergeMovedTransfers(mergeId: MergeId): List<MergeMovedTransfer>
 }

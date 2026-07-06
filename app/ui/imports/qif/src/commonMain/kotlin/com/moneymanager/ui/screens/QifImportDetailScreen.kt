@@ -36,12 +36,15 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.deleteQifImport
 import com.moneymanager.ui.components.qif.QifRecordList
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.qif.QifApplyStrategyDialog
+import com.moneymanager.ui.screens.qif.QifReimportDialog
 import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
 
@@ -57,6 +60,8 @@ fun QifImportDetailScreen(
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     settingsRepository: SettingsReadRepository,
+    transactionRepository: TransactionReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onBack: () -> Unit,
@@ -70,6 +75,7 @@ fun QifImportDetailScreen(
     var records by remember { mutableStateOf<List<QifImportRecord>>(emptyList()) }
     var refreshTrigger by remember { mutableStateOf(0) }
     var showApplyDialog by remember { mutableStateOf(false) }
+    var showReimportDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     androidx.compose.runtime.LaunchedEffect(importId, refreshTrigger) {
@@ -112,6 +118,14 @@ fun QifImportDetailScreen(
                 OutlinedButton(onClick = { onCreateStrategy(importId) }) {
                     Text("Create Strategy")
                 }
+                // Re-applies the last-used strategy/mappings retroactively (merges duplicate accounts,
+                // updates changed values, imports remaining records). Only meaningful once imported.
+                OutlinedButton(
+                    onClick = { showReimportDialog = true },
+                    enabled = current?.lastAppliedStrategyId != null && records.isNotEmpty(),
+                ) {
+                    Text("Re-import")
+                }
                 // Enabled only while there are supported records that still need importing — once a
                 // strategy has been applied (every record imported/duplicate), there's nothing to re-do.
                 val hasPendingRecords =
@@ -151,6 +165,29 @@ fun QifImportDetailScreen(
             onDismiss = { showApplyDialog = false },
             onImportComplete = {
                 showApplyDialog = false
+                refreshTrigger++
+            },
+        )
+    }
+
+    if (showReimportDialog && current != null) {
+        QifReimportDialog(
+            qifImport = current,
+            records = records,
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            accountMappingRepository = accountMappingRepository,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            currencyRepository = currencyRepository,
+            personRepository = personRepository,
+            qifImportRepository = qifImportRepository,
+            transactionRepository = transactionRepository,
+            transferSourceRepository = transferSourceRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+            onDismiss = { showReimportDialog = false },
+            onComplete = {
+                showReimportDialog = false
                 refreshTrigger++
             },
         )

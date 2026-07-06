@@ -7,6 +7,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.sql.qifImport.Qif_record
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
@@ -31,6 +32,7 @@ class QifImportReadRepositoryImpl(
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : QifImportReadRepository {
     private val selectQueries = database.qifImportSelectQueries
+    private val entitySourceSelectQueries = database.entitySourceSelectQueries
 
     override fun getAllImports(): Flow<List<QifImport>> =
         selectQueries
@@ -64,6 +66,15 @@ class QifImportReadRepositoryImpl(
     override suspend fun findImportsByChecksum(checksum: String): List<QifImport> =
         withContext(coroutineContext) {
             selectQueries.selectImportsByChecksum(checksum, ::toQifImport).executeAsList()
+        }
+
+    override suspend fun getAccountsCreatedByImport(id: QifImportId): Set<AccountId> =
+        withContext(coroutineContext) {
+            entitySourceSelectQueries
+                .selectAccountIdsCreatedByQifImport(id.id.toString())
+                .executeAsList()
+                .map { AccountId(it) }
+                .toSet()
         }
 
     private fun Qif_record.toDomain(): QifImportRecord =
