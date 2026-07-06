@@ -225,4 +225,31 @@ class CryptoComCsvE2ETest : DbTest() {
             assertEquals(0, second.transfersCreated, "everything is a duplicate on re-import")
             assertEquals(transfersAfterFirst, allTransfers().size)
         }
+
+    @Test
+    fun importAll_marksHeaderOnlyFileAsImported() =
+        runTest {
+            // A header-only export (no transactions in that period) still matches its strategy by
+            // filename. It has nothing to import, but must be marked imported so it leaves the
+            // Unimported tab instead of reappearing on every "Import all".
+            val emptyFiat = stage("fiat_transactions_record_20231120_085814.csv", emptyList())
+
+            val result = applyAll(listOf(emptyFiat))
+
+            assertEquals(1, result.filesImported, "the empty file is counted as imported")
+            assertEquals(0, result.transfersCreated, "nothing to import")
+            assertEquals(0, result.filesSkippedNoStrategy)
+            assertEquals(0, result.filesFailed)
+            val applied = repositories.csvImportRepository.getImport(emptyFiat.id).first()!!
+            assertTrue(
+                applied.lastAppliedAt != null,
+                "the empty file has an application record (out of the Unimported tab)",
+            )
+
+            // Idempotent: a second "Import all" keeps it imported and imports nothing new.
+            val second = applyAll(listOf(applied))
+            assertEquals(1, second.filesImported)
+            assertEquals(0, second.transfersCreated)
+            assertEquals(0, second.filesFailed)
+        }
 }

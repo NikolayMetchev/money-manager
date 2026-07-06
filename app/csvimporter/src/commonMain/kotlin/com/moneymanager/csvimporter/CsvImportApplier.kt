@@ -186,7 +186,18 @@ suspend fun applyStagedCsv(
 ): CsvImportResult? {
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
     val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
-    if (rows.isEmpty()) return null
+    if (rows.isEmpty()) {
+        // A file with no data rows is nonetheless "done". Leaving it without an application record keeps
+        // it in the Unimported tab, so it reappears on every "Import all". Record the strategy application
+        // to mark it imported — but only when the file is genuinely empty (allRows empty). When allRows is
+        // non-empty, every row was already imported on an earlier run (its application is already recorded),
+        // so return null and leave it untouched.
+        if (allRows.isEmpty()) {
+            recordCsvApplication(importEngine, csvImport.id, strategy)
+            return CsvImportResult(successCount = 0, failedRows = emptyList())
+        }
+        return null
+    }
 
     // The shared override only applies to strategies that need a user-chosen source. A hard-coded
     // mapping resolves its own account; a per-row mapping decides per row.
@@ -227,6 +238,32 @@ suspend fun applyStagedCsv(
         onProgress = onProgress,
         engineBatchSize = engineBatchSize,
     )
+}
+
+/**
+ * Records that [strategy] was applied to [csvImportId], moving the file into the "Imported" tab
+ * (`last_applied_at` becomes non-null). Failures are logged, not thrown — the transfers are already
+ * committed, so a missing history row must not fail the import.
+ */
+private suspend fun recordCsvApplication(
+    importEngine: ImportEngine,
+    csvImportId: CsvImportId,
+    strategy: CsvImportStrategy,
+) {
+    runCatching {
+        importEngine.applyCsvImportMutations(
+            listOf(
+                CsvImportMutation.RecordApplication(
+                    id = csvImportId,
+                    strategyId = strategy.id,
+                    strategyName = strategy.name,
+                    appliedAt = Clock.System.now(),
+                ),
+            ),
+        )
+    }.onFailure { error ->
+        logger.warn { "Import application history could not be recorded for import $csvImportId: ${error.message}" }
+    }
 }
 
 /**
@@ -656,22 +693,7 @@ suspend fun runCsvImport(
     }
 
     if ((successCount + duplicateCount) > 0) {
-        runCatching {
-            importEngine.applyCsvImportMutations(
-                listOf(
-                    CsvImportMutation.RecordApplication(
-                        id = csvImport.id,
-                        strategyId = strategy.id,
-                        strategyName = strategy.name,
-                        appliedAt = Clock.System.now(),
-                    ),
-                ),
-            )
-        }.onFailure { error ->
-            logger.warn {
-                "Import application history could not be recorded for import ${csvImport.id}: ${error.message}"
-            }
-        }
+        recordCsvApplication(importEngine, csvImport.id, strategy)
     }
 
     logger.info { "Import completed successfully" }
