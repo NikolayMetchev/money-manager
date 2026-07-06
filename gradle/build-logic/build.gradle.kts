@@ -16,6 +16,10 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     compilerOptions {
         allWarningsAsErrors.set(true)
         jvmTarget.set(JvmTarget.fromTarget(libs.versions.jvm.target.get()))
+        // Metro 1.3.0 marks its Gradle `analyzeMetroGraph` task (AnalyzeGraphTask) with
+        // @ExperimentalMetroGradleApi. The kotlin-dsl type-safe accessor generated for that task
+        // trips -Werror, so opt in here even though we don't call the task ourselves.
+        optIn.add("dev.zacsweers.metro.gradle.ExperimentalMetroGradleApi")
     }
 }
 
