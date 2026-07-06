@@ -206,4 +206,25 @@ class CryptoComCsvMapperTest {
         // crypto_* files (occasional viban rows, below the content threshold) match nothing.
         assertNull(strategies.selectForCsv("crypto_transactions_record_20251116_101217.csv", columns, cryptoRows))
     }
+
+    @Test
+    fun `older 10-column exports without Transaction Hash still route by filename`() {
+        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now)
+        // crypto.com added the "Transaction Hash" column later; 2021/2022 exports have one fewer column.
+        val legacyColumns =
+            columns.dropLast(1).mapIndexed { index, c -> CsvColumn(CsvColumnId(Uuid.random()), index, c.originalName) }
+
+        // The same rows minus the trailing Transaction Hash column (which older exports lacked).
+        fun legacy(full: CsvRow) = CsvRow(full.rowIndex, full.values.dropLast(1))
+        val legacyFiatRow = legacy(row("Top Up Card", "GBP", "200.0", "GBP", "200.0", "200.0", "viban_card_top_up"))
+        val legacyCardRow = legacy(row("Spotify", "GBP", "-12.99", "", "", "-12.99", ""))
+        assertEquals(
+            "Crypto.com Fiat",
+            strategies.selectForCsv("fiat_transactions_record_20210706_121420.csv", legacyColumns, listOf(legacyFiatRow))?.name,
+        )
+        assertEquals(
+            "Crypto.com Card",
+            strategies.selectForCsv("card_transactions_record_20210706_121443.csv", legacyColumns, listOf(legacyCardRow))?.name,
+        )
+    }
 }

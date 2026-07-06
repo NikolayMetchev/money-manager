@@ -195,14 +195,37 @@ class TransactionWriteRepositoryImpl(
                         id = updatedTransfer.id.id,
                     )
                     if (update.newAttributes.isNotEmpty()) {
+                        // The existing transfer may already carry some of these attribute types (e.g. a
+                        // cross-source reconciliation added one, so a re-import of an otherwise-unchanged
+                        // row is classified UPDATED). Upsert by (transaction_id, attribute_type_id) —
+                        // update a changed value, insert a genuinely new type — instead of blindly
+                        // inserting, which would violate the UNIQUE(transaction_id, attribute_type_id)
+                        // constraint on the types already present.
+                        val existingByType =
+                            transferAttributeSelectQueries
+                                .selectByTransaction(updatedTransfer.id.id) { rowId, _, typeId, value, _, _ ->
+                                    typeId to (rowId to value)
+                                }.executeAsList()
+                                .toMap()
                         database.beginCreationMode()
                         try {
-                            update.newAttributes.forEach { attr ->
-                                transferAttributeWriteQueries.insert(
-                                    transaction_id = updatedTransfer.id.id,
-                                    attribute_type_id = attr.typeId.id,
-                                    attribute_value = attr.value,
-                                )
+                            // Deduplicate by type first: a transfer holds one value per attribute type, and
+                            // [existingByType] is a snapshot, so two incoming attributes of the same type would
+                            // both take the insert path and hit the UNIQUE(transaction_id, attribute_type_id)
+                            // constraint. Last value wins, matching how the attribute would be stored.
+                            update.newAttributes.associateBy { it.typeId.id }.forEach { (typeId, attr) ->
+                                val existing = existingByType[typeId]
+                                when {
+                                    existing == null ->
+                                        transferAttributeWriteQueries.insert(
+                                            transaction_id = updatedTransfer.id.id,
+                                            attribute_type_id = typeId,
+                                            attribute_value = attr.value,
+                                        )
+                                    existing.second != attr.value ->
+                                        transferAttributeWriteQueries.updateValue(attr.value, existing.first)
+                                    // Same value already present: nothing to do.
+                                }
                             }
                         } finally {
                             database.endCreationMode()

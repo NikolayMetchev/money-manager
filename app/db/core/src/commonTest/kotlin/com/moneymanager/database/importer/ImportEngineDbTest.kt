@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
@@ -28,6 +29,7 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
@@ -144,6 +146,67 @@ class ImportEngineDbTest : DbTest() {
                     .id
             val transfers = repositories.transactionRepository.getTransactionsByAccount(coffeeShopId).first()
             assertEquals(1, transfers.size)
+        }
+
+    private fun batchWithAttributes(
+        sourceId: AccountId,
+        currency: Currency,
+        source: Source,
+        attributes: List<NewAttribute>,
+        description: String = "Coffee",
+    ): ImportBatch =
+        batchWithCounterparty(sourceId, currency, description, source).let { base ->
+            base.copy(transfers = base.transfers.map { it.copy(attributes = attributes) })
+        }
+
+    /**
+     * Re-importing a row whose existing transfer already carries an attribute of the same type must not
+     * violate the UNIQUE(transaction_id, attribute_type_id) constraint: the update path upserts (updates a
+     * changed value, keeps an unchanged one, inserts a genuinely new type) instead of blindly inserting.
+     * Regression for a Crypto.com CSV re-import crash (existing transfer had an extra reconciliation
+     * attribute, so the re-import was classified UPDATED and re-supplied its already-present attributes).
+     */
+    @Test
+    fun reimportUpdatingAttributes_upsertsWithoutUniqueConstraintCrash() =
+        runTest {
+            val sourceId = createSourceAccount()
+            val currency = gbp()
+            val source = Source.SampleGenerator
+            val extId = engine().getOrCreateAttributeType("external-id")
+            val note = engine().getOrCreateAttributeType("note")
+
+            // First import creates the transfer with two attributes.
+            engine().import(
+                batchWithAttributes(
+                    sourceId,
+                    currency,
+                    source,
+                    listOf(NewAttribute(extId, "abc"), NewAttribute(note, "keep")),
+                ),
+            )
+            val transferId =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(sourceId)
+                    .first()
+                    .single()
+                    .id
+
+            // Re-import the same row (same core fields) but drop one attribute and change the other's value.
+            // Core fields match, attributes differ -> UPDATED; the re-supplied external-id already exists.
+            val result =
+                engine().import(
+                    batchWithAttributes(sourceId, currency, source, listOf(NewAttribute(extId, "xyz"))),
+                )
+            assertEquals(0, result.transfersImported)
+            assertEquals(1, result.updated)
+
+            // external-id was updated in place; the untouched note attribute is preserved (nothing deleted).
+            val attrs =
+                repositories.transferAttributeRepository
+                    .getByTransaction(transferId)
+                    .first()
+                    .associate { it.attributeType.name to it.value }
+            assertEquals(mapOf("external-id" to "xyz", "note" to "keep"), attrs)
         }
 
     @Test

@@ -221,6 +221,7 @@ class CryptoComCsvE2ETest : DbTest() {
             val fiatAgain = stage("fiat_transactions_record_20240101_000000.csv", fiatRows)
             val second = applyAll(listOf(cardAgain, fiatAgain))
 
+            assertEquals(0, second.filesFailed, "re-import must not fail")
             assertEquals(0, second.transfersCreated, "everything is a duplicate on re-import")
             assertEquals(transfersAfterFirst, allTransfers().size)
         }
