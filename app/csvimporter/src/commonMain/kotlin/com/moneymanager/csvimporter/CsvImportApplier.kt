@@ -50,6 +50,33 @@ import kotlin.time.Duration.Companion.seconds
 
 private val logger = logging()
 
+/**
+ * Collapses consecutive duplicate accounts out of a pass-through spend-leg chain ([nodes] = the conduit
+ * account ids followed by the merchant account id), keeping [spendDescriptions] aligned 1:1 with the
+ * surviving conduit legs by dropping the description of each removed leg.
+ *
+ * The engine builds one spend leg per adjacent node pair (`nodes[i] -> nodes[i+1]`). A node that equals
+ * its predecessor — e.g. a merchant that resolved to its feeding conduit, or a repeated conduit — would
+ * make that leg a zero-movement `source == target` transfer, which the `transfer` CHECK constraint
+ * rejects (aborting the whole file). Returns the collapsed (nodes, descriptions), or null when fewer
+ * than two distinct nodes remain (no real pass-through — the caller imports the plain funding transfer).
+ */
+internal fun collapsePassThroughChain(
+    nodes: List<AccountId>,
+    spendDescriptions: List<String>,
+): Pair<List<AccountId>, List<String>>? {
+    if (nodes.isEmpty()) return null
+    val keptNodes = mutableListOf(nodes.first())
+    val keptDescriptions = mutableListOf<String>()
+    for (legIndex in 0 until nodes.size - 1) {
+        if (nodes[legIndex + 1] != keptNodes.last()) {
+            keptNodes += nodes[legIndex + 1]
+            keptDescriptions += spendDescriptions.getOrElse(legIndex) { "" }
+        }
+    }
+    return if (keptNodes.size < 2) null else keptNodes to keptDescriptions
+}
+
 /** Summary of a bulk CSV import run across many files. */
 data class CsvBulkResult(
     override val filesImported: Int,
@@ -526,16 +553,17 @@ suspend fun runCsvImport(
                     if (merchantId == null || innerConduitIds.any { it == null }) {
                         null
                     } else {
-                        ImportPassThrough(
-                            conduits =
-                                (listOf(firstConduitId) + innerConduitIds.filterNotNull())
-                                    .map { AccountRef.Existing(it) },
-                            merchantTarget = AccountRef.Existing(merchantId),
-                            amount = row.transfer.amount,
-                            spendDescriptions = pt.spendDescriptions,
-                            relationshipTypeId = RelationshipTypeId(pt.relationshipTypeId),
-                            incoming = pt.incoming,
-                        )
+                        val nodes = listOf(firstConduitId) + innerConduitIds.filterNotNull() + merchantId
+                        collapsePassThroughChain(nodes, pt.spendDescriptions)?.let { (keptNodes, keptDescriptions) ->
+                            ImportPassThrough(
+                                conduits = keptNodes.dropLast(1).map { AccountRef.Existing(it) },
+                                merchantTarget = AccountRef.Existing(keptNodes.last()),
+                                amount = row.transfer.amount,
+                                spendDescriptions = keptDescriptions,
+                                relationshipTypeId = RelationshipTypeId(pt.relationshipTypeId),
+                                incoming = pt.incoming,
+                            )
+                        }
                     }
                 }
             ImportTransfer(

@@ -13,7 +13,9 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
 import com.moneymanager.domain.model.AccountMergeContext
 import com.moneymanager.domain.model.MergeId
+import com.moneymanager.domain.model.MergeMovedTransfer
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -114,6 +116,18 @@ class AccountReadRepositoryImpl(
                         survivingAccountId = AccountId(survivingAccountId),
                         survivingAccountName = survivingAccountName,
                         reversed = reversed != 0L,
+                    )
+                }.executeAsList()
+        }
+
+    override suspend fun getMergeMovedTransfers(mergeId: MergeId): List<MergeMovedTransfer> =
+        withContext(Dispatchers.Default) {
+            mergeSelectQueries
+                .selectTransfersForMerge(mergeId.id) { transferId, movedSource, movedTarget ->
+                    MergeMovedTransfer(
+                        transferId = TransferId(transferId),
+                        movedSource = movedSource != 0L,
+                        movedTarget = movedTarget != 0L,
                     )
                 }.executeAsList()
         }

@@ -38,6 +38,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.sync.StrategyItem
 import com.moneymanager.remotestorage.sync.StrategyItemStatus
 import com.moneymanager.remotestorage.sync.StrategySyncController
@@ -80,6 +81,9 @@ fun StrategyCloudCard(
     val state by controller.state.collectAsState()
     var connected by remember { mutableStateOf(controller.isConnected()) }
     var message by remember { mutableStateOf<String?>(null) }
+    // Set when a failure was an expired/revoked Drive connection (Google `invalid_grant`), so the card
+    // offers a "Reconnect" button (re-consent) instead of a dead error — mirrors the main-database flow.
+    var needsReconnect by remember { mutableStateOf(false) }
     // Remote artifacts the user has ticked to pull (REMOTE_AHEAD / AVAILABLE).
     val selectedToPull = remember { mutableStateListOf<StrategyKey>() }
     // Per-conflict direction chosen by the user; a conflict without a choice is left untouched.
@@ -90,6 +94,16 @@ fun StrategyCloudCard(
     var syncProgress by remember { mutableStateOf<SyncProgress?>(null) }
     val actionsEnabled = !state.busy && !busyLocal
 
+    // Records a failure message and, when the cause is an expired/revoked Drive connection, flags the
+    // reconnect affordance so the user can re-consent (rather than being stuck on a dead error).
+    fun fail(
+        prefix: String,
+        cause: Throwable,
+    ) {
+        message = "$prefix ${cause.message}"
+        needsReconnect = cause is RemoteAuthException
+    }
+
     // Runs the two-way sync (auto-upload + the given pulls/forced uploads) with collected resolutions.
     fun performSync(
         pull: Set<StrategyKey>,
@@ -97,6 +111,7 @@ fun StrategyCloudCard(
         resolutions: Map<StrategyKey, Map<CsvUnresolvedReference, CsvResolution>>,
     ) {
         message = null
+        needsReconnect = false
         busyLocal = true
         scope.launch {
             runCatching {
@@ -112,7 +127,7 @@ fun StrategyCloudCard(
                 selectedToPull.clear()
                 conflictChoices.clear()
                 message = "Synced: ${summary.uploaded} uploaded, ${summary.pulled} imported."
-            }.onFailure { message = "Sync failed: ${it.message}" }
+            }.onFailure { fail("Sync failed:", it) }
             syncProgress = null
             busyLocal = false
         }
@@ -122,7 +137,7 @@ fun StrategyCloudCard(
     LaunchedEffect(connected) {
         if (connected) {
             runCatching { controller.refresh(library, appVersion) }
-                .onFailure { message = "Could not read the remote strategy library: ${it.message}" }
+                .onFailure { fail("Could not read the remote strategy library:", it) }
         }
     }
 
@@ -144,13 +159,14 @@ fun StrategyCloudCard(
                     OutlinedButton(
                         onClick = {
                             message = null
+                            needsReconnect = false
                             controller.beginBusy()
                             scope.launch {
                                 runCatching {
                                     controller.connect(type.id, config = null)
                                     connected = true
                                     controller.refresh(library, appVersion)
-                                }.onFailure { message = "Could not connect: ${it.message}" }
+                                }.onFailure { fail("Could not connect:", it) }
                             }
                         },
                         enabled = actionsEnabled,
@@ -177,10 +193,11 @@ fun StrategyCloudCard(
                     OutlinedButton(
                         onClick = {
                             message = null
+                            needsReconnect = false
                             controller.beginBusy()
                             scope.launch {
                                 runCatching { controller.refresh(library, appVersion) }
-                                    .onFailure { message = "Check failed: ${it.message}" }
+                                    .onFailure { fail("Check failed:", it) }
                             }
                         },
                         enabled = actionsEnabled,
@@ -191,6 +208,7 @@ fun StrategyCloudCard(
                     OutlinedButton(
                         onClick = {
                             message = null
+                            needsReconnect = false
                             // Only choices for keys that are still conflicts apply (state may have moved on).
                             val conflicts =
                                 state.items
@@ -217,7 +235,7 @@ fun StrategyCloudCard(
                                         pendingSync = PendingSync(pull, force, unresolved)
                                     }
                                 }.onFailure {
-                                    message = "Sync failed: ${it.message}"
+                                    fail("Sync failed:", it)
                                     syncProgress = null
                                     busyLocal = false
                                 }
@@ -233,10 +251,34 @@ fun StrategyCloudCard(
                 TextButton(onClick = {
                     controller.disconnect()
                     connected = false
+                    needsReconnect = false
                     selectedToPull.clear()
                     conflictChoices.clear()
                 }) {
                     Text("Disconnect")
+                }
+            }
+
+            // A dead Drive connection (expired/revoked refresh token) can't be refreshed silently — the
+            // user must re-consent. Offer that here (only while connected), then re-read the library.
+            if (needsReconnect && connected) {
+                OutlinedButton(
+                    onClick = {
+                        message = null
+                        busyLocal = true
+                        scope.launch {
+                            runCatching {
+                                controller.reconnect()
+                                needsReconnect = false
+                                controller.refresh(library, appVersion)
+                            }.onFailure { fail("Reconnect failed:", it) }
+                            busyLocal = false
+                        }
+                    },
+                    enabled = actionsEnabled,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Reconnect to Google Drive")
                 }
             }
 

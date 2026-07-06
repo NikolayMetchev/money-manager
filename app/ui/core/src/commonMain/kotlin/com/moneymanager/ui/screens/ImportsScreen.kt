@@ -35,6 +35,8 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.domain.repository.TransferRelationshipReadRepository
+import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
@@ -63,6 +65,8 @@ fun ImportsScreen(
     accountRepository: AccountReadRepository,
     currencyRepository: CurrencyReadRepository,
     transactionRepository: TransactionReadRepository,
+    transferRelationshipRepository: TransferRelationshipReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
     maintenance: Maintenance,
     personRepository: PersonReadRepository,
     importEngine: ImportEngine,
@@ -128,6 +132,9 @@ fun ImportsScreen(
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
                     passThroughAccountRepository = passThroughAccountRepository,
+                    transactionRepository = transactionRepository,
+                    transferRelationshipRepository = transferRelationshipRepository,
+                    transferSourceRepository = transferSourceRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
                     onImportClick = onCsvImportClick,
@@ -143,6 +150,8 @@ fun ImportsScreen(
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
                     settingsRepository = settingsRepository,
+                    transactionRepository = transactionRepository,
+                    transferSourceRepository = transferSourceRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
                     onImportClick = onQifImportClick,

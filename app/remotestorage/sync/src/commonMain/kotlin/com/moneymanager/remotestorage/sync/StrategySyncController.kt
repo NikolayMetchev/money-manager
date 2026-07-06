@@ -12,6 +12,7 @@ import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
 import com.moneymanager.remotestorage.RemoteStorageType
+import com.moneymanager.remotestorage.reconnect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -90,6 +91,17 @@ class StrategySyncController(
         resolveSignedIn(providerId, config)
         store.saveConnection(providerId, config)
         _state.value = _state.value.copy(connected = true)
+    }
+
+    /**
+     * Forces fresh interactive consent for the connected provider, minting a new refresh token. Recovers
+     * a revoked/expired refresh token (Google `invalid_grant`), which the normal [resolveSignedIn] path
+     * can't: its `isSignedIn()` check still reports a stored-but-revoked token as signed in and so never
+     * re-consents. Mirrors [RemoteDatabaseController.reconnect] via the shared [reconnect] helper.
+     */
+    suspend fun reconnect() {
+        val providerId = store.providerId() ?: error("Strategy library is not connected to remote storage")
+        providerFactory.reconnect(providerId, store.providerConfig(), SUBFOLDER)
     }
 
     /** Disconnects the library from remote storage (keeps local strategies and baselines). */

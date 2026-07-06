@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
+import com.moneymanager.remotestorage.reconnect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -184,7 +185,7 @@ class RemoteDatabaseController(
         providerId: String,
         config: String?,
     ) {
-        providerFactory.create(providerId, config).signIn()
+        providerFactory.reconnect(providerId, config)
     }
 
     /** Lists the archives stored by [providerId] (signing in if needed) for an open-from-remote picker. */

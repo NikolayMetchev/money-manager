@@ -27,6 +27,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -700,6 +701,100 @@ class CsvAccountMappingTest {
         assertIs<MappingResult.Success>(result)
         // Persisted mapping should take precedence
         assertEquals(specificAccountId, result.transfer.targetAccountId)
+    }
+
+    // A strategy whose SOURCE and TARGET both read the same column, with the source assigned a fixed
+    // account by an always-match rule (like Crypto.com's card strategy: source = "My Card").
+    private fun createStrategySharingDescriptionColumn(): CsvImportStrategy {
+        val now = Clock.System.now()
+        val base = createStrategyWithRegex()
+        return base.copy(
+            fieldMappings =
+                base.fieldMappings +
+                    mapOf(
+                        TransferField.SOURCE_ACCOUNT to
+                            RegexAccountMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.SOURCE_ACCOUNT,
+                                columnName = "Description",
+                                rules = listOf(RegexRule(pattern = "^", accountName = "My Card")),
+                            ),
+                        TransferField.TARGET_ACCOUNT to
+                            RegexAccountMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Description",
+                                rules = emptyList(),
+                            ),
+                    ),
+            updatedAt = now,
+        )
+    }
+
+    @Test
+    fun `persisted counterparty mapping does not hijack the fixed source leg into a self-transfer`() {
+        val card = Account(id = AccountId(70), name = "My Card", openingDate = Clock.System.now())
+        val vendor = Account(id = AccountId(71), name = "Vendor", openingDate = Clock.System.now())
+        // A persisted mapping the user created for the merchant "Amazon" — it matches the row's
+        // Description, which BOTH the source (always-match) and target legs read.
+        val mapper =
+            CsvTransferMapper(
+                strategy = createStrategySharingDescriptionColumn(),
+                columns = columnsWithType,
+                existingAccounts = mapOf("My Card" to card, "Vendor" to vendor),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                accountMappings = listOf(createAccountMapping(1, "Amazon", vendor.id)),
+            )
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Amazon purchase", "-10.00", "", ""))
+
+        val result = mapper.mapRow(row)
+        assertIs<MappingResult.Success>(result)
+        // The counterparty mapping applies to the target; the source falls back to its fixed "My Card".
+        assertEquals(card.id, result.transfer.sourceAccountId)
+        assertEquals(vendor.id, result.transfer.targetAccountId)
+    }
+
+    @Test
+    fun `a source re-resolved off a collision is still discovered as a new account`() {
+        // No "My Card" account exists yet: the re-resolved source is genuinely new. It must be discovered
+        // for creation despite the persisted counterparty mapping that hijacked (and still matches) the row.
+        val vendor = Account(id = AccountId(71), name = "Vendor", openingDate = Clock.System.now())
+        val mapper =
+            CsvTransferMapper(
+                strategy = createStrategySharingDescriptionColumn(),
+                columns = columnsWithType,
+                existingAccounts = mapOf("Vendor" to vendor),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                accountMappings = listOf(createAccountMapping(1, "Amazon", vendor.id)),
+            )
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Amazon purchase", "-10.00", "", ""))
+
+        val result = mapper.mapRow(row)
+        assertIs<MappingResult.Success>(result)
+        assertEquals(vendor.id, result.transfer.targetAccountId)
+        assertTrue(result.newAccounts.any { it.name == "My Card" }, "the re-resolved source account must be discovered")
+    }
+
+    @Test
+    fun `a row that genuinely resolves to one account on both legs is an error row not a crash`() {
+        val card = Account(id = AccountId(70), name = "My Card", openingDate = Clock.System.now())
+        // The persisted mapping maps the merchant onto the card itself, so even after re-resolving the
+        // source there is no distinct counterparty — the row can't be a transfer and must error, not crash.
+        val mapper =
+            CsvTransferMapper(
+                strategy = createStrategySharingDescriptionColumn(),
+                columns = columnsWithType,
+                existingAccounts = mapOf("My Card" to card),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                accountMappings = listOf(createAccountMapping(1, "Weird", card.id)),
+            )
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Weird row", "-10.00", "", ""))
+
+        val result = mapper.mapRow(row)
+        assertIs<MappingResult.Error>(result)
     }
 
     // ============= Column-Agnostic Mappings =============

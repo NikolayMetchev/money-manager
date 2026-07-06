@@ -86,6 +86,31 @@ class StrategySelectorTest {
     }
 
     @Test
+    fun `a file missing an optional column still matches by filename when nothing matches exactly`() {
+        // The strategy knows an extra "Transaction Hash" column a later export added; this older file
+        // has one fewer. No strategy matches the columns exactly, so the tolerant fallback + filename win.
+        val fiat = strategy("Fiat", identificationColumns = headings + "Transaction Hash", fileNamePattern = "^fiat_")
+        val selected = listOf(fiat).selectForCsv("fiat_transactions_record_2021.csv", columns, rows("viban_deposit"))
+        assertEquals("Fiat", selected?.name)
+    }
+
+    @Test
+    fun `an exact column match still wins over a tolerant candidate`() {
+        val exact = strategy("Exact", fileNamePattern = "^fiat_")
+        val superset = strategy("Superset", identificationColumns = headings + "Extra", fileNamePattern = "^fiat_")
+        val selected = listOf(superset, exact).selectForCsv("fiat_x.csv", columns, rows(""))
+        assertEquals("Exact", selected?.name)
+    }
+
+    @Test
+    fun `a file with an unknown extra column is not misrouted by the tolerant fallback`() {
+        // The strategy's identification columns are a strict subset of the file's, so the file carries a
+        // column the strategy doesn't know — it must not tolerantly match.
+        val s = strategy("A", identificationColumns = setOf("Date", "Amount"), fileNamePattern = "^fiat_")
+        assertNull(listOf(s).selectForCsv("fiat_transactions.csv", columns, rows("viban_deposit")))
+    }
+
+    @Test
     fun `filename match beats higher content score`() {
         val byName = strategy("Card", fileNamePattern = "^card_")
         val byContent = strategy("Fiat", contentMatchRules = listOf(kindRule))

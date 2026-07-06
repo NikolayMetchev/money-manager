@@ -458,6 +458,7 @@ fun CsvImportDetailScreen(
             passThroughAccountRepository = passThroughAccountRepository,
             transactionRepository = transactionRepository,
             transferRelationshipRepository = transferRelationshipRepository,
+            transferSourceRepository = transferSourceRepository,
             maintenance = maintenance,
             importEngine = importEngine,
             onDismiss = { showReimportDialog = false },

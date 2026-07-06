@@ -90,5 +90,10 @@ object QifCsvAdapter {
                     record.clearedStatus.orEmpty(),
                     record.accountName.orEmpty(),
                 ),
+            // Carry the record's import status and produced transfer so re-import can tell already-imported
+            // rows apart. A split record has one transaction_id shared by all its rows (see QifReimport).
+            transferId = record.transferId,
+            importStatus = record.importStatus,
+            errorMessage = record.errorMessage,
         )
 }

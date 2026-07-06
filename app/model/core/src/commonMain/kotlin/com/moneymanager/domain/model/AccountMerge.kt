@@ -35,3 +35,13 @@ value class MergeId(
 ) {
     override fun toString() = id.toString()
 }
+
+/**
+ * One transfer a merge moved onto the surviving account, recording which side(s) had pointed at the
+ * deleted account. Used by re-import auto-split to trace a moved transfer back to its source row.
+ */
+data class MergeMovedTransfer(
+    val transferId: TransferId,
+    val movedSource: Boolean,
+    val movedTarget: Boolean,
+)

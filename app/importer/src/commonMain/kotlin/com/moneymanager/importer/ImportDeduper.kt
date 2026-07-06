@@ -94,6 +94,15 @@ class ImportDeduper(
 ) {
     private val existingList = existing
 
+    // The reconciliation exclusion attribute type (when the policy enables cross-source reconciliation),
+    // ignored in attribute comparison so a reconciled transfer still dedupes cleanly on re-import.
+    private val reconciledExclusionTypeId: AttributeTypeId? =
+        when (policy) {
+            is DedupePolicy.FuzzyAllFields -> policy.reconciledExclusionAttributeTypeId
+            is DedupePolicy.ApiMultiKey -> policy.reconciledExclusionAttributeTypeId
+            else -> null
+        }
+
     private val existingByUniqueKey: Map<Map<String, String>, ExistingTransferInfo> =
         existing.filter { it.uniqueKey.isNotEmpty() }.associateBy { it.uniqueKey }
 
@@ -305,8 +314,14 @@ class ImportDeduper(
         transfer: ImportTransfer,
         existing: ExistingTransferInfo,
     ): Boolean {
-        val newAttrs = transfer.attributes.associate { it.typeId to it.value }
-        return newAttrs == existing.attributes
+        // The cross-source reconciliation exclusion attribute is engine-added (never present in the
+        // source), so an existing transfer that was reconciled carries it while the re-imported row does
+        // not. Ignore it on both sides: a row that is otherwise unchanged is a DUPLICATE, not a perpetual
+        // UPDATED, so re-importing the same export is idempotent.
+        val ignore = reconciledExclusionTypeId
+        val newAttrs = transfer.attributes.filter { it.typeId != ignore }.associate { it.typeId to it.value }
+        val existingAttrs = if (ignore == null) existing.attributes else existing.attributes.filterKeys { it != ignore }
+        return newAttrs == existingAttrs
     }
 
     private fun isFuzzyDuplicate(
