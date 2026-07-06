@@ -90,9 +90,8 @@ fun <D : Any> AuditScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        header()
-
         if (isLoading) {
+            header()
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
@@ -100,6 +99,7 @@ fun <D : Any> AuditScreen(
                 CircularProgressIndicator()
             }
         } else if (errorMessage != null) {
+            header()
             Text(
                 text = errorMessage!!,
                 color = MaterialTheme.colorScheme.error,
@@ -107,6 +107,7 @@ fun <D : Any> AuditScreen(
         } else {
             val diffs = screenData?.diffs.orEmpty()
             if (diffs.isEmpty()) {
+                header()
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
@@ -118,12 +119,15 @@ fun <D : Any> AuditScreen(
                     )
                 }
             } else {
+                // The header (e.g. an account's merge history) scrolls WITH the entries rather than
+                // sitting fixed above them, so a long header plus a long audit list stays fully reachable.
                 val auditListState = rememberLazyListState()
                 Box(modifier = Modifier.weight(1f)) {
                     LazyColumn(
                         state = auditListState,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        item(key = "audit-header") { header() }
                         items(diffs, key = { diffKey(it) }) { diff ->
                             diffCard(diff)
                         }

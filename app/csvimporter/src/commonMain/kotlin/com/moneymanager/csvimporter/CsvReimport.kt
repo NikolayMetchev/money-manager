@@ -3,8 +3,10 @@
 package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
@@ -21,6 +23,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
+import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.AccountMergeRequest
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.CsvImportMutation
@@ -64,6 +67,9 @@ enum class ReimportSkipReason {
 
     /** Updating a row's transfer to its recomputed values failed; the transfer was left as-is. */
     UPDATE_FAILED,
+
+    /** Reversing a merge whose accounts no longer consolidate failed; the merge was left as-is. */
+    REVERSAL_FAILED,
 }
 
 /** One duplicate-account merge the re-import will perform (or performed). */
@@ -126,6 +132,22 @@ data class ReimportValueUpdate(
     val targetAccountId: AccountId,
 )
 
+/**
+ * A previously-performed account merge the re-import will REVERSE because the current account mappings
+ * no longer consolidate the merged-away account onto its survivor (e.g. the mapping was narrowed or
+ * removed): the merge is undone, recreating the deleted account and moving its transfers back.
+ */
+data class ReimportReversal(
+    val mergeId: MergeId,
+    /** The account that will be recreated (was merged away). */
+    val deletedAccountName: String,
+    /** The survivor the transfers currently sit on. */
+    val survivingName: String,
+    val transferCount: Long,
+    /** This import's row indexes whose transfers move back — excluded from in-place value updates. */
+    val rowIndexes: Set<Long>,
+)
+
 /** The read-only preview of what a re-import would do, shown for confirmation before executing. */
 data class ReimportPlan(
     val merges: List<ReimportMerge>,
@@ -134,8 +156,11 @@ data class ReimportPlan(
     val rewrites: List<ReimportRewrite> = emptyList(),
     /** Already-imported rows whose transfer values (amount/currency/date/description) changed. */
     val valueUpdates: List<ReimportValueUpdate> = emptyList(),
+    /** Prior merges to undo because the current mappings no longer consolidate them. */
+    val reversals: List<ReimportReversal> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = merges.isEmpty() && skipped.isEmpty() && rewrites.isEmpty() && valueUpdates.isEmpty()
+    val isEmpty: Boolean
+        get() = merges.isEmpty() && skipped.isEmpty() && rewrites.isEmpty() && valueUpdates.isEmpty() && reversals.isEmpty()
 }
 
 /** The outcome of an executed re-import. */
@@ -150,6 +175,8 @@ data class CsvReimportResult(
     val rewrittenRows: List<ReimportRewrite> = emptyList(),
     /** Rows whose transfers were updated in place to the recomputed values. */
     val updatedRows: List<ReimportValueUpdate> = emptyList(),
+    /** Prior merges undone because the current mappings no longer consolidate them. */
+    val reversedMerges: List<ReimportReversal> = emptyList(),
 )
 
 /** Raw merge detection output: duplicate → single target, plus duplicates with competing targets. */
@@ -206,6 +233,71 @@ fun computeReimportMerges(
 }
 
 /**
+ * Detects prior account merges this re-import should REVERSE: for each still-active merge whose
+ * merged-away account was created by this import, it re-maps that account's moved transfers (traced back
+ * to their source rows) under the CURRENT mappings. A merge is reversed only when its rows resolve to a NEW
+ * account (no explicit mapping routes them anywhere) — the deleted account is recreated and its transfers
+ * move back. If the rows still resolve to ANY existing account — the survivor (merge still valid) or a
+ * different account they were remapped to — the merge is left as-is rather than sending the transfers to
+ * the deleted account (which the value-update pass, skipping reversed rows, would never then correct). This
+ * is the inverse of [computeReimportMerges] — it lets narrowing/removing a mapping split previously-
+ * consolidated accounts back out. [rowIndexForSource] returns a row index only for source records belonging
+ * to this import (CSV or QIF), so cross-import transfers on a shared account are ignored.
+ */
+@Suppress("LongParameterList")
+suspend fun computeReimportReversals(
+    importCreated: Set<AccountId>,
+    mappedNoHistoryPrep: ImportPreparation,
+    accountsById: Map<AccountId, Account>,
+    accountRepository: AccountReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
+    rowIndexForSource: (Source) -> Long?,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+): List<ReimportReversal> {
+    val candidates = accountRepository.getReversibleMerges().first().filter { it.deletedAccountId in importCreated }
+    if (candidates.isEmpty()) return emptyList()
+
+    onProgress?.invoke(ImportProgress("Checking merges to reverse"))
+    val mappedByRow = mappedNoHistoryPrep.validTransfers.associateBy { it.rowIndex }
+    val reversals = mutableListOf<ReimportReversal>()
+    for (merge in candidates) {
+        var sawRow = false
+        var resolvesToExistingAccount = false
+        val rowIndexes = mutableSetOf<Long>()
+        for (moved in accountRepository.getMergeMovedTransfers(merge.id)) {
+            val rowIndex =
+                transferSourceRepository
+                    .getSourcesForTransaction(moved.transferId)
+                    .firstNotNullOfOrNull { rowIndexForSource(it.source) }
+            val mapped = rowIndex?.let { mappedByRow[it] }
+            if (rowIndex != null && mapped != null) {
+                sawRow = true
+                rowIndexes += rowIndex
+                // The side that had pointed at the deleted account. Only reverse when it now resolves to a
+                // NEW account (id <= 0) — i.e. no explicit mapping routes it anywhere, so splitting it back
+                // to the merged-away account is exactly right. If it still resolves to ANY existing account
+                // — the survivor (merge still valid) OR a different account it was remapped to — don't
+                // reverse: reversing would wrongly send the transfer to the deleted account instead of that
+                // target, and the value-update pass skips reversed rows so it would never be corrected.
+                val resolved = if (moved.movedTarget) mapped.transfer.targetAccountId else mapped.transfer.sourceAccountId
+                if (resolved.id > 0) resolvesToExistingAccount = true
+            }
+        }
+        if (sawRow && !resolvesToExistingAccount) {
+            reversals +=
+                ReimportReversal(
+                    mergeId = merge.id,
+                    deletedAccountName = merge.deletedAccountName,
+                    survivingName = accountsById[merge.survivingAccountId]?.name ?: "#${merge.survivingAccountId.id}",
+                    transferCount = merge.transferCount,
+                    rowIndexes = rowIndexes,
+                )
+        }
+    }
+    return reversals
+}
+
+/**
  * Builds the read-only [ReimportPlan] for [csvImport] under [strategy]: which import-created accounts
  * the current mappings consolidate away (as merges), which detected duplicates cannot be merged,
  * which already-imported rows the current pass-through configuration reroutes through a conduit chain
@@ -225,6 +317,7 @@ suspend fun planCsvReimport(
     csvImportRepository: CsvImportReadRepository,
     transactionRepository: TransactionReadRepository,
     relationshipRepository: TransferRelationshipReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): ReimportPlan {
@@ -254,20 +347,37 @@ suspend fun planCsvReimport(
     val mappedPrep = prep(mappings)
     onProgress?.invoke(ImportProgress("Analyzing rows (pass 2 of 2)"))
     val candidates = computeReimportMerges(prep(emptyList()), mappedPrep, importCreated)
+    val accountsById = accounts.associateBy { it.id }
+    // Reversal detection re-maps with the mappings but NO historical names, so a merged-away account's
+    // name (now an audit alias of its survivor) doesn't mask a mapping that no longer routes it there.
+    val mappedNoHistoryPrep =
+        buildCsvMapper(strategy, csvImport.columns, accounts, currencies, mappings, effectiveSource, passThroughAccounts)
+            .prepareImport(allRows)
+    val reversals =
+        computeReimportReversals(
+            importCreated = importCreated,
+            mappedNoHistoryPrep = mappedNoHistoryPrep,
+            accountsById = accountsById,
+            accountRepository = accountRepository,
+            transferSourceRepository = transferSourceRepository,
+            rowIndexForSource = { source -> (source as? Source.Csv)?.takeIf { it.importId == csvImport.id }?.rowIndex },
+            onProgress = onProgress,
+        )
     val rewrites =
         computeReimportRewrites(allRows, mappedPrep, relationshipRepository, onProgress) { transferId ->
             transactionRepository.getTransactionById(transferId.id).first()
         }
+    // Rows whose transfers a reversal moves back are excluded from value updates: the reversal owns that
+    // transfer's account move, and a value update would re-send the pre-reversal (survivor) accounts.
+    val reversalRowIndexes = reversals.flatMapTo(mutableSetOf()) { it.rowIndexes }
     val valueUpdates =
         computeReimportValueUpdates(
             allRows = allRows,
             mappedPrep = mappedPrep,
-            rewrittenRowIndexes = rewrites.map { it.rowIndex }.toSet(),
+            rewrittenRowIndexes = rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes,
             transactionRepository = transactionRepository,
             onProgress = onProgress,
         )
-
-    val accountsById = accounts.associateBy { it.id }
 
     fun nameOf(id: AccountId): String = accountsById[id]?.name ?: "#${id.id}"
 
@@ -305,7 +415,13 @@ suspend fun planCsvReimport(
                 transferCount = accountRepository.countTransfersByAccount(duplicate),
             )
     }
-    return ReimportPlan(merges = merges, skipped = skipped, rewrites = rewrites, valueUpdates = valueUpdates)
+    return ReimportPlan(
+        merges = merges,
+        skipped = skipped,
+        rewrites = rewrites,
+        valueUpdates = valueUpdates,
+        reversals = reversals,
+    )
 }
 
 /**
@@ -316,7 +432,7 @@ suspend fun planCsvReimport(
  * Pass-through rows are excluded — value changes there invalidate every leg of the chain, so they
  * are handled by the rewrite path instead (see [computeReimportRewrites]).
  */
-internal suspend fun computeReimportValueUpdates(
+suspend fun computeReimportValueUpdates(
     allRows: List<CsvRow>,
     mappedPrep: ImportPreparation,
     rewrittenRowIndexes: Set<Long>,
@@ -520,9 +636,14 @@ suspend fun executeCsvReimport(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
     valueUpdateChunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
+    refreshViews: Boolean = true,
 ): CsvReimportResult {
     val merged = mutableListOf<ReimportMerge>()
     val skipped = plan.skipped.toMutableList()
+
+    // Reverse no-longer-valid merges FIRST: recreate the merged-away accounts and move their transfers
+    // back before value updates / merges / re-run touch them, so downstream steps see the split state.
+    val reversedMerges = applyReimportReversals(plan.reversals, importEngine, skipped, onProgress)
 
     val updatedRows = applyValueUpdates(plan.valueUpdates, csvImport, importEngine, skipped, onProgress, valueUpdateChunkSize)
 
@@ -616,8 +737,10 @@ suspend fun executeCsvReimport(
     onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))
     val deletedEmptyAccounts = deleteEmptyImportCreatedAccounts(csvImport, accountRepository, csvImportRepository, importEngine)
 
-    onProgress?.invoke(ImportProgress("Refreshing views"))
-    maintenance.refreshMaterializedViews()
+    if (refreshViews) {
+        onProgress?.invoke(ImportProgress("Refreshing views"))
+        maintenance.refreshMaterializedViews()
+    }
 
     return CsvReimportResult(
         mergedAccounts = merged,
@@ -626,7 +749,47 @@ suspend fun executeCsvReimport(
         importResult = importResult,
         rewrittenRows = rewritten,
         updatedRows = updatedRows,
+        reversedMerges = reversedMerges,
     )
+}
+
+/**
+ * Undoes each planned merge reversal via an [ImportBatch.manualEdits] unmerge intent (recreating the
+ * deleted account and moving its transfers back), one batch per reversal so a failure downgrades to a
+ * per-item skip. Returns the reversals actually applied; failures are appended to [skipped].
+ */
+suspend fun applyReimportReversals(
+    reversals: List<ReimportReversal>,
+    importEngine: ImportEngine,
+    skipped: MutableList<ReimportSkippedAccount>,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+): List<ReimportReversal> {
+    if (reversals.isEmpty()) return emptyList()
+    val reversed = mutableListOf<ReimportReversal>()
+    for ((index, reversal) in reversals.withIndex()) {
+        onProgress?.invoke(
+            ImportProgress(
+                "Reversing merges",
+                fraction = index.toFloat() / reversals.size,
+                processed = index,
+                total = reversals.size,
+            ),
+        )
+        try {
+            importEngine.import(ImportBatch.manualEdits(accountUnmerges = listOf(reversal.mergeId)))
+            reversed += reversal
+        } catch (expected: Exception) {
+            logger.warn(expected) { "Re-import reversal of merge '${reversal.deletedAccountName}' failed" }
+            skipped +=
+                ReimportSkippedAccount(
+                    accountId = null,
+                    accountName = reversal.deletedAccountName,
+                    reason = ReimportSkipReason.REVERSAL_FAILED,
+                    detail = expected.message ?: "Reversal failed",
+                )
+        }
+    }
+    return reversed
 }
 
 /**
@@ -742,4 +905,148 @@ private suspend fun deleteEmptyImportCreatedAccounts(
         ),
     )
     return emptyAccounts.map { it.name }
+}
+
+/**
+ * Summary of a bulk re-import run across many already-imported files. [filesImported] counts files a
+ * re-import actually ran over (had a resolvable strategy). [merges] and [skipped] carry the actual
+ * duplicate-account consolidations performed (and the ones that could not be merged) across all files,
+ * so the UI can show WHICH accounts merged — the per-file preview's key detail the bulk path drops.
+ */
+data class CsvBulkReimportResult(
+    override val filesImported: Int,
+    override val transfersCreated: Int,
+    override val duplicatesSkipped: Int,
+    override val filesSkippedNoStrategy: Int,
+    override val filesFailed: Int,
+    val merges: List<ReimportMerge>,
+    val reversals: List<ReimportReversal>,
+    val valueUpdates: Int,
+    val emptyAccountsDeleted: Int,
+    val skipped: List<ReimportSkippedAccount>,
+) : BulkImportResult {
+    override fun toSummary(): String =
+        buildString {
+            append("Re-imported $filesImported file${if (filesImported == 1) "" else "s"}")
+            append(" · $transfersCreated new")
+            if (valueUpdates > 0) append(" · $valueUpdates updated")
+            if (merges.isNotEmpty()) append(" · ${merges.size} account${if (merges.size == 1) "" else "s"} merged")
+            if (reversals.isNotEmpty()) append(" · ${reversals.size} merge${if (reversals.size == 1) "" else "s"} reversed")
+            if (emptyAccountsDeleted > 0) append(" · $emptyAccountsDeleted empty removed")
+            if (duplicatesSkipped > 0) append(" · $duplicatesSkipped duplicates skipped")
+            if (filesSkippedNoStrategy > 0) append(" · $filesSkippedNoStrategy skipped (no strategy)")
+            if (skipped.isNotEmpty()) append(" · ${skipped.size} not merged/updated")
+            if (filesFailed > 0) append(" · $filesFailed failed")
+        }
+}
+
+/**
+ * Re-imports every already-imported [imports] file in one go: for each, resolves the strategy it was
+ * last imported with ([CsvImport.lastAppliedStrategyId], falling back to content-aware auto-selection),
+ * then plans and executes a re-import so current strategy/mapping changes apply retroactively (duplicate
+ * accounts merged, changed transfer values updated, never-imported/errored rows imported, emptied
+ * import-created accounts removed). Files with no resolvable strategy are skipped and counted.
+ * Refreshes materialized views once at the end. Mirrors [bulkApplyCsv]; reports per-file [onProgress].
+ */
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+suspend fun bulkReimportCsv(
+    imports: List<CsvImport>,
+    sourceAccountOverride: AccountId?,
+    strategies: List<CsvImportStrategy>,
+    currencies: List<Currency>,
+    accountMappingRepository: AccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
+    csvImportRepository: CsvImportReadRepository,
+    transactionRepository: TransactionReadRepository,
+    relationshipRepository: TransferRelationshipReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
+    maintenance: Maintenance,
+    importEngine: ImportEngine,
+    onProgress: (done: Int, total: Int) -> Unit,
+    passThroughAccounts: List<PassThroughAccount> = emptyList(),
+): CsvBulkReimportResult {
+    var filesImported = 0
+    var transfers = 0
+    var duplicates = 0
+    var skippedNoStrategy = 0
+    var failed = 0
+    val merges = mutableListOf<ReimportMerge>()
+    val reversals = mutableListOf<ReimportReversal>()
+    var valueUpdates = 0
+    var emptyAccountsDeleted = 0
+    val skipped = mutableListOf<ReimportSkippedAccount>()
+
+    imports.forEachIndexed { index, listedImport ->
+        onProgress(index, imports.size)
+        // getAllImports() doesn't populate columns; re-fetch the full import so the strategy match works.
+        val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
+        val sampleRows = csvImportRepository.getImportRows(csvImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
+        // Prefer the strategy the file was last imported with (matches the per-file re-import dialog);
+        // fall back to content-aware auto-selection if it was deleted or was never recorded.
+        val matched =
+            csvImport.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
+                ?: strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, sampleRows)
+        if (matched == null) {
+            skippedNoStrategy++
+            return@forEachIndexed
+        }
+        try {
+            val plan =
+                planCsvReimport(
+                    csvImport = csvImport,
+                    strategy = matched,
+                    sourceAccountOverride = sourceAccountOverride,
+                    currencies = currencies,
+                    accountMappingRepository = accountMappingRepository,
+                    accountRepository = accountRepository,
+                    csvImportRepository = csvImportRepository,
+                    transactionRepository = transactionRepository,
+                    relationshipRepository = relationshipRepository,
+                    transferSourceRepository = transferSourceRepository,
+                    passThroughAccounts = passThroughAccounts,
+                )
+            val result =
+                executeCsvReimport(
+                    plan = plan,
+                    csvImport = csvImport,
+                    strategy = matched,
+                    sourceAccountOverride = sourceAccountOverride,
+                    currencies = currencies,
+                    accountMappingRepository = accountMappingRepository,
+                    accountRepository = accountRepository,
+                    csvImportRepository = csvImportRepository,
+                    maintenance = maintenance,
+                    importEngine = importEngine,
+                    passThroughAccounts = passThroughAccounts,
+                    refreshViews = false,
+                )
+            filesImported++
+            transfers += result.importResult?.successCount ?: 0
+            duplicates += result.importResult?.duplicateCount ?: 0
+            merges += result.mergedAccounts
+            reversals += result.reversedMerges
+            valueUpdates += result.updatedRows.size
+            emptyAccountsDeleted += result.deletedEmptyAccounts.size
+            skipped += result.skipped
+        } catch (expected: Exception) {
+            logger.error(expected) { "Bulk CSV re-import failed for ${csvImport.originalFileName}: ${expected.message}" }
+            failed++
+        }
+    }
+
+    onProgress(imports.size, imports.size)
+    maintenance.refreshMaterializedViews()
+
+    return CsvBulkReimportResult(
+        filesImported = filesImported,
+        transfersCreated = transfers,
+        duplicatesSkipped = duplicates,
+        filesSkippedNoStrategy = skippedNoStrategy,
+        filesFailed = failed,
+        merges = merges,
+        reversals = reversals,
+        valueUpdates = valueUpdates,
+        emptyAccountsDeleted = emptyAccountsDeleted,
+        skipped = skipped,
+    )
 }

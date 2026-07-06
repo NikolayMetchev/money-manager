@@ -6,6 +6,14 @@ FROM entity_source
 JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
 WHERE csv_entity_source.csv_import_id = ? AND entity_source.entity_type_id = 1;
 
+-- Accounts (entity_type_id = 1) whose creation was recorded against the given QIF import — the QIF
+-- analogue of selectAccountIdsCreatedByCsvImport, used by QIF re-import to scope merges/deletes.
+selectAccountIdsCreatedByQifImport:
+SELECT DISTINCT entity_source.entity_id
+FROM entity_source
+JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+WHERE qif_entity_source.qif_import_id = ? AND entity_source.entity_type_id = 1;
+
 selectEntitySourceForRevision:
 SELECT id, source_type_id
 FROM entity_source

@@ -1,6 +1,6 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class)
 
-package com.moneymanager.ui.screens.csv
+package com.moneymanager.ui.screens.qif
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -25,35 +25,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.CsvReimportResult
 import com.moneymanager.csvimporter.ReimportPlan
-import com.moneymanager.csvimporter.executeCsvReimport
 import com.moneymanager.csvimporter.needsSourceAccountOverride
-import com.moneymanager.csvimporter.planCsvReimport
-import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.csv.CsvImport
-import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
+import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.qif.QifImport
+import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportProgress
+import com.moneymanager.qifimporter.QifCsvAdapter
+import com.moneymanager.qifimporter.executeQifReimport
+import com.moneymanager.qifimporter.planQifReimport
+import com.moneymanager.qifimporter.qifCompatible
+import com.moneymanager.qifimporter.selectForQifContent
+import com.moneymanager.qifimporter.withQifCurrency
 import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -62,94 +66,103 @@ private val logger = logging()
 private const val VALUE_UPDATE_PREVIEW_LIMIT = 20
 
 /**
- * Re-imports an already-imported CSV so strategy/mapping changes take effect retroactively: shows a
+ * Re-imports an already-imported QIF so strategy/mapping changes take effect retroactively: shows a
  * read-only preview of the duplicate-account merges the current mappings imply and the transactions
  * whose values the current strategy now computes differently, then (on confirm) merges/updates them,
- * re-runs the strategy over never-imported/errored rows, and deletes import-created accounts left
- * empty.
+ * re-runs the strategy over never-imported/errored records, and deletes import-created accounts left
+ * empty. Mirrors the CSV ReimportDialog minus the pass-through-rewrite path (QIF has no pass-through).
+ * QIF carries no currency, so the one used at import time is chosen here (default preselected) — pick the
+ * same one to avoid spurious value updates.
  */
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 @Composable
-fun ReimportDialog(
-    csvImport: CsvImport,
-    rows: List<CsvRow>,
-    csvImportRepository: CsvImportReadRepository,
+fun QifReimportDialog(
+    qifImport: QifImport,
+    records: List<QifImportRecord>,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
-    passThroughAccountRepository: PassThroughAccountReadRepository,
+    qifImportRepository: QifImportReadRepository,
     transactionRepository: TransactionReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
-    onComplete: (CsvReimportResult) -> Unit,
+    onComplete: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val currencies by currencyRepository
         .getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val passThroughAccounts by passThroughAccountRepository
-        .getAll()
+    val strategies by csvImportStrategyRepository
+        .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
-    var strategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
+    val rows = remember(records) { QifCsvAdapter.toRows(records) }
+
+    var baseStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var strategyResolved by remember { mutableStateOf(false) }
     var selectedSourceAccountId by remember { mutableStateOf<AccountId?>(null) }
+    var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var plan by remember { mutableStateOf<ReimportPlan?>(null) }
     var isRunning by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var planProgress by remember { mutableStateOf<ImportProgress?>(null) }
     var executeProgress by remember { mutableStateOf<ImportProgress?>(null) }
+    var summary by remember { mutableStateOf<String?>(null) }
 
-    // Resolve the strategy that was last applied; fall back to auto-selection if it was deleted.
-    LaunchedEffect(csvImport.id) {
-        val byId =
-            csvImport.lastAppliedStrategyId?.let { strategyId ->
-                csvImportStrategyRepository.getStrategyById(strategyId).first()
-            }
-        strategy = byId
-            ?: csvImportStrategyRepository
-                .getAllStrategies()
-                .first()
-                .selectForCsv(csvImport.originalFileName, csvImport.columns, rows)
+    // Resolve the strategy that was last applied; fall back to content-aware auto-selection if it was
+    // deleted. Only QIF-compatible strategies are considered.
+    LaunchedEffect(qifImport.id, strategies) {
+        if (strategies.isEmpty()) return@LaunchedEffect
+        val qifStrategies = strategies.qifCompatible()
+        baseStrategy =
+            qifImport.lastAppliedStrategyId
+                ?.let { id -> qifStrategies.find { it.id == id } }
+                ?: qifStrategies.selectForQifContent(rows, QifCsvAdapter.columns)
         strategyResolved = true
     }
 
-    // A source-account picker is only needed to import remaining rows; merges don't use it.
-    val hasUnimportedRows = rows.any { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
-    val needsSourcePicker = strategy?.needsSourceAccountOverride() == true && hasUnimportedRows
+    // Preselect the DB default currency (the import path's default), and a hard-coded strategy source.
+    LaunchedEffect(currencies) {
+        if (selectedCurrencyId == null && currencies.isNotEmpty()) {
+            selectedCurrencyId = currencies.firstOrNull()?.id
+        }
+    }
+
+    val currencyStrategy = baseStrategy?.withQifCurrency(selectedCurrencyId)
+    val sourceMapping = currencyStrategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+    val hasHardcodedSource = sourceMapping is HardCodedAccountMapping
+    val hasPendingRecords = records.any { it.supported && (it.importStatus == null || it.importStatus == ImportStatus.ERROR) }
+    val needsSourcePicker = currencyStrategy?.needsSourceAccountOverride() == true && hasPendingRecords && !hasHardcodedSource
     val sourceReady = !needsSourcePicker || selectedSourceAccountId != null
 
-    // Build the read-only merge preview once the inputs are ready.
-    LaunchedEffect(strategy, selectedSourceAccountId, currencies, passThroughAccounts) {
-        val currentStrategy = strategy ?: return@LaunchedEffect
-        if (currencies.isEmpty()) return@LaunchedEffect
+    // Build the read-only preview once the inputs are ready.
+    LaunchedEffect(currencyStrategy, selectedSourceAccountId, currencies) {
+        val strategy = currencyStrategy ?: return@LaunchedEffect
+        if (currencies.isEmpty() || selectedCurrencyId == null) return@LaunchedEffect
         try {
             plan =
-                planCsvReimport(
-                    csvImport = csvImport,
-                    strategy = currentStrategy,
+                planQifReimport(
+                    qifImport = qifImport,
+                    strategy = strategy,
                     sourceAccountOverride = selectedSourceAccountId,
                     currencies = currencies,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
-                    csvImportRepository = csvImportRepository,
+                    qifImportRepository = qifImportRepository,
                     transactionRepository = transactionRepository,
-                    relationshipRepository = transferRelationshipRepository,
                     transferSourceRepository = transferSourceRepository,
-                    passThroughAccounts = passThroughAccounts,
                     onProgress = { planProgress = it },
                 )
             errorMessage = null
         } catch (expected: CancellationException) {
             throw expected
         } catch (expected: Exception) {
-            logger.error(expected) { "Re-import preview failed: ${expected.message}" }
+            logger.error(expected) { "QIF re-import preview failed: ${expected.message}" }
             errorMessage = "Failed to prepare re-import: ${expected.message}"
             plan = null
         } finally {
@@ -159,7 +172,7 @@ fun ReimportDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isRunning) onDismiss() },
-        title = { Text("Re-import ${csvImport.originalFileName}") },
+        title = { Text(if (summary != null) "Re-import complete" else "Re-import ${qifImport.originalFileName}") },
         text = {
             Column(
                 modifier =
@@ -167,17 +180,29 @@ fun ReimportDialog(
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState()),
             ) {
+                val currentSummary = summary
                 when {
+                    currentSummary != null -> Text(currentSummary, style = MaterialTheme.typography.bodyMedium)
                     !strategyResolved -> CircularProgressIndicator()
-                    strategy == null ->
+                    baseStrategy == null ->
                         Text(
-                            text = "No strategy matches this import. Create or restore a matching strategy first.",
+                            text = "No QIF strategy matches this import. Create or restore a matching strategy first.",
                             color = MaterialTheme.colorScheme.error,
                         )
                     else -> {
                         Text(
-                            text = "Strategy: ${strategy?.name}",
+                            text = "Strategy: ${baseStrategy?.name}",
                             style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        CurrencyPicker(
+                            selectedCurrencyId = selectedCurrencyId,
+                            onCurrencySelected = { selectedCurrencyId = it },
+                            label = "Currency (as used at import time)",
+                            currencyRepository = currencyRepository,
+                            enabled = !isRunning,
+                            isError = selectedCurrencyId == null,
                         )
                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -185,7 +210,7 @@ fun ReimportDialog(
                             AccountPicker(
                                 selectedAccountId = selectedSourceAccountId,
                                 onAccountSelected = { selectedSourceAccountId = it },
-                                label = "Source Account (for not-yet-imported rows)",
+                                label = "Source Account (for not-yet-imported records)",
                                 accountRepository = accountRepository,
                                 categoryRepository = categoryRepository,
                                 personRepository = personRepository,
@@ -198,14 +223,14 @@ fun ReimportDialog(
                         when (val currentPlan = plan) {
                             null ->
                                 if (errorMessage == null) {
-                                    ReimportProgressIndicator(planProgress ?: ImportProgress("Preparing preview"))
+                                    QifReimportProgressIndicator(planProgress ?: ImportProgress("Preparing preview"))
                                 }
                             else -> {
                                 if (isRunning) {
-                                    ReimportProgressIndicator(executeProgress ?: ImportProgress("Starting re-import"))
+                                    QifReimportProgressIndicator(executeProgress ?: ImportProgress("Starting re-import"))
                                     Spacer(modifier = Modifier.height(12.dp))
                                 }
-                                ReimportPlanPreview(currentPlan, hasUnimportedRows)
+                                QifReimportPlanPreview(currentPlan, hasPendingRecords)
                             }
                         }
                     }
@@ -222,65 +247,81 @@ fun ReimportDialog(
             }
         },
         confirmButton = {
-            LoadingTextButton(
-                onClick = {
-                    val currentStrategy = strategy ?: return@LoadingTextButton
-                    val currentPlan = plan ?: return@LoadingTextButton
-                    isRunning = true
-                    errorMessage = null
-                    scope.launch {
-                        try {
-                            val result =
-                                executeCsvReimport(
-                                    plan = currentPlan,
-                                    csvImport = csvImport,
-                                    strategy = currentStrategy,
-                                    sourceAccountOverride = selectedSourceAccountId,
-                                    currencies = currencies,
-                                    accountMappingRepository = accountMappingRepository,
-                                    accountRepository = accountRepository,
-                                    csvImportRepository = csvImportRepository,
-                                    maintenance = maintenance,
-                                    importEngine = importEngine,
-                                    passThroughAccounts = passThroughAccounts,
-                                    onProgress = { executeProgress = it },
-                                )
-                            onComplete(result)
-                        } catch (expected: CancellationException) {
-                            throw expected
-                        } catch (expected: Exception) {
-                            logger.error(expected) { "Re-import failed: ${expected.message}" }
-                            errorMessage = "Re-import failed: ${expected.message}"
-                            isRunning = false
-                        } finally {
-                            executeProgress = null
+            if (summary != null) {
+                TextButton(onClick = onComplete) { Text("Done") }
+            } else {
+                LoadingTextButton(
+                    onClick = {
+                        val strategy = currencyStrategy ?: return@LoadingTextButton
+                        val currentPlan = plan ?: return@LoadingTextButton
+                        isRunning = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                val result =
+                                    executeQifReimport(
+                                        plan = currentPlan,
+                                        qifImport = qifImport,
+                                        strategy = strategy,
+                                        sourceAccountOverride = selectedSourceAccountId,
+                                        currencies = currencies,
+                                        accountMappingRepository = accountMappingRepository,
+                                        accountRepository = accountRepository,
+                                        qifImportRepository = qifImportRepository,
+                                        maintenance = maintenance,
+                                        importEngine = importEngine,
+                                        onProgress = { executeProgress = it },
+                                    )
+                                summary = result.toDisplaySummary()
+                            } catch (expected: CancellationException) {
+                                throw expected
+                            } catch (expected: Exception) {
+                                logger.error(expected) { "QIF re-import failed: ${expected.message}" }
+                                errorMessage = "Re-import failed: ${expected.message}"
+                                isRunning = false
+                            } finally {
+                                executeProgress = null
+                            }
                         }
-                    }
-                },
-                enabled = !isRunning && strategy != null && plan != null && sourceReady,
-                loading = isRunning,
-                label = "Re-import",
-                loadingIndicatorModifier = Modifier.padding(end = 8.dp),
-                showLabelWhenLoading = true,
-            )
+                    },
+                    enabled = !isRunning && baseStrategy != null && plan != null && selectedCurrencyId != null && sourceReady,
+                    loading = isRunning,
+                    label = "Re-import",
+                    loadingIndicatorModifier = Modifier.padding(end = 8.dp),
+                    showLabelWhenLoading = true,
+                )
+            }
         },
         dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isRunning,
-            ) {
-                Text("Cancel")
+            if (summary == null) {
+                TextButton(
+                    onClick = onDismiss,
+                    enabled = !isRunning,
+                ) {
+                    Text("Cancel")
+                }
             }
         },
     )
 }
 
-/**
- * Phase label (plus "x of y" when counts are known) over a linear progress bar — determinate when
- * the phase reports a fraction, indeterminate otherwise.
- */
+/** One-line outcome summary for the completed re-import. */
+private fun CsvReimportResult.toDisplaySummary(): String =
+    buildString {
+        val imported = importResult?.successCount ?: 0
+        val duplicates = importResult?.duplicateCount ?: 0
+        append("Re-import complete")
+        append(" · $imported new")
+        if (updatedRows.isNotEmpty()) append(" · ${updatedRows.size} updated")
+        if (mergedAccounts.isNotEmpty()) append(" · ${mergedAccounts.size} account${if (mergedAccounts.size == 1) "" else "s"} merged")
+        if (reversedMerges.isNotEmpty()) append(" · ${reversedMerges.size} merge${if (reversedMerges.size == 1) "" else "s"} reversed")
+        if (deletedEmptyAccounts.isNotEmpty()) append(" · ${deletedEmptyAccounts.size} empty removed")
+        if (duplicates > 0) append(" · $duplicates duplicates skipped")
+        if (skipped.isNotEmpty()) append(" · ${skipped.size} not merged/updated")
+    }
+
 @Composable
-private fun ReimportProgressIndicator(progress: ImportProgress) {
+private fun QifReimportProgressIndicator(progress: ImportProgress) {
     Column(modifier = Modifier.fillMaxWidth()) {
         val counts =
             progress.processed
@@ -303,9 +344,9 @@ private fun ReimportProgressIndicator(progress: ImportProgress) {
 }
 
 @Composable
-private fun ReimportPlanPreview(
+private fun QifReimportPlanPreview(
     plan: ReimportPlan,
-    hasUnimportedRows: Boolean,
+    hasPendingRecords: Boolean,
 ) {
     Column {
         if (plan.merges.isNotEmpty()) {
@@ -383,30 +424,7 @@ private fun ReimportPlanPreview(
             Text(
                 text =
                     "Each transaction is updated in place — including over any manual edits made to " +
-                        "its amount, date or description.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (plan.rewrites.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Rows to reroute through pass-through accounts:",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.rewrites.forEach { rewrite ->
-                Text(
-                    text = "• ${rewrite.description} → ${(rewrite.conduitNames + rewrite.merchantName).joinToString(" → ")}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
-                    "Each row's old transaction(s) are deleted — including any manual edits made to " +
-                        "them — and the row is re-imported through the conduit chain.",
+                        "its amount, date or description. Split transactions are not value-updated.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -429,10 +447,10 @@ private fun ReimportPlanPreview(
             }
         }
 
-        if (hasUnimportedRows) {
+        if (hasPendingRecords) {
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Rows not yet imported (or in error) will also be imported using the current mappings.",
+                text = "Records not yet imported (or in error) will also be imported using the current mappings.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

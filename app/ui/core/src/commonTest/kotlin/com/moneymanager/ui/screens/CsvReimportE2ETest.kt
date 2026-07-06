@@ -179,6 +179,7 @@ class CsvReimportE2ETest {
                     csvImportRepository = dc.csvImportRepository,
                     transactionRepository = dc.transactionRepository,
                     relationshipRepository = dc.transferRelationshipRepository,
+                    transferSourceRepository = dc.transferSourceRepository,
                 )
             assertEquals(1, plan.merges.size)
             assertEquals(duplicateId, plan.merges.single().duplicateId)
@@ -258,6 +259,7 @@ class CsvReimportE2ETest {
                     csvImportRepository = dc.csvImportRepository,
                     transactionRepository = dc.transactionRepository,
                     relationshipRepository = dc.transferRelationshipRepository,
+                    transferSourceRepository = dc.transferSourceRepository,
                 )
             assertTrue(plan.merges.isEmpty())
             assertEquals(1, plan.skipped.size)
@@ -330,6 +332,7 @@ class CsvReimportE2ETest {
                     csvImportRepository = dc.csvImportRepository,
                     transactionRepository = dc.transactionRepository,
                     relationshipRepository = dc.transferRelationshipRepository,
+                    transferSourceRepository = dc.transferSourceRepository,
                     onProgress = { planProgress += it },
                 )
             assertTrue(plan.merges.isEmpty())
@@ -397,6 +400,7 @@ class CsvReimportE2ETest {
                     csvImportRepository = dc.csvImportRepository,
                     transactionRepository = dc.transactionRepository,
                     relationshipRepository = dc.transferRelationshipRepository,
+                    transferSourceRepository = dc.transferSourceRepository,
                 )
             assertTrue(secondPlan.valueUpdates.isEmpty())
         }

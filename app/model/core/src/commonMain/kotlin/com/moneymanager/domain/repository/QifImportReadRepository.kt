@@ -2,6 +2,7 @@
 
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.qif.QifImportRecord
@@ -32,4 +33,10 @@ interface QifImportReadRepository {
 
     /** Finds imports that match the given file checksum, newest first. */
     suspend fun findImportsByChecksum(checksum: String): List<QifImport>
+
+    /**
+     * Accounts this import auto-created (its provenance points at them), used by re-import to scope
+     * duplicate-account merges and empty-account cleanup to accounts the import itself introduced.
+     */
+    suspend fun getAccountsCreatedByImport(id: QifImportId): Set<AccountId>
 }
