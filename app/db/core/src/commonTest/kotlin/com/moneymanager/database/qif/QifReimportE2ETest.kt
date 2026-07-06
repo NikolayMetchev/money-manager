@@ -71,7 +71,7 @@ class QifReimportE2ETest : DbTest() {
                     2,
                     "01/03/2021",
                     "-1352.23",
-                    "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013, 1352.23",
+                    "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 374693512504002, MANDATE NO 0013, 1352.23",
                 ),
             )
         val id =

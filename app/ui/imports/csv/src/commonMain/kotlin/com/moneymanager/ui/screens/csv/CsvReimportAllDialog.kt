@@ -195,7 +195,9 @@ fun CsvReimportAllDialog(
                             }
                         }
                     },
-                    enabled = !isRunning && (!needsSourceAccount || sourceAccountId != null),
+                    // Wait for strategy matching to finish: until then needsSourceAccount is unknown (false),
+                    // so enabling the button early could run the bulk re-import without the source picker.
+                    enabled = !isRunning && matches != null && (!needsSourceAccount || sourceAccountId != null),
                     loading = isRunning,
                     label = "Re-import ${imported.size} files",
                 )

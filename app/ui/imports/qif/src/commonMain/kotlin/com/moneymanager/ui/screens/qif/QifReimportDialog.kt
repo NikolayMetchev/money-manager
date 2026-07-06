@@ -314,6 +314,7 @@ private fun CsvReimportResult.toDisplaySummary(): String =
         append(" · $imported new")
         if (updatedRows.isNotEmpty()) append(" · ${updatedRows.size} updated")
         if (mergedAccounts.isNotEmpty()) append(" · ${mergedAccounts.size} account${if (mergedAccounts.size == 1) "" else "s"} merged")
+        if (reversedMerges.isNotEmpty()) append(" · ${reversedMerges.size} merge${if (reversedMerges.size == 1) "" else "s"} reversed")
         if (deletedEmptyAccounts.isNotEmpty()) append(" · ${deletedEmptyAccounts.size} empty removed")
         if (duplicates > 0) append(" · $duplicates duplicates skipped")
         if (skipped.isNotEmpty()) append(" · ${skipped.size} not merged/updated")

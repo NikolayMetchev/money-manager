@@ -235,11 +235,14 @@ fun computeReimportMerges(
 /**
  * Detects prior account merges this re-import should REVERSE: for each still-active merge whose
  * merged-away account was created by this import, it re-maps that account's moved transfers (traced back
- * to their source rows) under the CURRENT mappings; if none of this import's rows still resolve onto the
- * survivor, the merge no longer holds and is reversed (the deleted account is recreated and its transfers
- * move back). This is the inverse of [computeReimportMerges] — it lets narrowing/removing a mapping split
- * previously-consolidated accounts back out. [rowIndexForSource] returns a row index only for source
- * records belonging to this import (CSV or QIF), so cross-import transfers on a shared account are ignored.
+ * to their source rows) under the CURRENT mappings. A merge is reversed only when its rows resolve to a NEW
+ * account (no explicit mapping routes them anywhere) — the deleted account is recreated and its transfers
+ * move back. If the rows still resolve to ANY existing account — the survivor (merge still valid) or a
+ * different account they were remapped to — the merge is left as-is rather than sending the transfers to
+ * the deleted account (which the value-update pass, skipping reversed rows, would never then correct). This
+ * is the inverse of [computeReimportMerges] — it lets narrowing/removing a mapping split previously-
+ * consolidated accounts back out. [rowIndexForSource] returns a row index only for source records belonging
+ * to this import (CSV or QIF), so cross-import transfers on a shared account are ignored.
  */
 @Suppress("LongParameterList")
 suspend fun computeReimportReversals(
@@ -259,7 +262,7 @@ suspend fun computeReimportReversals(
     val reversals = mutableListOf<ReimportReversal>()
     for (merge in candidates) {
         var sawRow = false
-        var stillOnSurvivor = false
+        var resolvesToExistingAccount = false
         val rowIndexes = mutableSetOf<Long>()
         for (moved in accountRepository.getMergeMovedTransfers(merge.id)) {
             val rowIndex =
@@ -270,13 +273,17 @@ suspend fun computeReimportReversals(
             if (rowIndex != null && mapped != null) {
                 sawRow = true
                 rowIndexes += rowIndex
-                // The side that had pointed at the deleted account: does an explicit mapping still route it
-                // to the survivor? If so, the merge is still justified and must not be reversed.
+                // The side that had pointed at the deleted account. Only reverse when it now resolves to a
+                // NEW account (id <= 0) — i.e. no explicit mapping routes it anywhere, so splitting it back
+                // to the merged-away account is exactly right. If it still resolves to ANY existing account
+                // — the survivor (merge still valid) OR a different account it was remapped to — don't
+                // reverse: reversing would wrongly send the transfer to the deleted account instead of that
+                // target, and the value-update pass skips reversed rows so it would never be corrected.
                 val resolved = if (moved.movedTarget) mapped.transfer.targetAccountId else mapped.transfer.sourceAccountId
-                if (resolved == merge.survivingAccountId) stillOnSurvivor = true
+                if (resolved.id > 0) resolvesToExistingAccount = true
             }
         }
-        if (sawRow && !stillOnSurvivor) {
+        if (sawRow && !resolvesToExistingAccount) {
             reversals +=
                 ReimportReversal(
                     mergeId = merge.id,
