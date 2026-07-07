@@ -142,34 +142,55 @@ class CryptoComCsvE2ETest : DbTest() {
                 setOf(
                     "Crypto.com Card",
                     "Crypto.com Cash",
-                    "Crypto.com TGBP",
                     "GBP Deposit (via FPS)",
                     "GBP Withdrawal (via FPS)",
                     "Spotify P3 C6 Ef4945",
-                    // The crypto export's cashback rows: a real CRO wallet + the reward counterparty.
-                    "Crypto.com CRO",
+                    // The crypto reward counterparty, plus the single account that holds ALL crypto
+                    // (CRO cashback + TGBP conversions) as separate per-asset balances.
                     "Card Cashback",
+                    "Crypto.com",
                 ),
                 accountNames,
             )
 
-            // The CRO cashback lands as a real crypto balance (0.37 + 0.42 = 0.79 CRO), created on demand.
             repositories.maintenanceService.refreshMaterializedViews()
-            val croWalletId = accounts.first { it.name == "Crypto.com CRO" }.id
-            val croBalance =
+            val cryptoAccountId = accounts.first { it.name == "Crypto.com" }.id
+            val cashId = accounts.first { it.name == "Crypto.com Cash" }.id
+            val cardId = accounts.first { it.name == "Crypto.com Card" }.id
+            val depositId = accounts.first { it.name == "GBP Deposit (via FPS)" }.id
+            val withdrawalId = accounts.first { it.name == "GBP Withdrawal (via FPS)" }.id
+
+            // One "Crypto.com" account holds every crypto as a separate per-asset balance.
+            val cryptoBalances =
                 repositories.transactionRepository
                     .getAccountBalances()
                     .first()
-                    .first { it.accountId == croWalletId }
-                    .balance
-            assertEquals("CRO", croBalance.currency.code)
-            assertEquals("0.79", croBalance.toDisplayValue().toString())
+                    .filter { it.accountId == cryptoAccountId }
+                    .associate { it.balance.currency.code to it.balance.toDisplayValue().toString() }
+            assertEquals("0.79", cryptoBalances["CRO"], "CRO cashback 0.37 + 0.42, created on demand")
+            // TGBP is an unknown ticker created on demand as crypto; net of the two conversions.
+            assertEquals("-9.86", cryptoBalances["TGBP"], "TGBP bought 5000 - sold 5009.86")
 
-            val cashId = accounts.first { it.name == "Crypto.com Cash" }.id
-            val cardId = accounts.first { it.name == "Crypto.com Card" }.id
-            val walletId = accounts.first { it.name == "Crypto.com TGBP" }.id
-            val depositId = accounts.first { it.name == "GBP Deposit (via FPS)" }.id
-            val withdrawalId = accounts.first { it.name == "GBP Withdrawal (via FPS)" }.id
+            // The two viban conversions are cross-asset trades (not GBP wallet transfers), correctly directed.
+            val cryptoTrades = repositories.tradeRepository.getTradesByAccount(cryptoAccountId).first()
+            assertTrue(
+                cryptoTrades.any {
+                    it.fromAccountId == cashId &&
+                        it.from.currency.code == "GBP" &&
+                        it.toAccountId == cryptoAccountId &&
+                        it.to.currency.code == "TGBP"
+                },
+                "viban_purchase: Cash GBP -> Crypto.com TGBP",
+            )
+            assertTrue(
+                cryptoTrades.any {
+                    it.fromAccountId == cryptoAccountId &&
+                        it.from.currency.code == "TGBP" &&
+                        it.toAccountId == cashId &&
+                        it.to.currency.code == "GBP"
+                },
+                "crypto_viban: Crypto.com TGBP -> Cash GBP",
+            )
 
             // Amounts in GBP minor units (scale factor 100).
             fun Money.pence(): Long = amount.toLong()
@@ -183,18 +204,6 @@ class CryptoComCsvE2ETest : DbTest() {
             assertTrue(
                 cashTransfers.any { it.sourceAccountId == cashId && it.targetAccountId == withdrawalId },
                 "viban_withdrawal: Cash -> external",
-            )
-            assertTrue(
-                cashTransfers.any {
-                    it.sourceAccountId == cashId && it.targetAccountId == walletId && it.amount.pence() == 500_000L
-                },
-                "viban_purchase: Cash -> wallet despite the positive amount",
-            )
-            assertTrue(
-                cashTransfers.any {
-                    it.sourceAccountId == walletId && it.targetAccountId == cashId && it.amount.pence() == 500_986L
-                },
-                "crypto_viban: wallet -> Cash",
             )
 
             // The shared top-up: both records exist as Cash -> Card...
@@ -289,12 +298,13 @@ class CryptoComCsvE2ETest : DbTest() {
 
             val accounts = repositories.accountRepository.getAllAccounts().first()
             val cashId = accounts.first { it.name == "Crypto.com Cash" }.id
-            val btcWalletId = accounts.first { it.name == "Crypto.com BTC" }.id
+            // All crypto lands in the single "Crypto.com" account, not a per-ticker wallet.
+            val cryptoAccountId = accounts.first { it.name == "Crypto.com" }.id
 
-            // The conversion became a trade (GBP out of Cash, BTC into the wallet), not a GBP transfer.
+            // The conversion became a trade (GBP out of Cash, BTC into the crypto account), not a GBP transfer.
             val trade =
                 repositories.tradeRepository
-                    .getTradesByAccount(btcWalletId)
+                    .getTradesByAccount(cryptoAccountId)
                     .first()
                     .single()
             assertEquals(cashId, trade.fromAccountId)
@@ -307,7 +317,7 @@ class CryptoComCsvE2ETest : DbTest() {
             assertEquals(
                 "0.005",
                 balances
-                    .first { it.accountId == btcWalletId }
+                    .first { it.accountId == cryptoAccountId && it.balance.currency.code == "BTC" }
                     .balance
                     .toDisplayValue()
                     .toString(),

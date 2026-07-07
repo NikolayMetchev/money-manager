@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
@@ -84,11 +85,36 @@ internal fun collapsePassThroughChain(
     return if (keptNodes.size < 2) null else keptNodes to keptDescriptions
 }
 
+/** Number of fractional digits in a raw CSV amount string (e.g. "0.79000000" → 8, "1,234.5" → 1). */
+private fun decimalPlaces(amount: String?): Int {
+    val cleaned = amount?.trim() ?: return 0
+    val dot = cleaned.indexOf('.')
+    if (dot < 0) return 0
+    var count = 0
+    for (i in dot + 1 until cleaned.length) {
+        if (cleaned[i].isDigit()) count++ else break
+    }
+    return count
+}
+
+/** `10^n` as a scale factor, bounded so it stays within a Long (crypto max precision is 18 decimals). */
+private fun scaleFactorForDecimals(decimals: Int): Long {
+    var factor = 1L
+    repeat(decimals.coerceIn(0, 18)) { factor *= 10 }
+    return factor
+}
+
 /**
- * Ensures a crypto asset exists for every registry-known ticker appearing in [strategy]'s currency
- * lookup column across [rows], creating any that are missing via the engine (upsert = idempotent), and
- * returns the full set of crypto assets to feed the mapper. Returns empty when no [cryptoRepository] is
- * supplied, the strategy's currency mapping isn't a column lookup, or the column carries only fiat.
+ * Ensures a crypto asset exists for every crypto ticker appearing in [strategy]'s currency-lookup
+ * columns across [rows], creating any missing ones via the engine (upsert = idempotent), and returns
+ * the full crypto-asset set to feed the mapper.
+ *
+ * A code is treated as crypto when it is registry-known, or — for a currency column whose
+ * [CurrencyLookupMapping.treatNonFiatAsCrypto] is set (the crypto.com strategies) — whenever it is not a
+ * known fiat currency. For an unknown code the scale factor is derived from the paired amount column's
+ * observed precision (CURRENCY↔AMOUNT, TO_CURRENCY↔TO_AMOUNT), so `Money.fromDisplayValue` (which throws
+ * on excess precision) always parses that asset's amounts exactly. Registry-known codes keep their
+ * registry scale. Returns empty when no [cryptoRepository] is supplied.
  */
 private suspend fun ensureCryptoAssets(
     strategy: CsvImportStrategy,
@@ -99,28 +125,51 @@ private suspend fun ensureCryptoAssets(
     cryptoRepository: CryptoReadRepository?,
 ): List<CryptoAsset> {
     if (cryptoRepository == null) return emptyList()
-    // Both the debited (CURRENCY) and credited (TO_CURRENCY) columns can carry a crypto ticker.
-    val currencyColumns =
-        listOf(TransferField.CURRENCY, TransferField.TO_CURRENCY)
-            .mapNotNull { strategy.fieldMappings[it] as? CurrencyLookupMapping }
-            .mapNotNull { m -> columns.firstOrNull { it.originalName == m.columnName }?.columnIndex }
-    if (currencyColumns.isNotEmpty()) {
-        val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
-        val existingCrypto = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
-        val newCryptoCodes =
-            rows
-                .asSequence()
-                .flatMap { row ->
-                    currencyColumns.asSequence().map {
-                        row.values
-                            .getOrNull(it)
-                            ?.trim()
-                            ?.uppercase()
-                    }
-                }.filterNotNull()
-                .filter { it.isNotEmpty() && it !in fiatCodes && it !in existingCrypto && CryptoRegistry.lookup(it) != null }
-                .toSet()
-        newCryptoCodes.forEach { importEngine.createCrypto(it) }
+
+    fun columnIndex(name: String): Int? = columns.firstOrNull { it.originalName == name }?.columnIndex
+
+    // Pair each currency-lookup column with its amount column (to derive an unknown asset's scale) and
+    // carry its treatNonFiatAsCrypto flag (whether non-fiat codes in that column become crypto assets).
+    val columnPairs =
+        listOf(
+            TransferField.CURRENCY to TransferField.AMOUNT,
+            TransferField.TO_CURRENCY to TransferField.TO_AMOUNT,
+        ).mapNotNull { (currencyField, amountField) ->
+            val currencyMapping = strategy.fieldMappings[currencyField] as? CurrencyLookupMapping ?: return@mapNotNull null
+            val currencyCol = columnIndex(currencyMapping.columnName) ?: return@mapNotNull null
+            val amountCol = (strategy.fieldMappings[amountField] as? AmountParsingMapping)?.amountColumnName?.let(::columnIndex)
+            Triple(currencyCol, amountCol, currencyMapping.treatNonFiatAsCrypto)
+        }
+    if (columnPairs.isEmpty()) return cryptoRepository.getAllCryptoAssets().first()
+
+    val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
+    val existingCrypto = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
+
+    // For each new crypto code, the max fractional digits seen in its paired amount column → its scale.
+    val maxDecimals = mutableMapOf<String, Int>()
+    for (row in rows) {
+        for ((currencyCol, amountCol, treatNonFiatAsCrypto) in columnPairs) {
+            val code =
+                row.values
+                    .getOrNull(currencyCol)
+                    ?.trim()
+                    ?.uppercase()
+            val isNewCrypto =
+                !code.isNullOrEmpty() &&
+                    code !in fiatCodes &&
+                    code !in existingCrypto &&
+                    (CryptoRegistry.lookup(code) != null || treatNonFiatAsCrypto)
+            if (isNewCrypto) {
+                val decimals = amountCol?.let { decimalPlaces(row.values.getOrNull(it)) } ?: 0
+                maxDecimals[code] = maxOf(maxDecimals[code] ?: 0, decimals)
+            }
+        }
+    }
+
+    for ((code, decimals) in maxDecimals) {
+        // Known codes keep their registry scale (scaleFactor = null → registry); unknown codes derive it.
+        val scaleFactor = if (CryptoRegistry.lookup(code) != null) null else scaleFactorForDecimals(decimals)
+        importEngine.createCrypto(code, scaleFactor = scaleFactor)
     }
     return cryptoRepository.getAllCryptoAssets().first()
 }
