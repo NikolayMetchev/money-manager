@@ -15,6 +15,7 @@ import com.moneymanager.domain.repository.ApiSessionWriteRepository
 import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CryptoWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
@@ -27,6 +28,7 @@ import com.moneymanager.domain.repository.PersonWriteRepository
 import com.moneymanager.domain.repository.QifImportWriteRepository
 import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.TradeWriteRepository
 import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.domain.repository.TransferAttributeWriteRepository
 import com.moneymanager.domain.repository.TransferRelationshipWriteRepository
@@ -60,6 +62,10 @@ interface DatabaseComponent {
     val accountMappingExportService: AccountMappingExportService
     val strategyLibrary: StrategyLibrary
     val currencyRepository: CurrencyWriteRepository
+
+    val cryptoRepository: CryptoWriteRepository
+
+    val tradeRepository: TradeWriteRepository
     val deviceRepository: DeviceWriteRepository
     val importDirectoryRepository: ImportDirectoryWriteRepository
     val maintenanceService: DatabaseMaintenanceService

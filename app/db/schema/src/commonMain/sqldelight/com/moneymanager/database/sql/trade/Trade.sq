@@ -1,0 +1,31 @@
+-- trade: a cross-asset exchange transaction — a second transaction subtype alongside `transfer`,
+-- both drawing their id from the shared `transaction_id` supertype. A trade moves `from_amount` of
+-- `from_asset` out of `from_account` and `to_amount` of `to_asset` into `to_account` (the implied
+-- rate is to_amount/from_amount). This honours double-entry across assets, which a single transfer
+-- (one asset, one amount for both legs) cannot.
+--
+-- Amounts are arbitrary-precision, stored as decimal strings (BigInteger.toString()), consistent with
+-- `transfer.amount`; per-asset balance aggregation is done in Kotlin BigInteger, not SQL SUM.
+CREATE TABLE trade (
+    id INTEGER PRIMARY KEY NOT NULL,
+    revision_id INTEGER NOT NULL DEFAULT 1,
+    timestamp INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    from_account_id INTEGER NOT NULL,
+    from_asset_id INTEGER NOT NULL,
+    from_amount TEXT NOT NULL,
+    to_account_id INTEGER NOT NULL,
+    to_asset_id INTEGER NOT NULL,
+    to_amount TEXT NOT NULL,
+    CHECK (from_account_id != to_account_id OR from_asset_id != to_asset_id),
+    FOREIGN KEY (id) REFERENCES transaction_id(id) ON DELETE RESTRICT,
+    FOREIGN KEY (from_account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (to_account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (from_asset_id) REFERENCES asset(id) ON DELETE RESTRICT,
+    FOREIGN KEY (to_asset_id) REFERENCES asset(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_trade_from_account ON trade(from_account_id);
+CREATE INDEX IF NOT EXISTS idx_trade_to_account ON trade(to_account_id);
+CREATE INDEX IF NOT EXISTS idx_trade_from_asset ON trade(from_asset_id);
+CREATE INDEX IF NOT EXISTS idx_trade_to_asset ON trade(to_asset_id);

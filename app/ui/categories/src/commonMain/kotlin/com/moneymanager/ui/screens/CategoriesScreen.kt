@@ -143,7 +143,7 @@ fun CategoriesScreen(
                 val maxMoney =
                     categoryBalances
                         .filter { it.balance.currency.id == currency.id }
-                        .maxByOrNull { kotlin.math.abs(it.balance.amount) }
+                        .maxByOrNull { it.balance.amount.abs() }
                         ?.balance
                 val formattedMax = maxMoney?.let { formatAmount(it) } ?: formatAmount(BigDecimal.ZERO, currency)
                 // Estimate width: ~8dp per character + 16dp padding
@@ -604,8 +604,8 @@ fun CategoryTreeItem(
                         color =
                             when {
                                 balance == null -> MaterialTheme.colorScheme.onSurfaceVariant
-                                balance.balance.amount > 0 -> MaterialTheme.colorScheme.primary
-                                balance.balance.amount < 0 -> MaterialTheme.colorScheme.error
+                                balance.balance.isPositive() -> MaterialTheme.colorScheme.primary
+                                balance.balance.isNegative() -> MaterialTheme.colorScheme.error
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
                         modifier =

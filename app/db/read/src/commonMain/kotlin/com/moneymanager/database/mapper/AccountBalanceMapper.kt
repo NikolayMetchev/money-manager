@@ -1,23 +1,23 @@
 package com.moneymanager.database.mapper
 
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.database.sql.transfer.SelectAllBalances
 import com.moneymanager.domain.model.AccountBalance
-import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import tech.mappie.api.ObjectMappie
 
 object AccountBalanceMapper : ObjectMappie<SelectAllBalances, AccountBalance>(), IdConversions {
     override fun map(from: SelectAllBalances): AccountBalance =
         mapping {
-            AccountBalance::balance fromValue Money(from.balance, from.toCurrency())
+            AccountBalance::balance fromValue Money(BigInteger(from.balance), from.toAsset())
         }
 }
 
-private fun SelectAllBalances.toCurrency(): Currency =
-    Currency(
-        id = CurrencyId(currency_id),
-        code = currency_code,
-        name = currency_name,
-        scaleFactor = currency_scale_factor,
+private fun SelectAllBalances.toAsset() =
+    AssetRowMapper.buildAsset(
+        id = asset_id,
+        code = asset_code,
+        name = asset_name,
+        scaleFactor = asset_scale_factor,
+        kind = asset_kind,
     )

@@ -14,4 +14,13 @@ enum class TransferField {
     AMOUNT,
     CURRENCY,
     TIMEZONE,
+
+    /**
+     * The credited asset/amount of a cross-asset conversion. When a strategy maps both [TO_CURRENCY]
+     * and [TO_AMOUNT] and a row's [CURRENCY] differs from [TO_CURRENCY], the importer emits a `trade`
+     * (a cross-asset exchange) instead of a single-asset transfer: [CURRENCY]/[AMOUNT] leave the source
+     * account and [TO_CURRENCY]/[TO_AMOUNT] enter the target account.
+     */
+    TO_CURRENCY,
+    TO_AMOUNT,
 }

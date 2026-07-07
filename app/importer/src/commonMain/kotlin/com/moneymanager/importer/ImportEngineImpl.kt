@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.MonzoCredentialId
@@ -18,6 +19,7 @@ import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
@@ -34,6 +36,7 @@ import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
 import com.moneymanager.domain.repository.ApiSessionWriteRepository
 import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CryptoWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
@@ -45,6 +48,7 @@ import com.moneymanager.domain.repository.PersonWriteRepository
 import com.moneymanager.domain.repository.QifImportWriteRepository
 import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.TradeWriteRepository
 import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.domain.repository.TransferUpdate
 import com.moneymanager.importengineapi.AccountMappingMutation
@@ -68,8 +72,10 @@ import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
+import com.moneymanager.importengineapi.LocalCryptoKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
 import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.QifImportMutation
@@ -100,6 +106,8 @@ class ImportEngineImpl(
     private val ownershipRepository: PersonAccountOwnershipWriteRepository,
     private val categoryRepository: CategoryWriteRepository,
     private val currencyRepository: CurrencyWriteRepository,
+    private val cryptoRepository: CryptoWriteRepository,
+    private val tradeRepository: TradeWriteRepository,
     private val attributeTypeRepository: AttributeTypeWriteRepository,
     private val relationshipTypeRepository: RelationshipTypeWriteRepository,
     private val csvImportStrategyRepository: CsvImportStrategyWriteRepository,
@@ -136,6 +144,24 @@ class ImportEngineImpl(
                     requireNotNull(intent.code),
                     requireNotNull(intent.name),
                     intent.source,
+                )
+        }
+        val createdCryptoIds = mutableMapOf<LocalCryptoKey, CryptoId>()
+        for (intent in batch.cryptoAssets.creates()) {
+            createdCryptoIds[intent.key] =
+                cryptoRepository.upsertCryptoByCode(requireNotNull(intent.code), intent.name, intent.scaleFactor, intent.source)
+        }
+        val createdTradeIds = mutableMapOf<LocalTradeKey, TradeId>()
+        for (intent in batch.trades) {
+            createdTradeIds[intent.key] =
+                tradeRepository.createTrade(
+                    timestamp = intent.timestamp,
+                    description = intent.description,
+                    fromAccountId = intent.fromAccountId,
+                    fromAmount = intent.fromAmount,
+                    toAccountId = intent.toAccountId,
+                    toAmount = intent.toAmount,
+                    source = intent.source,
                 )
         }
         val createdCategoryIds = mutableMapOf<LocalCategoryKey, Long>()
@@ -190,6 +216,9 @@ class ImportEngineImpl(
         for (intent in batch.currencies.updates()) {
             currencyRepository.updateCurrency(requireNotNull(intent.currency), intent.source)
         }
+        for (intent in batch.cryptoAssets.updates()) {
+            cryptoRepository.updateCryptoAsset(requireNotNull(intent.crypto), intent.source)
+        }
         for (intent in batch.peopleToCreate.updates()) {
             personRepository.updatePersonWithAttributes(
                 person = intent.person,
@@ -211,6 +240,7 @@ class ImportEngineImpl(
         batch.accountsToCreate.deletes().forEach { accountRepository.deleteAccount(requireNotNull(it.existingId)) }
         batch.categories.deletes().forEach { categoryRepository.deleteCategory(requireNotNull(it.existingId)) }
         batch.currencies.deletes().forEach { currencyRepository.deleteCurrency(requireNotNull(it.existingId)) }
+        batch.cryptoAssets.deletes().forEach { cryptoRepository.deleteCryptoAsset(requireNotNull(it.existingId)) }
         batch.peopleToCreate.deletes().forEach { personRepository.deletePerson(requireNotNull(it.existingId)) }
 
         return ImportResult(
@@ -228,6 +258,8 @@ class ImportEngineImpl(
             createdCategoryIds = createdCategoryIds,
             createdPersonIds = personResolution.keyToId,
             createdCurrencyIds = createdCurrencyIds,
+            createdCryptoIds = createdCryptoIds,
+            createdTradeIds = createdTradeIds,
             attributeTypeIds = attributeTypeIds,
             relationshipTypeIds = relationshipTypeIds,
             createdCsvStrategyIds = config.csvStrategyIds,

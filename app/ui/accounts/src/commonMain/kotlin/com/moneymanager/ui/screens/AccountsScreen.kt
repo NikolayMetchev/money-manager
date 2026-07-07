@@ -406,8 +406,8 @@ fun AccountCard(
                             style = MaterialTheme.typography.bodyLarge,
                             color =
                                 when {
-                                    balance.balance.amount > 0 -> MaterialTheme.colorScheme.primary
-                                    balance.balance.amount < 0 -> MaterialTheme.colorScheme.error
+                                    balance.balance.isPositive() -> MaterialTheme.colorScheme.primary
+                                    balance.balance.isNegative() -> MaterialTheme.colorScheme.error
                                     else -> MaterialTheme.colorScheme.onSurface
                                 },
                         )

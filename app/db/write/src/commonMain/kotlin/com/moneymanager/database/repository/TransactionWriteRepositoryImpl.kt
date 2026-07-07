@@ -96,8 +96,8 @@ class TransactionWriteRepositoryImpl(
                         description = transfer.description,
                         source_account_id = transfer.sourceAccountId.id,
                         target_account_id = transfer.targetAccountId.id,
-                        currency_id = transfer.amount.currency.id.id,
-                        amount = transfer.amount.amount,
+                        asset_id = transfer.amount.currency.id.id,
+                        amount = transfer.amount.amount.toString(),
                         id = transfer.id.id,
                     )
                 } else if (hasAttributeChanges) {
@@ -190,8 +190,8 @@ class TransactionWriteRepositoryImpl(
                         description = updatedTransfer.description,
                         source_account_id = updatedTransfer.sourceAccountId.id,
                         target_account_id = updatedTransfer.targetAccountId.id,
-                        currency_id = updatedTransfer.amount.currency.id.id,
-                        amount = updatedTransfer.amount.amount,
+                        asset_id = updatedTransfer.amount.currency.id.id,
+                        amount = updatedTransfer.amount.amount.toString(),
                         id = updatedTransfer.id.id,
                     )
                     if (update.newAttributes.isNotEmpty()) {
@@ -273,8 +273,8 @@ class TransactionWriteRepositoryImpl(
                 description = transfer.description,
                 source_account_id = transfer.sourceAccountId.id,
                 target_account_id = transfer.targetAccountId.id,
-                currency_id = transfer.amount.currency.id.id,
-                amount = transfer.amount.amount,
+                asset_id = transfer.amount.currency.id.id,
+                amount = transfer.amount.amount.toString(),
             )
             newAttributes[transfer.id].orEmpty().forEach { attr ->
                 transferAttributeWriteQueries.insert(

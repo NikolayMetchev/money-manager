@@ -2,6 +2,7 @@
 
 package com.moneymanager.csvimporter
 
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -143,7 +144,7 @@ class CsvTransferMapperTest {
         assertEquals("Test payment", result.transfer.description)
         assertEquals(testSourceAccountId, result.transfer.sourceAccountId)
         assertEquals(testTargetAccountId, result.transfer.targetAccountId)
-        assertEquals(5000L, result.transfer.amount.amount)
+        assertEquals(BigInteger(5000L), result.transfer.amount.amount)
     }
 
     @Test
@@ -475,7 +476,7 @@ class CsvTransferMapperTest {
         val result = mapper.mapRow(row)
 
         assertIs<MappingResult.Success>(result)
-        assertEquals(5000L, result.transfer.amount.amount)
+        assertEquals(BigInteger(5000L), result.transfer.amount.amount)
     }
 
     @Test
@@ -494,7 +495,7 @@ class CsvTransferMapperTest {
         val result = mapper.mapRow(row)
 
         assertIs<MappingResult.Success>(result)
-        assertEquals(123400L, result.transfer.amount.amount)
+        assertEquals(BigInteger(123400L), result.transfer.amount.amount)
     }
 
     @Test
@@ -575,7 +576,7 @@ class CsvTransferMapperTest {
         assertIs<MappingResult.Success>(result)
         assertEquals("Test payment", result.transfer.description)
         assertEquals(testCurrencyId, result.transfer.amount.currency.id)
-        assertEquals(5000L, result.transfer.amount.amount)
+        assertEquals(BigInteger(5000L), result.transfer.amount.amount)
     }
 
     @Test

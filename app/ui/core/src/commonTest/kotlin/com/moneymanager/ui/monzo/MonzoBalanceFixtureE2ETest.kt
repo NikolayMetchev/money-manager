@@ -129,7 +129,14 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                     }
                 assertEquals(expectedByName.keys.sorted(), actualByName.keys.sorted())
                 expectedByName.forEach { (accountName, expected) ->
-                    assertEquals(expected.balance, actualByName.getValue(accountName).balance.amount, accountName)
+                    assertEquals(
+                        expected.balance,
+                        actualByName
+                            .getValue(accountName)
+                            .balance.amount
+                            .toLong(),
+                        accountName,
+                    )
                 }
             }
         }

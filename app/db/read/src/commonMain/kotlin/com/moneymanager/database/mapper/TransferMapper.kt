@@ -2,9 +2,8 @@
 
 package com.moneymanager.database.mapper
 
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -19,19 +18,14 @@ object TransferMapper {
         description: String,
         sourceAccountId: Long,
         targetAccountId: Long,
-        amount: Long,
-        currencyId: Long,
-        currencyCode: String,
-        currencyName: String,
-        currencyScaleFactor: Long,
+        amount: String,
+        assetId: Long,
+        assetCode: String,
+        assetName: String,
+        assetScaleFactor: Long,
+        assetKind: String,
     ): Transfer {
-        val currency =
-            Currency(
-                id = CurrencyId(currencyId),
-                code = currencyCode,
-                name = currencyName,
-                scaleFactor = currencyScaleFactor,
-            )
+        val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetKind)
         return Transfer(
             id = TransferId(id),
             revisionId = revisionId,
@@ -39,7 +33,7 @@ object TransferMapper {
             description = description,
             sourceAccountId = AccountId(sourceAccountId),
             targetAccountId = AccountId(targetAccountId),
-            amount = Money(amount, currency),
+            amount = Money(BigInteger(amount), asset),
             attributes = emptyList(),
         )
     }

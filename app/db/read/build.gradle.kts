@@ -26,11 +26,13 @@ kotlin {
                 api(libs.kotlinx.serialization.core)
                 api(projects.app.db.schema)
                 api(projects.app.model.core)
+                implementation(projects.utils.bigdecimal)
             }
         }
         getByName("androidMain") {
             dependencies {
                 api(libs.kotlinx.serialization.core)
+                implementation(projects.utils.bigdecimal)
             }
         }
         getByName("commonTest") {

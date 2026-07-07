@@ -18,6 +18,8 @@ import com.moneymanager.database.repository.AttributeTypeWriteRepositoryImpl
 import com.moneymanager.database.repository.AuditReadRepositoryImpl
 import com.moneymanager.database.repository.CategoryReadRepositoryImpl
 import com.moneymanager.database.repository.CategoryWriteRepositoryImpl
+import com.moneymanager.database.repository.CryptoReadRepositoryImpl
+import com.moneymanager.database.repository.CryptoWriteRepositoryImpl
 import com.moneymanager.database.repository.CsvImportReadRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyReadRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyWriteRepositoryImpl
@@ -42,6 +44,8 @@ import com.moneymanager.database.repository.RelationshipTypeReadRepositoryImpl
 import com.moneymanager.database.repository.RelationshipTypeWriteRepositoryImpl
 import com.moneymanager.database.repository.SettingsReadRepositoryImpl
 import com.moneymanager.database.repository.SettingsWriteRepositoryImpl
+import com.moneymanager.database.repository.TradeReadRepositoryImpl
+import com.moneymanager.database.repository.TradeWriteRepositoryImpl
 import com.moneymanager.database.repository.TransactionReadRepositoryImpl
 import com.moneymanager.database.repository.TransactionWriteRepositoryImpl
 import com.moneymanager.database.repository.TransferAttributeReadRepositoryImpl
@@ -72,6 +76,8 @@ import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
+import com.moneymanager.domain.repository.CryptoWriteRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
@@ -96,6 +102,8 @@ import com.moneymanager.domain.repository.RelationshipTypeReadRepository
 import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.TradeReadRepository
+import com.moneymanager.domain.repository.TradeWriteRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.domain.repository.TransferAttributeReadRepository
@@ -267,6 +275,30 @@ interface RepositoryModule {
         deviceId: DeviceId,
         reader: CurrencyReadRepository,
     ): CurrencyWriteRepository = CurrencyWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideCryptoReadRepository(database: MoneyManagerDatabaseWrapper): CryptoReadRepository = CryptoReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideCryptoWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+        reader: CryptoReadRepository,
+    ): CryptoWriteRepository = CryptoWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideTradeReadRepository(database: MoneyManagerDatabaseWrapper): TradeReadRepository = TradeReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideTradeWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+        reader: TradeReadRepository,
+    ): TradeWriteRepository = TradeWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -463,6 +495,8 @@ interface RepositoryModule {
         ownershipRepository: PersonAccountOwnershipWriteRepository,
         categoryRepository: CategoryWriteRepository,
         currencyRepository: CurrencyWriteRepository,
+        cryptoRepository: CryptoWriteRepository,
+        tradeRepository: TradeWriteRepository,
         attributeTypeRepository: AttributeTypeWriteRepository,
         relationshipTypeRepository: RelationshipTypeWriteRepository,
         csvImportStrategyRepository: CsvImportStrategyWriteRepository,
@@ -484,6 +518,8 @@ interface RepositoryModule {
             ownershipRepository = ownershipRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
+            cryptoRepository = cryptoRepository,
+            tradeRepository = tradeRepository,
             attributeTypeRepository = attributeTypeRepository,
             relationshipTypeRepository = relationshipTypeRepository,
             csvImportStrategyRepository = csvImportStrategyRepository,

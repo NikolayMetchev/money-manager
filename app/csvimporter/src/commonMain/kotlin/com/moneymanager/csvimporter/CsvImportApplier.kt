@@ -6,6 +6,8 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.CryptoAsset
+import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
@@ -19,11 +21,13 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.CsvImportMutation
@@ -35,13 +39,16 @@ import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportRowKey
+import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.createAccountMappings
 import com.moneymanager.importengineapi.createAccounts
+import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
@@ -77,6 +84,47 @@ internal fun collapsePassThroughChain(
     return if (keptNodes.size < 2) null else keptNodes to keptDescriptions
 }
 
+/**
+ * Ensures a crypto asset exists for every registry-known ticker appearing in [strategy]'s currency
+ * lookup column across [rows], creating any that are missing via the engine (upsert = idempotent), and
+ * returns the full set of crypto assets to feed the mapper. Returns empty when no [cryptoRepository] is
+ * supplied, the strategy's currency mapping isn't a column lookup, or the column carries only fiat.
+ */
+private suspend fun ensureCryptoAssets(
+    strategy: CsvImportStrategy,
+    columns: List<CsvColumn>,
+    rows: List<CsvRow>,
+    currencies: List<Currency>,
+    importEngine: ImportEngine,
+    cryptoRepository: CryptoReadRepository?,
+): List<CryptoAsset> {
+    if (cryptoRepository == null) return emptyList()
+    // Both the debited (CURRENCY) and credited (TO_CURRENCY) columns can carry a crypto ticker.
+    val currencyColumns =
+        listOf(TransferField.CURRENCY, TransferField.TO_CURRENCY)
+            .mapNotNull { strategy.fieldMappings[it] as? CurrencyLookupMapping }
+            .mapNotNull { m -> columns.firstOrNull { it.originalName == m.columnName }?.columnIndex }
+    if (currencyColumns.isNotEmpty()) {
+        val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
+        val existingCrypto = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
+        val newCryptoCodes =
+            rows
+                .asSequence()
+                .flatMap { row ->
+                    currencyColumns.asSequence().map {
+                        row.values
+                            .getOrNull(it)
+                            ?.trim()
+                            ?.uppercase()
+                    }
+                }.filterNotNull()
+                .filter { it.isNotEmpty() && it !in fiatCodes && it !in existingCrypto && CryptoRegistry.lookup(it) != null }
+                .toSet()
+        newCryptoCodes.forEach { importEngine.createCrypto(it) }
+    }
+    return cryptoRepository.getAllCryptoAssets().first()
+}
+
 /** Summary of a bulk CSV import run across many files. */
 data class CsvBulkResult(
     override val filesImported: Int,
@@ -107,6 +155,7 @@ suspend fun bulkApplyCsv(
     importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
+    cryptoRepository: CryptoReadRepository? = null,
 ): CsvBulkResult {
     var filesImported = 0
     var transfers = 0
@@ -139,6 +188,7 @@ suspend fun bulkApplyCsv(
                     importEngine = importEngine,
                     refreshViews = false,
                     passThroughAccounts = passThroughAccounts,
+                    cryptoRepository = cryptoRepository,
                 ) ?: return@forEachIndexed
             filesImported++
             transfers += result.successCount
@@ -183,6 +233,7 @@ suspend fun applyStagedCsv(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
+    cryptoRepository: CryptoReadRepository? = null,
 ): CsvImportResult? {
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
     val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
@@ -203,6 +254,11 @@ suspend fun applyStagedCsv(
     // mapping resolves its own account; a per-row mapping decides per row.
     val effectiveSource = effectiveSourceFor(strategy, sourceAccountOverride)
 
+    // On-demand: create crypto assets for registry-known tickers appearing in the strategy's currency
+    // column, so rows denominated in crypto resolve to a real crypto asset (upsert = idempotent on
+    // re-import). No-op unless a CryptoReadRepository is supplied and the currency column carries crypto.
+    val cryptoAssets = ensureCryptoAssets(strategy, csvImport.columns, rows, currencies, importEngine, cryptoRepository)
+
     // Re-fetch accounts so payee accounts created by earlier files in the same scan are seen.
     val accounts = accountRepository.getAllAccounts().first()
     val mappings = accountMappingRepository.getAllMappings().first()
@@ -217,9 +273,11 @@ suspend fun applyStagedCsv(
             effectiveSource,
             passThroughAccounts,
             historicalAccountNames,
+            cryptoAssets,
         ).prepareImport(rows)
 
     return runCsvImport(
+        cryptoAssets = cryptoAssets,
         csvImport = csvImport,
         rows = rows,
         columns = csvImport.columns,
@@ -294,6 +352,7 @@ fun buildCsvMapper(
     sourceAccountOverride: AccountId?,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     historicalAccountNames: Map<String, AccountId> = emptyMap(),
+    cryptoAssets: List<CryptoAsset> = emptyList(),
 ): CsvTransferMapper =
     CsvTransferMapper(
         strategy = strategy,
@@ -301,6 +360,7 @@ fun buildCsvMapper(
         existingAccounts = accounts.associateBy { it.name },
         existingCurrencies = currencies.associateBy { it.id },
         existingCurrenciesByCode = currencies.associateBy { it.code.uppercase() },
+        existingCryptoByCode = cryptoAssets.associateBy { it.code.uppercase() },
         accountMappings = accountMappings,
         historicalAccountNames = historicalAccountNames,
         sourceAccountOverride = sourceAccountOverride,
@@ -431,6 +491,7 @@ suspend fun runCsvImport(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
+    cryptoAssets: List<CryptoAsset> = emptyList(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
@@ -486,6 +547,7 @@ suspend fun runCsvImport(
             existingAccounts = accountsByName,
             existingCurrencies = currenciesById,
             existingCurrenciesByCode = currenciesByCode,
+            existingCryptoByCode = cryptoAssets.associateBy { it.code.uppercase() },
             accountMappings = latestAccountMappings,
             historicalAccountNames = historicalAccountNames,
             sourceAccountOverride = selectedSourceAccountId,
@@ -557,8 +619,43 @@ suspend fun runCsvImport(
             null
         }
 
+    // Rows carrying a credited leg (Currency != To Currency) are cross-asset conversions → trades.
+    val importTrades =
+        finalPrep.validTransfers.mapNotNull { row ->
+            val credit = row.tradeTo ?: return@mapNotNull null
+            ImportTradeIntent(
+                key = LocalTradeKey("csv-${csvImport.id.id}-${row.rowIndex}"),
+                source = Source.Csv(csvImport.id),
+                timestamp = row.transfer.timestamp,
+                description = row.transfer.description,
+                fromAccountId = row.transfer.sourceAccountId,
+                fromAmount = row.transfer.amount,
+                toAccountId = row.transfer.targetAccountId,
+                toAmount = credit,
+            )
+        }
+
+    // A trade carries no fee field, so a conversion row that also has a fee would otherwise drop it.
+    // Emit each such fee as its own standalone movement (source account -> "<strategy> Fees") so the
+    // money isn't lost. (Not produced by the current built-in strategies, but keeps the path honest.)
+    val tradeFeeTransfers =
+        finalPrep.validTransfers.mapNotNull { row ->
+            if (row.tradeTo == null) return@mapNotNull null
+            val fee = row.feeAmount ?: return@mapNotNull null
+            val feeAcct = feeAccountId ?: return@mapNotNull null
+            ImportTransfer(
+                rowKey = ImportRowKey.CsvRow(row.rowIndex),
+                fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
+                toAccount = AccountRef.Existing(feeAcct),
+                source = Source.Csv(csvImport.id),
+                timestamp = row.transfer.timestamp,
+                description = "${row.transfer.description} (fee)",
+                amount = fee,
+            )
+        }
+
     val importTransfers =
-        finalPrep.validTransfers.map { row ->
+        finalPrep.validTransfers.filter { it.tradeTo == null }.map { row ->
             val uniqueKey =
                 if (uniqueIdTypeNames.isEmpty()) {
                     null
@@ -620,7 +717,8 @@ suspend fun runCsvImport(
 
     val batch =
         ImportBatch(
-            transfers = importTransfers,
+            transfers = importTransfers + tradeFeeTransfers,
+            trades = importTrades,
             dedupePolicy =
                 if (uniqueIdTypeNames.isEmpty()) {
                     // Cross-source reconciliation is opt-in per strategy: rows recording a movement

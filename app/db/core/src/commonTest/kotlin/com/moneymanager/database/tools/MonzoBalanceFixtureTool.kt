@@ -41,7 +41,7 @@ private fun generateBalancesFixture(
         SELECT
           a.id AS account_id,
           a.name AS account_name,
-          t.currency_id AS currency_id,
+          t.asset_id AS currency_id,
           SUM(
             CASE
               WHEN t.target_account_id = a.id THEN t.amount
@@ -55,8 +55,8 @@ private fun generateBalancesFixture(
           OR t.source_account_id = a.id
         WHERE a.name LIKE 'Monzo:%'
            OR a.name LIKE 'Monzo Counterparty:%'
-        GROUP BY a.id, a.name, t.currency_id
-        ORDER BY a.name, a.id, t.currency_id
+        GROUP BY a.id, a.name, t.asset_id
+        ORDER BY a.name, a.id, t.asset_id
         """.trimIndent()
 
     val rows =

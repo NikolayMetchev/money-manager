@@ -2,9 +2,8 @@
 
 package com.moneymanager.database.mapper
 
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.database.sql.audit.SelectAuditHistoryForTransfer
-import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.SourceRecord
@@ -18,17 +17,18 @@ object TransferAuditEntryMapper :
     AuditTypeConversions {
     override fun map(from: SelectAuditHistoryForTransfer): TransferAuditEntry =
         mapping {
-            TransferAuditEntry::amount fromValue Money(from.amount, from.toCurrency())
+            TransferAuditEntry::amount fromValue Money(BigInteger(from.amount), from.toAsset())
             TransferAuditEntry::source fromValue from.toSourceRecord()
         }
 }
 
-private fun SelectAuditHistoryForTransfer.toCurrency(): Currency =
-    Currency(
-        id = CurrencyId(currency_id),
-        code = currency_code,
-        name = currency_name,
-        scaleFactor = currency_scale_factor,
+private fun SelectAuditHistoryForTransfer.toAsset() =
+    AssetRowMapper.buildAsset(
+        id = asset_id,
+        code = asset_code,
+        name = asset_name,
+        scaleFactor = asset_scale_factor,
+        kind = asset_kind,
     )
 
 private fun SelectAuditHistoryForTransfer.toSourceRecord(): SourceRecord? =

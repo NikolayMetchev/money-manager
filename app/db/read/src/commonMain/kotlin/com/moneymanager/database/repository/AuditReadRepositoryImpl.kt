@@ -5,6 +5,7 @@ package com.moneymanager.database.repository
 import com.moneymanager.database.mapper.AccountAuditEntryMapper
 import com.moneymanager.database.mapper.ApiImportStrategyAuditEntryMapper
 import com.moneymanager.database.mapper.CategoryAuditEntryMapper
+import com.moneymanager.database.mapper.CryptoAuditEntryMapper
 import com.moneymanager.database.mapper.CsvImportStrategyAuditEntryMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
 import com.moneymanager.database.mapper.ImportDirectoryAuditEntryMapper
@@ -12,6 +13,7 @@ import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAttributeAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAuditEntryMapper
+import com.moneymanager.database.mapper.TradeAuditEntryMapper
 import com.moneymanager.database.mapper.TransferAuditEntryMapper
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountAttributeAuditEntry
@@ -22,6 +24,8 @@ import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CategoryAuditEntry
+import com.moneymanager.domain.model.CryptoAuditEntry
+import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CsvImportStrategyAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
@@ -30,6 +34,8 @@ import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.TradeAuditEntry
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferAttributeAuditEntry
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
@@ -108,6 +114,22 @@ class AuditReadRepositoryImpl(
                 .selectAuditHistoryForCurrency(currencyId.id)
                 .executeAsList()
                 .map(CurrencyAuditEntryMapper::map)
+        }
+
+    override suspend fun getAuditHistoryForCrypto(cryptoId: CryptoId): List<CryptoAuditEntry> =
+        withContext(Dispatchers.Default) {
+            auditSelectQueries
+                .selectAuditHistoryForCrypto(cryptoId.id)
+                .executeAsList()
+                .map(CryptoAuditEntryMapper::map)
+        }
+
+    override suspend fun getAuditHistoryForTrade(tradeId: TradeId): List<TradeAuditEntry> =
+        withContext(Dispatchers.Default) {
+            auditSelectQueries
+                .selectAuditHistoryForTrade(tradeId.id)
+                .executeAsList()
+                .map(TradeAuditEntryMapper::map)
         }
 
     override suspend fun getAuditHistoryForCategory(categoryId: Long): List<CategoryAuditEntry> =

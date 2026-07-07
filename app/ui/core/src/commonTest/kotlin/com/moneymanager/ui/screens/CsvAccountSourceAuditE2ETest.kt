@@ -143,6 +143,8 @@ class CsvAccountSourceAuditE2ETest {
                             ownershipRepository = dc.personAccountOwnershipRepository,
                             categoryRepository = dc.categoryRepository,
                             currencyRepository = dc.currencyRepository,
+                            cryptoRepository = dc.cryptoRepository,
+                            tradeRepository = dc.tradeRepository,
                             attributeTypeRepository = dc.attributeTypeRepository,
                             relationshipTypeRepository = dc.relationshipTypeRepository,
                             csvImportStrategyRepository = dc.csvImportStrategyRepository,

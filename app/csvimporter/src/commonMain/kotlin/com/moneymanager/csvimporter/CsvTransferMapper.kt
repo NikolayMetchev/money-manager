@@ -9,7 +9,9 @@ package com.moneymanager.csvimporter
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
@@ -73,6 +75,12 @@ sealed interface MappingResult {
         val discoveredMappings: List<DiscoveredAccountMapping> = emptyList(),
         /** Fee charged on the row, imported as its own linked fee transfer; null when there is none. */
         val feeAmount: Money? = null,
+        /**
+         * The credited leg of a cross-asset conversion (from the TO_CURRENCY/TO_AMOUNT mappings). When
+         * set, the row is a `trade`: [transfer]'s amount/source is the debited leg and this the credited
+         * leg entering [transfer]'s target account. Null for ordinary single-asset rows.
+         */
+        val tradeTo: Money? = null,
         /**
          * Name of the counterparty account when it was resolved via a person-flagged regex rule, so
          * the import can additionally create a Person + ownership link; null otherwise.
@@ -154,6 +162,8 @@ data class CsvTransferWithAttributes(
     val discoveredMappings: List<DiscoveredAccountMapping> = emptyList(),
     /** Fee charged on the row, imported as its own linked fee transfer; null when there is none. */
     val feeAmount: Money? = null,
+    /** Credited leg of a cross-asset conversion; when set the row is imported as a `trade`. */
+    val tradeTo: Money? = null,
     /** Counterparty account name when it is a person (drives Person + ownership creation); else null. */
     val personalCounterpartyName: String? = null,
     /** Pass-through (conduit) routing for the row (e.g. Curve); null for ordinary rows. */
@@ -215,6 +225,8 @@ class CsvTransferMapper(
     private val existingAccounts: Map<String, Account>,
     private val existingCurrencies: Map<CurrencyId, Currency>,
     private val existingCurrenciesByCode: Map<String, Currency>,
+    /** Crypto assets keyed by uppercased ticker; consulted when a code isn't a known fiat currency. */
+    private val existingCryptoByCode: Map<String, CryptoAsset> = emptyMap(),
     private val existingTransfers: List<ExistingTransferInfo> = emptyList(),
     accountMappings: List<AccountMapping> = emptyList(),
     /**
@@ -277,6 +289,7 @@ class CsvTransferMapper(
                             rowIndex = row.rowIndex,
                             discoveredMappings = result.discoveredMappings,
                             feeAmount = result.feeAmount,
+                            tradeTo = result.tradeTo,
                             personalCounterpartyName = result.personalCounterpartyName,
                             passThrough = result.passThrough,
                         ),
@@ -468,6 +481,21 @@ class CsvTransferMapper(
             // Create Money with absolute value (direction is indicated by source/target)
             val amount = Money.fromDisplayValue(rawAmount.abs(), currency)
 
+            // Cross-asset conversion: when the strategy maps a TO_CURRENCY/TO_AMOUNT and the credited
+            // asset differs from the debited one, this row is a trade — the credited leg is captured
+            // here and the importer emits a `trade` (debit `amount`, credit `tradeTo`) instead of a
+            // single-asset transfer.
+            val tradeTo: Money? =
+                run {
+                    val toCurrencyMapping = strategy.fieldMappings[TransferField.TO_CURRENCY] ?: return@run null
+                    val toAmountMapping = strategy.fieldMappings[TransferField.TO_AMOUNT] ?: return@run null
+                    val toAsset = parseCurrency(toCurrencyMapping, values) ?: return@run null
+                    if (toAsset.id == currency.id) return@run null
+                    val toRaw = parseAmount(toAmountMapping, values).abs()
+                    if (toRaw.compareTo(BigDecimal.ZERO) == 0) return@run null
+                    Money.fromDisplayValue(toRaw, toAsset)
+                }
+
             // A fee is modelled as its own movement (linked to this transfer), not folded into the amount.
             val feeMagnitude = parseFeeMagnitude(amountMapping, values)
             val feeAmount =
@@ -539,6 +567,7 @@ class CsvTransferMapper(
                 existingTransferId = existingTransferId,
                 discoveredMappings = discoveredMappings,
                 feeAmount = feeAmount,
+                tradeTo = tradeTo,
                 personalCounterpartyName = personalCounterpartyName,
                 passThrough = passThrough,
             )
@@ -1105,12 +1134,13 @@ class CsvTransferMapper(
     private fun parseCurrency(
         mapping: FieldMapping,
         values: List<String>,
-    ): Currency? =
+    ): Asset? =
         when (mapping) {
             is HardCodedCurrencyMapping -> existingCurrencies[mapping.currencyId]
             is CurrencyLookupMapping -> {
                 val code = getColumnValue(mapping.columnName, values).trim().uppercase()
-                existingCurrenciesByCode[code]
+                // Fiat first; fall back to crypto so a strategy can denominate a leg in a crypto asset.
+                existingCurrenciesByCode[code] ?: existingCryptoByCode[code]
             }
             else -> throw IllegalArgumentException("Invalid currency mapping type: ${mapping::class}")
         }

@@ -46,6 +46,7 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
@@ -236,7 +237,7 @@ fun AccountTransactionsScreen(
         if (showExcluded) runningBalances else runningBalances.filter { !it.isExcluded }
 
     // Get all unique currencies from account balances for matrix
-    val uniqueCurrencyIds = accountBalances.map { it.balance.currency.id }.distinct()
+    val uniqueCurrencyIds = accountBalances.map { CurrencyId(it.balance.currency.id.id) }.distinct()
 
     // Calculate column widths for each account based on account name and balance amounts
     val accountColumnWidths: Map<AccountId, Dp> =
@@ -588,7 +589,7 @@ fun AccountTransactionsScreen(
                                                             text = formatAmount(balance.balance),
                                                             style = MaterialTheme.typography.bodySmall,
                                                             color =
-                                                                if (balance.balance.amount >= 0) {
+                                                                if (!balance.balance.isNegative()) {
                                                                     MaterialTheme.colorScheme.primary
                                                                 } else {
                                                                     MaterialTheme.colorScheme.error
@@ -763,7 +764,7 @@ fun AccountTransactionsScreen(
                                 ?: return@let
 
                         // Set currency filter to match the transaction
-                        selectedCurrencyId = transaction.transactionAmount.currency.id
+                        selectedCurrencyId = CurrencyId(transaction.transactionAmount.currency.id.id)
 
                         // Now find the index in the filtered list (which now includes this currency)
                         val index =
@@ -864,7 +865,12 @@ fun AccountTransactionsScreen(
                                 screenSizeClass = screenSizeClass,
                                 isHighlighted = highlightedTransactionId == runningBalance.transactionId,
                                 onEditClick = { transfer ->
-                                    transactionIdToEdit = transfer.id
+                                    // TransactionEditDialog is fiat-only (CurrencyPicker + currencyRepository
+                                    // save path); opening it on a crypto-denominated transfer would corrupt
+                                    // its asset. Only fiat transfers are editable here for now.
+                                    if (transfer.amount.currency is Currency) {
+                                        transactionIdToEdit = transfer.id
+                                    }
                                 },
                                 onAuditClick = onAuditClick,
                                 onFeeLinkClick = { linkedTransferId ->
@@ -894,7 +900,7 @@ fun AccountTransactionsScreen(
                                 },
                                 onAccountClick = { clickedAccountId ->
                                     highlightedTransactionId = runningBalance.transactionId
-                                    selectedCurrencyId = runningBalance.transactionAmount.currency.id
+                                    selectedCurrencyId = CurrencyId(runningBalance.transactionAmount.currency.id.id)
 
                                     // Notify parent to switch to the clicked account
                                     onAccountIdChange(clickedAccountId)
@@ -940,7 +946,7 @@ fun AccountTransactionsScreen(
                                         onAccountClick(
                                             clickedAccountId,
                                             clickedAccount.name,
-                                            runningBalance.transactionAmount.currency.id,
+                                            CurrencyId(runningBalance.transactionAmount.currency.id.id),
                                             TransferId(runningBalance.transactionId.id),
                                         )
                                     }

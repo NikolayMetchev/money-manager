@@ -3,12 +3,12 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.bigdecimal.BigInteger
+import com.moneymanager.database.mapper.AssetRowMapper
 import com.moneymanager.database.mapper.CategoryMapper
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
-import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.repository.CategoryReadRepository
 import kotlinx.coroutines.Dispatchers
@@ -33,19 +33,27 @@ class CategoryReadRepositoryImpl(
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->
-                list.map { row ->
-                    val currency =
-                        Currency(
-                            id = CurrencyId(row.currency_id),
-                            code = row.currency_code,
-                            name = row.currency_name,
-                            scaleFactor = row.currency_scale_factor,
+                // category_balance_view is non-aggregating (one row per ancestor category × descendant
+                // account × asset), so sum per (category, asset) here in BigInteger — TEXT amounts can't
+                // be SUMmed in SQL.
+                list
+                    .groupBy { it.category_id to it.asset_id }
+                    .map { (_, rows) ->
+                        val first = rows.first()
+                        val asset =
+                            AssetRowMapper.buildAsset(
+                                id = first.asset_id,
+                                code = first.asset_code,
+                                name = first.asset_name,
+                                scaleFactor = first.asset_scale_factor,
+                                kind = first.asset_kind,
+                            )
+                        val total = rows.fold(BigInteger.ZERO) { acc, r -> acc + BigInteger(r.balance) }
+                        CategoryBalance(
+                            categoryId = first.category_id,
+                            balance = Money(total, asset),
                         )
-                    CategoryBalance(
-                        categoryId = row.category_id,
-                        balance = Money(row.balance ?: 0, currency),
-                    )
-                }
+                    }
             }
 
     override fun getCategoryById(id: Long): Flow<Category?> =

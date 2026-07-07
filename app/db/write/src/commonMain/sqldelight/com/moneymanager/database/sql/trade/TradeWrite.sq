@@ -1,0 +1,14 @@
+-- id must be an already-allocated `transaction_id` (mirrors transfer). Amounts are decimal-string TEXT.
+insert:
+INSERT INTO trade(id, revision_id, timestamp, description, from_account_id, from_asset_id, from_amount, to_account_id, to_asset_id, to_amount)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE trade
+SET revision_id = revision_id + 1, timestamp = ?, description = ?,
+    from_account_id = ?, from_asset_id = ?, from_amount = ?,
+    to_account_id = ?, to_asset_id = ?, to_amount = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM trade WHERE id = ?;

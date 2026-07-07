@@ -25,6 +25,8 @@ INSERT OR IGNORE INTO entity_type (id, name) VALUES (5, 'CATEGORY');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (6, 'API_IMPORT_STRATEGY');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (7, 'TRANSFER');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (8, 'CSV_IMPORT_STRATEGY');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (10, 'CRYPTO');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (11, 'TRADE');
 
 CREATE TABLE entity_source (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

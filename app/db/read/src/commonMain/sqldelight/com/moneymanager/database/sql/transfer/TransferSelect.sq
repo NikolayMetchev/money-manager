@@ -7,12 +7,13 @@ SELECT
     transfer.source_account_id,
     transfer.target_account_id,
     transfer.amount,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
 FROM transfer
-JOIN currency ON transfer.currency_id = currency.id
+JOIN asset_details ON transfer.asset_id = asset_details.id
 WHERE transfer.id = ?;
 
 selectByAccount:
@@ -24,12 +25,13 @@ SELECT
     transfer.source_account_id,
     transfer.target_account_id,
     transfer.amount,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
 FROM transfer
-JOIN currency ON transfer.currency_id = currency.id
+JOIN asset_details ON transfer.asset_id = asset_details.id
 WHERE source_account_id = ? OR target_account_id = ?
 ORDER BY timestamp DESC;
 
@@ -42,12 +44,13 @@ SELECT
     transfer.source_account_id,
     transfer.target_account_id,
     transfer.amount,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
 FROM transfer
-JOIN currency ON transfer.currency_id = currency.id
+JOIN asset_details ON transfer.asset_id = asset_details.id
 WHERE timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
@@ -60,12 +63,13 @@ SELECT
     transfer.source_account_id,
     transfer.target_account_id,
     transfer.amount,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
 FROM transfer
-JOIN currency ON transfer.currency_id = currency.id
+JOIN asset_details ON transfer.asset_id = asset_details.id
 WHERE (source_account_id = ? OR target_account_id = ?)
 AND timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
@@ -73,16 +77,16 @@ ORDER BY timestamp DESC;
 selectAllBalances:
 SELECT
     account_balance_materialized_view.account_id,
-    account_balance_materialized_view.currency_id,
+    account_balance_materialized_view.asset_id,
     account_balance_materialized_view.balance,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
 FROM account_balance_materialized_view
 JOIN account ON account_balance_materialized_view.account_id = account.id
-JOIN currency ON account_balance_materialized_view.currency_id = currency.id
-ORDER BY currency.code, account.name;
+JOIN asset_details ON account_balance_materialized_view.asset_id = asset_details.id
+ORDER BY asset_details.code, account.name;
 
 selectRunningBalanceByAccountPaginated:
 SELECT
@@ -92,12 +96,13 @@ SELECT
     running_balance_materialized_view.account_id,
     running_balance_materialized_view.transaction_amount,
     running_balance_materialized_view.running_balance,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor,
-    transfer.source_account_id,
-    transfer.target_account_id,
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind,
+    COALESCE(transfer.source_account_id, trade.from_account_id) AS source_account_id,
+    COALESCE(transfer.target_account_id, trade.to_account_id) AS target_account_id,
     running_balance_materialized_view.is_excluded,
     CASE WHEN EXISTS (
         SELECT 1 FROM transfer_relationship tr
@@ -117,8 +122,9 @@ SELECT
     pass_through_as_funding.id2 AS pass_through_spend_id,
     pass_through_as_spend.id1 AS pass_through_funding_id
 FROM running_balance_materialized_view
-JOIN currency ON running_balance_materialized_view.currency_id = currency.id
-JOIN transfer ON running_balance_materialized_view.id = transfer.id
+JOIN asset_details ON running_balance_materialized_view.asset_id = asset_details.id
+LEFT JOIN transfer ON running_balance_materialized_view.id = transfer.id
+LEFT JOIN trade ON running_balance_materialized_view.id = trade.id
 LEFT JOIN transfer_relationship fee_as_main
     ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
 LEFT JOIN transfer_relationship fee_as_child
@@ -128,7 +134,7 @@ LEFT JOIN transfer_relationship pass_through_as_funding
 LEFT JOIN transfer_relationship pass_through_as_spend
     ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
 WHERE running_balance_materialized_view.account_id = :accountId
-  AND (:currencyId IS NULL OR running_balance_materialized_view.currency_id = :currencyId)
+  AND (:currencyId IS NULL OR running_balance_materialized_view.asset_id = :currencyId)
   AND ((:lastTimestamp IS NULL AND :lastId IS NULL)
        OR running_balance_materialized_view.timestamp < :lastTimestamp
        OR (running_balance_materialized_view.timestamp = :lastTimestamp
@@ -146,12 +152,13 @@ SELECT
     running_balance_materialized_view.account_id,
     running_balance_materialized_view.transaction_amount,
     running_balance_materialized_view.running_balance,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor,
-    transfer.source_account_id,
-    transfer.target_account_id,
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind,
+    COALESCE(transfer.source_account_id, trade.from_account_id) AS source_account_id,
+    COALESCE(transfer.target_account_id, trade.to_account_id) AS target_account_id,
     running_balance_materialized_view.is_excluded,
     CASE WHEN EXISTS (
         SELECT 1 FROM transfer_relationship tr
@@ -171,8 +178,9 @@ SELECT
     pass_through_as_funding.id2 AS pass_through_spend_id,
     pass_through_as_spend.id1 AS pass_through_funding_id
 FROM running_balance_materialized_view
-JOIN currency ON running_balance_materialized_view.currency_id = currency.id
-JOIN transfer ON running_balance_materialized_view.id = transfer.id
+JOIN asset_details ON running_balance_materialized_view.asset_id = asset_details.id
+LEFT JOIN transfer ON running_balance_materialized_view.id = transfer.id
+LEFT JOIN trade ON running_balance_materialized_view.id = trade.id
 LEFT JOIN transfer_relationship fee_as_main
     ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
 LEFT JOIN transfer_relationship fee_as_child
@@ -182,7 +190,7 @@ LEFT JOIN transfer_relationship pass_through_as_funding
 LEFT JOIN transfer_relationship pass_through_as_spend
     ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
 WHERE running_balance_materialized_view.account_id = :accountId
-  AND (:currencyId IS NULL OR running_balance_materialized_view.currency_id = :currencyId)
+  AND (:currencyId IS NULL OR running_balance_materialized_view.asset_id = :currencyId)
   AND (running_balance_materialized_view.timestamp > :firstTimestamp
        OR (running_balance_materialized_view.timestamp = :firstTimestamp
            AND running_balance_materialized_view.id > :firstId))
@@ -195,7 +203,7 @@ getTransactionRowPosition:
 SELECT COUNT(*)
 FROM running_balance_materialized_view
 WHERE account_id = :accountId
-  AND (:currencyId IS NULL OR currency_id = :currencyId)
+  AND (:currencyId IS NULL OR asset_id = :currencyId)
   AND (timestamp > :targetTimestamp
        OR (timestamp = :targetTimestamp AND id > :targetId));
 
@@ -208,12 +216,13 @@ SELECT
     running_balance_materialized_view.account_id,
     running_balance_materialized_view.transaction_amount,
     running_balance_materialized_view.running_balance,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor,
-    transfer.source_account_id,
-    transfer.target_account_id,
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind,
+    COALESCE(transfer.source_account_id, trade.from_account_id) AS source_account_id,
+    COALESCE(transfer.target_account_id, trade.to_account_id) AS target_account_id,
     running_balance_materialized_view.is_excluded,
     CASE WHEN EXISTS (
         SELECT 1 FROM transfer_relationship tr
@@ -233,8 +242,9 @@ SELECT
     pass_through_as_funding.id2 AS pass_through_spend_id,
     pass_through_as_spend.id1 AS pass_through_funding_id
 FROM running_balance_materialized_view
-JOIN currency ON running_balance_materialized_view.currency_id = currency.id
-JOIN transfer ON running_balance_materialized_view.id = transfer.id
+JOIN asset_details ON running_balance_materialized_view.asset_id = asset_details.id
+LEFT JOIN transfer ON running_balance_materialized_view.id = transfer.id
+LEFT JOIN trade ON running_balance_materialized_view.id = trade.id
 LEFT JOIN transfer_relationship fee_as_main
     ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
 LEFT JOIN transfer_relationship fee_as_child
@@ -244,7 +254,7 @@ LEFT JOIN transfer_relationship pass_through_as_funding
 LEFT JOIN transfer_relationship pass_through_as_spend
     ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
 WHERE running_balance_materialized_view.account_id = :accountId
-  AND (:currencyId IS NULL OR running_balance_materialized_view.currency_id = :currencyId)
+  AND (:currencyId IS NULL OR running_balance_materialized_view.asset_id = :currencyId)
 ORDER BY running_balance_materialized_view.timestamp DESC, running_balance_materialized_view.id DESC
 LIMIT :limit OFFSET :offset;
 
@@ -253,7 +263,7 @@ countTransactionsByAccount:
 SELECT COUNT(*)
 FROM running_balance_materialized_view
 WHERE account_id = :accountId
-  AND (:currencyId IS NULL OR currency_id = :currencyId);
+  AND (:currencyId IS NULL OR asset_id = :currencyId);
 
 countTransfersByAccount:
 SELECT COUNT(*)
@@ -269,12 +279,13 @@ SELECT
     transfer.source_account_id,
     transfer.target_account_id,
     transfer.amount,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
 FROM transfer
-JOIN currency ON transfer.currency_id = currency.id
+JOIN asset_details ON transfer.asset_id = asset_details.id
 WHERE (source_account_id = :accountA AND target_account_id = :accountB)
    OR (source_account_id = :accountB AND target_account_id = :accountA)
 ORDER BY timestamp DESC;
@@ -291,16 +302,17 @@ SELECT
     transfer.source_account_id,
     transfer.target_account_id,
     transfer.amount,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
 FROM transfer
-JOIN currency ON transfer.currency_id = currency.id
+JOIN asset_details ON transfer.asset_id = asset_details.id
 WHERE transfer.source_account_id = :sourceAccountId
   AND transfer.target_account_id = :targetAccountId
   AND transfer.amount = :amount
-  AND transfer.currency_id = :currencyId
+  AND transfer.asset_id = :currencyId
   AND transfer.timestamp <= :maxTimestamp
   AND NOT EXISTS (
       SELECT 1 FROM transfer_relationship
@@ -333,16 +345,17 @@ SELECT
     source_account.name AS source_account_name,
     target_account.id AS target_account_id,
     target_account.name AS target_account_name,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
 FROM transfer
 JOIN transfer_attribute match_attr ON match_attr.transaction_id = transfer.id
 JOIN attribute_type match_type ON match_attr.attribute_type_id = match_type.id
 JOIN account source_account ON transfer.source_account_id = source_account.id
 JOIN account target_account ON transfer.target_account_id = target_account.id
-JOIN currency ON transfer.currency_id = currency.id
+JOIN asset_details ON transfer.asset_id = asset_details.id
 WHERE match_type.name = :matchAttributeName
   AND match_attr.attribute_value LIKE :matchValuePattern
   AND NOT EXISTS (

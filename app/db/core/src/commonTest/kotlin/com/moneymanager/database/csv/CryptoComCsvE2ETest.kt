@@ -88,7 +88,6 @@ class CryptoComCsvE2ETest : DbTest() {
     private val cryptoRows =
         listOf(
             row("2023-11-19 08:00:00", "Card Cashback", "CRO", "0.37", "", "", "0.09", "referral_card_cashback"),
-            row("2023-11-19 09:00:00", "GBP -> TGBP", "GBP", "10.0", "TGBP", "10.0", "10.0", "viban_purchase"),
             row("2023-11-19 10:00:00", "Card Cashback", "CRO", "0.42", "", "", "0.10", "referral_card_cashback"),
         )
 
@@ -119,6 +118,7 @@ class CryptoComCsvE2ETest : DbTest() {
             maintenance = maintenance,
             importEngine = repositories.importEngine,
             onProgress = { _, _ -> },
+            cryptoRepository = repositories.cryptoRepository,
         )
 
     @Test
@@ -130,10 +130,10 @@ class CryptoComCsvE2ETest : DbTest() {
 
             val result = applyAll(listOf(card, fiat, crypto))
 
-            // The card and fiat files matched their strategies by filename; the crypto file matched
-            // neither built-in and was skipped instead of being misrouted.
-            assertEquals(2, result.filesImported, "card + fiat should import")
-            assertEquals(1, result.filesSkippedNoStrategy, "crypto_* file should be skipped")
+            // All three files match their strategies by filename: the crypto_* export is now imported
+            // by the "Crypto.com Crypto" strategy (denominating in the real crypto currency).
+            assertEquals(3, result.filesImported, "card + fiat + crypto should import")
+            assertEquals(0, result.filesSkippedNoStrategy)
             assertEquals(0, result.filesFailed)
 
             val accounts = repositories.accountRepository.getAllAccounts().first()
@@ -146,9 +146,24 @@ class CryptoComCsvE2ETest : DbTest() {
                     "GBP Deposit (via FPS)",
                     "GBP Withdrawal (via FPS)",
                     "Spotify P3 C6 Ef4945",
+                    // The crypto export's cashback rows: a real CRO wallet + the reward counterparty.
+                    "Crypto.com CRO",
+                    "Card Cashback",
                 ),
                 accountNames,
             )
+
+            // The CRO cashback lands as a real crypto balance (0.37 + 0.42 = 0.79 CRO), created on demand.
+            repositories.maintenanceService.refreshMaterializedViews()
+            val croWalletId = accounts.first { it.name == "Crypto.com CRO" }.id
+            val croBalance =
+                repositories.transactionRepository
+                    .getAccountBalances()
+                    .first()
+                    .first { it.accountId == croWalletId }
+                    .balance
+            assertEquals("CRO", croBalance.currency.code)
+            assertEquals("0.79", croBalance.toDisplayValue().toString())
 
             val cashId = accounts.first { it.name == "Crypto.com Cash" }.id
             val cardId = accounts.first { it.name == "Crypto.com Card" }.id
@@ -157,7 +172,7 @@ class CryptoComCsvE2ETest : DbTest() {
             val withdrawalId = accounts.first { it.name == "GBP Withdrawal (via FPS)" }.id
 
             // Amounts in GBP minor units (scale factor 100).
-            fun Money.pence(): Long = amount
+            fun Money.pence(): Long = amount.toLong()
 
             val cashTransfers = repositories.transactionRepository.getTransactionsByAccount(cashId).first()
             // Directions per Transaction Kind (the sign alone does not encode them).
@@ -256,6 +271,54 @@ class CryptoComCsvE2ETest : DbTest() {
             assertTrue(
                 stillApplied.lastAppliedAt != null,
                 "the empty file stays imported after a second run",
+            )
+        }
+
+    @Test
+    fun fiatExport_cryptoBuy_importsAsTrade() =
+        runTest {
+            // A real crypto buy in the fiat export: £100 -> 0.005 BTC (viban_purchase, To Currency = BTC).
+            val fiat =
+                stage(
+                    "fiat_transactions_record_20231120_085814.csv",
+                    listOf(row("2023-11-20 09:00:00", "GBP -> BTC", "GBP", "100.0", "BTC", "0.005", "100.0", "viban_purchase")),
+                )
+
+            assertEquals(1, applyAll(listOf(fiat)).filesImported)
+            repositories.maintenanceService.refreshMaterializedViews()
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val cashId = accounts.first { it.name == "Crypto.com Cash" }.id
+            val btcWalletId = accounts.first { it.name == "Crypto.com BTC" }.id
+
+            // The conversion became a trade (GBP out of Cash, BTC into the wallet), not a GBP transfer.
+            val trade =
+                repositories.tradeRepository
+                    .getTradesByAccount(btcWalletId)
+                    .first()
+                    .single()
+            assertEquals(cashId, trade.fromAccountId)
+            assertEquals("GBP", trade.from.currency.code)
+            assertEquals("100", trade.from.toDisplayValue().toString())
+            assertEquals("BTC", trade.to.currency.code)
+            assertEquals("0.005", trade.to.toDisplayValue().toString())
+
+            val balances = repositories.transactionRepository.getAccountBalances().first()
+            assertEquals(
+                "0.005",
+                balances
+                    .first { it.accountId == btcWalletId }
+                    .balance
+                    .toDisplayValue()
+                    .toString(),
+            )
+            assertEquals(
+                "-100",
+                balances
+                    .first { it.accountId == cashId }
+                    .balance
+                    .toDisplayValue()
+                    .toString(),
             )
         }
 }

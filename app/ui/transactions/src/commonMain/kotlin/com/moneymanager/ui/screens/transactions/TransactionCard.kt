@@ -204,7 +204,7 @@ fun AccountTransactionCard(
                 text = formatAmount(runningBalance.transactionAmount),
                 style = cellStyle,
                 color =
-                    if (runningBalance.transactionAmount.amount >= 0) {
+                    if (!runningBalance.transactionAmount.isNegative()) {
                         MaterialTheme.colorScheme.primary.copy(alpha = mutedAlpha)
                     } else {
                         MaterialTheme.colorScheme.error.copy(alpha = mutedAlpha)
@@ -220,7 +220,7 @@ fun AccountTransactionCard(
                 text = formatAmount(runningBalance.runningBalance),
                 style = cellStyle,
                 color =
-                    if (runningBalance.runningBalance.amount >= 0) {
+                    if (!runningBalance.runningBalance.isNegative()) {
                         MaterialTheme.colorScheme.primary.copy(alpha = mutedAlpha)
                     } else {
                         MaterialTheme.colorScheme.error.copy(alpha = mutedAlpha)
@@ -237,7 +237,7 @@ fun AccountTransactionCard(
                     // Reconstruct Transfer object from AccountRow fields
                     // Note: Amount needs to be positive value from the materialized view
                     val amount =
-                        if (runningBalance.transactionAmount.amount < 0) {
+                        if (runningBalance.transactionAmount.isNegative()) {
                             Money(-runningBalance.transactionAmount.amount, runningBalance.transactionAmount.currency)
                         } else {
                             runningBalance.transactionAmount

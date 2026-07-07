@@ -1,6 +1,7 @@
 package com.moneymanager.domain.model
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.bigdecimal.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -52,14 +53,14 @@ class MoneyTest {
     @Test
     fun fromDisplayValue_bigDecimal_convertsCorrectly() {
         val money = Money.fromDisplayValue(BigDecimal("123.45"), usd)
-        assertEquals(12345L, money.amount)
+        assertEquals(BigInteger(12345L), money.amount)
         assertEquals(usd.id, money.currency.id)
     }
 
     @Test
     fun fromDisplayValue_string_convertsCorrectly() {
         val money = Money.fromDisplayValue("123.45", usd)
-        assertEquals(12345L, money.amount)
+        assertEquals(BigInteger(12345L), money.amount)
     }
 
     @Test
@@ -68,7 +69,7 @@ class MoneyTest {
         val b = Money(5000, usd) // $50.00
         val result = a + b
 
-        assertEquals(15000L, result.amount) // $150.00
+        assertEquals(BigInteger(15000L), result.amount) // $150.00
         assertEquals(usd.id, result.currency.id)
     }
 
@@ -88,7 +89,7 @@ class MoneyTest {
         val b = Money(3000, usd) // $30.00
         val result = a - b
 
-        assertEquals(7000L, result.amount) // $70.00
+        assertEquals(BigInteger(7000L), result.amount) // $70.00
         assertEquals(usd.id, result.currency.id)
     }
 
@@ -107,7 +108,7 @@ class MoneyTest {
         val money = Money(1000, usd) // $10.00
         val result = money * 5L
 
-        assertEquals(5000L, result.amount) // $50.00
+        assertEquals(BigInteger(5000L), result.amount) // $50.00
         assertEquals(usd.id, result.currency.id)
     }
 
@@ -116,7 +117,7 @@ class MoneyTest {
         val money = Money(1000, usd) // $10.00
         val result = money * 3
 
-        assertEquals(3000L, result.amount) // $30.00
+        assertEquals(BigInteger(3000L), result.amount) // $30.00
         assertEquals(usd.id, result.currency.id)
     }
 
@@ -125,7 +126,7 @@ class MoneyTest {
         val money = Money(10000, usd) // $100.00
         val result = money / 4L
 
-        assertEquals(2500L, result.amount) // $25.00
+        assertEquals(BigInteger(2500L), result.amount) // $25.00
         assertEquals(usd.id, result.currency.id)
     }
 
@@ -134,7 +135,7 @@ class MoneyTest {
         val money = Money(10000, usd) // $100.00
         val result = money / 2
 
-        assertEquals(5000L, result.amount) // $50.00
+        assertEquals(BigInteger(5000L), result.amount) // $50.00
         assertEquals(usd.id, result.currency.id)
     }
 
@@ -143,7 +144,7 @@ class MoneyTest {
         val money = Money(10000, usd) // $100.00
         val result = -money
 
-        assertEquals(-10000L, result.amount) // -$100.00
+        assertEquals(BigInteger(-10000L), result.amount) // -$100.00
         assertEquals(usd.id, result.currency.id)
     }
 
@@ -223,14 +224,14 @@ class MoneyTest {
         val positive = Money(100, usd)
         val negative = Money(-100, usd)
 
-        assertEquals(100L, positive.abs().amount)
-        assertEquals(100L, negative.abs().amount)
+        assertEquals(BigInteger(100L), positive.abs().amount)
+        assertEquals(BigInteger(100L), negative.abs().amount)
     }
 
     @Test
     fun zero_createsZeroMoney() {
         val money = Money.zero(usd)
-        assertEquals(0L, money.amount)
+        assertEquals(BigInteger(0L), money.amount)
         assertEquals(usd.id, money.currency.id)
     }
 
@@ -259,5 +260,56 @@ class MoneyTest {
         val converted = money.toDisplayValue()
 
         assertEquals(original.toString(), converted.toString())
+    }
+
+    // --- Crypto asset / arbitrary-precision tests ---
+
+    private val btc =
+        CryptoAsset(
+            id = CryptoId(10L),
+            code = "BTC",
+            name = "Bitcoin",
+            scaleFactor = 100_000_000L, // 8 decimals
+        )
+
+    private val eth =
+        CryptoAsset(
+            id = CryptoId(11L),
+            code = "ETH",
+            name = "Ethereum",
+            scaleFactor = 1_000_000_000_000_000_000L, // 18 decimals
+        )
+
+    @Test
+    fun crypto_roundTrip_eightDecimals() {
+        val money = Money.fromDisplayValue("0.5", btc)
+        assertEquals(BigInteger(50_000_000L), money.amount)
+        assertEquals("0.5", money.toDisplayValue().toString())
+        assertEquals(btc.id, money.currency.id)
+    }
+
+    @Test
+    fun crypto_ethAmountFarBeyondLongMax_isExact() {
+        // 100 ETH at 18 decimals = 1e20 minor units, which overflows a Long (max ~9.2e18).
+        val money = Money.fromDisplayValue("100", eth)
+        assertEquals(BigInteger("100000000000000000000"), money.amount)
+        assertEquals("100", money.toDisplayValue().toString())
+    }
+
+    @Test
+    fun crypto_sumBeyondLongMax_isExact() {
+        val a = Money.fromDisplayValue("9", eth) // 9e18, near Long.MAX
+        val b = Money.fromDisplayValue("9", eth)
+        val sum = a + b // 1.8e19 > Long.MAX — must not overflow
+        assertEquals(BigInteger("18000000000000000000"), sum.amount)
+        assertEquals("18", sum.toDisplayValue().toString())
+    }
+
+    @Test
+    fun fromDisplayValue_throwsOnExcessPrecision() {
+        // 9 decimals for an 8-decimal asset cannot be represented exactly — must throw, not truncate.
+        assertFailsWith<ArithmeticException> {
+            Money.fromDisplayValue("0.123456789", btc)
+        }
     }
 }

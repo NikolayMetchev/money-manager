@@ -31,11 +31,13 @@ kotlin {
                 api(projects.app.model.core)
 
                 implementation(libs.kotlinx.serialization.core)
+                implementation(projects.utils.bigdecimal)
             }
         }
         getByName("androidMain") {
             dependencies {
                 implementation(libs.kotlinx.serialization.core)
+                implementation(projects.utils.bigdecimal)
             }
         }
     }

@@ -1,0 +1,63 @@
+-- Enumerates every account-affecting leg of every transaction (transfer + trade), one row per
+-- (transaction, account it touches), with a signed direction. Amounts are arbitrary-precision TEXT.
+-- Consumed by DatabaseMaintenanceServiceImpl, which aggregates in Kotlin BigInteger to (re)populate
+-- account_balance_materialized_view and running_balance_materialized_view (SQLite cannot SUM TEXT
+-- without precision loss). `sign` is +1 for an inflow to the account, -1 for an outflow.
+-- `is_excluded` = 1 for transfers carrying the well-known excluded attribute (-1); trades are never
+-- excluded. Excluded rows are omitted from balance sums but still listed in the running balance.
+selectAllTransactionLegs:
+SELECT
+    tr.id,
+    tr.timestamp,
+    tr.description,
+    tr.target_account_id AS account_id,
+    tr.asset_id,
+    tr.amount,
+    1 AS sign,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM transfer_attribute ta
+        WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+    ) THEN 1 ELSE 0 END AS is_excluded
+FROM transfer tr
+
+UNION ALL
+
+SELECT
+    tr.id,
+    tr.timestamp,
+    tr.description,
+    tr.source_account_id AS account_id,
+    tr.asset_id,
+    tr.amount,
+    -1 AS sign,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM transfer_attribute ta
+        WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+    ) THEN 1 ELSE 0 END AS is_excluded
+FROM transfer tr
+
+UNION ALL
+
+SELECT
+    td.id,
+    td.timestamp,
+    td.description,
+    td.to_account_id AS account_id,
+    td.to_asset_id AS asset_id,
+    td.to_amount AS amount,
+    1 AS sign,
+    0 AS is_excluded
+FROM trade td
+
+UNION ALL
+
+SELECT
+    td.id,
+    td.timestamp,
+    td.description,
+    td.from_account_id AS account_id,
+    td.from_asset_id AS asset_id,
+    td.from_amount AS amount,
+    -1 AS sign,
+    0 AS is_excluded
+FROM trade td;

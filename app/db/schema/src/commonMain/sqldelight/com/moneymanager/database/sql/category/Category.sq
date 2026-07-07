@@ -23,11 +23,13 @@ WITH RECURSIVE CategoryHierarchy AS (
     FROM CategoryHierarchy ch
     JOIN category c ON c.parent_id = ch.descendant_id
 )
+-- Non-aggregating: emits one balance row per (ancestor category, descendant account, asset).
+-- Balances are arbitrary-precision TEXT, so the per-category SUM is done in Kotlin BigInteger
+-- (see CategoryReadRepositoryImpl) rather than SQL.
 SELECT
     ch.ancestor_id AS category_id,
-    abv.currency_id,
-    SUM(abv.balance) AS balance
+    abv.asset_id,
+    abv.balance AS balance
 FROM CategoryHierarchy ch
 JOIN account a ON a.category_id = ch.descendant_id
-JOIN account_balance_materialized_view abv ON abv.account_id = a.id
-GROUP BY ch.ancestor_id, abv.currency_id;
+JOIN account_balance_materialized_view abv ON abv.account_id = a.id;

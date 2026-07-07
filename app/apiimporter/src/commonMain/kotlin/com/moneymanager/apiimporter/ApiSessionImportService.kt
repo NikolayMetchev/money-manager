@@ -3,6 +3,7 @@
 package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
@@ -1838,7 +1839,7 @@ private suspend fun prepareValidTransactionItem(
             setup.strategy.transactionMappings.feeIncludedInAmount &&
             fee.amount.currency.id == data.money.currency.id
         ) {
-            Money((data.money.amount - fee.amount.amount).coerceAtLeast(0L), data.money.currency)
+            Money((data.money.amount - fee.amount.amount).coerceAtLeast(BigInteger.ZERO), data.money.currency)
         } else {
             data.money
         }
@@ -1933,7 +1934,7 @@ private suspend fun buildImportFee(
             item.feeAmountDecimalMajor != null -> Money.fromDisplayValue(item.feeAmountDecimalMajor, feeCurrency)
             else -> return null
         }
-    if (feeMoney.amount == 0L) return null
+    if (feeMoney.isZero()) return null
     val feeAccountKey = setup.accountResolver.resolveNamedAccount("${setup.strategy.name} Fees", source = apiSource.toSource())
     // Point the fee's audit trail at the JSON object that holds the fee (e.g. `atm_fees_detailed`)
     // rather than the whole transaction or the bare amount leaf, by extending the transaction path with

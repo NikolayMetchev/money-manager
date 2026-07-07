@@ -27,6 +27,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -56,6 +57,7 @@ fun CsvImportAllDialog(
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
+    cryptoRepository: CryptoReadRepository,
     personRepository: PersonReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
     csvImportRepository: CsvImportReadRepository,
@@ -155,6 +157,7 @@ fun CsvImportAllDialog(
                                         importEngine = importEngine,
                                         onProgress = { done, total -> progress = done to total },
                                         passThroughAccounts = passThroughAccounts,
+                                        cryptoRepository = cryptoRepository,
                                     )
                                 summary = result.toSummary()
                             } finally {

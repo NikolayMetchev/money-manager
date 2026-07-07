@@ -1,0 +1,7 @@
+-- Allocate a new asset id (shared id space for currency/crypto/…), mirroring transaction_id.
+insert:
+INSERT INTO asset DEFAULT VALUES;
+
+-- Get the last inserted asset id.
+lastInsertedId:
+SELECT last_insert_rowid();

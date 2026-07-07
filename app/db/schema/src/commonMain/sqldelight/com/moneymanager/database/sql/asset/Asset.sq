@@ -1,0 +1,16 @@
+-- asset: shared id-generator supertype for every asset class (fiat currency, crypto, and future
+-- kinds such as stocks). Mirrors `transaction_id` for transactions: a bare, permanent id space so a
+-- transfer/trade/balance can denominate in any asset uniformly via a single asset id.
+-- Like transaction_id, rows are NEVER deleted directly; deleting the concrete subtype row
+-- (currency/crypto) cascades from here.
+CREATE TABLE asset (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+);
+
+-- asset_details: unifying read view over every asset subtype, exposing the common columns plus a
+-- `kind` discriminator so a reader (e.g. a transfer/trade mapper) can resolve any asset_id to the
+-- right domain type without knowing which subtype table it lives in.
+CREATE VIEW asset_details AS
+SELECT id, revision_id, code, name, scale_factor, 'FIAT' AS kind FROM currency
+UNION ALL
+SELECT id, revision_id, code, name, scale_factor, 'CRYPTO' AS kind FROM crypto;

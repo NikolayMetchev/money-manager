@@ -7,6 +7,8 @@ import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.CategoryAuditEntry
+import com.moneymanager.domain.model.CryptoAuditEntry
+import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CsvImportStrategyAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
@@ -15,6 +17,8 @@ import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.TradeAuditEntry
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
@@ -97,6 +101,12 @@ interface AuditReadRepository {
      * @return List of audit entries for the currency
      */
     suspend fun getAuditHistoryForCurrency(currencyId: CurrencyId): List<CurrencyAuditEntry>
+
+    /** Audit history for a crypto asset. */
+    suspend fun getAuditHistoryForCrypto(cryptoId: CryptoId): List<CryptoAuditEntry>
+
+    /** Audit history for a trade. */
+    suspend fun getAuditHistoryForTrade(tradeId: TradeId): List<TradeAuditEntry>
 
     /**
      * Gets the audit history for a specific category.

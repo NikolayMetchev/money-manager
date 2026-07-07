@@ -56,6 +56,8 @@ class ImportDirectoryScannerTest : DbTest() {
             ownershipRepository = repositories.personAccountOwnershipRepository,
             categoryRepository = repositories.categoryRepository,
             currencyRepository = repositories.currencyRepository,
+            cryptoRepository = repositories.cryptoRepository,
+            tradeRepository = repositories.tradeRepository,
             attributeTypeRepository = repositories.attributeTypeRepository,
             relationshipTypeRepository = repositories.relationshipTypeRepository,
             csvImportStrategyRepository = repositories.csvImportStrategyRepository,

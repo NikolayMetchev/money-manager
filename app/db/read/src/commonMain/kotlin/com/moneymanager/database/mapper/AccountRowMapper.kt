@@ -2,10 +2,9 @@
 
 package com.moneymanager.database.mapper
 
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
-import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.TransferId
 import kotlin.time.Instant.Companion.fromEpochMilliseconds
@@ -17,48 +16,34 @@ object AccountRowMapper {
         timestamp: Long,
         description: String,
         accountId: Long,
-        transactionAmount: Long,
-        runningBalance: Long,
-        currencyId: Long,
-        currencyCode: String,
-        currencyName: String,
-        currencyScaleFactor: Long,
-        sourceAccountId: Long,
-        targetAccountId: Long,
+        transactionAmount: String,
+        runningBalance: String,
+        assetId: Long,
+        assetCode: String,
+        assetName: String,
+        assetScaleFactor: Long,
+        assetKind: String,
+        // Nullable because the running-balance row LEFT JOINs both transfer and trade and COALESCEs the
+        // accounts; every row is one or the other, so exactly one side is non-null.
+        sourceAccountId: Long?,
+        targetAccountId: Long?,
         isExcluded: Long,
         isReconciled: Long,
         feeTransferId: Long?,
         feeParentTransferId: Long?,
         passThroughSpendId: Long?,
         passThroughFundingId: Long?,
-    ): AccountRow =
-        AccountRow(
+    ): AccountRow {
+        val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetKind)
+        return AccountRow(
             transactionId = TransferId(id),
             timestamp = fromEpochMilliseconds(timestamp),
             description = description,
             accountId = AccountId(accountId),
-            transactionAmount =
-                Money(
-                    transactionAmount,
-                    Currency(
-                        id = CurrencyId(currencyId),
-                        code = currencyCode,
-                        name = currencyName,
-                        scaleFactor = currencyScaleFactor,
-                    ),
-                ),
-            runningBalance =
-                Money(
-                    runningBalance,
-                    Currency(
-                        id = CurrencyId(currencyId),
-                        code = currencyCode,
-                        name = currencyName,
-                        scaleFactor = currencyScaleFactor,
-                    ),
-                ),
-            sourceAccountId = AccountId(sourceAccountId),
-            targetAccountId = AccountId(targetAccountId),
+            transactionAmount = Money(BigInteger(transactionAmount), asset),
+            runningBalance = Money(BigInteger(runningBalance), asset),
+            sourceAccountId = AccountId(requireNotNull(sourceAccountId)),
+            targetAccountId = AccountId(requireNotNull(targetAccountId)),
             isExcluded = isExcluded != 0L,
             isReconciled = isReconciled != 0L,
             feeTransferId = feeTransferId?.let { TransferId(it) },
@@ -66,4 +51,5 @@ object AccountRowMapper {
             passThroughSpendId = passThroughSpendId?.let { TransferId(it) },
             passThroughFundingId = passThroughFundingId?.let { TransferId(it) },
         )
+    }
 }

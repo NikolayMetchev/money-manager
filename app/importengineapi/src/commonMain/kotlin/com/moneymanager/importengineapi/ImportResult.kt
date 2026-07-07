@@ -6,10 +6,12 @@ import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -58,6 +60,8 @@ data class ImportResult(
     val createdCategoryIds: Map<LocalCategoryKey, Long> = emptyMap(),
     val createdPersonIds: Map<LocalPersonKey, PersonId> = emptyMap(),
     val createdCurrencyIds: Map<LocalCurrencyKey, CurrencyId> = emptyMap(),
+    val createdCryptoIds: Map<LocalCryptoKey, CryptoId> = emptyMap(),
+    val createdTradeIds: Map<LocalTradeKey, TradeId> = emptyMap(),
     /** Resolved (get-or-create) attribute-type ids for each name in [ImportBatch.attributeTypeNames]. */
     val attributeTypeIds: Map<String, AttributeTypeId> = emptyMap(),
     /** Resolved (get-or-create) relationship-type ids for each name in [ImportBatch.relationshipTypeNames]. */

@@ -25,6 +25,8 @@ class MoneyManagerDatabaseWrapper(
     val accountMappingWriteQueries get() = writeDb.accountMappingWriteQueries
     val accountMergeWriteQueries get() = writeDb.accountMergeWriteQueries
     val accountWriteQueries get() = writeDb.accountWriteQueries
+    val assetWriteQueries get() = writeDb.assetWriteQueries
+    val cryptoWriteQueries get() = writeDb.cryptoWriteQueries
     val apiImportStrategyWriteQueries get() = writeDb.apiImportStrategyWriteQueries
     val apiSessionWriteQueries get() = writeDb.apiSessionWriteQueries
     val attributeTypeWriteQueries get() = writeDb.attributeTypeWriteQueries
@@ -42,6 +44,7 @@ class MoneyManagerDatabaseWrapper(
     val qifImportWriteQueries get() = writeDb.qifImportWriteQueries
     val relationshipTypeWriteQueries get() = writeDb.relationshipTypeWriteQueries
     val settingsWriteQueries get() = writeDb.settingsWriteQueries
+    val tradeWriteQueries get() = writeDb.tradeWriteQueries
     val transactionIdWriteQueries get() = writeDb.transactionIdWriteQueries
     val transferAttributeWriteQueries get() = writeDb.transferAttributeWriteQueries
     val transferRelationshipWriteQueries get() = writeDb.transferRelationshipWriteQueries
@@ -332,6 +335,9 @@ class MoneyManagerDatabaseWrapper(
             "audit_type",
             "account_audit",
             "currency_audit",
+            "crypto_audit",
+            "trade_audit",
+            "asset",
             "category_audit",
             "transfer_audit",
             "person_audit",

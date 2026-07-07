@@ -5,6 +5,7 @@ package com.moneymanager.csvimporter
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.Money
@@ -20,6 +21,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
@@ -319,6 +321,7 @@ suspend fun planCsvReimport(
     relationshipRepository: TransferRelationshipReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
+    cryptoAssets: List<CryptoAsset> = emptyList(),
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): ReimportPlan {
     onProgress?.invoke(ImportProgress("Loading rows"))
@@ -341,6 +344,7 @@ suspend fun planCsvReimport(
             effectiveSource,
             passThroughAccounts,
             historicalAccountNames,
+            cryptoAssets,
         ).prepareImport(allRows)
 
     onProgress?.invoke(ImportProgress("Analyzing rows (pass 1 of 2)"))
@@ -351,8 +355,16 @@ suspend fun planCsvReimport(
     // Reversal detection re-maps with the mappings but NO historical names, so a merged-away account's
     // name (now an audit alias of its survivor) doesn't mask a mapping that no longer routes it there.
     val mappedNoHistoryPrep =
-        buildCsvMapper(strategy, csvImport.columns, accounts, currencies, mappings, effectiveSource, passThroughAccounts)
-            .prepareImport(allRows)
+        buildCsvMapper(
+            strategy,
+            csvImport.columns,
+            accounts,
+            currencies,
+            mappings,
+            effectiveSource,
+            passThroughAccounts,
+            cryptoAssets = cryptoAssets,
+        ).prepareImport(allRows)
     val reversals =
         computeReimportReversals(
             importCreated = importCreated,
@@ -637,6 +649,7 @@ suspend fun executeCsvReimport(
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
     valueUpdateChunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
     refreshViews: Boolean = true,
+    cryptoRepository: CryptoReadRepository? = null,
 ): CsvReimportResult {
     val merged = mutableListOf<ReimportMerge>()
     val skipped = plan.skipped.toMutableList()
@@ -730,6 +743,7 @@ suspend fun executeCsvReimport(
             importEngine = importEngine,
             refreshViews = false,
             passThroughAccounts = passThroughAccounts,
+            cryptoRepository = cryptoRepository,
             onProgress = onProgress,
             engineBatchSize = REIMPORT_ENGINE_BATCH_SIZE,
         )
@@ -964,6 +978,7 @@ suspend fun bulkReimportCsv(
     importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
+    cryptoRepository: CryptoReadRepository? = null,
 ): CsvBulkReimportResult {
     var filesImported = 0
     var transfers = 0
@@ -975,6 +990,7 @@ suspend fun bulkReimportCsv(
     var valueUpdates = 0
     var emptyAccountsDeleted = 0
     val skipped = mutableListOf<ReimportSkippedAccount>()
+    val cryptoAssets = cryptoRepository?.getAllCryptoAssets()?.first().orEmpty()
 
     imports.forEachIndexed { index, listedImport ->
         onProgress(index, imports.size)
@@ -1004,6 +1020,7 @@ suspend fun bulkReimportCsv(
                     relationshipRepository = relationshipRepository,
                     transferSourceRepository = transferSourceRepository,
                     passThroughAccounts = passThroughAccounts,
+                    cryptoAssets = cryptoAssets,
                 )
             val result =
                 executeCsvReimport(

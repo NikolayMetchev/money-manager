@@ -58,10 +58,16 @@ object DatabaseConfig {
             currencies.forEach { currency ->
                 if (currency.code == GBP_CODE) return@forEach
                 val scaleFactor = CurrencyScaleFactors.getScaleFactor(currency.code)
-                currencyWriteQueries.insert(currency.code, currency.displayName, scaleFactor.toLong())
-                // Fetch the id by code rather than last_insert_rowid(): the currency INSERT fires an audit
-                // trigger that also inserts a row, so the rowid is not reliably the currency's own.
-                val currencyId = currencySelectQueries.selectByCode(currency.code).executeAsOne().id
+                // Allocate an id from the shared `asset` id space first (asset has no triggers, so
+                // last_insert_rowid() is reliable), then insert the currency with that id.
+                // insert + last_insert_rowid() must share one connection (the driver may pool
+                // connections), so allocate the asset id inside a transaction.
+                val currencyId =
+                    assetWriteQueries.transactionWithResult {
+                        assetWriteQueries.insert()
+                        assetWriteQueries.lastInsertedId().executeAsOne()
+                    }
+                currencyWriteQueries.insert(currencyId, currency.code, currency.displayName, scaleFactor.toLong())
                 recordSource(
                     DeviceId(WellKnownIds.SYSTEM_DEVICE_ID),
                     EntityType.CURRENCY,

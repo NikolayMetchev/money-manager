@@ -1,0 +1,8 @@
+selectAll:
+SELECT * FROM crypto ORDER BY code;
+
+selectById:
+SELECT * FROM crypto WHERE id = ?;
+
+selectByCode:
+SELECT * FROM crypto WHERE code = ?;

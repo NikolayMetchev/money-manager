@@ -1,6 +1,7 @@
+-- id must be an already-allocated `asset` id (see asset/AssetWrite.sq).
 insert:
-INSERT INTO currency(code, name, scale_factor)
-VALUES (?, ?, ?);
+INSERT INTO currency(id, code, name, scale_factor)
+VALUES (?, ?, ?, ?);
 
 lastInsertedId:
 SELECT last_insert_rowid();
