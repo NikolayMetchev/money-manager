@@ -46,6 +46,7 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransactionId
@@ -236,8 +237,12 @@ fun AccountTransactionsScreen(
     val displayedRunningBalances =
         if (showExcluded) runningBalances else runningBalances.filter { !it.isExcluded }
 
-    // Get all unique assets (fiat or crypto) from account balances for matrix, deduped by id
-    val uniqueAssets = accountBalances.map { it.balance.currency }.distinctBy { it.id.id }
+    // Get all unique assets (fiat or crypto) from account balances for matrix, deduped by id.
+    // Sorted by code for a deterministic row order independent of balance emission order.
+    val uniqueAssets =
+        remember(accountBalances) {
+            accountBalances.map { it.balance.currency }.distinctBy { it.id.id }.sortedBy { it.code }
+        }
 
     // Calculate column widths for each account based on account name and balance amounts
     val accountColumnWidths: Map<AccountId, Dp> =
@@ -791,10 +796,7 @@ fun AccountTransactionsScreen(
 
                             // Scroll matrix to show the account and currency
                             val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
-                            val currencyIndex =
-                                uniqueAssets.indexOfFirst {
-                                    it.id.id == transaction.transactionAmount.currency.id.id
-                                }
+                            val currencyIndex = uniqueAssets.indexOfAsset(transaction.transactionAmount.currency.id.id)
 
                             if (accountIndex >= 0 && currencyIndex >= 0) {
                                 val targetScrollX =
@@ -922,9 +924,7 @@ fun AccountTransactionsScreen(
                                                 )
                                             // Calculate vertical scroll position for the currency
                                             val currencyIndex =
-                                                uniqueAssets.indexOfFirst {
-                                                    it.id.id == runningBalance.transactionAmount.currency.id.id
-                                                }
+                                                uniqueAssets.indexOfAsset(runningBalance.transactionAmount.currency.id.id)
                                             if (currencyIndex >= 0) {
                                                 // Each currency row: text + padding + spacing ≈ 28.dp
                                                 val targetScrollY =
@@ -1009,3 +1009,6 @@ fun AccountTransactionsScreen(
         )
     }
 }
+
+/** Index of the matrix row for the asset with the given id, or -1 if absent. */
+private fun List<Asset>.indexOfAsset(assetId: Long): Int = indexOfFirst { it.id.id == assetId }
