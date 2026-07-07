@@ -149,7 +149,7 @@ class ImportEngineImpl(
         val createdCryptoIds = mutableMapOf<LocalCryptoKey, CryptoId>()
         for (intent in batch.cryptoAssets.creates()) {
             createdCryptoIds[intent.key] =
-                cryptoRepository.upsertCryptoByCode(requireNotNull(intent.code), intent.name, intent.source)
+                cryptoRepository.upsertCryptoByCode(requireNotNull(intent.code), intent.name, intent.scaleFactor, intent.source)
         }
         val createdTradeIds = mutableMapOf<LocalTradeKey, TradeId>()
         for (intent in batch.trades) {

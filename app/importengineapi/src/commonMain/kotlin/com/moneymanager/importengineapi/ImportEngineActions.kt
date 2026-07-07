@@ -39,16 +39,38 @@ suspend fun ImportEngine.createCurrency(
 suspend fun ImportEngine.createCrypto(
     code: String,
     name: String? = null,
+    scaleFactor: Long? = null,
     source: Source = Source.Manual,
 ): CryptoId {
     val key = LocalCryptoKey(code)
     val result =
         import(
             ImportBatch(
-                cryptoAssets = listOf(ImportCryptoIntent(key = key, source = source, code = code, name = name)),
+                cryptoAssets =
+                    listOf(ImportCryptoIntent(key = key, source = source, code = code, name = name, scaleFactor = scaleFactor)),
             ),
         )
     return requireNotNull(result.createdCryptoIds[key]) { "Crypto asset $code was not created" }
+}
+
+/** Deletes a crypto asset by id. */
+suspend fun ImportEngine.deleteCrypto(
+    id: CryptoId,
+    source: Source = Source.Manual,
+) {
+    import(
+        ImportBatch(
+            cryptoAssets =
+                listOf(
+                    ImportCryptoIntent(
+                        key = LocalCryptoKey(id.toString()),
+                        source = source,
+                        operation = ImportOperation.DELETE,
+                        existingId = id,
+                    ),
+                ),
+        ),
+    )
 }
 
 /** Creates a single cross-asset trade and returns its id. */

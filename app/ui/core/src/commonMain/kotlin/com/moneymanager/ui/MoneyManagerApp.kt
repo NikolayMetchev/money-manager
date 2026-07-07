@@ -71,10 +71,10 @@ import com.moneymanager.ui.screens.AccountAuditScreen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.ApiConnectScreen
 import com.moneymanager.ui.screens.ApiSessionTrafficScreen
+import com.moneymanager.ui.screens.AssetsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CategoryAuditScreen
 import com.moneymanager.ui.screens.CsvImportDetailScreen
-import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.CurrencyAuditScreen
 import com.moneymanager.ui.screens.DatabaseSizeBreakdownScreen
 import com.moneymanager.ui.screens.ImportDirectoryAuditScreen
@@ -222,7 +222,7 @@ fun MoneyManagerApp(
                             )
                             NavigationBarItem(
                                 icon = { Text("\uD83D\uDCB1") },
-                                label = { Text("Currencies") },
+                                label = { Text("Assets") },
                                 selected = currentScreen is Screen.Currencies,
                                 onClick = { navigationHistory.navigateTo(Screen.Currencies) },
                             )
@@ -366,9 +366,10 @@ fun MoneyManagerApp(
                                         }
                                         entry<Screen.Currencies> {
                                             resetViewedIds()
-                                            CurrenciesScreen(
+                                            AssetsScreen(
                                                 currencyRepository = services.accounts.currencyRepository,
-                                                onAuditClick = { currency ->
+                                                cryptoRepository = services.accounts.cryptoRepository,
+                                                onCurrencyAuditClick = { currency ->
                                                     navigationHistory.navigateTo(Screen.CurrencyAuditHistory(currency.id, currency.code))
                                                 },
                                             )

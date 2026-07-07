@@ -259,6 +259,8 @@ data class ImportCryptoIntent(
     override val source: Source,
     val code: String? = null,
     val name: String? = null,
+    /** CREATE: overrides the scale factor (minor-unit divisor); null falls back to the CryptoRegistry. */
+    val scaleFactor: Long? = null,
     override val operation: ImportOperation = ImportOperation.CREATE,
     val existingId: CryptoId? = null,
     /** UPDATE: the new crypto row, passed straight to the repository. */

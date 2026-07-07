@@ -17,6 +17,7 @@ interface CryptoWriteRepository : CryptoReadRepository {
     suspend fun upsertCryptoByCode(
         code: String,
         name: String? = null,
+        scaleFactor: Long? = null,
         source: Source,
     ): CryptoId
 

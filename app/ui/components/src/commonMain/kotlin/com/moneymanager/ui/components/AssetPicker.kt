@@ -7,9 +7,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,6 +22,7 @@ import androidx.compose.ui.focus.focusRequester
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.AssetId
 import com.moneymanager.domain.model.CryptoAsset
+import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -67,6 +70,17 @@ fun AssetPicker(
 
     val selected = assets.find { it.id == selectedAssetId }
 
+    var showCreateCryptoDialog by remember { mutableStateOf(false) }
+    // A just-created crypto asset isn't in `assets` until its flow re-emits; select it once it arrives.
+    var pendingCryptoId by remember { mutableStateOf<CryptoId?>(null) }
+    LaunchedEffect(assets, pendingCryptoId) {
+        val pid = pendingCryptoId ?: return@LaunchedEffect
+        assets.firstOrNull { it.id == pid }?.let {
+            onAssetSelected(it)
+            pendingCryptoId = null
+        }
+    }
+
     fun label(asset: Asset): String {
         val kind = if (asset is CryptoAsset) " (crypto)" else ""
         return "${asset.code} - ${asset.name}$kind"
@@ -110,6 +124,25 @@ fun AssetPicker(
                     },
                 )
             }
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("+ Create New Crypto Asset") },
+                onClick = {
+                    showCreateCryptoDialog = true
+                    expanded = false
+                    searchQuery = ""
+                },
+            )
         }
+    }
+
+    if (showCreateCryptoDialog) {
+        CreateCryptoDialog(
+            onCryptoCreated = { cryptoId ->
+                pendingCryptoId = cryptoId
+                showCreateCryptoDialog = false
+            },
+            onDismiss = { showCreateCryptoDialog = false },
+        )
     }
 }
