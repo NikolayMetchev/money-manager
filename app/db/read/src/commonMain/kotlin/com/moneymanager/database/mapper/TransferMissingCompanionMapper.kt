@@ -2,9 +2,8 @@
 
 package com.moneymanager.database.mapper
 
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferMissingCompanion
@@ -16,24 +15,19 @@ object TransferMissingCompanionMapper {
         id: Long,
         timestamp: Long,
         description: String,
-        amount: Long,
+        amount: String,
         matchValue: String,
         sourceAccountId: Long,
         sourceAccountName: String,
         targetAccountId: Long,
         targetAccountName: String,
-        currencyId: Long,
-        currencyCode: String,
-        currencyName: String,
-        currencyScaleFactor: Long,
+        assetId: Long,
+        assetCode: String,
+        assetName: String,
+        assetScaleFactor: Long,
+        assetKind: String,
     ): TransferMissingCompanion {
-        val currency =
-            Currency(
-                id = CurrencyId(currencyId),
-                code = currencyCode,
-                name = currencyName,
-                scaleFactor = currencyScaleFactor,
-            )
+        val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetKind)
         return TransferMissingCompanion(
             transferId = TransferId(id),
             matchValue = matchValue,
@@ -43,7 +37,7 @@ object TransferMissingCompanionMapper {
             sourceAccountName = sourceAccountName,
             targetAccountId = AccountId(targetAccountId),
             targetAccountName = targetAccountName,
-            amount = Money(amount, currency),
+            amount = Money(BigInteger(amount), asset),
         )
     }
 }

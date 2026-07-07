@@ -15,6 +15,7 @@ import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -52,6 +53,7 @@ data class AccountsDomain(
     val accountAttributeRepository: AccountAttributeReadRepository,
     val categoryRepository: CategoryReadRepository,
     val currencyRepository: CurrencyReadRepository,
+    val cryptoRepository: CryptoReadRepository,
 )
 
 data class ImportsDomain(
@@ -105,6 +107,7 @@ fun Application.toAppServices(importEngine: ImportEngine) =
                 accountAttributeRepository = accounts.accountAttributeRepository,
                 categoryRepository = accounts.categoryRepository,
                 currencyRepository = accounts.currencyRepository,
+                cryptoRepository = accounts.cryptoRepository,
             ),
         imports =
             ImportsDomain(

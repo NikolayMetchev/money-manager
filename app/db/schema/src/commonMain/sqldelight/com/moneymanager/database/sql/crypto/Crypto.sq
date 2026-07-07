@@ -1,0 +1,10 @@
+-- crypto: a crypto asset (BTC, ETH, CRO, …) — a subtype of `asset`, sibling to `currency`.
+-- Its id is drawn from the shared `asset` id space. Crypto assets are created on demand (not
+-- seeded from the platform ISO list) and use a larger scale factor than fiat for higher precision.
+CREATE TABLE crypto (
+    id INTEGER PRIMARY KEY NOT NULL REFERENCES asset(id) ON DELETE CASCADE,
+    revision_id INTEGER NOT NULL DEFAULT 1,
+    code TEXT NOT NULL UNIQUE CHECK(length(trim(code)) > 0),
+    name TEXT NOT NULL CHECK(length(trim(name)) > 0),
+    scale_factor INTEGER NOT NULL DEFAULT 100000000
+);

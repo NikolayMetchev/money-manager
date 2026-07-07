@@ -1,6 +1,7 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.importer
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
@@ -29,6 +30,8 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.createCrypto
+import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.test.database.DbTest
@@ -56,6 +59,8 @@ class ImportEngineDbTest : DbTest() {
             ownershipRepository = repositories.personAccountOwnershipRepository,
             categoryRepository = repositories.categoryRepository,
             currencyRepository = repositories.currencyRepository,
+            cryptoRepository = repositories.cryptoRepository,
+            tradeRepository = repositories.tradeRepository,
             attributeTypeRepository = repositories.attributeTypeRepository,
             relationshipTypeRepository = repositories.relationshipTypeRepository,
             csvImportStrategyRepository = repositories.csvImportStrategyRepository,
@@ -591,14 +596,15 @@ class ImportEngineDbTest : DbTest() {
             val curveRows = repositories.transactionRepository.getTransactionsByAccount(curveId).first()
             assertEquals(2, curveRows.size)
             val curveNet =
-                curveRows.sumOf { t ->
-                    when (curveId) {
-                        t.targetAccountId -> t.amount.amount
-                        t.sourceAccountId -> -t.amount.amount
-                        else -> 0L
-                    }
+                curveRows.fold(com.moneymanager.bigdecimal.BigInteger.ZERO) { acc, t ->
+                    acc +
+                        when (curveId) {
+                            t.targetAccountId -> t.amount.amount
+                            t.sourceAccountId -> -t.amount.amount
+                            else -> com.moneymanager.bigdecimal.BigInteger.ZERO
+                        }
                 }
-            assertEquals(0L, curveNet)
+            assertEquals(com.moneymanager.bigdecimal.BigInteger.ZERO, curveNet)
 
             // The merchant receives the spend exactly once.
             val merchantRows = repositories.transactionRepository.getTransactionsByAccount(merchantId).first()
@@ -693,14 +699,15 @@ class ImportEngineDbTest : DbTest() {
                 val rows = repositories.transactionRepository.getTransactionsByAccount(conduitId).first()
                 assertEquals(2, rows.size)
                 val net =
-                    rows.sumOf { t ->
-                        when (conduitId) {
-                            t.targetAccountId -> t.amount.amount
-                            t.sourceAccountId -> -t.amount.amount
-                            else -> 0L
-                        }
+                    rows.fold(com.moneymanager.bigdecimal.BigInteger.ZERO) { acc, t ->
+                        acc +
+                            when (conduitId) {
+                                t.targetAccountId -> t.amount.amount
+                                t.sourceAccountId -> -t.amount.amount
+                                else -> com.moneymanager.bigdecimal.BigInteger.ZERO
+                            }
                     }
-                assertEquals(0L, net)
+                assertEquals(com.moneymanager.bigdecimal.BigInteger.ZERO, net)
             }
             val merchantRows = repositories.transactionRepository.getTransactionsByAccount(merchantId).first()
             assertEquals(1, merchantRows.size)
@@ -812,14 +819,15 @@ class ImportEngineDbTest : DbTest() {
                     repositories.transactionRepository
                         .getTransactionsByAccount(accountId)
                         .first()
-                        .sumOf { t ->
-                            when (accountId) {
-                                t.targetAccountId -> t.amount.amount
-                                t.sourceAccountId -> -t.amount.amount
-                                else -> 0L
-                            }
+                        .fold(com.moneymanager.bigdecimal.BigInteger.ZERO) { acc, t ->
+                            acc +
+                                when (accountId) {
+                                    t.targetAccountId -> t.amount.amount
+                                    t.sourceAccountId -> -t.amount.amount
+                                    else -> com.moneymanager.bigdecimal.BigInteger.ZERO
+                                }
                         }
-                assertEquals(0L, net, "account $name should net to zero")
+                assertEquals(com.moneymanager.bigdecimal.BigInteger.ZERO, net, "account $name should net to zero")
             }
 
             // The originals are consumed: a second identical cancellation finds nothing to reverse.
@@ -982,14 +990,15 @@ class ImportEngineDbTest : DbTest() {
                     repositories.transactionRepository
                         .getTransactionsByAccount(accountId)
                         .first()
-                        .sumOf { t ->
-                            when (accountId) {
-                                t.targetAccountId -> t.amount.amount
-                                t.sourceAccountId -> -t.amount.amount
-                                else -> 0L
-                            }
+                        .fold(com.moneymanager.bigdecimal.BigInteger.ZERO) { acc, t ->
+                            acc +
+                                when (accountId) {
+                                    t.targetAccountId -> t.amount.amount
+                                    t.sourceAccountId -> -t.amount.amount
+                                    else -> com.moneymanager.bigdecimal.BigInteger.ZERO
+                                }
                         }
-                assertEquals(0L, net, "account $accountId should net to zero")
+                assertEquals(com.moneymanager.bigdecimal.BigInteger.ZERO, net, "account $accountId should net to zero")
             }
 
             // The refund's spend leg (id1) links to the original charge's spend leg (id2) via the
@@ -1244,5 +1253,63 @@ class ImportEngineDbTest : DbTest() {
                     ),
                 )
             }
+        }
+
+    @Test
+    fun cryptoTrade_createsCryptoAssetAndTrade_withFullPrecisionBalances() =
+        runTest {
+            val e = engine()
+            val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = baseTime))
+            val wallet =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "ETH Wallet", openingDate = baseTime),
+                )
+            val gbp = repositories.currencyRepository.getCurrencyByCode("GBP").first()!!
+
+            // Crypto asset created on demand via the engine; scale/name come from the registry.
+            val ethId = e.createCrypto("ETH")
+            val eth = repositories.cryptoRepository.getCryptoAssetById(ethId).first()!!
+            assertEquals("Ethereum", eth.name)
+            assertEquals(1_000_000_000_000_000_000L, eth.scaleFactor)
+
+            // Buy 100 ETH for £250,000. 100 ETH = 1e20 wei — far beyond Long.MAX, must stay exact.
+            val tradeId =
+                e.createTrade(
+                    timestamp = baseTime,
+                    description = "Buy ETH",
+                    fromAccountId = bank,
+                    fromAmount = Money.fromDisplayValue("250000", gbp),
+                    toAccountId = wallet,
+                    toAmount = Money.fromDisplayValue("100", eth),
+                )
+            repositories.maintenanceService.refreshMaterializedViews()
+
+            // The trade round-trips with both legs' assets.
+            val trade = repositories.tradeRepository.getTradeById(tradeId).first()!!
+            assertEquals("GBP", trade.from.currency.code)
+            assertEquals("ETH", trade.to.currency.code)
+            assertEquals(BigInteger("100000000000000000000"), trade.to.amount)
+
+            // Balances reflect the trade's two legs at full precision.
+            val balances = repositories.transactionRepository.getAccountBalances().first()
+            val walletBalance = balances.first { it.accountId == wallet }.balance
+            assertEquals("ETH", walletBalance.currency.code)
+            assertEquals("100", walletBalance.toDisplayValue().toString())
+            assertEquals(BigInteger("100000000000000000000"), walletBalance.amount)
+
+            val bankBalance = balances.first { it.accountId == bank }.balance
+            assertEquals("GBP", bankBalance.currency.code)
+            assertEquals("-250000", bankBalance.toDisplayValue().toString())
+
+            // The trade appears in the wallet's transaction list (running balance) as a +100 ETH row.
+            val walletRows =
+                repositories.transactionRepository
+                    .getRunningBalanceByAccountPaginated(wallet, pageSize = 10, pagingInfo = null)
+                    .items
+            val tradeRow = walletRows.single { it.transactionId.id == tradeId.id }
+            assertEquals("ETH", tradeRow.transactionAmount.currency.code)
+            assertEquals(BigInteger("100000000000000000000"), tradeRow.transactionAmount.amount)
+            assertEquals(bank, tradeRow.sourceAccountId)
+            assertEquals(wallet, tradeRow.targetAccountId)
         }
 }

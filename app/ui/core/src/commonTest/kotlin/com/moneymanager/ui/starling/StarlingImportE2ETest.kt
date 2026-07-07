@@ -300,11 +300,11 @@ class StarlingImportE2ETest : DbTest() {
             val coffee = allAccounts.single { it.name == "Coffee Shop" }
             val acme = allAccounts.single { it.name == "ACME Ltd" }
 
-            val outgoing = transfers.single { it.amount.amount == 1250L }
+            val outgoing = transfers.single { it.amount.amount == com.moneymanager.bigdecimal.BigInteger(1250L) }
             assertEquals(ownAccount.id, outgoing.sourceAccountId, "OUT direction: money leaves the user's account")
             assertEquals(coffee.id, outgoing.targetAccountId)
 
-            val incoming = transfers.single { it.amount.amount == 50000L }
+            val incoming = transfers.single { it.amount.amount == com.moneymanager.bigdecimal.BigInteger(50000L) }
             assertEquals(acme.id, incoming.sourceAccountId)
             assertEquals(ownAccount.id, incoming.targetAccountId, "IN direction: money arrives at the user's account")
         }
@@ -541,7 +541,7 @@ class StarlingImportE2ETest : DbTest() {
             // it by excluding the pre-existing account's id.
             val ownAccount = allAccounts.single { it.name == "Personal" && it.id != existingId }
             val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
-            val acmeIncoming = transfers.single { it.amount.amount == 50000L }
+            val acmeIncoming = transfers.single { it.amount.amount == com.moneymanager.bigdecimal.BigInteger(50000L) }
             assertEquals(existingId, acmeIncoming.sourceAccountId, "The ACME transfer should link to the pre-existing account")
         }
 
@@ -1041,6 +1041,10 @@ class StarlingImportE2ETest : DbTest() {
 
             // Balance reflects only the two settled items (+50000 in, -1250 out); the 200000 declined
             // outgoing is excluded. Were it counted, the balance would be -151250 instead of 48750.
-            assertEquals(48750L, ownBalance.balance.amount, "Declined item must not affect the balance")
+            assertEquals(
+                com.moneymanager.bigdecimal.BigInteger(48750L),
+                ownBalance.balance.amount,
+                "Declined item must not affect the balance",
+            )
         }
 }

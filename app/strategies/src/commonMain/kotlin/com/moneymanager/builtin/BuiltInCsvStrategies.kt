@@ -40,6 +40,7 @@ object BuiltInCsvStrategies {
     val santanderQifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000006")
     val cryptoComCardStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000007")
     val cryptoComFiatStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000008")
+    val cryptoComCryptoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -78,6 +79,8 @@ object BuiltInCsvStrategies {
 
     private fun cryptoComFiatMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 6, index = index)
 
+    private fun cryptoComCryptoMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 7, index = index)
+
     /**
      * All built-in CSV import strategies seeded into a fresh database. [qifCurrencyId] is the fixed
      * currency the QIF strategies carry (the default the QIF import dialog pre-selects); it is resolved
@@ -94,6 +97,7 @@ object BuiltInCsvStrategies {
             buildMonzoCsvStrategy(now),
             buildCryptoComCardStrategy(now),
             buildCryptoComFiatStrategy(now),
+            buildCryptoComCryptoStrategy(now),
         )
 
     /**
@@ -280,19 +284,37 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.DESCRIPTION,
                         columnName = "Transaction Description",
                     ),
+                // Debit leg in its real currency (== Native GBP for fiat rows, but the actual asset for
+                // a crypto buy). When To Currency is a different, resolvable asset the row becomes a trade.
                 TransferField.AMOUNT to
                     AmountParsingMapping(
                         id = cryptoComFiatMappingId(7),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
-                        amountColumnName = "Native Amount",
+                        amountColumnName = "Amount",
                         flipAccountsOnPositive = true,
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(
                         id = cryptoComFiatMappingId(8),
                         fieldType = TransferField.CURRENCY,
-                        columnName = "Native Currency",
+                        columnName = "Currency",
+                    ),
+                // Credit leg of a conversion → the importer emits a trade when To Currency differs from
+                // Currency and resolves (e.g. a real crypto buy). The GBP-pegged TGBP token doesn't
+                // resolve, so those conversions stay ordinary transfers as before.
+                TransferField.TO_AMOUNT to
+                    AmountParsingMapping(
+                        id = cryptoComFiatMappingId(9),
+                        fieldType = TransferField.TO_AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "To Amount",
+                    ),
+                TransferField.TO_CURRENCY to
+                    CurrencyLookupMapping(
+                        id = cryptoComFiatMappingId(10),
+                        fieldType = TransferField.TO_CURRENCY,
+                        columnName = "To Currency",
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
@@ -342,6 +364,96 @@ object BuiltInCsvStrategies {
             rowPreprocessingRules = rowRules,
             contentMatchRules = listOf(ContentMatchRule(columnName = "Transaction Kind", pattern = "^(viban_|crypto_viban)")),
             fileNamePattern = "^fiat_transactions_record_",
+            crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in strategy for crypto.com's crypto_transactions_record_*.csv export — the crypto-native
+     * ledger (card cashback, staking/earn rewards, swaps). Unlike the card/fiat strategies (which
+     * denominate everything in the Native GBP columns and keep the crypto figure only as an
+     * attribute), this one denominates each row in its **real Currency/Amount**, so a wallet holds a
+     * genuine crypto balance (e.g. 0.37 CRO), and routes it to a per-asset "Crypto.com <CODE>" wallet.
+     * The crypto asset itself is created on demand during import (see CsvImportApplier.ensureCryptoAssets).
+     *
+     * The wallet is the SOURCE and the counterparty (from the description, e.g. "Card Cashback") the
+     * TARGET; [AmountParsingMapping.flipAccountsOnPositive] then makes a positive amount (rewards) flow
+     * INTO the wallet and a negative amount (a spend/swap out) flow OUT of it — mirroring the card
+     * strategy's sign convention.
+     */
+    fun buildCryptoComCryptoStrategy(now: Instant): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                // The wallet for this row's asset, e.g. "Crypto.com CRO"; created on demand if absent.
+                TransferField.SOURCE_ACCOUNT to
+                    TemplateAccountMapping(
+                        id = cryptoComCryptoMappingId(1),
+                        fieldType = TransferField.SOURCE_ACCOUNT,
+                        columnName = "Currency",
+                        prefix = CRYPTO_COM_WALLET_PREFIX,
+                    ),
+                // Counterparty (reward source / merchant) looked up from the description.
+                TransferField.TARGET_ACCOUNT to
+                    RegexAccountMapping(
+                        id = cryptoComCryptoMappingId(2),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = "Transaction Description",
+                        rules = emptyList(),
+                    ),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        id = cryptoComCryptoMappingId(3),
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = "Timestamp (UTC)",
+                        dateFormat = "yyyy-MM-dd",
+                        dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        id = cryptoComCryptoMappingId(4),
+                        fieldType = TransferField.DESCRIPTION,
+                        columnName = "Transaction Description",
+                    ),
+                // Positive = crypto received into the wallet (flip so the wallet is the target).
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        id = cryptoComCryptoMappingId(5),
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "Amount",
+                        flipAccountsOnPositive = true,
+                    ),
+                // The row's real asset (crypto ticker or, for the odd fiat row, a currency code).
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(
+                        id = cryptoComCryptoMappingId(6),
+                        fieldType = TransferField.CURRENCY,
+                        columnName = "Currency",
+                    ),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(
+                        id = cryptoComCryptoMappingId(7),
+                        fieldType = TransferField.TIMEZONE,
+                        timezoneId = "UTC",
+                    ),
+            )
+        val attributeMappings =
+            listOf(
+                AttributeColumnMapping("Transaction Kind", "cryptocom-kind"),
+                AttributeColumnMapping("Native Currency", "cryptocom-native-currency"),
+                AttributeColumnMapping("Native Amount", "cryptocom-native-amount"),
+                AttributeColumnMapping("Native Amount (in USD)", "cryptocom-usd-amount"),
+                AttributeColumnMapping("Transaction Hash", "cryptocom-hash"),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(cryptoComCryptoStrategyId),
+            name = "Crypto.com Crypto",
+            identificationColumns = cryptoComIdentificationColumns,
+            fieldMappings = fieldMappings,
+            attributeMappings = attributeMappings,
+            fileNamePattern = "^crypto_transactions_record_",
             crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
             createdAt = now,
             updatedAt = now,

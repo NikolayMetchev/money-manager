@@ -443,7 +443,7 @@ class AuditFunctionalTest : DbTest() {
             assertEquals(1, auditHistory.size)
             assertEquals("INSERT", auditHistory[0].audit_type)
             assertEquals(description, auditHistory[0].description)
-            assertEquals(amount.amount, auditHistory[0].amount)
+            assertEquals(amount.amount.toString(), auditHistory[0].amount)
         }
 
     @Test
@@ -490,7 +490,7 @@ class AuditFunctionalTest : DbTest() {
             val updateAudit = auditHistory[0]
             assertEquals("UPDATE", updateAudit.audit_type)
             assertEquals("Original Description", updateAudit.description, "Should store OLD description")
-            assertEquals(originalAmount.amount, updateAudit.amount, "Should store OLD amount")
+            assertEquals(originalAmount.amount.toString(), updateAudit.amount, "Should store OLD amount")
         }
 
     @Test

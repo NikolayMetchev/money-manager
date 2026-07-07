@@ -1,0 +1,13 @@
+-- id must be an already-allocated `asset` id (see asset/AssetWrite.sq).
+insert:
+INSERT INTO crypto(id, code, name, scale_factor)
+VALUES (?, ?, ?, ?);
+
+update:
+UPDATE crypto
+SET revision_id = revision_id + 1,
+    code = ?, name = ?, scale_factor = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM crypto WHERE id = ?;

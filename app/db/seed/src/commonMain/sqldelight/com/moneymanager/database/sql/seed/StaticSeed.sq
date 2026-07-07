@@ -51,6 +51,9 @@ INSERT INTO relationship_type (id, name) VALUES (4, 'reversal');
 -- more ISO 4217 codes than the JVM, so the full set cannot be frozen at build time). currency IS
 -- audited, so this fires the currency insert audit trigger; its SYSTEM provenance (entity_type
 -- CURRENCY=3, source_type SYSTEM=4, device 1) is recorded explicitly.
+-- Every asset id (currency/crypto) is drawn from the shared `asset` id space, so GBP's fixed id=1
+-- must first exist in `asset` before the currency row can reference it.
+INSERT INTO asset (id) VALUES (1);
 INSERT INTO currency (id, revision_id, code, name, scale_factor) VALUES (1, 1, 'GBP', 'British Pound', 100);
 INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
 VALUES (3, 1, 1, 4, 1);

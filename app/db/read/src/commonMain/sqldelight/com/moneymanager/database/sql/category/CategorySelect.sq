@@ -16,12 +16,12 @@ SELECT revision_id FROM category WHERE id = ?;
 selectAllCategoryBalances:
 SELECT
     category_balance_view.category_id,
-    category_balance_view.currency_id,
+    category_balance_view.asset_id,
     category_balance_view.balance,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
 FROM category_balance_view
-JOIN currency ON category_balance_view.currency_id = currency.id
-ORDER BY category_id, currency_id;
+JOIN asset_details ON category_balance_view.asset_id = asset_details.id
+ORDER BY category_id, asset_id;

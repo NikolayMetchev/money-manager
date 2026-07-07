@@ -1,10 +1,16 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TradeId
+import kotlin.time.Instant
 
 /*
  * Convenience ImportEngine extensions for single, non-transfer writes. Each builds a one-item
@@ -27,6 +33,55 @@ suspend fun ImportEngine.createCurrency(
             ),
         )
     return requireNotNull(result.createdCurrencyIds[key]) { "Currency $code was not created" }
+}
+
+/** Upserts a crypto asset by ticker [code] and returns its id (scale/name from the crypto registry). */
+suspend fun ImportEngine.createCrypto(
+    code: String,
+    name: String? = null,
+    source: Source = Source.Manual,
+): CryptoId {
+    val key = LocalCryptoKey(code)
+    val result =
+        import(
+            ImportBatch(
+                cryptoAssets = listOf(ImportCryptoIntent(key = key, source = source, code = code, name = name)),
+            ),
+        )
+    return requireNotNull(result.createdCryptoIds[key]) { "Crypto asset $code was not created" }
+}
+
+/** Creates a single cross-asset trade and returns its id. */
+@Suppress("LongParameterList")
+suspend fun ImportEngine.createTrade(
+    timestamp: Instant,
+    description: String,
+    fromAccountId: AccountId,
+    fromAmount: Money,
+    toAccountId: AccountId,
+    toAmount: Money,
+    source: Source = Source.Manual,
+): TradeId {
+    val key = LocalTradeKey("$fromAccountId->$toAccountId@$timestamp")
+    val result =
+        import(
+            ImportBatch(
+                trades =
+                    listOf(
+                        ImportTradeIntent(
+                            key = key,
+                            source = source,
+                            timestamp = timestamp,
+                            description = description,
+                            fromAccountId = fromAccountId,
+                            fromAmount = fromAmount,
+                            toAccountId = toAccountId,
+                            toAmount = toAmount,
+                        ),
+                    ),
+            ),
+        )
+    return requireNotNull(result.createdTradeIds[key]) { "Trade was not created" }
 }
 
 /** Deletes a currency by id. */

@@ -18,6 +18,7 @@ fun DatabaseComponent.toApplication() =
                 accountAttributeRepository = accountAttributeRepository,
                 categoryRepository = categoryRepository,
                 currencyRepository = currencyRepository,
+                cryptoRepository = cryptoRepository,
             ),
         imports =
             Imports(

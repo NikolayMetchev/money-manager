@@ -21,6 +21,7 @@ import com.moneymanager.domain.repository.ApiImportStrategyWriteRepository
 import com.moneymanager.domain.repository.ApiSessionWriteRepository
 import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CryptoWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
@@ -32,6 +33,7 @@ import com.moneymanager.domain.repository.PersonWriteRepository
 import com.moneymanager.domain.repository.QifImportWriteRepository
 import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.TradeWriteRepository
 import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importer.ImportEngineImpl
@@ -67,6 +69,8 @@ class CategoriesScreenTest {
             ownershipRepository = mock<PersonAccountOwnershipWriteRepository>(MockMode.autoUnit),
             categoryRepository = categoryRepository,
             currencyRepository = mock<CurrencyWriteRepository>(MockMode.autoUnit),
+            cryptoRepository = mock<CryptoWriteRepository>(MockMode.autoUnit),
+            tradeRepository = mock<TradeWriteRepository>(MockMode.autoUnit),
             attributeTypeRepository = mock<AttributeTypeWriteRepository>(MockMode.autoUnit),
             relationshipTypeRepository = mock<RelationshipTypeWriteRepository>(MockMode.autoUnit),
             csvImportStrategyRepository = mock<CsvImportStrategyWriteRepository>(MockMode.autoUnit),

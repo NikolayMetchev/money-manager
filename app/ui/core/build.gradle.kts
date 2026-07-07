@@ -125,6 +125,7 @@ kotlin {
                 implementation(projects.app.di.core)
                 implementation(projects.app.importer)
                 implementation(projects.app.qifimporter)
+                implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.rest)
             }
         }
@@ -142,6 +143,7 @@ kotlin {
                 implementation(projects.app.importer)
                 implementation(projects.test.app.db)
                 implementation(projects.test.app.ui)
+                implementation(projects.utils.bigdecimal)
             }
             kotlin.srcDir("src/commonTest/kotlin")
             // Include commonTest resources for test database files
@@ -156,6 +158,7 @@ kotlin {
                 implementation(projects.app.di.core)
                 implementation(projects.app.importer)
                 implementation(projects.test.app.db)
+                implementation(projects.utils.bigdecimal)
             }
         }
     }

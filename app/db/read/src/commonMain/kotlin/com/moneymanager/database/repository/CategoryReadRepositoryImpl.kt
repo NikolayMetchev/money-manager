@@ -3,12 +3,12 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.bigdecimal.BigInteger
+import com.moneymanager.database.mapper.AssetRowMapper
 import com.moneymanager.database.mapper.CategoryMapper
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
-import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.repository.CategoryReadRepository
 import kotlinx.coroutines.Dispatchers
@@ -34,16 +34,17 @@ class CategoryReadRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
-                    val currency =
-                        Currency(
-                            id = CurrencyId(row.currency_id),
-                            code = row.currency_code,
-                            name = row.currency_name,
-                            scaleFactor = row.currency_scale_factor,
+                    val asset =
+                        AssetRowMapper.buildAsset(
+                            id = row.asset_id,
+                            code = row.asset_code,
+                            name = row.asset_name,
+                            scaleFactor = row.asset_scale_factor,
+                            kind = row.asset_kind,
                         )
                     CategoryBalance(
                         categoryId = row.category_id,
-                        balance = Money(row.balance ?: 0, currency),
+                        balance = Money(BigInteger(row.balance), asset),
                     )
                 }
             }

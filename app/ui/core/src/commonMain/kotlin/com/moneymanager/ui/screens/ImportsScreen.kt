@@ -26,6 +26,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -64,6 +65,7 @@ fun ImportsScreen(
     accountAttributeRepository: AccountAttributeReadRepository,
     accountRepository: AccountReadRepository,
     currencyRepository: CurrencyReadRepository,
+    cryptoRepository: CryptoReadRepository,
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
@@ -130,6 +132,7 @@ fun ImportsScreen(
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
+                    cryptoRepository = cryptoRepository,
                     personRepository = personRepository,
                     passThroughAccountRepository = passThroughAccountRepository,
                     transactionRepository = transactionRepository,

@@ -1,143 +1,123 @@
 package com.moneymanager.domain.model
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.bigdecimal.BigInteger
+import com.moneymanager.bigdecimal.toBigIntegerExact
 
 /**
- * Represents a monetary amount with a specific currency.
+ * Represents a monetary amount denominated in a specific [Asset] (fiat [Currency] or [CryptoAsset]).
  *
- * Money amounts are stored as integers in the smallest currency unit (e.g., cents for USD, yen for JPY)
- * to avoid floating-point precision issues. The [Currency.scaleFactor] determines the conversion
- * between stored amounts and display amounts.
+ * Amounts are stored as arbitrary-precision integers in the asset's smallest unit (e.g. pence for
+ * GBP, satoshis for BTC, wei for ETH) to avoid floating-point precision loss. The [Asset.scaleFactor]
+ * determines the conversion between stored amounts and display amounts. A [BigInteger] (rather than a
+ * [Long]) is required because high-precision crypto scale factors would otherwise overflow.
+ *
+ * The denominating asset is exposed as [currency] for historical reasons — it may be any [Asset],
+ * fiat or crypto, not only a fiat [Currency].
  *
  * For example:
  * - £123.45 is stored as amount=12345 with GBP (scaleFactor=100)
  * - ¥1000 is stored as amount=1000 with JPY (scaleFactor=1)
- * - BD 123.456 is stored as amount=123456 with BHD (scaleFactor=1000)
+ * - 0.5 BTC is stored as amount=50000000 with BTC (scaleFactor=100000000)
  *
- * @property amount The amount in the smallest currency unit (e.g., cents, pence, satoshis)
- * @property currency The currency of this monetary amount
+ * @property amount The amount in the asset's smallest unit (pence, satoshis, wei, …)
+ * @property currency The asset this monetary amount is denominated in
  */
 data class Money(
-    val amount: Long,
-    val currency: Currency,
+    val amount: BigInteger,
+    val currency: Asset,
 ) : Comparable<Money> {
+    /** Convenience for constructing from a minor-unit amount that fits in a [Long]. */
+    constructor(amount: Long, currency: Asset) : this(BigInteger(amount), currency)
+
+    /** Convenience for constructing from a minor-unit amount that fits in an [Int]. */
+    constructor(amount: Int, currency: Asset) : this(BigInteger(amount.toLong()), currency)
+
     /**
      * Converts the stored amount to a display value using BigDecimal for precision.
      *
      * @return The display value as BigDecimal (e.g., 12345 with scaleFactor=100 becomes 123.45)
      */
-    fun toDisplayValue(): BigDecimal {
-        val amountDecimal = BigDecimal(amount)
-        val scaleFactorDecimal = BigDecimal(currency.scaleFactor)
-        return amountDecimal / scaleFactorDecimal
-    }
+    fun toDisplayValue(): BigDecimal = amount.toBigDecimal() / BigDecimal(currency.scaleFactor)
 
     /**
      * Adds another Money amount to this one.
      *
-     * @param other The Money amount to add
-     * @return A new Money instance with the sum
-     * @throws IllegalArgumentException if currencies don't match
+     * @throws IllegalArgumentException if assets don't match
      */
     operator fun plus(other: Money): Money {
-        requireSameCurrency(other)
+        requireSameAsset(other)
         return Money(amount + other.amount, currency)
     }
 
     /**
      * Subtracts another Money amount from this one.
      *
-     * @param other The Money amount to subtract
-     * @return A new Money instance with the difference
-     * @throws IllegalArgumentException if currencies don't match
+     * @throws IllegalArgumentException if assets don't match
      */
     operator fun minus(other: Money): Money {
-        requireSameCurrency(other)
+        requireSameAsset(other)
         return Money(amount - other.amount, currency)
     }
 
     /**
      * Multiplies this Money amount by a scalar value.
-     *
-     * @param multiplier The value to multiply by
-     * @return A new Money instance with the product
      */
-    operator fun times(multiplier: Long): Money = Money(amount * multiplier, currency)
+    operator fun times(multiplier: Long): Money = Money(amount * BigInteger(multiplier), currency)
 
     /**
      * Multiplies this Money amount by a scalar value.
-     *
-     * @param multiplier The value to multiply by
-     * @return A new Money instance with the product
      */
-    operator fun times(multiplier: Int): Money = Money(amount * multiplier, currency)
+    operator fun times(multiplier: Int): Money = times(multiplier.toLong())
 
     /**
-     * Divides this Money amount by a scalar value.
-     *
-     * @param divisor The value to divide by
-     * @return A new Money instance with the quotient
+     * Divides this Money amount by a scalar value (integer division, truncated toward zero).
      */
-    operator fun div(divisor: Long): Money = Money(amount / divisor, currency)
+    operator fun div(divisor: Long): Money = Money(amount / BigInteger(divisor), currency)
 
     /**
-     * Divides this Money amount by a scalar value.
-     *
-     * @param divisor The value to divide by
-     * @return A new Money instance with the quotient
+     * Divides this Money amount by a scalar value (integer division, truncated toward zero).
      */
-    operator fun div(divisor: Int): Money = Money(amount / divisor, currency)
+    operator fun div(divisor: Int): Money = div(divisor.toLong())
 
     /**
      * Negates this Money amount.
-     *
-     * @return A new Money instance with the negated amount
      */
     operator fun unaryMinus(): Money = Money(-amount, currency)
 
     /**
      * Compares this Money amount with another.
      *
-     * @param other The Money amount to compare with
-     * @return Negative if this < other, zero if equal, positive if this > other
-     * @throws IllegalArgumentException if currencies don't match
+     * @throws IllegalArgumentException if assets don't match
      */
     override fun compareTo(other: Money): Int {
-        requireSameCurrency(other)
+        requireSameAsset(other)
         return amount.compareTo(other.amount)
     }
 
     /**
      * Checks if this Money amount is zero.
-     *
-     * @return true if the amount is zero, false otherwise
      */
-    fun isZero(): Boolean = amount == 0L
+    fun isZero(): Boolean = amount.compareTo(BigInteger.ZERO) == 0
 
     /**
      * Checks if this Money amount is positive.
-     *
-     * @return true if the amount is greater than zero, false otherwise
      */
-    fun isPositive(): Boolean = amount > 0L
+    fun isPositive(): Boolean = amount.compareTo(BigInteger.ZERO) > 0
 
     /**
      * Checks if this Money amount is negative.
-     *
-     * @return true if the amount is less than zero, false otherwise
      */
-    fun isNegative(): Boolean = amount < 0L
+    fun isNegative(): Boolean = amount.compareTo(BigInteger.ZERO) < 0
 
     /**
      * Returns the absolute value of this Money amount.
-     *
-     * @return A new Money instance with the absolute amount
      */
-    fun abs(): Money = if (amount < 0) Money(-amount, currency) else this
+    fun abs(): Money = if (isNegative()) Money(amount.abs(), currency) else this
 
-    private fun requireSameCurrency(other: Money) {
+    private fun requireSameAsset(other: Money) {
         require(currency.id == other.currency.id) {
-            "Cannot perform operation on Money with different currencies: ${currency.code} and ${other.currency.code}"
+            "Cannot perform operation on Money with different assets: ${currency.code} and ${other.currency.code}"
         }
     }
 
@@ -145,37 +125,31 @@ data class Money(
         /**
          * Creates a Money instance from a display value (e.g., 123.45).
          *
-         * @param displayValue The display value as BigDecimal
-         * @param currency The currency of the amount
-         * @return A new Money instance with the amount converted to the smallest currency unit
+         * The value is scaled to the asset's smallest unit exactly; it throws if [displayValue] has
+         * more decimal places than the asset's [Asset.scaleFactor] can represent, so precision is
+         * never silently lost.
+         *
+         * @throws ArithmeticException if the scaled value is not a whole number of minor units
          */
         fun fromDisplayValue(
             displayValue: BigDecimal,
-            currency: Currency,
+            currency: Asset,
         ): Money {
-            val scaleFactorDecimal = BigDecimal(currency.scaleFactor)
-            val amount = (displayValue * scaleFactorDecimal).toLong()
-            return Money(amount, currency)
+            val scaled = displayValue * BigDecimal(currency.scaleFactor)
+            return Money(scaled.toBigIntegerExact(), currency)
         }
 
         /**
          * Creates a Money instance from a display value (e.g., "123.45").
-         *
-         * @param displayValue The display value as String
-         * @param currency The currency of the amount
-         * @return A new Money instance with the amount converted to the smallest currency unit
          */
         fun fromDisplayValue(
             displayValue: String,
-            currency: Currency,
+            currency: Asset,
         ): Money = fromDisplayValue(BigDecimal(displayValue), currency)
 
         /**
-         * Creates a zero Money instance for a given currency.
-         *
-         * @param currency The currency of the amount
-         * @return A new Money instance with zero amount
+         * Creates a zero Money instance for a given asset.
          */
-        fun zero(currency: Currency): Money = Money(0L, currency)
+        fun zero(currency: Asset): Money = Money(BigInteger.ZERO, currency)
     }
 }

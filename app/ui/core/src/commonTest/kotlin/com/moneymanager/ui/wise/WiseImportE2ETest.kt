@@ -167,14 +167,14 @@ class WiseImportE2ETest : DbTest() {
             assertEquals(2, transfers.size, "Own account should have exactly two transfers")
 
             // CREDIT: 500.00 GBP incoming (target is our account); decimal -> 50000 minor units.
-            val credit = transfers.single { it.amount.amount == 50_000L }
+            val credit = transfers.single { it.amount.amount == com.moneymanager.bigdecimal.BigInteger(50_000L) }
             assertEquals(ownAccount.id, credit.targetAccountId, "Credit should be incoming to the Wise account")
 
             // DEBIT: 12.34 GBP outgoing (source is our account); decimal -> 1234 minor units.
-            val debit = transfers.single { it.amount.amount == 1_234L }
+            val debit = transfers.single { it.amount.amount == com.moneymanager.bigdecimal.BigInteger(1_234L) }
             assertEquals(ownAccount.id, debit.sourceAccountId, "Debit should be outgoing from the Wise account")
 
-            assertTrue(credit.amount.amount > 0 && debit.amount.amount > 0, "Stored magnitudes are positive")
+            assertTrue(credit.amount.isPositive() && debit.amount.isPositive(), "Stored magnitudes are positive")
         }
 
     @Test

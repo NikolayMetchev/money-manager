@@ -154,7 +154,7 @@ class ManualEntriesE2ETest {
                 assertEquals(wiseEur, companion.targetAccountId)
                 assertEquals(feeTimestamp.toEpochMilliseconds(), companion.timestamp.toEpochMilliseconds())
                 assertEquals("EUR", companion.amount.currency.code)
-                assertEquals(123L, companion.amount.amount)
+                assertEquals(com.moneymanager.bigdecimal.BigInteger(123L), companion.amount.amount)
                 val link = companion.attributes.single { it.attributeType.name == "wise-interest-for" }
                 assertEquals("ACCRUAL_CHARGE-18326272", link.value)
 

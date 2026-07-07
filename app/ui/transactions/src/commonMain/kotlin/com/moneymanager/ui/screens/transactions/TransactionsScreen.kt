@@ -236,7 +236,7 @@ fun AccountTransactionsScreen(
         if (showExcluded) runningBalances else runningBalances.filter { !it.isExcluded }
 
     // Get all unique currencies from account balances for matrix
-    val uniqueCurrencyIds = accountBalances.map { it.balance.currency.id }.distinct()
+    val uniqueCurrencyIds = accountBalances.map { CurrencyId(it.balance.currency.id.id) }.distinct()
 
     // Calculate column widths for each account based on account name and balance amounts
     val accountColumnWidths: Map<AccountId, Dp> =
@@ -588,7 +588,7 @@ fun AccountTransactionsScreen(
                                                             text = formatAmount(balance.balance),
                                                             style = MaterialTheme.typography.bodySmall,
                                                             color =
-                                                                if (balance.balance.amount >= 0) {
+                                                                if (!balance.balance.isNegative()) {
                                                                     MaterialTheme.colorScheme.primary
                                                                 } else {
                                                                     MaterialTheme.colorScheme.error
@@ -763,7 +763,7 @@ fun AccountTransactionsScreen(
                                 ?: return@let
 
                         // Set currency filter to match the transaction
-                        selectedCurrencyId = transaction.transactionAmount.currency.id
+                        selectedCurrencyId = CurrencyId(transaction.transactionAmount.currency.id.id)
 
                         // Now find the index in the filtered list (which now includes this currency)
                         val index =
@@ -894,7 +894,7 @@ fun AccountTransactionsScreen(
                                 },
                                 onAccountClick = { clickedAccountId ->
                                     highlightedTransactionId = runningBalance.transactionId
-                                    selectedCurrencyId = runningBalance.transactionAmount.currency.id
+                                    selectedCurrencyId = CurrencyId(runningBalance.transactionAmount.currency.id.id)
 
                                     // Notify parent to switch to the clicked account
                                     onAccountIdChange(clickedAccountId)
@@ -940,7 +940,7 @@ fun AccountTransactionsScreen(
                                         onAccountClick(
                                             clickedAccountId,
                                             clickedAccount.name,
-                                            runningBalance.transactionAmount.currency.id,
+                                            CurrencyId(runningBalance.transactionAmount.currency.id.id),
                                             TransferId(runningBalance.transactionId.id),
                                         )
                                     }

@@ -687,7 +687,7 @@ class MonzoImportE2ETest : DbTest() {
             // Zero-amount transaction should use the Void counterparty account
             val voidAccount = allAccounts.find { it.name == "Void" }
             assertNotNull(voidAccount, "Void counterparty account should be created for zero-amount transactions")
-            val zeroTransfer = transfers.single { it.amount.amount == 0L }
+            val zeroTransfer = transfers.single { it.amount.isZero() }
             assertEquals(
                 voidAccount.id,
                 zeroTransfer.targetAccountId,
@@ -849,7 +849,7 @@ class MonzoImportE2ETest : DbTest() {
                     .first()
             assertEquals(3, transfers.size, "All 3 transactions (2 excluded + 1 settled) should be stored as transfers")
             val settledTransfer = transfers.single { it.attributes.none { attr -> attr.attributeType.name == "excluded" } }
-            assertEquals(2500L, settledTransfer.amount.amount)
+            assertEquals(com.moneymanager.bigdecimal.BigInteger(2500L), settledTransfer.amount.amount)
         }
 
     @Test
@@ -1719,11 +1719,19 @@ class MonzoImportE2ETest : DbTest() {
             // API import mirrors CSV semantics: transfer money remains in account currency.
             val foreignTransfer = transfers.single { it.description == "FOREIGN SPEND" }
             assertEquals("GBP", foreignTransfer.amount.currency.code, "Foreign transfer should remain in account currency")
-            assertEquals(1250L, foreignTransfer.amount.amount, "Foreign transfer should use the main GBP amount")
+            assertEquals(
+                com.moneymanager.bigdecimal.BigInteger(1250L),
+                foreignTransfer.amount.amount,
+                "Foreign transfer should use the main GBP amount",
+            )
 
             val domesticTransfer = transfers.single { it.description == "DOMESTIC SPEND" }
             assertEquals("GBP", domesticTransfer.amount.currency.code, "Domestic transfer should remain in account currency")
-            assertEquals(5000L, domesticTransfer.amount.amount, "Domestic transfer should use the main GBP amount")
+            assertEquals(
+                com.moneymanager.bigdecimal.BigInteger(5000L),
+                domesticTransfer.amount.amount,
+                "Domestic transfer should use the main GBP amount",
+            )
         }
 
     @Test
@@ -1808,10 +1816,10 @@ class MonzoImportE2ETest : DbTest() {
             // Monzo's `amount` (-20000) is gross: it already includes the £3.50 fee, so the fee is carved
             // out (main 19650 + fee 350 = 20000) rather than double-charged.
             val withdrawal = transfers.single { it.description == "FOREIGN ATM MADRID ESP" }
-            assertEquals(19650L, withdrawal.amount.amount, "Fee is carved out of the gross amount")
+            assertEquals(com.moneymanager.bigdecimal.BigInteger(19650L), withdrawal.amount.amount, "Fee is carved out of the gross amount")
 
             val feeTransfer = transfers.single { it.description == "Fee" }
-            assertEquals(350L, feeTransfer.amount.amount, "Fee transfer carries the atm fee amount")
+            assertEquals(com.moneymanager.bigdecimal.BigInteger(350L), feeTransfer.amount.amount, "Fee transfer carries the atm fee amount")
             assertEquals("GBP", feeTransfer.amount.currency.code)
             assertEquals(monzoAccount.id, feeTransfer.sourceAccountId, "Fee leaves the Monzo account")
             assertEquals(feeAccount.id, feeTransfer.targetAccountId, "Fee goes to the consolidated Monzo Fees account")

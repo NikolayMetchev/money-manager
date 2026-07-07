@@ -14,6 +14,7 @@ import com.moneymanager.domain.repository.ApiSessionWriteRepository
 import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
+import com.moneymanager.domain.repository.CryptoWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
@@ -45,6 +46,7 @@ data class Accounts(
     val accountAttributeRepository: AccountAttributeWriteRepository,
     val categoryRepository: CategoryWriteRepository,
     val currencyRepository: CurrencyWriteRepository,
+    val cryptoRepository: CryptoWriteRepository,
 )
 
 data class Imports(

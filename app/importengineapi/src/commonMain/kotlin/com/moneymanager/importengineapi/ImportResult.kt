@@ -58,6 +58,8 @@ data class ImportResult(
     val createdCategoryIds: Map<LocalCategoryKey, Long> = emptyMap(),
     val createdPersonIds: Map<LocalPersonKey, PersonId> = emptyMap(),
     val createdCurrencyIds: Map<LocalCurrencyKey, CurrencyId> = emptyMap(),
+    val createdCryptoIds: Map<LocalCryptoKey, com.moneymanager.domain.model.CryptoId> = emptyMap(),
+    val createdTradeIds: Map<LocalTradeKey, com.moneymanager.domain.model.TradeId> = emptyMap(),
     /** Resolved (get-or-create) attribute-type ids for each name in [ImportBatch.attributeTypeNames]. */
     val attributeTypeIds: Map<String, AttributeTypeId> = emptyMap(),
     /** Resolved (get-or-create) relationship-type ids for each name in [ImportBatch.relationshipTypeNames]. */

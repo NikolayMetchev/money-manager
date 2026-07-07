@@ -203,8 +203,12 @@ class CryptoComCsvMapperTest {
         // Renamed files still resolve by content.
         assertEquals("Crypto.com Card", strategies.selectForCsv("renamed.csv", columns, cardRows)?.name)
         assertEquals("Crypto.com Fiat", strategies.selectForCsv("renamed.csv", columns, fiatRows)?.name)
-        // crypto_* files (occasional viban rows, below the content threshold) match nothing.
-        assertNull(strategies.selectForCsv("crypto_transactions_record_20251116_101217.csv", columns, cryptoRows))
+        // crypto_* files now route to the "Crypto.com Crypto" strategy (by filename) and import as
+        // real crypto balances instead of being skipped.
+        assertEquals(
+            "Crypto.com Crypto",
+            strategies.selectForCsv("crypto_transactions_record_20251116_101217.csv", columns, cryptoRows)?.name,
+        )
     }
 
     @Test

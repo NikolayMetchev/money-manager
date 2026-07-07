@@ -124,7 +124,7 @@ class TransactionReadRepositoryImpl(
                 .selectUnreversedTransfersBetweenAccountsByAmount(
                     sourceAccountId = sourceAccountId.id,
                     targetAccountId = targetAccountId.id,
-                    amount = amount.amount,
+                    amount = amount.amount.toString(),
                     currencyId = amount.currency.id.id,
                     maxTimestamp = maxTimestamp.toEpochMilliseconds(),
                     reversalTypeId = reversalTypeId.id,

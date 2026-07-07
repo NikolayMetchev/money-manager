@@ -148,7 +148,7 @@ class WiseCsvMapperTest {
         // "Avolta - Tenerife" is unknown so a new account placeholder is used
         assertEquals(AccountId(-1), result.transfer.targetAccountId)
         assertEquals(listOf(NewAccount("Avolta - Tenerife", -1L)), result.newAccounts)
-        assertEquals(2210L, result.transfer.amount.amount)
+        assertEquals(com.moneymanager.bigdecimal.BigInteger(2210L), result.transfer.amount.amount)
         assertEquals(eur, result.transfer.amount.currency)
     }
 
@@ -171,7 +171,7 @@ class WiseCsvMapperTest {
         assertIs<MappingResult.Success>(result)
         assertEquals(AccountId(30), result.transfer.sourceAccountId)
         assertEquals(wiseGbp.id, result.transfer.targetAccountId)
-        assertEquals(250000L, result.transfer.amount.amount)
+        assertEquals(com.moneymanager.bigdecimal.BigInteger(250000L), result.transfer.amount.amount)
         assertEquals(gbp, result.transfer.amount.currency)
         assertTrue(result.newAccounts.isEmpty())
     }
@@ -192,7 +192,7 @@ class WiseCsvMapperTest {
         assertEquals(wiseEur.id, result.transfer.sourceAccountId)
         assertEquals(wiseGbp.id, result.transfer.targetAccountId)
         // Wise-side (source) amount is recorded
-        assertEquals(10000L, result.transfer.amount.amount)
+        assertEquals(com.moneymanager.bigdecimal.BigInteger(10000L), result.transfer.amount.amount)
         assertEquals(eur, result.transfer.amount.currency)
     }
 
@@ -213,7 +213,7 @@ class WiseCsvMapperTest {
         assertIs<MappingResult.Success>(result)
         assertEquals(wiseEur.id, result.transfer.sourceAccountId)
         assertEquals(transferwise.id, result.transfer.targetAccountId)
-        assertEquals(6L, result.transfer.amount.amount)
+        assertEquals(com.moneymanager.bigdecimal.BigInteger(6L), result.transfer.amount.amount)
         assertEquals("Assets fee 18326272", result.transfer.description)
     }
 
@@ -235,8 +235,8 @@ class WiseCsvMapperTest {
         val result = mapper(accounts).mapRow(row)
 
         assertIs<MappingResult.Success>(result)
-        assertEquals(20000L, result.transfer.amount.amount)
-        assertEquals(729L, result.feeAmount?.amount)
+        assertEquals(com.moneymanager.bigdecimal.BigInteger(20000L), result.transfer.amount.amount)
+        assertEquals(com.moneymanager.bigdecimal.BigInteger(729L), result.feeAmount?.amount)
     }
 
     @Test
@@ -257,7 +257,7 @@ class WiseCsvMapperTest {
         val result = mapper(accounts).mapRow(row)
 
         assertIs<MappingResult.Success>(result)
-        assertEquals(9900L, result.transfer.amount.amount)
+        assertEquals(com.moneymanager.bigdecimal.BigInteger(9900L), result.transfer.amount.amount)
         assertEquals(null, result.feeAmount)
     }
 
@@ -281,8 +281,8 @@ class WiseCsvMapperTest {
         assertEquals(wiseGbp.id, result.transfer.sourceAccountId)
         assertEquals(teodora.id, result.transfer.targetAccountId)
         // 89.19 converted is the main movement; the 1.18 fee is its own linked fee transfer.
-        assertEquals(8919L, result.transfer.amount.amount)
-        assertEquals(118L, result.feeAmount?.amount)
+        assertEquals(com.moneymanager.bigdecimal.BigInteger(8919L), result.transfer.amount.amount)
+        assertEquals(com.moneymanager.bigdecimal.BigInteger(118L), result.feeAmount?.amount)
         assertEquals(gbp, result.transfer.amount.currency)
         assertEquals(gbp, result.feeAmount?.currency)
         assertTrue(result.attributes.contains("wise-exchange-rate" to "2.24251"))
@@ -304,7 +304,7 @@ class WiseCsvMapperTest {
         val result = mapper(accounts).mapRow(row)
 
         assertIs<MappingResult.Success>(result)
-        assertEquals(0L, result.transfer.amount.amount)
+        assertEquals(com.moneymanager.bigdecimal.BigInteger(0L), result.transfer.amount.amount)
         assertTrue(result.attributes.contains("wise-status" to "REFUNDED"))
     }
 

@@ -316,6 +316,33 @@ BEGIN
     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.code, old.name, old.scale_factor);
 END;
 
+-- trigger_crypto_delete_audit
+CREATE TRIGGER trigger_crypto_delete_audit
+AFTER DELETE ON crypto
+FOR EACH ROW
+BEGIN
+    INSERT INTO crypto_audit (audit_timestamp, audit_type_id, crypto_id, revision_id, code, name, scale_factor)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.code, old.name, old.scale_factor);
+END;
+
+-- trigger_crypto_insert_audit
+CREATE TRIGGER trigger_crypto_insert_audit
+AFTER INSERT ON crypto
+FOR EACH ROW
+BEGIN
+    INSERT INTO crypto_audit (audit_timestamp, audit_type_id, crypto_id, revision_id, code, name, scale_factor)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.code, new.name, new.scale_factor);
+END;
+
+-- trigger_crypto_update_audit
+CREATE TRIGGER trigger_crypto_update_audit
+AFTER UPDATE ON crypto
+FOR EACH ROW
+BEGIN
+    INSERT INTO crypto_audit (audit_timestamp, audit_type_id, crypto_id, revision_id, code, name, scale_factor)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.code, old.name, old.scale_factor);
+END;
+
 -- trigger_import_directory_delete_audit
 CREATE TRIGGER trigger_import_directory_delete_audit
 AFTER DELETE ON import_directory
@@ -488,13 +515,40 @@ BEGIN
     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.first_name, old.middle_name, old.last_name);
 END;
 
+-- trigger_trade_delete_audit
+CREATE TRIGGER trigger_trade_delete_audit
+AFTER DELETE ON trade
+FOR EACH ROW
+BEGIN
+    INSERT INTO trade_audit (audit_timestamp, audit_type_id, trade_id, revision_id, timestamp, description, from_account_id, from_asset_id, from_amount, to_account_id, to_asset_id, to_amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.timestamp, old.description, old.from_account_id, old.from_asset_id, old.from_amount, old.to_account_id, old.to_asset_id, old.to_amount);
+END;
+
+-- trigger_trade_insert_audit
+CREATE TRIGGER trigger_trade_insert_audit
+AFTER INSERT ON trade
+FOR EACH ROW
+BEGIN
+    INSERT INTO trade_audit (audit_timestamp, audit_type_id, trade_id, revision_id, timestamp, description, from_account_id, from_asset_id, from_amount, to_account_id, to_asset_id, to_amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.timestamp, new.description, new.from_account_id, new.from_asset_id, new.from_amount, new.to_account_id, new.to_asset_id, new.to_amount);
+END;
+
+-- trigger_trade_update_audit
+CREATE TRIGGER trigger_trade_update_audit
+AFTER UPDATE ON trade
+FOR EACH ROW
+BEGIN
+    INSERT INTO trade_audit (audit_timestamp, audit_type_id, trade_id, revision_id, timestamp, description, from_account_id, from_asset_id, from_amount, to_account_id, to_asset_id, to_amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.timestamp, old.description, old.from_account_id, old.from_asset_id, old.from_amount, old.to_account_id, old.to_asset_id, old.to_amount);
+END;
+
 -- trigger_transfer_delete_audit
 CREATE TRIGGER trigger_transfer_delete_audit
 AFTER DELETE ON transfer
 FOR EACH ROW
 BEGIN
-    INSERT INTO transfer_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, timestamp, description, source_account_id, target_account_id, currency_id, amount)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.timestamp, old.description, old.source_account_id, old.target_account_id, old.currency_id, old.amount);
+    INSERT INTO transfer_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, timestamp, description, source_account_id, target_account_id, asset_id, amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.timestamp, old.description, old.source_account_id, old.target_account_id, old.asset_id, old.amount);
 END;
 
 -- trigger_transfer_insert_audit
@@ -502,8 +556,8 @@ CREATE TRIGGER trigger_transfer_insert_audit
 AFTER INSERT ON transfer
 FOR EACH ROW
 BEGIN
-    INSERT INTO transfer_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, timestamp, description, source_account_id, target_account_id, currency_id, amount)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.timestamp, new.description, new.source_account_id, new.target_account_id, new.currency_id, new.amount);
+    INSERT INTO transfer_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, timestamp, description, source_account_id, target_account_id, asset_id, amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.timestamp, new.description, new.source_account_id, new.target_account_id, new.asset_id, new.amount);
 END;
 
 -- trigger_transfer_update_audit
@@ -511,7 +565,7 @@ CREATE TRIGGER trigger_transfer_update_audit
 AFTER UPDATE ON transfer
 FOR EACH ROW
 BEGIN
-    INSERT INTO transfer_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, timestamp, description, source_account_id, target_account_id, currency_id, amount)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.timestamp, old.description, old.source_account_id, old.target_account_id, old.currency_id, old.amount);
+    INSERT INTO transfer_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, timestamp, description, source_account_id, target_account_id, asset_id, amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.timestamp, old.description, old.source_account_id, old.target_account_id, old.asset_id, old.amount);
 END;
 

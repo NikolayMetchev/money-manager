@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -90,6 +92,7 @@ import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 import com.moneymanager.ui.screens.qif.QifStrategyEditorScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
+import com.moneymanager.ui.screens.transactions.TradeEntryDialog
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.screens.transactions.TransactionEditDialog
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -119,6 +122,8 @@ fun MoneyManagerApp(
         val navigationHistory = remember(backStack) { NavigationHistory(backStack) }
         val currentScreen = navigationHistory.currentScreen
         var showTransactionDialog by remember { mutableStateOf(false) }
+        var showTradeDialog by remember { mutableStateOf(false) }
+        var showAddMenu by remember { mutableStateOf(false) }
         var preSelectedAccountId by remember { mutableStateOf<AccountId?>(null) }
         var currentlyViewedAccountId by remember { mutableStateOf<AccountId?>(null) }
         var preSelectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
@@ -279,14 +284,28 @@ fun MoneyManagerApp(
                                 currentScreen is Screen.AccountTransactions ||
                                 currentScreen is Screen.Categories
                         if (showTransactionFab && !editingLocked) {
-                            FloatingActionButton(
-                                onClick = {
-                                    preSelectedAccountId = currentlyViewedAccountId
-                                    preSelectedCurrencyId = currentlyViewedCurrencyId ?: defaultCurrencyId
-                                    showTransactionDialog = true
-                                },
-                            ) {
-                                Text("+", style = MaterialTheme.typography.headlineLarge)
+                            Box {
+                                FloatingActionButton(onClick = { showAddMenu = true }) {
+                                    Text("+", style = MaterialTheme.typography.headlineLarge)
+                                }
+                                DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("New transaction") },
+                                        onClick = {
+                                            showAddMenu = false
+                                            preSelectedAccountId = currentlyViewedAccountId
+                                            preSelectedCurrencyId = currentlyViewedCurrencyId ?: defaultCurrencyId
+                                            showTransactionDialog = true
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("New trade") },
+                                        onClick = {
+                                            showAddMenu = false
+                                            showTradeDialog = true
+                                        },
+                                    )
+                                }
                             }
                         }
                     },
@@ -489,6 +508,7 @@ fun MoneyManagerApp(
                                                 accountAttributeRepository = services.accounts.accountAttributeRepository,
                                                 accountRepository = services.accounts.accountRepository,
                                                 currencyRepository = services.accounts.currencyRepository,
+                                                cryptoRepository = services.accounts.cryptoRepository,
                                                 transactionRepository = services.transactions.transactionRepository,
                                                 transferRelationshipRepository = services.transactions.transferRelationshipRepository,
                                                 transferSourceRepository = services.transactions.transferSourceRepository,
@@ -879,6 +899,19 @@ fun MoneyManagerApp(
                         onSaved = {
                             transactionRefreshTrigger++
                         },
+                    )
+                }
+
+                if (showTradeDialog && !editingLocked) {
+                    TradeEntryDialog(
+                        accountRepository = services.accounts.accountRepository,
+                        categoryRepository = services.accounts.categoryRepository,
+                        personRepository = services.people.personRepository,
+                        currencyRepository = services.accounts.currencyRepository,
+                        cryptoRepository = services.accounts.cryptoRepository,
+                        maintenance = services.imports.maintenance,
+                        onDismiss = { showTradeDialog = false },
+                        onSaved = { transactionRefreshTrigger++ },
                     )
                 }
 

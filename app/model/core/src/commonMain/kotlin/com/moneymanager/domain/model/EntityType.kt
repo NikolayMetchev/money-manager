@@ -32,4 +32,13 @@ enum class EntityType(
      * only the read-model discriminator.
      */
     IMPORT_DIRECTORY(9),
+
+    /** A crypto asset. Shares the unified `entity_source` store, like [CURRENCY]. */
+    CRYPTO(10),
+
+    /**
+     * A trade (cross-asset exchange) source. Shares the unified `entity_source` store, like
+     * [TRANSFER]: a trade's provenance is an `entity_source` row with `entity_type_id = 11`.
+     */
+    TRADE(11),
 }

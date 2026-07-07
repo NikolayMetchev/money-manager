@@ -100,8 +100,10 @@ class TransactionAttributeAuditE2ETest {
             waitUntilExactlyOneExists(hasText("Checking Account", substring = true), timeoutMillis = 5000)
 
             // Step 4: Create a new transaction with an attribute
-            // Click the FAB to create a new transaction
+            // Click the FAB, then choose "New transaction" from the add menu.
             onNodeWithText("+").performClick()
+            waitForIdle()
+            onNodeWithText("New transaction").performClick()
             waitForIdle()
 
             // Wait for transaction entry dialog - look for the dialog title

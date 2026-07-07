@@ -18,6 +18,8 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
+import com.moneymanager.importengineapi.createCrypto
+import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createCategory
@@ -69,6 +71,10 @@ class AuditSourceCoverageTest : DbTest() {
             setOf(
                 "pass_through_account_audit",
             )
+
+        // Provenanced entity types whose write paths (with source recording) are not implemented yet.
+        // Empty: crypto_audit and trade_audit are now fully covered below (issue #263).
+        private val PENDING_COVERAGE_AUDIT_TABLES = emptySet<String>()
 
         // Fixed UUID of the built-in Monzo strategy (installed from the fixture in this test).
         private val MONZO_STRATEGY_ID =
@@ -176,6 +182,32 @@ class AuditSourceCoverageTest : DbTest() {
             ) { it.source }
             coveredTables.add("transfer_audit")
 
+            // Crypto asset — created via the engine, which records EntityType.CRYPTO provenance.
+            val cryptoId = repositories.importEngine.createCrypto("BTC")
+            assertAllHaveSource(
+                "crypto BTC",
+                repositories.auditRepository.getAuditHistoryForCrypto(cryptoId),
+            ) { it.source }
+            coveredTables.add("crypto_audit")
+
+            // Trade — a cross-asset exchange (USD out, BTC in) recorded with EntityType.TRADE provenance.
+            val btc = repositories.cryptoRepository.getCryptoAssetByCode("BTC").first()
+            assertNotNull(btc, "BTC crypto asset should exist")
+            val tradeId =
+                repositories.importEngine.createTrade(
+                    timestamp = now,
+                    description = "Coverage test trade",
+                    fromAccountId = sourceAccountId,
+                    fromAmount = Money.fromDisplayValue("100.00", usd),
+                    toAccountId = targetAccountId,
+                    toAmount = Money.fromDisplayValue("0.001", btc),
+                )
+            assertAllHaveSource(
+                "trade",
+                repositories.auditRepository.getAuditHistoryForTrade(tradeId),
+            ) { it.source }
+            coveredTables.add("trade_audit")
+
             // CSV import strategy (dedicated source table, like the API strategy)
             val csvStrategyId =
                 repositories.csvImportStrategyRepository.createStrategy(
@@ -220,7 +252,7 @@ class AuditSourceCoverageTest : DbTest() {
             // This fails automatically when a new *_audit table appears without test coverage.
             // ---------------------------------------------------------------
             val entityAuditTables =
-                discoverAuditTables() - ATTRIBUTE_AUDIT_TABLES - SOURCELESS_AUDIT_TABLES
+                discoverAuditTables() - ATTRIBUTE_AUDIT_TABLES - SOURCELESS_AUDIT_TABLES - PENDING_COVERAGE_AUDIT_TABLES
             assertEquals(
                 entityAuditTables,
                 coveredTables,

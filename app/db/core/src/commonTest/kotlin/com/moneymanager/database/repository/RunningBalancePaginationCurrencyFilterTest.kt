@@ -103,7 +103,7 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
             assertEquals(false, usdPage.pagingInfo.hasMore)
 
             // Running balances accumulate within the filtered currency only (card is the source side).
-            assertEquals(listOf(-3000L, -1000L), usdPage.items.map { it.runningBalance.amount })
+            assertEquals(listOf("-3000", "-1000"), usdPage.items.map { it.runningBalance.amount.toString() })
 
             // Centering on a USD transaction with the filter active positions within USD rows only.
             val usdTransferId = usdPage.items.last().transactionId
@@ -127,7 +127,7 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
                         currencyId = usd.id,
                     )
             assertEquals(listOf("Old USD 2"), backward.items.map { it.description })
-            assertEquals(listOf(-3000L), backward.items.map { it.runningBalance.amount })
+            assertEquals(listOf("-3000"), backward.items.map { it.runningBalance.amount.toString() })
             assertEquals(false, backward.pagingInfo.hasMore)
         }
 }

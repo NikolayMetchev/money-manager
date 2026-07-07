@@ -1,0 +1,65 @@
+-- Reads a trade with both legs' assets resolved via asset_details (fiat or crypto, per `kind`).
+selectById:
+SELECT
+    trade.id,
+    trade.revision_id,
+    trade.timestamp,
+    trade.description,
+    trade.from_account_id,
+    trade.from_asset_id,
+    trade.from_amount,
+    fa.code AS from_asset_code,
+    fa.name AS from_asset_name,
+    fa.scale_factor AS from_asset_scale_factor,
+    fa.kind AS from_asset_kind,
+    trade.to_account_id,
+    trade.to_asset_id,
+    trade.to_amount,
+    ta.code AS to_asset_code,
+    ta.name AS to_asset_name,
+    ta.scale_factor AS to_asset_scale_factor,
+    ta.kind AS to_asset_kind
+FROM trade
+JOIN asset_details fa ON trade.from_asset_id = fa.id
+JOIN asset_details ta ON trade.to_asset_id = ta.id
+WHERE trade.id = ?;
+
+-- Finds an existing trade identical on every field, for re-import dedup (so re-running the same CSV
+-- doesn't double-book a conversion). Amounts are the canonical decimal strings.
+selectMatchingTradeId:
+SELECT id FROM trade
+WHERE timestamp = ?
+  AND description = ?
+  AND from_account_id = ?
+  AND from_asset_id = ?
+  AND from_amount = ?
+  AND to_account_id = ?
+  AND to_asset_id = ?
+  AND to_amount = ?
+LIMIT 1;
+
+selectByAccount:
+SELECT
+    trade.id,
+    trade.revision_id,
+    trade.timestamp,
+    trade.description,
+    trade.from_account_id,
+    trade.from_asset_id,
+    trade.from_amount,
+    fa.code AS from_asset_code,
+    fa.name AS from_asset_name,
+    fa.scale_factor AS from_asset_scale_factor,
+    fa.kind AS from_asset_kind,
+    trade.to_account_id,
+    trade.to_asset_id,
+    trade.to_amount,
+    ta.code AS to_asset_code,
+    ta.name AS to_asset_name,
+    ta.scale_factor AS to_asset_scale_factor,
+    ta.kind AS to_asset_kind
+FROM trade
+JOIN asset_details fa ON trade.from_asset_id = fa.id
+JOIN asset_details ta ON trade.to_asset_id = ta.id
+WHERE trade.from_account_id = ? OR trade.to_account_id = ?
+ORDER BY trade.timestamp DESC;

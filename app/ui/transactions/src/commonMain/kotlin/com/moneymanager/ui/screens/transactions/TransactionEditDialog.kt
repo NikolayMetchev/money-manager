@@ -91,7 +91,15 @@ fun TransactionEditDialog(
     val isEditMode = transaction != null
     var sourceAccountId by remember { mutableStateOf(transaction?.sourceAccountId ?: preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf(transaction?.targetAccountId) }
-    var currencyId by remember { mutableStateOf(transaction?.amount?.currency?.id ?: preSelectedCurrencyId) }
+    var currencyId by remember {
+        mutableStateOf(
+            transaction
+                ?.amount
+                ?.currency
+                ?.id
+                ?.let { CurrencyId(it.id) } ?: preSelectedCurrencyId,
+        )
+    }
     var amount by remember {
         mutableStateOf(
             transaction

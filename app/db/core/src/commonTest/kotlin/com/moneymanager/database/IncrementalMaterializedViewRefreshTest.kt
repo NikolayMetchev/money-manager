@@ -2,6 +2,7 @@
 
 package com.moneymanager.database
 import app.cash.sqldelight.db.QueryResult
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
@@ -23,8 +24,8 @@ import kotlin.time.Clock
  */
 private data class BalanceViewRecord(
     val accountId: Long,
-    val currencyId: Long,
-    val balance: Long?,
+    val assetId: Long,
+    val balance: String,
 )
 
 /**
@@ -61,26 +62,22 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
      * Retrieves balances from AccountBalanceView using raw SQL.
      */
     private fun selectBalancesFromView(): List<BalanceViewRecord> {
-        val sql = "SELECT account_id, currency_id, balance FROM account_balance_view ORDER BY account_id, currency_id"
-        return database
-            .executeQuery(
-                identifier = null,
-                sql = sql,
-                mapper = { cursor ->
-                    val results = mutableListOf<BalanceViewRecord>()
-                    while (cursor.next().value) {
-                        results.add(
-                            BalanceViewRecord(
-                                accountId = cursor.getLong(0)!!,
-                                currencyId = cursor.getLong(1)!!,
-                                balance = cursor.getLong(2),
-                            ),
-                        )
-                    }
-                    QueryResult.Value(results)
-                },
-                parameters = 0,
-            ).value
+        // The SQL account_balance_view was removed when amounts became arbitrary-precision TEXT.
+        // Independently recompute non-excluded account balances from the raw legs in Kotlin
+        // BigInteger — a cross-check that the materialized table matches a from-scratch aggregation.
+        val sums = LinkedHashMap<Pair<Long, Long>, BigInteger>()
+        database.balanceLegsSelectQueries
+            .selectAllTransactionLegs()
+            .executeAsList()
+            .forEach { leg ->
+                if (leg.is_excluded != 0L) return@forEach
+                val value = if (leg.sign < 0) -BigInteger(leg.amount) else BigInteger(leg.amount)
+                val key = leg.account_id to leg.asset_id
+                sums[key] = (sums[key] ?: BigInteger.ZERO) + value
+            }
+        return sums.entries
+            .map { BalanceViewRecord(it.key.first, it.key.second, it.value.toString()) }
+            .sortedWith(compareBy({ it.accountId }, { it.assetId }))
     }
 
     // Helper to verify materialized views match the source views
@@ -93,7 +90,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             database.transferSelectQueries
                 .selectAllBalances()
                 .executeAsList()
-                .sortedWith(compareBy({ it.account_id }, { it.currency_id }))
+                .sortedWith(compareBy({ it.account_id }, { it.asset_id }))
 
         val viewBalances = selectBalancesFromView()
 
@@ -112,14 +109,14 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                 "Account ID should match between materialized view and view",
             )
             assertEquals(
-                view.currencyId,
-                materialized.currency_id,
-                "Currency ID should match between materialized view and view",
+                view.assetId,
+                materialized.asset_id,
+                "Asset ID should match between materialized view and recomputation",
             )
             assertEquals(
-                view.balance ?: 0,
+                view.balance,
                 materialized.balance,
-                "Balance should match between materialized view and view",
+                "Balance should match between materialized view and recomputation",
             )
         }
     }
@@ -623,7 +620,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             // Verify the new currency appears in balances
             val balances = database.transferSelectQueries.selectAllBalances().executeAsList()
             assertTrue(
-                balances.any { it.currency_id == eurId.id },
+                balances.any { it.asset_id == eurId.id },
                 "New currency should appear in materialized view",
             )
         }
@@ -737,7 +734,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                 database.transferSelectQueries
                     .selectAllBalances()
                     .executeAsList()
-                    .sortedBy { "${it.account_id}-${it.currency_id}" }
+                    .sortedBy { "${it.account_id}-${it.asset_id}" }
 
             // Do full refresh
             repositories.maintenanceService.fullRefreshMaterializedViews()
@@ -745,7 +742,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                 database.transferSelectQueries
                     .selectAllBalances()
                     .executeAsList()
-                    .sortedBy { "${it.account_id}-${it.currency_id}" }
+                    .sortedBy { "${it.account_id}-${it.asset_id}" }
 
             // Compare results
             assertEquals(
@@ -761,8 +758,8 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     "Account IDs should match",
                 )
                 assertEquals(
-                    full.currency_id,
-                    incremental.currency_id,
+                    full.asset_id,
+                    incremental.asset_id,
                     "Currency IDs should match",
                 )
                 assertEquals(

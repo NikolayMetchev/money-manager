@@ -8,6 +8,8 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Auditable
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CryptoAsset
+import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.MergeId
@@ -240,6 +242,53 @@ data class ImportCurrencyIntent(
 ) : Auditable,
     WriteIntent
 
+/** Builder-chosen placeholder identity for a crypto asset created in this batch, before DB ids exist. */
+@JvmInline
+value class LocalCryptoKey(
+    val value: String,
+)
+
+/**
+ * A crypto asset to create/update/delete. CREATE upserts by [code] (ticker); scale factor and
+ * default name come from the crypto registry. The resulting id is read back from
+ * [ImportResult.createdCryptoIds] via [key]. [existingId]/[crypto] target the row for UPDATE;
+ * [existingId] for DELETE.
+ */
+data class ImportCryptoIntent(
+    val key: LocalCryptoKey,
+    override val source: Source,
+    val code: String? = null,
+    val name: String? = null,
+    override val operation: ImportOperation = ImportOperation.CREATE,
+    val existingId: CryptoId? = null,
+    /** UPDATE: the new crypto row, passed straight to the repository. */
+    val crypto: CryptoAsset? = null,
+) : Auditable,
+    WriteIntent
+
+/** Builder-chosen placeholder identity for a trade created in this batch, before DB ids exist. */
+@JvmInline
+value class LocalTradeKey(
+    val value: String,
+)
+
+/**
+ * A cross-asset exchange to create: [fromAmount] leaves [fromAccountId] and [toAmount] enters
+ * [toAccountId], where the two [Money] legs may be denominated in different assets. The engine
+ * allocates a `transaction_id`, inserts the trade, and records provenance; the resulting id is read
+ * back from [ImportResult.createdTradeIds] via [key]. (CREATE only for now.)
+ */
+data class ImportTradeIntent(
+    val key: LocalTradeKey,
+    val source: Source,
+    val timestamp: Instant,
+    val description: String,
+    val fromAccountId: AccountId,
+    val fromAmount: Money,
+    val toAccountId: AccountId,
+    val toAmount: Money,
+)
+
 /** A request to merge [deletedId] into [survivingId] (reassign its transfers, then delete it). */
 data class AccountMergeRequest(
     val deletedId: AccountId,
@@ -396,6 +445,8 @@ data class ImportBatch(
     val ownerships: List<ImportOwnershipIntent> = emptyList(),
     val categories: List<ImportCategoryIntent> = emptyList(),
     val currencies: List<ImportCurrencyIntent> = emptyList(),
+    val cryptoAssets: List<ImportCryptoIntent> = emptyList(),
+    val trades: List<ImportTradeIntent> = emptyList(),
     val csvStrategyMutations: List<CsvStrategyMutation> = emptyList(),
     val apiStrategyMutations: List<ApiStrategyMutation> = emptyList(),
     val passThroughMutations: List<PassThroughMutation> = emptyList(),
