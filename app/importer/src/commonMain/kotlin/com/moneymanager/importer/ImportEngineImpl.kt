@@ -216,6 +216,9 @@ class ImportEngineImpl(
         for (intent in batch.currencies.updates()) {
             currencyRepository.updateCurrency(requireNotNull(intent.currency), intent.source)
         }
+        for (intent in batch.cryptoAssets.updates()) {
+            cryptoRepository.updateCryptoAsset(requireNotNull(intent.crypto), intent.source)
+        }
         for (intent in batch.peopleToCreate.updates()) {
             personRepository.updatePersonWithAttributes(
                 person = intent.person,
@@ -237,6 +240,7 @@ class ImportEngineImpl(
         batch.accountsToCreate.deletes().forEach { accountRepository.deleteAccount(requireNotNull(it.existingId)) }
         batch.categories.deletes().forEach { categoryRepository.deleteCategory(requireNotNull(it.existingId)) }
         batch.currencies.deletes().forEach { currencyRepository.deleteCurrency(requireNotNull(it.existingId)) }
+        batch.cryptoAssets.deletes().forEach { cryptoRepository.deleteCryptoAsset(requireNotNull(it.existingId)) }
         batch.peopleToCreate.deletes().forEach { personRepository.deletePerson(requireNotNull(it.existingId)) }
 
         return ImportResult(

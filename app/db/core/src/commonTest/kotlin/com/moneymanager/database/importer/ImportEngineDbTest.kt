@@ -596,15 +596,15 @@ class ImportEngineDbTest : DbTest() {
             val curveRows = repositories.transactionRepository.getTransactionsByAccount(curveId).first()
             assertEquals(2, curveRows.size)
             val curveNet =
-                curveRows.fold(com.moneymanager.bigdecimal.BigInteger.ZERO) { acc, t ->
+                curveRows.fold(BigInteger.ZERO) { acc, t ->
                     acc +
                         when (curveId) {
                             t.targetAccountId -> t.amount.amount
                             t.sourceAccountId -> -t.amount.amount
-                            else -> com.moneymanager.bigdecimal.BigInteger.ZERO
+                            else -> BigInteger.ZERO
                         }
                 }
-            assertEquals(com.moneymanager.bigdecimal.BigInteger.ZERO, curveNet)
+            assertEquals(BigInteger.ZERO, curveNet)
 
             // The merchant receives the spend exactly once.
             val merchantRows = repositories.transactionRepository.getTransactionsByAccount(merchantId).first()
@@ -699,15 +699,15 @@ class ImportEngineDbTest : DbTest() {
                 val rows = repositories.transactionRepository.getTransactionsByAccount(conduitId).first()
                 assertEquals(2, rows.size)
                 val net =
-                    rows.fold(com.moneymanager.bigdecimal.BigInteger.ZERO) { acc, t ->
+                    rows.fold(BigInteger.ZERO) { acc, t ->
                         acc +
                             when (conduitId) {
                                 t.targetAccountId -> t.amount.amount
                                 t.sourceAccountId -> -t.amount.amount
-                                else -> com.moneymanager.bigdecimal.BigInteger.ZERO
+                                else -> BigInteger.ZERO
                             }
                     }
-                assertEquals(com.moneymanager.bigdecimal.BigInteger.ZERO, net)
+                assertEquals(BigInteger.ZERO, net)
             }
             val merchantRows = repositories.transactionRepository.getTransactionsByAccount(merchantId).first()
             assertEquals(1, merchantRows.size)
@@ -819,15 +819,15 @@ class ImportEngineDbTest : DbTest() {
                     repositories.transactionRepository
                         .getTransactionsByAccount(accountId)
                         .first()
-                        .fold(com.moneymanager.bigdecimal.BigInteger.ZERO) { acc, t ->
+                        .fold(BigInteger.ZERO) { acc, t ->
                             acc +
                                 when (accountId) {
                                     t.targetAccountId -> t.amount.amount
                                     t.sourceAccountId -> -t.amount.amount
-                                    else -> com.moneymanager.bigdecimal.BigInteger.ZERO
+                                    else -> BigInteger.ZERO
                                 }
                         }
-                assertEquals(com.moneymanager.bigdecimal.BigInteger.ZERO, net, "account $name should net to zero")
+                assertEquals(BigInteger.ZERO, net, "account $name should net to zero")
             }
 
             // The originals are consumed: a second identical cancellation finds nothing to reverse.
@@ -990,15 +990,15 @@ class ImportEngineDbTest : DbTest() {
                     repositories.transactionRepository
                         .getTransactionsByAccount(accountId)
                         .first()
-                        .fold(com.moneymanager.bigdecimal.BigInteger.ZERO) { acc, t ->
+                        .fold(BigInteger.ZERO) { acc, t ->
                             acc +
                                 when (accountId) {
                                     t.targetAccountId -> t.amount.amount
                                     t.sourceAccountId -> -t.amount.amount
-                                    else -> com.moneymanager.bigdecimal.BigInteger.ZERO
+                                    else -> BigInteger.ZERO
                                 }
                         }
-                assertEquals(com.moneymanager.bigdecimal.BigInteger.ZERO, net, "account $accountId should net to zero")
+                assertEquals(BigInteger.ZERO, net, "account $accountId should net to zero")
             }
 
             // The refund's spend leg (id1) links to the original charge's spend leg (id2) via the

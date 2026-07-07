@@ -4,8 +4,8 @@
 -- rate is to_amount/from_amount). This honours double-entry across assets, which a single transfer
 -- (one asset, one amount for both legs) cannot.
 --
--- NOTE (stage 1): amounts are INTEGER for now so the SQL SUM balance views keep working; they move
--- to TEXT (arbitrary-precision) together with a Kotlin aggregation pass in a follow-up.
+-- Amounts are arbitrary-precision, stored as decimal strings (BigInteger.toString()), consistent with
+-- `transfer.amount`; per-asset balance aggregation is done in Kotlin BigInteger, not SQL SUM.
 CREATE TABLE trade (
     id INTEGER PRIMARY KEY NOT NULL,
     revision_id INTEGER NOT NULL DEFAULT 1,

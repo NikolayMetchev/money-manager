@@ -3,6 +3,7 @@
 package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
@@ -1838,7 +1839,7 @@ private suspend fun prepareValidTransactionItem(
             setup.strategy.transactionMappings.feeIncludedInAmount &&
             fee.amount.currency.id == data.money.currency.id
         ) {
-            Money((data.money.amount - fee.amount.amount).coerceAtLeast(com.moneymanager.bigdecimal.BigInteger.ZERO), data.money.currency)
+            Money((data.money.amount - fee.amount.amount).coerceAtLeast(BigInteger.ZERO), data.money.currency)
         } else {
             data.money
         }

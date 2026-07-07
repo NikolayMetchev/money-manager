@@ -33,20 +33,27 @@ class CategoryReadRepositoryImpl(
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->
-                list.map { row ->
-                    val asset =
-                        AssetRowMapper.buildAsset(
-                            id = row.asset_id,
-                            code = row.asset_code,
-                            name = row.asset_name,
-                            scaleFactor = row.asset_scale_factor,
-                            kind = row.asset_kind,
+                // category_balance_view is non-aggregating (one row per ancestor category × descendant
+                // account × asset), so sum per (category, asset) here in BigInteger — TEXT amounts can't
+                // be SUMmed in SQL.
+                list
+                    .groupBy { it.category_id to it.asset_id }
+                    .map { (_, rows) ->
+                        val first = rows.first()
+                        val asset =
+                            AssetRowMapper.buildAsset(
+                                id = first.asset_id,
+                                code = first.asset_code,
+                                name = first.asset_name,
+                                scaleFactor = first.asset_scale_factor,
+                                kind = first.asset_kind,
+                            )
+                        val total = rows.fold(BigInteger.ZERO) { acc, r -> acc + BigInteger(r.balance) }
+                        CategoryBalance(
+                            categoryId = first.category_id,
+                            balance = Money(total, asset),
                         )
-                    CategoryBalance(
-                        categoryId = row.category_id,
-                        balance = Money(BigInteger(row.balance), asset),
-                    )
-                }
+                    }
             }
 
     override fun getCategoryById(id: Long): Flow<Category?> =

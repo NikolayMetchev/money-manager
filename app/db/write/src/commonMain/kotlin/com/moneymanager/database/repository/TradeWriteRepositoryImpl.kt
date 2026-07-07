@@ -34,8 +34,13 @@ class TradeWriteRepositoryImpl(
         toAccountId: AccountId,
         toAmount: Money,
         source: Source,
-    ): TradeId =
-        withContext(Dispatchers.Default) {
+    ): TradeId {
+        // A trade is a cross-asset exchange; a same-asset movement is a transfer. The DB CHECK only
+        // blocks the same-account+same-asset degenerate case, so enforce the cross-asset rule here.
+        require(fromAmount.currency.id != toAmount.currency.id) {
+            "A trade must exchange two different assets (from and to assets are both ${fromAmount.currency.code})"
+        }
+        return withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
                 // Idempotency: re-importing the same conversion must not double-book. If an identical
                 // trade already exists, return it instead of inserting a duplicate.
@@ -73,6 +78,7 @@ class TradeWriteRepositoryImpl(
                 TradeId(id)
             }
         }
+    }
 
     override suspend fun deleteTrade(id: TradeId): Unit =
         withContext(Dispatchers.Default) {

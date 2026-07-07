@@ -635,6 +635,25 @@ suspend fun runCsvImport(
             )
         }
 
+    // A trade carries no fee field, so a conversion row that also has a fee would otherwise drop it.
+    // Emit each such fee as its own standalone movement (source account -> "<strategy> Fees") so the
+    // money isn't lost. (Not produced by the current built-in strategies, but keeps the path honest.)
+    val tradeFeeTransfers =
+        finalPrep.validTransfers.mapNotNull { row ->
+            if (row.tradeTo == null) return@mapNotNull null
+            val fee = row.feeAmount ?: return@mapNotNull null
+            val feeAcct = feeAccountId ?: return@mapNotNull null
+            ImportTransfer(
+                rowKey = ImportRowKey.CsvRow(row.rowIndex),
+                fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
+                toAccount = AccountRef.Existing(feeAcct),
+                source = Source.Csv(csvImport.id),
+                timestamp = row.transfer.timestamp,
+                description = "${row.transfer.description} (fee)",
+                amount = fee,
+            )
+        }
+
     val importTransfers =
         finalPrep.validTransfers.filter { it.tradeTo == null }.map { row ->
             val uniqueKey =
@@ -698,7 +717,7 @@ suspend fun runCsvImport(
 
     val batch =
         ImportBatch(
-            transfers = importTransfers,
+            transfers = importTransfers + tradeFeeTransfers,
             trades = importTrades,
             dedupePolicy =
                 if (uniqueIdTypeNames.isEmpty()) {

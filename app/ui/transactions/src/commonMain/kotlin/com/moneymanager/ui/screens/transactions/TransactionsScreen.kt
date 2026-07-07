@@ -46,6 +46,7 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
@@ -864,7 +865,12 @@ fun AccountTransactionsScreen(
                                 screenSizeClass = screenSizeClass,
                                 isHighlighted = highlightedTransactionId == runningBalance.transactionId,
                                 onEditClick = { transfer ->
-                                    transactionIdToEdit = transfer.id
+                                    // TransactionEditDialog is fiat-only (CurrencyPicker + currencyRepository
+                                    // save path); opening it on a crypto-denominated transfer would corrupt
+                                    // its asset. Only fiat transfers are editable here for now.
+                                    if (transfer.amount.currency is Currency) {
+                                        transactionIdToEdit = transfer.id
+                                    }
                                 },
                                 onAuditClick = onAuditClick,
                                 onFeeLinkClick = { linkedTransferId ->
