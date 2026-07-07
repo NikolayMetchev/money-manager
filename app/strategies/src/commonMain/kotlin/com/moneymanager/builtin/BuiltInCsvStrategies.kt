@@ -45,7 +45,9 @@ object BuiltInCsvStrategies {
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
     private const val CRYPTO_COM_CASH_ACCOUNT = "Crypto.com Cash"
-    private const val CRYPTO_COM_WALLET_PREFIX = "Crypto.com "
+
+    /** Single account that holds every crypto.com crypto balance (one per-asset balance, not per account). */
+    private const val CRYPTO_COM_CRYPTO_ACCOUNT = "Crypto.com"
 
     /**
      * Cross-source reconciliation window for the crypto.com strategies. The same top-up appears in
@@ -104,8 +106,7 @@ object BuiltInCsvStrategies {
      * The column header shared by all three crypto.com exports (card_transactions_record_*,
      * fiat_transactions_record_* and crypto_transactions_record_*). Because the sets are identical,
      * the crypto.com strategies rely on [CsvImportStrategy.fileNamePattern] and content rules over
-     * the Transaction Kind column to tell the files apart; crypto_* files match neither built-in
-     * strategy and are skipped.
+     * the Transaction Kind column to tell the three files apart.
      */
     private val cryptoComIdentificationColumns =
         setOf(
@@ -220,15 +221,15 @@ object BuiltInCsvStrategies {
      * - viban_withdrawal ("GBP Withdrawal (via FPS)", negative): Cash → external bank.
      * - viban_card_top_up ("Top Up Card", POSITIVE but money leaves Cash): Cash → Card. A row rule
      *   flips source/target to cancel the positive-amount flip.
-     * - viban_purchase ("GBP -> TGBP", positive, To Currency = wallet code): Cash → per-currency
-     *   wallet, same cancelled flip.
-     * - crypto_viban ("TGBP -> GBP", positive, Currency = wallet code): wallet → Cash. A column swap
-     *   moves the wallet code into To Currency so the conversion target mapping below sees it; the
-     *   positive-amount flip then puts the wallet on the source side.
+     * - viban_purchase ("GBP -> TGBP", a buy) and crypto_viban ("TGBP -> GBP", a sell) are cross-asset
+     *   conversions → cross-asset TRADES: the debited (Currency) and credited (To Currency) legs already
+     *   name the assets, and the positive-amount flip puts the debit leg on the source side, so both
+     *   directions come out correct with no column swap.
      *
-     * Amount/currency always read the Native columns (the Cash-side fiat value, present on every row
-     * including conversions), so no crypto-token currencies are required in the database.
-     * To Currency is populated on every row; conversions are detected by Currency != To Currency.
+     * Amount/currency read the real Currency/Amount columns; a To/From Currency that is not a fiat code
+     * (e.g. TGBP, or any crypto) is provisioned on demand as a crypto asset
+     * ([CurrencyLookupMapping.treatNonFiatAsCrypto]) and held in the single Crypto.com account. To
+     * Currency is populated on every row; conversions are detected by Currency != To Currency.
      */
     fun buildCryptoComFiatStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
@@ -248,13 +249,14 @@ object BuiltInCsvStrategies {
                             listOf(
                                 RowCondition("Currency", RowConditionOperator.NOT_EQUALS_COLUMN, otherColumnName = "To Currency"),
                             ),
-                        // Conversion rows target the per-currency wallet ("Crypto.com TGBP").
+                        // Conversion rows (GBP -> crypto/TGBP) credit the single "Crypto.com" account
+                        // (the To Currency asset), not a per-currency wallet.
                         whenTrue =
-                            TemplateAccountMapping(
+                            RegexAccountMapping(
                                 id = cryptoComFiatMappingId(3),
                                 fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "To Currency",
-                                prefix = CRYPTO_COM_WALLET_PREFIX,
+                                columnName = "Transaction Description",
+                                rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CRYPTO_ACCOUNT)),
                             ),
                         whenFalse =
                             RegexAccountMapping(
@@ -299,10 +301,11 @@ object BuiltInCsvStrategies {
                         id = cryptoComFiatMappingId(8),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Currency",
+                        treatNonFiatAsCrypto = true,
                     ),
                 // Credit leg of a conversion → the importer emits a trade when To Currency differs from
-                // Currency and resolves (e.g. a real crypto buy). The GBP-pegged TGBP token doesn't
-                // resolve, so those conversions stay ordinary transfers as before.
+                // Currency. Because the currency lookups set treatNonFiatAsCrypto, any non-fiat To/From
+                // Currency (TGBP and every real crypto) is created on demand and the conversion is a trade.
                 TransferField.TO_AMOUNT to
                     AmountParsingMapping(
                         id = cryptoComFiatMappingId(9),
@@ -315,6 +318,7 @@ object BuiltInCsvStrategies {
                         id = cryptoComFiatMappingId(10),
                         fieldType = TransferField.TO_CURRENCY,
                         columnName = "To Currency",
+                        treatNonFiatAsCrypto = true,
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
@@ -325,13 +329,10 @@ object BuiltInCsvStrategies {
             )
         val rowRules =
             listOf(
-                // crypto_viban rows are wallet → Cash ("TGBP -> GBP"): move the wallet code into
-                // To Currency so the conversion target mapping resolves the wallet account. The
-                // positive amount then flips it onto the source side.
-                RowPreprocessingRule(
-                    conditions = listOf(RowCondition("Transaction Kind", RowConditionOperator.EQUALS_VALUE, value = "crypto_viban")),
-                    columnSwaps = listOf(ColumnPairSwap("Currency", "To Currency")),
-                ),
+                // crypto_viban ("TGBP -> GBP", a crypto sale) is a cross-asset conversion → a trade.
+                // Its Currency/To Currency already name the sold/received assets, and the positive-amount
+                // flip puts the crypto (source) leg on the debit side, so the trade comes out correctly
+                // directed WITHOUT the old column swap (which was a single-asset-transfer artifact).
                 // Top-ups and purchases are positive but money LEAVES Cash: flipping source/target
                 // here cancels the positive-amount flip (the two flips are XORed), keeping Cash as
                 // the source.
@@ -374,25 +375,27 @@ object BuiltInCsvStrategies {
      * Built-in strategy for crypto.com's crypto_transactions_record_*.csv export — the crypto-native
      * ledger (card cashback, staking/earn rewards, swaps). Unlike the card/fiat strategies (which
      * denominate everything in the Native GBP columns and keep the crypto figure only as an
-     * attribute), this one denominates each row in its **real Currency/Amount**, so a wallet holds a
-     * genuine crypto balance (e.g. 0.37 CRO), and routes it to a per-asset "Crypto.com <CODE>" wallet.
-     * The crypto asset itself is created on demand during import (see CsvImportApplier.ensureCryptoAssets).
+     * attribute), this one denominates each row in its **real Currency/Amount**, so the account holds a
+     * genuine crypto balance (e.g. 0.37 CRO). Every row lands in the single [CRYPTO_COM_CRYPTO_ACCOUNT]
+     * account (one balance per asset), and the crypto asset itself is created on demand during import
+     * (see CsvImportApplier.ensureCryptoAssets; the currency lookup sets treatNonFiatAsCrypto).
      *
-     * The wallet is the SOURCE and the counterparty (from the description, e.g. "Card Cashback") the
-     * TARGET; [AmountParsingMapping.flipAccountsOnPositive] then makes a positive amount (rewards) flow
-     * INTO the wallet and a negative amount (a spend/swap out) flow OUT of it — mirroring the card
-     * strategy's sign convention.
+     * The Crypto.com account is the SOURCE and the counterparty (from the description, e.g. "Card
+     * Cashback") the TARGET; [AmountParsingMapping.flipAccountsOnPositive] then makes a positive amount
+     * (rewards) flow INTO the account and a negative amount (a spend/swap out) flow OUT of it —
+     * mirroring the card strategy's sign convention.
      */
     fun buildCryptoComCryptoStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
-                // The wallet for this row's asset, e.g. "Crypto.com CRO"; created on demand if absent.
+                // All crypto lands in the single "Crypto.com" account (one balance per asset), not a
+                // separate wallet per ticker. The always-matching "^" rule routes every row there.
                 TransferField.SOURCE_ACCOUNT to
-                    TemplateAccountMapping(
+                    RegexAccountMapping(
                         id = cryptoComCryptoMappingId(1),
                         fieldType = TransferField.SOURCE_ACCOUNT,
-                        columnName = "Currency",
-                        prefix = CRYPTO_COM_WALLET_PREFIX,
+                        columnName = "Transaction Description",
+                        rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CRYPTO_ACCOUNT)),
                     ),
                 // Counterparty (reward source / merchant) looked up from the description.
                 TransferField.TARGET_ACCOUNT to
@@ -431,6 +434,7 @@ object BuiltInCsvStrategies {
                         id = cryptoComCryptoMappingId(6),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Currency",
+                        treatNonFiatAsCrypto = true,
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(

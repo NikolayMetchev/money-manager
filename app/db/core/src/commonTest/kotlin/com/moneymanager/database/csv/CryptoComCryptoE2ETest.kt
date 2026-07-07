@@ -129,7 +129,7 @@ class CryptoComCryptoE2ETest : DbTest() {
                 repositories.accountRepository
                     .getAllAccounts()
                     .first()
-                    .first { it.name == "Crypto.com CRO" }
+                    .first { it.name == "Crypto.com" }
             val balance =
                 repositories.transactionRepository
                     .getAccountBalances()
@@ -163,7 +163,7 @@ class CryptoComCryptoE2ETest : DbTest() {
             // The wallet holds a real crypto balance: 0.37 + 0.42 = 0.79 CRO.
             repositories.maintenanceService.refreshMaterializedViews()
             val accounts = repositories.accountRepository.getAllAccounts().first()
-            val wallet = accounts.first { it.name == "Crypto.com CRO" }
+            val wallet = accounts.first { it.name == "Crypto.com" }
             val balance =
                 repositories.transactionRepository
                     .getAccountBalances()

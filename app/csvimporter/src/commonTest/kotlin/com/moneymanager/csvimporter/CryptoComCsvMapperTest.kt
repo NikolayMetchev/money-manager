@@ -6,6 +6,8 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CryptoAsset
+import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
@@ -52,6 +54,10 @@ class CryptoComCsvMapperTest {
             "Transaction Hash",
         ).mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
 
+    // TGBP is a crypto asset (created on demand by ensureCryptoAssets in the real flow); provide it here
+    // so the mapper resolves it and the conversion rows map to cross-asset trades.
+    private val tgbp = CryptoAsset(id = CryptoId(100), code = "TGBP", name = "TGBP", scaleFactor = 100)
+
     private fun mapper(strategy: CsvImportStrategy): CsvTransferMapper =
         CsvTransferMapper(
             strategy = strategy,
@@ -59,6 +65,7 @@ class CryptoComCsvMapperTest {
             existingAccounts = mapOf(card.name to card, cash.name to cash),
             existingCurrencies = mapOf(gbp.id to gbp),
             existingCurrenciesByCode = mapOf(gbp.code to gbp),
+            existingCryptoByCode = mapOf(tgbp.code to tgbp),
         )
 
     @Suppress("LongParameterList")
@@ -127,22 +134,23 @@ class CryptoComCsvMapperTest {
     }
 
     @Test
-    fun `viban_purchase is Cash into the per-currency wallet`() {
+    fun `viban_purchase is a trade - Cash GBP into the single Crypto_com account as TGBP`() {
         val r = map(fiatStrategy, row("GBP -> TGBP", "GBP", "5000.0", "TGBP", "5000.0", "5000.0", "viban_purchase"))
+        // Debit GBP from Cash, credit TGBP into the single "Crypto.com" account (not a per-ticker wallet).
         assertEquals(cash.id, r.transfer.sourceAccountId)
-        assertEquals("Crypto.com TGBP", r.newAccountName())
-        // Amount stays in the Native (Cash-side) currency; no TGBP currency is needed.
+        assertEquals("Crypto.com", r.newAccountName())
         assertEquals(Money.fromDisplayValue(BigDecimal("5000.0"), gbp), r.transfer.amount)
+        assertEquals(Money.fromDisplayValue(BigDecimal("5000.0"), tgbp), r.tradeTo)
     }
 
     @Test
-    fun `crypto_viban is the per-currency wallet back into Cash`() {
+    fun `crypto_viban is a trade - TGBP out of the Crypto_com account into Cash as GBP`() {
         val r = map(fiatStrategy, row("TGBP -> GBP", "TGBP", "5009.86", "GBP", "5009.86", "5009.86", "crypto_viban"))
-        // The Currency<->To Currency swap resolves the wallet, and the positive amount flips it
-        // onto the source side.
+        // Debit TGBP from the "Crypto.com" account (source, after the positive-amount flip), credit GBP to Cash.
+        assertEquals("Crypto.com", r.newAccountName())
         assertEquals(cash.id, r.transfer.targetAccountId)
-        assertEquals("Crypto.com TGBP", r.newAccountName())
-        assertEquals(Money.fromDisplayValue(BigDecimal("5009.86"), gbp), r.transfer.amount)
+        assertEquals(Money.fromDisplayValue(BigDecimal("5009.86"), tgbp), r.transfer.amount)
+        assertEquals(Money.fromDisplayValue(BigDecimal("5009.86"), gbp), r.tradeTo)
     }
 
     @Test
