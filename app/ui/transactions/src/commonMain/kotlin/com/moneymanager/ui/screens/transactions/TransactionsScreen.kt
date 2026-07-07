@@ -46,6 +46,7 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransactionId
@@ -236,8 +237,12 @@ fun AccountTransactionsScreen(
     val displayedRunningBalances =
         if (showExcluded) runningBalances else runningBalances.filter { !it.isExcluded }
 
-    // Get all unique currencies from account balances for matrix
-    val uniqueCurrencyIds = accountBalances.map { CurrencyId(it.balance.currency.id.id) }.distinct()
+    // Get all unique assets (fiat or crypto) from account balances for matrix, deduped by id.
+    // Sorted by code for a deterministic row order independent of balance emission order.
+    val uniqueAssets =
+        remember(accountBalances) {
+            accountBalances.map { it.balance.currency }.distinctBy { it.id.id }.sortedBy { it.code }
+        }
 
     // Calculate column widths for each account based on account name and balance amounts
     val accountColumnWidths: Map<AccountId, Dp> =
@@ -511,8 +516,8 @@ fun AccountTransactionsScreen(
                                             .verticalScroll(verticalScrollState),
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
-                                    uniqueCurrencyIds.forEach { currencyId ->
-                                        val isCurrencySelected = selectedCurrencyId == currencyId
+                                    uniqueAssets.forEach { asset ->
+                                        val isCurrencySelected = selectedCurrencyId?.id == asset.id.id
                                         Box(
                                             modifier =
                                                 Modifier
@@ -526,7 +531,7 @@ fun AccountTransactionsScreen(
                                                     ).padding(vertical = 4.dp),
                                         ) {
                                             Text(
-                                                text = "${currencies.find { it.id == currencyId }?.code ?: "?"}:",
+                                                text = "${asset.code}:",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color =
                                                     if (isCurrencySelected) {
@@ -550,7 +555,7 @@ fun AccountTransactionsScreen(
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
                                     // Row for each currency
-                                    uniqueCurrencyIds.forEach { currencyId ->
+                                    uniqueAssets.forEach { asset ->
                                         Row(
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
@@ -559,9 +564,10 @@ fun AccountTransactionsScreen(
                                             allAccounts.forEach { account ->
                                                 val balance =
                                                     accountBalances.find {
-                                                        it.accountId == account.id && it.balance.currency.id == currencyId
+                                                        it.accountId == account.id && it.balance.currency.id.id == asset.id.id
                                                     }
-                                                val isSelectedCell = selectedAccountId == account.id && selectedCurrencyId == currencyId
+                                                val isSelectedCell =
+                                                    selectedAccountId == account.id && selectedCurrencyId?.id == asset.id.id
                                                 val isColumnSelected = selectedAccountId == account.id && selectedCurrencyId == null
                                                 val columnWidth = accountColumnWidths[account.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
 
@@ -578,9 +584,10 @@ fun AccountTransactionsScreen(
                                                             .width(columnWidth)
                                                             .background(backgroundColor)
                                                             .clickable(enabled = balance != null) {
+                                                                val assetCurrencyId = CurrencyId(asset.id.id)
                                                                 selectedAccountId = account.id
-                                                                selectedCurrencyId = currencyId
-                                                                onAccountClick(account.id, account.name, currencyId, null)
+                                                                selectedCurrencyId = assetCurrencyId
+                                                                onAccountClick(account.id, account.name, assetCurrencyId, null)
                                                             }.padding(vertical = 4.dp),
                                                     contentAlignment = Alignment.Center,
                                                 ) {
@@ -789,10 +796,7 @@ fun AccountTransactionsScreen(
 
                             // Scroll matrix to show the account and currency
                             val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
-                            val currencyIndex =
-                                uniqueCurrencyIds.indexOfFirst {
-                                    it == transaction.transactionAmount.currency.id
-                                }
+                            val currencyIndex = uniqueAssets.indexOfAsset(transaction.transactionAmount.currency.id.id)
 
                             if (accountIndex >= 0 && currencyIndex >= 0) {
                                 val targetScrollX =
@@ -920,9 +924,7 @@ fun AccountTransactionsScreen(
                                                 )
                                             // Calculate vertical scroll position for the currency
                                             val currencyIndex =
-                                                uniqueCurrencyIds.indexOfFirst {
-                                                    it == runningBalance.transactionAmount.currency.id
-                                                }
+                                                uniqueAssets.indexOfAsset(runningBalance.transactionAmount.currency.id.id)
                                             if (currencyIndex >= 0) {
                                                 // Each currency row: text + padding + spacing ≈ 28.dp
                                                 val targetScrollY =
@@ -1007,3 +1009,6 @@ fun AccountTransactionsScreen(
         )
     }
 }
+
+/** Index of the matrix row for the asset with the given id, or -1 if absent. */
+private fun List<Asset>.indexOfAsset(assetId: Long): Int = indexOfFirst { it.id.id == assetId }
