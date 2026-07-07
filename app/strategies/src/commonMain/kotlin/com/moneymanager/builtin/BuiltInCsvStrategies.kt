@@ -45,7 +45,6 @@ object BuiltInCsvStrategies {
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
     private const val CRYPTO_COM_CASH_ACCOUNT = "Crypto.com Cash"
-    private const val CRYPTO_COM_WALLET_PREFIX = "Crypto.com "
 
     /** Single account that holds every crypto.com crypto balance (one per-asset balance, not per account). */
     private const val CRYPTO_COM_CRYPTO_ACCOUNT = "Crypto.com"
@@ -222,15 +221,15 @@ object BuiltInCsvStrategies {
      * - viban_withdrawal ("GBP Withdrawal (via FPS)", negative): Cash → external bank.
      * - viban_card_top_up ("Top Up Card", POSITIVE but money leaves Cash): Cash → Card. A row rule
      *   flips source/target to cancel the positive-amount flip.
-     * - viban_purchase ("GBP -> TGBP", positive, To Currency = wallet code): Cash → per-currency
-     *   wallet, same cancelled flip.
-     * - crypto_viban ("TGBP -> GBP", positive, Currency = wallet code): wallet → Cash. A column swap
-     *   moves the wallet code into To Currency so the conversion target mapping below sees it; the
-     *   positive-amount flip then puts the wallet on the source side.
+     * - viban_purchase ("GBP -> TGBP", a buy) and crypto_viban ("TGBP -> GBP", a sell) are cross-asset
+     *   conversions → cross-asset TRADES: the debited (Currency) and credited (To Currency) legs already
+     *   name the assets, and the positive-amount flip puts the debit leg on the source side, so both
+     *   directions come out correct with no column swap.
      *
-     * Amount/currency always read the Native columns (the Cash-side fiat value, present on every row
-     * including conversions), so no crypto-token currencies are required in the database.
-     * To Currency is populated on every row; conversions are detected by Currency != To Currency.
+     * Amount/currency read the real Currency/Amount columns; a To/From Currency that is not a fiat code
+     * (e.g. TGBP, or any crypto) is provisioned on demand as a crypto asset
+     * ([CurrencyLookupMapping.treatNonFiatAsCrypto]) and held in the single Crypto.com account. To
+     * Currency is populated on every row; conversions are detected by Currency != To Currency.
      */
     fun buildCryptoComFiatStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
@@ -305,8 +304,8 @@ object BuiltInCsvStrategies {
                         treatNonFiatAsCrypto = true,
                     ),
                 // Credit leg of a conversion → the importer emits a trade when To Currency differs from
-                // Currency and resolves (e.g. a real crypto buy). The GBP-pegged TGBP token doesn't
-                // resolve, so those conversions stay ordinary transfers as before.
+                // Currency. Because the currency lookups set treatNonFiatAsCrypto, any non-fiat To/From
+                // Currency (TGBP and every real crypto) is created on demand and the conversion is a trade.
                 TransferField.TO_AMOUNT to
                     AmountParsingMapping(
                         id = cryptoComFiatMappingId(9),
@@ -376,14 +375,15 @@ object BuiltInCsvStrategies {
      * Built-in strategy for crypto.com's crypto_transactions_record_*.csv export — the crypto-native
      * ledger (card cashback, staking/earn rewards, swaps). Unlike the card/fiat strategies (which
      * denominate everything in the Native GBP columns and keep the crypto figure only as an
-     * attribute), this one denominates each row in its **real Currency/Amount**, so a wallet holds a
-     * genuine crypto balance (e.g. 0.37 CRO), and routes it to a per-asset "Crypto.com <CODE>" wallet.
-     * The crypto asset itself is created on demand during import (see CsvImportApplier.ensureCryptoAssets).
+     * attribute), this one denominates each row in its **real Currency/Amount**, so the account holds a
+     * genuine crypto balance (e.g. 0.37 CRO). Every row lands in the single [CRYPTO_COM_CRYPTO_ACCOUNT]
+     * account (one balance per asset), and the crypto asset itself is created on demand during import
+     * (see CsvImportApplier.ensureCryptoAssets; the currency lookup sets treatNonFiatAsCrypto).
      *
-     * The wallet is the SOURCE and the counterparty (from the description, e.g. "Card Cashback") the
-     * TARGET; [AmountParsingMapping.flipAccountsOnPositive] then makes a positive amount (rewards) flow
-     * INTO the wallet and a negative amount (a spend/swap out) flow OUT of it — mirroring the card
-     * strategy's sign convention.
+     * The Crypto.com account is the SOURCE and the counterparty (from the description, e.g. "Card
+     * Cashback") the TARGET; [AmountParsingMapping.flipAccountsOnPositive] then makes a positive amount
+     * (rewards) flow INTO the account and a negative amount (a spend/swap out) flow OUT of it —
+     * mirroring the card strategy's sign convention.
      */
     fun buildCryptoComCryptoStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
