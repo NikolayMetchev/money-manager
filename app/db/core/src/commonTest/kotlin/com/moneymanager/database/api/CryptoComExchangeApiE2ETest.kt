@@ -3,7 +3,14 @@
 package com.moneymanager.database.api
 
 import com.moneymanager.apiimporter.importApiSessionExchange
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
+import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -72,6 +79,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
 
         importApiSessionExchange(
             apiSessionRepository = repositories.apiSessionRepository,
+            accountRepository = repositories.accountRepository,
             currencyRepository = repositories.currencyRepository,
             cryptoRepository = repositories.cryptoRepository,
             sessionId = sessionId,
@@ -115,4 +123,64 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             val tradesAfter = repositories.tradeRepository.getTradesByAccount(exchange.id).first().size
             assertEquals(tradesBefore, tradesAfter, "re-import must not double-book trades")
         }
+
+    @Test
+    fun `reconciles an App to Exchange transfer into one internal transfer`() =
+        runTest {
+            // Seed the App side: the CSV "Crypto.com" account records the same CRO moving out (to a
+            // dangling external wallet) that the Exchange deposit below records moving in.
+            val croId = repositories.importEngine.createCrypto("CRO")
+            val cro = repositories.cryptoRepository.getCryptoAssetById(croId).first()!!
+            val appAccount = repositories.importEngine.createAppAccount("Crypto.com")
+            val external = repositories.importEngine.createAppAccount("App wallet -> Exchange")
+            repositories.transactionRepository.createTransfers(
+                transfers =
+                    listOf(
+                        Transfer(
+                            id = TransferId(0),
+                            timestamp = Instant.fromEpochMilliseconds(1_700_000_001_000L),
+                            description = "Transfer: App wallet -> Exchange",
+                            sourceAccountId = appAccount,
+                            targetAccountId = external,
+                            amount = Money.fromDisplayValue("1500.25", cro),
+                        ),
+                    ),
+                sources = listOf(Source.SampleGenerator),
+            )
+
+            stageSessionAndImport()
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val exchange = accounts.first { it.name == "Crypto.com Exchange" }
+            // The Exchange's incoming CRO deposit was rewritten to come from the App "Crypto.com" account
+            // (one internal transfer), instead of the generic funding account.
+            val exchangeTransfers =
+                repositories.transactionRepository.getTransactionsByDateRange(
+                    startDate = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    endDate = Instant.fromEpochMilliseconds(1_700_000_002_000L),
+                ).first()
+            val croDeposit =
+                exchangeTransfers.firstOrNull { it.targetAccountId == exchange.id && it.amount.currency.code == "CRO" }
+            assertNotNull(croDeposit, "the CRO deposit should target the Exchange account")
+            assertEquals(appAccount, croDeposit.sourceAccountId, "deposit rewritten to come from the App account")
+
+            // The stale App-side leg is now excluded from balances (reconciled).
+            val appLeg = exchangeTransfers.firstOrNull { it.sourceAccountId == appAccount && it.targetAccountId == external }
+            assertNotNull(appLeg, "the original App leg still exists")
+            assertTrue(
+                appLeg.attributes.any { it.attributeType.id.id == -1L },
+                "the App leg should carry the excluded attribute",
+            )
+        }
 }
+
+/** Creates a plain app account (name only) for test seeding, via the engine's create-account helper. */
+private suspend fun com.moneymanager.importengineapi.ImportEngine.createAppAccount(name: String) =
+    createAccount(
+        Account(
+            id = com.moneymanager.domain.model.AccountId(0),
+            name = name,
+            openingDate = Instant.fromEpochMilliseconds(1_600_000_000_000L),
+        ),
+        Source.SampleGenerator,
+    )

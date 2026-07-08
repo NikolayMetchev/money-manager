@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 // path a catalog install takes) must survive the JSON round trip through the database.
 class BuiltInApiStrategyInstallTest : DbTest() {
     @Test
-    fun `installing the built-in API strategies creates all three`() =
+    fun `installing the built-in API strategies creates all of them`() =
         runTest {
             repositories.installBuiltInApiStrategies()
             val names =
@@ -24,7 +24,26 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .map { it.name }
                     .toSet()
-            assertEquals(setOf("Monzo", "Wise", "Starling"), names)
+            assertEquals(setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange"), names)
+        }
+
+    @Test
+    fun `the Crypto_com Exchange strategy installs with its signed-exchange configuration`() =
+        runTest {
+            repositories.installBuiltInApiStrategies()
+            val exchange =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Crypto.com Exchange" }
+
+            assertEquals(com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED, exchange.authType)
+            // The generic signing recipe + single account + data endpoints survive the JSON round trip.
+            assertNotNull(exchange.requestSigning, "signing recipe persisted")
+            assertEquals("Crypto.com Exchange", assertNotNull(exchange.syntheticAccount).name)
+            assertTrue(exchange.dataEndpoints.isNotEmpty(), "data endpoints persisted")
+            assertNotNull(exchange.internalTransferReconcile, "internal-transfer reconciliation persisted")
+            assertEquals("Crypto.com", exchange.internalTransferReconcile!!.bridges.single().otherAccountName)
         }
 
     @Test

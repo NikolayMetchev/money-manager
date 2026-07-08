@@ -409,7 +409,7 @@ class ImportEngineImpl(
         val classified = ImportDeduper(batch.dedupePolicy, existing).classify(resolvedTransfers)
 
         val toImport = resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })
-        val toUpdate = classified.filter { it.status == ImportStatus.UPDATED }
+        val toUpdate = classified.filter { it.status == ImportStatus.UPDATED } + internalReconcileExclusions(classified)
         val duplicates = classified.count { it.status == ImportStatus.DUPLICATE }
         val excluded = resolvedTransfers.count { it.excludedFromBalances }
 
@@ -907,8 +907,10 @@ class ImportEngineImpl(
                 }
                 is DedupePolicy.ApiMultiKey -> {
                     // Load full history for every account the batch touches (the own account may be the
-                    // source or the target depending on transaction direction).
-                    accountIds
+                    // source or the target depending on transaction direction), plus the app accounts
+                    // bridged for internal-transfer reconciliation (whose legs the batch does not touch).
+                    val policy = batch.dedupePolicy as DedupePolicy.ApiMultiKey
+                    (accountIds + policy.internalTransferBridges.map { it.appAccountId })
                         .flatMap { transactionRepository.getTransactionsByAccount(it).first() }
                         .distinctBy { it.id }
                 }
@@ -1156,6 +1158,33 @@ class ImportEngineImpl(
         }
         return CreatePayload(transfersToCreate, newAttributes, newRelationships, orderedSources, mainResultIndices, spendResultIndices)
     }
+
+    /**
+     * Synthetic UPDATE entries that tag the stale app-side legs of internal-transfer reconciliations
+     * excluded-from-balances (the movement is now carried by the rewritten incoming transfer). One per
+     * distinct existing transfer; the row fields are preserved and only the exclusion attribute is added.
+     */
+    private fun internalReconcileExclusions(classified: List<Classified>): List<Classified> =
+        classified
+            .mapNotNull { it.excludeExisting }
+            .distinctBy { it.transfer.id }
+            .map { ex ->
+                Classified(
+                    transfer =
+                        ImportTransfer(
+                            source = Source.System,
+                            rowKey = ImportRowKey.Manual(ex.transfer.id.id),
+                            fromAccount = AccountRef.Existing(ex.transfer.sourceAccountId),
+                            toAccount = AccountRef.Existing(ex.transfer.targetAccountId),
+                            timestamp = ex.transfer.timestamp,
+                            description = ex.transfer.description,
+                            amount = ex.transfer.amount,
+                            attributes = listOf(NewAttribute(ex.exclusionTypeId, "reconciled")),
+                        ),
+                    status = ImportStatus.UPDATED,
+                    existing = ex.transfer.id,
+                )
+            }
 
     private fun buildUpdates(toUpdate: List<Classified>): Pair<List<TransferUpdate>, List<Source>> {
         val updates = mutableListOf<TransferUpdate>()

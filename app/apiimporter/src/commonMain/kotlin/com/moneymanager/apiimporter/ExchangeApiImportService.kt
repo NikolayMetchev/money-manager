@@ -20,9 +20,13 @@ import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.importengineapi.AccountBridge
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
@@ -46,7 +50,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
+import kotlin.time.DurationUnit
 import kotlin.time.Instant
+import kotlin.time.toDuration
 
 /**
  * Generic download + import for **signed exchange** strategies — any [ApiImportStrategy] with a
@@ -229,6 +235,7 @@ private data class OrderMeta(
 @Suppress("LongMethod", "CyclomaticComplexMethod")
 suspend fun importApiSessionExchange(
     apiSessionRepository: ApiSessionReadRepository,
+    accountRepository: AccountReadRepository,
     currencyRepository: CurrencyReadRepository,
     cryptoRepository: CryptoReadRepository,
     sessionId: ApiSessionId,
@@ -414,6 +421,16 @@ suspend fun importApiSessionExchange(
             )
     }
 
+    // Internal-transfer reconciliation: bridge the exchange account to any configured app account
+    // (e.g. the CSV "Crypto.com" App account) so App<->Exchange transfers collapse into one movement.
+    val reconcile = strategy.internalTransferReconcile
+    val existingAccounts = accountRepository.getAllAccounts().first()
+    val bridges =
+        reconcile?.bridges?.mapNotNull { bridge ->
+            existingAccounts.firstOrNull { it.name == bridge.otherAccountName }
+                ?.let { AccountBridge(exchangeAccountId = syntheticId, appAccountId = it.id) }
+        }.orEmpty()
+
     val result =
         importEngine.import(
             ImportBatch(
@@ -421,9 +438,13 @@ suspend fun importApiSessionExchange(
                 trades = tradeIntents,
                 dedupePolicy =
                     DedupePolicy.ApiMultiKey(
-                        reconcileWindow = null,
-                        reconciledExclusionAttributeTypeId = null,
-                        reconciledRelationshipTypeId = null,
+                        reconciledExclusionAttributeTypeId =
+                            if (bridges.isEmpty()) null else AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
+                        reconciledRelationshipTypeId =
+                            if (bridges.isEmpty()) null else RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
+                        internalTransferBridges = bridges,
+                        internalTransferWindow = reconcile?.windowSeconds?.let { it.toDuration(DurationUnit.SECONDS) },
+                        internalTransferAmountTolerancePct = reconcile?.amountTolerancePct ?: 0.0,
                     ),
                 apiIdExtractor =
                     ExistingApiIdExtractor { transfer ->
