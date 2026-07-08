@@ -71,6 +71,10 @@ fun ApiConnectScreen(
 
     var strategyMenuExpanded by remember { mutableStateOf(false) }
     var tokenInput by remember { mutableStateOf("") }
+    var secretInput by remember { mutableStateOf("") }
+    // Signed exchange strategies (Crypto.com/Binance/Kraken) authenticate with an api-key + secret pair
+    // rather than a single bearer token.
+    val isSigned = selectedStrategy?.authType == com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -170,7 +174,10 @@ fun ApiConnectScreen(
                         .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(text = "Enter Access Token", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = if (isSigned) "Enter API Key & Secret" else "Enter Access Token",
+                    style = MaterialTheme.typography.titleMedium,
+                )
 
                 OutlinedTextField(
                     value = tokenInput,
@@ -178,13 +185,29 @@ fun ApiConnectScreen(
                         tokenInput = it
                         errorMessage = null
                     },
-                    label = { Text("Access Token") },
-                    placeholder = { Text("Paste your ${selectedStrategy?.name ?: "API"} access token here") },
+                    label = { Text(if (isSigned) "API Key" else "Access Token") },
+                    placeholder = { Text("Paste your ${selectedStrategy?.name ?: "API"} ${if (isSigned) "API key" else "access token"} here") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     isError = errorMessage != null,
                 )
+
+                if (isSigned) {
+                    OutlinedTextField(
+                        value = secretInput,
+                        onValueChange = {
+                            secretInput = it
+                            errorMessage = null
+                        },
+                        label = { Text("API Secret") },
+                        placeholder = { Text("Paste your ${selectedStrategy.name} API secret here") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        isError = errorMessage != null,
+                    )
+                }
 
                 errorMessage?.let { error ->
                     Text(
@@ -206,6 +229,11 @@ fun ApiConnectScreen(
                             errorMessage = "Select a provider first."
                             return@Button
                         }
+                        val trimmedSecret = secretInput.trim()
+                        if (isSigned && trimmedSecret.isBlank()) {
+                            errorMessage = "API secret cannot be empty."
+                            return@Button
+                        }
                         isSaving = true
                         errorMessage = null
                         scope.launch {
@@ -213,7 +241,14 @@ fun ApiConnectScreen(
                                 importEngine.createApiCredential(
                                     token = trimmedToken,
                                     createdAt = Clock.System.now(),
+                                    type =
+                                        if (isSigned) {
+                                            com.moneymanager.domain.model.ApiSessionType.CRYPTO_COM_EXCHANGE
+                                        } else {
+                                            com.moneymanager.domain.model.ApiSessionType.MONZO
+                                        },
                                     strategyId = strategyId,
+                                    apiSecret = trimmedSecret.takeIf { isSigned },
                                 )
                                 onCredentialSaved()
                             } catch (expected: Exception) {
@@ -223,13 +258,15 @@ fun ApiConnectScreen(
                             }
                         }
                     },
-                    enabled = !isSaving && tokenInput.isNotBlank() && selectedStrategyId != null,
+                    enabled =
+                        !isSaving && tokenInput.isNotBlank() && selectedStrategyId != null &&
+                            (!isSigned || secretInput.isNotBlank()),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (isSaving) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
-                        Text("Save Token")
+                        Text(if (isSigned) "Save Credentials" else "Save Token")
                     }
                 }
             }

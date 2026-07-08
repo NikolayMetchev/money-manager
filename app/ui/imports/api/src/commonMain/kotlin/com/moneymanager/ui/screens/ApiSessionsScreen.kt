@@ -124,6 +124,7 @@ fun ApiSessionsScreen(
     accountAttributeRepository: AccountAttributeReadRepository,
     accountRepository: AccountReadRepository,
     currencyRepository: CurrencyReadRepository,
+    cryptoRepository: com.moneymanager.domain.repository.CryptoReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
     maintenance: Maintenance,
     deviceId: DeviceId,
@@ -251,6 +252,30 @@ fun ApiSessionsScreen(
             initialDetail = "Starting import for session #${session.id}.",
         ) {
             val importStartedAt = System.currentTimeMillis()
+
+            // Signed exchange strategies use the generic exchange import (trades + deposits/withdrawals)
+            // instead of the bank-shaped accounts→transactions→people path.
+            if (strategy.syntheticAccount != null) {
+                val exchangeResult =
+                    com.moneymanager.apiimporter.importApiSessionExchange(
+                        apiSessionRepository = apiSessionRepository,
+                        accountRepository = accountRepository,
+                        currencyRepository = currencyRepository,
+                        cryptoRepository = cryptoRepository,
+                        sessionId = session.id,
+                        strategy = strategy,
+                        importEngine = importEngine,
+                    )
+                importEngine.markApiSessionImported(
+                    id = session.id,
+                    revisionId = strategy.revisionId,
+                    importedAt = Clock.System.now(),
+                    importDurationMillis = System.currentTimeMillis() - importStartedAt,
+                )
+                onTransactionsImported()
+                return@startTask "Imported ${exchangeResult.tradesImported} trades and ${exchangeResult.transfersImported} transfers."
+            }
+
             // Transactions import creates the accounts and the people derived from transactions/accounts.
             val transactionsResult =
                 importApiSessionTransactions(
@@ -401,6 +426,39 @@ fun ApiSessionsScreen(
                                                         ),
                                                     engine = null,
                                                 )
+                                            // Signed exchange strategies download via the generic
+                                            // config-driven exchange path (signed POST/GET per endpoint).
+                                            if (strategy.syntheticAccount != null) {
+                                                update("Downloading exchange data...")
+                                                val signer =
+                                                    com.moneymanager.rest.ApiRequestSigner(requireNotNull(strategy.requestSigning))
+                                                val exchangeDownload =
+                                                    com.moneymanager.apiimporter.downloadApiSessionExchange(
+                                                        apiClient = apiClient,
+                                                        signer = signer,
+                                                        apiKey = credential.token,
+                                                        apiSecret = credential.apiSecret.orEmpty(),
+                                                        apiSessionRepository = apiSessionRepository,
+                                                        sessionId = newSessionId,
+                                                        strategy = strategy,
+                                                        onProgress = { progress ->
+                                                            downloadProgressByCredential =
+                                                                downloadProgressByCredential + (credential.id to progress)
+                                                            update(progress.downloadDetail())
+                                                        },
+                                                    )
+                                                val exchangeResult =
+                                                    ApiSessionDownloadResult(
+                                                        accounts = com.moneymanager.apiimporter.ApiAccountsDownloadResult(accountCount = 1),
+                                                        transactions = exchangeDownload,
+                                                        people = null,
+                                                    )
+                                                downloadResultByCredential =
+                                                    downloadResultByCredential + (credential.id to exchangeResult)
+                                                downloadProgressByCredential = downloadProgressByCredential - credential.id
+                                                refresh()
+                                                return@startTask exchangeResult.displaySummary()
+                                            }
                                             val sca = scaParamsFor(strategy, credential)
                                             update("Downloading accounts...")
                                             val accounts =
