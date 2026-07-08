@@ -2183,7 +2183,7 @@ private fun arrayItemJsonPath(
  * array. A bare JSON object body (e.g. a single-resource endpoint like Starling's account holder) is
  * wrapped as a one-element array so single-object responses parse like any other.
  */
-private fun responseItemsArray(
+internal fun responseItemsArray(
     json: String,
     responseArrayKey: String,
 ): JsonArray? =
@@ -2351,7 +2351,7 @@ private fun buildDateWindowTransactionUrl(
             parameters.append(pagination.endParam, window.end.toString())
         }.buildString()
 
-private data class ApiDateWindow(
+internal data class ApiDateWindow(
     val start: Instant,
     val end: Instant,
 )
@@ -2360,7 +2360,7 @@ private data class ApiDateWindow(
  * Produces the date windows to fetch, anchored to fixed epoch boundaries so earlier windows yield
  * stable, cacheable URLs across re-imports; only the final window (ending [now]) shifts.
  */
-private fun dateWindows(
+internal fun dateWindows(
     pagination: ApiPaginationConfig,
     now: Instant,
 ): List<ApiDateWindow> {
