@@ -15,6 +15,11 @@ SELECT
         FROM csv_import_application application
         WHERE application.csv_import_id = csv_import_metadata.id
     ) AS application_count,
+    (
+        SELECT COUNT(*)
+        FROM csv_import_error err
+        WHERE err.csv_import_id = csv_import_metadata.id
+    ) AS error_count,
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,
@@ -51,6 +56,11 @@ SELECT
         FROM csv_import_application application
         WHERE application.csv_import_id = csv_import_metadata.id
     ) AS application_count,
+    (
+        SELECT COUNT(*)
+        FROM csv_import_error err
+        WHERE err.csv_import_id = csv_import_metadata.id
+    ) AS error_count,
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,
@@ -87,6 +97,11 @@ SELECT
         FROM csv_import_application application
         WHERE application.csv_import_id = csv_import_metadata.id
     ) AS application_count,
+    (
+        SELECT COUNT(*)
+        FROM csv_import_error err
+        WHERE err.csv_import_id = csv_import_metadata.id
+    ) AS error_count,
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,

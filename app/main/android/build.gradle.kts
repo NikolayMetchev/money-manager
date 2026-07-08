@@ -46,6 +46,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.ktor.client.core)
     implementation(libs.play.services.auth)
+    implementation(projects.app.cryptodata)
     implementation(projects.app.db.core)
     implementation(projects.app.db.write)
     implementation(projects.app.di.core)

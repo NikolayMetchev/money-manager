@@ -132,7 +132,9 @@ fun CreateCryptoDialog(
                         // Pre-fill name/decimals from the registry for a known ticker (unless the user typed a name).
                         CryptoRegistry.lookup(code)?.let { entry ->
                             if (!nameEdited) name = entry.name
-                            decimals = decimalsForScaleFactor(entry.scaleFactor).toString()
+                            // Catalog entries may carry no scale factor (name known, decimals unknown);
+                            // leave the field's default in that case rather than forcing 8.
+                            entry.scaleFactor?.let { decimals = decimalsForScaleFactor(it).toString() }
                         }
                     },
                     label = { Text("Ticker (e.g., BTC)") },

@@ -26,6 +26,7 @@ import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.CryptoCatalogRefresher
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.importfilesource.DriveFolderBrowser
@@ -96,6 +97,7 @@ fun AppStartupHost(
     strategyCatalogController: StrategyCatalogController? = null,
     importFileSourceFactory: ImportFileSourceFactory? = null,
     driveFolderBrowser: DriveFolderBrowser? = null,
+    cryptoCatalogRefresher: CryptoCatalogRefresher? = null,
     onDatabaseReady: (MoneyManagerDatabaseWrapper?, DbLocation?) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
@@ -193,6 +195,7 @@ fun AppStartupHost(
                 strategyCatalogController = strategyCatalogController,
                 importFileSourceFactory = importFileSourceFactory,
                 driveFolderBrowser = driveFolderBrowser,
+                cryptoCatalogRefresher = cryptoCatalogRefresher,
                 onRequestSwitchDatabase = { target ->
                     scope.launch {
                         switchDatabase(

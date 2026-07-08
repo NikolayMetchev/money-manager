@@ -38,6 +38,7 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.StrategyLibrary
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.CryptoCatalogRefresher
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -168,6 +169,7 @@ fun SettingsScreen(
     database: MoneyManagerDatabaseWrapper? = null,
     strategySyncController: StrategySyncController? = null,
     strategyLibrary: StrategyLibrary? = null,
+    cryptoCatalogRefresher: CryptoCatalogRefresher? = null,
     appVersion: AppVersion? = null,
     accountRepository: AccountReadRepository? = null,
     categoryRepository: CategoryReadRepository? = null,
@@ -445,6 +447,77 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("Database size breakdown…")
+                    }
+                }
+            }
+        }
+
+        // Crypto Section — refresh the bundled crypto-asset name catalog from the network.
+        if (cryptoCatalogRefresher != null) {
+            var isRefreshingCrypto by remember { mutableStateOf(false) }
+            var cryptoMessage by remember { mutableStateOf<String?>(null) }
+            var cryptoError by remember { mutableStateOf<String?>(null) }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = "Crypto",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text =
+                            "Import creates crypto assets on demand and names them from a bundled catalog. " +
+                                "Update it to pick up newly listed coins.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            isRefreshingCrypto = true
+                            cryptoMessage = null
+                            cryptoError = null
+                            scope.launch {
+                                try {
+                                    val count = cryptoCatalogRefresher.refresh()
+                                    cryptoMessage = "Updated crypto list ($count entries)."
+                                } catch (expected: Exception) {
+                                    cryptoError = "Failed to update crypto list: ${expected.message}"
+                                } finally {
+                                    isRefreshingCrypto = false
+                                }
+                            }
+                        },
+                        enabled = !isRefreshingCrypto,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (isRefreshingCrypto) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text("Update crypto list")
+                        }
+                    }
+                    cryptoError?.let {
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    cryptoMessage?.let {
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
             }

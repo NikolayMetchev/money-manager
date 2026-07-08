@@ -258,13 +258,6 @@ data class CurrencyLookupMapping(
     override val id: FieldMappingId,
     override val fieldType: TransferField,
     val columnName: String,
-    /**
-     * When true, a value in [columnName] that is not a known fiat currency is treated as a crypto asset
-     * and created on demand (scale derived from the paired amount column). Set on the crypto.com
-     * strategies, whose currency columns only ever carry fiat or crypto tickers. Default false keeps the
-     * safe registry-only behaviour for other banks (a stray/typo code stays fiat, not a bogus crypto).
-     */
-    val treatNonFiatAsCrypto: Boolean = false,
 ) : FieldMapping
 
 /**

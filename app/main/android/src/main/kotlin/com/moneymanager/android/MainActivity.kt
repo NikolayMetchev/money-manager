@@ -7,6 +7,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.moneymanager.android.auth.AndroidGoogleAccessTokenSource
 import com.moneymanager.android.auth.GoogleAuthConsentLauncher
+import com.moneymanager.cryptodata.HttpCryptoCatalogRefresher
+import com.moneymanager.cryptodata.initializeCryptoCatalogStore
+import com.moneymanager.cryptodata.installCryptoCatalog
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
@@ -94,6 +97,9 @@ class MainActivity : ComponentActivity() {
         }
 
         initializeVersionReader(applicationContext)
+        // Install the bundled crypto-asset name catalog (+ any refreshed layer) before imports run.
+        initializeCryptoCatalogStore(applicationContext.filesDir)
+        installCryptoCatalog()
 
         googleAuthConsentLauncher.attach(this)
         val params =
@@ -135,6 +141,7 @@ class MainActivity : ComponentActivity() {
                 strategyCatalogController = component.strategyCatalogController,
                 importFileSourceFactory = importFileSourceFactory,
                 driveFolderBrowser = driveFolderBrowser,
+                cryptoCatalogRefresher = HttpCryptoCatalogRefresher(),
                 onDatabaseReady = { database, _ -> openDatabase = database },
             )
         }

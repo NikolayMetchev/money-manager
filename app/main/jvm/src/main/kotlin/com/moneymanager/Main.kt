@@ -10,6 +10,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.moneymanager.cryptodata.HttpCryptoCatalogRefresher
+import com.moneymanager.cryptodata.installCryptoCatalog
 import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
@@ -114,6 +116,9 @@ fun main() {
 
     // Desktop runs need the Swing Main dispatcher provider on the application classpath.
     Dispatchers.Swing
+
+    // Install the bundled crypto-asset name catalog (+ any network-refreshed layer) before imports run.
+    installCryptoCatalog()
 
     // Set up global exception handler for schema errors
     val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -238,6 +243,7 @@ private fun MainWindow(onExit: () -> Unit) {
                 strategyCatalogController = component.strategyCatalogController,
                 importFileSourceFactory = importFileSourceFactory,
                 driveFolderBrowser = driveFolderBrowser,
+                cryptoCatalogRefresher = HttpCryptoCatalogRefresher(),
                 onDatabaseReady = { database, _ -> openDatabase[0] = database },
             )
         }

@@ -23,6 +23,7 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/app/apiimporter" />
+            <option value="$PROJECT_DIR$/app/cryptodata" />
             <option value="$PROJECT_DIR$/app/csvimporter" />
             <option value="$PROJECT_DIR$/app/db" />
             <option value="$PROJECT_DIR$/app/db/core" />
@@ -72,6 +73,7 @@
             <option value="$PROJECT_DIR$/test/app/db" />
             <option value="$PROJECT_DIR$/test/app/ui" />
             <option value="$PROJECT_DIR$/tools" />
+            <option value="$PROJECT_DIR$/tools/crypto-dataset" />
             <option value="$PROJECT_DIR$/tools/strategy-catalog" />
             <option value="$PROJECT_DIR$/utils" />
             <option value="$PROJECT_DIR$/utils/archive" />

@@ -990,7 +990,11 @@ suspend fun bulkReimportCsv(
     var valueUpdates = 0
     var emptyAccountsDeleted = 0
     val skipped = mutableListOf<ReimportSkippedAccount>()
-    val cryptoAssets = cryptoRepository?.getAllCryptoAssets()?.first().orEmpty()
+    // Create every crypto asset the batch needs up front, sized to the batch-wide max precision per
+    // ticker, so cross-file ordering never leaves a ticker missing or a scale factor too small (the
+    // net-new ERROR rows a re-import picks up are denominated in these assets).
+    val cryptoAssets =
+        ensureCryptoAssetsForImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository)
 
     imports.forEachIndexed { index, listedImport ->
         onProgress(index, imports.size)
