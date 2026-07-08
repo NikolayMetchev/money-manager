@@ -5,6 +5,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 deleteImport:
 DELETE FROM csv_import_metadata WHERE id = ?;
 
+setImportIgnored:
+UPDATE csv_import_metadata SET ignored = ? WHERE id = ?;
+
 insertColumn:
 INSERT INTO csv_column_metadata (id, import_id, column_index, original_name)
 VALUES (?, ?, ?, ?);

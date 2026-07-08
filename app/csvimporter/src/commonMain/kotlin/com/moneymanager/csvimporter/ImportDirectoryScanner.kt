@@ -41,8 +41,9 @@ internal fun isSupportedImportFile(fileName: String): Boolean = supportedKind(fi
  * Scans one configured [directory]: lists its files and DOWNLOADS new/changed **supported** files
  * (.csv → CSV staging, .qif → QIF staging) into the Imports section. Unsupported files (e.g. .pdf) are
  * skipped without downloading. It does NOT apply a strategy — the user runs the existing "Import All".
- * Change detection is by last-modified, sha256-confirmed; a changed file produces a fresh staging row;
- * a bad file is recorded as a failure and does not abort the scan.
+ * Change detection: a matching server-provided content hash (e.g. Drive md5Checksum) skips the download
+ * entirely; otherwise the file is downloaded and sha256-confirmed. A changed file produces a fresh
+ * staging row; a bad file is recorded as a failure and does not abort the scan.
  */
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 suspend fun scanImportDirectory(
@@ -72,12 +73,34 @@ suspend fun scanImportDirectory(
             return@forEachIndexed
         }
         try {
+            val tracked = importDirectoryRepository.getTrackedFile(directory.id, entry.ref)
+            val lastModified = entry.lastModifiedInstant()
+
+            // Incremental skip: a server-provided content hash (e.g. Drive md5Checksum) that matches the
+            // last import means the bytes are unchanged, so there is no need to download the file at all.
+            // Only remote backends supply this; local entries have a null hash and fall through to
+            // download + sha256 below (cheap, no network — and robust against preserved timestamps).
+            val remoteContentHash = entry.remoteContentHash
+            if (remoteContentHash != null && tracked?.remoteContentHash == remoteContentHash) {
+                importEngine.recordDirectoryFileImported(
+                    directoryId = directory.id,
+                    fileRef = entry.ref,
+                    fileName = entry.name,
+                    lastModified = lastModified,
+                    checksum = tracked.checksum,
+                    remoteContentHash = remoteContentHash,
+                    csvImportId = tracked.csvImportId,
+                    qifImportId = tracked.qifImportId,
+                    importedAt = Clock.System.now(),
+                )
+                unchanged++
+                return@forEachIndexed
+            }
+
             // Always hash the content: a provider that preserves/backdates the timestamp on an edit
             // would otherwise hide a real content change forever. The checksum below decides re-staging.
-            val tracked = importDirectoryRepository.getTrackedFile(directory.id, entry.ref)
             val content = fileSource.download(entry.ref).decodeToString()
             val checksum = sha256Hex(content)
-            val lastModified = entry.lastModifiedInstant()
 
             // Content unchanged despite a moved timestamp: advance the cursor, don't re-stage.
             if (tracked?.checksum == checksum) {
@@ -87,6 +110,7 @@ suspend fun scanImportDirectory(
                     fileName = entry.name,
                     lastModified = lastModified,
                     checksum = checksum,
+                    remoteContentHash = remoteContentHash,
                     csvImportId = tracked.csvImportId,
                     qifImportId = tracked.qifImportId,
                     importedAt = Clock.System.now(),
@@ -118,6 +142,7 @@ suspend fun scanImportDirectory(
                 fileName = entry.name,
                 lastModified = lastModified,
                 checksum = checksum,
+                remoteContentHash = remoteContentHash,
                 csvImportId = csvImportId,
                 qifImportId = qifImportId,
                 importedAt = Clock.System.now(),

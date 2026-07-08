@@ -52,6 +52,7 @@ import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createCsvImport
+import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.CsvImportAllDialog
@@ -205,8 +206,10 @@ fun CsvImportsScreen(
         } else {
             // Split files into those still needing a strategy applied vs. already imported, so a large
             // set of files is easy to work through. The Unimported tab is the default/actionable one.
-            val unimported = remember(imports) { imports.filter { it.lastAppliedAt == null } }
-            val importedList = remember(imports) { imports.filter { it.lastAppliedAt != null } }
+            // Ignored files are dismissed by the user and kept out of both actionable lists.
+            val unimported = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt == null } }
+            val importedList = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt != null } }
+            val ignoredList = remember(imports) { imports.filter { it.ignored } }
             var selectedTab by remember { mutableStateOf(0) }
 
             SecondaryTabRow(selectedTabIndex = selectedTab) {
@@ -219,6 +222,11 @@ fun CsvImportsScreen(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     text = { Text("Imported (${importedList.size})") },
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("Ignored (${ignoredList.size})") },
                 )
             }
 
@@ -287,19 +295,30 @@ fun CsvImportsScreen(
                 )
             }
 
-            val shown = if (selectedTab == 0) unimported else importedList
+            val shown =
+                when (selectedTab) {
+                    0 -> unimported
+                    1 -> importedList
+                    else -> ignoredList
+                }
             if (shown.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = if (selectedTab == 0) "All files have been imported." else "No files imported yet.",
+                        text =
+                            when (selectedTab) {
+                                0 -> "All files have been imported."
+                                1 -> "No files imported yet."
+                                else -> "No ignored files."
+                            },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             } else {
+                val ignoredTab = selectedTab == 2
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -307,6 +326,10 @@ fun CsvImportsScreen(
                         CsvImportCard(
                             import = import,
                             onClick = { onImportClick(import.id) },
+                            ignored = ignoredTab,
+                            onSetIgnored = { ignore ->
+                                scope.launch { importEngine.setCsvImportIgnored(import.id, ignore) }
+                            },
                         )
                     }
                 }
@@ -321,6 +344,8 @@ fun CsvImportsScreen(
 private fun CsvImportCard(
     import: CsvImport,
     onClick: () -> Unit,
+    ignored: Boolean,
+    onSetIgnored: (Boolean) -> Unit,
 ) {
     val isImported = import.lastAppliedAt != null
     val containerColor =
@@ -357,8 +382,22 @@ private fun CsvImportCard(
                 Text(
                     text = import.originalFileName,
                     style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
                 )
-                ImportStateBadge(isImported = isImported)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (!ignored) {
+                        ImportStateBadge(isImported = isImported)
+                    }
+                    // Only unimported files can be ignored; the Ignored tab offers Restore.
+                    if (ignored) {
+                        TextButton(onClick = { onSetIgnored(false) }) { Text("Restore") }
+                    } else if (!isImported) {
+                        TextButton(onClick = { onSetIgnored(true) }) { Text("Ignore") }
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(4.dp))
             Row(

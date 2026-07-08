@@ -48,6 +48,7 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createQifImport
+import com.moneymanager.importengineapi.setQifImportIgnored
 import com.moneymanager.qif.QifParser
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -194,8 +195,9 @@ fun QifImportsScreen(
         } else {
             // Split files into those still needing a strategy applied vs. already imported, so a large
             // set of files is easy to work through. The Unimported tab is the default/actionable one.
-            val unimported = remember(imports) { imports.filter { it.lastAppliedAt == null } }
-            val importedList = remember(imports) { imports.filter { it.lastAppliedAt != null } }
+            val unimported = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt == null } }
+            val importedList = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt != null } }
+            val ignoredList = remember(imports) { imports.filter { it.ignored } }
             var selectedTab by remember { mutableStateOf(0) }
 
             SecondaryTabRow(selectedTabIndex = selectedTab) {
@@ -208,6 +210,11 @@ fun QifImportsScreen(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     text = { Text("Imported (${importedList.size})") },
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("Ignored (${ignoredList.size})") },
                 )
             }
 
@@ -273,19 +280,30 @@ fun QifImportsScreen(
                 )
             }
 
-            val shown = if (selectedTab == 0) unimported else importedList
+            val shown =
+                when (selectedTab) {
+                    0 -> unimported
+                    1 -> importedList
+                    else -> ignoredList
+                }
             if (shown.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = if (selectedTab == 0) "All files have been imported." else "No files imported yet.",
+                        text =
+                            when (selectedTab) {
+                                0 -> "All files have been imported."
+                                1 -> "No files imported yet."
+                                else -> "No ignored files."
+                            },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             } else {
+                val ignoredTab = selectedTab == 2
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -293,6 +311,10 @@ fun QifImportsScreen(
                         QifImportCard(
                             import = import,
                             onClick = { onImportClick(import.id) },
+                            ignored = ignoredTab,
+                            onSetIgnored = { ignore ->
+                                scope.launch { importEngine.setQifImportIgnored(import.id, ignore) }
+                            },
                         )
                     }
                 }
@@ -307,6 +329,8 @@ fun QifImportsScreen(
 private fun QifImportCard(
     import: QifImport,
     onClick: () -> Unit,
+    ignored: Boolean,
+    onSetIgnored: (Boolean) -> Unit,
 ) {
     val isImported = import.lastAppliedAt != null
     val containerColor =
@@ -338,8 +362,22 @@ private fun QifImportCard(
                 Text(
                     text = import.originalFileName,
                     style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
                 )
-                QifImportStateBadge(isImported = isImported)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (!ignored) {
+                        QifImportStateBadge(isImported = isImported)
+                    }
+                    // Only unimported files can be ignored; the Ignored tab offers Restore.
+                    if (ignored) {
+                        TextButton(onClick = { onSetIgnored(false) }) { Text("Restore") }
+                    } else if (!isImported) {
+                        TextButton(onClick = { onSetIgnored(true) }) { Text("Ignore") }
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(4.dp))
             Row(

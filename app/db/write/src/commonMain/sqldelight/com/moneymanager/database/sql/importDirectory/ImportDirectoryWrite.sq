@@ -20,12 +20,13 @@ VALUES (?, ?, ?, ?);
 -- Upsert the per-file change-detection cursor. The csv/qif import a file staged into lives in the
 -- import_directory_file_csv_import / _qif_import child tables, written separately (see below).
 upsertFile:
-INSERT INTO import_directory_file (directory_id, file_ref, file_name, last_modified, checksum, imported_at)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO import_directory_file (directory_id, file_ref, file_name, last_modified, checksum, remote_content_hash, imported_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (directory_id, file_ref) DO UPDATE SET
     file_name = excluded.file_name,
     last_modified = excluded.last_modified,
     checksum = excluded.checksum,
+    remote_content_hash = excluded.remote_content_hash,
     imported_at = excluded.imported_at;
 
 -- Replace a file's csv/qif import child rows (at most one is present per file).

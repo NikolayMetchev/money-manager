@@ -46,6 +46,7 @@ interface ImportDirectoryWriteRepository : ImportDirectoryReadRepository {
         fileName: String,
         lastModified: Instant,
         checksum: String?,
+        remoteContentHash: String?,
         csvImportId: CsvImportId?,
         qifImportId: QifImportId?,
         importedAt: Instant,

@@ -84,6 +84,14 @@ class QifImportWriteRepositoryImpl(
             writeQueries.deleteImport(id.id.toString())
         }
 
+    override suspend fun setImportIgnored(
+        id: QifImportId,
+        ignored: Boolean,
+    ): Unit =
+        withContext(coroutineContext) {
+            writeQueries.setImportIgnored(if (ignored) 1L else 0L, id.id.toString())
+        }
+
     override suspend fun updateRecordStatusesBatch(
         id: QifImportId,
         status: String,

@@ -9,6 +9,7 @@ SELECT
     qif_import_metadata.account_type,
     qif_import_metadata.file_checksum,
     qif_import_metadata.file_last_modified,
+    qif_import_metadata.ignored,
     (
         SELECT COUNT(*)
         FROM qif_import_application application
@@ -49,6 +50,7 @@ SELECT
     qif_import_metadata.account_type,
     qif_import_metadata.file_checksum,
     qif_import_metadata.file_last_modified,
+    qif_import_metadata.ignored,
     (
         SELECT COUNT(*)
         FROM qif_import_application application
@@ -89,6 +91,7 @@ SELECT
     qif_import_metadata.account_type,
     qif_import_metadata.file_checksum,
     qif_import_metadata.file_last_modified,
+    qif_import_metadata.ignored,
     (
         SELECT COUNT(*)
         FROM qif_import_application application

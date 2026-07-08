@@ -152,6 +152,13 @@ suspend fun ImportEngine.deleteCsvImport(id: CsvImportId) {
     import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Delete(id))))
 }
 
+suspend fun ImportEngine.setCsvImportIgnored(
+    id: CsvImportId,
+    ignored: Boolean,
+) {
+    import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.SetIgnored(id, ignored))))
+}
+
 /** Applies several CSV staging write-backs (status/error/application) in one batch. */
 suspend fun ImportEngine.applyCsvImportMutations(mutations: List<CsvImportMutation>) {
     if (mutations.isNotEmpty()) import(ImportBatch(csvImportMutations = mutations))
@@ -179,6 +186,13 @@ suspend fun ImportEngine.createQifImport(
 
 suspend fun ImportEngine.deleteQifImport(id: QifImportId) {
     import(ImportBatch(qifImportMutations = listOf(QifImportMutation.Delete(id))))
+}
+
+suspend fun ImportEngine.setQifImportIgnored(
+    id: QifImportId,
+    ignored: Boolean,
+) {
+    import(ImportBatch(qifImportMutations = listOf(QifImportMutation.SetIgnored(id, ignored))))
 }
 
 /** Applies several QIF staging write-backs (status/error/application) in one batch. */
@@ -324,6 +338,7 @@ suspend fun ImportEngine.recordDirectoryFileImported(
     fileName: String,
     lastModified: Instant,
     checksum: String?,
+    remoteContentHash: String? = null,
     csvImportId: CsvImportId? = null,
     qifImportId: QifImportId? = null,
     importedAt: Instant,
@@ -338,6 +353,7 @@ suspend fun ImportEngine.recordDirectoryFileImported(
                         fileName = fileName,
                         lastModified = lastModified,
                         checksum = checksum,
+                        remoteContentHash = remoteContentHash,
                         csvImportId = csvImportId,
                         qifImportId = qifImportId,
                         importedAt = importedAt,

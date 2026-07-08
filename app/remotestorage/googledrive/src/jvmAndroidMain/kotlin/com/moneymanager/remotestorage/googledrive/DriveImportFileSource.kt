@@ -72,6 +72,8 @@ class DriveImportFileSource(
             name = name,
             lastModifiedEpochMs = modifiedTime?.let { runCatching { Instant.parse(it).toEpochMilliseconds() }.getOrNull() },
             sizeBytes = size?.toLongOrNull(),
+            // Drive computes md5Checksum server-side; the scanner uses it to skip unchanged downloads.
+            remoteContentHash = md5Checksum,
         )
 
     @Serializable
@@ -80,6 +82,7 @@ class DriveImportFileSource(
         val name: String = "",
         val size: String? = null,
         val modifiedTime: String? = null,
+        val md5Checksum: String? = null,
     )
 
     @Serializable
@@ -91,7 +94,7 @@ class DriveImportFileSource(
     companion object {
         private const val FILES_ENDPOINT = "https://www.googleapis.com/drive/v3/files"
         private const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
-        private const val FILE_FIELDS = "id,name,size,modifiedTime"
+        private const val FILE_FIELDS = "id,name,size,modifiedTime,md5Checksum"
         private const val HTTP_FORBIDDEN = 403
         private const val PAGE_SIZE = "1000"
         private val json = JsonFormat { ignoreUnknownKeys = true }

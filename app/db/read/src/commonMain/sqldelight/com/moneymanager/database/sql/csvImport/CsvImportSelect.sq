@@ -10,6 +10,7 @@ SELECT
     csv_import_metadata.device_id,
     csv_import_metadata.file_checksum,
     csv_import_metadata.file_last_modified,
+    csv_import_metadata.ignored,
     (
         SELECT COUNT(*)
         FROM csv_import_application application
@@ -51,6 +52,7 @@ SELECT
     csv_import_metadata.device_id,
     csv_import_metadata.file_checksum,
     csv_import_metadata.file_last_modified,
+    csv_import_metadata.ignored,
     (
         SELECT COUNT(*)
         FROM csv_import_application application
@@ -92,6 +94,7 @@ SELECT
     csv_import_metadata.device_id,
     csv_import_metadata.file_checksum,
     csv_import_metadata.file_last_modified,
+    csv_import_metadata.ignored,
     (
         SELECT COUNT(*)
         FROM csv_import_application application

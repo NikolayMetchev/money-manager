@@ -86,6 +86,36 @@ class CsvImportRepositoryImplTest : DbTest() {
         }
 
     @Test
+    fun `setImportIgnored should toggle the ignored flag`() =
+        runTest {
+            val repo = repositories.csvImportRepository
+            val importId =
+                repo.createImport(
+                    fileName = "noise.csv",
+                    headers = headers,
+                    rows = rows,
+                    fileChecksum = "ignore_checksum",
+                    fileLastModified = lastModified,
+                )
+
+            val created = repo.getImport(importId).first()
+            assertNotNull(created)
+            assertEquals(false, created.ignored)
+
+            repo.setImportIgnored(importId, true)
+            val afterIgnore = repo.getImport(importId).first()
+            assertNotNull(afterIgnore)
+            assertTrue(afterIgnore.ignored)
+            val listed = repo.getAllImports().first()
+            assertTrue(listed.single().ignored)
+
+            repo.setImportIgnored(importId, false)
+            val afterRestore = repo.getImport(importId).first()
+            assertNotNull(afterRestore)
+            assertEquals(false, afterRestore.ignored)
+        }
+
+    @Test
     fun `recordImportApplication should persist latest application metadata and count`() =
         runTest {
             val monzoStrategy = createStrategy("Monzo")

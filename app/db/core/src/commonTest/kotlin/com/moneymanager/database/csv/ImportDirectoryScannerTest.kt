@@ -31,18 +31,34 @@ private class FileSpec(
     val name: String,
     var content: String,
     var lastModifiedEpochMs: Long,
+    // A server-provided content hash (e.g. Drive md5Checksum); null models a local file with none.
+    var remoteContentHash: String? = null,
 )
 
 /** A controllable [ImportFileSource] over an in-memory set of files. */
 private class FakeFileSource(
     private val files: List<FileSpec>,
 ) : ImportFileSource {
+    /** Counts downloads so tests can assert the scanner skipped them for unchanged remote files. */
+    var downloadCount: Int = 0
+        private set
+
     override suspend fun list(): List<ImportFileEntry> =
-        files.map { ImportFileEntry(ref = it.name, name = it.name, lastModifiedEpochMs = it.lastModifiedEpochMs) }
+        files.map {
+            ImportFileEntry(
+                ref = it.name,
+                name = it.name,
+                lastModifiedEpochMs = it.lastModifiedEpochMs,
+                remoteContentHash = it.remoteContentHash,
+            )
+        }
 
     override suspend fun listSubfolders(): List<ImportSubfolder> = emptyList()
 
-    override suspend fun download(fileRef: String): ByteArray = files.first { it.name == fileRef }.content.encodeToByteArray()
+    override suspend fun download(fileRef: String): ByteArray {
+        downloadCount++
+        return files.first { it.name == fileRef }.content.encodeToByteArray()
+    }
 }
 
 class ImportDirectoryScannerTest : DbTest() {
@@ -132,6 +148,8 @@ class ImportDirectoryScannerTest : DbTest() {
             val second = scan(engine, directory, source)
             assertEquals(0, second.filesDownloaded, "unchanged file should not re-stage")
             assertEquals(1, second.filesUnchanged, "unchanged file should be counted")
+            // A local file (no remote hash) is downloaded on every scan; the sha256 confirms it is unchanged.
+            assertEquals(2, source.downloadCount, "local files fall back to download + sha256 each scan")
         }
 
     @Test
@@ -178,6 +196,47 @@ class ImportDirectoryScannerTest : DbTest() {
                     importedAt = Clock.System.now(),
                 )
             }
+        }
+
+    @Test
+    fun `scan skips the download entirely when the remote content hash is unchanged`() =
+        runTest {
+            val engine = engine()
+            val directory = newDirectory(engine)
+            val source = FakeFileSource(listOf(FileSpec("jan.csv", csvV1, 1_000, remoteContentHash = "md5-aaa")))
+
+            val first = scan(engine, directory, source)
+            assertEquals(1, first.filesDownloaded, "new file is downloaded/staged on the first scan")
+            assertEquals(1, source.downloadCount, "first scan must download to stage the file")
+
+            val second = scan(engine, directory, source)
+            assertEquals(0, second.filesDownloaded, "unchanged remote file should not re-stage")
+            assertEquals(1, second.filesUnchanged, "unchanged remote file should be counted")
+            assertEquals(1, source.downloadCount, "matching remote hash must skip the download on re-scan")
+        }
+
+    @Test
+    fun `scan re-downloads and re-stages when the remote content hash changes`() =
+        runTest {
+            val engine = engine()
+            val directory = newDirectory(engine)
+            val file = FileSpec("jan.csv", csvV1, 1_000, remoteContentHash = "md5-aaa")
+            val source = FakeFileSource(listOf(file))
+
+            scan(engine, directory, source)
+            val firstStaging = repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv")!!.csvImportId
+            assertEquals(1, source.downloadCount)
+
+            // Content and its server hash change.
+            file.content = csvV1 + "\n03/01/2024,Dinner,20.00"
+            file.remoteContentHash = "md5-bbb"
+
+            val rescan = scan(engine, directory, source)
+            assertEquals(1, rescan.filesDownloaded, "changed remote hash should re-download and re-stage")
+            assertEquals(2, source.downloadCount, "a changed remote hash must trigger a download")
+
+            val secondStaging = repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv")!!.csvImportId
+            assertEquals(false, firstStaging == secondStaging, "re-stage should create a fresh staging row")
         }
 
     @Test

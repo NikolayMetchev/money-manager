@@ -99,6 +99,7 @@ class ImportDirectoryWriteRepositoryImpl(
         fileName: String,
         lastModified: Instant,
         checksum: String?,
+        remoteContentHash: String?,
         csvImportId: CsvImportId?,
         qifImportId: QifImportId?,
         importedAt: Instant,
@@ -117,6 +118,7 @@ class ImportDirectoryWriteRepositoryImpl(
                     file_name = fileName,
                     last_modified = lastModified.toEpochMilliseconds(),
                     checksum = checksum,
+                    remote_content_hash = remoteContentHash,
                     imported_at = importedAt.toEpochMilliseconds(),
                 )
                 // The csv/qif import lives in a 1:1 child table; replace it so a re-import (or a

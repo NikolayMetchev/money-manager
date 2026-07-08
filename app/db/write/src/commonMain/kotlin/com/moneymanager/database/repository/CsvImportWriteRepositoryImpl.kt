@@ -89,6 +89,14 @@ class CsvImportWriteRepositoryImpl(
             csvImportWriteQueries.deleteImport(id.id.toString())
         }
 
+    override suspend fun setImportIgnored(
+        id: CsvImportId,
+        ignored: Boolean,
+    ): Unit =
+        withContext(coroutineContext) {
+            csvImportWriteQueries.setImportIgnored(if (ignored) 1L else 0L, id.id.toString())
+        }
+
     override suspend fun updateRowTransferId(
         id: CsvImportId,
         rowIndex: Long,

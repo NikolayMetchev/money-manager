@@ -45,4 +45,6 @@ data class QifImport(
     val lastAppliedStrategyId: CsvImportStrategyId? = null,
     val lastAppliedStrategyName: String? = null,
     val lastAppliedAt: Instant? = null,
+    /** User dismissed this file: hidden from the actionable lists and skipped by "Import all". */
+    val ignored: Boolean = false,
 )
