@@ -26,6 +26,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(projects.app.apiimporter)
                 implementation(projects.app.csvimporter)
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.model.core)

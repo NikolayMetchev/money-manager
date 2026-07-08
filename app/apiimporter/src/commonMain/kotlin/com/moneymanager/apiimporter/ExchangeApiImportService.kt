@@ -30,6 +30,8 @@ import com.moneymanager.importengineapi.ExistingApiIdExtractor
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
@@ -202,6 +204,7 @@ private data class ParsedTrade(
     val feeAmount: BigDecimal?,
     val feeCode: String?,
     val orderId: String?,
+    val requestId: ApiRequestId,
 )
 
 private data class ParsedExchangeTransfer(
@@ -211,6 +214,7 @@ private data class ParsedExchangeTransfer(
     val amount: BigDecimal,
     val direction: TransferDirection,
     val description: String,
+    val requestId: ApiRequestId,
 )
 
 private data class OrderMeta(
@@ -249,7 +253,7 @@ suspend fun importApiSessionExchange(
             val obj = element as? JsonObject ?: continue
             when (dataEndpoint.kind) {
                 ApiEndpointKind.TRADES ->
-                    dataEndpoint.tradeMappings?.let { parseTrade(obj, it) }?.let(trades::add)
+                    dataEndpoint.tradeMappings?.let { parseTrade(obj, it, response.requestId) }?.let(trades::add)
                 ApiEndpointKind.ORDERS ->
                     dataEndpoint.tradeMappings?.let { tm ->
                         val orderId = tm.orderIdField?.let { obj.str(it) } ?: obj.str(tm.idField)
@@ -262,9 +266,13 @@ suspend fun importApiSessionExchange(
                         }
                     }
                 ApiEndpointKind.DEPOSITS ->
-                    dataEndpoint.transactionMappings?.let { parseExchangeTransfer(obj, it, TransferDirection.IN) }?.let(transfers::add)
+                    dataEndpoint.transactionMappings
+                        ?.let { parseExchangeTransfer(obj, it, TransferDirection.IN, response.requestId) }
+                        ?.let(transfers::add)
                 ApiEndpointKind.WITHDRAWALS ->
-                    dataEndpoint.transactionMappings?.let { parseExchangeTransfer(obj, it, TransferDirection.OUT) }?.let(transfers::add)
+                    dataEndpoint.transactionMappings
+                        ?.let { parseExchangeTransfer(obj, it, TransferDirection.OUT, response.requestId) }
+                        ?.let(transfers::add)
                 ApiEndpointKind.BANK_TRANSACTIONS -> Unit
             }
         }
@@ -305,6 +313,8 @@ suspend fun importApiSessionExchange(
     val syntheticKey = LocalAccountKey("exchange-synthetic")
     val feeKey = LocalAccountKey("exchange-fees")
     val fundingKey = LocalAccountKey("exchange-funding")
+    val openingDate =
+        (trades.map { it.timestamp } + transfers.map { it.timestamp }).minOrNull() ?: Clock.System.now()
     val accountResult =
         importEngine.import(
             ImportBatch(
@@ -315,6 +325,7 @@ suspend fun importApiSessionExchange(
                             source = source,
                             match = AccountMatchKey.ByExternalId(exchangeAcctAttr, synthetic.externalId),
                             name = synthetic.name,
+                            openingDate = openingDate,
                             attributes = listOf(NewAttribute(exchangeAcctAttr, synthetic.externalId)),
                         ),
                         ImportAccountIntent(
@@ -322,12 +333,14 @@ suspend fun importApiSessionExchange(
                             source = source,
                             match = AccountMatchKey.ByName("${synthetic.name} Fees"),
                             name = "${synthetic.name} Fees",
+                            openingDate = openingDate,
                         ),
                         ImportAccountIntent(
                             key = fundingKey,
                             source = source,
                             match = AccountMatchKey.ByName("${synthetic.name} Funding"),
                             name = "${synthetic.name} Funding",
+                            openingDate = openingDate,
                         ),
                     ),
             ),
@@ -375,6 +388,7 @@ suspend fun importApiSessionExchange(
                         toAccount = feeAccountId,
                         money = Money.fromDisplayValue(feeAmount, feeAsset),
                         source = source,
+                        requestId = t.requestId,
                         txnIdAttr = txnIdAttr,
                     )
             }
@@ -395,6 +409,7 @@ suspend fun importApiSessionExchange(
                 toAccount = to,
                 money = money,
                 source = source,
+                requestId = tx.requestId,
                 txnIdAttr = txnIdAttr,
             )
     }
@@ -431,10 +446,12 @@ private fun exchangeTransfer(
     toAccount: AccountId,
     money: Money,
     source: Source,
+    requestId: ApiRequestId,
     txnIdAttr: AttributeTypeId,
 ): ImportTransfer =
     ImportTransfer(
         source = source,
+        rowKey = ImportRowKey.ApiJsonPath(requestId, "exchange:$id"),
         fromAccount = AccountRef.Existing(fromAccount),
         toAccount = AccountRef.Existing(toAccount),
         timestamp = timestamp,
@@ -457,6 +474,7 @@ private fun tradeDescription(
 private fun parseTrade(
     obj: JsonObject,
     tm: ApiTradeMappings,
+    requestId: ApiRequestId,
 ): ParsedTrade? {
     val instrument = obj.str(tm.instrumentField) ?: return null
     val (baseCode, quoteCode) = splitInstrument(instrument, tm) ?: return null
@@ -480,6 +498,7 @@ private fun parseTrade(
         feeAmount = tm.feeField?.let { obj.str(it)?.let { v -> runCatching { BigDecimal(v).abs() }.getOrNull() } },
         feeCode = tm.feeCurrencyField?.let { obj.str(it) },
         orderId = tm.orderIdField?.let { obj.str(it) },
+        requestId = requestId,
     )
 }
 
@@ -503,6 +522,7 @@ private fun parseExchangeTransfer(
     obj: JsonObject,
     tm: ApiTransactionMappings,
     direction: TransferDirection,
+    requestId: ApiRequestId,
 ): ParsedExchangeTransfer? {
     val amount = obj.str(tm.amountField)?.let { runCatching { BigDecimal(it).abs() }.getOrNull() } ?: return null
     val currency = obj.str(tm.currencyField) ?: return null
@@ -510,7 +530,7 @@ private fun parseExchangeTransfer(
     val id = obj.str(tm.idField) ?: return null
     val description = obj.str(tm.descriptionField)?.takeIf { it.isNotBlank() }
         ?: if (direction == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
-    return ParsedExchangeTransfer(id, timestamp, currency, amount, direction, description)
+    return ParsedExchangeTransfer(id, timestamp, currency, amount, direction, description, requestId)
 }
 
 /** Rounds a positive display value to its asset's minor units (half-up), avoiding fromDisplayValue's
