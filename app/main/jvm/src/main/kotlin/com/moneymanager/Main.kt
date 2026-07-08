@@ -117,9 +117,6 @@ fun main() {
     // Desktop runs need the Swing Main dispatcher provider on the application classpath.
     Dispatchers.Swing
 
-    // Install the bundled crypto-asset name catalog (+ any network-refreshed layer) before imports run.
-    installCryptoCatalog()
-
     // Set up global exception handler for schema errors
     val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -135,6 +132,11 @@ fun main() {
             defaultHandler?.uncaughtException(thread, throwable)
         }
     }
+
+    // Install the bundled crypto-asset name catalog (+ any network-refreshed layer) before imports run.
+    // This auxiliary feature must not block startup, so a failure is logged rather than propagated.
+    runCatching { installCryptoCatalog() }
+        .onFailure { logger.error(it) { "Failed to install crypto catalog" } }
 
     application {
         MainWindow(onExit = ::exitApplication)

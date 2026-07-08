@@ -98,8 +98,11 @@ class MainActivity : ComponentActivity() {
 
         initializeVersionReader(applicationContext)
         // Install the bundled crypto-asset name catalog (+ any refreshed layer) before imports run.
-        initializeCryptoCatalogStore(applicationContext.filesDir)
-        installCryptoCatalog()
+        // This auxiliary feature must not take down the app, so a failure is logged rather than propagated.
+        runCatching {
+            initializeCryptoCatalogStore(applicationContext.filesDir)
+            installCryptoCatalog()
+        }.onFailure { Log.e(TAG, "Failed to install crypto catalog", it) }
 
         googleAuthConsentLauncher.attach(this)
         val params =
