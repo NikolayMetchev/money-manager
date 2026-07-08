@@ -1377,7 +1377,9 @@ class ImportEngineImpl(
                 is ApiSessionMutation.CreateCredential ->
                     apiCredentialIds.putUnique(
                         m.key,
-                        apiSessionRepository.createCredential(m.token, m.createdAt, m.type, m.strategyId, m.privateKey, m.publicKey),
+                        apiSessionRepository.createCredential(
+                            m.token, m.createdAt, m.type, m.strategyId, m.privateKey, m.publicKey, m.apiSecret,
+                        ),
                         "ApiCredential",
                     )
                 is ApiSessionMutation.UpdateCredentialStrategy ->

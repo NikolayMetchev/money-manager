@@ -30,6 +30,8 @@ sealed interface ApiSessionMutation {
         val strategyId: ApiImportStrategyId? = null,
         val privateKey: String? = null,
         val publicKey: String? = null,
+        /** HMAC secret for ApiAuthType.SIGNED strategies; [token] holds the api key. */
+        val apiSecret: String? = null,
     ) : ApiSessionMutation
 
     data class UpdateCredentialStrategy(

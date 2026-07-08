@@ -16,6 +16,9 @@ CREATE TABLE api_credential (
     -- A signing key is only meaningful as a pair, so enforce both-null or both-present.
     private_key TEXT,
     public_key TEXT,
+    -- HMAC secret for signed exchange APIs (ApiAuthType.SIGNED; e.g. Crypto.com); token holds the
+    -- api key, this holds the api secret. Null for bearer/SCA strategies.
+    api_secret TEXT,
     CHECK ((private_key IS NULL) = (public_key IS NULL)),
     FOREIGN KEY (type_id) REFERENCES api_session_type(id),
     FOREIGN KEY (strategy_id) REFERENCES api_import_strategy(id) ON DELETE SET NULL

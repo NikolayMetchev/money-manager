@@ -17,11 +17,17 @@ data class MonzoCredential(
     /** PEM-encoded RSA keys for request signing (e.g. Wise SCA); null when not configured. */
     val privateKey: String? = null,
     val publicKey: String? = null,
+    /**
+     * HMAC secret for signed exchange APIs (ApiAuthType.SIGNED; e.g. Crypto.com). For these strategies
+     * [token] holds the api key and this holds the api secret. Null for bearer/SCA strategies.
+     */
+    val apiSecret: String? = null,
 ) {
     override fun toString(): String =
         "MonzoCredential(id=$id, type=$type, token=<redacted>, createdAt=$createdAt, " +
             "strategyId=$strategyId, privateKey=${if (privateKey != null) "<redacted>" else "null"}, " +
-            "publicKey=${if (publicKey != null) "<redacted>" else "null"})"
+            "publicKey=${if (publicKey != null) "<redacted>" else "null"}, " +
+            "apiSecret=${if (apiSecret != null) "<redacted>" else "null"})"
 }
 
 @JvmInline
@@ -46,6 +52,7 @@ enum class ApiSessionType(
     val id: Long,
 ) {
     MONZO(1),
+    CRYPTO_COM_EXCHANGE(2),
     ;
 
     companion object {

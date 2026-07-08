@@ -1,6 +1,6 @@
 insertCredential:
-INSERT INTO api_credential(type_id, token, created_at, strategy_id, private_key, public_key)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT INTO api_credential(type_id, token, created_at, strategy_id, private_key, public_key, api_secret)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 lastInsertCredentialRowId:
 SELECT last_insert_rowid();

@@ -162,6 +162,7 @@ class ApiSessionReadRepositoryImpl(
             strategyId = strategy_id?.let { ApiImportStrategyId(Uuid.parse(it)) },
             privateKey = private_key,
             publicKey = public_key,
+            apiSecret = api_secret,
         )
 
     private fun com.moneymanager.database.sql.apiSession.Api_session_with_latest_import.toApiSession(): ApiSession =
