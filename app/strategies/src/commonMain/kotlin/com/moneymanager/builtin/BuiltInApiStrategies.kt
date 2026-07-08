@@ -49,8 +49,7 @@ object BuiltInApiStrategies {
     val cryptoComExchangeStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
 
     /** All built-in API import strategies. */
-    fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> =
-        listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now))
+    fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> = listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now))
 
     /** The built-in Monzo API import strategy. */
     fun monzo(now: Instant): ApiImportStrategy =
@@ -345,6 +344,7 @@ object BuiltInApiStrategies {
                 windowDays = 30,
                 lookbackDays = 365 * 4,
             )
+
         fun signed(
             path: String,
             key: String,
@@ -383,6 +383,7 @@ object BuiltInApiStrategies {
                 orderTypeField = "type",
                 orderStatusField = "status",
             )
+
         fun transferMappings() =
             ApiTransactionMappings(
                 amountField = "amount",
@@ -424,7 +425,11 @@ object BuiltInApiStrategies {
             dataEndpoints =
                 listOf(
                     ApiDataEndpoint(signed("private/get-trades", "result.data"), ApiEndpointKind.TRADES, tradeMappings = tradeMappings),
-                    ApiDataEndpoint(signed("private/get-order-history", "result.data"), ApiEndpointKind.ORDERS, tradeMappings = orderMappings),
+                    ApiDataEndpoint(
+                        signed("private/get-order-history", "result.data"),
+                        ApiEndpointKind.ORDERS,
+                        tradeMappings = orderMappings,
+                    ),
                     ApiDataEndpoint(
                         signed("private/get-deposit-history", "result.deposit_list"),
                         ApiEndpointKind.DEPOSITS,

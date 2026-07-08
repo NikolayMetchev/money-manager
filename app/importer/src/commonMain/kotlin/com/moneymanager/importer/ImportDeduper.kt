@@ -251,37 +251,39 @@ class ImportDeduper(
         val from = transfer.fromAccount.requireId()
         val to = transfer.toAccount.requireId()
 
-        for (bridge in policy.internalTransferBridges) {
+        return policy.internalTransferBridges.firstNotNullOfOrNull { bridge ->
             val exchangeIsTarget = to == bridge.exchangeAccountId // a deposit into the exchange
             val exchangeIsSource = from == bridge.exchangeAccountId // a withdrawal out of the exchange
-            if (!exchangeIsTarget && !exchangeIsSource) continue
-            val match =
-                reconcileCandidates.firstOrNull { (_, existing) ->
-                    existing.amount.currency.id == amount.currency.id &&
-                        amountWithinTolerance(amount, existing.amount, policy.internalTransferAmountTolerancePct) &&
-                        (timestamp - existing.timestamp).absoluteValue <= window &&
-                        (
-                            (exchangeIsTarget && existing.sourceAccountId == bridge.appAccountId) ||
-                                (exchangeIsSource && existing.targetAccountId == bridge.appAccountId)
+            if (!exchangeIsTarget && !exchangeIsSource) {
+                null
+            } else {
+                reconcileCandidates
+                    .firstOrNull { (_, existing) ->
+                        existing.amount.currency.id == amount.currency.id &&
+                            amountWithinTolerance(amount, existing.amount, policy.internalTransferAmountTolerancePct) &&
+                            (timestamp - existing.timestamp).absoluteValue <= window &&
+                            (
+                                (exchangeIsTarget && existing.sourceAccountId == bridge.appAccountId) ||
+                                    (exchangeIsSource && existing.targetAccountId == bridge.appAccountId)
+                            )
+                    }?.let { (matchId, existingTransfer) ->
+                        val rewritten =
+                            if (exchangeIsTarget) {
+                                transfer.copy(fromAccount = AccountRef.Existing(bridge.appAccountId))
+                            } else {
+                                transfer.copy(toAccount = AccountRef.Existing(bridge.appAccountId))
+                            }
+                        val relationships =
+                            rewritten.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId)
+                        Classified(
+                            transfer = rewritten.copy(relationships = relationships, fee = null),
+                            status = ImportStatus.IMPORTED,
+                            existing = null,
+                            excludeExisting = ExcludeExistingLeg(existingTransfer, exclusionTypeId),
                         )
-                } ?: continue
-            val (matchId, existingTransfer) = match
-            val rewritten =
-                if (exchangeIsTarget) {
-                    transfer.copy(fromAccount = AccountRef.Existing(bridge.appAccountId))
-                } else {
-                    transfer.copy(toAccount = AccountRef.Existing(bridge.appAccountId))
-                }
-            val relationships =
-                rewritten.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId)
-            return Classified(
-                transfer = rewritten.copy(relationships = relationships, fee = null),
-                status = ImportStatus.IMPORTED,
-                existing = null,
-                excludeExisting = ExcludeExistingLeg(existingTransfer, exclusionTypeId),
-            )
+                    }
+            }
         }
-        return null
     }
 
     private fun amountWithinTolerance(
