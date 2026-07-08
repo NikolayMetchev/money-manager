@@ -154,7 +154,15 @@ class ApiRequestSigner(
                     is SigPart.Sha256 ->
                         sha256(
                             buildMessageBytes(
-                                part.parts, methodName, requestId, apiKey, nonce, path, queryString, body, params,
+                                part.parts,
+                                methodName,
+                                requestId,
+                                apiKey,
+                                nonce,
+                                path,
+                                queryString,
+                                body,
+                                params,
                             ),
                         )
                 }
@@ -260,7 +268,10 @@ class ApiRequestSigner(
     }
 
     private suspend fun sha256(bytes: ByteArray): ByteArray =
-        CryptographyProvider.Default.get(SHA256).hasher().hash(bytes)
+        CryptographyProvider.Default
+            .get(SHA256)
+            .hasher()
+            .hash(bytes)
 
     private fun encodeSignature(bytes: ByteArray): String =
         when (config.signatureEncoding) {

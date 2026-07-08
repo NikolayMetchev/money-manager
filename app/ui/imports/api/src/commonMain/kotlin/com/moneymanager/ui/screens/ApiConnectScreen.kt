@@ -186,7 +186,11 @@ fun ApiConnectScreen(
                         errorMessage = null
                     },
                     label = { Text(if (isSigned) "API Key" else "Access Token") },
-                    placeholder = { Text("Paste your ${selectedStrategy?.name ?: "API"} ${if (isSigned) "API key" else "access token"} here") },
+                    placeholder = {
+                        Text(
+                            "Paste your ${selectedStrategy?.name ?: "API"} ${if (isSigned) "API key" else "access token"} here",
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
@@ -259,7 +263,9 @@ fun ApiConnectScreen(
                         }
                     },
                     enabled =
-                        !isSaving && tokenInput.isNotBlank() && selectedStrategyId != null &&
+                        !isSaving &&
+                            tokenInput.isNotBlank() &&
+                            selectedStrategyId != null &&
                             (!isSigned || secretInput.isNotBlank()),
                     modifier = Modifier.fillMaxWidth(),
                 ) {

@@ -95,7 +95,10 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             stageSessionAndImport()
 
             val exchange =
-                repositories.accountRepository.getAllAccounts().first().firstOrNull { it.name == "Crypto.com Exchange" }
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .firstOrNull { it.name == "Crypto.com Exchange" }
             assertNotNull(exchange, "the single Crypto.com Exchange account should exist")
 
             // BTC and CRO were auto-created as crypto assets (neither is a fiat currency).
@@ -120,7 +123,11 @@ class CryptoComExchangeApiE2ETest : DbTest() {
 
             // Re-import the same session: the exact-match guard keeps trades idempotent.
             stageSessionAndImport()
-            val tradesAfter = repositories.tradeRepository.getTradesByAccount(exchange.id).first().size
+            val tradesAfter =
+                repositories.tradeRepository
+                    .getTradesByAccount(exchange.id)
+                    .first()
+                    .size
             assertEquals(tradesBefore, tradesAfter, "re-import must not double-book trades")
         }
 
@@ -155,10 +162,11 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             // The Exchange's incoming CRO deposit was rewritten to come from the App "Crypto.com" account
             // (one internal transfer), instead of the generic funding account.
             val exchangeTransfers =
-                repositories.transactionRepository.getTransactionsByDateRange(
-                    startDate = Instant.fromEpochMilliseconds(1_700_000_000_000L),
-                    endDate = Instant.fromEpochMilliseconds(1_700_000_002_000L),
-                ).first()
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        startDate = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                        endDate = Instant.fromEpochMilliseconds(1_700_000_002_000L),
+                    ).first()
             val croDeposit =
                 exchangeTransfers.firstOrNull { it.targetAccountId == exchange.id && it.amount.currency.code == "CRO" }
             assertNotNull(croDeposit, "the CRO deposit should target the Exchange account")
@@ -178,7 +186,9 @@ class CryptoComExchangeApiE2ETest : DbTest() {
 private suspend fun com.moneymanager.importengineapi.ImportEngine.createAppAccount(name: String) =
     createAccount(
         Account(
-            id = com.moneymanager.domain.model.AccountId(0),
+            id =
+                com.moneymanager.domain.model
+                    .AccountId(0),
             name = name,
             openingDate = Instant.fromEpochMilliseconds(1_600_000_000_000L),
         ),

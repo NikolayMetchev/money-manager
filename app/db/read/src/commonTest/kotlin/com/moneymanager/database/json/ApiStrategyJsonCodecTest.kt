@@ -19,7 +19,6 @@ import com.moneymanager.domain.model.apistrategy.FieldPlacement
 import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.PaginationMode
-import com.moneymanager.domain.model.apistrategy.ParamStringFormat
 import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SigFieldLocation
 import com.moneymanager.domain.model.apistrategy.SigPart
@@ -130,8 +129,18 @@ class ApiStrategyJsonCodecTest {
         val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
         assertEquals(original, decoded)
         assertEquals(SigningAlgorithm.HMAC_SHA512, decoded.requestSigning?.algorithm)
-        assertEquals("result.data", decoded.dataEndpoints.single().endpoint.responseArrayKey)
-        assertEquals(HttpMethodType.POST, decoded.dataEndpoints.single().endpoint.method)
+        assertEquals(
+            "result.data",
+            decoded.dataEndpoints
+                .single()
+                .endpoint.responseArrayKey,
+        )
+        assertEquals(
+            HttpMethodType.POST,
+            decoded.dataEndpoints
+                .single()
+                .endpoint.method,
+        )
     }
 
     @Test

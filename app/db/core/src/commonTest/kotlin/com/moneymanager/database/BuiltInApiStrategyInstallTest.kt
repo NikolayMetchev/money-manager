@@ -43,7 +43,13 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertEquals("Crypto.com Exchange", assertNotNull(exchange.syntheticAccount).name)
             assertTrue(exchange.dataEndpoints.isNotEmpty(), "data endpoints persisted")
             assertNotNull(exchange.internalTransferReconcile, "internal-transfer reconciliation persisted")
-            assertEquals("Crypto.com", exchange.internalTransferReconcile!!.bridges.single().otherAccountName)
+            assertEquals(
+                "Crypto.com",
+                exchange.internalTransferReconcile!!
+                    .bridges
+                    .single()
+                    .otherAccountName,
+            )
         }
 
     @Test
