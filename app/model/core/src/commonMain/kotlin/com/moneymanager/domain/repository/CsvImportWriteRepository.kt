@@ -32,6 +32,15 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     suspend fun deleteImport(id: CsvImportId)
 
     /**
+     * Marks an import as ignored (or clears the flag). Ignored files are hidden from the actionable
+     * Unimported/Imported lists and skipped by "Import all".
+     */
+    suspend fun setImportIgnored(
+        id: CsvImportId,
+        ignored: Boolean,
+    )
+
+    /**
      * Updates the transfer ID for a specific row after importing.
      * This links the CSV row to the created transfer for navigation.
      *

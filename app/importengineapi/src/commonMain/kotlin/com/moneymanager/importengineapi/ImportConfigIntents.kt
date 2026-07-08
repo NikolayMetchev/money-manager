@@ -115,6 +115,12 @@ sealed interface CsvImportMutation {
         val id: CsvImportId,
     ) : CsvImportMutation
 
+    /** Toggles the "ignored" flag; ignored files are hidden from the actionable lists. */
+    data class SetIgnored(
+        val id: CsvImportId,
+        val ignored: Boolean,
+    ) : CsvImportMutation
+
     data class UpdateRowTransferId(
         val id: CsvImportId,
         val rowIndex: Long,
@@ -187,6 +193,12 @@ sealed interface QifImportMutation {
         val id: QifImportId,
     ) : QifImportMutation
 
+    /** Toggles the "ignored" flag; ignored files are hidden from the actionable lists. */
+    data class SetIgnored(
+        val id: QifImportId,
+        val ignored: Boolean,
+    ) : QifImportMutation
+
     data class UpdateRecordStatuses(
         val id: QifImportId,
         val status: String,
@@ -236,6 +248,8 @@ sealed interface ImportDirectoryMutation {
         val fileName: String,
         val lastModified: Instant,
         val checksum: String?,
+        /** Server-provided content hash (e.g. Drive md5Checksum) used to skip re-downloading; null for local. */
+        val remoteContentHash: String?,
         val csvImportId: CsvImportId?,
         val qifImportId: QifImportId?,
         val importedAt: Instant,

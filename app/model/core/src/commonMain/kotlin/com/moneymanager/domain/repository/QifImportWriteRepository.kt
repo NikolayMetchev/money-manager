@@ -28,6 +28,15 @@ interface QifImportWriteRepository : QifImportReadRepository {
     suspend fun deleteImport(id: QifImportId)
 
     /**
+     * Marks an import as ignored (or clears the flag). Ignored files are hidden from the actionable
+     * Unimported/Imported lists and skipped by "Import all".
+     */
+    suspend fun setImportIgnored(
+        id: QifImportId,
+        ignored: Boolean,
+    )
+
+    /**
      * Updates the import status (and optional linked transfer) for multiple records in a single
      * database transaction.
      */

@@ -74,6 +74,26 @@ class QifImportRepositoryTest : DbTest() {
         }
 
     @Test
+    fun setImportIgnored_togglesTheIgnoredFlag() =
+        runTest {
+            val now = Clock.System.now()
+            val importId = repo.createImport("noise.qif", listOf(bankRecord(0, "-5.00")), "BANK", "ignore_sum", now)
+
+            val created = repo.getImport(importId).first()!!
+            assertEquals(false, created.ignored)
+
+            repo.setImportIgnored(importId, true)
+            val afterIgnore = repo.getImport(importId).first()!!
+            assertTrue(afterIgnore.ignored)
+            val listed = repo.getAllImports().first()
+            assertTrue(listed.single().ignored)
+
+            repo.setImportIgnored(importId, false)
+            val afterRestore = repo.getImport(importId).first()!!
+            assertEquals(false, afterRestore.ignored)
+        }
+
+    @Test
     fun updateRecordStatusesBatch_persistsStatusAndTransferLink() =
         runTest {
             val now = Clock.System.now()

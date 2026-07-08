@@ -9,6 +9,12 @@ data class ImportFileEntry(
     val name: String,
     val lastModifiedEpochMs: Long?,
     val sizeBytes: Long? = null,
+    /**
+     * A server-provided content hash (e.g. Google Drive's md5Checksum). When present and unchanged
+     * since the last import, the scanner can skip downloading the file entirely. Null for backends
+     * with no cheap server-side hash (e.g. local folders), which fall back to download + sha256.
+     */
+    val remoteContentHash: String? = null,
 )
 
 /** An immediate subfolder of an import directory. [ref] opens it (a path / Drive folder id). */

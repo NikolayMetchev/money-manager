@@ -71,6 +71,9 @@ CREATE TABLE import_directory_file (
     file_name TEXT NOT NULL,
     last_modified INTEGER NOT NULL,
     checksum TEXT,
+    -- Server-provided content hash (e.g. Drive md5Checksum). When it matches on the next scan the file
+    -- is unchanged and is NOT downloaded. Null for local folders (no cheap server-side hash).
+    remote_content_hash TEXT,
     imported_at INTEGER,
     FOREIGN KEY (directory_id) REFERENCES import_directory(id) ON DELETE CASCADE,
     UNIQUE (directory_id, file_ref)

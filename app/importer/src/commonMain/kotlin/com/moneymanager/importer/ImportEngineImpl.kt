@@ -1293,6 +1293,7 @@ class ImportEngineImpl(
                         "CsvImport",
                     )
                 is CsvImportMutation.Delete -> csvImportRepository.deleteImport(m.id)
+                is CsvImportMutation.SetIgnored -> csvImportRepository.setImportIgnored(m.id, m.ignored)
                 is CsvImportMutation.UpdateRowTransferId -> csvImportRepository.updateRowTransferId(m.id, m.rowIndex, m.transferId)
                 is CsvImportMutation.UpdateRowTransferIds -> csvImportRepository.updateRowTransferIdsBatch(m.id, m.rowTransferMap)
                 is CsvImportMutation.UpdateRowStatus -> csvImportRepository.updateRowStatus(m.id, m.rowIndex, m.status, m.transferId)
@@ -1321,6 +1322,7 @@ class ImportEngineImpl(
                         "QifImport",
                     )
                 is QifImportMutation.Delete -> qifImportRepository.deleteImport(m.id)
+                is QifImportMutation.SetIgnored -> qifImportRepository.setImportIgnored(m.id, m.ignored)
                 is QifImportMutation.UpdateRecordStatuses ->
                     qifImportRepository.updateRecordStatusesBatch(
                         m.id,
@@ -1357,6 +1359,7 @@ class ImportEngineImpl(
                         m.fileName,
                         m.lastModified,
                         m.checksum,
+                        m.remoteContentHash,
                         m.csvImportId,
                         m.qifImportId,
                         m.importedAt,

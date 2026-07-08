@@ -5,6 +5,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 deleteImport:
 DELETE FROM qif_import_metadata WHERE id = ?;
 
+setImportIgnored:
+UPDATE qif_import_metadata SET ignored = ? WHERE id = ?;
+
 -- qif_record queries
 insertRecord:
 INSERT INTO qif_record (
