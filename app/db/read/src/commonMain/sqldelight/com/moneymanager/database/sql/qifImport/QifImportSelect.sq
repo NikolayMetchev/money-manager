@@ -14,6 +14,11 @@ SELECT
         FROM qif_import_application application
         WHERE application.qif_import_id = qif_import_metadata.id
     ) AS application_count,
+    (
+        SELECT COUNT(*)
+        FROM qif_import_error err
+        WHERE err.qif_import_id = qif_import_metadata.id
+    ) AS error_count,
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,
@@ -49,6 +54,11 @@ SELECT
         FROM qif_import_application application
         WHERE application.qif_import_id = qif_import_metadata.id
     ) AS application_count,
+    (
+        SELECT COUNT(*)
+        FROM qif_import_error err
+        WHERE err.qif_import_id = qif_import_metadata.id
+    ) AS error_count,
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,
@@ -84,6 +94,11 @@ SELECT
         FROM qif_import_application application
         WHERE application.qif_import_id = qif_import_metadata.id
     ) AS application_count,
+    (
+        SELECT COUNT(*)
+        FROM qif_import_error err
+        WHERE err.qif_import_id = qif_import_metadata.id
+    ) AS error_count,
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,

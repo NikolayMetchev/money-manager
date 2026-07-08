@@ -124,6 +124,7 @@ class CsvImportReadRepositoryImpl(
         val fileChecksum: String,
         val fileLastModifiedMs: Long,
         val applicationCount: Int,
+        val errorCount: Int,
         val lastAppliedStrategyId: String?,
         val lastAppliedStrategyName: String?,
         val lastAppliedAtMs: Long?,
@@ -140,6 +141,7 @@ class CsvImportReadRepositoryImpl(
         fileChecksum: String,
         fileLastModifiedMs: Long,
         applicationCount: Long,
+        errorCount: Long,
         lastAppliedStrategyId: String?,
         lastAppliedStrategyName: String?,
         lastAppliedAtMs: Long?,
@@ -165,6 +167,7 @@ class CsvImportReadRepositoryImpl(
             fileChecksum = fileChecksum,
             fileLastModifiedMs = fileLastModifiedMs,
             applicationCount = applicationCount.toIntChecked("applicationCount"),
+            errorCount = errorCount.toIntChecked("errorCount"),
             lastAppliedStrategyId = lastAppliedStrategyId,
             lastAppliedStrategyName = lastAppliedStrategyName,
             lastAppliedAtMs = lastAppliedAtMs,
@@ -194,6 +197,7 @@ class CsvImportReadRepositoryImpl(
             fileChecksum = record.fileChecksum,
             fileLastModifiedMs = record.fileLastModifiedMs,
             applicationCount = record.applicationCount,
+            errorCount = record.errorCount,
             lastAppliedStrategyId = record.lastAppliedStrategyId,
             lastAppliedStrategyName = record.lastAppliedStrategyName,
             lastAppliedAtMs = record.lastAppliedAtMs,
@@ -215,6 +219,7 @@ class CsvImportReadRepositoryImpl(
         fileChecksum: String,
         fileLastModifiedMs: Long,
         applicationCount: Int,
+        errorCount: Int,
         lastAppliedStrategyId: String?,
         lastAppliedStrategyName: String?,
         lastAppliedAtMs: Long?,
@@ -239,6 +244,7 @@ class CsvImportReadRepositoryImpl(
             fileChecksum = fileChecksum,
             fileLastModified = Instant.fromEpochMilliseconds(fileLastModifiedMs),
             applicationCount = applicationCount,
+            errorCount = errorCount,
             lastAppliedStrategyId =
                 lastAppliedStrategyId?.let { strategyId ->
                     CsvImportStrategyId(Uuid.parse(strategyId))

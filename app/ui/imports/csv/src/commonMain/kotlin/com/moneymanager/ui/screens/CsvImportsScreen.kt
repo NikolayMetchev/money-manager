@@ -376,6 +376,14 @@ private fun CsvImportCard(
                     color = metadataColor,
                 )
             }
+            if (import.errorCount > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${import.errorCount} error${if (import.errorCount == 1) "" else "s"}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             Spacer(modifier = Modifier.height(4.dp))
             val lastAppliedAt = import.lastAppliedAt
             Text(

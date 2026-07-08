@@ -10,6 +10,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.moneymanager.cryptodata.HttpCryptoCatalogRefresher
+import com.moneymanager.cryptodata.installCryptoCatalog
 import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
@@ -131,6 +133,11 @@ fun main() {
         }
     }
 
+    // Install the bundled crypto-asset name catalog (+ any network-refreshed layer) before imports run.
+    // This auxiliary feature must not block startup, so a failure is logged rather than propagated.
+    runCatching { installCryptoCatalog() }
+        .onFailure { logger.error(it) { "Failed to install crypto catalog" } }
+
     application {
         MainWindow(onExit = ::exitApplication)
     }
@@ -238,6 +245,7 @@ private fun MainWindow(onExit: () -> Unit) {
                 strategyCatalogController = component.strategyCatalogController,
                 importFileSourceFactory = importFileSourceFactory,
                 driveFolderBrowser = driveFolderBrowser,
+                cryptoCatalogRefresher = HttpCryptoCatalogRefresher(),
                 onDatabaseReady = { database, _ -> openDatabase[0] = database },
             )
         }

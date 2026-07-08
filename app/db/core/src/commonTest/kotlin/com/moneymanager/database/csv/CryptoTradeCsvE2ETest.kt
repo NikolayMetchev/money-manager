@@ -7,6 +7,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -164,6 +165,25 @@ class CryptoTradeCsvE2ETest : DbTest() {
                     .toDisplayValue()
                     .toString(),
             )
+        }
+
+    @Test
+    fun conversionRow_getsImportedStatus_notLeftAsError() =
+        runTest {
+            val cash = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Cash", openingDate = now))
+            val wallet = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "BTC Wallet", openingDate = now))
+            val csvImport = stage()
+
+            apply(csvImport, strategy(cash, wallet))
+
+            // The conversion row is imported as a trade (reported via createdTradeIds, not rowOutcomes);
+            // its CSV row status must become IMPORTED with its error cleared — not stay ERROR, which would
+            // reprocess it on the next import.
+            val row =
+                repositories.csvImportRepository
+                    .getImportRows(csvImport.id, limit = 10, offset = 0)
+                    .single { it.values.contains("Buy BTC") }
+            assertEquals(ImportStatus.IMPORTED, row.importStatus, "conversion (trade) row must be marked IMPORTED")
         }
 
     @Test

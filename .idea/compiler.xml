@@ -24,6 +24,9 @@
       <module name="money-manager.app.apiimporter" options="-Xlint:all -Werror" />
       <module name="money-manager.app.apiimporter.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.apiimporter.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.cryptodata" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.cryptodata.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.cryptodata.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.app.csvimporter" options="-Xlint:all -Werror" />
       <module name="money-manager.app.csvimporter.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.csvimporter.jvmTest" options="-Xlint:all -Werror" />
@@ -154,6 +157,9 @@
       <module name="money-manager.test.app.ui.jvmDev" options="-Xlint:all -Werror" />
       <module name="money-manager.test.app.ui.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.test.app.ui.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.tools.crypto-dataset" options="-Xlint:all -Werror" />
+      <module name="money-manager.tools.crypto-dataset.main" options="-Xlint:all -Werror" />
+      <module name="money-manager.tools.crypto-dataset.test" options="-Xlint:all -Werror" />
       <module name="money-manager.tools.strategy-catalog" options="-Xlint:all -Werror" />
       <module name="money-manager.tools.strategy-catalog.main" options="-Xlint:all -Werror" />
       <module name="money-manager.tools.strategy-catalog.test" options="-Xlint:all -Werror" />

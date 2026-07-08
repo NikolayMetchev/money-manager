@@ -44,6 +44,7 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.CryptoCatalogRefresher
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.PersonId
@@ -114,6 +115,7 @@ fun MoneyManagerApp(
     strategyCatalogController: StrategyCatalogController? = null,
     importFileSourceFactory: ImportFileSourceFactory? = null,
     driveFolderBrowser: DriveFolderBrowser? = null,
+    cryptoCatalogRefresher: CryptoCatalogRefresher? = null,
 ) {
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
@@ -421,6 +423,7 @@ fun MoneyManagerApp(
                                                 database = database,
                                                 strategySyncController = strategySyncController,
                                                 strategyLibrary = services.imports.strategyLibrary,
+                                                cryptoCatalogRefresher = cryptoCatalogRefresher,
                                                 appVersion = appVersion,
                                                 accountRepository = services.accounts.accountRepository,
                                                 categoryRepository = services.accounts.categoryRepository,
@@ -610,6 +613,7 @@ fun MoneyManagerApp(
                                                 currencyRepository = services.accounts.currencyRepository,
                                                 personRepository = services.people.personRepository,
                                                 passThroughAccountRepository = services.imports.passThroughAccountRepository,
+                                                cryptoRepository = services.accounts.cryptoRepository,
                                                 maintenance = services.imports.maintenance,
                                                 transactionRepository = services.transactions.transactionRepository,
                                                 transferSourceRepository = services.transactions.transferSourceRepository,

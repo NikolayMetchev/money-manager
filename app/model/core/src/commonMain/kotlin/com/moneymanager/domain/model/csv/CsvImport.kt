@@ -34,6 +34,8 @@ data class CsvImport(
     val fileChecksum: String,
     val fileLastModified: Instant,
     val applicationCount: Int = 0,
+    /** Number of rows that failed to import (rows currently logged in csv_import_error). */
+    val errorCount: Int = 0,
     val lastAppliedStrategyId: CsvImportStrategyId? = null,
     val lastAppliedStrategyName: String? = null,
     val lastAppliedAt: Instant? = null,

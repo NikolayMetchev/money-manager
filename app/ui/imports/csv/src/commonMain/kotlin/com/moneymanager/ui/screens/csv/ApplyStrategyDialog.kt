@@ -49,12 +49,14 @@ import com.moneymanager.csvimporter.ImportPreparation
 import com.moneymanager.csvimporter.NewAccount
 import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
 import com.moneymanager.csvimporter.buildPendingAccountMappings
+import com.moneymanager.csvimporter.ensureCryptoAssets
 import com.moneymanager.csvimporter.hasBlankNewAccountNames
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
@@ -67,6 +69,7 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
@@ -97,6 +100,7 @@ fun ApplyStrategyDialog(
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
+    cryptoRepository: CryptoReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
@@ -127,6 +131,10 @@ fun ApplyStrategyDialog(
     var selectedNewAccountNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isImporting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    // Already-existing crypto assets, so the preview resolves crypto tickers that were created by an
+    // earlier import. Brand-new tickers are created at import time (below), not during the read-only
+    // preview. Refreshed after a successful import.
+    var cryptoAssets by remember { mutableStateOf<List<CryptoAsset>>(emptyList()) }
 
     // Strategies whose SOURCE_ACCOUNT mapping resolves per-row (e.g. by currency) need no
     // user-selected source account; the mapping decides the account for each row.
@@ -155,6 +163,7 @@ fun ApplyStrategyDialog(
     // same way the actual import will.
     LaunchedEffect(Unit) {
         historicalAccountNames = accountRepository.getPreviousAccountNames()
+        cryptoAssets = cryptoRepository.getAllCryptoAssets().first()
     }
 
     // Auto-select matching strategy when strategies load (filename/content-aware selection)
@@ -177,6 +186,7 @@ fun ApplyStrategyDialog(
         currencies,
         accountMappings,
         historicalAccountNames,
+        cryptoAssets,
     ) {
         selectedStrategy?.let { strategy ->
             // An empty accounts list is fine: the mapper resolves unknown accounts to
@@ -193,6 +203,7 @@ fun ApplyStrategyDialog(
                             existingAccounts = accountsByName,
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
+                            existingCryptoByCode = cryptoAssets.associateBy { it.code.uppercase() },
                             accountMappings = accountMappings,
                             historicalAccountNames = historicalAccountNames,
                             sourceAccountOverride = selectedSourceAccountId,
@@ -235,6 +246,7 @@ fun ApplyStrategyDialog(
         baseImportPreparation,
         selectedExistingAccounts,
         historicalAccountNames,
+        cryptoAssets,
     ) {
         selectedStrategy?.let { strategy ->
             val basePreparation = baseImportPreparation
@@ -256,6 +268,7 @@ fun ApplyStrategyDialog(
                             existingAccounts = accountsByName,
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
+                            existingCryptoByCode = cryptoAssets.associateBy { it.code.uppercase() },
                             accountMappings = accountMappings + previewMappings,
                             historicalAccountNames = historicalAccountNames,
                             sourceAccountOverride = selectedSourceAccountId,
@@ -372,6 +385,20 @@ fun ApplyStrategyDialog(
 
                     scope.launch {
                         try {
+                            // Create a crypto asset for every non-fiat ticker in the strategy's currency
+                            // column before mapping, so crypto rows resolve instead of failing with
+                            // "Currency not found" (upsert is idempotent). Same step the bulk/re-import
+                            // paths run; done here at import time (not during the read-only preview).
+                            val resolvedCrypto =
+                                ensureCryptoAssets(
+                                    strategy = strategy,
+                                    columns = csvImport.columns,
+                                    rows = rowsToProcess,
+                                    currencies = currencies,
+                                    importEngine = importEngine,
+                                    cryptoRepository = cryptoRepository,
+                                )
+                            cryptoAssets = resolvedCrypto
                             val result =
                                 runCsvImport(
                                     csvImport = csvImport,
@@ -387,6 +414,7 @@ fun ApplyStrategyDialog(
                                     accountRepository = accountRepository,
                                     maintenance = maintenance,
                                     importEngine = importEngine,
+                                    cryptoAssets = resolvedCrypto,
                                     passThroughAccounts = passThroughAccounts,
                                 )
                             onImportComplete(result)

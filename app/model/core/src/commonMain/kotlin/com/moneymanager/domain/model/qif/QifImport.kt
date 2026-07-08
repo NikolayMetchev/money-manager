@@ -28,6 +28,7 @@ value class QifImportId
  * @property recordCount Total number of parsed records (across all sections).
  * @property unsupportedCount Number of records that cannot be imported in v1 (investments, unknown sections).
  * @property accountType The dominant account/section type of the file (e.g. "BANK"), used for strategy matching.
+ * @property errorCount Number of records that failed to import (records currently logged in qif_import_error).
  */
 data class QifImport(
     val id: QifImportId,
@@ -40,6 +41,7 @@ data class QifImport(
     val fileChecksum: String,
     val fileLastModified: Instant,
     val applicationCount: Int = 0,
+    val errorCount: Int = 0,
     val lastAppliedStrategyId: CsvImportStrategyId? = null,
     val lastAppliedStrategyName: String? = null,
     val lastAppliedAt: Instant? = null,

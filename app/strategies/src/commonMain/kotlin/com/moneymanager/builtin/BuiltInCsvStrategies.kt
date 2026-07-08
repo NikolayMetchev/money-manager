@@ -227,9 +227,9 @@ object BuiltInCsvStrategies {
      *   directions come out correct with no column swap.
      *
      * Amount/currency read the real Currency/Amount columns; a To/From Currency that is not a fiat code
-     * (e.g. TGBP, or any crypto) is provisioned on demand as a crypto asset
-     * ([CurrencyLookupMapping.treatNonFiatAsCrypto]) and held in the single Crypto.com account. To
-     * Currency is populated on every row; conversions are detected by Currency != To Currency.
+     * (e.g. TGBP, or any crypto) is provisioned on demand as a crypto asset (see
+     * CsvImportApplier.ensureCryptoAssets) and held in the single Crypto.com account. To Currency is
+     * populated on every row; conversions are detected by Currency != To Currency.
      */
     fun buildCryptoComFiatStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
@@ -301,11 +301,10 @@ object BuiltInCsvStrategies {
                         id = cryptoComFiatMappingId(8),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Currency",
-                        treatNonFiatAsCrypto = true,
                     ),
                 // Credit leg of a conversion → the importer emits a trade when To Currency differs from
-                // Currency. Because the currency lookups set treatNonFiatAsCrypto, any non-fiat To/From
-                // Currency (TGBP and every real crypto) is created on demand and the conversion is a trade.
+                // Currency. Any non-fiat To/From Currency (TGBP and every real crypto) is created on
+                // demand as a crypto asset, so the conversion becomes a trade.
                 TransferField.TO_AMOUNT to
                     AmountParsingMapping(
                         id = cryptoComFiatMappingId(9),
@@ -318,7 +317,6 @@ object BuiltInCsvStrategies {
                         id = cryptoComFiatMappingId(10),
                         fieldType = TransferField.TO_CURRENCY,
                         columnName = "To Currency",
-                        treatNonFiatAsCrypto = true,
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
@@ -378,7 +376,7 @@ object BuiltInCsvStrategies {
      * attribute), this one denominates each row in its **real Currency/Amount**, so the account holds a
      * genuine crypto balance (e.g. 0.37 CRO). Every row lands in the single [CRYPTO_COM_CRYPTO_ACCOUNT]
      * account (one balance per asset), and the crypto asset itself is created on demand during import
-     * (see CsvImportApplier.ensureCryptoAssets; the currency lookup sets treatNonFiatAsCrypto).
+     * (see CsvImportApplier.ensureCryptoAssets; any non-fiat currency-lookup value becomes a crypto asset).
      *
      * The Crypto.com account is the SOURCE and the counterparty (from the description, e.g. "Card
      * Cashback") the TARGET; [AmountParsingMapping.flipAccountsOnPositive] then makes a positive amount
@@ -434,7 +432,6 @@ object BuiltInCsvStrategies {
                         id = cryptoComCryptoMappingId(6),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Currency",
-                        treatNonFiatAsCrypto = true,
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(

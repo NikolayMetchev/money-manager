@@ -17,6 +17,7 @@ dependencies {
     implementation(libs.kmlogging)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.swing)
+    implementation(projects.app.cryptodata)
     implementation(projects.app.db.core)
     implementation(projects.app.db.write)
     implementation(projects.app.di.core)
