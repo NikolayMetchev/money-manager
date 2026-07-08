@@ -34,14 +34,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.moneymanager.compose.filepicker.rememberFilePicker
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
+import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.deleteApiStrategy
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 @Composable
 fun ApiStrategiesScreen(
@@ -58,7 +64,31 @@ fun ApiStrategiesScreen(
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var strategyPendingDelete by remember { mutableStateOf<ApiImportStrategy?>(null) }
+    var importError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    // Import a portable API strategy export (`*.api.json`) from a local file — the same distribution
+    // format the catalog publishes, so a strategy can be tried before it is published to the catalog.
+    val importPicker =
+        rememberFilePicker(
+            mimeTypes = listOf("application/json"),
+            onResult = { result ->
+                if (result != null) {
+                    scope.launch {
+                        @Suppress("TooGenericExceptionCaught")
+                        try {
+                            val export = ApiStrategyExportCodec.decode(result.content)
+                            val strategy =
+                                ApiStrategyExportMapper.fromExport(export, ApiImportStrategyId(Uuid.random()), Clock.System.now())
+                            importEngine.createApiStrategy(strategy)
+                            importError = null
+                        } catch (expected: Exception) {
+                            importError = "Failed to import strategy: ${expected.message}"
+                        }
+                    }
+                }
+            },
+        )
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -79,8 +109,18 @@ fun ApiStrategiesScreen(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = onBrowseCatalog) { Text("Browse catalog") }
+                    TextButton(onClick = { importPicker.launch() }) { Text("Import file") }
                     TextButton(onClick = onCreateStrategy) { Text("+ New") }
                 }
+            }
+
+            importError?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
             }
 
             if (strategies.isEmpty()) {

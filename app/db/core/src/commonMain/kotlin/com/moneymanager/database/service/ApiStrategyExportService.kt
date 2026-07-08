@@ -26,30 +26,6 @@ class ApiStrategyExportService {
      * Builds a (not-yet-saved) [ApiImportStrategy] from an export, with a fresh id and timestamps.
      * The write repository recomputes `config_json` from these fields, so it is left blank here.
      */
-    fun createStrategyFromExport(export: ApiStrategyExport): ApiImportStrategy {
-        val now = Clock.System.now()
-        return ApiImportStrategy(
-            id = ApiImportStrategyId(Uuid.random()),
-            name = export.name,
-            baseUrl = export.baseUrl,
-            authType = export.authType,
-            accountsEndpoint = export.accountsEndpoint,
-            transactionsEndpoint = export.transactionsEndpoint,
-            accountMappings = export.accountMappings,
-            transactionMappings = export.transactionMappings,
-            peopleMappings = export.peopleMappings,
-            accountIdentifiersEndpoint = export.accountIdentifiersEndpoint,
-            ancestorEndpoints = export.ancestorEndpoints,
-            builtInCounterpartyRules = export.builtInCounterpartyRules,
-            signing = export.signing,
-            peopleDownload = export.peopleDownload,
-            personExternalIdAttribute = export.personExternalIdAttribute,
-            requestSigning = export.requestSigning,
-            dataEndpoints = export.dataEndpoints,
-            syntheticAccount = export.syntheticAccount,
-            internalTransferReconcile = export.internalTransferReconcile,
-            createdAt = now,
-            updatedAt = now,
-        )
-    }
+    fun createStrategyFromExport(export: ApiStrategyExport): ApiImportStrategy =
+        ApiStrategyExportMapper.fromExport(export, ApiImportStrategyId(Uuid.random()), Clock.System.now())
 }

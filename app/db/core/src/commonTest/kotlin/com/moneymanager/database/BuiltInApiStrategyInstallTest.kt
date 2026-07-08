@@ -53,6 +53,34 @@ class BuiltInApiStrategyInstallTest : DbTest() {
         }
 
     @Test
+    fun `the Crypto_com Exchange strategy survives an export file round trip`() =
+        runTest {
+            // The distribution format used by the catalog and by the API-strategies "Import file" button:
+            // toExport -> JSON encode/decode -> fromExport must reproduce the full signed-exchange config.
+            val now = kotlin.time.Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val original =
+                com.moneymanager.builtin.BuiltInApiStrategies
+                    .cryptoComExchange(now)
+            val json =
+                com.moneymanager.database.json.ApiStrategyExportCodec.encode(
+                    com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
+                        .toExport(original, "test"),
+                )
+            val rebuilt =
+                com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper.fromExport(
+                    com.moneymanager.database.json.ApiStrategyExportCodec
+                        .decode(json),
+                    original.id,
+                    now,
+                )
+            assertEquals(original.authType, rebuilt.authType)
+            assertEquals(original.requestSigning, rebuilt.requestSigning)
+            assertEquals(original.dataEndpoints, rebuilt.dataEndpoints)
+            assertEquals(original.syntheticAccount, rebuilt.syntheticAccount)
+            assertEquals(original.internalTransferReconcile, rebuilt.internalTransferReconcile)
+        }
+
+    @Test
     fun `the Starling strategy installs with its expected configuration`() =
         runTest {
             repositories.installBuiltInApiStrategies()
