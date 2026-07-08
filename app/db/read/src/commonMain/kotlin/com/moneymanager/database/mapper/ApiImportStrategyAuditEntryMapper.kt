@@ -60,6 +60,10 @@ object ApiImportStrategyAuditEntryMapper {
                 signing = raw.signing,
                 peopleDownload = raw.peopleDownload,
                 personExternalIdAttribute = raw.personExternalIdAttribute,
+                requestSigning = raw.requestSigning,
+                dataEndpoints = raw.dataEndpoints,
+                syntheticAccount = raw.syntheticAccount,
+                internalTransferReconcile = raw.internalTransferReconcile,
             )
         return ApiImportStrategyAuditEntry(
             id = from.id,

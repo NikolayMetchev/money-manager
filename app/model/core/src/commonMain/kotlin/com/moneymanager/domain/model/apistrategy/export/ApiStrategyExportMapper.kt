@@ -27,5 +27,9 @@ object ApiStrategyExportMapper {
             signing = strategy.signing,
             peopleDownload = strategy.peopleDownload,
             personExternalIdAttribute = strategy.personExternalIdAttribute,
+            requestSigning = strategy.requestSigning,
+            dataEndpoints = strategy.dataEndpoints,
+            syntheticAccount = strategy.syntheticAccount,
+            internalTransferReconcile = strategy.internalTransferReconcile,
         )
 }

@@ -44,6 +44,10 @@ class ApiStrategyExportService {
             signing = export.signing,
             peopleDownload = export.peopleDownload,
             personExternalIdAttribute = export.personExternalIdAttribute,
+            requestSigning = export.requestSigning,
+            dataEndpoints = export.dataEndpoints,
+            syntheticAccount = export.syntheticAccount,
+            internalTransferReconcile = export.internalTransferReconcile,
             createdAt = now,
             updatedAt = now,
         )

@@ -9,6 +9,36 @@ import kotlinx.serialization.Serializable
 enum class ApiAuthType {
     /** HTTP Bearer token authentication (Authorization: Bearer <token>). */
     BEARER_TOKEN,
+
+    /**
+     * Proactive per-request signing driven by [ApiImportStrategy.requestSigning] — an HMAC signature
+     * computed over a configurable message and placed in a header/query/body field on every request.
+     * Used by exchange APIs (Crypto.com, and later Binance/Kraken) that authenticate with an
+     * api-key + secret rather than a bearer token.
+     */
+    SIGNED,
+}
+
+/** HTTP method for an API endpoint. */
+@Serializable
+enum class HttpMethodType {
+    GET,
+    POST,
+}
+
+/**
+ * How a timestamp value is encoded in an API response.
+ *
+ * [ISO_8601] — an ISO-8601 string parsed via `Instant.parse` (bank APIs: Monzo/Wise/Starling).
+ * [EPOCH_MS]/[EPOCH_S] — an integer count of milliseconds/seconds since the epoch (most exchanges).
+ * [EPOCH_S_FLOAT] — a fractional count of seconds since the epoch (e.g. Kraken `1499.234`).
+ */
+@Serializable
+enum class TimestampFormat {
+    ISO_8601,
+    EPOCH_MS,
+    EPOCH_S,
+    EPOCH_S_FLOAT,
 }
 
 /**
@@ -77,10 +107,17 @@ data class ApiPaginationConfig(
  * @property path URL path relative to the strategy's base URL. May contain `{expression}`
  *               placeholders resolved against the import context using the same vocabulary as
  *               [ApiQueryParam.dynamicSource] (e.g. "/v4/profiles/{ancestor[0].id}/balances").
- * @property responseArrayKey Top-level JSON object key holding the items array (e.g. "accounts").
- *                            Blank means the response body itself is the array (a bare JSON array).
- * @property queryParams Static and dynamic query parameters appended to every request
+ * @property responseArrayKey JSON key holding the items array (e.g. "accounts"). Supports a dot-path
+ *                            for nested envelopes (e.g. "result.data" for Crypto.com). Blank means the
+ *                            response body itself is the array (a bare JSON array).
+ * @property queryParams Static and dynamic query/body parameters sent with every request. For a POST
+ *                       endpoint these become the signed request body (see [method]).
  * @property pagination Optional pagination strategy; null means only one page is fetched
+ * @property method HTTP method; defaults to GET (bank APIs). Exchange private endpoints use POST.
+ * @property successCodeField Optional dot-path to a numeric/string status code in the response
+ *                            envelope (e.g. Crypto.com "code"). When set, a response whose value at
+ *                            this path differs from [successCodeOkValue] is treated as an error.
+ * @property successCodeOkValue The [successCodeField] value that means success (e.g. "0").
  */
 @Serializable
 data class ApiEndpointConfig(
@@ -88,6 +125,9 @@ data class ApiEndpointConfig(
     val responseArrayKey: String,
     val queryParams: List<ApiQueryParam> = emptyList(),
     val pagination: ApiPaginationConfig? = null,
+    val method: HttpMethodType = HttpMethodType.GET,
+    val successCodeField: String? = null,
+    val successCodeOkValue: String? = null,
 )
 
 /**
@@ -184,6 +224,7 @@ enum class ApiSignSource {
 data class ApiTransactionMappings(
     val amountField: String = "amount",
     val timestampField: String = "created",
+    val timestampFormat: TimestampFormat = TimestampFormat.ISO_8601,
     val currencyField: String = "currency",
     val descriptionField: String = "description",
     val amountFormat: ApiAmountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
@@ -353,6 +394,332 @@ data class ApiPersonImportConfig(
     val ownsAllAccounts: Boolean = false,
 )
 
+// ---------------------------------------------------------------------------------------------
+// Proactive request signing (ApiAuthType.SIGNED) — a generic, provider-agnostic HMAC recipe.
+// One config shape expresses Crypto.com, Binance and Kraken signing without any per-provider code.
+// ---------------------------------------------------------------------------------------------
+
+/** HMAC hash function used to sign a request. */
+@Serializable
+enum class SigningAlgorithm {
+    HMAC_SHA256,
+    HMAC_SHA512,
+}
+
+/** How the API secret is decoded before use as the HMAC key. */
+@Serializable
+enum class SecretEncoding {
+    /** The secret is used as raw UTF-8 bytes (Crypto.com, Binance). */
+    UTF8,
+
+    /** The secret is Base64-decoded to bytes first (Kraken). */
+    BASE64,
+}
+
+/** How the computed HMAC digest is encoded for transmission. */
+@Serializable
+enum class SignatureEncoding {
+    HEX,
+    BASE64,
+}
+
+/** How a set of request parameters is serialised into part of the signed message. */
+@Serializable
+enum class ParamStringFormat {
+    /** Keys sorted ascending, concatenated with no separators: `k1v1k2v2…` (Crypto.com). */
+    SORTED_CONCAT,
+
+    /** `k1=v1&k2=v2` query-string form (Binance). */
+    QUERY_STRING,
+}
+
+/** Where a signing field (api key, nonce, signature) is placed on the outgoing request. */
+@Serializable
+enum class SigFieldLocation {
+    HEADER,
+    QUERY,
+    BODY_FIELD,
+}
+
+/** How the nonce value is generated. */
+@Serializable
+enum class NonceFormat {
+    EPOCH_MS,
+    EPOCH_US,
+    EPOCH_NS,
+
+    /** A strictly increasing counter (rarely needed; timestamp forms are preferred). */
+    INCREMENTING,
+}
+
+/** How the per-request `id` (Crypto.com) is generated. */
+@Serializable
+enum class RequestIdFormat {
+    INCREMENTING,
+    EPOCH_MS,
+}
+
+/** How request parameters are marshalled into the HTTP request body. */
+@Serializable
+enum class BodyFormat {
+    /** No body; parameters live in the query string (GET, or Binance signed GET/POST). */
+    NONE,
+
+    /** A JSON object `{...}` wrapping the signing fields and params (Crypto.com). */
+    JSON_ENVELOPE,
+
+    /** `application/x-www-form-urlencoded` body (Kraken). */
+    FORM_URLENCODED,
+
+    /** Params go only in the query string, signature appended there (Binance). */
+    QUERY_ONLY,
+}
+
+/** Placement of one signing field on the request. */
+@Serializable
+data class FieldPlacement(
+    val location: SigFieldLocation,
+    val name: String,
+)
+
+/** Nonce generation + placement. */
+@Serializable
+data class NonceSpec(
+    val format: NonceFormat = NonceFormat.EPOCH_MS,
+    val placement: FieldPlacement,
+)
+
+/** Per-request id generation + placement (Crypto.com `id`). */
+@Serializable
+data class RequestIdSpec(
+    val format: RequestIdFormat = RequestIdFormat.INCREMENTING,
+    val placement: FieldPlacement,
+)
+
+/**
+ * One ordered fragment of the message that gets HMAC-signed. The signer concatenates the bytes each
+ * part produces, in list order, then signs the result. This is expressive enough for all three target
+ * exchanges (see [ApiRequestSigningConfig]).
+ */
+@Serializable
+sealed interface SigPart {
+    /** A fixed literal string. */
+    @Serializable
+    data class Literal(
+        val text: String,
+    ) : SigPart
+
+    /** The API method name (Crypto.com: the endpoint path minus base, e.g. "private/get-trades"). */
+    @Serializable
+    data object Method : SigPart
+
+    /** The per-request id (Crypto.com `id`). */
+    @Serializable
+    data object RequestId : SigPart
+
+    /** The API key. */
+    @Serializable
+    data object ApiKey : SigPart
+
+    /** The nonce value. */
+    @Serializable
+    data object Nonce : SigPart
+
+    /** The request URI path (Kraken). */
+    @Serializable
+    data object Path : SigPart
+
+    /** The request query string without the leading `?` (Binance). */
+    @Serializable
+    data object QueryString : SigPart
+
+    /** The raw request body (Binance body, Kraken form-encoded post data). */
+    @Serializable
+    data object Body : SigPart
+
+    /** The request parameters serialised via [format] (Crypto.com sorted-concat). */
+    @Serializable
+    data class ParamString(
+        val format: ParamStringFormat = ParamStringFormat.SORTED_CONCAT,
+    ) : SigPart
+
+    /** SHA-256 of the concatenation of [parts], emitted as raw bytes (Kraken's nested hash). */
+    @Serializable
+    data class Sha256(
+        val parts: List<SigPart>,
+    ) : SigPart
+}
+
+/**
+ * A complete, provider-agnostic recipe for signing a request. The engine computes
+ * `sig = HMAC(secretEncoding(secret))` over the bytes produced by [message], encodes it via
+ * [signatureEncoding], and places api key / nonce / (optional) id / signature per their placements.
+ *
+ * The three target exchanges map to three literal values of this type — no code branches per provider:
+ * - **Crypto.com**: HMAC_SHA256, UTF8, HEX, message = [Method, RequestId, ApiKey, ParamString(SORTED_CONCAT), Nonce];
+ *   api key/nonce/id/sig in BODY_FIELD; [bodyFormat] JSON_ENVELOPE with [paramsEnvelopeKey] = "params".
+ * - **Binance**: HMAC_SHA256, UTF8, HEX, message = [QueryString, Body]; api key in HEADER `X-MBX-APIKEY`,
+ *   nonce = `timestamp` in QUERY, sig in QUERY `signature`; [bodyFormat] QUERY_ONLY.
+ * - **Kraken**: HMAC_SHA512, BASE64 secret, BASE64 sig, message = [Path, Sha256([Nonce, Body])]; api key in
+ *   HEADER `API-Key`, nonce in BODY_FIELD, sig in HEADER `API-Sign`; [bodyFormat] FORM_URLENCODED.
+ */
+@Serializable
+data class ApiRequestSigningConfig(
+    val algorithm: SigningAlgorithm,
+    val secretEncoding: SecretEncoding = SecretEncoding.UTF8,
+    val signatureEncoding: SignatureEncoding = SignatureEncoding.HEX,
+    val message: List<SigPart>,
+    val apiKey: FieldPlacement,
+    val nonce: NonceSpec,
+    val signature: FieldPlacement,
+    val requestId: RequestIdSpec? = null,
+    val bodyFormat: BodyFormat = BodyFormat.NONE,
+    /** For [BodyFormat.JSON_ENVELOPE], the key under which request params are nested (Crypto.com "params"). */
+    val paramsEnvelopeKey: String? = null,
+)
+
+// ---------------------------------------------------------------------------------------------
+// Multiple data endpoints + entity kinds — exchanges expose several endpoints (trades, deposits,
+// withdrawals, order history), each mapping to a different kind of imported record.
+// ---------------------------------------------------------------------------------------------
+
+/** What kind of imported record an [ApiDataEndpoint] produces. */
+@Serializable
+enum class ApiEndpointKind {
+    /** A bank-style single-asset transaction feed (the legacy [ApiImportStrategy.transactionsEndpoint] shape). */
+    BANK_TRANSACTIONS,
+
+    /** Executed exchange fills — cross-asset trades (two legs). */
+    TRADES,
+
+    /** Order history — reference metadata joined onto [TRADES] by order id (no money movement). */
+    ORDERS,
+
+    /** Incoming deposits — single-asset transfers into the account. */
+    DEPOSITS,
+
+    /** Outgoing withdrawals — single-asset transfers out of the account. */
+    WITHDRAWALS,
+}
+
+/** Fixed movement direction for deposit/withdrawal endpoints (relative to the owning account). */
+@Serializable
+enum class TransferDirection {
+    IN,
+    OUT,
+}
+
+/**
+ * One data endpoint of a strategy that has several (exchanges). Each pairs an [endpoint] with the
+ * [kind] of record it yields and the mappings needed to interpret it.
+ *
+ * @property transactionMappings Field mappings for [ApiEndpointKind.BANK_TRANSACTIONS]/DEPOSITS/WITHDRAWALS.
+ * @property tradeMappings Field mappings for [ApiEndpointKind.TRADES]/ORDERS.
+ * @property fixedDirection For DEPOSITS/WITHDRAWALS, the movement direction (amounts are unsigned).
+ * @property counterpartyAccountName For DEPOSITS/WITHDRAWALS, the fixed external/funding account name
+ *                                   the money comes from / goes to (e.g. "Crypto.com Exchange Funding").
+ */
+@Serializable
+data class ApiDataEndpoint(
+    val endpoint: ApiEndpointConfig,
+    val kind: ApiEndpointKind,
+    val transactionMappings: ApiTransactionMappings? = null,
+    val tradeMappings: ApiTradeMappings? = null,
+    val fixedDirection: TransferDirection? = null,
+    val counterpartyAccountName: String? = null,
+)
+
+/** How a trading pair symbol is split into its base and quote assets. */
+@Serializable
+enum class InstrumentSplitMode {
+    /** Split on a separator character (Crypto.com "BTC_USD"). */
+    SEPARATOR,
+
+    /** Explicit base/quote fields on the item (some order endpoints). */
+    EXPLICIT_FIELDS,
+
+    /** Strip a known quote-asset suffix from a separator-less symbol (Binance "BTCUSDT"). */
+    QUOTE_SUFFIX,
+}
+
+/**
+ * Field mappings for a trade (fill) endpoint. A fill exchanges a base asset for a quote asset. The
+ * engine derives two [com.moneymanager.domain.model.Money] legs: base = [baseQuantityField] of the base
+ * asset; quote = [quoteQuantityField] (or [baseQuantityField] × [priceField]) of the quote asset. For a
+ * BUY the quote leg leaves and the base leg arrives; a SELL reverses them. Both legs sit on the single
+ * exchange account, so the movement is a cross-asset [com.moneymanager.domain.model.Trade].
+ *
+ * @property instrumentField Dot-path to the pair symbol (e.g. "instrument_name").
+ * @property splitMode How [instrumentField] is split into base/quote assets.
+ * @property instrumentSeparator Separator for [InstrumentSplitMode.SEPARATOR] (default "_").
+ * @property baseAssetField/quoteAssetField Dot-paths for [InstrumentSplitMode.EXPLICIT_FIELDS].
+ * @property quoteAssets Known quote assets for [InstrumentSplitMode.QUOTE_SUFFIX] (longest match wins).
+ * @property sideField Dot-path to the buy/sell side; [buyValues] enumerates the values meaning BUY.
+ * @property baseQuantityField Dot-path to the base-asset quantity traded.
+ * @property priceField Dot-path to the price (quote per base); quote amount = quantity × price.
+ * @property quoteQuantityField Dot-path to an explicit quote amount (used instead of price when present).
+ * @property feeField/feeCurrencyField Optional dot-paths to a trade fee and its asset code.
+ * @property timestampField/timestampFormat Dot-path + encoding of the fill timestamp.
+ * @property idField Dot-path to the stable trade id (used for de-duplication).
+ * @property orderIdField Optional dot-path to the owning order id (joins ORDERS metadata onto the trade).
+ */
+@Serializable
+data class ApiTradeMappings(
+    val instrumentField: String,
+    val splitMode: InstrumentSplitMode = InstrumentSplitMode.SEPARATOR,
+    val instrumentSeparator: String = "_",
+    val baseAssetField: String? = null,
+    val quoteAssetField: String? = null,
+    val quoteAssets: List<String> = emptyList(),
+    val sideField: String,
+    val buyValues: Set<String> = setOf("BUY", "buy"),
+    val baseQuantityField: String,
+    val priceField: String? = null,
+    val quoteQuantityField: String? = null,
+    val feeField: String? = null,
+    val feeCurrencyField: String? = null,
+    val timestampField: String,
+    val timestampFormat: TimestampFormat = TimestampFormat.EPOCH_MS,
+    val idField: String,
+    val orderIdField: String? = null,
+    val descriptionField: String? = null,
+    /** Order-only fields surfaced as trade attributes when ORDERS metadata is joined in. */
+    val orderTypeField: String? = null,
+    val orderStatusField: String? = null,
+)
+
+/**
+ * Declares that this strategy imports into a single fixed account holding all assets, instead of
+ * enumerating accounts from an accounts endpoint (exchanges). When set, the accounts endpoint is not
+ * fetched; the account is matched/created by [externalId] with display [name].
+ */
+@Serializable
+data class ApiSyntheticAccount(
+    val name: String,
+    val externalId: String,
+)
+
+/** A bridge to another (already-imported) account this strategy's transfers should reconcile against. */
+@Serializable
+data class ApiAccountBridge(
+    /** Display name of the other owned account (e.g. the CSV "Crypto.com" App account). */
+    val otherAccountName: String,
+)
+
+/**
+ * Reconciles internal transfers between this strategy's account and another owned account that records
+ * the same real movement at its own end (e.g. money moved from the Crypto.com App into the Exchange:
+ * the App CSV records a withdrawal out, the Exchange API records a deposit in). On a match within
+ * [windowSeconds] of the same asset and (within [amountTolerancePct]) amount, the two half-transfers
+ * are collapsed into one internal transfer and linked via the `reconciled` relationship.
+ */
+@Serializable
+data class ApiInternalTransferReconcile(
+    val bridges: List<ApiAccountBridge>,
+    val windowSeconds: Long,
+    val amountTolerancePct: Double = 0.0,
+)
+
 /**
  * Decoded, domain-level view of an API import strategy's full configuration.
  * Stored as JSON in the database; decoded by the db layer for use across all layers.
@@ -383,4 +750,15 @@ data class ApiStrategyConfig(
      * provider id backfilled. Null disables external-id storage.
      */
     val personExternalIdAttribute: String? = null,
+    /** Proactive per-request signing recipe; required when [authType] is [ApiAuthType.SIGNED]. */
+    val requestSigning: ApiRequestSigningConfig? = null,
+    /**
+     * Multiple data endpoints (trades/orders/deposits/withdrawals) for exchange strategies. When
+     * non-empty this supersedes [transactionsEndpoint] for the download/import loop.
+     */
+    val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
+    /** When set, import into one fixed account holding all assets instead of enumerating accounts. */
+    val syntheticAccount: ApiSyntheticAccount? = null,
+    /** Reconcile internal transfers against another owned account (e.g. the Crypto.com App account). */
+    val internalTransferReconcile: ApiInternalTransferReconcile? = null,
 )
