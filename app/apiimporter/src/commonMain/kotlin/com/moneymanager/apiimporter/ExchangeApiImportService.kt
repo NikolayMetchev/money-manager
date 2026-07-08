@@ -79,7 +79,9 @@ suspend fun downloadApiSessionExchange(
     apiSessionRepository: ApiSessionReadRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
-    rateLimitMillis: Long = 250,
+    // Crypto.com's get-trades / get-order-history are limited to 1 request/second, so pace every request
+    // just over 1s to stay clear of rate-limit rejections across all endpoints.
+    rateLimitMillis: Long = 1100,
     onProgress: (ApiTransactionsDownloadProgress) -> Unit = {},
 ): ApiTransactionsDownloadResult {
     val signing = requireNotNull(strategy.requestSigning) { "SIGNED strategy '${strategy.name}' has no requestSigning" }
@@ -88,7 +90,10 @@ suspend fun downloadApiSessionExchange(
     val downloadedUrls = existingRequests.filter { existingResponses.containsKey(it.id) }.map { it.url }.toSet()
 
     var responseCount = 0
-    var nonce = Clock.System.now().toEpochMilliseconds()
+    // The nonce must be the CURRENT epoch-ms on every request (exchanges reject a nonce that drifts too
+    // far from server time), yet also strictly increasing. Sampling the clock per request and clamping
+    // to lastNonce+1 guarantees both across a long multi-endpoint, multi-window download.
+    var lastNonce = 0L
     var requestId = 1L
     val now = Clock.System.now()
 
@@ -105,6 +110,8 @@ suspend fun downloadApiSessionExchange(
             }
 
             val endpointUrl = buildExchangeEndpointUrl(strategy.baseUrl, endpoint.path)
+            val nonce = nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds())
+            lastNonce = nonce
             val signed =
                 signer.sign(
                     endpointUrl = endpointUrl,
@@ -116,7 +123,6 @@ suspend fun downloadApiSessionExchange(
                     nonce = nonce,
                     requestId = requestId,
                 )
-            nonce += 1
             requestId += 1
 
             // Make the recorded URL unique per (endpoint, window) so incremental skip works. For a signed
@@ -165,6 +171,16 @@ private fun dateWindowsOrSingle(
     } else {
         listOf(null)
     }
+
+/**
+ * The next request nonce: the current epoch-ms, but never less than the previous nonce + 1. Exchanges
+ * require the nonce to track server time yet be strictly increasing; this satisfies both even when two
+ * requests fall in the same millisecond.
+ */
+internal fun nextExchangeNonce(
+    lastNonce: Long,
+    nowMillis: Long,
+): Long = maxOf(nowMillis, lastNonce + 1)
 
 private fun buildExchangeEndpointUrl(
     baseUrl: String,
