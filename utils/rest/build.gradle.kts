@@ -38,10 +38,10 @@ kotlin {
         jvmMain {
             dependencies {
                 api(projects.app.importengineapi)
+                api(projects.app.model.core)
 
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
-                implementation(projects.app.model.core)
 
                 runtimeOnly(libs.cryptography.provider.jdk)
             }

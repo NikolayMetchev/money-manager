@@ -15,10 +15,18 @@ kotlin {
             }
         }
 
+        getByName("androidMain") {
+            dependencies {
+                implementation(projects.utils.bigdecimal)
+            }
+        }
+
         getByName("jvmMain") {
             dependencies {
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+
+                implementation(projects.utils.bigdecimal)
             }
         }
 
