@@ -573,6 +573,8 @@ data class ApiRequestSigningConfig(
     val nonce: NonceSpec,
     val signature: FieldPlacement,
     val requestId: RequestIdSpec? = null,
+    /** Where the API method name is written on the request (Crypto.com body field "method"); null omits it. */
+    val method: FieldPlacement? = null,
     val bodyFormat: BodyFormat = BodyFormat.NONE,
     /** For [BodyFormat.JSON_ENVELOPE], the key under which request params are nested (Crypto.com "params"). */
     val paramsEnvelopeKey: String? = null,

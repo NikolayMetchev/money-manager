@@ -12,6 +12,8 @@ kotlin {
                 api(projects.app.model.core)
 
                 implementation(libs.ktor.client.cio)
+                // HMAC signing for exchange APIs (Crypto.com/Binance/Kraken), same lib as utils/archive.
+                implementation(libs.cryptography.core)
             }
         }
 
@@ -27,6 +29,8 @@ kotlin {
             dependencies {
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
+                // Provider is resolved at runtime via CryptographyProvider.Default (no compile usage).
+                runtimeOnly(libs.cryptography.provider.jdk)
             }
         }
 
@@ -37,6 +41,7 @@ kotlin {
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
                 implementation(projects.app.model.core)
+                runtimeOnly(libs.cryptography.provider.jdk)
             }
         }
 
