@@ -234,7 +234,14 @@ suspend fun ImportEngine.createApiCredential(
                 apiSessionMutations =
                     listOf(
                         ApiSessionMutation.CreateCredential(
-                            key, token, createdAt, type, strategyId, privateKey, publicKey, apiSecret,
+                            key,
+                            token,
+                            createdAt,
+                            type,
+                            strategyId,
+                            privateKey,
+                            publicKey,
+                            apiSecret,
                         ),
                     ),
             ),

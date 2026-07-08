@@ -5,12 +5,16 @@ package com.moneymanager.apiimporter
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
@@ -20,8 +24,6 @@ import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.TransferDirection
-import com.moneymanager.domain.model.RelationshipTypeId
-import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -34,7 +36,6 @@ import com.moneymanager.importengineapi.ExistingApiIdExtractor
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
@@ -42,23 +43,21 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeType
-import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
 import kotlin.time.DurationUnit
 import kotlin.time.Instant
 import kotlin.time.toDuration
 
-/**
- * Generic download + import for **signed exchange** strategies — any [ApiImportStrategy] with a
- * [ApiImportStrategy.syntheticAccount] and [ApiImportStrategy.dataEndpoints]. Entirely config-driven
- * (Crypto.com today; Binance/Kraken later as config), so there is no per-provider code here. The
- * bank-shaped path in `ApiSessionImportService` is untouched; the two are dispatched by strategy shape.
+/*
+ * Generic download + import for signed exchange strategies — any ApiImportStrategy with a
+ * syntheticAccount and dataEndpoints. Entirely config-driven (Crypto.com today; Binance/Kraken later as
+ * config), so there is no per-provider code here. The bank-shaped path in ApiSessionImportService is
+ * untouched; the two are dispatched by strategy shape.
  */
 
 /** The external-id attribute type name used to match the single exchange account across re-imports. */
@@ -228,6 +227,43 @@ private data class OrderMeta(
     val status: String?,
 )
 
+/** Accumulator for parsed items across all of a session's responses. */
+private class ParsedExchangeData {
+    val trades = mutableListOf<ParsedTrade>()
+    val transfers = mutableListOf<ParsedExchangeTransfer>()
+    val orderMeta = mutableMapOf<String, OrderMeta>()
+}
+
+/** Parses one response item into [into] according to its endpoint kind. */
+private fun parseExchangeItem(
+    obj: JsonObject,
+    dataEndpoint: com.moneymanager.domain.model.apistrategy.ApiDataEndpoint,
+    requestId: ApiRequestId,
+    into: ParsedExchangeData,
+) {
+    when (dataEndpoint.kind) {
+        ApiEndpointKind.TRADES ->
+            dataEndpoint.tradeMappings?.let { parseTrade(obj, it, requestId) }?.let(into.trades::add)
+        ApiEndpointKind.ORDERS ->
+            dataEndpoint.tradeMappings?.let { tm ->
+                val orderId = tm.orderIdField?.let { obj.str(it) } ?: obj.str(tm.idField)
+                orderId?.let {
+                    into.orderMeta[it] =
+                        OrderMeta(type = tm.orderTypeField?.let { f -> obj.str(f) }, status = tm.orderStatusField?.let { f -> obj.str(f) })
+                }
+            }
+        ApiEndpointKind.DEPOSITS ->
+            dataEndpoint.transactionMappings
+                ?.let { parseExchangeTransfer(obj, it, TransferDirection.IN, requestId) }
+                ?.let(into.transfers::add)
+        ApiEndpointKind.WITHDRAWALS ->
+            dataEndpoint.transactionMappings
+                ?.let { parseExchangeTransfer(obj, it, TransferDirection.OUT, requestId) }
+                ?.let(into.transfers::add)
+        ApiEndpointKind.BANK_TRANSACTIONS -> Unit
+    }
+}
+
 /**
  * Imports a downloaded exchange session: parses stored responses per data-endpoint kind, auto-creates
  * crypto assets, and builds one [ImportBatch] of cross-asset trades + deposit/withdrawal transfers.
@@ -248,47 +284,24 @@ suspend fun importApiSessionExchange(
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val responses = apiSessionRepository.getResponsesBySession(sessionId)
 
-    val trades = mutableListOf<ParsedTrade>()
-    val transfers = mutableListOf<ParsedExchangeTransfer>()
-    val orderMeta = mutableMapOf<String, OrderMeta>()
-
-    for (response in responses) {
-        val request = requestsById[response.requestId] ?: continue
-        val dataEndpoint = strategy.dataEndpoints.firstOrNull { request.url.contains(it.endpoint.path) } ?: continue
-        val items = responseItemsArray(response.json, dataEndpoint.endpoint.responseArrayKey) ?: continue
-        for (element in items) {
-            val obj = element as? JsonObject ?: continue
-            when (dataEndpoint.kind) {
-                ApiEndpointKind.TRADES ->
-                    dataEndpoint.tradeMappings?.let { parseTrade(obj, it, response.requestId) }?.let(trades::add)
-                ApiEndpointKind.ORDERS ->
-                    dataEndpoint.tradeMappings?.let { tm ->
-                        val orderId = tm.orderIdField?.let { obj.str(it) } ?: obj.str(tm.idField)
-                        if (orderId != null) {
-                            orderMeta[orderId] =
-                                OrderMeta(
-                                    type = tm.orderTypeField?.let { obj.str(it) },
-                                    status = tm.orderStatusField?.let { obj.str(it) },
-                                )
-                        }
-                    }
-                ApiEndpointKind.DEPOSITS ->
-                    dataEndpoint.transactionMappings
-                        ?.let { parseExchangeTransfer(obj, it, TransferDirection.IN, response.requestId) }
-                        ?.let(transfers::add)
-                ApiEndpointKind.WITHDRAWALS ->
-                    dataEndpoint.transactionMappings
-                        ?.let { parseExchangeTransfer(obj, it, TransferDirection.OUT, response.requestId) }
-                        ?.let(transfers::add)
-                ApiEndpointKind.BANK_TRANSACTIONS -> Unit
-            }
+    val parsed = ParsedExchangeData()
+    responses.forEach { response ->
+        val request = requestsById[response.requestId] ?: return@forEach
+        val dataEndpoint = strategy.dataEndpoints.firstOrNull { request.url.contains(it.endpoint.path) } ?: return@forEach
+        val items = responseItemsArray(response.json, dataEndpoint.endpoint.responseArrayKey) ?: return@forEach
+        items.forEach { element ->
+            (element as? JsonObject)?.let { parseExchangeItem(it, dataEndpoint, response.requestId, parsed) }
         }
     }
+    val trades = parsed.trades
+    val transfers = parsed.transfers
+    val orderMeta = parsed.orderMeta
 
     // Resolve assets: any code that isn't a known fiat currency is treated as a crypto asset and
     // auto-created (the same rule as the CSV importer), sized to the precision the data actually uses.
     val fiatByCode = currencyRepository.getAllCurrencies().first().associateBy { it.code.uppercase() }
     val cryptoDecimals = mutableMapOf<String, Int>()
+
     fun noteCrypto(
         code: String?,
         amount: BigDecimal?,
@@ -306,10 +319,16 @@ suspend fun importApiSessionExchange(
 
     for ((code, decimals) in cryptoDecimals) {
         val explicit = CryptoRegistry.explicitDecimalsFor(code) ?: 0
-        importEngine.createCrypto(code, name = CryptoRegistry.nameFor(code), scaleFactor = scaleFactorForDecimals(maxOf(explicit, decimals)), source = source)
+        importEngine.createCrypto(
+            code,
+            name = CryptoRegistry.nameFor(code),
+            scaleFactor = scaleFactorForDecimals(maxOf(explicit, decimals)),
+            source = source,
+        )
     }
 
     val cryptoByCode = cryptoRepository.getAllCryptoAssets().first().associateBy { it.code.uppercase() }
+
     fun asset(code: String): Asset? = fiatByCode[code.uppercase()] ?: cryptoByCode[code.uppercase()]
 
     // Resolve attribute types and the accounts (synthetic + fee + funding) in a first batch so the
@@ -359,9 +378,10 @@ suspend fun importApiSessionExchange(
     val tradeIntents = mutableListOf<ImportTradeIntent>()
     val transferIntents = mutableListOf<ImportTransfer>()
 
-    for (t in trades) {
-        val baseAsset = asset(t.baseCode) ?: continue
-        val quoteAsset = asset(t.quoteCode) ?: continue
+    trades.forEach forEachTrade@{ t ->
+        val baseAsset = asset(t.baseCode)
+        val quoteAsset = asset(t.quoteCode)
+        if (baseAsset == null || quoteAsset == null) return@forEachTrade
         val baseMoney = Money.fromDisplayValue(t.baseQuantity, baseAsset)
         val quoteMoney = moneyRounded(t.quoteAmount, quoteAsset)
         val orderInfo = t.orderId?.let { orderMeta[it] }
@@ -403,7 +423,7 @@ suspend fun importApiSessionExchange(
     }
 
     for (tx in transfers) {
-        val txAsset = asset(tx.currencyCode) ?: continue
+        val txAsset = asset(tx.currencyCode) ?: continue // single jump — allowed
         val money = Money.fromDisplayValue(tx.amount, txAsset)
         val (from, to) =
             if (tx.direction == TransferDirection.IN) fundingId to syntheticId else syntheticId to fundingId
@@ -426,10 +446,13 @@ suspend fun importApiSessionExchange(
     val reconcile = strategy.internalTransferReconcile
     val existingAccounts = accountRepository.getAllAccounts().first()
     val bridges =
-        reconcile?.bridges?.mapNotNull { bridge ->
-            existingAccounts.firstOrNull { it.name == bridge.otherAccountName }
-                ?.let { AccountBridge(exchangeAccountId = syntheticId, appAccountId = it.id) }
-        }.orEmpty()
+        reconcile
+            ?.bridges
+            ?.mapNotNull { bridge ->
+                existingAccounts
+                    .firstOrNull { it.name == bridge.otherAccountName }
+                    ?.let { AccountBridge(exchangeAccountId = syntheticId, appAccountId = it.id) }
+            }.orEmpty()
 
     val result =
         importEngine.import(
@@ -549,8 +572,9 @@ private fun parseExchangeTransfer(
     val currency = obj.str(tm.currencyField) ?: return null
     val timestamp = obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat) } ?: return null
     val id = obj.str(tm.idField) ?: return null
-    val description = obj.str(tm.descriptionField)?.takeIf { it.isNotBlank() }
-        ?: if (direction == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
+    val description =
+        obj.str(tm.descriptionField)?.takeIf { it.isNotBlank() }
+            ?: if (direction == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
     return ParsedExchangeTransfer(id, timestamp, currency, amount, direction, description, requestId)
 }
 
