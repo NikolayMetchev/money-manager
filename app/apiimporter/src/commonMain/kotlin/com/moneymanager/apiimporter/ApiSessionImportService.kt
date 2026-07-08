@@ -29,6 +29,7 @@ import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.PredicateOp
@@ -2045,7 +2046,7 @@ private fun parseTransactionsWithPath(
         responseItemsArray(json, strategy.transactionsEndpoint.responseArrayKey)
             ?.mapIndexedNotNull { index, element ->
                 val obj = element as? JsonObject ?: return@mapIndexedNotNull null
-                val created = obj.resolveJsonPath(mappings.timestampField)?.let { Instant.parse(it) }
+                val created = obj.resolveJsonPath(mappings.timestampField)?.let { parseApiTimestamp(it, mappings.timestampFormat) }
                 val amount = parseAmount(obj, mappings)
                 val currency = obj.resolveJsonPath(mappings.currencyField)
                 val declineReason = resolveDeclineReason(obj, mappings)
@@ -2195,12 +2196,33 @@ private fun responseItemsArray(
                 else -> null
             }
         } else {
-            (root as? JsonObject)?.get(responseArrayKey)?.jsonArray
+            // Supports a dot-path key so nested envelopes (e.g. Crypto.com "result.data") resolve.
+            root.resolveJsonPathElement(responseArrayKey) as? JsonArray
         }
     } catch (e: SerializationException) {
         logger.error(e) { "Failed to parse API response array (key='$responseArrayKey')" }
         null
     }
+
+/**
+ * Whether a response passed its envelope status check. Strategies with a [successCodeField]
+ * (Crypto.com "code") require the value at that path to equal [successCodeOkValue] (e.g. "0");
+ * a null field means no check (bank APIs rely on the HTTP status alone).
+ */
+internal fun responseCodeOk(
+    json: String,
+    successCodeField: String?,
+    successCodeOkValue: String?,
+): Boolean {
+    if (successCodeField == null) return true
+    return try {
+        val actual =
+            (Json.parseToJsonElement(json).resolveJsonPathElement(successCodeField) as? JsonPrimitive)?.contentOrNull
+        actual == successCodeOkValue
+    } catch (e: SerializationException) {
+        false
+    }
+}
 
 private const val MILLIS_PER_DAY = 86_400_000L
 
@@ -2867,13 +2889,55 @@ private fun strategyAttributeNameForJsonPath(
 private fun JsonObject.stringOrNull(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
 /** Resolves a dot-notation path (e.g. "merchant.name") against this JSON object. */
-private fun JsonObject.resolveJsonPath(dotPath: String): String? {
+private fun JsonObject.resolveJsonPath(dotPath: String): String? =
+    (resolveJsonPathElement(dotPath) as? JsonPrimitive)?.contentOrNull
+
+/**
+ * Resolves a dot-notation path to a [JsonElement], supporting array indexing so exchange responses
+ * whose items live inside nested arrays are addressable — e.g. "result.data", "data[0].price",
+ * "legs[1].amount". Each segment is an optional object key followed by zero or more `[n]` indices.
+ */
+internal fun JsonElement.resolveJsonPathElement(dotPath: String): JsonElement? {
+    if (dotPath.isEmpty()) return this
     var current: JsonElement = this
-    for (part in dotPath.split(".")) {
-        current = (current as? JsonObject)?.get(part) ?: return null
+    for (rawPart in dotPath.split(".")) {
+        val bracketStart = rawPart.indexOf('[')
+        val key = if (bracketStart >= 0) rawPart.substring(0, bracketStart) else rawPart
+        if (key.isNotEmpty()) {
+            current = (current as? JsonObject)?.get(key) ?: return null
+        }
+        if (bracketStart >= 0) {
+            var rest = rawPart.substring(bracketStart)
+            while (rest.startsWith("[")) {
+                val end = rest.indexOf(']')
+                if (end < 0) return null
+                val index = rest.substring(1, end).toIntOrNull() ?: return null
+                current = (current as? JsonArray)?.getOrNull(index) ?: return null
+                rest = rest.substring(end + 1)
+            }
+        }
     }
-    return (current as? JsonPrimitive)?.contentOrNull
+    return current
 }
+
+/**
+ * Parses an API timestamp string per its [TimestampFormat] — ISO-8601 (bank APIs) or epoch
+ * milliseconds/seconds (most exchanges), including fractional seconds (Kraken).
+ */
+internal fun parseApiTimestamp(
+    value: String,
+    format: TimestampFormat,
+): Instant? =
+    when (format) {
+        TimestampFormat.ISO_8601 -> runCatching { Instant.parse(value) }.getOrNull()
+        TimestampFormat.EPOCH_MS -> value.toLongOrNull()?.let { Instant.fromEpochMilliseconds(it) }
+        TimestampFormat.EPOCH_S -> value.toLongOrNull()?.let { Instant.fromEpochSeconds(it) }
+        TimestampFormat.EPOCH_S_FLOAT ->
+            value.toDoubleOrNull()?.let {
+                val seconds = it.toLong()
+                Instant.fromEpochSeconds(seconds, ((it - seconds) * 1_000_000_000L).toLong())
+            }
+    }
 
 private fun JsonObject.resolveCounterpartyIdentity(
     counterpartyIdField: String?,
