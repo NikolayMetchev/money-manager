@@ -53,7 +53,13 @@ data class ConversionConfig(
     val pairingKeyColumns: List<String> = emptyList(),
     val pairingWindowSeconds: Long,
     val relationshipTypeName: String,
-)
+) {
+    init {
+        require(conversionAccountName != null || conversionAccountRules.isNotEmpty()) {
+            "ConversionConfig needs a conversionAccountName or at least one conversionAccountRule to route legs through"
+        }
+    }
+}
 
 /**
  * A single per-value routing rule for [ConversionConfig.conversionAccountRules]: when the value in

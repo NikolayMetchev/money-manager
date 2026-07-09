@@ -370,13 +370,16 @@ data class ImportPassThrough(
 }
 
 /**
- * A relationship from the owning [ImportTransfer] (id1) to another transfer created in the SAME batch,
- * referenced by its [ImportRowKey] rather than a persisted id. Unlike [NewRelationship] (whose
- * `relatedTransferId` must already exist), this lets a producer link two co-created transfers before
- * either has an id; the engine resolves [relatedRowKey] to the related transfer's real id (created in
- * this batch, in an earlier chunk, or the existing transfer it was deduped to) and resolves
- * [typeName] get-or-create. If [relatedRowKey] cannot be resolved (e.g. the related row errored and
- * produced no transfer), the link is silently skipped.
+ * A relationship from the owning [ImportTransfer] (id1) to another transfer **created in the SAME
+ * batch**, referenced by its [ImportRowKey] rather than a persisted id. Unlike [NewRelationship]
+ * (whose `relatedTransferId` must already exist), this lets a producer link two co-created transfers
+ * before either has an id; the engine resolves [relatedRowKey] to the related transfer's real id
+ * (created in this chunk, or in an earlier chunk of this batch) and resolves [typeName] get-or-create.
+ *
+ * The link is silently skipped when [relatedRowKey] resolves to no newly-created transfer — i.e. the
+ * related row was deduped to an existing transfer (DUPLICATE/UPDATED) or errored. This is deliberate:
+ * such a link is already redundant. On re-import the owning row and its target dedupe together, so the
+ * relationship persisted by the first import still stands; nothing needs re-linking.
  */
 data class BatchRelationship(
     val relatedRowKey: ImportRowKey,
@@ -395,9 +398,10 @@ data class BatchRelationship(
  * @property attributes Transfer attributes with type ids already resolved by the builder.
  * @property relationships Relationships to existing transfers, created once this transfer's id exists.
  * @property batchRelationships Relationships to OTHER transfers created in the same batch, referenced
- *   by their [ImportRowKey]; the engine resolves each related row key to its id (created in this batch,
- *   an earlier chunk, or an existing transfer it deduped to) and the type name get-or-create. This
- *   transfer becomes id1, the related transfer id2.
+ *   by their [ImportRowKey]; the engine resolves each related row key to its newly-created id (in this
+ *   chunk or an earlier chunk of this batch) and the type name get-or-create. This transfer becomes
+ *   id1, the related transfer id2. A link whose target was not newly created (deduped/errored) is
+ *   skipped — see [BatchRelationship].
  * @property uniqueKey Unique-identifier dedupe key (attribute name -> value), or null for fuzzy dedupe.
  * @property fee An optional fee charged on this transaction, expanded by the engine into a linked transfer.
  */
