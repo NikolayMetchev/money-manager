@@ -345,9 +345,16 @@ object BuiltInApiStrategies {
                 windowDays = 90,
                 lookbackDays = 365 * 6,
             )
-        // get-trades / get-order-history only serve a recent window (older trades come from the CSV
-        // import), so a short lookback avoids paging years of empty windows.
-        val recentWindow = historyWindow.copy(windowDays = 30, lookbackDays = 180)
+        // get-trades / get-order-history only serve the last 6 months (older trades come from the CSV
+        // import) and cap the window at 7 days; unlike the deposit/withdrawal endpoints they take
+        // start_time/end_time (start_ts/end_ts is silently ignored and defaults to the last 24h).
+        val recentWindow =
+            historyWindow.copy(
+                startParam = "start_time",
+                endParam = "end_time",
+                windowDays = 7,
+                lookbackDays = 180,
+            )
 
         fun signed(
             path: String,

@@ -35,7 +35,9 @@ class CryptoComExchangeApiE2ETest : DbTest() {
         """
         {"code":0,"result":{"data":[
           {"instrument_name":"BTC_USD","side":"BUY","traded_quantity":"0.5","traded_price":"40000.55",
-           "fees":"0.001","fee_instrument_name":"BTC","create_time":1700000000000,"trade_id":"t1","order_id":"o1"}
+           "fees":"0.001","fee_instrument_name":"BTC","create_time":1700000000000,"trade_id":"t1","order_id":"o1"},
+          {"instrument_name":"BTC_USD","side":"SELL","traded_quantity":"0.1","traded_price":"41000.00",
+           "fees":"-0.525570","fee_instrument_name":"USD","create_time":1700000000100,"trade_id":"t2","order_id":"o2"}
         ]}}
         """.trimIndent()
 
@@ -106,10 +108,10 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             assertNotNull(repositories.cryptoRepository.getCryptoAssetByCode("BTC").first(), "BTC created")
             assertNotNull(repositories.cryptoRepository.getCryptoAssetByCode("CRO").first(), "CRO created")
 
-            // One trade (BUY BTC/USD) on the exchange account.
+            // Two trades (BUY + SELL BTC/USD) on the exchange account.
             val trades = repositories.tradeRepository.getTradesByAccount(exchange.id).first()
-            assertEquals(1, trades.size, "one trade imported")
-            val trade = trades.single()
+            assertEquals(2, trades.size, "both trades imported")
+            val trade = trades.first { it.to.currency.code == "BTC" }
             // BUY: USD leaves, BTC arrives.
             assertEquals("USD", trade.from.currency.code)
             assertEquals("BTC", trade.to.currency.code)
@@ -119,6 +121,23 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             assertEquals("20000.28", trade.from.toDisplayValue().toString())
             // Order type folded into the description as reference.
             assertTrue(trade.description.contains("LIMIT"), "order type recorded: ${trade.description}")
+
+            // The SELL's fiat fee ("-0.525570" USD, more decimals than USD's scale) books as its own
+            // movement to the Fees account, rounded half-up to 0.53 rather than crashing the import.
+            val feesAccount =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .first { it.name == "Crypto.com Exchange Fees" }
+            val feeTransfer =
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        startDate = Instant.fromEpochMilliseconds(1_700_000_000_050L),
+                        endDate = Instant.fromEpochMilliseconds(1_700_000_000_150L),
+                    ).first()
+                    .first { it.targetAccountId == feesAccount.id }
+            assertEquals("USD", feeTransfer.amount.currency.code)
+            assertEquals("0.53", feeTransfer.amount.toDisplayValue().toString())
 
             // Provenance points at the real JSON node so the audit view can expand to it.
             val deposit =

@@ -461,7 +461,10 @@ suspend fun importApiSessionExchange(
         val feeAmount = t.feeAmount
         if (feeCode != null && feeAmount != null) {
             val feeAsset = asset(feeCode)
-            if (feeAsset != null) {
+            // Fiat fees carry more decimals than the currency's scale (e.g. "-0.525570" USD), so
+            // round like the quote leg; a fee that rounds to zero minor units is dropped.
+            val feeMoney = feeAsset?.let { moneyRounded(feeAmount, it) }
+            if (feeAsset != null && feeMoney != null && !feeMoney.isZero()) {
                 transferIntents +=
                     exchangeTransfer(
                         id = "${t.id}-fee",
@@ -469,7 +472,7 @@ suspend fun importApiSessionExchange(
                         description = "$description fee",
                         fromAccount = AccountRef.Existing(syntheticId),
                         toAccount = AccountRef.Existing(feeAccountId),
-                        money = Money.fromDisplayValue(feeAmount, feeAsset),
+                        money = feeMoney,
                         source = source,
                         requestId = t.requestId,
                         jsonPath = t.jsonPath,
