@@ -370,6 +370,20 @@ data class ImportPassThrough(
 }
 
 /**
+ * A relationship from the owning [ImportTransfer] (id1) to another transfer created in the SAME batch,
+ * referenced by its [ImportRowKey] rather than a persisted id. Unlike [NewRelationship] (whose
+ * `relatedTransferId` must already exist), this lets a producer link two co-created transfers before
+ * either has an id; the engine resolves [relatedRowKey] to the related transfer's real id (created in
+ * this batch, in an earlier chunk, or the existing transfer it was deduped to) and resolves
+ * [typeName] get-or-create. If [relatedRowKey] cannot be resolved (e.g. the related row errored and
+ * produced no transfer), the link is silently skipped.
+ */
+data class BatchRelationship(
+    val relatedRowKey: ImportRowKey,
+    val typeName: String,
+)
+
+/**
  * A transfer to import. Account references may be [AccountRef.Existing] (resolved by the builder) or
  * [AccountRef.Local] (resolved by the engine from [ImportBatch.accountsToCreate]).
  *
@@ -380,6 +394,10 @@ data class ImportPassThrough(
  *   per-row detail from [rowKey] via `Source.forRow`.
  * @property attributes Transfer attributes with type ids already resolved by the builder.
  * @property relationships Relationships to existing transfers, created once this transfer's id exists.
+ * @property batchRelationships Relationships to OTHER transfers created in the same batch, referenced
+ *   by their [ImportRowKey]; the engine resolves each related row key to its id (created in this batch,
+ *   an earlier chunk, or an existing transfer it deduped to) and the type name get-or-create. This
+ *   transfer becomes id1, the related transfer id2.
  * @property uniqueKey Unique-identifier dedupe key (attribute name -> value), or null for fuzzy dedupe.
  * @property fee An optional fee charged on this transaction, expanded by the engine into a linked transfer.
  */
@@ -393,6 +411,7 @@ data class ImportTransfer(
     val amount: Money? = null,
     val attributes: List<NewAttribute> = emptyList(),
     val relationships: List<NewRelationship> = emptyList(),
+    val batchRelationships: List<BatchRelationship> = emptyList(),
     val uniqueKey: Map<String, String>? = null,
     // API transaction id, for DedupePolicy.ApiMultiKey.
     val apiId: String? = null,

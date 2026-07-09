@@ -173,4 +173,103 @@ class CryptoComCryptoE2ETest : DbTest() {
             assertEquals("CRO", balance.currency.code)
             assertEquals("0.79", balance.toDisplayValue().toString())
         }
+
+    @Test
+    fun dustConversion_manyDebitsOneCredit_linkedThroughConversionsAccount() =
+        runTest {
+            // A "Convert Dust" event: three tiny tokens converted into one aggregate CRO credit, all at
+            // the same timestamp (crypto.com reports the credit as a separate *_credited row with only
+            // Currency/Amount — no To Currency). Previously the credit leg errored and the debits imported
+            // one-sided; now every leg imports through the shared Conversions account and each debit links
+            // to the credit.
+            val file =
+                stage(
+                    "crypto_transactions_record_dust.csv",
+                    listOf(
+                        row("2022-06-22 22:38:22", "Convert Dust", "CRO", "0.53", "0.06", "dust_conversion_credited"),
+                        row("2022-06-22 22:38:22", "Convert Dust", "LUNA2", "-0.016", "0.03", "dust_conversion_debited"),
+                        row("2022-06-22 22:38:22", "Convert Dust", "DOT", "-0.0002", "0.0002", "dust_conversion_debited"),
+                        row("2022-06-22 22:38:23", "Convert Dust", "ALI", "-1.35", "0.026", "dust_conversion_debited"),
+                    ),
+                )
+            applyAll(listOf(file))
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val wallet = accounts.first { it.name == "Crypto.com" }
+            val conversions = accounts.first { it.name == "Crypto.com Conversions" }
+
+            // All four legs imported (the credited leg is no longer an ERROR): the Conversions account
+            // touches every leg — 3 debits in + 1 credit out.
+            val conversionLegs = repositories.transactionRepository.getTransactionsByAccount(conversions.id).first()
+            assertEquals(4, conversionLegs.size)
+            val credit = conversionLegs.single { it.sourceAccountId == conversions.id }
+            val debits = conversionLegs.filter { it.targetAccountId == conversions.id }
+            assertEquals(wallet.id, credit.targetAccountId)
+            assertEquals("CRO", credit.amount.currency.code)
+            assertEquals(3, debits.size)
+            assertEquals(setOf("LUNA2", "DOT", "ALI"), debits.map { it.amount.currency.code }.toSet())
+
+            // Each debit links to the credit with a `conversion` relationship (credit is id2).
+            val links = repositories.transferRelationshipRepository.getByTransfer(credit.id).first()
+            assertEquals(3, links.size)
+            assertEquals(setOf("conversion"), links.map { it.relationshipType.name }.toSet())
+            assertEquals(setOf(credit.id), links.map { it.id2 }.toSet())
+            assertEquals(debits.map { it.id }.toSet(), links.map { it.id1 }.toSet())
+
+            // The wallet gained the credited CRO; balances stay exact.
+            repositories.maintenanceService.refreshMaterializedViews()
+            val cro =
+                repositories.transactionRepository
+                    .getAccountBalances()
+                    .first()
+                    .first { it.accountId == wallet.id && it.balance.currency.code == "CRO" }
+                    .balance
+            assertEquals("0.53", cro.toDisplayValue().toString())
+        }
+
+    @Test
+    fun walletSwap_oneToOne_linkedThroughConversionsAccount() =
+        runTest {
+            // A 1:1 "Balance Conversion" (crypto_wallet_swap): LUNA -> LUNC.
+            val file =
+                stage(
+                    "crypto_transactions_record_swap.csv",
+                    listOf(
+                        row("2022-05-13 07:00:00", "Balance Conversion", "LUNC", "0.054", "0.00", "crypto_wallet_swap_credited"),
+                        row("2022-05-13 07:00:00", "Balance Conversion", "LUNA", "-0.054", "0.00", "crypto_wallet_swap_debited"),
+                    ),
+                )
+            applyAll(listOf(file))
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val wallet = accounts.first { it.name == "Crypto.com" }
+            val conversions = accounts.first { it.name == "Crypto.com Conversions" }
+
+            val legs = repositories.transactionRepository.getTransactionsByAccount(conversions.id).first()
+            assertEquals(2, legs.size)
+            val credit = legs.single { it.sourceAccountId == conversions.id }
+            val debit = legs.single { it.targetAccountId == conversions.id }
+            assertEquals(wallet.id, credit.targetAccountId)
+            assertEquals(wallet.id, debit.sourceAccountId)
+
+            val links = repositories.transferRelationshipRepository.getByTransfer(credit.id).first()
+            assertEquals(1, links.size)
+            assertEquals("conversion", links.single().relationshipType.name)
+            assertEquals(debit.id, links.single().id1)
+            assertEquals(credit.id, links.single().id2)
+
+            // Re-import is idempotent: still exactly two legs and one link (re-import may recreate the
+            // transfers, so re-fetch the credit leg rather than reuse the stale id).
+            reimportAll(repositories.csvImportRepository.getAllImports().first())
+            val legsAfter = repositories.transactionRepository.getTransactionsByAccount(conversions.id).first()
+            assertEquals(2, legsAfter.size)
+            val creditAfter = legsAfter.single { it.sourceAccountId == conversions.id }
+            assertEquals(
+                1,
+                repositories.transferRelationshipRepository
+                    .getByTransfer(creditAfter.id)
+                    .first()
+                    .size,
+            )
+        }
 }

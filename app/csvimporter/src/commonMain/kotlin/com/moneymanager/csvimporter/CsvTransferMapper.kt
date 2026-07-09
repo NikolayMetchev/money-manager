@@ -27,6 +27,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
+import com.moneymanager.domain.model.csvstrategy.ConversionAccountRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -93,6 +94,8 @@ sealed interface MappingResult {
          * Null for ordinary rows.
          */
         val passThrough: CsvPassThrough? = null,
+        /** Set when the row is one leg of an asset conversion (see [ConversionConfig]); null otherwise. */
+        val conversionLeg: ConversionLegInfo? = null,
     ) : MappingResult {
         /** Convenience for flows where only the target side can discover a new account. */
         val newAccountName: String? get() = newAccounts.firstOrNull()?.name
@@ -142,6 +145,22 @@ data class CsvPassThrough(
     val conduitName: String get() = conduitNames.first()
 }
 
+/** Which side of an asset conversion a row represents (see [ConversionConfig]). */
+enum class ConversionSide { DEBIT, CREDIT }
+
+/**
+ * Marks a mapped row as one leg of an asset conversion (see [ConversionConfig]). The applier pairs
+ * each [ConversionSide.DEBIT] leg to a [ConversionSide.CREDIT] leg with the same [pairingKey] within
+ * the config's time window and links them with the conversion relationship.
+ *
+ * @property side Whether this leg is the debit (asset leaving) or credit (asset received).
+ * @property pairingKey Value that must match between a debit and credit leg of the same event.
+ */
+data class ConversionLegInfo(
+    val side: ConversionSide,
+    val pairingKey: String,
+)
+
 /**
  * A transfer with its associated attributes extracted from CSV.
  * Uses attribute type names (not IDs) since types may need to be created.
@@ -168,6 +187,8 @@ data class CsvTransferWithAttributes(
     val personalCounterpartyName: String? = null,
     /** Pass-through (conduit) routing for the row (e.g. Curve); null for ordinary rows. */
     val passThrough: CsvPassThrough? = null,
+    /** Set when the row is one leg of an asset conversion (see [ConversionConfig]); null otherwise. */
+    val conversionLeg: ConversionLegInfo? = null,
 )
 
 /**
@@ -216,6 +237,9 @@ data class DiscoveredAccountMapping(
     val matchedPattern: String? = null,
 )
 
+/** Separator joining the parts of a conversion pairing key; a control char that won't appear in data. */
+private const val PAIRING_KEY_SEPARATOR = "\u0000"
+
 /**
  * Maps CSV rows to Transfer objects using an import strategy.
  */
@@ -242,6 +266,20 @@ class CsvTransferMapper(
 ) {
     private val columnIndexByName: Map<String, Int> =
         columns.associate { it.originalName to it.columnIndex }
+
+    // Precompiled conversion detection (null when the strategy declares no conversionConfig). Regexes
+    // are case-insensitive, matching the file's existing account/content-rule matching convention.
+    private val conversionDebitRegex: Regex? =
+        strategy.conversionConfig?.let { Regex(it.debitPattern, RegexOption.IGNORE_CASE) }
+    private val conversionCreditRegex: Regex? =
+        strategy.conversionConfig?.let { Regex(it.creditPattern, RegexOption.IGNORE_CASE) }
+    private val conversionPairingKeyRegex: Regex? =
+        strategy.conversionConfig?.pairingKeyPattern?.let { Regex(it, RegexOption.IGNORE_CASE) }
+    private val conversionAccountRuleRegexes: List<Pair<Regex, ConversionAccountRule>> =
+        strategy.conversionConfig
+            ?.conversionAccountRules
+            .orEmpty()
+            .map { Regex(it.pattern, RegexOption.IGNORE_CASE) to it }
 
     // Extract unique identifier column names from strategy
     private val uniqueIdentifierColumns: List<String> =
@@ -292,6 +330,7 @@ class CsvTransferMapper(
                             tradeTo = result.tradeTo,
                             personalCounterpartyName = result.personalCounterpartyName,
                             passThrough = result.passThrough,
+                            conversionLeg = result.conversionLeg,
                         ),
                     )
                     // Count by status
@@ -384,6 +423,15 @@ class CsvTransferMapper(
             var sourceAccountId = resolvedSourceAccountId
             var targetAccountId = parseAccount(targetMapping, values)
 
+            // Asset-conversion leg: route the counterparty side to the shared conversion account so both
+            // the debit and credit legs parse as valid single-asset transfers (owner account <-> conversion
+            // account). The amount-sign flip below then places the owner on the correct side (owner is the
+            // source of a debit, the target of a credit). The applier pairs and links the legs afterwards.
+            val conversionDetection = detectConversionLeg(values)
+            if (conversionDetection != null) {
+                targetAccountId = resolveExistingAccountId(conversionDetection.accountName) ?: AccountId(-1)
+            }
+
             // Both account fields can read the same column (e.g. Crypto.com's card strategy resolves both
             // legs from "Transaction Description"), so a persisted counterparty mapping that matches the
             // description can hijack the source leg too and collapse both onto one account. When the source
@@ -474,9 +522,13 @@ class CsvTransferMapper(
 
             // Detect a personal counterparty (resolved from the target mapping regardless of any
             // account flip — the counterparty is the same account on whichever side it ends up). A
-            // pass-through merchant is never a person, so skip it there.
+            // pass-through merchant / conversion counterparty is never a person, so skip it there.
             val personalCounterpartyName =
-                if (passThroughMatch != null) null else resolvePersonalCounterparty(targetMapping, values)
+                if (passThroughMatch != null || conversionDetection != null) {
+                    null
+                } else {
+                    resolvePersonalCounterparty(targetMapping, values)
+                }
 
             // Create Money with absolute value (direction is indicated by source/target)
             val amount = Money.fromDisplayValue(rawAmount.abs(), currency)
@@ -538,7 +590,9 @@ class CsvTransferMapper(
                             add(discoverNewAccount(it, values, applyPersistedMappings = sourceUsedPersistedMappings))
                         }
                     }
-                    if (passThroughMatch == null) add(discoverNewAccount(targetMapping, values))
+                    // A conversion leg's counterparty is the shared conversion account (added below), not
+                    // the description-derived account the target mapping would discover, so skip it here.
+                    if (passThroughMatch == null && conversionDetection == null) add(discoverNewAccount(targetMapping, values))
                 }
             val targetCategoryId =
                 when (targetMapping) {
@@ -550,6 +604,10 @@ class CsvTransferMapper(
             val newAccounts =
                 buildList {
                     addAll(discoveries.mapNotNull { it?.first })
+                    // Create the shared conversion counterparty account on demand.
+                    if (conversionDetection != null && !accountExists(conversionDetection.accountName)) {
+                        add(NewAccount(conversionDetection.accountName, Category.UNCATEGORIZED_ID))
+                    }
                     if (passThrough != null) {
                         passThrough.conduitNames
                             .filterNot { accountExists(it) }
@@ -570,6 +628,8 @@ class CsvTransferMapper(
                 tradeTo = tradeTo,
                 personalCounterpartyName = personalCounterpartyName,
                 passThrough = passThrough,
+                conversionLeg =
+                    conversionDetection?.let { ConversionLegInfo(side = it.side, pairingKey = it.pairingKey) },
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
@@ -606,6 +666,46 @@ class CsvTransferMapper(
     ): String? {
         val index = columnIndexByName[columnName] ?: return null
         return values.getOrNull(index)
+    }
+
+    /** A detected conversion leg: which side, the counterparty account name, and the pairing key. */
+    private data class ConversionDetection(
+        val side: ConversionSide,
+        val accountName: String,
+        val pairingKey: String,
+    )
+
+    /**
+     * Detects whether [values] is a leg of an asset conversion per [CsvImportStrategy.conversionConfig].
+     * Returns null when the strategy has no conversion config, the signal column doesn't match a
+     * debit/credit pattern, or no counterparty account can be resolved.
+     */
+    private fun detectConversionLeg(values: List<String>): ConversionDetection? {
+        val config = strategy.conversionConfig ?: return null
+        val signal = getColumnValueOrNull(config.signalColumn, values)?.trim().orEmpty()
+        if (signal.isEmpty()) return null
+        val side =
+            when {
+                conversionDebitRegex?.containsMatchIn(signal) == true -> ConversionSide.DEBIT
+                conversionCreditRegex?.containsMatchIn(signal) == true -> ConversionSide.CREDIT
+                else -> return null
+            }
+        val accountName =
+            conversionAccountRuleRegexes
+                .firstOrNull { (regex, rule) ->
+                    getColumnValueOrNull(rule.column, values)?.let { regex.containsMatchIn(it) } == true
+                }?.second
+                ?.accountName
+                ?: config.conversionAccountName
+                ?: return null
+        val base =
+            conversionPairingKeyRegex
+                ?.find(signal)
+                ?.groupValues
+                ?.getOrNull(1)
+                .orEmpty()
+        val extra = config.pairingKeyColumns.joinToString(PAIRING_KEY_SEPARATOR) { getColumnValueOrNull(it, values)?.trim().orEmpty() }
+        return ConversionDetection(side, accountName, "$base$PAIRING_KEY_SEPARATOR$extra")
     }
 
     private fun parseAmount(

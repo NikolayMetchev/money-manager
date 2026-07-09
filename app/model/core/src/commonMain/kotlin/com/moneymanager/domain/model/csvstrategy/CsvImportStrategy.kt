@@ -42,6 +42,10 @@ data class ContentMatchRule(
  *                                             amount, timestamps within this window) is imported
  *                                             but tagged excluded and linked as reconciled instead
  *                                             of counting twice. Null disables reconciliation.
+ * @property conversionConfig When set, describes how this source expresses asset conversions as
+ *                            separate debited/credited rows; the importer routes the legs through a
+ *                            shared counterparty account and links each debit to its credit (see
+ *                            [ConversionConfig]). Null when the source has no such conversions.
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
  */
@@ -56,6 +60,7 @@ data class CsvImportStrategy(
     val contentMatchRules: List<ContentMatchRule> = emptyList(),
     val fileNamePattern: String? = null,
     val crossSourceReconcileWindowSeconds: Long? = null,
+    val conversionConfig: ConversionConfig? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

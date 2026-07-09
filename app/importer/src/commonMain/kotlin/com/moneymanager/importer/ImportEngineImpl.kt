@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.Transfer
@@ -970,14 +971,33 @@ class ImportEngineImpl(
             return emptyList()
         }
 
+        // Resolve (get-or-create) every relationship type named by a batch relationship once, so
+        // buildCreatePayload (not suspend) can look ids up synchronously.
+        val batchRelTypeIds: Map<String, RelationshipTypeId> =
+            toImport
+                .flatMap { it.transfer.batchRelationships }
+                .map { it.typeName }
+                .distinct()
+                .associateWith { relationshipTypeRepository.getOrCreate(it) }
+
         val total = toImport.size
         val createdIds = mutableListOf<TransferId>()
         // Spend-leg real ids from already-written chunks, keyed by (to-import index, leg index), so
         // later chunks can resolve reversal targets that point across a chunk boundary.
         val resolvedSpendLegIds = mutableMapOf<LegKey, TransferId>()
+        // Main-transfer real ids from already-written chunks, keyed by row key, so a batch relationship
+        // whose target landed in an earlier chunk (its temp id is no longer resolvable) still links.
+        val priorMainIdsByRowKey = mutableMapOf<ImportRowKey, TransferId>()
         var written = 0
         chunks.forEachIndexed { index, chunk ->
-            val payload = buildCreatePayload(chunk, chunkStartIndex = index * effectiveBatchSize, resolvedSpendLegIds)
+            val payload =
+                buildCreatePayload(
+                    chunk,
+                    chunkStartIndex = index * effectiveBatchSize,
+                    resolvedSpendLegIds,
+                    priorMainIdsByRowKey,
+                    batchRelTypeIds,
+                )
             // Updates ride with the final create chunk (one transaction in the common single-chunk case).
             val (updates, updateSources) =
                 if (index == chunks.lastIndex) buildUpdates(toUpdate) else emptyList<TransferUpdate>() to emptyList()
@@ -991,7 +1011,12 @@ class ImportEngineImpl(
                     updateSources = updateSources,
                 )
             // Keep only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
-            createdIds += payload.mainResultIndices.map { allCreatedIds[it] }
+            val chunkMainIds = payload.mainResultIndices.map { allCreatedIds[it] }
+            createdIds += chunkMainIds
+            // Record this chunk's main ids by row key so later chunks can resolve cross-chunk batch links.
+            chunk.forEachIndexed { i, classified ->
+                classified.transfer.rowKey?.let { priorMainIdsByRowKey[it] = chunkMainIds[i] }
+            }
             payload.spendResultIndices.forEach { (legKey, resultIndex) ->
                 resolvedSpendLegIds[legKey] = allCreatedIds[resultIndex]
             }
@@ -1030,6 +1055,11 @@ class ImportEngineImpl(
         // reversal target that landed in a previous chunk (its temp id is no longer resolvable) still
         // links by real id.
         priorSpendLegIds: Map<LegKey, TransferId>,
+        // Real main-transfer ids created by earlier chunks, keyed by row key, so a batch relationship
+        // whose target landed in a previous chunk still links by real id.
+        priorMainIdsByRowKey: Map<ImportRowKey, TransferId>,
+        // Resolved relationship-type ids for every type named by a batch relationship in this batch.
+        batchRelTypeIds: Map<String, RelationshipTypeId>,
     ): CreatePayload {
         // Assign negative temp ids so newAttributes/newRelationships can be keyed before real ids exist.
         // A main transfer carrying a fee expands into two transfers (main + fee) created in this same
@@ -1046,9 +1076,15 @@ class ImportEngineImpl(
         val spendTempIdByLeg = mutableMapOf<LegKey, TransferId>()
         val spendResultIndices = mutableMapOf<LegKey, Int>()
         var tempCounter = 0
+        // Pre-assign a temp id for every main transfer up front, so a batch relationship can reference
+        // another row's main transfer regardless of their relative order in this chunk (a debit leg may
+        // appear before or after the credit leg it links to).
+        val mainTempIds = chunk.map { TransferId(-(++tempCounter).toLong()) }
+        val mainTempIdByRowKey: Map<ImportRowKey, TransferId> =
+            chunk.mapIndexedNotNull { i, c -> c.transfer.rowKey?.let { it to mainTempIds[i] } }.toMap()
         chunk.forEachIndexed { chunkIndex, classified ->
             val t = classified.transfer
-            val mainTempId = TransferId(-(++tempCounter).toLong())
+            val mainTempId = mainTempIds[chunkIndex]
             val fee = t.fee
             val feeTempId = if (fee != null) TransferId(-(++tempCounter).toLong()) else null
             val passThrough = t.passThrough
@@ -1062,6 +1098,16 @@ class ImportEngineImpl(
                     }
                     if (passThrough != null && spendTempIds != null) {
                         add(NewRelationship(relatedTransferId = spendTempIds.first(), typeId = passThrough.relationshipTypeId))
+                    }
+                    // Link to sibling transfers created in this batch (this chunk's temp id, or an
+                    // earlier chunk's real id). Targets that weren't created (deduped/errored) resolve
+                    // to null and are skipped.
+                    for (br in t.batchRelationships) {
+                        val targetId = mainTempIdByRowKey[br.relatedRowKey] ?: priorMainIdsByRowKey[br.relatedRowKey]
+                        val typeId = batchRelTypeIds[br.typeName]
+                        if (targetId != null && typeId != null) {
+                            add(NewRelationship(relatedTransferId = targetId, typeId = typeId))
+                        }
                     }
                 }
             val rowKey = requireNotNull(t.rowKey)

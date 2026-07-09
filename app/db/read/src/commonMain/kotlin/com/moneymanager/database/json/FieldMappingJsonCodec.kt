@@ -3,6 +3,7 @@ package com.moneymanager.database.json
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
+import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
@@ -79,4 +80,14 @@ object FieldMappingJsonCodec {
      * Decodes content match rules from JSON array string.
      */
     fun decodeContentRules(jsonString: String): List<ContentMatchRule> = json.decodeFromString(jsonString)
+
+    /**
+     * Encodes an optional conversion config to a JSON string, or null when absent.
+     */
+    fun encodeConversionConfig(config: ConversionConfig?): String? = config?.let { json.encodeToString(it) }
+
+    /**
+     * Decodes an optional conversion config from a JSON string (null when the column is null).
+     */
+    fun decodeConversionConfig(jsonString: String?): ConversionConfig? = jsonString?.let { json.decodeFromString(it) }
 }

@@ -31,6 +31,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.BatchRelationship
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
@@ -778,6 +779,35 @@ suspend fun runCsvImport(
             )
         }
 
+    // Asset-conversion linking: pair each debit leg to a credit leg (same pairing key, nearest
+    // timestamp within the configured window) so the engine links them with the conversion
+    // relationship. Handles both 1:1 swaps and N-debits -> 1-credit dust events (many debits share the
+    // one credit). Debits with no in-window credit are left unlinked (still valid, balance-correct).
+    val conversionConfig = strategy.conversionConfig
+    val conversionLinkByRow: Map<Long, BatchRelationship> =
+        if (conversionConfig == null) {
+            emptyMap()
+        } else {
+            val window = conversionConfig.pairingWindowSeconds.seconds
+            val credits = finalPrep.validTransfers.filter { it.conversionLeg?.side == ConversionSide.CREDIT }
+            finalPrep.validTransfers
+                .filter { it.conversionLeg?.side == ConversionSide.DEBIT }
+                .mapNotNull { debit ->
+                    val key = debit.conversionLeg!!.pairingKey
+                    val match =
+                        credits
+                            .filter { it.conversionLeg!!.pairingKey == key }
+                            .minByOrNull { (it.transfer.timestamp - debit.transfer.timestamp).absoluteValue }
+                            ?.takeIf { (it.transfer.timestamp - debit.transfer.timestamp).absoluteValue <= window }
+                            ?: return@mapNotNull null
+                    debit.rowIndex to
+                        BatchRelationship(
+                            relatedRowKey = ImportRowKey.CsvRow(match.rowIndex),
+                            typeName = conversionConfig.relationshipTypeName,
+                        )
+                }.toMap()
+        }
+
     val importTransfers =
         finalPrep.validTransfers.filter { it.tradeTo == null }.map { row ->
             val uniqueKey =
@@ -836,6 +866,7 @@ suspend fun runCsvImport(
                 uniqueKey = uniqueKey,
                 fee = fee,
                 passThrough = passThrough,
+                batchRelationships = listOfNotNull(conversionLinkByRow[row.rowIndex]),
             )
         }
 

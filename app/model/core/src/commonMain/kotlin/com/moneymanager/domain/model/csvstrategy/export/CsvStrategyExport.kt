@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
+import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
@@ -29,6 +30,8 @@ import kotlinx.serialization.Serializable
  * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fileNamePattern])
  * @property crossSourceReconcileWindowSeconds Cross-source reconciliation window
  * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.crossSourceReconcileWindowSeconds])
+ * @property conversionConfig Asset-conversion configuration (already portable, no IDs)
+ * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.conversionConfig])
  */
 @Serializable
 data class CsvStrategyExport(
@@ -43,6 +46,7 @@ data class CsvStrategyExport(
     val accountMappings: List<AccountMappingExport> = emptyList(),
     val fileNamePattern: String? = null,
     val crossSourceReconcileWindowSeconds: Long? = null,
+    val conversionConfig: ConversionConfig? = null,
 )
 
 /**
