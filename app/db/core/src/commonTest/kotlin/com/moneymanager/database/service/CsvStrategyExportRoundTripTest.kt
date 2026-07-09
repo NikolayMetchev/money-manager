@@ -58,9 +58,12 @@ class CsvStrategyExportRoundTripTest : DbTest() {
 
                 val imported = service.createStrategyFromExport(decoded, resolutions = emptyMap()).strategy
                 val reExport = service.toExport(imported, appVersion)
+                // Compare serialized (canonical) form: encoding sorts order-insensitive collections, so
+                // this tolerates the round trip normalizing authored order while still catching any lost
+                // or altered content byte-for-byte.
                 assertEquals(
-                    export,
-                    reExport,
+                    CsvStrategyExportCodec.encode(export),
+                    CsvStrategyExportCodec.encode(reExport),
                     "Strategy '${strategy.name}' changed across an export-import round trip",
                 )
             }

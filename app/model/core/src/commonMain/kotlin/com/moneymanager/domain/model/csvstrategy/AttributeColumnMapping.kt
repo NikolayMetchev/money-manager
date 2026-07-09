@@ -27,4 +27,9 @@ data class AttributeColumnMapping(
     val isUniqueIdentifier: Boolean = false,
     val extraction: ColumnExtraction? = null,
     val emitWhenMatched: String? = null,
-)
+) : Comparable<AttributeColumnMapping> {
+    // Natural order for canonical export serialization: (columnName, attributeTypeName) is the
+    // mapping's identity; entries tying on both sort stably, which is deterministic enough because
+    // their stored order is itself part of the strategy's persisted config.
+    override fun compareTo(other: AttributeColumnMapping): Int = compareValuesBy(this, other, { it.columnName }, { it.attributeTypeName })
+}
