@@ -336,25 +336,30 @@ object BuiltInApiStrategies {
      */
     fun cryptoComExchange(now: Instant): ApiImportStrategy {
         val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
-        val window =
+        // get-deposit-history / get-withdrawal-history serve years of history, so page a long lookback.
+        val historyWindow =
             ApiPaginationConfig(
                 mode = PaginationMode.DATE_WINDOW,
                 startParam = "start_ts",
                 endParam = "end_ts",
-                windowDays = 30,
-                lookbackDays = 365 * 4,
+                windowDays = 90,
+                lookbackDays = 365 * 6,
             )
+        // get-trades / get-order-history only serve a recent window (older trades come from the CSV
+        // import), so a short lookback avoids paging years of empty windows.
+        val recentWindow = historyWindow.copy(windowDays = 30, lookbackDays = 180)
 
         fun signed(
             path: String,
             key: String,
+            pagination: ApiPaginationConfig,
         ) = ApiEndpointConfig(
             path = path,
             responseArrayKey = key,
             method = HttpMethodType.POST,
             successCodeField = "code",
             successCodeOkValue = "0",
-            pagination = window,
+            pagination = pagination,
         )
         val tradeMappings =
             ApiTradeMappings(
@@ -424,29 +429,23 @@ object BuiltInApiStrategies {
             syntheticAccount = ApiSyntheticAccount(name = "Crypto.com Exchange", externalId = "crypto-com-exchange"),
             dataEndpoints =
                 listOf(
-                    ApiDataEndpoint(signed("private/get-trades", "result.data"), ApiEndpointKind.TRADES, tradeMappings = tradeMappings),
                     ApiDataEndpoint(
-                        signed("private/get-order-history", "result.data"),
+                        signed("private/get-trades", "result.data", recentWindow),
+                        ApiEndpointKind.TRADES,
+                        tradeMappings = tradeMappings,
+                    ),
+                    ApiDataEndpoint(
+                        signed("private/get-order-history", "result.data", recentWindow),
                         ApiEndpointKind.ORDERS,
                         tradeMappings = orderMappings,
                     ),
                     ApiDataEndpoint(
-                        signed("private/get-deposit-history", "result.deposit_list"),
+                        signed("private/get-deposit-history", "result.deposit_list", historyWindow),
                         ApiEndpointKind.DEPOSITS,
                         transactionMappings = transferMappings(),
                     ),
                     ApiDataEndpoint(
-                        signed("private/get-withdrawal-history", "result.withdrawal_list"),
-                        ApiEndpointKind.WITHDRAWALS,
-                        transactionMappings = transferMappings(),
-                    ),
-                    ApiDataEndpoint(
-                        signed("private/fiat/fiat-deposit-history", "result.data"),
-                        ApiEndpointKind.DEPOSITS,
-                        transactionMappings = transferMappings(),
-                    ),
-                    ApiDataEndpoint(
-                        signed("private/fiat/fiat-withdraw-history", "result.data"),
+                        signed("private/get-withdrawal-history", "result.withdrawal_list", historyWindow),
                         ApiEndpointKind.WITHDRAWALS,
                         transactionMappings = transferMappings(),
                     ),

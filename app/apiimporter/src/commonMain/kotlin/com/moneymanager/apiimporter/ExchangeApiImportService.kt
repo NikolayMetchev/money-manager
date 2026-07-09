@@ -48,10 +48,13 @@ import com.moneymanager.rest.ApiRequestSigner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonObject
+import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.DurationUnit
 import kotlin.time.Instant
 import kotlin.time.toDuration
+
+private val logger = logging()
 
 /*
  * Generic download + import for signed exchange strategies — any ApiImportStrategy with a
@@ -100,7 +103,11 @@ suspend fun downloadApiSessionExchange(
     strategy.dataEndpoints.forEachIndexed { endpointIndex, dataEndpoint ->
         val endpoint = dataEndpoint.endpoint
         val windows = dateWindowsOrSingle(endpoint.pagination, now)
+        // A single failing endpoint (e.g. a path this account/product doesn't support) must not abort
+        // the whole download; once one window fails, skip the rest of that endpoint's windows.
+        var endpointBroken = false
         windows.forEachIndexed { windowIndex, window ->
+            if (endpointBroken) return@forEachIndexed
             val params = linkedMapOf<String, String>()
             endpoint.queryParams.forEach { p -> p.value?.let { params[p.name] = it } }
             if (window != null) {
@@ -147,11 +154,17 @@ suspend fun downloadApiSessionExchange(
             if (sendUrl !in downloadedUrls) {
                 val method = endpoint.method.name
                 val response = apiClient.send(method, sendUrl, signed.headers, signed.body, signed.contentType)
-                if (response.statusCode != 200) {
-                    throw ApiSessionImportException("HTTP ${response.statusCode}: ${response.body}")
-                }
-                if (!responseCodeOk(response.body, endpoint.successCodeField, endpoint.successCodeOkValue)) {
-                    throw ApiSessionImportException("API error for ${endpoint.path}: ${response.body}")
+                val error =
+                    when {
+                        response.statusCode != 200 -> "HTTP ${response.statusCode}: ${response.body}"
+                        !responseCodeOk(response.body, endpoint.successCodeField, endpoint.successCodeOkValue) ->
+                            "API error: ${response.body}"
+                        else -> null
+                    }
+                if (error != null) {
+                    logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
+                    endpointBroken = true
+                    return@forEachIndexed
                 }
                 responseCount += 1
                 if (rateLimitMillis > 0) delay(rateLimitMillis)
