@@ -114,6 +114,9 @@ class StrategyArtifactCodecTest {
         val decoded = CsvStrategyExportCodec.decode(CsvStrategyExportCodec.encode(reordered))
 
         assertEquals(listOf("Amount", "Date"), decoded.identificationColumns.toList())
+        val decodedFieldOrder = decoded.fieldMappings.keys.map { it.name }
+        assertEquals(decodedFieldOrder.sorted(), decodedFieldOrder)
+        assertEquals(decoded.attributeMappings, decoded.attributeMappings.sorted())
         assertEquals(decoded.accountMappings, decoded.accountMappings.sorted())
     }
 }
