@@ -272,6 +272,21 @@ fun ApiSessionsScreen(
                     importedAt = Clock.System.now(),
                     importDurationMillis = System.currentTimeMillis() - importStartedAt,
                 )
+                // Rebuild balance materialized views so the imported transfers/trades show up (the
+                // bank path does this too); then surface the per-session result and refresh the list.
+                maintenance.refreshMaterializedViews()
+                importResultBySession =
+                    importResultBySession +
+                    (
+                        session.id to
+                            ApiSessionImportResult(
+                                accountCount = 0,
+                                transactionCount = exchangeResult.tradesImported + exchangeResult.transfersImported,
+                                duplicateCount = exchangeResult.duplicatesSkipped,
+                            )
+                    )
+                importProgressBySession = importProgressBySession - session.id
+                refresh()
                 onTransactionsImported()
                 return@startTask "Imported ${exchangeResult.tradesImported} trades and ${exchangeResult.transfersImported} transfers."
             }
