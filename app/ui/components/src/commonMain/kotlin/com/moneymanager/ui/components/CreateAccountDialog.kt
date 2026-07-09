@@ -38,7 +38,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.ui.LocalImportEngine
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.CreateCategoryDialog
 import com.moneymanager.ui.util.onEnterKeyDown
@@ -67,12 +67,12 @@ fun CreateAccountDialog(
     var selectedOwnerIdForAddition by remember { mutableStateOf<Long?>(null) }
     var ownerDropdownExpanded by remember { mutableStateOf(false) }
 
-    val categories by categoryRepository
-        .getAllCategories()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val people by personRepository
-        .getAllPeople()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val categories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        categoryRepository.getAllCategories()
+    }
+    val people by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        personRepository.getAllPeople()
+    }
     val scope = rememberSchemaAwareCoroutineScope()
     val importEngine = LocalImportEngine.current
 

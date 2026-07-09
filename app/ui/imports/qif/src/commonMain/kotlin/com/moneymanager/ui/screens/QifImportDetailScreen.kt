@@ -41,7 +41,7 @@ import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.deleteQifImport
 import com.moneymanager.ui.components.qif.QifRecordList
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.qif.QifApplyStrategyDialog
 import com.moneymanager.ui.screens.qif.QifReimportDialog
@@ -70,7 +70,9 @@ fun QifImportDetailScreen(
     onTransferClick: (TransferId, Boolean) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val import by qifImportRepository.getImport(importId).collectAsStateWithSchemaErrorHandling(initial = null)
+    val import by rememberFlowAsStateWithSchemaErrorHandling(importId, initial = null) {
+        qifImportRepository.getImport(importId)
+    }
 
     var records by remember { mutableStateOf<List<QifImportRecord>>(emptyList()) }
     var refreshTrigger by remember { mutableStateOf(0) }

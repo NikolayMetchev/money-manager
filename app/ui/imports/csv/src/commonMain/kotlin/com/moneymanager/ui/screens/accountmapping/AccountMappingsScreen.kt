@@ -55,7 +55,7 @@ import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.deleteAccountMapping
 import com.moneymanager.ui.LocalImportEngine
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 
@@ -78,10 +78,14 @@ fun AccountMappingsScreen(
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
 
-    val allMappings by accountMappingRepository.getAllMappings().collectAsStateWithSchemaErrorHandling(emptyList())
+    val allMappings by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        accountMappingRepository.getAllMappings()
+    }
     // This screen manages only global mappings; strategy-scoped ones are edited in the strategy editor.
     val mappings = remember(allMappings) { allMappings.filter { it.strategyId == null } }
-    val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
+    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        accountRepository.getAllAccounts()
+    }
     val accountsById = remember(accounts) { accounts.associateBy { it.id } }
 
     var editingMapping by remember { mutableStateOf<AccountMapping?>(null) }

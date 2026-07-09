@@ -26,7 +26,7 @@ import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.onEnterKeyDown
 
 /**
@@ -48,12 +48,12 @@ fun AssetPicker(
     focusRequester: FocusRequester? = null,
     onSubmit: (() -> Unit)? = null,
 ) {
-    val currencies by currencyRepository
-        .getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val cryptos by cryptoRepository
-        .getAllCryptoAssets()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        currencyRepository.getAllCurrencies()
+    }
+    val cryptos by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        cryptoRepository.getAllCryptoAssets()
+    }
 
     val assets: List<Asset> = remember(currencies, cryptos) { currencies + cryptos }
 

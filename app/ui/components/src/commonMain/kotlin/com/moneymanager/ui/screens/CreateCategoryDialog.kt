@@ -39,7 +39,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.ui.LocalImportEngine
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch
@@ -61,9 +61,9 @@ fun CreateCategoryDialog(
     val source = Source.Manual
     val importEngine = LocalImportEngine.current
 
-    val categories by categoryRepository
-        .getAllCategories()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val categories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        categoryRepository.getAllCategories()
+    }
     val scope = rememberSchemaAwareCoroutineScope()
 
     val nameFocusRequester = remember { FocusRequester() }

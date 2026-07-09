@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -61,7 +63,7 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.ui.components.EditAccountDialog
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
 import com.moneymanager.ui.util.ScreenSizeClass
@@ -107,6 +109,48 @@ private fun verticalMatrixScrollTarget(
         (rowCenterPx - (viewportHeightPx / 2)).coerceAtLeast(0f).toInt()
     }
 
+/** A precomputed matrix cell: formatted balance text and whether it is negative (for color). */
+private class MatrixCell(
+    val text: String,
+    val isNegative: Boolean,
+)
+
+/**
+ * Per-column horizontal geometry (in px) for the account matrix. Precomputing the cumulative column
+ * offsets lets the matrix virtualize its columns — only the ones intersecting the viewport are
+ * composed instead of all ~1000+, which otherwise materializes tens of thousands of cells on open.
+ */
+private class MatrixColumns(
+    val starts: FloatArray,
+    val widths: FloatArray,
+    val totalPx: Float,
+    val spacingPx: Float,
+)
+
+/** The inclusive range of account-column indices intersecting the viewport, with a small overscan. */
+private fun visibleColumnRange(
+    columns: MatrixColumns,
+    scrollPx: Float,
+    viewportPx: Float,
+    count: Int,
+): IntRange {
+    if (count == 0) return IntRange.EMPTY
+    val viewStart = scrollPx
+    val viewEnd = scrollPx + viewportPx
+    var first = 0
+    while (first < count && columns.starts[first] + columns.widths[first] < viewStart) {
+        first++
+    }
+    var last = first
+    while (last < count && columns.starts[last] <= viewEnd) {
+        last++
+    }
+    last--
+    if (last < first) return IntRange.EMPTY
+    val overscan = 3
+    return (first - overscan).coerceAtLeast(0)..(last + overscan).coerceAtMost(count - 1)
+}
+
 @Composable
 fun AccountTransactionsScreen(
     accountId: AccountId,
@@ -128,15 +172,15 @@ fun AccountTransactionsScreen(
     initialCurrencyId: CurrencyId? = null,
     externalRefreshTrigger: Int = 0,
 ) {
-    val allAccounts by accountRepository
-        .getAllAccounts()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val currencies by currencyRepository
-        .getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val accountBalances by transactionRepository
-        .getAccountBalances()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val allAccounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        accountRepository.getAllAccounts()
+    }
+    val currencies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        currencyRepository.getAllCurrencies()
+    }
+    val accountBalances by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        transactionRepository.getAccountBalances()
+    }
 
     // Selected account state - synced with parent's accountId parameter
     var selectedAccountId by remember { mutableStateOf(accountId) }
@@ -237,6 +281,21 @@ fun AccountTransactionsScreen(
     val displayedRunningBalances =
         if (showExcluded) runningBalances else runningBalances.filter { !it.isExcluded }
 
+    // Precompute per-(account, asset) formatted balances once, keyed accountId -> assetId -> cell, so
+    // matrix cells are O(1) lookups with no per-cell find/formatAmount (formatAmount builds a
+    // CurrencyFormatter per call). With ~1000 accounts this is the difference between one pass and a
+    // find over every balance for each of tens of thousands of cells.
+    val cellsByAccount: Map<Long, Map<Long, MatrixCell>> =
+        remember(accountBalances) {
+            accountBalances
+                .groupBy { it.accountId.id }
+                .mapValues { (_, list) ->
+                    list.associate { ab ->
+                        ab.balance.currency.id.id to MatrixCell(formatAmount(ab.balance), ab.balance.isNegative())
+                    }
+                }
+        }
+
     // Get all unique assets (fiat or crypto) from account balances for matrix, deduped by id.
     // Sorted by code for a deterministic row order independent of balance emission order.
     val uniqueAssets =
@@ -244,18 +303,19 @@ fun AccountTransactionsScreen(
             accountBalances.map { it.balance.currency }.distinctBy { it.id.id }.sortedBy { it.code }
         }
 
-    // Calculate column widths for each account based on account name and balance amounts
+    // Calculate column widths for each account based on account name and balance amounts,
+    // reusing the precomputed formatted strings above.
     val accountColumnWidths: Map<AccountId, Dp> =
-        remember(allAccounts, accountBalances) {
+        remember(allAccounts, cellsByAccount) {
             allAccounts.associate { account ->
                 // Calculate width needed for account name header
                 val nameWidth = (account.name.length * 8 + 16).dp
 
                 // Calculate max balance width for this account
                 val maxBalanceWidth =
-                    accountBalances
-                        .filter { it.accountId == account.id }
-                        .maxOfOrNull { formatAmount(it.balance).length }
+                    cellsByAccount[account.id.id]
+                        ?.values
+                        ?.maxOfOrNull { it.text.length }
                         ?.let { (it * 8 + 16).dp }
                         ?: 0.dp
 
@@ -385,11 +445,45 @@ fun AccountTransactionsScreen(
         val screenSizeClass = ScreenSizeClass.fromWidth(maxWidth)
 
         // Get density for dp to pixel conversion
-        val density = androidx.compose.ui.platform.LocalDensity.current
+        val density = LocalDensity.current
 
         // Capture container dimensions for centering calculations
         val containerWidthDp = maxWidth
         val containerHeightDp = maxHeight
+
+        // Precompute cumulative column x-offsets (px) so the matrix can virtualize its columns.
+        val matrixColumns =
+            remember(allAccounts, accountColumnWidths, density) {
+                with(density) {
+                    val spacingPx = 8.dp.toPx()
+                    val starts = FloatArray(allAccounts.size)
+                    val widths = FloatArray(allAccounts.size)
+                    var offsetPx = 0f
+                    for (i in allAccounts.indices) {
+                        val widthPx = (accountColumnWidths[allAccounts[i].id] ?: ACCOUNT_COLUMN_MIN_WIDTH).toPx()
+                        starts[i] = offsetPx
+                        widths[i] = widthPx
+                        offsetPx += widthPx + spacingPx
+                    }
+                    MatrixColumns(starts, widths, totalPx = offsetPx, spacingPx = spacingPx)
+                }
+            }
+
+        // Width of the scrollable balance grid: the container minus the fixed 60dp label column.
+        val gridViewportPx = with(density) { (containerWidthDp - 60.dp).toPx() }
+
+        // Only the account columns intersecting the viewport (plus overscan) are composed. Recomputes
+        // (via derivedStateOf) only when the visible index range actually changes, not every scroll px.
+        val visibleColumns by remember(matrixColumns, gridViewportPx) {
+            derivedStateOf {
+                visibleColumnRange(
+                    matrixColumns,
+                    horizontalScrollState.value.toFloat(),
+                    gridViewportPx,
+                    allAccounts.size,
+                )
+            }
+        }
 
         // Auto-scroll matrix horizontally when account changes (including on initial load)
         LaunchedEffect(selectedAccountId, allAccounts) {
@@ -432,6 +526,28 @@ fun AccountTransactionsScreen(
                         )
                     }
                 } else if (allAccounts.isNotEmpty()) {
+                    // Horizontal virtualization: only the account columns intersecting the viewport
+                    // (plus overscan) are composed. The rest of the scrollable width is filled by
+                    // leading/trailing spacers so the ScrollState range (and the scrollbar / auto-scroll
+                    // pixel math) stay identical to a fully-materialized grid.
+                    val range = visibleColumns
+                    val leadingWidth =
+                        with(density) {
+                            (if (range.isEmpty()) matrixColumns.totalPx else matrixColumns.starts[range.first]).toDp()
+                        }
+                    val trailingWidth =
+                        with(density) {
+                            val end =
+                                if (range.isEmpty()) {
+                                    matrixColumns.totalPx
+                                } else {
+                                    matrixColumns.starts[range.last] +
+                                        matrixColumns.widths[range.last] +
+                                        matrixColumns.spacingPx
+                                }
+                            (matrixColumns.totalPx - end).coerceAtLeast(0f).toDp()
+                        }
+
                     // Account Picker - Buttons with balances underneath in table format
                     Column(
                         modifier = Modifier.fillMaxSize(),
@@ -441,16 +557,17 @@ fun AccountTransactionsScreen(
                             // Empty corner space for currency label column
                             Spacer(modifier = Modifier.width(60.dp))
 
-                            // Account names row (horizontally scrollable)
+                            // Account names row (horizontally scrollable, virtualized)
                             Row(
                                 modifier =
                                     Modifier
                                         .weight(1f)
                                         .linuxHorizontalScrollWheel(horizontalScrollState)
                                         .horizontalScroll(horizontalScrollState),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                allAccounts.forEach { account ->
+                                Spacer(modifier = Modifier.width(leadingWidth))
+                                for (columnIndex in range) {
+                                    val account = allAccounts[columnIndex]
                                     val isSelectedColumn = selectedAccountId == account.id
                                     val isColumnSelected = isSelectedColumn && selectedCurrencyId == null
                                     val isCellSelected = isSelectedColumn && selectedCurrencyId != null
@@ -499,7 +616,9 @@ fun AccountTransactionsScreen(
                                             }
                                         }
                                     }
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
+                                Spacer(modifier = Modifier.width(trailingWidth))
                             }
                         }
 
@@ -544,7 +663,7 @@ fun AccountTransactionsScreen(
                                     }
                                 }
 
-                                // Right side: Balance grid (scrolls both vertically and horizontally)
+                                // Right side: Balance grid (scrolls both vertically and horizontally, virtualized)
                                 Column(
                                     modifier =
                                         Modifier
@@ -557,15 +676,13 @@ fun AccountTransactionsScreen(
                                     // Row for each currency
                                     uniqueAssets.forEach { asset ->
                                         Row(
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
-                                            // Balance for each account
-                                            allAccounts.forEach { account ->
-                                                val balance =
-                                                    accountBalances.find {
-                                                        it.accountId == account.id && it.balance.currency.id.id == asset.id.id
-                                                    }
+                                            Spacer(modifier = Modifier.width(leadingWidth))
+                                            // Balance for each visible account
+                                            for (columnIndex in range) {
+                                                val account = allAccounts[columnIndex]
+                                                val cell = cellsByAccount[account.id.id]?.get(asset.id.id)
                                                 val isSelectedCell =
                                                     selectedAccountId == account.id && selectedCurrencyId?.id == asset.id.id
                                                 val isColumnSelected = selectedAccountId == account.id && selectedCurrencyId == null
@@ -583,7 +700,7 @@ fun AccountTransactionsScreen(
                                                         Modifier
                                                             .width(columnWidth)
                                                             .background(backgroundColor)
-                                                            .clickable(enabled = balance != null) {
+                                                            .clickable(enabled = cell != null) {
                                                                 val assetCurrencyId = CurrencyId(asset.id.id)
                                                                 selectedAccountId = account.id
                                                                 selectedCurrencyId = assetCurrencyId
@@ -591,12 +708,12 @@ fun AccountTransactionsScreen(
                                                             }.padding(vertical = 4.dp),
                                                     contentAlignment = Alignment.Center,
                                                 ) {
-                                                    if (balance != null) {
+                                                    if (cell != null) {
                                                         Text(
-                                                            text = formatAmount(balance.balance),
+                                                            text = cell.text,
                                                             style = MaterialTheme.typography.bodySmall,
                                                             color =
-                                                                if (!balance.balance.isNegative()) {
+                                                                if (!cell.isNegative) {
                                                                     MaterialTheme.colorScheme.primary
                                                                 } else {
                                                                     MaterialTheme.colorScheme.error
@@ -612,7 +729,9 @@ fun AccountTransactionsScreen(
                                                         )
                                                     }
                                                 }
+                                                Spacer(modifier = Modifier.width(8.dp))
                                             }
+                                            Spacer(modifier = Modifier.width(trailingWidth))
                                         }
                                     }
                                 }

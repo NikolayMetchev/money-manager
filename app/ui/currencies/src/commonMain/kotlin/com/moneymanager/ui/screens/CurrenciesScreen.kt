@@ -17,7 +17,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.deleteCurrency
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CreateCurrencyDialog
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -29,9 +29,9 @@ fun CurrenciesScreen(
     currencyRepository: CurrencyReadRepository,
     onAuditClick: (Currency) -> Unit = {},
 ) {
-    val currencies by currencyRepository
-        .getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        currencyRepository.getAllCurrencies()
+    }
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {

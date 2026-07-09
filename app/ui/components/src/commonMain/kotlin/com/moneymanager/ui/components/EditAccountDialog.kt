@@ -42,7 +42,7 @@ import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.ui.LocalImportEngine
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.CreateCategoryDialog
 import com.moneymanager.ui.screens.transactions.EditableAttributesSection
@@ -68,15 +68,15 @@ fun EditAccountDialog(
 ) {
     val accountState = rememberAccountDialogState(initialName = account.name, initialCategoryId = account.categoryId)
 
-    val categories by categoryRepository
-        .getAllCategories()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val people by personRepository
-        .getAllPeople()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val existingOwnerships by personAccountOwnershipRepository
-        .getOwnershipsByAccount(account.id)
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val categories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        categoryRepository.getAllCategories()
+    }
+    val people by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        personRepository.getAllPeople()
+    }
+    val existingOwnerships by rememberFlowAsStateWithSchemaErrorHandling(account.id, initial = emptyList()) {
+        personAccountOwnershipRepository.getOwnershipsByAccount(account.id)
+    }
 
     var selectedOwnerIds by remember(existingOwnerships) {
         mutableStateOf(existingOwnerships.map { it.personId.id }.toSet())

@@ -49,7 +49,7 @@ import com.moneymanager.importengineapi.updateImportDirectory
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.ui.LocalImportEngine
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.navigation.ImportTab
 import kotlinx.coroutines.launch
@@ -77,12 +77,16 @@ fun ImportDirectoriesScreen(
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
 
-    val directories by importDirectoryRepository
-        .getAllDirectories()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val directories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        importDirectoryRepository.getAllDirectories()
+    }
     // All staged imports, used to tell whether a directory's downloaded files are still un-imported.
-    val csvImports by csvImportRepository.getAllImports().collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val qifImports by qifImportRepository.getAllImports().collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val csvImports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        csvImportRepository.getAllImports()
+    }
+    val qifImports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        qifImportRepository.getAllImports()
+    }
 
     var showAddDialog by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
@@ -344,9 +348,9 @@ private fun ImportDirectoryRow(
     onAudit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val trackedFiles by importDirectoryRepository
-        .getTrackedFiles(directory.id)
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val trackedFiles by rememberFlowAsStateWithSchemaErrorHandling(directory.id, initial = emptyList()) {
+        importDirectoryRepository.getTrackedFiles(directory.id)
+    }
 
     val csvCount = trackedFiles.count { it.csvImportId != null }
     val qifCount = trackedFiles.count { it.qifImportId != null }

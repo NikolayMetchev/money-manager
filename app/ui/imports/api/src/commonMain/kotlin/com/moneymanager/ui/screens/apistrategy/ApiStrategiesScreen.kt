@@ -44,7 +44,7 @@ import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.deleteApiStrategy
 import com.moneymanager.ui.LocalImportEngine
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -59,9 +59,9 @@ fun ApiStrategiesScreen(
     onAuditHistoryClick: ((ApiImportStrategy) -> Unit)? = null,
 ) {
     val importEngine = LocalImportEngine.current
-    val strategies by apiImportStrategyRepository
-        .getAllStrategies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val strategies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        apiImportStrategyRepository.getAllStrategies()
+    }
 
     var strategyPendingDelete by remember { mutableStateOf<ApiImportStrategy?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }

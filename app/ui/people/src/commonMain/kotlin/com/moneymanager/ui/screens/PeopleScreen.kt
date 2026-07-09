@@ -46,7 +46,7 @@ import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.components.DeletePersonConfirmationDialog
 import com.moneymanager.ui.components.EditPersonDialog
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 
 @Composable
 fun PeopleScreen(
@@ -57,9 +57,9 @@ fun PeopleScreen(
     scrollToPersonId: PersonId? = null,
     onAuditClick: (Person) -> Unit = {},
 ) {
-    val people by personRepository
-        .getAllPeople()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val people by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        personRepository.getAllPeople()
+    }
     var showCreateDialog by remember { mutableStateOf(false) }
     var personToEdit by remember { mutableStateOf<Person?>(null) }
     var personToDelete by remember { mutableStateOf<Person?>(null) }
@@ -110,9 +110,12 @@ fun PeopleScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(people) { person ->
-                        val ownerships by personAccountOwnershipRepository
-                            .getOwnershipsByPerson(person.id)
-                            .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+                        val ownerships by rememberFlowAsStateWithSchemaErrorHandling(
+                            person.id,
+                            initial = emptyList(),
+                        ) {
+                            personAccountOwnershipRepository.getOwnershipsByPerson(person.id)
+                        }
                         PersonCard(
                             person = person,
                             ownerships = ownerships,
@@ -151,9 +154,12 @@ fun PeopleScreen(
 
     val currentPersonToDelete = personToDelete
     if (currentPersonToDelete != null) {
-        val ownerships by personAccountOwnershipRepository
-            .getOwnershipsByPerson(currentPersonToDelete.id)
-            .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+        val ownerships by rememberFlowAsStateWithSchemaErrorHandling(
+            currentPersonToDelete.id,
+            initial = emptyList(),
+        ) {
+            personAccountOwnershipRepository.getOwnershipsByPerson(currentPersonToDelete.id)
+        }
         DeletePersonConfirmationDialog(
             person = currentPersonToDelete,
             accountCount = ownerships.size,

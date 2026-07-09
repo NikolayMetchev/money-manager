@@ -20,7 +20,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.onEnterKeyDown
 
 /**
@@ -53,9 +53,9 @@ fun CurrencyPicker(
     focusRequester: FocusRequester? = null,
     onSubmit: (() -> Unit)? = null,
 ) {
-    val currencies by currencyRepository
-        .getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        currencyRepository.getAllCurrencies()
+    }
 
     var expanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }

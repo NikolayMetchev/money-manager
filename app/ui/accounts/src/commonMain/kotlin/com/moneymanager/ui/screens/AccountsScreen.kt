@@ -42,6 +42,7 @@ import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
@@ -63,22 +64,23 @@ fun AccountsScreen(
     onAccountClick: (Account) -> Unit,
     onAuditClick: (Account) -> Unit = {},
 ) {
-    // Use schema-error-aware collection for flows that may fail on old databases
-    val accounts by accountRepository
-        .getAllAccounts()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val balances by transactionRepository
-        .getAccountBalances()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val categories by categoryRepository
-        .getAllCategories()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val people by personRepository
-        .getAllPeople()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val ownerships by personAccountOwnershipRepository
-        .getAllOwnerships()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    // Use schema-error-aware collection for flows that may fail on old databases.
+    // Flows are remembered so they subscribe once instead of re-querying on every recomposition.
+    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        accountRepository.getAllAccounts()
+    }
+    val balances by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        transactionRepository.getAccountBalances()
+    }
+    val categories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        categoryRepository.getAllCategories()
+    }
+    val people by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        personRepository.getAllPeople()
+    }
+    val ownerships by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        personAccountOwnershipRepository.getAllOwnerships()
+    }
     var showCreateDialog by remember { mutableStateOf(false) }
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
     var selectedOwnerIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
@@ -90,15 +92,30 @@ fun AccountsScreen(
     }
 
     val ownerIdsByAccount: Map<AccountId, Set<Long>> =
-        ownerships.groupBy({ it.accountId }, { it.personId.id }).mapValues { it.value.toSet() }
+        remember(ownerships) {
+            ownerships.groupBy({ it.accountId }, { it.personId.id }).mapValues { it.value.toSet() }
+        }
     val displayedAccounts =
-        if (selectedOwnerIds.isEmpty()) {
-            accounts
-        } else {
-            accounts.filter { account ->
-                ownerIdsByAccount[account.id].orEmpty().any { it in selectedOwnerIds }
+        remember(accounts, selectedOwnerIds, ownerIdsByAccount) {
+            if (selectedOwnerIds.isEmpty()) {
+                accounts
+            } else {
+                accounts.filter { account ->
+                    ownerIdsByAccount[account.id].orEmpty().any { it in selectedOwnerIds }
+                }
             }
         }
+
+    // Precompute per-account lookups once so each card avoids O(accounts)/O(balances) scans.
+    val ownersByAccount: Map<AccountId, List<Person>> =
+        remember(ownerships, people) {
+            val peopleById = people.associateBy { it.id }
+            ownerships
+                .groupBy { it.accountId }
+                .mapValues { (_, os) -> os.mapNotNull { peopleById[it.personId] } }
+        }
+    val balancesByAccount = remember(balances) { balances.groupBy { it.accountId } }
+    val categoriesById = remember(categories) { categories.associateBy { it.id } }
 
     Column(
         modifier =
@@ -174,15 +191,12 @@ fun AccountsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(displayedAccounts, key = { it.id.id }) { account ->
-                        val accountBalances = balances.filter { it.accountId == account.id }
-                        val category = categories.find { it.id == account.categoryId }
                         AccountCard(
                             account = account,
-                            category = category,
-                            balances = accountBalances,
+                            category = categoriesById[account.categoryId],
+                            balances = balancesByAccount[account.id].orEmpty(),
+                            owners = ownersByAccount[account.id].orEmpty(),
                             accountRepository = accountRepository,
-                            personRepository = personRepository,
-                            personAccountOwnershipRepository = personAccountOwnershipRepository,
                             maintenance = maintenance,
                             onClick = { onAccountClick(account) },
                             onEditClick = { accountToEdit = account },
@@ -303,26 +317,14 @@ fun AccountCard(
     account: Account,
     category: Category?,
     balances: List<AccountBalance>,
+    owners: List<Person>,
     accountRepository: AccountReadRepository,
-    personRepository: PersonReadRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     maintenance: Maintenance,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
     onAuditClick: () -> Unit = {},
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
-
-    val ownerships by personAccountOwnershipRepository
-        .getOwnershipsByAccount(account.id)
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val allPeople by personRepository
-        .getAllPeople()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val owners =
-        ownerships.mapNotNull { ownership ->
-            allPeople.find { it.id == ownership.personId }
-        }
 
     Card(
         modifier =

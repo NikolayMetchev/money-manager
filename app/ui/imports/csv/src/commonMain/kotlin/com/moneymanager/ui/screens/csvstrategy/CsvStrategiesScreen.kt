@@ -59,7 +59,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
 
@@ -81,9 +81,9 @@ fun CsvStrategiesScreen(
     onEditQifStrategy: (CsvImportStrategyId, QifImportId) -> Unit = { _, _ -> },
     onAuditHistoryClick: (CsvImportStrategy) -> Unit = {},
 ) {
-    val strategies by csvImportStrategyRepository
-        .getAllStrategies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val strategies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        csvImportStrategyRepository.getAllStrategies()
+    }
 
     // Edit flow state: pick a sample file to edit the strategy against, then navigate to the editor.
     // QIF strategies (columns are the fixed QIF fields) need a QIF file as sample data, not a CSV one.
