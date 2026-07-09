@@ -2173,7 +2173,7 @@ private fun resolveSign(
     }
 
 /** JSON path for the [index]-th item of a response array, accounting for a blank (root-array) key. */
-private fun arrayItemJsonPath(
+internal fun arrayItemJsonPath(
     responseArrayKey: String,
     index: Int,
 ): JsonPath = if (responseArrayKey.isBlank()) JsonPath("$[$index]") else JsonPath("$.$responseArrayKey[$index]")

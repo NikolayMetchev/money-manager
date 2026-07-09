@@ -119,6 +119,24 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             // Order type folded into the description as reference.
             assertTrue(trade.description.contains("LIMIT"), "order type recorded: ${trade.description}")
 
+            // Provenance points at the real JSON node so the audit view can expand to it.
+            val deposit =
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        startDate = Instant.fromEpochMilliseconds(1_700_000_000_500L),
+                        endDate = Instant.fromEpochMilliseconds(1_700_000_001_500L),
+                    ).first()
+                    .first { it.targetAccountId == exchange.id && it.amount.currency.code == "CRO" }
+            val depositSource =
+                repositories.transferSourceRepository
+                    .getSourcesForTransaction(deposit.id)
+                    .first()
+                    .source
+            assertEquals(
+                "\$.result.deposit_list[0]",
+                (depositSource as com.moneymanager.domain.model.Source.Api).jsonPath?.value,
+            )
+
             val tradesBefore = trades.size
 
             // Re-import the same session: the exact-match guard keeps trades idempotent.

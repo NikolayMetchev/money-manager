@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CryptoRegistry
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
@@ -239,6 +240,7 @@ private data class ParsedTrade(
     val feeCode: String?,
     val orderId: String?,
     val requestId: ApiRequestId,
+    val jsonPath: String,
 )
 
 private data class ParsedExchangeTransfer(
@@ -249,6 +251,7 @@ private data class ParsedExchangeTransfer(
     val direction: TransferDirection,
     val description: String,
     val requestId: ApiRequestId,
+    val jsonPath: String,
 )
 
 private data class OrderMeta(
@@ -268,11 +271,12 @@ private fun parseExchangeItem(
     obj: JsonObject,
     dataEndpoint: com.moneymanager.domain.model.apistrategy.ApiDataEndpoint,
     requestId: ApiRequestId,
+    jsonPath: String,
     into: ParsedExchangeData,
 ) {
     when (dataEndpoint.kind) {
         ApiEndpointKind.TRADES ->
-            dataEndpoint.tradeMappings?.let { parseTrade(obj, it, requestId) }?.let(into.trades::add)
+            dataEndpoint.tradeMappings?.let { parseTrade(obj, it, requestId, jsonPath) }?.let(into.trades::add)
         ApiEndpointKind.ORDERS ->
             dataEndpoint.tradeMappings?.let { tm ->
                 val orderId = tm.orderIdField?.let { obj.str(it) } ?: obj.str(tm.idField)
@@ -283,11 +287,11 @@ private fun parseExchangeItem(
             }
         ApiEndpointKind.DEPOSITS ->
             dataEndpoint.transactionMappings
-                ?.let { parseExchangeTransfer(obj, it, TransferDirection.IN, requestId) }
+                ?.let { parseExchangeTransfer(obj, it, TransferDirection.IN, requestId, jsonPath) }
                 ?.let(into.transfers::add)
         ApiEndpointKind.WITHDRAWALS ->
             dataEndpoint.transactionMappings
-                ?.let { parseExchangeTransfer(obj, it, TransferDirection.OUT, requestId) }
+                ?.let { parseExchangeTransfer(obj, it, TransferDirection.OUT, requestId, jsonPath) }
                 ?.let(into.transfers::add)
         ApiEndpointKind.BANK_TRANSACTIONS -> Unit
     }
@@ -318,8 +322,12 @@ suspend fun importApiSessionExchange(
         val request = requestsById[response.requestId] ?: return@forEach
         val dataEndpoint = strategy.dataEndpoints.firstOrNull { request.url.contains(it.endpoint.path) } ?: return@forEach
         val items = responseItemsArray(response.json, dataEndpoint.endpoint.responseArrayKey) ?: return@forEach
-        items.forEach { element ->
-            (element as? JsonObject)?.let { parseExchangeItem(it, dataEndpoint, response.requestId, parsed) }
+        items.forEachIndexed { index, element ->
+            (element as? JsonObject)?.let {
+                // The real JSON path of this item so the audit view can expand to the exact node.
+                val jsonPath = arrayItemJsonPath(dataEndpoint.endpoint.responseArrayKey, index).value
+                parseExchangeItem(it, dataEndpoint, response.requestId, jsonPath, parsed)
+            }
         }
     }
     val trades = parsed.trades
@@ -421,7 +429,7 @@ suspend fun importApiSessionExchange(
         tradeIntents +=
             ImportTradeIntent(
                 key = LocalTradeKey("api-$sessionId-trade-${t.id}"),
-                source = source,
+                source = Source.Api(sessionId, t.requestId, JsonPath(t.jsonPath)),
                 timestamp = t.timestamp,
                 description = description,
                 fromAccountId = syntheticId,
@@ -445,6 +453,7 @@ suspend fun importApiSessionExchange(
                         money = Money.fromDisplayValue(feeAmount, feeAsset),
                         source = source,
                         requestId = t.requestId,
+                        jsonPath = t.jsonPath,
                         txnIdAttr = txnIdAttr,
                     )
             }
@@ -466,6 +475,7 @@ suspend fun importApiSessionExchange(
                 money = money,
                 source = source,
                 requestId = tx.requestId,
+                jsonPath = tx.jsonPath,
                 txnIdAttr = txnIdAttr,
             )
     }
@@ -520,11 +530,12 @@ private fun exchangeTransfer(
     money: Money,
     source: Source,
     requestId: ApiRequestId,
+    jsonPath: String,
     txnIdAttr: AttributeTypeId,
 ): ImportTransfer =
     ImportTransfer(
         source = source,
-        rowKey = ImportRowKey.ApiJsonPath(requestId, "exchange:$id"),
+        rowKey = ImportRowKey.ApiJsonPath(requestId, jsonPath),
         fromAccount = AccountRef.Existing(fromAccount),
         toAccount = AccountRef.Existing(toAccount),
         timestamp = timestamp,
@@ -548,6 +559,7 @@ private fun parseTrade(
     obj: JsonObject,
     tm: ApiTradeMappings,
     requestId: ApiRequestId,
+    jsonPath: String,
 ): ParsedTrade? {
     val instrument = obj.str(tm.instrumentField) ?: return null
     val (baseCode, quoteCode) = splitInstrument(instrument, tm) ?: return null
@@ -572,6 +584,7 @@ private fun parseTrade(
         feeCode = tm.feeCurrencyField?.let { obj.str(it) },
         orderId = tm.orderIdField?.let { obj.str(it) },
         requestId = requestId,
+        jsonPath = jsonPath,
     )
 }
 
@@ -596,6 +609,7 @@ private fun parseExchangeTransfer(
     tm: ApiTransactionMappings,
     direction: TransferDirection,
     requestId: ApiRequestId,
+    jsonPath: String,
 ): ParsedExchangeTransfer? {
     val amount = obj.str(tm.amountField)?.let { runCatching { BigDecimal(it).abs() }.getOrNull() } ?: return null
     val currency = obj.str(tm.currencyField) ?: return null
@@ -604,7 +618,7 @@ private fun parseExchangeTransfer(
     val description =
         obj.str(tm.descriptionField)?.takeIf { it.isNotBlank() }
             ?: if (direction == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
-    return ParsedExchangeTransfer(id, timestamp, currency, amount, direction, description, requestId)
+    return ParsedExchangeTransfer(id, timestamp, currency, amount, direction, description, requestId, jsonPath)
 }
 
 /** Rounds a positive display value to its asset's minor units (half-up), avoiding fromDisplayValue's
