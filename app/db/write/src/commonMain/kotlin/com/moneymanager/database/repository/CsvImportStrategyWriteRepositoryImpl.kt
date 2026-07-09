@@ -63,6 +63,7 @@ class CsvImportStrategyWriteRepositoryImpl(
                     content_match_rules_json = FieldMappingJsonCodec.encodeContentRules(strategy.contentMatchRules),
                     file_name_pattern = strategy.fileNamePattern,
                     cross_source_reconcile_window_seconds = strategy.crossSourceReconcileWindowSeconds,
+                    conversion_config_json = FieldMappingJsonCodec.encodeConversionConfig(strategy.conversionConfig),
                     updated_at = now.toEpochMilliseconds(),
                     id = strategy.id.id.toString(),
                 )

@@ -11,6 +11,7 @@ CREATE TABLE csv_import_strategy (
     content_match_rules_json TEXT NOT NULL DEFAULT '[]',
     file_name_pattern TEXT,
     cross_source_reconcile_window_seconds INTEGER,
+    conversion_config_json TEXT,
     created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
     updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000)
 );

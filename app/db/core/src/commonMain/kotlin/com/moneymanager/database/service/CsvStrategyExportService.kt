@@ -414,6 +414,7 @@ class CsvStrategyExportService(
                 contentMatchRules = export.contentMatchRules,
                 fileNamePattern = export.fileNamePattern,
                 crossSourceReconcileWindowSeconds = export.crossSourceReconcileWindowSeconds,
+                conversionConfig = export.conversionConfig,
                 createdAt = now,
                 updatedAt = now,
             )

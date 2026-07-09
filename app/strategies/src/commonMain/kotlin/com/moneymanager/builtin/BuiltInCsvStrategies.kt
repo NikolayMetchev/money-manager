@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
+import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -58,11 +59,26 @@ object BuiltInCsvStrategies {
     private const val CRYPTO_COM_EXCHANGE_ACCOUNT = "Crypto.com Exchange"
 
     /**
+     * Counterparty account for crypto.com asset conversions that arrive as separate debited/credited
+     * rows (dust conversions, wallet swaps). The dusted assets flow Crypto.com -> here and the received
+     * asset flows here -> Crypto.com, so the Crypto.com balances stay exact and the (economically
+     * meaningless) mixed-asset residual is isolated in this one account. See [ConversionConfig].
+     */
+    private const val CRYPTO_COM_CONVERSIONS_ACCOUNT = "Crypto.com Conversions"
+
+    /**
      * Cross-source reconciliation window for the crypto.com strategies. The same top-up appears in
      * both the card export ("GBP Deposit") and the fiat export (viban_card_top_up) with near-identical
      * timestamps, but statement exports are less precise than API feeds, so allow up to an hour.
      */
     private const val CRYPTO_COM_RECONCILE_WINDOW_SECONDS = 3600L
+
+    /**
+     * Window for pairing a conversion's debit leg to its credit leg. Crypto.com stamps the two legs of
+     * one event within ~1s of each other (occasionally straddling a second boundary), while distinct
+     * conversion events are minutes-to-days apart, so a few seconds cleanly separates events.
+     */
+    private const val CRYPTO_COM_CONVERSION_PAIRING_WINDOW_SECONDS = 5L
 
     /** Account name prefix shared with the Wise API import strategy ("Wise: " + currency code). */
     private const val WISE_ACCOUNT_PREFIX = "Wise: "
@@ -467,6 +483,24 @@ object BuiltInCsvStrategies {
             attributeMappings = attributeMappings,
             fileNamePattern = "^crypto_transactions_record_",
             crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+            // Dust conversions ("Convert Dust") and wallet swaps ("Balance Conversion") arrive as
+            // separate *_debited/*_credited rows (only Currency/Amount populated, no To Currency). Route
+            // both legs through the Conversions account and link each debit to its credit. The signal
+            // patterns match ONLY these two families — one-sided *_credited kinds (supercharger/rewards/
+            // admin income) are deliberately excluded. Debit rows are negative and credit rows positive,
+            // so the AMOUNT flip-on-positive already places the Crypto.com wallet on the correct side.
+            conversionConfig =
+                ConversionConfig(
+                    signalColumn = "Transaction Kind",
+                    debitPattern = "^(dust_conversion|crypto_wallet_swap)_debited$",
+                    creditPattern = "^(dust_conversion|crypto_wallet_swap)_credited$",
+                    conversionAccountName = CRYPTO_COM_CONVERSIONS_ACCOUNT,
+                    // Group 1 (dust_conversion | crypto_wallet_swap) keeps the two families from pairing
+                    // across each other; the time window then separates individual events within a family.
+                    pairingKeyPattern = "^(dust_conversion|crypto_wallet_swap)_",
+                    pairingWindowSeconds = CRYPTO_COM_CONVERSION_PAIRING_WINDOW_SECONDS,
+                    relationshipTypeName = "conversion",
+                ),
             createdAt = now,
             updatedAt = now,
         )

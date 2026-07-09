@@ -1,5 +1,5 @@
 insert:
-INSERT INTO transfer_relationship (id1, id2, relationship_type_id)
+INSERT OR IGNORE INTO transfer_relationship (id1, id2, relationship_type_id)
 VALUES (?, ?, ?);
 
 delete:

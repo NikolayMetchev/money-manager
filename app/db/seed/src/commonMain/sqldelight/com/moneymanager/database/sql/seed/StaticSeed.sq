@@ -43,6 +43,7 @@ INSERT INTO relationship_type (id, name) VALUES (1, 'reconciled');
 INSERT INTO relationship_type (id, name) VALUES (2, 'fee');
 INSERT INTO relationship_type (id, name) VALUES (3, 'pass-through');
 INSERT INTO relationship_type (id, name) VALUES (4, 'reversal');
+INSERT INTO relationship_type (id, name) VALUES (5, 'conversion');
 
 -- Pass-through (conduit) definitions are NOT seeded: the built-in Curve/PayPal definitions live in
 -- the strategy-library/ catalog and are installed on demand from the UI.
