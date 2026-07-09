@@ -246,6 +246,21 @@ data class ApiTransactionMappings(
     val feeIncludedInAmount: Boolean = false,
     val customFields: Map<String, String> = emptyMap(),
     val uniqueIdentifierFields: Set<String> = emptySet(),
+    /**
+     * Dot-path to a blockchain wallet address on a deposit/withdrawal item (e.g. "address" for a
+     * withdrawal destination, "source_address" for a deposit sender). When set and non-blank, the
+     * counterparty is modelled as a per-wallet account keyed by this address (so the same wallet
+     * reconciles across sources) rather than the generic funding account.
+     */
+    val counterpartyAddressField: String? = null,
+    /** Optional dot-path to the blockchain network of the wallet (e.g. "network_id"), used to label it. */
+    val counterpartyNetworkField: String? = null,
+    /**
+     * Dot-path to the on-chain transaction id (e.g. "txid"). When set, it is stored as a cross-source
+     * unique identifier on the transfer so the same on-chain movement seen from another source (another
+     * exchange or a wallet import) can be reconciled to it.
+     */
+    val txidField: String? = null,
 )
 
 @Serializable

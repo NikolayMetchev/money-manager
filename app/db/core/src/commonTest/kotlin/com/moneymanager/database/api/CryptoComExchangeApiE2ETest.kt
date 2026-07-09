@@ -50,7 +50,8 @@ class CryptoComExchangeApiE2ETest : DbTest() {
     private val depositsJson =
         """
         {"code":0,"result":{"deposit_list":[
-          {"id":"d1","amount":"1500.25","currency":"CRO","create_time":1700000001000}
+          {"id":"d1","amount":"1500.25","currency":"CRO","create_time":1700000001000,
+           "source_address":"cro1senderwallet","txid":"0xabc123","network_id":"CRONOS"}
         ]}}
         """.trimIndent()
 
@@ -135,6 +136,21 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             assertEquals(
                 "\$.result.deposit_list[0]",
                 (depositSource as com.moneymanager.domain.model.Source.Api).jsonPath?.value,
+            )
+
+            // The deposit's counterparty is a per-wallet account keyed by the sender address (not the
+            // generic funding account), so the same wallet reconciles across sources.
+            val wallet =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .first { it.id == deposit.sourceAccountId }
+            assertEquals("CRONOS:cro1senderwallet", wallet.name, "deposit should come from the per-wallet account")
+            // The on-chain txid is stored as a unique identifier for cross-source reconciliation.
+            val depositAttrs = repositories.transferAttributeRepository.getByTransaction(deposit.id).first()
+            assertTrue(
+                depositAttrs.any { it.attributeType.name == "blockchain-txid" && it.value == "0xabc123" },
+                "txid stored as unique id: $depositAttrs",
             )
 
             val tradesBefore = trades.size

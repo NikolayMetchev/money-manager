@@ -4,7 +4,6 @@ package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.bigdecimal.BigInteger
-import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.Asset
@@ -34,6 +33,7 @@ import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingApiIdExtractor
+import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
@@ -69,6 +69,12 @@ private const val EXCHANGE_ACCOUNT_EXTERNAL_ID_ATTR = "exchange-account-external
 
 /** Attribute type storing an exchange transfer's provider id (deposit/withdraw id) for de-duplication. */
 private const val EXCHANGE_TXN_ID_ATTR = "exchange.txn_id"
+
+/** External-id attribute keying a blockchain-wallet counterparty account by its address. */
+private const val WALLET_ADDRESS_ATTR = "blockchain-wallet-address"
+
+/** Cross-source unique-id attribute holding a transfer's on-chain transaction id. */
+private const val BLOCKCHAIN_TXID_ATTR = "blockchain-txid"
 
 /**
  * Downloads every data endpoint of an exchange [strategy] into [sessionId] as signed POST/GET requests,
@@ -252,6 +258,11 @@ private data class ParsedExchangeTransfer(
     val description: String,
     val requestId: ApiRequestId,
     val jsonPath: String,
+    /** Blockchain wallet address of the counterparty (blank/null → generic funding account). */
+    val counterpartyAddress: String?,
+    val network: String?,
+    /** On-chain transaction id, used as a cross-source unique identifier. */
+    val txid: String?,
 )
 
 private data class OrderMeta(
@@ -372,6 +383,8 @@ suspend fun importApiSessionExchange(
     // trades/transfers below can reference real account ids (the engine creates trades before accounts).
     val exchangeAcctAttr = importEngine.getOrCreateAttributeType(EXCHANGE_ACCOUNT_EXTERNAL_ID_ATTR)
     val txnIdAttr = importEngine.getOrCreateAttributeType(EXCHANGE_TXN_ID_ATTR)
+    val walletAddrAttr = importEngine.getOrCreateAttributeType(WALLET_ADDRESS_ATTR)
+    val txidAttr = importEngine.getOrCreateAttributeType(BLOCKCHAIN_TXID_ATTR)
 
     val syntheticKey = LocalAccountKey("exchange-synthetic")
     val feeKey = LocalAccountKey("exchange-fees")
@@ -448,8 +461,8 @@ suspend fun importApiSessionExchange(
                         id = "${t.id}-fee",
                         timestamp = t.timestamp,
                         description = "$description fee",
-                        fromAccount = syntheticId,
-                        toAccount = feeAccountId,
+                        fromAccount = AccountRef.Existing(syntheticId),
+                        toAccount = AccountRef.Existing(feeAccountId),
                         money = Money.fromDisplayValue(feeAmount, feeAsset),
                         source = source,
                         requestId = t.requestId,
@@ -460,11 +473,33 @@ suspend fun importApiSessionExchange(
         }
     }
 
+    // A per-wallet counterparty account for each distinct blockchain address (keyed by the address so
+    // the same wallet reconciles across sources); deposits/withdrawals with no address fall back to the
+    // generic funding account.
+    val walletKeys = mutableMapOf<String, LocalAccountKey>()
+    val walletIntents = mutableListOf<ImportAccountIntent>()
+    transfers.mapNotNull { it.counterpartyAddress }.distinct().forEach { address ->
+        val key = LocalAccountKey("wallet-$address")
+        walletKeys[address] = key
+        val network = transfers.firstOrNull { it.counterpartyAddress == address && it.network != null }?.network
+        walletIntents +=
+            ImportAccountIntent(
+                key = key,
+                source = source,
+                match = AccountMatchKey.ByExternalId(walletAddrAttr, address),
+                name = if (network != null) "$network:$address" else address,
+                openingDate = openingDate,
+                attributes = listOf(NewAttribute(walletAddrAttr, address)),
+            )
+    }
+
+    val exchangeRef = AccountRef.Existing(syntheticId)
     for (tx in transfers) {
         val txAsset = asset(tx.currencyCode) ?: continue // single jump — allowed
         val money = Money.fromDisplayValue(tx.amount, txAsset)
-        val (from, to) =
-            if (tx.direction == TransferDirection.IN) fundingId to syntheticId else syntheticId to fundingId
+        val counterparty =
+            tx.counterpartyAddress?.let { walletKeys[it] }?.let { AccountRef.Local(it) } ?: AccountRef.Existing(fundingId)
+        val (from, to) = if (tx.direction == TransferDirection.IN) counterparty to exchangeRef else exchangeRef to counterparty
         transferIntents +=
             exchangeTransfer(
                 id = tx.id,
@@ -477,6 +512,8 @@ suspend fun importApiSessionExchange(
                 requestId = tx.requestId,
                 jsonPath = tx.jsonPath,
                 txnIdAttr = txnIdAttr,
+                txid = tx.txid,
+                txidAttr = txidAttr,
             )
     }
 
@@ -498,6 +535,7 @@ suspend fun importApiSessionExchange(
             ImportBatch(
                 transfers = transferIntents,
                 trades = tradeIntents,
+                accountsToCreate = walletIntents,
                 dedupePolicy =
                     DedupePolicy.ApiMultiKey(
                         reconciledExclusionAttributeTypeId =
@@ -512,6 +550,12 @@ suspend fun importApiSessionExchange(
                     ExistingApiIdExtractor { transfer ->
                         transfer.attributes.firstOrNull { it.attributeType.id == txnIdAttr }?.value
                     },
+                uniqueKeyExtractor =
+                    ExistingUniqueKeyExtractor { transfer ->
+                        transfer.attributes
+                            .firstOrNull { it.attributeType.name == BLOCKCHAIN_TXID_ATTR }
+                            ?.let { mapOf(BLOCKCHAIN_TXID_ATTR to it.value) }
+                    },
             ),
         )
     return ExchangeImportResult(
@@ -525,25 +569,31 @@ private fun exchangeTransfer(
     id: String,
     timestamp: Instant,
     description: String,
-    fromAccount: AccountId,
-    toAccount: AccountId,
+    fromAccount: AccountRef,
+    toAccount: AccountRef,
     money: Money,
     source: Source,
     requestId: ApiRequestId,
     jsonPath: String,
     txnIdAttr: AttributeTypeId,
-): ImportTransfer =
-    ImportTransfer(
+    txid: String? = null,
+    txidAttr: AttributeTypeId? = null,
+): ImportTransfer {
+    val txidAttribute = if (txid != null && txidAttr != null) NewAttribute(txidAttr, txid) else null
+    return ImportTransfer(
         source = source,
         rowKey = ImportRowKey.ApiJsonPath(requestId, jsonPath),
-        fromAccount = AccountRef.Existing(fromAccount),
-        toAccount = AccountRef.Existing(toAccount),
+        fromAccount = fromAccount,
+        toAccount = toAccount,
         timestamp = timestamp,
         description = description,
         amount = money,
         apiId = id,
-        attributes = listOf(NewAttribute(txnIdAttr, id)),
+        // The on-chain txid is the cross-source unique identifier; the exchange's own id keys re-imports.
+        uniqueKey = txid?.let { mapOf(BLOCKCHAIN_TXID_ATTR to it) },
+        attributes = listOfNotNull(NewAttribute(txnIdAttr, id), txidAttribute),
     )
+}
 
 private fun tradeDescription(
     trade: ParsedTrade,
@@ -618,7 +668,19 @@ private fun parseExchangeTransfer(
     val description =
         obj.str(tm.descriptionField)?.takeIf { it.isNotBlank() }
             ?: if (direction == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
-    return ParsedExchangeTransfer(id, timestamp, currency, amount, direction, description, requestId, jsonPath)
+    return ParsedExchangeTransfer(
+        id = id,
+        timestamp = timestamp,
+        currencyCode = currency,
+        amount = amount,
+        direction = direction,
+        description = description,
+        requestId = requestId,
+        jsonPath = jsonPath,
+        counterpartyAddress = tm.counterpartyAddressField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+        network = tm.counterpartyNetworkField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+        txid = tm.txidField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+    )
 }
 
 /** Rounds a positive display value to its asset's minor units (half-up), avoiding fromDisplayValue's

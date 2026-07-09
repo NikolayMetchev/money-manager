@@ -389,7 +389,7 @@ object BuiltInApiStrategies {
                 orderStatusField = "status",
             )
 
-        fun transferMappings() =
+        fun transferMappings(addressField: String) =
             ApiTransactionMappings(
                 amountField = "amount",
                 currencyField = "currency",
@@ -397,6 +397,12 @@ object BuiltInApiStrategies {
                 timestampFormat = TimestampFormat.EPOCH_MS,
                 idField = "id",
                 amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                // Model the blockchain wallet as a per-address account; key the movement by its on-chain
+                // txid so it reconciles with the same transaction seen from another source. A deposit's
+                // counterparty is the sender (source_address); a withdrawal's is the destination (address).
+                counterpartyAddressField = addressField,
+                counterpartyNetworkField = "network_id",
+                txidField = "txid",
             )
         return ApiImportStrategy(
             id = ApiImportStrategyId(cryptoComExchangeStrategyId),
@@ -442,12 +448,12 @@ object BuiltInApiStrategies {
                     ApiDataEndpoint(
                         signed("private/get-deposit-history", "result.deposit_list", historyWindow),
                         ApiEndpointKind.DEPOSITS,
-                        transactionMappings = transferMappings(),
+                        transactionMappings = transferMappings("source_address"),
                     ),
                     ApiDataEndpoint(
                         signed("private/get-withdrawal-history", "result.withdrawal_list", historyWindow),
                         ApiEndpointKind.WITHDRAWALS,
-                        transactionMappings = transferMappings(),
+                        transactionMappings = transferMappings("address"),
                     ),
                 ),
             internalTransferReconcile =
