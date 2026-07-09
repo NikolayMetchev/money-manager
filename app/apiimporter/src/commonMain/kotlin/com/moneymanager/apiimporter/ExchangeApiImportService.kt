@@ -263,6 +263,8 @@ private data class ParsedExchangeTransfer(
     val network: String?,
     /** On-chain transaction id, used as a cross-source unique identifier. */
     val txid: String?,
+    /** Name of an owned account the counterparty aliases to (e.g. "Crypto.com" for an internal deposit). */
+    val aliasAccount: String?,
 )
 
 private data class OrderMeta(
@@ -396,10 +398,13 @@ suspend fun importApiSessionExchange(
             ImportBatch(
                 accountsToCreate =
                     listOf(
+                        // Match by name so the single Exchange account unifies with the one the CSV export
+                        // routes App<->Exchange transfers to (both use "Crypto.com Exchange"), regardless of
+                        // which strategy imports first; the external-id attribute is kept for reference.
                         ImportAccountIntent(
                             key = syntheticKey,
                             source = source,
-                            match = AccountMatchKey.ByExternalId(exchangeAcctAttr, synthetic.externalId),
+                            match = AccountMatchKey.ByName(synthetic.name),
                             name = synthetic.name,
                             openingDate = openingDate,
                             attributes = listOf(NewAttribute(exchangeAcctAttr, synthetic.externalId)),
@@ -473,16 +478,24 @@ suspend fun importApiSessionExchange(
         }
     }
 
-    // A per-wallet counterparty account for each distinct blockchain address (keyed by the address so
-    // the same wallet reconciles across sources); deposits/withdrawals with no address fall back to the
+    // Counterparty accounts. An aliased counterparty (e.g. an internal deposit whose `address` is
+    // "INTERNAL_DEPOSIT") is booked against a named owned account (the Crypto.com App account) so the
+    // same movement recorded by the CSV export reconciles to it. Otherwise each distinct blockchain
+    // address becomes its own wallet account (keyed by the address); a missing address falls back to the
     // generic funding account.
-    val walletKeys = mutableMapOf<String, LocalAccountKey>()
-    val walletIntents = mutableListOf<ImportAccountIntent>()
-    transfers.mapNotNull { it.counterpartyAddress }.distinct().forEach { address ->
+    val accountKeys = mutableMapOf<String, LocalAccountKey>()
+    val counterpartyIntents = mutableListOf<ImportAccountIntent>()
+    transfers.mapNotNull { it.aliasAccount }.distinct().forEach { name ->
+        val key = LocalAccountKey("alias-$name")
+        accountKeys[name] = key
+        counterpartyIntents +=
+            ImportAccountIntent(key = key, source = source, match = AccountMatchKey.ByName(name), name = name, openingDate = openingDate)
+    }
+    transfers.filter { it.aliasAccount == null }.mapNotNull { it.counterpartyAddress }.distinct().forEach { address ->
         val key = LocalAccountKey("wallet-$address")
-        walletKeys[address] = key
+        accountKeys[address] = key
         val network = transfers.firstOrNull { it.counterpartyAddress == address && it.network != null }?.network
-        walletIntents +=
+        counterpartyIntents +=
             ImportAccountIntent(
                 key = key,
                 source = source,
@@ -497,8 +510,8 @@ suspend fun importApiSessionExchange(
     for (tx in transfers) {
         val txAsset = asset(tx.currencyCode) ?: continue // single jump — allowed
         val money = Money.fromDisplayValue(tx.amount, txAsset)
-        val counterparty =
-            tx.counterpartyAddress?.let { walletKeys[it] }?.let { AccountRef.Local(it) } ?: AccountRef.Existing(fundingId)
+        val counterpartyKey = tx.aliasAccount?.let { accountKeys[it] } ?: tx.counterpartyAddress?.let { accountKeys[it] }
+        val counterparty = counterpartyKey?.let { AccountRef.Local(it) } ?: AccountRef.Existing(fundingId)
         val (from, to) = if (tx.direction == TransferDirection.IN) counterparty to exchangeRef else exchangeRef to counterparty
         transferIntents +=
             exchangeTransfer(
@@ -535,13 +548,17 @@ suspend fun importApiSessionExchange(
             ImportBatch(
                 transfers = transferIntents,
                 trades = tradeIntents,
-                accountsToCreate = walletIntents,
+                accountsToCreate = counterpartyIntents,
                 dedupePolicy =
                     DedupePolicy.ApiMultiKey(
+                        // A configured reconcile window also enables plain cross-source reconciliation, so
+                        // an aliased internal transfer (booked directly against the App account) links to
+                        // the identical leg the CSV export produces, regardless of which imports first.
+                        reconcileWindow = reconcile?.windowSeconds?.let { it.toDuration(DurationUnit.SECONDS) },
                         reconciledExclusionAttributeTypeId =
-                            if (bridges.isEmpty()) null else AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
+                            if (reconcile == null) null else AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
                         reconciledRelationshipTypeId =
-                            if (bridges.isEmpty()) null else RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
+                            if (reconcile == null) null else RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
                         internalTransferBridges = bridges,
                         internalTransferWindow = reconcile?.windowSeconds?.let { it.toDuration(DurationUnit.SECONDS) },
                         internalTransferAmountTolerancePct = reconcile?.amountTolerancePct ?: 0.0,
@@ -680,6 +697,7 @@ private fun parseExchangeTransfer(
         counterpartyAddress = tm.counterpartyAddressField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
         network = tm.counterpartyNetworkField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
         txid = tm.txidField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+        aliasAccount = tm.counterpartyAliasField?.let { obj.str(it) }?.let { tm.counterpartyAccountAliases[it] },
     )
 }
 

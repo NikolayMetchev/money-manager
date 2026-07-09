@@ -403,6 +403,10 @@ object BuiltInApiStrategies {
                 counterpartyAddressField = addressField,
                 counterpartyNetworkField = "network_id",
                 txidField = "txid",
+                // An internal transfer (funds moved from/to the Crypto.com App) is booked directly against
+                // the "Crypto.com" App account so the same movement in the CSV export reconciles to it.
+                counterpartyAliasField = "address",
+                counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Crypto.com", "INTERNAL_WITHDRAWAL" to "Crypto.com"),
             )
         return ApiImportStrategy(
             id = ApiImportStrategyId(cryptoComExchangeStrategyId),

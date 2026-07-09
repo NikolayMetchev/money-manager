@@ -261,6 +261,19 @@ data class ApiTransactionMappings(
      * exchange or a wallet import) can be reconciled to it.
      */
     val txidField: String? = null,
+    /**
+     * Dot-path to a field whose value can alias the counterparty to a named, already-owned account
+     * (e.g. "address"): a Crypto.com Exchange internal deposit has `address` = "INTERNAL_DEPOSIT",
+     * meaning the funds came from the Crypto.com App account. See [counterpartyAccountAliases].
+     */
+    val counterpartyAliasField: String? = null,
+    /**
+     * Maps a [counterpartyAliasField] value to the name of an owned account that is the real
+     * counterparty (e.g. {"INTERNAL_DEPOSIT": "Crypto.com"}). When matched, the transfer is booked
+     * directly against that account instead of a wallet/funding account, so the same movement recorded
+     * by another strategy (the CSV "Crypto.com" App export) reconciles to it regardless of import order.
+     */
+    val counterpartyAccountAliases: Map<String, String> = emptyMap(),
 )
 
 @Serializable

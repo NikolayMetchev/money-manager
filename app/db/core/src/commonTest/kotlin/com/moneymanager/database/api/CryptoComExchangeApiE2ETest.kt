@@ -55,7 +55,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
         ]}}
         """.trimIndent()
 
-    private suspend fun stageSessionAndImport(): Int {
+    private suspend fun stageSessionAndImport(deposits: String = depositsJson): Int {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Crypto.com Exchange").first()
         assertNotNull(strategy, "built-in Crypto.com Exchange strategy should be installed")
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
@@ -76,7 +76,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
         }
         stage("private/get-trades", tradesJson)
         stage("private/get-order-history", ordersJson)
-        stage("private/get-deposit-history", depositsJson)
+        stage("private/get-deposit-history", deposits)
 
         importApiSessionExchange(
             apiSessionRepository = repositories.apiSessionRepository,
@@ -163,6 +163,64 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                     .first()
                     .size
             assertEquals(tradesBefore, tradesAfter, "re-import must not double-book trades")
+        }
+
+    @Test
+    fun `an internal deposit aliases to the App account and reconciles with the CSV leg regardless of order`() =
+        runTest {
+            // The CSV export's view of the same App -> Exchange transfer, already imported:
+            // Crypto.com -> Crypto.com Exchange, 1500.25 CRO, 30s before the API's create_time.
+            val croId = repositories.importEngine.createCrypto("CRO")
+            val cro = repositories.cryptoRepository.getCryptoAssetById(croId).first()!!
+            val app = repositories.importEngine.createAppAccount("Crypto.com")
+            val exchange = repositories.importEngine.createAppAccount("Crypto.com Exchange")
+            repositories.transactionRepository.createTransfers(
+                transfers =
+                    listOf(
+                        Transfer(
+                            id = TransferId(0),
+                            timestamp = Instant.fromEpochMilliseconds(1_700_000_000_970L),
+                            description = "Transfer: App wallet -> Exchange",
+                            sourceAccountId = app,
+                            targetAccountId = exchange,
+                            amount = Money.fromDisplayValue("1500.25", cro),
+                        ),
+                    ),
+                sources = listOf(Source.SampleGenerator),
+            )
+
+            // The API's view: an INTERNAL_DEPOSIT (address = "INTERNAL_DEPOSIT") aliases the counterparty
+            // to the "Crypto.com" App account, so it is booked as the identical Crypto.com -> Crypto.com
+            // Exchange transfer and reconciles against the CSV leg above.
+            val internalDeposit =
+                """
+                {"code":0,"result":{"deposit_list":[
+                  {"id":"d9","amount":"1500.25","currency":"CRO","create_time":1700000001000,
+                   "address":"INTERNAL_DEPOSIT","source_address":"","txid":"internal-1"}
+                ]}}
+                """.trimIndent()
+            stageSessionAndImport(deposits = internalDeposit)
+
+            val apiDeposit =
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        Instant.fromEpochMilliseconds(1_700_000_000_980L),
+                        Instant.fromEpochMilliseconds(1_700_000_001_020L),
+                    ).first()
+                    .first { it.amount.currency.code == "CRO" }
+            // Booked directly App -> Exchange (not via a funding/wallet account).
+            assertEquals(app, apiDeposit.sourceAccountId, "internal deposit source should be the App account")
+            assertEquals(exchange, apiDeposit.targetAccountId, "internal deposit target should be the Exchange account")
+            // Reconciled to the CSV leg: excluded from balances + linked.
+            val attrs = repositories.transferAttributeRepository.getByTransaction(apiDeposit.id).first()
+            assertTrue(attrs.any { it.attributeType.id.id == -1L }, "the API leg should be excluded (reconciled)")
+            assertTrue(
+                repositories.transferRelationshipRepository
+                    .getByTransfer(apiDeposit.id)
+                    .first()
+                    .isNotEmpty(),
+                "the API leg should be linked to the CSV leg",
+            )
         }
 
     @Test

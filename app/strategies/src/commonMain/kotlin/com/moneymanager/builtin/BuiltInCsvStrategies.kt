@@ -50,6 +50,14 @@ object BuiltInCsvStrategies {
     private const val CRYPTO_COM_CRYPTO_ACCOUNT = "Crypto.com"
 
     /**
+     * The Crypto.com Exchange account (also created by the Exchange API strategy). Routing the App's
+     * "App wallet -> Exchange" / "Exchange -> App wallet" transfers to it — instead of a description-named
+     * placeholder — makes the CSV and the API emit the identical `Crypto.com -> Crypto.com Exchange`
+     * transfer, so cross-source reconciliation links the two ends regardless of which imports first.
+     */
+    private const val CRYPTO_COM_EXCHANGE_ACCOUNT = "Crypto.com Exchange"
+
+    /**
      * Cross-source reconciliation window for the crypto.com strategies. The same top-up appears in
      * both the card export ("GBP Deposit") and the fiat export (viban_card_top_up) with near-identical
      * timestamps, but statement exports are less precise than API feeds, so allow up to an hour.
@@ -395,13 +403,16 @@ object BuiltInCsvStrategies {
                         columnName = "Transaction Description",
                         rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CRYPTO_ACCOUNT)),
                     ),
-                // Counterparty (reward source / merchant) looked up from the description.
+                // Counterparty (reward source / merchant) looked up from the description, except App<->Exchange
+                // transfers which route to the shared "Crypto.com Exchange" account (see the constant's KDoc).
+                // Both descriptions contain "App wallet"; the flip-on-positive turns the pre-flip target into
+                // the source for the "Exchange -> App wallet" (received) direction.
                 TransferField.TARGET_ACCOUNT to
                     RegexAccountMapping(
                         id = cryptoComCryptoMappingId(2),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         columnName = "Transaction Description",
-                        rules = emptyList(),
+                        rules = listOf(RegexRule(pattern = "App wallet", accountName = CRYPTO_COM_EXCHANGE_ACCOUNT)),
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
