@@ -1,5 +1,6 @@
 package com.moneymanager.domain.model.accountmapping.export
 
+import com.moneymanager.domain.model.serialization.SortedListSerializer
 import kotlinx.serialization.Serializable
 
 /**
@@ -12,8 +13,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AccountMappingsExport(
     val version: String,
+    @Serializable(with = SortedAccountMappingListSerializer::class)
     val mappings: List<AccountMappingExport> = emptyList(),
 )
+
+/**
+ * Serializes account-mapping lists sorted by [AccountMappingExport]'s natural order, so the artifact
+ * bytes don't depend on per-device database-id order. Safe because runtime first-match resolution uses
+ * each device's own id order, never the artifact's list order.
+ */
+object SortedAccountMappingListSerializer : SortedListSerializer<AccountMappingExport>(AccountMappingExport.serializer())
 
 /**
  * Portable export format for a single persisted account mapping.
@@ -27,4 +36,6 @@ data class AccountMappingsExport(
 data class AccountMappingExport(
     val valuePattern: String,
     val accountName: String,
-)
+) : Comparable<AccountMappingExport> {
+    override fun compareTo(other: AccountMappingExport): Int = compareValuesBy(this, other, { it.valuePattern }, { it.accountName })
+}

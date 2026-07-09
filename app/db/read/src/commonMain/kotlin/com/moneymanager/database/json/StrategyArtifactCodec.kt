@@ -12,7 +12,10 @@ object StrategyArtifactCodec {
     /**
      * A stable, version-independent content hash of an artifact: the JSON is re-encoded with the
      * `version` stamp blanked so semantically-equal artifacts exported under different app versions
-     * hash identically, then hashed with FNV-1a 64-bit (platform-independent).
+     * hash identically, then hashed with FNV-1a 64-bit (platform-independent). The re-encode also
+     * canonicalizes collection order — the export models serialize their order-insensitive
+     * collections through sorted serializers (see `SortedListSerializer` and friends in app/model) —
+     * so artifacts differing only in collection order hash identically too.
      */
     fun canonicalHash(
         kind: StrategyKind,
