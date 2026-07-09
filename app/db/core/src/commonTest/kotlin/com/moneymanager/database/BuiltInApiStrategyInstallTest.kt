@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 // path a catalog install takes) must survive the JSON round trip through the database.
 class BuiltInApiStrategyInstallTest : DbTest() {
     @Test
-    fun `installing the built-in API strategies creates all three`() =
+    fun `installing the built-in API strategies creates all of them`() =
         runTest {
             repositories.installBuiltInApiStrategies()
             val names =
@@ -24,7 +24,60 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .map { it.name }
                     .toSet()
-            assertEquals(setOf("Monzo", "Wise", "Starling"), names)
+            assertEquals(setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange"), names)
+        }
+
+    @Test
+    fun `the Crypto_com Exchange strategy installs with its signed-exchange configuration`() =
+        runTest {
+            repositories.installBuiltInApiStrategies()
+            val exchange =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Crypto.com Exchange" }
+
+            assertEquals(com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED, exchange.authType)
+            // The generic signing recipe + single account + data endpoints survive the JSON round trip.
+            assertNotNull(exchange.requestSigning, "signing recipe persisted")
+            assertEquals("Crypto.com Exchange", assertNotNull(exchange.syntheticAccount).name)
+            assertTrue(exchange.dataEndpoints.isNotEmpty(), "data endpoints persisted")
+            assertNotNull(exchange.internalTransferReconcile, "internal-transfer reconciliation persisted")
+            assertEquals(
+                "Crypto.com",
+                exchange.internalTransferReconcile!!
+                    .bridges
+                    .single()
+                    .otherAccountName,
+            )
+        }
+
+    @Test
+    fun `the Crypto_com Exchange strategy survives an export file round trip`() =
+        runTest {
+            // The distribution format used by the catalog and by the API-strategies "Import file" button:
+            // toExport -> JSON encode/decode -> fromExport must reproduce the full signed-exchange config.
+            val now = kotlin.time.Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val original =
+                com.moneymanager.builtin.BuiltInApiStrategies
+                    .cryptoComExchange(now)
+            val json =
+                com.moneymanager.database.json.ApiStrategyExportCodec.encode(
+                    com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
+                        .toExport(original, "test"),
+                )
+            val rebuilt =
+                com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper.fromExport(
+                    com.moneymanager.database.json.ApiStrategyExportCodec
+                        .decode(json),
+                    original.id,
+                    now,
+                )
+            assertEquals(original.authType, rebuilt.authType)
+            assertEquals(original.requestSigning, rebuilt.requestSigning)
+            assertEquals(original.dataEndpoints, rebuilt.dataEndpoints)
+            assertEquals(original.syntheticAccount, rebuilt.syntheticAccount)
+            assertEquals(original.internalTransferReconcile, rebuilt.internalTransferReconcile)
         }
 
     @Test

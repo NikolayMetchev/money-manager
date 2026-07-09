@@ -35,6 +35,7 @@ class ApiSessionWriteRepositoryImpl(
         strategyId: ApiImportStrategyId?,
         privateKey: String?,
         publicKey: String?,
+        apiSecret: String?,
     ): MonzoCredentialId =
         withContext(Dispatchers.Default) {
             val id =
@@ -46,6 +47,7 @@ class ApiSessionWriteRepositoryImpl(
                         strategy_id = strategyId?.id?.toString(),
                         private_key = privateKey,
                         public_key = publicKey,
+                        api_secret = apiSecret,
                     )
                     writeQueries.lastInsertCredentialRowId().executeAsOne()
                 }

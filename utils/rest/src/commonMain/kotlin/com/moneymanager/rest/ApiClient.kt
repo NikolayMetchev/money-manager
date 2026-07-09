@@ -7,9 +7,12 @@ import io.ktor.client.plugins.plugin
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.request
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.util.AttributeKey
 
 /**
@@ -50,6 +53,31 @@ class ApiClient(
                 return signed.toApiHttpResponse()
             }
         }
+        return response.toApiHttpResponse()
+    }
+
+    /**
+     * Issues a request with an explicit [method], [headers] and optional [body] — the generic path used
+     * by signed exchange APIs (the signature/api-key/nonce are already baked into [headers]/[body]/[url]
+     * by [ApiRequestSigner]). The traffic interceptor records only method/url/(redacted) headers, never
+     * the body, so a secret carried in the JSON body (Crypto.com) is never persisted.
+     */
+    suspend fun send(
+        method: String,
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        body: String? = null,
+        contentType: String? = null,
+    ): ApiHttpResponse {
+        val response =
+            httpClient.request(url) {
+                this.method = HttpMethod.parse(method)
+                headers.forEach { (name, value) -> header(name, value) }
+                if (body != null) {
+                    contentType?.let { header(HttpHeaders.ContentType, it) }
+                    setBody(body)
+                }
+            }
         return response.toApiHttpResponse()
     }
 
@@ -128,7 +156,13 @@ const val NO_RESPONSE_ID: Long = -1L
 private fun isSensitiveHeader(key: String): Boolean {
     if (key.equals(HttpHeaders.Authorization, ignoreCase = true)) return true
     val lower = key.lowercase()
-    return lower.contains("signature") || lower.contains("2fa") || lower.contains("approval")
+    return lower.contains("signature") ||
+        lower.contains("2fa") ||
+        lower.contains("approval") ||
+        // Exchange auth headers: Binance `X-MBX-APIKEY`, Kraken `API-Key` / `API-Sign`.
+        lower.contains("api-key") ||
+        lower.contains("apikey") ||
+        lower.contains("api-sign")
 }
 
 private val apiResponseBodyKey = AttributeKey<String>("ApiResponseBody")

@@ -2,8 +2,10 @@
 
 package com.moneymanager.importer
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.RelationshipTypeId
@@ -49,6 +51,18 @@ data class Classified(
     val existing: TransferId?,
     val inBatchMatchIndex: Int? = null,
     val reversalLinks: Map<Int, ReversalLink> = emptyMap(),
+    /**
+     * An existing transfer to mark excluded-from-balances as a side effect of importing [transfer]
+     * (internal-transfer reconciliation): the stale app-side leg whose movement is now represented by
+     * the rewritten [transfer]. The engine adds the exclusion attribute to it during the update phase.
+     */
+    val excludeExisting: ExcludeExistingLeg? = null,
+)
+
+/** An existing transfer to tag excluded (its [transfer] carries the real id + fields to preserve). */
+data class ExcludeExistingLeg(
+    val transfer: Transfer,
+    val exclusionTypeId: AttributeTypeId,
 )
 
 /**
@@ -162,6 +176,10 @@ class ImportDeduper(
             policy.reconciledRelationshipTypeId,
         )?.let { return it }
 
+        // Internal-transfer reconciliation between two owned accounts (e.g. Crypto.com App -> Exchange):
+        // rewrite the incoming leg into one internal transfer and exclude the stale app-side leg.
+        classifyAsInternalTransferReconciled(transfer, policy)?.let { return it }
+
         // ... then an earlier accepted transfer in this same batch (resolved to its created id later).
         val batchMatchIndex =
             transfer.apiId?.let { batchApiId[it] }
@@ -212,6 +230,74 @@ class ImportDeduper(
             ImportStatus.IMPORTED,
             existing = null,
         )
+    }
+
+    /**
+     * Reconciles an internal transfer between two owned accounts recorded once at each end. The incoming
+     * leg moves into/out of a bridge's exchange account against a dangling external counterparty; a
+     * matching existing leg (same asset, amount within tolerance, timestamp within window, opposite
+     * direction) touches the bridge's app account. On a match the incoming leg is rewritten to run
+     * directly between the two owned accounts (so balances net correctly in one movement), linked to the
+     * existing leg via the `reconciled` relationship, and the existing app-side leg is flagged excluded.
+     */
+    private fun classifyAsInternalTransferReconciled(
+        transfer: ImportTransfer,
+        policy: DedupePolicy.ApiMultiKey,
+    ): Classified? {
+        val window = policy.internalTransferWindow ?: return null
+        val exclusionTypeId = policy.reconciledExclusionAttributeTypeId ?: return null
+        val relationshipTypeId = policy.reconciledRelationshipTypeId ?: return null
+        if (policy.internalTransferBridges.isEmpty()) return null
+        val amount = transfer.amount ?: return null
+        val timestamp = transfer.timestamp ?: return null
+        val from = transfer.fromAccount.requireId()
+        val to = transfer.toAccount.requireId()
+
+        return policy.internalTransferBridges.firstNotNullOfOrNull { bridge ->
+            val exchangeIsTarget = to == bridge.exchangeAccountId // a deposit into the exchange
+            val exchangeIsSource = from == bridge.exchangeAccountId // a withdrawal out of the exchange
+            if (!exchangeIsTarget && !exchangeIsSource) {
+                null
+            } else {
+                reconcileCandidates
+                    .firstOrNull { (_, existing) ->
+                        existing.amount.currency.id == amount.currency.id &&
+                            amountWithinTolerance(amount, existing.amount, policy.internalTransferAmountTolerance) &&
+                            (timestamp - existing.timestamp).absoluteValue <= window &&
+                            (
+                                (exchangeIsTarget && existing.sourceAccountId == bridge.appAccountId) ||
+                                    (exchangeIsSource && existing.targetAccountId == bridge.appAccountId)
+                            )
+                    }?.let { (matchId, existingTransfer) ->
+                        val rewritten =
+                            if (exchangeIsTarget) {
+                                transfer.copy(fromAccount = AccountRef.Existing(bridge.appAccountId))
+                            } else {
+                                transfer.copy(toAccount = AccountRef.Existing(bridge.appAccountId))
+                            }
+                        val relationships =
+                            rewritten.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId)
+                        Classified(
+                            transfer = rewritten.copy(relationships = relationships, fee = null),
+                            status = ImportStatus.IMPORTED,
+                            existing = null,
+                            excludeExisting = ExcludeExistingLeg(existingTransfer, exclusionTypeId),
+                        )
+                    }
+            }
+        }
+    }
+
+    private fun amountWithinTolerance(
+        incoming: Money,
+        existing: Money,
+        tolerancePercent: BigDecimal,
+    ): Boolean {
+        if (incoming.amount == existing.amount) return true
+        if (tolerancePercent <= BigDecimal.ZERO) return false
+        // diff * 100 <= |existing| * tolerancePercent, in exact decimal math (no fractional-percent loss).
+        val diff = (incoming.amount - existing.amount).abs().toBigDecimal()
+        return diff * BigDecimal(100) <= existing.amount.abs().toBigDecimal() * tolerancePercent
     }
 
     private fun reconcileMatches(

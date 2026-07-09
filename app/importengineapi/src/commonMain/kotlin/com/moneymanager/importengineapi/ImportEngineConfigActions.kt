@@ -223,6 +223,7 @@ suspend fun ImportEngine.createApiCredential(
     strategyId: ApiImportStrategyId? = null,
     privateKey: String? = null,
     publicKey: String? = null,
+    apiSecret: String? = null,
 ): MonzoCredentialId {
     // The read-back key is echoed through ImportResult, so derive it from the (non-secret) createdAt
     // timestamp rather than the secret token. A helper creates exactly one credential per batch.
@@ -231,7 +232,18 @@ suspend fun ImportEngine.createApiCredential(
         import(
             ImportBatch(
                 apiSessionMutations =
-                    listOf(ApiSessionMutation.CreateCredential(key, token, createdAt, type, strategyId, privateKey, publicKey)),
+                    listOf(
+                        ApiSessionMutation.CreateCredential(
+                            key,
+                            token,
+                            createdAt,
+                            type,
+                            strategyId,
+                            privateKey,
+                            publicKey,
+                            apiSecret,
+                        ),
+                    ),
             ),
         ).apiCredentialIds[key],
     )

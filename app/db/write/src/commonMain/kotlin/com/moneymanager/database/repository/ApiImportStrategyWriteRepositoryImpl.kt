@@ -98,5 +98,9 @@ class ApiImportStrategyWriteRepositoryImpl(
             signing = signing,
             peopleDownload = peopleDownload,
             personExternalIdAttribute = personExternalIdAttribute,
+            requestSigning = requestSigning,
+            dataEndpoints = dataEndpoints,
+            syntheticAccount = syntheticAccount,
+            internalTransferReconcile = internalTransferReconcile,
         )
 }

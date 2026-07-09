@@ -2,10 +2,14 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
+import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
+import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
+import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
+import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import kotlinx.serialization.Serializable
@@ -30,6 +34,10 @@ data class ApiStrategyConfigJson(
     val signing: ApiSigningConfig? = null,
     val peopleDownload: ApiPersonImportConfig? = null,
     val personExternalIdAttribute: String? = null,
+    val requestSigning: ApiRequestSigningConfig? = null,
+    val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
+    val syntheticAccount: ApiSyntheticAccount? = null,
+    val internalTransferReconcile: ApiInternalTransferReconcile? = null,
 )
 
 /**

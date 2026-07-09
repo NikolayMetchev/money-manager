@@ -39,6 +39,7 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
         strategyId: ApiImportStrategyId? = null,
         privateKey: String? = null,
         publicKey: String? = null,
+        apiSecret: String? = null,
     ): MonzoCredentialId
 
     /**

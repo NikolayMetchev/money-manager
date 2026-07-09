@@ -12,9 +12,11 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(projects.app.apiimporter)
+                implementation(projects.app.db.read)
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.foundation)
+                implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.rest)
             }

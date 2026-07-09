@@ -1,9 +1,21 @@
 package com.moneymanager.importengineapi
 
+import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.RelationshipTypeId
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+
+/**
+ * Links this strategy's [exchangeAccountId] to an [appAccountId] the user also owns, where a transfer
+ * between the two is recorded once at each end (e.g. the Crypto.com App CSV records a withdrawal out of
+ * "Crypto.com" while the Exchange API records a deposit in). See [DedupePolicy.ApiMultiKey].
+ */
+data class AccountBridge(
+    val exchangeAccountId: AccountId,
+    val appAccountId: AccountId,
+)
 
 /**
  * Descriptions at or above this normalised similarity are treated as the same transaction. Single
@@ -67,6 +79,19 @@ sealed interface DedupePolicy {
         val reconcileWindow: Duration? = null,
         val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
         val reconciledRelationshipTypeId: RelationshipTypeId? = null,
+        /**
+         * Internal-transfer reconciliation between owned accounts. When [internalTransferBridges] is
+         * non-empty and the exclusion/relationship type ids + [internalTransferWindow] are set, an
+         * incoming transfer into/out of a bridge's exchange account that matches (same asset, amount
+         * within [internalTransferAmountTolerance], timestamp within the window, opposite direction)
+         * an existing leg on the bridge's app account is REWRITTEN into one internal transfer between the
+         * two owned accounts; the stale existing app-side leg is marked excluded and the two are linked
+         * via the `reconciled` relationship. See the Crypto.com App↔Exchange case.
+         */
+        val internalTransferBridges: List<AccountBridge> = emptyList(),
+        val internalTransferWindow: Duration? = null,
+        /** Allowed amount difference as a percentage (BigDecimal for precise monetary comparison). */
+        val internalTransferAmountTolerance: BigDecimal = BigDecimal.ZERO,
     ) : DedupePolicy
 
     /** No deduplication — every transfer is imported. */

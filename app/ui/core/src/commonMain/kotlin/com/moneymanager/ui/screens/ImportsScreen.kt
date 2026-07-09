@@ -167,6 +167,7 @@ fun ImportsScreen(
                     accountAttributeRepository = accountAttributeRepository,
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
+                    cryptoRepository = cryptoRepository,
                     passThroughAccountRepository = passThroughAccountRepository,
                     maintenance = maintenance,
                     deviceId = deviceId,

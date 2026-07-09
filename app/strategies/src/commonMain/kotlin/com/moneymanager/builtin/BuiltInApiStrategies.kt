@@ -2,24 +2,42 @@
 
 package com.moneymanager.builtin
 
+import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
+import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
+import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
+import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
+import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
+import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
+import com.moneymanager.domain.model.apistrategy.FieldPlacement
+import com.moneymanager.domain.model.apistrategy.HttpMethodType
+import com.moneymanager.domain.model.apistrategy.NonceFormat
+import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.PaginationMode
+import com.moneymanager.domain.model.apistrategy.ParamStringFormat
 import com.moneymanager.domain.model.apistrategy.PredicateOp
+import com.moneymanager.domain.model.apistrategy.RequestIdSpec
 import com.moneymanager.domain.model.apistrategy.RulePredicate
 import com.moneymanager.domain.model.apistrategy.RuleSign
+import com.moneymanager.domain.model.apistrategy.SigFieldLocation
+import com.moneymanager.domain.model.apistrategy.SigPart
+import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
+import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -28,9 +46,10 @@ object BuiltInApiStrategies {
     val monzoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000001")
     val wiseStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000002")
     val starlingStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000005")
+    val cryptoComExchangeStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
 
     /** All built-in API import strategies. */
-    fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> = listOf(monzo(now), wise(now), starling(now))
+    fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> = listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now))
 
     /** The built-in Monzo API import strategy. */
     fun monzo(now: Instant): ApiImportStrategy =
@@ -305,4 +324,150 @@ object BuiltInApiStrategies {
             createdAt = now,
             updatedAt = now,
         )
+
+    /**
+     * Built-in Crypto.com **Exchange** API strategy — pure config over the generic signed-exchange
+     * engine (no provider code). Uses HMAC-SHA256 request signing, a single "Crypto.com Exchange"
+     * account holding all assets, and data endpoints for trades, order history and fiat/crypto
+     * deposits/withdrawals. Internal transfers reconcile against the CSV "Crypto.com" App account.
+     *
+     * Field paths follow the Crypto.com Exchange v1 REST docs; verify against a live response when
+     * connecting real keys (the shapes are covered by the db-level E2E test).
+     */
+    fun cryptoComExchange(now: Instant): ApiImportStrategy {
+        val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
+        // get-deposit-history / get-withdrawal-history serve years of history, so page a long lookback.
+        val historyWindow =
+            ApiPaginationConfig(
+                mode = PaginationMode.DATE_WINDOW,
+                startParam = "start_ts",
+                endParam = "end_ts",
+                windowDays = 90,
+                lookbackDays = 365 * 6,
+            )
+        // get-trades / get-order-history only serve a recent window (older trades come from the CSV
+        // import), so a short lookback avoids paging years of empty windows.
+        val recentWindow = historyWindow.copy(windowDays = 30, lookbackDays = 180)
+
+        fun signed(
+            path: String,
+            key: String,
+            pagination: ApiPaginationConfig,
+        ) = ApiEndpointConfig(
+            path = path,
+            responseArrayKey = key,
+            method = HttpMethodType.POST,
+            successCodeField = "code",
+            successCodeOkValue = "0",
+            pagination = pagination,
+        )
+        val tradeMappings =
+            ApiTradeMappings(
+                instrumentField = "instrument_name",
+                instrumentSeparator = "_",
+                sideField = "side",
+                buyValues = setOf("BUY", "buy"),
+                baseQuantityField = "traded_quantity",
+                priceField = "traded_price",
+                feeField = "fees",
+                feeCurrencyField = "fee_instrument_name",
+                timestampField = "create_time",
+                timestampFormat = TimestampFormat.EPOCH_MS,
+                idField = "trade_id",
+                orderIdField = "order_id",
+            )
+        val orderMappings =
+            ApiTradeMappings(
+                instrumentField = "instrument_name",
+                sideField = "side",
+                baseQuantityField = "quantity",
+                timestampField = "create_time",
+                timestampFormat = TimestampFormat.EPOCH_MS,
+                idField = "order_id",
+                orderIdField = "order_id",
+                orderTypeField = "type",
+                orderStatusField = "status",
+            )
+
+        fun transferMappings(addressField: String) =
+            ApiTransactionMappings(
+                amountField = "amount",
+                currencyField = "currency",
+                timestampField = "create_time",
+                timestampFormat = TimestampFormat.EPOCH_MS,
+                idField = "id",
+                amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                // Model the blockchain wallet as a per-address account; key the movement by its on-chain
+                // txid so it reconciles with the same transaction seen from another source. A deposit's
+                // counterparty is the sender (source_address); a withdrawal's is the destination (address).
+                counterpartyAddressField = addressField,
+                counterpartyNetworkField = "network_id",
+                txidField = "txid",
+                // An internal transfer (funds moved from/to the Crypto.com App) is booked directly against
+                // the "Crypto.com" App account so the same movement in the CSV export reconciles to it.
+                counterpartyAliasField = "address",
+                counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Crypto.com", "INTERNAL_WITHDRAWAL" to "Crypto.com"),
+            )
+        return ApiImportStrategy(
+            id = ApiImportStrategyId(cryptoComExchangeStrategyId),
+            name = "Crypto.com Exchange",
+            baseUrl = "https://api.crypto.com/exchange/v1",
+            authType = ApiAuthType.SIGNED,
+            accountsEndpoint = unused,
+            transactionsEndpoint = unused,
+            accountMappings = ApiAccountMappings(),
+            transactionMappings = ApiTransactionMappings(),
+            requestSigning =
+                ApiRequestSigningConfig(
+                    algorithm = SigningAlgorithm.HMAC_SHA256,
+                    message =
+                        listOf(
+                            SigPart.Method,
+                            SigPart.RequestId,
+                            SigPart.ApiKey,
+                            SigPart.ParamString(ParamStringFormat.SORTED_CONCAT),
+                            SigPart.Nonce,
+                        ),
+                    apiKey = FieldPlacement(SigFieldLocation.BODY_FIELD, "api_key"),
+                    nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.BODY_FIELD, "nonce")),
+                    signature = FieldPlacement(SigFieldLocation.BODY_FIELD, "sig"),
+                    requestId = RequestIdSpec(placement = FieldPlacement(SigFieldLocation.BODY_FIELD, "id")),
+                    method = FieldPlacement(SigFieldLocation.BODY_FIELD, "method"),
+                    bodyFormat = BodyFormat.JSON_ENVELOPE,
+                    paramsEnvelopeKey = "params",
+                ),
+            syntheticAccount = ApiSyntheticAccount(name = "Crypto.com Exchange", externalId = "crypto-com-exchange"),
+            dataEndpoints =
+                listOf(
+                    ApiDataEndpoint(
+                        signed("private/get-trades", "result.data", recentWindow),
+                        ApiEndpointKind.TRADES,
+                        tradeMappings = tradeMappings,
+                    ),
+                    ApiDataEndpoint(
+                        signed("private/get-order-history", "result.data", recentWindow),
+                        ApiEndpointKind.ORDERS,
+                        tradeMappings = orderMappings,
+                    ),
+                    ApiDataEndpoint(
+                        signed("private/get-deposit-history", "result.deposit_list", historyWindow),
+                        ApiEndpointKind.DEPOSITS,
+                        transactionMappings = transferMappings("source_address"),
+                    ),
+                    ApiDataEndpoint(
+                        signed("private/get-withdrawal-history", "result.withdrawal_list", historyWindow),
+                        ApiEndpointKind.WITHDRAWALS,
+                        transactionMappings = transferMappings("address"),
+                    ),
+                ),
+            internalTransferReconcile =
+                ApiInternalTransferReconcile(
+                    bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
+                    windowSeconds = 24 * 3600,
+                    amountTolerancePercent = "2",
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
 }
