@@ -77,7 +77,7 @@ import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.ErrorMessageText
 import com.moneymanager.ui.components.LoadingTextButton
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
 import com.moneymanager.ui.util.CategoryNode
@@ -100,15 +100,15 @@ fun CategoriesScreen(
     currencyRepository: CurrencyReadRepository,
     onAuditClick: (Category) -> Unit = {},
 ) {
-    val categories by categoryRepository
-        .getAllCategories()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val categoryBalances by categoryRepository
-        .getCategoryBalances()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val currencies by currencyRepository
-        .getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val categories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        categoryRepository.getAllCategories()
+    }
+    val categoryBalances by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        categoryRepository.getCategoryBalances()
+    }
+    val currencies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        currencyRepository.getAllCurrencies()
+    }
 
     var expandedIds by remember { mutableStateOf(emptySet<Long>()) }
     var showCreateDialog by remember { mutableStateOf(false) }

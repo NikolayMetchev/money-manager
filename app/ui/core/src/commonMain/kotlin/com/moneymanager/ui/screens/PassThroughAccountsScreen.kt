@@ -40,7 +40,7 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createPassThroughAccount
 import com.moneymanager.importengineapi.deletePassThroughAccount
 import com.moneymanager.importengineapi.updatePassThroughAccount
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 
@@ -57,7 +57,9 @@ fun PassThroughAccountsScreen(
     onBrowseCatalog: () -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val accounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
+    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        passThroughAccountRepository.getAll()
+    }
     var editing by remember { mutableStateOf<PassThroughAccount?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }

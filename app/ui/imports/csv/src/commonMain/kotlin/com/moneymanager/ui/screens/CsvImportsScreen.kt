@@ -53,7 +53,7 @@ import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createCsvImport
 import com.moneymanager.importengineapi.setCsvImportIgnored
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.CsvImportAllDialog
 import com.moneymanager.ui.screens.csv.CsvReimportAllDialog
@@ -84,9 +84,9 @@ fun CsvImportsScreen(
     onStrategiesClick: () -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val imports by csvImportRepository
-        .getAllImports()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val imports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        csvImportRepository.getAllImports()
+    }
     var isImporting by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
     var importMessageIsError by remember { mutableStateOf(false) }

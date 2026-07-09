@@ -40,7 +40,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.deleteCrypto
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CreateCryptoDialog
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -83,9 +83,9 @@ fun AssetsScreen(
 
 @Composable
 private fun CryptoAssetsTab(cryptoRepository: CryptoReadRepository) {
-    val cryptoAssets by cryptoRepository
-        .getAllCryptoAssets()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val cryptoAssets by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        cryptoRepository.getAllCryptoAssets()
+    }
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {

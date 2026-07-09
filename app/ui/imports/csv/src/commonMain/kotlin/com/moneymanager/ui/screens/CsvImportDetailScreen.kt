@@ -50,7 +50,7 @@ import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.deleteCsvImport
 import com.moneymanager.ui.components.csv.CsvPreviewTable
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.ApplyStrategyDialog
 import com.moneymanager.ui.screens.csv.ReimportDialog
@@ -82,9 +82,9 @@ fun CsvImportDetailScreen(
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val import by csvImportRepository
-        .getImport(importId)
-        .collectAsStateWithSchemaErrorHandling(initial = null)
+    val import by rememberFlowAsStateWithSchemaErrorHandling(importId, initial = null) {
+        csvImportRepository.getImport(importId)
+    }
     var rows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -98,9 +98,9 @@ fun CsvImportDetailScreen(
     var hasMatchingStrategy by remember { mutableStateOf(false) }
 
     // Observe strategies to re-check when new ones are added
-    val strategies by csvImportStrategyRepository
-        .getAllStrategies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val strategies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        csvImportStrategyRepository.getAllStrategies()
+    }
 
     // Check if there's a matching strategy for this import (filename/content-aware selection).
     // Re-runs when the import, the strategies list, or the loaded rows change.

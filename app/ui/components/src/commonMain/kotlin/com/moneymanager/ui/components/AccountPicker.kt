@@ -22,7 +22,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.onEnterKeyDown
 
 /**
@@ -58,9 +58,9 @@ fun AccountPicker(
     focusRequester: FocusRequester? = null,
     onSubmit: (() -> Unit)? = null,
 ) {
-    val accounts by accountRepository
-        .getAllAccounts()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        accountRepository.getAllAccounts()
+    }
 
     var expanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }

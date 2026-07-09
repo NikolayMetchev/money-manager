@@ -96,7 +96,7 @@ import com.moneymanager.ui.api.sca.generateScaKeyPair
 import com.moneymanager.ui.api.sca.signScaChallenge
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.formatElapsedTime
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.currentCountryCode
@@ -137,7 +137,9 @@ fun ApiSessionsScreen(
     val scope = rememberSchemaAwareCoroutineScope()
     val backgroundTasks = LocalBackgroundTaskManager.current
     val clipboard = LocalClipboard.current
-    val passThroughAccounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
+    val passThroughAccounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        passThroughAccountRepository.getAll()
+    }
 
     var credentials by remember { mutableStateOf<List<MonzoCredential>>(emptyList()) }
     var sessionsByCredential by remember { mutableStateOf<Map<MonzoCredentialId, List<ApiSession>>>(emptyMap()) }

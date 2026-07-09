@@ -50,7 +50,7 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createQifImport
 import com.moneymanager.importengineapi.setQifImportIgnored
 import com.moneymanager.qif.QifParser
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.qif.QifImportAllDialog
 import com.moneymanager.ui.screens.qif.QifReimportAllDialog
@@ -81,9 +81,9 @@ fun QifImportsScreen(
     onStrategiesClick: () -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val imports by qifImportRepository
-        .getAllImports()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val imports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        qifImportRepository.getAllImports()
+    }
     var isImporting by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
     var importMessageIsError by remember { mutableStateOf(false) }
