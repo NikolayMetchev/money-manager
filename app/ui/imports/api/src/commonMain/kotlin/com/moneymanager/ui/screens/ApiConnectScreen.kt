@@ -77,6 +77,13 @@ fun ApiConnectScreen(
     val isSigned = selectedStrategy?.authType == com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    // Don't retain an entered token/secret after switching providers — a hidden secret must not linger
+    // in state or reappear under a different provider.
+    LaunchedEffect(selectedStrategyId) {
+        tokenInput = ""
+        secretInput = ""
+        errorMessage = null
+    }
 
     Column(
         modifier =

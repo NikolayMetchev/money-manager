@@ -2215,10 +2215,13 @@ internal fun responseCodeOk(
     successCodeOkValue: String?,
 ): Boolean {
     if (successCodeField == null) return true
+    // Fail closed: a configured status field with no expected value must never pass (an absent code
+    // would otherwise equal a null expected value and let an error envelope through).
+    val expected = successCodeOkValue ?: return false
     return try {
         val actual =
             (Json.parseToJsonElement(json).resolveJsonPathElement(successCodeField) as? JsonPrimitive)?.contentOrNull
-        actual == successCodeOkValue
+        actual == expected
     } catch (e: SerializationException) {
         false
     }
@@ -2914,6 +2917,8 @@ internal fun JsonElement.resolveJsonPathElement(dotPath: String): JsonElement? {
                 current = (current as? JsonArray)?.getOrNull(index) ?: return null
                 rest = rest.substring(end + 1)
             }
+            // Reject a malformed segment with trailing text after the brackets (e.g. "data[0]foo").
+            if (rest.isNotEmpty()) return null
         }
     }
     return current

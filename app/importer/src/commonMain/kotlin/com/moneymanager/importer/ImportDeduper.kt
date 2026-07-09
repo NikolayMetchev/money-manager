@@ -2,8 +2,10 @@
 
 package com.moneymanager.importer
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.RelationshipTypeId
@@ -260,7 +262,7 @@ class ImportDeduper(
                 reconcileCandidates
                     .firstOrNull { (_, existing) ->
                         existing.amount.currency.id == amount.currency.id &&
-                            amountWithinTolerance(amount, existing.amount, policy.internalTransferAmountTolerancePct) &&
+                            amountWithinTolerance(amount, existing.amount, policy.internalTransferAmountTolerance) &&
                             (timestamp - existing.timestamp).absoluteValue <= window &&
                             (
                                 (exchangeIsTarget && existing.sourceAccountId == bridge.appAccountId) ||
@@ -287,16 +289,15 @@ class ImportDeduper(
     }
 
     private fun amountWithinTolerance(
-        incoming: com.moneymanager.domain.model.Money,
-        existing: com.moneymanager.domain.model.Money,
-        tolerancePct: Double,
+        incoming: Money,
+        existing: Money,
+        tolerancePercent: BigDecimal,
     ): Boolean {
         if (incoming.amount == existing.amount) return true
-        if (tolerancePct <= 0.0) return false
-        val diff = (incoming.amount - existing.amount).abs()
-        // diff / |existing| <= tolerancePct/100, kept in integer arithmetic (percent truncated).
-        return diff * com.moneymanager.bigdecimal.BigInteger(100) <=
-            existing.amount.abs() * com.moneymanager.bigdecimal.BigInteger(tolerancePct.toLong())
+        if (tolerancePercent <= BigDecimal.ZERO) return false
+        // diff * 100 <= |existing| * tolerancePercent, in exact decimal math (no fractional-percent loss).
+        val diff = (incoming.amount - existing.amount).abs().toBigDecimal()
+        return diff * BigDecimal(100) <= existing.amount.abs().toBigDecimal() * tolerancePercent
     }
 
     private fun reconcileMatches(

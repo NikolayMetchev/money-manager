@@ -740,14 +740,18 @@ data class ApiAccountBridge(
  * Reconciles internal transfers between this strategy's account and another owned account that records
  * the same real movement at its own end (e.g. money moved from the Crypto.com App into the Exchange:
  * the App CSV records a withdrawal out, the Exchange API records a deposit in). On a match within
- * [windowSeconds] of the same asset and (within [amountTolerancePct]) amount, the two half-transfers
+ * [windowSeconds] of the same asset and (within [amountTolerancePercent]) amount, the two half-transfers
  * are collapsed into one internal transfer and linked via the `reconciled` relationship.
  */
 @Serializable
 data class ApiInternalTransferReconcile(
     val bridges: List<ApiAccountBridge>,
     val windowSeconds: Long,
-    val amountTolerancePct: Double = 0.0,
+    /**
+     * Allowed amount difference as a percentage, held as a decimal string (e.g. "2" or "0.5") so it is
+     * parsed to `BigDecimal` for the monetary comparison rather than an imprecise `Double`.
+     */
+    val amountTolerancePercent: String = "0",
 )
 
 /**

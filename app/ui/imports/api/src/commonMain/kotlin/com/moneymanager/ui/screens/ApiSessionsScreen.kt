@@ -444,15 +444,23 @@ fun ApiSessionsScreen(
                                             // Signed exchange strategies download via the generic
                                             // config-driven exchange path (signed POST/GET per endpoint).
                                             if (strategy.syntheticAccount != null) {
+                                                // Fail with a clear message before making any signed request
+                                                // if the strategy is misconfigured or the credential has no
+                                                // secret (e.g. imported/migrated without one).
+                                                val requestSigning =
+                                                    strategy.requestSigning
+                                                        ?: return@startTask "This strategy is missing its request-signing config."
+                                                val apiSecret =
+                                                    credential.apiSecret?.takeIf { it.isNotBlank() }
+                                                        ?: return@startTask "This credential has no API secret; reconnect it."
                                                 update("Downloading exchange data...")
-                                                val signer =
-                                                    com.moneymanager.rest.ApiRequestSigner(requireNotNull(strategy.requestSigning))
+                                                val signer = com.moneymanager.rest.ApiRequestSigner(requestSigning)
                                                 val exchangeDownload =
                                                     com.moneymanager.apiimporter.downloadApiSessionExchange(
                                                         apiClient = apiClient,
                                                         signer = signer,
                                                         apiKey = credential.token,
-                                                        apiSecret = credential.apiSecret.orEmpty(),
+                                                        apiSecret = apiSecret,
                                                         apiSessionRepository = apiSessionRepository,
                                                         sessionId = newSessionId,
                                                         strategy = strategy,

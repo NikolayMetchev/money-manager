@@ -33,7 +33,6 @@ import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingApiIdExtractor
-import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
@@ -362,7 +361,9 @@ suspend fun importApiSessionExchange(
     }
     for (t in trades) {
         noteCrypto(t.baseCode, t.baseQuantity)
-        noteCrypto(t.quoteCode, null)
+        // Size the quote asset to its own precision too, so a crypto that only ever appears as the quote
+        // leg isn't created with zero decimals and then rounded away by moneyRounded().
+        noteCrypto(t.quoteCode, t.quoteAmount)
         noteCrypto(t.feeCode, t.feeAmount)
     }
     for (tx in transfers) noteCrypto(tx.currencyCode, tx.amount)
@@ -561,17 +562,12 @@ suspend fun importApiSessionExchange(
                             if (reconcile == null) null else RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
                         internalTransferBridges = bridges,
                         internalTransferWindow = reconcile?.windowSeconds?.let { it.toDuration(DurationUnit.SECONDS) },
-                        internalTransferAmountTolerancePct = reconcile?.amountTolerancePct ?: 0.0,
+                        internalTransferAmountTolerance =
+                            reconcile?.amountTolerancePercent?.let { runCatching { BigDecimal(it) }.getOrNull() } ?: BigDecimal.ZERO,
                     ),
                 apiIdExtractor =
                     ExistingApiIdExtractor { transfer ->
                         transfer.attributes.firstOrNull { it.attributeType.id == txnIdAttr }?.value
-                    },
-                uniqueKeyExtractor =
-                    ExistingUniqueKeyExtractor { transfer ->
-                        transfer.attributes
-                            .firstOrNull { it.attributeType.name == BLOCKCHAIN_TXID_ATTR }
-                            ?.let { mapOf(BLOCKCHAIN_TXID_ATTR to it.value) }
                     },
             ),
         )
@@ -605,9 +601,10 @@ private fun exchangeTransfer(
         timestamp = timestamp,
         description = description,
         amount = money,
+        // The exchange's own id keys re-imports (skip). The on-chain txid is stored as an attribute for
+        // cross-source reconciliation — NOT as a dedupe uniqueKey, which would skip (rather than link) an
+        // opposite leg that shares the same txid.
         apiId = id,
-        // The on-chain txid is the cross-source unique identifier; the exchange's own id keys re-imports.
-        uniqueKey = txid?.let { mapOf(BLOCKCHAIN_TXID_ATTR to it) },
         attributes = listOfNotNull(NewAttribute(txnIdAttr, id), txidAttribute),
     )
 }
@@ -628,8 +625,15 @@ private fun parseTrade(
     requestId: ApiRequestId,
     jsonPath: String,
 ): ParsedTrade? {
-    val instrument = obj.str(tm.instrumentField) ?: return null
-    val (baseCode, quoteCode) = splitInstrument(instrument, tm) ?: return null
+    val (baseCode, quoteCode) =
+        if (tm.splitMode == InstrumentSplitMode.EXPLICIT_FIELDS) {
+            val base = tm.baseAssetField?.let { obj.str(it) }
+            val quote = tm.quoteAssetField?.let { obj.str(it) }
+            if (base != null && quote != null) base to quote else return null
+        } else {
+            val instrument = obj.str(tm.instrumentField) ?: return null
+            splitInstrument(instrument, tm) ?: return null
+        }
     val side = obj.str(tm.sideField) ?: return null
     val isBuy = side in tm.buyValues
     val baseQty = obj.str(tm.baseQuantityField)?.let { runCatching { BigDecimal(it) }.getOrNull() } ?: return null
@@ -664,7 +668,8 @@ private fun splitInstrument(
             val parts = instrument.split(tm.instrumentSeparator)
             if (parts.size >= 2) parts[0] to parts[1] else null
         }
-        InstrumentSplitMode.EXPLICIT_FIELDS -> null // handled by caller when base/quote fields set; unused for now
+        // EXPLICIT_FIELDS is resolved directly in parseTrade from the base/quote asset fields.
+        InstrumentSplitMode.EXPLICIT_FIELDS -> null
         InstrumentSplitMode.QUOTE_SUFFIX -> {
             val quote = tm.quoteAssets.filter { instrument.endsWith(it) }.maxByOrNull { it.length }
             quote?.let { instrument.removeSuffix(it) to it }

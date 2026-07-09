@@ -155,14 +155,27 @@ class CryptoComExchangeApiE2ETest : DbTest() {
 
             val tradesBefore = trades.size
 
-            // Re-import the same session: the exact-match guard keeps trades idempotent.
+            suspend fun depositCount() =
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        startDate = Instant.fromEpochMilliseconds(1_700_000_000_500L),
+                        endDate = Instant.fromEpochMilliseconds(1_700_000_001_500L),
+                    ).first()
+                    .count { it.targetAccountId == exchange.id }
+            val depositsBefore = depositCount()
+
+            // Re-import the same session: the exact-match guard keeps trades idempotent, and the provider
+            // id (ApiMultiKey) keeps deposits/withdrawals idempotent.
             stageSessionAndImport()
-            val tradesAfter =
+            assertEquals(
+                tradesBefore,
                 repositories.tradeRepository
                     .getTradesByAccount(exchange.id)
                     .first()
-                    .size
-            assertEquals(tradesBefore, tradesAfter, "re-import must not double-book trades")
+                    .size,
+                "re-import must not double-book trades",
+            )
+            assertEquals(depositsBefore, depositCount(), "re-import must not double-book deposits")
         }
 
     @Test

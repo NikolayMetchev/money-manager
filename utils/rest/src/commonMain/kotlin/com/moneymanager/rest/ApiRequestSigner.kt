@@ -223,7 +223,8 @@ class ApiRequestSigner(
                 '\n' -> sb.append("\\n")
                 '\r' -> sb.append("\\r")
                 '\t' -> sb.append("\\t")
-                else -> sb.append(c)
+                // Per RFC 8259 §7, every other control character (U+0000–U+001F, incl. \b and \f) is escaped as \uXXXX.
+                else -> if (c < ' ') sb.append("\\u").append(c.code.toString(16).padStart(4, '0')) else sb.append(c)
             }
         }
         return sb.append("\"").toString()

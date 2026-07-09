@@ -464,7 +464,7 @@ object BuiltInApiStrategies {
                 ApiInternalTransferReconcile(
                     bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
                     windowSeconds = 24 * 3600,
-                    amountTolerancePct = 2.0,
+                    amountTolerancePercent = "2",
                 ),
             createdAt = now,
             updatedAt = now,

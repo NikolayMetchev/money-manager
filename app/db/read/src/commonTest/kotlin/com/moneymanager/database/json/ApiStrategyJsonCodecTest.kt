@@ -99,7 +99,7 @@ class ApiStrategyJsonCodecTest {
                     ApiInternalTransferReconcile(
                         bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
                         windowSeconds = 3600,
-                        amountTolerancePct = 1.0,
+                        amountTolerancePercent = "1",
                     ),
                 dataEndpoints =
                     listOf(

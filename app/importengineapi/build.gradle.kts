@@ -12,9 +12,16 @@ kotlin {
             }
         }
 
+        getByName("androidMain") {
+            dependencies {
+                api(projects.utils.bigdecimal)
+            }
+        }
+
         getByName("jvmMain") {
             dependencies {
                 api(projects.app.model.core)
+                api(projects.utils.bigdecimal)
             }
         }
     }

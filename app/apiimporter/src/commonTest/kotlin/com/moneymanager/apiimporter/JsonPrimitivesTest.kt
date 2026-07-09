@@ -22,6 +22,8 @@ class JsonPrimitivesTest {
         assertEquals("0", path(json, "code"))
         assertNull(path(json, "result.data[2].price"))
         assertNull(path(json, "result.missing"))
+        // Malformed segment with trailing text after the brackets resolves to null, not data[0].
+        assertNull(path(json, "result.data[0]foo"))
     }
 
     @Test
@@ -32,6 +34,8 @@ class JsonPrimitivesTest {
         assertEquals(false, responseCodeOk(bad, "code", "0"))
         // No configured field: never gates (bank APIs rely on HTTP status).
         assertEquals(true, responseCodeOk(bad, null, null))
+        // A configured field with no expected value fails closed (never passes an error envelope).
+        assertEquals(false, responseCodeOk(ok, "code", null))
     }
 
     @Test

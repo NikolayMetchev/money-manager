@@ -1,5 +1,6 @@
 package com.moneymanager.importengineapi
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.RelationshipTypeId
@@ -82,14 +83,15 @@ sealed interface DedupePolicy {
          * Internal-transfer reconciliation between owned accounts. When [internalTransferBridges] is
          * non-empty and the exclusion/relationship type ids + [internalTransferWindow] are set, an
          * incoming transfer into/out of a bridge's exchange account that matches (same asset, amount
-         * within [internalTransferAmountTolerancePct], timestamp within the window, opposite direction)
+         * within [internalTransferAmountTolerance], timestamp within the window, opposite direction)
          * an existing leg on the bridge's app account is REWRITTEN into one internal transfer between the
          * two owned accounts; the stale existing app-side leg is marked excluded and the two are linked
          * via the `reconciled` relationship. See the Crypto.com App↔Exchange case.
          */
         val internalTransferBridges: List<AccountBridge> = emptyList(),
         val internalTransferWindow: Duration? = null,
-        val internalTransferAmountTolerancePct: Double = 0.0,
+        /** Allowed amount difference as a percentage (BigDecimal for precise monetary comparison). */
+        val internalTransferAmountTolerance: BigDecimal = BigDecimal.ZERO,
     ) : DedupePolicy
 
     /** No deduplication — every transfer is imported. */
