@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.moneymanager.ui.screens
 
@@ -25,11 +25,17 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -78,6 +84,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.MonzoCredential
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
@@ -148,6 +155,10 @@ fun ApiSessionsScreen(
     var strategyNameByCredential by remember { mutableStateOf<Map<MonzoCredentialId, String>>(emptyMap()) }
     var requiresSigningByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Boolean>>(emptyMap()) }
     var transactionsBlockReasonByCredential by remember { mutableStateOf<Map<MonzoCredentialId, String>>(emptyMap()) }
+    var strategies by remember { mutableStateOf<List<ApiImportStrategy>>(emptyList()) }
+    var strategyIdByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiImportStrategyId?>>(emptyMap()) }
+    var selectedStrategyId by remember { mutableStateOf<ApiImportStrategyId?>(null) }
+    var selectedTab by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
@@ -197,6 +208,11 @@ fun ApiSessionsScreen(
                 // change once additional providers (e.g. Wise) are seeded.
                 val fallbackStrategy = legacyDefaultStrategy(allStrategies)
                 val fallbackStrategyRevision = fallbackStrategy?.revisionId
+                strategies = allStrategies.sortedBy { it.name.lowercase() }
+                strategyIdByCredential =
+                    allCredentials.associate { credential ->
+                        credential.id to (credential.strategyId ?: fallbackStrategy?.id)
+                    }
                 currentStrategyRevisionByCredential =
                     allCredentials.associate { credential ->
                         credential.id to (
@@ -381,11 +397,76 @@ fun ApiSessionsScreen(
                 }
             }
             else -> {
+                val filteredCredentials =
+                    filterCredentialsByStrategy(
+                        credentials = credentials,
+                        strategyIdByCredential = strategyIdByCredential,
+                        selectedStrategyId = selectedStrategyId,
+                    )
+                val split =
+                    splitSessionsByImportState(
+                        credentials = filteredCredentials,
+                        sessionsByCredential = sessionsByCredential,
+                        currentStrategyRevisionByCredential = currentStrategyRevisionByCredential,
+                        importedSessionRevisions = importedSessionRevisions,
+                    )
+
+                StrategyFilterDropdown(
+                    strategies = strategies,
+                    selectedStrategyId = selectedStrategyId,
+                    onStrategySelected = { selectedStrategyId = it },
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SecondaryTabRow(selectedTabIndex = selectedTab) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("Outstanding (${split.outstandingCount})") },
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("Imported (${split.importedCount})") },
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // The Outstanding tab is the working tab: credential cards stay visible even with no
+                // outstanding sessions so Download remains reachable. The Imported tab only lists
+                // credentials that actually have imported sessions.
+                val visibleCredentials =
+                    if (selectedTab == 0) {
+                        filteredCredentials
+                    } else {
+                        filteredCredentials.filter { split.importedByCredential[it.id].orEmpty().isNotEmpty() }
+                    }
+
                 val lazyListState = rememberLazyListState()
                 Box(modifier = Modifier.fillMaxSize()) {
+                    if (visibleCredentials.isEmpty()) {
+                        Text(
+                            text =
+                                if (selectedTab == 0) {
+                                    "No credentials for this strategy. Click '+ Connect' to add one."
+                                } else {
+                                    "No imported sessions yet."
+                                },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
                     LazyColumn(state = lazyListState, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(credentials) { credential ->
-                            val credentialSessions = sessionsByCredential[credential.id].orEmpty()
+                        items(visibleCredentials) { credential ->
+                            val credentialSessions =
+                                if (selectedTab == 0) {
+                                    split.outstandingByCredential[credential.id].orEmpty()
+                                } else {
+                                    split.importedByCredential[credential.id].orEmpty()
+                                }
                             val isDownloading = backgroundTasks.isRunning(monzoDownloadTaskKey(credential.id))
                             CredentialCard(
                                 credential = credential,
@@ -830,9 +911,11 @@ private fun CredentialCard(
                         session = session,
                         isImporting = isImportingSession(session.id),
                         isAlreadyImported =
-                            selectedStrategyRevision?.let { revision ->
-                                ApiSessionImportRevision(session.id, revision) in importedSessionRevisions
-                            } == true,
+                            sessionImportedAtCurrentRevision(
+                                sessionId = session.id,
+                                currentRevision = selectedStrategyRevision,
+                                importedSessionRevisions = importedSessionRevisions,
+                            ),
                         importResult = importResultBySession[session.id],
                         importError = importErrorBySession[session.id],
                         importProgress = importProgressBySession[session.id],
@@ -1753,6 +1836,112 @@ private const val LEGACY_DEFAULT_STRATEGY_NAME = "Monzo"
  */
 private fun legacyDefaultStrategy(strategies: List<ApiImportStrategy>): ApiImportStrategy? =
     strategies.firstOrNull { it.name == LEGACY_DEFAULT_STRATEGY_NAME }
+
+/**
+ * A session counts as imported only at the credential's current strategy revision — a session
+ * imported under an older revision is outstanding again, because re-importing it would apply the
+ * updated strategy.
+ */
+internal fun sessionImportedAtCurrentRevision(
+    sessionId: ApiSessionId,
+    currentRevision: Long?,
+    importedSessionRevisions: Set<ApiSessionImportRevision>,
+): Boolean =
+    currentRevision?.let { revision ->
+        ApiSessionImportRevision(sessionId, revision) in importedSessionRevisions
+    } == true
+
+internal fun filterCredentialsByStrategy(
+    credentials: List<MonzoCredential>,
+    strategyIdByCredential: Map<MonzoCredentialId, ApiImportStrategyId?>,
+    selectedStrategyId: ApiImportStrategyId?,
+): List<MonzoCredential> =
+    if (selectedStrategyId == null) {
+        credentials
+    } else {
+        credentials.filter { strategyIdByCredential[it.id] == selectedStrategyId }
+    }
+
+internal data class ApiSessionsSplit(
+    val outstandingByCredential: Map<MonzoCredentialId, List<ApiSession>>,
+    val importedByCredential: Map<MonzoCredentialId, List<ApiSession>>,
+) {
+    val outstandingCount: Int get() = outstandingByCredential.values.sumOf { it.size }
+    val importedCount: Int get() = importedByCredential.values.sumOf { it.size }
+}
+
+internal fun splitSessionsByImportState(
+    credentials: List<MonzoCredential>,
+    sessionsByCredential: Map<MonzoCredentialId, List<ApiSession>>,
+    currentStrategyRevisionByCredential: Map<MonzoCredentialId, Long?>,
+    importedSessionRevisions: Set<ApiSessionImportRevision>,
+): ApiSessionsSplit {
+    val outstanding = mutableMapOf<MonzoCredentialId, List<ApiSession>>()
+    val imported = mutableMapOf<MonzoCredentialId, List<ApiSession>>()
+    credentials.forEach { credential ->
+        val (importedSessions, outstandingSessions) =
+            sessionsByCredential[credential.id].orEmpty().partition { session ->
+                sessionImportedAtCurrentRevision(
+                    sessionId = session.id,
+                    currentRevision = currentStrategyRevisionByCredential[credential.id],
+                    importedSessionRevisions = importedSessionRevisions,
+                )
+            }
+        outstanding[credential.id] = outstandingSessions
+        imported[credential.id] = importedSessions
+    }
+    return ApiSessionsSplit(outstandingByCredential = outstanding, importedByCredential = imported)
+}
+
+@Composable
+private fun StrategyFilterDropdown(
+    strategies: List<ApiImportStrategy>,
+    selectedStrategyId: ApiImportStrategyId?,
+    onStrategySelected: (ApiImportStrategyId?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedName = strategies.firstOrNull { it.id == selectedStrategyId }?.name ?: ALL_STRATEGIES_LABEL
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+    ) {
+        OutlinedTextField(
+            value = selectedName,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text("Strategy") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(ALL_STRATEGIES_LABEL) },
+                onClick = {
+                    onStrategySelected(null)
+                    expanded = false
+                },
+            )
+            strategies.forEach { strategy ->
+                DropdownMenuItem(
+                    text = { Text(strategy.name) },
+                    onClick = {
+                        onStrategySelected(strategy.id)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+private const val ALL_STRATEGIES_LABEL = "All strategies"
 
 private fun monzoDownloadTaskKey(credentialId: MonzoCredentialId): String = "monzo-download-cred-${credentialId.id}"
 
