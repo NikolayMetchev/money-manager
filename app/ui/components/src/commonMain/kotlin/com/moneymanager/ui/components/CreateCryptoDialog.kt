@@ -30,6 +30,7 @@ import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.onEnterKeyDown
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -76,6 +77,8 @@ fun CreateCryptoDialog(
                             name = name.trim().ifBlank { null },
                         )
                     onCryptoCreated(cryptoId)
+                } catch (expected: CancellationException) {
+                    throw expected
                 } catch (expected: Exception) {
                     cryptoDialogLogger.error(expected) { "Failed to create crypto asset: ${expected.message}" }
                     saveState.errorMessage = "Failed to create crypto asset: ${expected.message}"
