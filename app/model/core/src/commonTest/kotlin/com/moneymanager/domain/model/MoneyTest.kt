@@ -307,9 +307,24 @@ class MoneyTest {
 
     @Test
     fun fromDisplayValue_throwsOnExcessPrecision() {
-        // 9 decimals for an 8-decimal asset cannot be represented exactly — must throw, not truncate.
+        // 19 decimals for an 18-decimal asset cannot be represented exactly — must throw, not truncate.
         assertFailsWith<ArithmeticException> {
-            Money.fromDisplayValue("0.123456789", btc)
+            Money.fromDisplayValue("0.1234567890123456789", eth)
         }
+    }
+
+    @Test
+    fun crypto_roundTrip_fullEighteenDecimalPrecision() {
+        // All 18 fractional digits must survive the display round-trip: a division-based
+        // toDisplayValue that rounds at a fixed scale would corrupt this value.
+        val original = "0.123456789012345678"
+        val money = Money.fromDisplayValue(original, eth)
+        assertEquals(original, money.toDisplayValue().toString())
+    }
+
+    @Test
+    fun crypto_oneWei_displaysExactly() {
+        val money = Money(BigInteger(1L), eth)
+        assertEquals("0.000000000000000001", money.toDisplayValue().toString())
     }
 }

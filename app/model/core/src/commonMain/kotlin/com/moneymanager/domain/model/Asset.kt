@@ -15,7 +15,19 @@ sealed interface Asset {
 
     /**
      * Stored amount = display amount × [scaleFactor]. 100 for 2-decimal fiat, 1 for 0-decimal
-     * fiat (JPY), up to very large values for high-precision crypto (e.g. 1e18 for ETH).
+     * fiat (JPY), 1e18 for crypto. Always a power of ten.
      */
     val scaleFactor: Long
 }
+
+/** Number of decimal places implied by [Asset.scaleFactor] (e.g. 100 → 2, 1e18 → 18). */
+val Asset.decimalPlaces: Int
+    get() {
+        var factor = scaleFactor
+        var places = 0
+        while (factor > 1) {
+            factor /= 10
+            places++
+        }
+        return places
+    }

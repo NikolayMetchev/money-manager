@@ -35,11 +35,10 @@ suspend fun ImportEngine.createCurrency(
     return requireNotNull(result.createdCurrencyIds[key]) { "Currency $code was not created" }
 }
 
-/** Upserts a crypto asset by ticker [code] and returns its id (scale/name from the crypto registry). */
+/** Upserts a crypto asset by ticker [code] and returns its id (fixed 18-decimal scale; name from the registry). */
 suspend fun ImportEngine.createCrypto(
     code: String,
     name: String? = null,
-    scaleFactor: Long? = null,
     source: Source = Source.Manual,
 ): CryptoId {
     val key = LocalCryptoKey(code)
@@ -47,7 +46,7 @@ suspend fun ImportEngine.createCrypto(
         import(
             ImportBatch(
                 cryptoAssets =
-                    listOf(ImportCryptoIntent(key = key, source = source, code = code, name = name, scaleFactor = scaleFactor)),
+                    listOf(ImportCryptoIntent(key = key, source = source, code = code, name = name)),
             ),
         )
     return requireNotNull(result.createdCryptoIds[key]) { "Crypto asset $code was not created" }

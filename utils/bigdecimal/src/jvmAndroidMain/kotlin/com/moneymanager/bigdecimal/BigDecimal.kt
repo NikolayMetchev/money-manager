@@ -38,6 +38,8 @@ actual class BigDecimal : Comparable<BigDecimal> {
 
     actual operator fun div(divisor: BigDecimal): BigDecimal = BigDecimal(value.divide(divisor.value, 10, RoundingMode.HALF_UP))
 
+    actual fun movePointLeft(n: Int): BigDecimal = BigDecimal(value.movePointLeft(n))
+
     actual operator fun unaryMinus(): BigDecimal = BigDecimal(value.negate())
 
     actual fun abs(): BigDecimal = BigDecimal(value.abs())
