@@ -18,7 +18,7 @@ import com.moneymanager.bigdecimal.toBigIntegerExact
  * For example:
  * - £123.45 is stored as amount=12345 with GBP (scaleFactor=100)
  * - ¥1000 is stored as amount=1000 with JPY (scaleFactor=1)
- * - 0.5 BTC is stored as amount=50000000 with BTC (scaleFactor=100000000)
+ * - 0.5 BTC is stored as amount=5·10^17 with BTC (scaleFactor=10^18)
  *
  * @property amount The amount in the asset's smallest unit (pence, satoshis, wei, …)
  * @property currency The asset this monetary amount is denominated in
@@ -36,9 +36,12 @@ data class Money(
     /**
      * Converts the stored amount to a display value using BigDecimal for precision.
      *
+     * Exact: shifts the decimal point by the asset's decimal count instead of dividing, because
+     * [BigDecimal.div] rounds to a fixed scale and would corrupt high-precision crypto amounts.
+     *
      * @return The display value as BigDecimal (e.g., 12345 with scaleFactor=100 becomes 123.45)
      */
-    fun toDisplayValue(): BigDecimal = amount.toBigDecimal() / BigDecimal(currency.scaleFactor)
+    fun toDisplayValue(): BigDecimal = amount.toBigDecimal().movePointLeft(currency.decimalPlaces)
 
     /**
      * Adds another Money amount to this one.

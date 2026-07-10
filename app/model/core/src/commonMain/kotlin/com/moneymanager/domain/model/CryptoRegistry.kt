@@ -1,7 +1,7 @@
 package com.moneymanager.domain.model
 
 /**
- * A source of crypto-asset definitions (ticker → display name + optional scale factor).
+ * A source of crypto-asset definitions (ticker → display name).
  *
  * Implemented by the bundled offline catalog (see `app/cryptodata`) and installed into
  * [CryptoRegistry] at app startup. Kept intentionally tiny and synchronous so the registry's callers
@@ -13,48 +13,36 @@ interface CryptoCatalog {
 }
 
 /**
- * Registry of known crypto assets (ticker → display name + scale factor).
+ * Registry of known crypto assets (ticker → display name).
  *
  * Crypto assets are not part of the platform ISO-4217 list, so they cannot be seeded from it. Instead
- * they are created on demand during import, using this registry to resolve a human-readable name and,
- * when known, the asset's precision.
+ * they are created on demand during import, using this registry to resolve a human-readable name.
+ * Precision is not looked up: every crypto asset is created with the fixed 18-decimal
+ * [CryptoAsset.CRYPTO_SCALE_FACTOR].
  *
  * Resolution order for a ticker is: **built-in default entries → refreshed overrides → installed
- * catalog**. The hand-curated defaults win because they carry correct names *and* decimals for the
- * few coins that matter, whereas the large offline catalog (installed via [install]) is a noisy
- * ~17k-ticker dump with no decimals and arbitrary names for colliding tickers. A user-triggered
- * network refresh ([installOverrides]) layers newer long-tail names above the shipped catalog but
- * still below the curated defaults. The defaults always resolve even before a catalog is installed
- * (tests, early startup).
- *
- * An [Entry.scaleFactor] of `null` means "name known, decimals unknown" — the bundled catalog knows
- * names but not decimals, so callers must derive the precision from the data (observed CSV precision)
- * rather than assuming a fixed scale. [scaleFactorFor] falls back to the 8-decimal default for such
- * entries and for unknown tickers.
- *
- * Scale factors are [Long] (not [Int]) because high-precision tokens such as ETH use 18 decimal
- * places (scale factor 1e18), which overflows an [Int].
+ * catalog**. The hand-curated defaults win because they carry correct names for the few coins that
+ * matter, whereas the large offline catalog (installed via [install]) is a noisy ~17k-ticker dump
+ * with arbitrary names for colliding tickers. A user-triggered network refresh ([installOverrides])
+ * layers newer long-tail names above the shipped catalog but still below the curated defaults. The
+ * defaults always resolve even before a catalog is installed (tests, early startup).
  */
 object CryptoRegistry {
-    /** A known crypto asset's display name and (optionally known) scale factor. */
+    /** A known crypto asset's display name. */
     data class Entry(
         val name: String,
-        val scaleFactor: Long?,
     )
-
-    private const val SCALE_8 = 100_000_000L // 8 decimals (satoshi-style)
-    private const val SCALE_18 = 1_000_000_000_000_000_000L // 18 decimals (ETH/ERC-20 wei)
 
     /** Built-in fallback entries — always available even with no catalog installed. */
     private val defaultEntries =
         mapOf(
-            "BTC" to Entry("Bitcoin", SCALE_8),
-            "ETH" to Entry("Ethereum", SCALE_18),
-            "BNB" to Entry("BNB", SCALE_8),
-            "CRO" to Entry("Cronos", SCALE_8),
-            "BOSON" to Entry("Boson Protocol", SCALE_8),
-            "USDC" to Entry("USD Coin", SCALE_8),
-            "USDT" to Entry("Tether", SCALE_8),
+            "BTC" to Entry("Bitcoin"),
+            "ETH" to Entry("Ethereum"),
+            "BNB" to Entry("BNB"),
+            "CRO" to Entry("Cronos"),
+            "BOSON" to Entry("Boson Protocol"),
+            "USDC" to Entry("USD Coin"),
+            "USDT" to Entry("Tether"),
         )
 
     @Volatile
@@ -88,27 +76,6 @@ object CryptoRegistry {
         return defaultEntries[upper] ?: overrides[upper] ?: installedCatalog?.lookup(upper)
     }
 
-    /** Returns the scale factor for [code], defaulting to 8 decimals for unknown/decimal-less tickers. */
-    fun scaleFactorFor(code: String): Long = lookup(code)?.scaleFactor ?: CryptoAsset.DEFAULT_CRYPTO_SCALE_FACTOR
-
-    /**
-     * Returns the *explicitly known* decimal count for [code], or null when the ticker is unknown or its
-     * entry carries no scale factor. Callers use this to prefer a known precision while still deriving an
-     * unknown asset's scale from the data — never forcing the 8-decimal default onto a name-only entry.
-     */
-    fun explicitDecimalsFor(code: String): Int? = lookup(code)?.scaleFactor?.let(::decimalsForScaleFactor)
-
     /** Returns the display name for [code], defaulting to the ticker itself for unknown tickers. */
     fun nameFor(code: String): String = lookup(code)?.name ?: code.uppercase()
-
-    /** Number of decimal places encoded by a power-of-ten [scaleFactor] (e.g. 1e8 → 8). */
-    private fun decimalsForScaleFactor(scaleFactor: Long): Int {
-        var decimals = 0
-        var value = scaleFactor
-        while (value > 1) {
-            value /= 10
-            decimals++
-        }
-        return decimals
-    }
 }

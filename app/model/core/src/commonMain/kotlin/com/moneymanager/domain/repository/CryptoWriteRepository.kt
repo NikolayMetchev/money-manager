@@ -7,7 +7,8 @@ import com.moneymanager.domain.model.Source
 interface CryptoWriteRepository : CryptoReadRepository {
     /**
      * Creates a crypto asset, or returns the existing one if a crypto asset with the same code
-     * exists. The scale factor and (when [name] is null) display name are resolved from
+     * exists. Every crypto asset is created with the fixed 18-decimal
+     * [CryptoAsset.CRYPTO_SCALE_FACTOR]; the display name (when [name] is null) is resolved from
      * [com.moneymanager.domain.model.CryptoRegistry].
      *
      * @param code The ticker symbol (e.g. "BTC", "ETH")
@@ -17,7 +18,6 @@ interface CryptoWriteRepository : CryptoReadRepository {
     suspend fun upsertCryptoByCode(
         code: String,
         name: String? = null,
-        scaleFactor: Long? = null,
         source: Source,
     ): CryptoId
 

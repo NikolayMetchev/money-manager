@@ -85,3 +85,9 @@ expect class BigInteger : Comparable<BigInteger> {
  * Used when turning a scaled display value into integer minor units without silent truncation.
  */
 expect fun BigDecimal.toBigIntegerExact(): BigInteger
+
+/**
+ * Converts this [BigDecimal] to a [BigInteger], discarding any fractional part (truncation toward
+ * zero). Used after explicit rounding arithmetic, where the fraction is meant to be dropped.
+ */
+expect fun BigDecimal.toBigIntegerTruncated(): BigInteger

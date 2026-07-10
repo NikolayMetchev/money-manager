@@ -58,3 +58,9 @@ actual class BigInteger : Comparable<BigInteger> {
  * fractional part. Reconstructs the java value from the plain string so no internal access is needed.
  */
 actual fun BigDecimal.toBigIntegerExact(): BigInteger = BigInteger(java.math.BigDecimal(toString()).toBigIntegerExact())
+
+/**
+ * Converts this [BigDecimal] to a [BigInteger], discarding any fractional part (truncation toward
+ * zero). Reconstructs the java value from the plain string so no internal access is needed.
+ */
+actual fun BigDecimal.toBigIntegerTruncated(): BigInteger = BigInteger(java.math.BigDecimal(toString()).toBigInteger())

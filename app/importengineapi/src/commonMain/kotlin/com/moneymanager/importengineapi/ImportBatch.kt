@@ -249,8 +249,8 @@ value class LocalCryptoKey(
 )
 
 /**
- * A crypto asset to create/update/delete. CREATE upserts by [code] (ticker); scale factor and
- * default name come from the crypto registry. The resulting id is read back from
+ * A crypto asset to create/update/delete. CREATE upserts by [code] (ticker) at the fixed 18-decimal
+ * crypto scale; the default name comes from the crypto registry. The resulting id is read back from
  * [ImportResult.createdCryptoIds] via [key]. [existingId]/[crypto] target the row for UPDATE;
  * [existingId] for DELETE.
  */
@@ -259,8 +259,6 @@ data class ImportCryptoIntent(
     override val source: Source,
     val code: String? = null,
     val name: String? = null,
-    /** CREATE: overrides the scale factor (minor-unit divisor); null falls back to the CryptoRegistry. */
-    val scaleFactor: Long? = null,
     override val operation: ImportOperation = ImportOperation.CREATE,
     val existingId: CryptoId? = null,
     /** UPDATE: the new crypto row, passed straight to the repository. */

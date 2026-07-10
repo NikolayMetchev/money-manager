@@ -38,7 +38,7 @@ class CryptoAssetCsvResolutionTest {
     private val now = Clock.System.now()
     private val external = Account(id = AccountId(1), name = "External", openingDate = now)
     private val wallet = Account(id = AccountId(2), name = "Crypto.com CRO", openingDate = now)
-    private val cro = CryptoAsset(id = CryptoId(50), code = "CRO", name = "Cronos", scaleFactor = 100_000_000L)
+    private val cro = CryptoAsset(id = CryptoId(50), code = "CRO", name = "Cronos")
 
     private val columns =
         listOf("Date", "Amount", "Currency")
@@ -86,5 +86,26 @@ class CryptoAssetCsvResolutionTest {
         assertTrue(success.transfer.amount.currency is CryptoAsset, "denominated in a crypto asset")
         assertEquals("CRO", success.transfer.amount.currency.code)
         assertEquals(Money.fromDisplayValue("48.78055303", cro), success.transfer.amount)
+    }
+
+    @Test
+    fun eighteenDecimalDustAmountParsesExactly() {
+        // Regression: crypto.com "Convert Dust" rows carry 18 fractional digits. With the fixed
+        // 18-decimal crypto scale they must map instead of failing with "Rounding necessary".
+        val mapper =
+            buildCsvMapper(
+                strategy = strategy,
+                columns = columns,
+                accounts = listOf(external, wallet),
+                currencies = emptyList(),
+                accountMappings = emptyList(),
+                sourceAccountOverride = null,
+                cryptoAssets = listOf(cro),
+            )
+
+        val result = mapper.mapRow(CsvRow(rowIndex = 1, values = listOf("2023-11-01", "0.011548987600813619", "CRO")))
+        val success = assertIs<MappingResult.Success>(result, "dust row should map: ${(result as? MappingResult.Error)?.errorMessage}")
+
+        assertEquals(Money.fromDisplayValue("0.011548987600813619", cro), success.transfer.amount)
     }
 }

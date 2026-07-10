@@ -3,7 +3,7 @@
 package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.bigdecimal.BigInteger
+import com.moneymanager.bigdecimal.toBigIntegerTruncated
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.Asset
@@ -349,33 +349,21 @@ suspend fun importApiSessionExchange(
     // Resolve assets: any code that isn't a known fiat currency is treated as a crypto asset and
     // auto-created (the same rule as the CSV importer), sized to the precision the data actually uses.
     val fiatByCode = currencyRepository.getAllCurrencies().first().associateBy { it.code.uppercase() }
-    val cryptoDecimals = mutableMapOf<String, Int>()
+    val cryptoCodes = mutableSetOf<String>()
 
-    fun noteCrypto(
-        code: String?,
-        amount: BigDecimal?,
-    ) {
+    fun noteCrypto(code: String?) {
         if (code == null || code.uppercase() in fiatByCode) return
-        val digits = amount?.let { fractionDigits(it.toString()) } ?: 0
-        cryptoDecimals[code.uppercase()] = maxOf(cryptoDecimals[code.uppercase()] ?: 0, digits)
+        cryptoCodes += code.uppercase()
     }
     for (t in trades) {
-        noteCrypto(t.baseCode, t.baseQuantity)
-        // Size the quote asset to its own precision too, so a crypto that only ever appears as the quote
-        // leg isn't created with zero decimals and then rounded away by moneyRounded().
-        noteCrypto(t.quoteCode, t.quoteAmount)
-        noteCrypto(t.feeCode, t.feeAmount)
+        noteCrypto(t.baseCode)
+        noteCrypto(t.quoteCode)
+        noteCrypto(t.feeCode)
     }
-    for (tx in transfers) noteCrypto(tx.currencyCode, tx.amount)
+    for (tx in transfers) noteCrypto(tx.currencyCode)
 
-    for ((code, decimals) in cryptoDecimals) {
-        val explicit = CryptoRegistry.explicitDecimalsFor(code) ?: 0
-        importEngine.createCrypto(
-            code,
-            name = CryptoRegistry.nameFor(code),
-            scaleFactor = scaleFactorForDecimals(maxOf(explicit, decimals)),
-            source = source,
-        )
+    for (code in cryptoCodes) {
+        importEngine.createCrypto(code, name = CryptoRegistry.nameFor(code), source = source)
     }
 
     val cryptoByCode = cryptoRepository.getAllCryptoAssets().first().associateBy { it.code.uppercase() }
@@ -710,26 +698,17 @@ private fun parseExchangeTransfer(
 }
 
 /** Rounds a positive display value to its asset's minor units (half-up), avoiding fromDisplayValue's
- * exact-precision requirement for a computed leg (quote = quantity × price). */
+ * exact-precision requirement for a computed leg (quote = quantity × price). Truncation via
+ * BigInteger — never Long — because 18-decimal crypto minor units easily exceed a Long. */
 private fun moneyRounded(
     displayValue: BigDecimal,
     asset: Asset,
 ): Money {
     val scaled = displayValue.abs() * BigDecimal(asset.scaleFactor)
-    val minor = (scaled + HALF).toLong()
-    return Money(BigInteger(minor), asset)
+    return Money((scaled + HALF).toBigIntegerTruncated(), asset)
 }
 
 private val HALF = BigDecimal("0.5")
-
-/** Significant fractional digits of a decimal string (trailing zeros ignored). */
-private fun fractionDigits(value: String): Int = value.substringAfter('.', "").trimEnd('0').length
-
-private fun scaleFactorForDecimals(decimals: Int): Long {
-    var factor = 1L
-    repeat(decimals.coerceIn(0, 18)) { factor *= 10 }
-    return factor
-}
 
 private fun JsonObject.str(path: String): String? =
     (resolveJsonPathElement(path) as? kotlinx.serialization.json.JsonPrimitive)?.let { it.contentOrNullCompat() }

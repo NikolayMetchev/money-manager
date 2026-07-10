@@ -2,15 +2,11 @@ package com.moneymanager.cryptodata
 
 import com.moneymanager.domain.model.CryptoRegistry
 
-/** Highest crypto precision we encode (ETH/ERC-20 use 18); bounded so `10^decimals` fits a Long. */
-private const val MAX_DECIMALS = 18
-
 /**
- * Parses the bundled/refreshed TSV catalog (`SYMBOL\tNAME\tDECIMALS`, one entry per line, DECIMALS
- * optional) into a ticker→[CryptoRegistry.Entry] map keyed by uppercased symbol. Blank lines and rows
- * with a blank symbol or name are skipped; the first occurrence of a symbol wins (the generator already
- * de-duplicates, so this is just defensive). A missing/blank/invalid decimals field yields a null scale
- * factor ("name known, decimals unknown").
+ * Parses the bundled/refreshed TSV catalog (`SYMBOL\tNAME`, one entry per line; any extra columns
+ * are ignored for compatibility with older stored catalogs) into a ticker→[CryptoRegistry.Entry]
+ * map keyed by uppercased symbol. Blank lines and rows with a blank symbol or name are skipped; the
+ * first occurrence of a symbol wins (the generator already de-duplicates, so this is just defensive).
  */
 fun parseCryptoDataset(text: String): Map<String, CryptoRegistry.Entry> {
     val result = LinkedHashMap<String, CryptoRegistry.Entry>()
@@ -24,13 +20,7 @@ fun parseCryptoDataset(text: String): Map<String, CryptoRegistry.Entry> {
                 .orEmpty()
         val name = fields.getOrNull(1)?.trim().orEmpty()
         if (symbol.isNotEmpty() && name.isNotEmpty() && symbol !in result) {
-            val decimals =
-                fields
-                    .getOrNull(2)
-                    ?.trim()
-                    ?.toIntOrNull()
-                    ?.takeIf { it in 0..MAX_DECIMALS }
-            result[symbol] = CryptoRegistry.Entry(name, decimals?.let { scaleFactorForDecimals(it) })
+            result[symbol] = CryptoRegistry.Entry(name)
         }
     }
     return result
@@ -52,11 +42,5 @@ fun renderCryptoDataset(entries: List<CryptoDatasetEntry>): String {
     }
     return deduped.values
         .sortedBy { it.symbol }
-        .joinToString("\n", postfix = "\n") { "${it.symbol}\t${it.name}\t${it.decimals ?: ""}" }
-}
-
-private fun scaleFactorForDecimals(decimals: Int): Long {
-    var factor = 1L
-    repeat(decimals.coerceIn(0, MAX_DECIMALS)) { factor *= 10 }
-    return factor
+        .joinToString("\n", postfix = "\n") { "${it.symbol}\t${it.name}" }
 }

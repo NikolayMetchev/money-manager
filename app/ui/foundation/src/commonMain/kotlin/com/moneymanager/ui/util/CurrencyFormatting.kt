@@ -11,7 +11,8 @@ import com.moneymanager.currency.Currency as CurrencyFormatter
  *
  * Fiat assets are formatted with the locale currency symbol via [CurrencyFormatter] (ISO 4217).
  * Crypto assets are not ISO 4217 (java.util.Currency throws on them), so they are formatted as a
- * plain decimal padded to the asset's precision with the ticker appended, e.g. "5.00000000 BNB".
+ * plain decimal with trailing zeros trimmed and the ticker appended, e.g. "5 BNB", "0.5 BTC" —
+ * every crypto asset carries 18 decimals, so padding to full precision would be unreadable.
  *
  * @param amount The amount to format
  * @param asset The asset the amount is denominated in
@@ -21,7 +22,8 @@ fun formatAmount(
     asset: Asset,
 ): String =
     if (asset is CryptoAsset) {
-        "${amount.toPlainStringWithDecimals(decimalPlacesOf(asset.scaleFactor))} ${asset.code}"
+        // BigDecimal.toString() already strips trailing zeros and never uses scientific notation.
+        "$amount ${asset.code}"
     } else {
         try {
             CurrencyFormatter(asset.code).format(amount)
@@ -35,31 +37,6 @@ fun formatAmount(
  * Formats a Money value using the embedded asset.
  *
  * @param money The Money value to format
- * @return Formatted string (e.g., "$1,234.56" for USD, "5.00000000 BNB" for a crypto asset)
+ * @return Formatted string (e.g., "$1,234.56" for USD, "0.5 BTC" for a crypto asset)
  */
 fun formatAmount(money: Money): String = formatAmount(money.toDisplayValue(), money.currency)
-
-/** Number of decimal places implied by a scale factor (e.g. 100 -> 2, 1e8 -> 8). */
-private fun decimalPlacesOf(scaleFactor: Long): Int {
-    var factor = scaleFactor
-    var places = 0
-    while (factor > 1) {
-        factor /= 10
-        places++
-    }
-    return places
-}
-
-/** Formats [this] with exactly [decimals] fractional digits (zero-padded). */
-private fun BigDecimal.toPlainStringWithDecimals(decimals: Int): String {
-    val s = toString()
-    if (decimals == 0) return s.substringBefore('.')
-    val dot = s.indexOf('.')
-    if (dot < 0) return s + "." + "0".repeat(decimals)
-    val frac = s.length - dot - 1
-    return when {
-        frac == decimals -> s
-        frac < decimals -> s + "0".repeat(decimals - frac)
-        else -> s.substring(0, dot + 1 + decimals)
-    }
-}

@@ -26,7 +26,6 @@ class CryptoWriteRepositoryImpl(
     override suspend fun upsertCryptoByCode(
         code: String,
         name: String?,
-        scaleFactor: Long?,
         source: Source,
     ): CryptoId =
         withContext(Dispatchers.Default) {
@@ -34,12 +33,11 @@ class CryptoWriteRepositoryImpl(
                 val existing = selectQueries.selectByCode(code).executeAsOneOrNull()
                 existing?.let { CryptoId(it.id) }
                     ?: run {
-                        val scaleFactor = scaleFactor ?: CryptoRegistry.scaleFactorFor(code)
                         val displayName = name ?: CryptoRegistry.nameFor(code)
                         // Allocate an id from the shared `asset` id space, then insert the crypto with it.
                         assetWriteQueries.insert()
                         val newId = assetWriteQueries.lastInsertedId().executeAsOne()
-                        writeQueries.insert(newId, code, displayName, scaleFactor)
+                        writeQueries.insert(newId, code, displayName, CryptoAsset.CRYPTO_SCALE_FACTOR)
                         database.recordSource(deviceId, EntityType.CRYPTO, newId, 1L, source)
                         CryptoId(newId)
                     }

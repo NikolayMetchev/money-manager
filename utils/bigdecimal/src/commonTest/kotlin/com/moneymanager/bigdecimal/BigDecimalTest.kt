@@ -111,4 +111,28 @@ class BigDecimalTest {
         val pence = pounds * scaleFactor
         assertEquals(12345L, pence.toLong())
     }
+
+    @Test
+    fun movePointLeft_isExactAtEighteenDecimals() {
+        // div rounds to a fixed scale of 10, so it cannot convert 18-decimal minor units; movePointLeft can.
+        val wei = BigDecimal("123456789012345678901")
+        assertEquals("123.456789012345678901", wei.movePointLeft(18).toString())
+        assertEquals("0.000000000000000001", BigDecimal(1).movePointLeft(18).toString())
+    }
+
+    @Test
+    fun movePointLeft_zeroPlacesIsIdentity() {
+        assertEquals("123.45", BigDecimal("123.45").movePointLeft(0).toString())
+    }
+
+    @Test
+    fun toBigIntegerTruncated_dropsFraction() {
+        assertEquals("123", BigDecimal("123.999").toBigIntegerTruncated().toString())
+        assertEquals("0", BigDecimal("0.5").toBigIntegerTruncated().toString())
+        // Values far beyond Long.MAX must not overflow.
+        assertEquals(
+            "123456789012345678901",
+            BigDecimal("123456789012345678901.75").toBigIntegerTruncated().toString(),
+        )
+    }
 }

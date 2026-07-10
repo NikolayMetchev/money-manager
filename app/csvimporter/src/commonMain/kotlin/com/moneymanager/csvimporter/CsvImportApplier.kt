@@ -20,7 +20,6 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
@@ -86,25 +85,6 @@ internal fun collapsePassThroughChain(
     return if (keptNodes.size < 2) null else keptNodes to keptDescriptions
 }
 
-/** Number of fractional digits in a raw CSV amount string (e.g. "0.79000000" → 8, "1,234.5" → 1). */
-private fun decimalPlaces(amount: String?): Int {
-    val cleaned = amount?.trim() ?: return 0
-    val dot = cleaned.indexOf('.')
-    if (dot < 0) return 0
-    var count = 0
-    for (i in dot + 1 until cleaned.length) {
-        if (cleaned[i].isDigit()) count++ else break
-    }
-    return count
-}
-
-/** `10^n` as a scale factor, bounded so it stays within a Long (crypto max precision is 18 decimals). */
-private fun scaleFactorForDecimals(decimals: Int): Long {
-    var factor = 1L
-    repeat(decimals.coerceIn(0, 18)) { factor *= 10 }
-    return factor
-}
-
 /**
  * Ensures a crypto asset exists for every crypto ticker appearing in [strategy]'s currency-lookup
  * columns across [rows], creating any missing ones via the engine (upsert = idempotent), and returns
@@ -114,11 +94,9 @@ private fun scaleFactorForDecimals(decimals: Int): Long {
  * **Any** value in a currency-lookup column that is not a known fiat currency is treated as a crypto
  * asset and auto-created, using the catalog's display name (or the ticker itself when unknown), so a
  * crypto ticker resolves instead of failing with "Currency not found". This is unconditional — it does
- * not depend on any per-strategy flag, so it holds even for strategies stored before crypto support. The
- * scale factor is `max(catalog decimals, observed precision)`: the bundled catalog carries no decimals,
- * so this is normally the paired amount column's observed precision (CURRENCY↔AMOUNT, TO_CURRENCY↔
- * TO_AMOUNT), ensuring `Money.fromDisplayValue` (which throws on excess precision) parses every amount
- * exactly; the curated defaults (BTC/ETH) contribute their real scale when higher. Returns empty when no
+ * not depend on any per-strategy flag, so it holds even for strategies stored before crypto support.
+ * Every asset is created at the fixed 18-decimal crypto scale, so any observed precision parses
+ * exactly via `Money.fromDisplayValue` (which throws on excess precision). Returns empty when no
  * [cryptoRepository] is supplied.
  */
 suspend fun ensureCryptoAssets(
@@ -132,19 +110,16 @@ suspend fun ensureCryptoAssets(
     if (cryptoRepository == null) return emptyList()
     val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
     val existingCrypto = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
-    val needs = collectCryptoScaleNeeds(strategy, columns, rows, fiatCodes, existingCrypto)
-    createCryptoAssets(needs, importEngine)
+    createCryptoAssets(collectCryptoCodes(strategy, columns, rows, fiatCodes, existingCrypto), importEngine)
     return cryptoRepository.getAllCryptoAssets().first()
 }
 
 /**
  * Pre-creates every crypto asset needed across a whole batch of [imports] **before** any file is
- * imported, sizing each asset's scale factor to the maximum precision seen for that ticker across the
- * entire batch. This is what the per-file [ensureCryptoAssets] cannot do: a ticker that first appears
- * with few decimals in one file and with many in another would otherwise be created too small and the
- * high-precision rows fail with "Rounding necessary"; and a fiat file processed before the crypto file
- * that introduces a ticker would fail with "Currency not found". Creating everything up front, at the
- * batch-wide precision, removes both. Returns the full crypto-asset set. No-op without [cryptoRepository].
+ * imported. This is what the per-file [ensureCryptoAssets] cannot do: a fiat file processed before
+ * the crypto file that introduces a ticker would fail with "Currency not found". Creating everything
+ * up front removes that ordering dependency. Returns the full crypto-asset set. No-op without
+ * [cryptoRepository].
  */
 suspend fun ensureCryptoAssetsForImports(
     imports: List<CsvImport>,
@@ -158,91 +133,76 @@ suspend fun ensureCryptoAssetsForImports(
     val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
     val existingCrypto = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
 
-    val globalNeeds = mutableMapOf<String, Int>()
+    val codes = mutableSetOf<String>()
     for (listedImport in imports) {
-        cryptoScaleNeedsForImport(listedImport, strategies, csvImportRepository, fiatCodes, existingCrypto).forEach { (code, dec) ->
-            globalNeeds[code] = maxOf(globalNeeds[code] ?: 0, dec)
-        }
+        codes += cryptoCodesForImport(listedImport, strategies, csvImportRepository, fiatCodes, existingCrypto)
     }
-    createCryptoAssets(globalNeeds, importEngine)
+    createCryptoAssets(codes, importEngine)
     return cryptoRepository.getAllCryptoAssets().first()
 }
 
-/** Per-import crypto scale needs for the batch pre-pass: matches the strategy and scans importable rows. */
-private suspend fun cryptoScaleNeedsForImport(
+/** Per-import crypto codes for the batch pre-pass: matches the strategy and scans importable rows. */
+private suspend fun cryptoCodesForImport(
     listedImport: CsvImport,
     strategies: List<CsvImportStrategy>,
     csvImportRepository: CsvImportReadRepository,
     fiatCodes: Set<String>,
     existingCrypto: Set<String>,
-): Map<String, Int> {
-    val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: return emptyMap()
+): Set<String> {
+    val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: return emptySet()
     val sampleRows = csvImportRepository.getImportRows(csvImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
     val strategy =
         csvImport.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
             ?: strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, sampleRows)
-            ?: return emptyMap()
+            ?: return emptySet()
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
     val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
-    return collectCryptoScaleNeeds(strategy, csvImport.columns, rows, fiatCodes, existingCrypto)
+    return collectCryptoCodes(strategy, csvImport.columns, rows, fiatCodes, existingCrypto)
 }
 
 /**
- * Scans [rows] of [strategy]'s currency-lookup columns and returns, for each non-fiat ticker not already
- * an [existingCryptoCodes] asset, the maximum fractional-digit count observed in its paired amount column.
- * Any non-fiat code qualifies (unconditional — no per-strategy flag). Pure; does not create anything.
+ * Scans [rows] of [strategy]'s currency-lookup columns and returns every non-fiat ticker not already
+ * an [existingCryptoCodes] asset. Any non-fiat code qualifies (unconditional — no per-strategy flag).
+ * Pure; does not create anything.
  */
-private fun collectCryptoScaleNeeds(
+private fun collectCryptoCodes(
     strategy: CsvImportStrategy,
     columns: List<CsvColumn>,
     rows: List<CsvRow>,
     fiatCodes: Set<String>,
     existingCryptoCodes: Set<String>,
-): Map<String, Int> {
+): Set<String> {
     fun columnIndex(name: String): Int? = columns.firstOrNull { it.originalName == name }?.columnIndex
 
-    // Pair each currency-lookup column with its amount column (to derive an unknown asset's scale).
-    val columnPairs =
-        listOf(
-            TransferField.CURRENCY to TransferField.AMOUNT,
-            TransferField.TO_CURRENCY to TransferField.TO_AMOUNT,
-        ).mapNotNull { (currencyField, amountField) ->
-            val currencyMapping = strategy.fieldMappings[currencyField] as? CurrencyLookupMapping ?: return@mapNotNull null
-            val currencyCol = columnIndex(currencyMapping.columnName) ?: return@mapNotNull null
-            val amountCol = (strategy.fieldMappings[amountField] as? AmountParsingMapping)?.amountColumnName?.let(::columnIndex)
-            currencyCol to amountCol
+    val currencyColumns =
+        listOf(TransferField.CURRENCY, TransferField.TO_CURRENCY).mapNotNull { field ->
+            (strategy.fieldMappings[field] as? CurrencyLookupMapping)?.columnName?.let(::columnIndex)
         }
-    if (columnPairs.isEmpty()) return emptyMap()
+    if (currencyColumns.isEmpty()) return emptySet()
 
-    val maxDecimals = mutableMapOf<String, Int>()
+    val codes = mutableSetOf<String>()
     for (row in rows) {
-        for ((currencyCol, amountCol) in columnPairs) {
+        for (currencyCol in currencyColumns) {
             val code =
                 row.values
                     .getOrNull(currencyCol)
                     ?.trim()
                     ?.uppercase()
             if (!code.isNullOrEmpty() && code !in fiatCodes && code !in existingCryptoCodes) {
-                val decimals = amountCol?.let { decimalPlaces(row.values.getOrNull(it)) } ?: 0
-                maxDecimals[code] = maxOf(maxDecimals[code] ?: 0, decimals)
+                codes += code
             }
         }
     }
-    return maxDecimals
+    return codes
 }
 
-/** Creates a crypto asset for each ([code] → observed decimals) need, sized to hold that precision. */
+/** Creates a crypto asset for each of [codes] (fixed 18-decimal scale; display name from the catalog). */
 private suspend fun createCryptoAssets(
-    needs: Map<String, Int>,
+    codes: Set<String>,
     importEngine: ImportEngine,
 ) {
-    for ((code, observedDecimals) in needs) {
-        // Prefer the catalog's explicit precision when it has one, but never below the precision the data
-        // actually uses — otherwise Money.fromDisplayValue throws on a higher-precision amount and the row
-        // fails all over again. The catalog (CoinGecko) has no decimals, so this is normally the observed
-        // precision; the curated defaults (BTC/ETH) contribute their real scale when it is higher.
-        val decimals = maxOf(CryptoRegistry.explicitDecimalsFor(code) ?: 0, observedDecimals)
-        importEngine.createCrypto(code, name = CryptoRegistry.nameFor(code), scaleFactor = scaleFactorForDecimals(decimals))
+    for (code in codes) {
+        importEngine.createCrypto(code, name = CryptoRegistry.nameFor(code))
     }
 }
 
