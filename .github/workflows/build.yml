@@ -255,7 +255,11 @@ jobs:
     needs: [changes, lint-format]
     # Unlike the other heavy jobs this one also runs on workflow_dispatch, so it has no
     # event-name condition.
+    # Disabled: the Qodana Cloud open-source license expired on 2026-07-06, so every run
+    # fails before producing a SARIF. Re-enable (drop the leading `false &&`) once a new
+    # license is granted.
     if: >-
+      false &&
       !cancelled() &&
       needs.changes.outputs.code == 'true' &&
       (needs.lint-format.result == 'success' || needs.lint-format.result == 'skipped')
