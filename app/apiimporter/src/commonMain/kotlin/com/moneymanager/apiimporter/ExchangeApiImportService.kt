@@ -3,7 +3,6 @@
 package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.bigdecimal.toBigIntegerTruncated
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.Asset
@@ -427,7 +426,7 @@ suspend fun importApiSessionExchange(
         val quoteAsset = asset(t.quoteCode)
         if (baseAsset == null || quoteAsset == null) return@forEachTrade
         val baseMoney = Money.fromDisplayValue(t.baseQuantity, baseAsset)
-        val quoteMoney = moneyRounded(t.quoteAmount, quoteAsset)
+        val quoteMoney = moneyExact(t.quoteAmount, quoteAsset, "Trade ${t.id} quote leg")
         val orderInfo = t.orderId?.let { orderMeta[it] }
         val description = tradeDescription(t, orderInfo)
         // BUY: quote leaves, base arrives. SELL: base leaves, quote arrives. Both on the one account.
@@ -449,9 +448,9 @@ suspend fun importApiSessionExchange(
         val feeAmount = t.feeAmount
         if (feeCode != null && feeAmount != null) {
             val feeAsset = asset(feeCode)
-            // Fiat fees carry more decimals than the currency's scale (e.g. "-0.525570" USD), so
-            // round like the quote leg; a fee that rounds to zero minor units is dropped.
-            val feeMoney = feeAsset?.let { moneyRounded(feeAmount, it) }
+            // A fee whose precision exceeds the asset's scale fails the import (no silent rounding);
+            // a genuinely zero fee is dropped.
+            val feeMoney = feeAsset?.let { moneyExact(feeAmount, it, "Trade ${t.id} fee") }
             if (feeAsset != null && feeMoney != null && !feeMoney.isZero()) {
                 transferIntents +=
                     exchangeTransfer(
@@ -697,18 +696,21 @@ private fun parseExchangeTransfer(
     )
 }
 
-/** Rounds a positive display value to its asset's minor units (half-up), avoiding fromDisplayValue's
- * exact-precision requirement for a computed leg (quote = quantity × price). Truncation via
- * BigInteger — never Long — because 18-decimal crypto minor units easily exceed a Long. */
-private fun moneyRounded(
+/** Converts an exchange-reported display value exactly; throws if the asset's scale can't
+ * represent it, so precision is never silently lost. */
+private fun moneyExact(
     displayValue: BigDecimal,
     asset: Asset,
-): Money {
-    val scaled = displayValue.abs() * BigDecimal(asset.scaleFactor)
-    return Money((scaled + HALF).toBigIntegerTruncated(), asset)
-}
-
-private val HALF = BigDecimal("0.5")
+    context: String,
+): Money =
+    try {
+        Money.fromDisplayValue(displayValue.abs(), asset)
+    } catch (e: ArithmeticException) {
+        throw IllegalArgumentException(
+            "$context: $displayValue ${asset.code} cannot be represented exactly at scale ${asset.scaleFactor}",
+            e,
+        )
+    }
 
 private fun JsonObject.str(path: String): String? =
     (resolveJsonPathElement(path) as? kotlinx.serialization.json.JsonPrimitive)?.let { it.contentOrNullCompat() }

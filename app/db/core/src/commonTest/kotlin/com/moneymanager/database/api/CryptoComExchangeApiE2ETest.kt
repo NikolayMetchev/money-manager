@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -34,10 +35,10 @@ class CryptoComExchangeApiE2ETest : DbTest() {
     private val tradesJson =
         """
         {"code":0,"result":{"data":[
-          {"instrument_name":"BTC_USD","side":"BUY","traded_quantity":"0.5","traded_price":"40000.55",
+          {"instrument_name":"BTC_USD","side":"BUY","traded_quantity":"0.5","traded_price":"40000.54",
            "fees":"0.001","fee_instrument_name":"BTC","create_time":1700000000000,"trade_id":"t1","order_id":"o1"},
           {"instrument_name":"BTC_USD","side":"SELL","traded_quantity":"0.1","traded_price":"41000.00",
-           "fees":"-0.525570","fee_instrument_name":"USD","create_time":1700000000100,"trade_id":"t2","order_id":"o2"}
+           "fees":"-0.52","fee_instrument_name":"USD","create_time":1700000000100,"trade_id":"t2","order_id":"o2"}
         ]}}
         """.trimIndent()
 
@@ -57,7 +58,10 @@ class CryptoComExchangeApiE2ETest : DbTest() {
         ]}}
         """.trimIndent()
 
-    private suspend fun stageSessionAndImport(deposits: String = depositsJson): Int {
+    private suspend fun stageSessionAndImport(
+        deposits: String = depositsJson,
+        trades: String = tradesJson,
+    ): Int {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Crypto.com Exchange").first()
         assertNotNull(strategy, "built-in Crypto.com Exchange strategy should be installed")
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
@@ -76,7 +80,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                 )
             repositories.apiSessionRepository.insertResponse(requestId, sessionId, json)
         }
-        stage("private/get-trades", tradesJson)
+        stage("private/get-trades", trades)
         stage("private/get-order-history", ordersJson)
         stage("private/get-deposit-history", deposits)
 
@@ -117,13 +121,12 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             assertEquals("BTC", trade.to.currency.code)
             // 0.5 BTC in.
             assertEquals("0.5", trade.to.toDisplayValue().toString())
-            // quote = 0.5 * 40000.55 = 20000.275 -> rounded to 2 dp = 20000.28.
-            assertEquals("20000.28", trade.from.toDisplayValue().toString())
+            // quote = 0.5 * 40000.54 = 20000.27, exactly representable at USD's 2-decimal scale.
+            assertEquals("20000.27", trade.from.toDisplayValue().toString())
             // Order type folded into the description as reference.
             assertTrue(trade.description.contains("LIMIT"), "order type recorded: ${trade.description}")
 
-            // The SELL's fiat fee ("-0.525570" USD, more decimals than USD's scale) books as its own
-            // movement to the Fees account, rounded half-up to 0.53 rather than crashing the import.
+            // The SELL's fiat fee books as its own movement to the Fees account.
             val feesAccount =
                 repositories.accountRepository
                     .getAllAccounts()
@@ -137,7 +140,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                     ).first()
                     .first { it.targetAccountId == feesAccount.id }
             assertEquals("USD", feeTransfer.amount.currency.code)
-            assertEquals("0.53", feeTransfer.amount.toDisplayValue().toString())
+            assertEquals("0.52", feeTransfer.amount.toDisplayValue().toString())
 
             // Provenance points at the real JSON node so the audit view can expand to it.
             val deposit =
@@ -195,6 +198,26 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                 "re-import must not double-book trades",
             )
             assertEquals(depositsBefore, depositCount(), "re-import must not double-book deposits")
+        }
+
+    @Test
+    fun `a value with more precision than the asset's scale fails the import instead of rounding`() =
+        runTest {
+            // The fiat fee "-0.525570" USD (6 decimals against USD's scale of 100) is not exactly
+            // representable, so the import must throw rather than silently round.
+            val excessPrecisionTrades =
+                """
+                {"code":0,"result":{"data":[
+                  {"instrument_name":"BTC_USD","side":"SELL","traded_quantity":"0.1","traded_price":"41000.00",
+                   "fees":"-0.525570","fee_instrument_name":"USD","create_time":1700000000100,"trade_id":"t9","order_id":"o9"}
+                ]}}
+                """.trimIndent()
+            val failure =
+                assertFailsWith<IllegalArgumentException> {
+                    stageSessionAndImport(trades = excessPrecisionTrades)
+                }
+            assertTrue("t9" in failure.message.orEmpty(), "failure names the trade: ${failure.message}")
+            assertTrue("USD" in failure.message.orEmpty(), "failure names the asset: ${failure.message}")
         }
 
     @Test
