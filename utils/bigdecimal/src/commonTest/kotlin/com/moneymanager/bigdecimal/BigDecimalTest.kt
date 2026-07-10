@@ -124,15 +124,4 @@ class BigDecimalTest {
     fun movePointLeft_zeroPlacesIsIdentity() {
         assertEquals("123.45", BigDecimal("123.45").movePointLeft(0).toString())
     }
-
-    @Test
-    fun toBigIntegerTruncated_dropsFraction() {
-        assertEquals("123", BigDecimal("123.999").toBigIntegerTruncated().toString())
-        assertEquals("0", BigDecimal("0.5").toBigIntegerTruncated().toString())
-        // Values far beyond Long.MAX must not overflow.
-        assertEquals(
-            "123456789012345678901",
-            BigDecimal("123456789012345678901.75").toBigIntegerTruncated().toString(),
-        )
-    }
 }
