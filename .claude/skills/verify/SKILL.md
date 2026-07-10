@@ -14,9 +14,11 @@ sent to the nested display stay inside it (they never touch the user's real poin
 ```bash
 # 1. Nested X display (opens one contained window on the user's screen)
 Xwayland :9 -geometry 1600x1000 -decorate -retro &
+XWAYLAND_PID=$!
 
-# 2. Launch the app inside it (background; first window paint takes ~15s after gradle is warm)
-DISPLAY=:9 ./gradlew :app:main:jvm:run --console=plain
+# 2. Launch the app inside it in the background (first window paint takes ~15s once gradle is warm)
+DISPLAY=:9 ./gradlew :app:main:jvm:run --console=plain &
+APP_PID=$!
 
 # 3. Screenshot (ImageMagick `import` works against the nested server; no WM needed)
 DISPLAY=:9 import -window root shot.png
@@ -39,7 +41,8 @@ Settings); Imports screen has top tabs Directories/CSV/QIF/API/Misc.
   Navigation, tabs, and dropdowns are read-only — but do NOT click Download/Import/Delete
   buttons: they hit real provider APIs / mutate real data.
 - `xset` is not installed; test the server with `import` or `pgrep -f 'Xwayland :9'` instead.
-- Closing the app window (or killing the gradle run task) exits cleanly; kill the Xwayland
-  pid afterwards.
+- Cleanup: `kill $APP_PID` (or close the app window — either exits cleanly), then
+  `kill $XWAYLAND_PID`. Kill the captured PIDs, not by pattern, to avoid hitting the user's
+  own `Xwayland :1` session process.
 - Don't run the GUI while a full `./gradlew build` is running — they contend for the
   configuration cache lock.
