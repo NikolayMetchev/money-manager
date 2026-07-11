@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
@@ -149,6 +150,20 @@ private fun visibleColumnRange(
     if (last < first) return IntRange.EMPTY
     val overscan = 3
     return (first - overscan).coerceAtLeast(0)..(last + overscan).coerceAtMost(count - 1)
+}
+
+/**
+ * Zero-height filler standing in for the virtualized (off-screen) matrix columns. This cannot be a
+ * `Spacer(Modifier.width(...))`: with 1000+ accounts the combined column width exceeds the ~262k px
+ * a [androidx.compose.ui.unit.Constraints] can represent, so the width modifier crashes creating its
+ * fixed constraints. Reporting the size from measure skips that limit — inside `horizontalScroll`
+ * the incoming max width is unbounded, so the reported width is never coerced.
+ */
+@Composable
+private fun MatrixColumnsFiller(width: Dp) {
+    Layout(modifier = Modifier) { _, _ ->
+        layout(width.roundToPx(), 0) {}
+    }
 }
 
 @Composable
@@ -565,7 +580,7 @@ fun AccountTransactionsScreen(
                                         .linuxHorizontalScrollWheel(horizontalScrollState)
                                         .horizontalScroll(horizontalScrollState),
                             ) {
-                                Spacer(modifier = Modifier.width(leadingWidth))
+                                MatrixColumnsFiller(leadingWidth)
                                 for (columnIndex in range) {
                                     val account = allAccounts[columnIndex]
                                     val isSelectedColumn = selectedAccountId == account.id
@@ -618,7 +633,7 @@ fun AccountTransactionsScreen(
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
-                                Spacer(modifier = Modifier.width(trailingWidth))
+                                MatrixColumnsFiller(trailingWidth)
                             }
                         }
 
@@ -678,7 +693,7 @@ fun AccountTransactionsScreen(
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
-                                            Spacer(modifier = Modifier.width(leadingWidth))
+                                            MatrixColumnsFiller(leadingWidth)
                                             // Balance for each visible account
                                             for (columnIndex in range) {
                                                 val account = allAccounts[columnIndex]
@@ -731,7 +746,7 @@ fun AccountTransactionsScreen(
                                                 }
                                                 Spacer(modifier = Modifier.width(8.dp))
                                             }
-                                            Spacer(modifier = Modifier.width(trailingWidth))
+                                            MatrixColumnsFiller(trailingWidth)
                                         }
                                     }
                                 }
