@@ -78,6 +78,46 @@ import kotlin.time.Duration
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
     @Test
+    fun accountMatrix_rendersWhenTotalColumnWidthExceedsComposeConstraintsLimit() =
+        runMoneyManagerComposeUiTest {
+            // Given: enough accounts that the matrix's total scrollable width (~120dp per column)
+            // exceeds the ~262k px a Compose Constraints value can represent. The virtualization
+            // fillers standing in for the off-screen columns must not crash the measure pass
+            // ("Can't represent a width of X and height of 0 in Constraints").
+            val now = Clock.System.now()
+            val usdCurrency =
+                Currency(
+                    id = CurrencyId(1L),
+                    code = "USD",
+                    name = "US Dollar",
+                )
+            val accounts =
+                (1L..3000L).map { Account(id = AccountId(it), name = "Account $it", openingDate = now) }
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountTransactionsScreen(
+                        accountId = accounts.first().id,
+                        transactionRepository = createTransactionRepository(emptyList()),
+                        accountRepository = createAccountRepository(accounts),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        currencyRepository = createCurrencyRepository(listOf(usdCurrency)),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        onAccountIdChange = {},
+                        onCurrencyIdChange = {},
+                    )
+                }
+            }
+
+            // Then: the screen measures without throwing and the selected account's column is composed
+            waitUntilExactlyOneExists(hasText("Account 1"))
+        }
+
+    @Test
     fun accountTransactionCard_flipsAccountDisplay_whenPerspectiveChanges() =
         runMoneyManagerComposeUiTest {
             // Given: Two accounts and a transfer between them
