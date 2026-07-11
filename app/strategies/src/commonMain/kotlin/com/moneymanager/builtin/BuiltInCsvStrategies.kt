@@ -151,9 +151,10 @@ object BuiltInCsvStrategies {
      * Built-in strategy for crypto.com's card_transactions_record_*.csv export (the Visa card
      * statement). Every row has a blank Transaction Kind — the content rule that identifies the file
      * when it has been renamed. Spends are negative Native Amounts to a merchant account looked up
-     * from the description; "GBP Deposit" rows are card top-ups arriving from the crypto.com Cash
-     * account (the fiat export records the same movement as viban_card_top_up, which cross-source
-     * reconciliation links instead of double-counting).
+     * from the description; "GBP Deposit" rows (described as "GBP -> GBP" in pre-mid-2022 exports)
+     * are card top-ups arriving from the crypto.com Cash account (the fiat export records the same
+     * movement as viban_card_top_up, which cross-source reconciliation links instead of
+     * double-counting).
      */
     fun buildCryptoComCardStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
@@ -177,6 +178,11 @@ object BuiltInCsvStrategies {
                             listOf(
                                 // Top-ups ("GBP Deposit", "EUR Deposit", …) come from the Cash account.
                                 RegexRule(pattern = "^[A-Z]{3,5} Deposit$", accountName = CRYPTO_COM_CASH_ACCOUNT),
+                                // Pre-mid-2022 exports describe the same top-up as "GBP -> GBP" (same
+                                // currency on both sides). Cross-currency arrows (e.g. "TGBP -> GBP") are
+                                // conversion-funded and deliberately NOT matched — the crypto export
+                                // records that movement separately.
+                                RegexRule(pattern = "^([A-Z]{3,5}) -> \\1$", accountName = CRYPTO_COM_CASH_ACCOUNT),
                             ),
                         // Everything else looks up/creates a merchant account from the raw description.
                     ),
