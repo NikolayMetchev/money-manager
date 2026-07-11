@@ -49,6 +49,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.format.DateTimeFormat
 import kotlinx.datetime.format.byUnicodePattern
 import kotlinx.datetime.toInstant
 import kotlin.time.Duration
@@ -266,6 +267,33 @@ class CsvTransferMapper(
 ) {
     private val columnIndexByName: Map<String, Int> =
         columns.associate { it.originalName to it.columnIndex }
+
+    // Compiled once per pattern: account rules and column extractions run against every row, so
+    // compiling in place would dominate the mapping cost. Case-insensitive like all rule matching here.
+    private val patternCache = HashMap<String, Regex>()
+
+    private fun compiledPattern(pattern: String): Regex = patternCache.getOrPut(pattern) { Regex(pattern, RegexOption.IGNORE_CASE) }
+
+    // Likewise for date/time formats: building a kotlinx-datetime Format compiles a parser, which is
+    // far more expensive than the parse itself.
+    private val dateTimeFormatCache = HashMap<String, DateTimeFormat<LocalDateTime>>()
+    private val dateFormatCache = HashMap<String, DateTimeFormat<LocalDate>>()
+    private val timeFormatCache = HashMap<String, DateTimeFormat<LocalTime>>()
+
+    private fun cachedDateTimeFormat(pattern: String): DateTimeFormat<LocalDateTime> =
+        dateTimeFormatCache.getOrPut(pattern) {
+            LocalDateTime.Format { byUnicodePattern(pattern) }
+        }
+
+    private fun cachedDateFormat(pattern: String): DateTimeFormat<LocalDate> =
+        dateFormatCache.getOrPut(pattern) {
+            LocalDate.Format { byUnicodePattern(pattern) }
+        }
+
+    private fun cachedTimeFormat(pattern: String): DateTimeFormat<LocalTime> =
+        timeFormatCache.getOrPut(pattern) {
+            LocalTime.Format { byUnicodePattern(pattern) }
+        }
 
     // Precompiled conversion detection (null when the strategy declares no conversionConfig). Regexes
     // are case-insensitive, matching the file's existing account/content-rule matching convention.
@@ -1030,13 +1058,13 @@ class CsvTransferMapper(
         // Try each rule in order; first match wins
         if (primaryValue.isNotBlank()) {
             for (rule in mapping.rules) {
-                val match = Regex(rule.pattern, RegexOption.IGNORE_CASE).find(primaryValue)
+                val match = compiledPattern(rule.pattern).find(primaryValue)
                 if (match != null) {
                     // When a template is configured, derive the name from the matched text via
                     // capture-group substitution; otherwise use the fixed account name (legacy behaviour).
                     val accountName =
                         rule.accountNameTemplate
-                            ?.let { substituteTemplate(it, match).replace(Regex("\\s+"), " ").trim() }
+                            ?.let { substituteTemplate(it, match).replace(WHITESPACE_RUN_REGEX, " ").trim() }
                             ?.takeIf { it.isNotBlank() }
                             ?: rule.accountName
                     return RegexAccountResult(
@@ -1087,8 +1115,7 @@ class CsvTransferMapper(
         return try {
             if (dateTimeFormat != null) {
                 // Single column holding a combined date+time value
-                LocalDateTime
-                    .Format { byUnicodePattern(dateTimeFormat) }
+                cachedDateTimeFormat(dateTimeFormat)
                     .parse(dateValue.trim())
                     .toInstant(timezone)
             } else {
@@ -1107,15 +1134,13 @@ class CsvTransferMapper(
         timeFormat: String?,
         timezone: TimeZone,
     ): Instant {
-        val date = LocalDate.Format { byUnicodePattern(dateFormat) }.parse(dateValue.trim())
+        val date = cachedDateFormat(dateFormat).parse(dateValue.trim())
 
         val time =
             if (timeValue.isBlank()) {
                 LocalTime(12, 0, 0)
-            } else if (timeFormat != null) {
-                LocalTime.Format { byUnicodePattern(timeFormat) }.parse(timeValue.trim())
             } else {
-                LocalTime.Format { byUnicodePattern("HH:mm[:ss]") }.parse(timeValue.trim())
+                cachedTimeFormat(timeFormat ?: "HH:mm[:ss]").parse(timeValue.trim())
             }
 
         return LocalDateTime(date, time).toInstant(timezone)
@@ -1193,7 +1218,7 @@ class CsvTransferMapper(
         value: String,
         extraction: ColumnExtraction,
     ): String? {
-        val match = Regex(extraction.pattern, RegexOption.IGNORE_CASE).find(value) ?: return null
+        val match = compiledPattern(extraction.pattern).find(value) ?: return null
         return substituteTemplate(extraction.outputTemplate, match)
     }
 
@@ -1424,5 +1449,8 @@ class CsvTransferMapper(
     private companion object {
         /** Posting dates of the same transaction can drift between bank exports by a day or two. */
         val DUPLICATE_DATE_TOLERANCE: Duration = 3.days
+
+        /** Collapses whitespace runs in template-derived account names. */
+        val WHITESPACE_RUN_REGEX = Regex("\\s+")
     }
 }

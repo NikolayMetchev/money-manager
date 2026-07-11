@@ -15,5 +15,5 @@ CREATE TABLE transfer_relationship (
 );
 
 CREATE INDEX idx_transfer_relationship_id1 ON transfer_relationship(id1);
-CREATE INDEX idx_transfer_relationship_id2 ON transfer_relationship(id2);
+CREATE INDEX idx_transfer_relationship_id2_type ON transfer_relationship(id2, relationship_type_id);
 CREATE INDEX idx_transfer_relationship_type ON transfer_relationship(relationship_type_id);
