@@ -470,6 +470,7 @@ class ImportEngineImpl(
         val claimedExisting = mutableSetOf<TransferId>()
         val claimedInBatch = mutableSetOf<LegKey>()
         val batchSpendLegs = mutableListOf<BatchSpendLeg>()
+        val existingCandidates = loadReversalCandidates(toImport, reversalTypeId)
         return toImport.mapIndexed { index, classified ->
             val t = classified.transfer
             val passThrough = t.passThrough ?: return@mapIndexed classified
@@ -495,9 +496,8 @@ class ImportEngineImpl(
                                 leg.timestamp <= timestamp
                         }.maxWithOrNull(compareBy({ it.timestamp }, { it.toImportIndex }))
                 val existingMatch =
-                    transactionRepository
-                        .getUnreversedTransfersBetween(spendTarget, spendSource, amount, timestamp, reversalTypeId)
-                        .firstOrNull { it.id !in claimedExisting }
+                    existingCandidates[ReversalCandidateKey(spendTarget, spendSource, amount)]
+                        ?.firstOrNull { it.timestamp <= timestamp && it.id !in claimedExisting }
 
                 val link =
                     when {
@@ -517,6 +517,41 @@ class ImportEngineImpl(
             if (links.isEmpty()) classified else classified.copy(reversalLinks = links)
         }
     }
+
+    /**
+     * Loads the existing-DB reversal candidates for every pass-through spend leg of [toImport] in one
+     * query, grouped by directed (source, target, amount), newest first within each group. Every spend
+     * leg has at least one conduit endpoint, so bounding the query by the batch's conduit accounts (and
+     * the legs' amounts and max timestamp) covers all per-leg lookups; the currency check the old
+     * per-leg query did via asset_id happens here through the [Money] group key. The DB is not written
+     * while legs are resolved, so this snapshot is equivalent to querying per leg.
+     */
+    private suspend fun loadReversalCandidates(
+        toImport: List<Classified>,
+        reversalTypeId: RelationshipTypeId,
+    ): Map<ReversalCandidateKey, List<Transfer>> {
+        val conduitAccounts = mutableSetOf<AccountId>()
+        val amounts = mutableSetOf<Money>()
+        var maxTimestamp: Instant? = null
+        for (classified in toImport) {
+            val passThrough = classified.transfer.passThrough ?: continue
+            passThrough.conduits.forEach { conduitAccounts += it.requireExistingId() }
+            amounts += passThrough.amount
+            val timestamp = requireNotNull(classified.transfer.timestamp)
+            if (maxTimestamp == null || timestamp > maxTimestamp) maxTimestamp = timestamp
+        }
+        if (conduitAccounts.isEmpty() || maxTimestamp == null) return emptyMap()
+        return transactionRepository
+            .getUnreversedTransfersTouchingAccounts(conduitAccounts, amounts, maxTimestamp, reversalTypeId)
+            .groupBy { ReversalCandidateKey(it.sourceAccountId, it.targetAccountId, it.amount) }
+    }
+
+    /** Directed reversal-candidate lookup key: candidates running source → target of exactly amount. */
+    private data class ReversalCandidateKey(
+        val source: AccountId,
+        val target: AccountId,
+        val amount: Money,
+    )
 
     /** Identifies one spend leg of one to-import row: (index into the to-import list, leg index). */
     private data class LegKey(

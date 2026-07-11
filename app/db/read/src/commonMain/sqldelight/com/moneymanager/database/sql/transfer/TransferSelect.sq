@@ -308,10 +308,11 @@ WHERE (source_account_id = :accountA AND target_account_id = :accountB)
    OR (source_account_id = :accountB AND target_account_id = :accountA)
 ORDER BY timestamp DESC;
 
--- Candidate originals for a reversal (refund/cancellation) link: directed transfers of the same amount
--- not yet reversed (never id2 of a :reversalTypeId relationship), newest first. Used by the import
--- engine to pair a pass-through refund's spend leg with the charge it reverses.
-selectUnreversedTransfersBetweenAccountsByAmount:
+-- Candidate originals for reversal (refund/cancellation) links: transfers touching any of the given
+-- accounts with one of the given amounts, not yet reversed (never id2 of a :reversalTypeId
+-- relationship), newest first. The import engine loads these once per batch (every pass-through
+-- spend leg has a conduit endpoint) and pairs legs with charges in memory.
+selectUnreversedTransfersTouchingAccounts:
 SELECT
     transfer.id,
     transfer.revision_id,
@@ -327,10 +328,8 @@ SELECT
     asset_details.kind AS asset_kind
 FROM transfer
 JOIN asset_details ON transfer.asset_id = asset_details.id
-WHERE transfer.source_account_id = :sourceAccountId
-  AND transfer.target_account_id = :targetAccountId
-  AND transfer.amount = :amount
-  AND transfer.asset_id = :currencyId
+WHERE (transfer.source_account_id IN :accountIds OR transfer.target_account_id IN :accountIds)
+  AND transfer.amount IN :amounts
   AND transfer.timestamp <= :maxTimestamp
   AND NOT EXISTS (
       SELECT 1 FROM transfer_relationship

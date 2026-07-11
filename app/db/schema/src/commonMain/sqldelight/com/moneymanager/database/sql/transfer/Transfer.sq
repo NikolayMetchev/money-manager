@@ -15,8 +15,8 @@ CREATE TABLE transfer (
     FOREIGN KEY (asset_id) REFERENCES asset(id) ON DELETE RESTRICT
 );
 
-CREATE INDEX IF NOT EXISTS idx_transfer_src_account ON transfer(source_account_id);
-CREATE INDEX IF NOT EXISTS idx_transfer_target_account ON transfer(target_account_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_src_target_amount ON transfer(source_account_id, target_account_id, amount);
+CREATE INDEX IF NOT EXISTS idx_transfer_target_timestamp ON transfer(target_account_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_transfer_asset ON transfer(asset_id);
 
 -- Materialized table for account balances (manually refreshed)

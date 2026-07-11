@@ -56,14 +56,14 @@ interface TransactionReadRepository {
     ): Flow<List<TransferMissingCompanion>>
 
     /**
-     * Directed transfers [sourceAccountId] → [targetAccountId] of exactly [amount] at or before
-     * [maxTimestamp] that are not yet the target (id2) of a [reversalTypeId] relationship, newest
-     * first. Used by the import engine to pair a refund/cancellation with the movement it reverses.
+     * Transfers touching any of [accountIds] (as source or target) whose amount is one of [amounts]
+     * at or before [maxTimestamp] and not yet the target (id2) of a [reversalTypeId] relationship,
+     * newest first. Loaded once per import batch by the import engine, which pairs
+     * refunds/cancellations with the movements they reverse in memory.
      */
-    suspend fun getUnreversedTransfersBetween(
-        sourceAccountId: AccountId,
-        targetAccountId: AccountId,
-        amount: Money,
+    suspend fun getUnreversedTransfersTouchingAccounts(
+        accountIds: Set<AccountId>,
+        amounts: Set<Money>,
         maxTimestamp: Instant,
         reversalTypeId: RelationshipTypeId,
     ): List<Transfer>

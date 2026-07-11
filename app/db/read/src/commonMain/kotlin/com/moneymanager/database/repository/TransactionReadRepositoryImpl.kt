@@ -129,20 +129,18 @@ class TransactionReadRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map { loadAttributesForTransfers(it) }
 
-    override suspend fun getUnreversedTransfersBetween(
-        sourceAccountId: AccountId,
-        targetAccountId: AccountId,
-        amount: Money,
+    override suspend fun getUnreversedTransfersTouchingAccounts(
+        accountIds: Set<AccountId>,
+        amounts: Set<Money>,
         maxTimestamp: Instant,
         reversalTypeId: RelationshipTypeId,
     ): List<Transfer> =
         withContext(Dispatchers.Default) {
+            if (accountIds.isEmpty() || amounts.isEmpty()) return@withContext emptyList()
             transferSelectQueries
-                .selectUnreversedTransfersBetweenAccountsByAmount(
-                    sourceAccountId = sourceAccountId.id,
-                    targetAccountId = targetAccountId.id,
-                    amount = amount.amount.toString(),
-                    currencyId = amount.currency.id.id,
+                .selectUnreversedTransfersTouchingAccounts(
+                    accountIds = accountIds.map { it.id },
+                    amounts = amounts.map { it.amount.toString() },
                     maxTimestamp = maxTimestamp.toEpochMilliseconds(),
                     reversalTypeId = reversalTypeId.id,
                     TransferMapper::mapRaw,

@@ -17,6 +17,7 @@ import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.StringSimilarity
 import kotlin.time.Duration
+import kotlin.time.Instant
 
 /**
  * Information about an existing transfer, used by [ImportDeduper] for duplicate detection.
@@ -106,7 +107,42 @@ class ImportDeduper(
     private val policy: DedupePolicy,
     existing: List<ExistingTransferInfo>,
 ) {
-    private val existingList = existing
+    /**
+     * Exact-match key over a transfer's core fields. Incoming-side fields are nullable, so an
+     * incomplete incoming transfer builds a key that simply misses every (fully populated) existing
+     * entry — the same outcome as the field-by-field comparison it replaces.
+     */
+    private data class CoreKey(
+        val timestamp: Instant?,
+        val sourceAccountId: AccountId,
+        val targetAccountId: AccountId,
+        val amount: Money?,
+        val description: String?,
+    )
+
+    /** Directed (source, target, amount) key for exact-account reconcile/candidate lookups. */
+    private data class DirectedAmountKey(
+        val sourceAccountId: AccountId,
+        val targetAccountId: AccountId,
+        val amount: Money?,
+    )
+
+    private fun Transfer.coreKey() = CoreKey(timestamp, sourceAccountId, targetAccountId, amount, description)
+
+    private fun ImportTransfer.coreKey() =
+        CoreKey(timestamp, fromAccount.requireId(), toAccount.requireId(), amount, description)
+
+    // Indexes over the existing transfers so classification is a hash lookup (plus a scan of the small
+    // matching bucket) instead of a linear pass over the whole DB history per incoming row. Buckets
+    // preserve input order, so first-match-in-list-order semantics are unchanged.
+    private val existingByCoreKey: Map<CoreKey, ExistingTransferInfo> = buildMap {
+        for (info in existing) {
+            val key = info.transfer.coreKey()
+            if (key !in this) put(key, info)
+        }
+    }
+    private val existingByAmount: Map<Money, List<ExistingTransferInfo>> =
+        existing.groupBy { it.transfer.amount }
 
     // The reconciliation exclusion attribute type (when the policy enables cross-source reconciliation),
     // ignored in attribute comparison so a reconciled transfer still dedupes cleanly on re-import.
@@ -129,14 +165,23 @@ class ImportDeduper(
         existing.mapNotNull { info -> info.apiId?.let { it to info.transferId } }.toMap()
     private val existingUniqueKeyId: Map<Map<String, String>, TransferId> =
         existing.filter { it.uniqueKey.isNotEmpty() }.associate { it.uniqueKey to it.transferId }
-    private val existingMatchCandidates: List<Pair<TransferId, Transfer>> =
-        existing.map { it.transferId to it.transfer }
+
+    // apiMatches needs an exact timestamp+amount, so bucket the candidates by that pair.
+    private val existingMatchCandidates: Map<Pair<Instant, Money>, List<Pair<TransferId, Transfer>>> =
+        existing
+            .map { it.transferId to it.transfer }
+            .groupBy { (_, t) -> t.timestamp to t.amount }
 
     // Reconciliation only considers existing transfers this provider cannot identify by its own id
     // (apiId == null) — i.e. transfers from a different source — so genuine repeats from the same
     // provider (which carry an apiId) are never reconciled away.
     private val reconcileCandidates: List<Pair<TransferId, Transfer>> =
         existing.filter { it.apiId == null }.map { it.transferId to it.transfer }
+
+    // reconcileMatches needs exact source+target+amount (only the timestamp window varies), so bucket
+    // the reconcile candidates by that triple.
+    private val reconcileCandidatesByDirectedAmount: Map<DirectedAmountKey, List<Pair<TransferId, Transfer>>> =
+        reconcileCandidates.groupBy { (_, t) -> DirectedAmountKey(t.sourceAccountId, t.targetAccountId, t.amount) }
     private val batchApiId = mutableMapOf<String, Int>()
     private val batchUniqueKey = mutableMapOf<Map<String, String>, Int>()
     private val batchMatchCandidates = mutableListOf<Pair<Int, Transfer>>()
@@ -164,7 +209,7 @@ class ImportDeduper(
         val existingId =
             transfer.apiId?.let { existingApiId[it] }
                 ?: transfer.uniqueKey?.takeIf { it.isNotEmpty() }?.let { existingUniqueKeyId[it] }
-                ?: existingMatchCandidates.firstOrNull { (_, e) -> apiMatches(transfer, e) }?.first
+                ?: apiMatchCandidatesFor(transfer).firstOrNull { (_, e) -> apiMatches(transfer, e) }?.first
         if (existingId != null) return Classified(transfer, ImportStatus.DUPLICATE, existingId)
 
         // Cross-source reconciliation: the same real movement seen from another provider. Keep this
@@ -213,8 +258,11 @@ class ImportDeduper(
         relationshipTypeId: RelationshipTypeId?,
     ): Classified? {
         if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
+        val key = DirectedAmountKey(transfer.fromAccount.requireId(), transfer.toAccount.requireId(), transfer.amount)
         val matchId =
-            reconcileCandidates.firstOrNull { (_, existing) -> reconcileMatches(transfer, existing, window) }?.first
+            reconcileCandidatesByDirectedAmount[key]
+                ?.firstOrNull { (_, existing) -> reconcileMatches(transfer, existing, window) }
+                ?.first
                 ?: return null
         val attributes =
             if (transfer.attributes.any { it.typeId == exclusionTypeId }) {
@@ -312,6 +360,13 @@ class ImportDeduper(
         return delta <= window
     }
 
+    /** The existing transfers that could satisfy [apiMatches] (exact timestamp + amount bucket). */
+    private fun apiMatchCandidatesFor(transfer: ImportTransfer): List<Pair<TransferId, Transfer>> {
+        val timestamp = transfer.timestamp ?: return emptyList()
+        val amount = transfer.amount ?: return emptyList()
+        return existingMatchCandidates[timestamp to amount].orEmpty()
+    }
+
     private fun apiMatches(
         transfer: ImportTransfer,
         existing: Transfer,
@@ -356,17 +411,18 @@ class ImportDeduper(
         policy: DedupePolicy.FuzzyAllFields,
     ): Classified {
         // First pass: an exact core-field match preserves the DUPLICATE/UPDATED distinction.
-        for (existing in existingList) {
-            if (coreFieldsMatch(transfer, existing.transfer)) {
-                val status =
-                    if (attributesAreIdentical(transfer, existing)) ImportStatus.DUPLICATE else ImportStatus.UPDATED
-                return Classified(transfer, status, existing.transferId)
-            }
+        existingByCoreKey[transfer.coreKey()]?.let { existing ->
+            val status =
+                if (attributesAreIdentical(transfer, existing)) ImportStatus.DUPLICATE else ImportStatus.UPDATED
+            return Classified(transfer, status, existing.transferId)
         }
-        // Second pass: tolerate bank re-export drift (close date, similar description).
-        for (existing in existingList) {
-            if (isFuzzyDuplicate(transfer, existing.transfer, policy)) {
-                return Classified(transfer, ImportStatus.DUPLICATE, existing.transferId)
+        // Second pass: tolerate bank re-export drift (close date, similar description) — the amount
+        // must still match exactly, so only that bucket needs scanning.
+        transfer.amount?.let { amount ->
+            existingByAmount[amount]?.forEach { existing ->
+                if (isFuzzyDuplicate(transfer, existing.transfer, policy)) {
+                    return Classified(transfer, ImportStatus.DUPLICATE, existing.transferId)
+                }
             }
         }
         // Third pass: cross-source reconciliation (opt-in per strategy) — the same real movement
