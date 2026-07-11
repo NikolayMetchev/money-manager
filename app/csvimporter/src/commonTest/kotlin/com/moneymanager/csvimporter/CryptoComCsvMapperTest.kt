@@ -204,6 +204,28 @@ class CryptoComCsvMapperTest {
         assertTrue(r.newAccounts.isEmpty())
     }
 
+    @Test
+    fun `old-format card top-up described as GBP - GBP is Cash to Card`() {
+        // Pre-mid-2022 card exports describe top-ups as "GBP -> GBP" (with the To columns populated)
+        // instead of "GBP Deposit"; they must resolve the same Cash -> Card pair so cross-source
+        // reconciliation still links them to the fiat file's viban_card_top_up rows.
+        val r = map(cardStrategy, row("GBP -> GBP", "GBP", "1500.0", "GBP", "1500.0", "1500.0", ""))
+        assertEquals(cash.id, r.transfer.sourceAccountId)
+        assertEquals(card.id, r.transfer.targetAccountId)
+        assertEquals(Money.fromDisplayValue(BigDecimal("1500.0"), gbp), r.transfer.amount)
+        assertNull(r.tradeTo)
+        assertTrue(r.newAccounts.isEmpty(), "old-format top-ups must not create a 'GBP -> GBP' account")
+    }
+
+    @Test
+    fun `cross-currency card arrow row keeps the description counterparty`() {
+        // "TGBP -> GBP" top-ups are funded by a conversion the crypto export records separately, so
+        // routing them to Cash would double-count; they stay a description-derived conduit account.
+        val r = map(cardStrategy, row("TGBP -> GBP", "GBP", "4000.0", "TGBP", "4000.0", "4000.0", ""))
+        assertEquals(card.id, r.transfer.targetAccountId)
+        assertEquals("TGBP -> GBP", r.newAccountName())
+    }
+
     // ---- Crypto strategy: cross-asset rows become trades ----
 
     @Test
