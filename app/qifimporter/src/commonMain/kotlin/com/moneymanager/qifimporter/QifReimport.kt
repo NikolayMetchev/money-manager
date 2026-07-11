@@ -111,12 +111,15 @@ suspend fun planQifReimport(
             onProgress = onProgress,
         )
     val reversalRowIndexes = reversals.flatMapTo(mutableSetOf()) { it.rowIndexes }
+    // One batched load instead of a per-record getTransactionById round trip in the value-update scan.
+    onProgress?.invoke(ImportProgress("Loading existing transactions"))
+    val existingTransfers = transactionRepository.getTransactionsByIds(allRows.mapNotNull { it.transferId })
     val valueUpdates =
         computeReimportValueUpdates(
             allRows = allRows,
             mappedPrep = mappedPrep,
             rewrittenRowIndexes = splitRecordIndexes + reversalRowIndexes,
-            transactionRepository = transactionRepository,
+            existingTransferLookup = { transferId -> existingTransfers[transferId] },
             onProgress = onProgress,
         )
 

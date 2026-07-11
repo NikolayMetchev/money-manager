@@ -33,6 +33,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
 
+/** Android's SQLite caps bound variables at 999 per statement. */
+private const val MAX_IDS_PER_QUERY = 999
+
 class TransactionReadRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : TransactionReadRepository {
@@ -75,6 +78,20 @@ class TransactionReadRepositoryImpl(
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { loadAttributesForTransfer(it) }
+
+    override suspend fun getTransactionsByIds(ids: Collection<TransferId>): Map<TransferId, Transfer> =
+        withContext(Dispatchers.Default) {
+            ids
+                .asSequence()
+                .map { it.id }
+                .distinct()
+                .chunked(MAX_IDS_PER_QUERY)
+                .flatMap { chunk ->
+                    loadAttributesForTransfers(
+                        transferSelectQueries.selectByIds(chunk, TransferMapper::mapRaw).executeAsList(),
+                    )
+                }.associateBy { it.id }
+        }
 
     override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
         transferSelectQueries

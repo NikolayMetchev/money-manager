@@ -55,3 +55,4 @@ webpage/modules-graph.md
 
 # Guard against a literal "~" directory accidentally created by un-expanded tilde paths
 /~/
+/profile.jfr

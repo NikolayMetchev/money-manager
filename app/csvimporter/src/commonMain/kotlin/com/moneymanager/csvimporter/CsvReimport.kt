@@ -404,9 +404,13 @@ suspend fun planCsvReimport(
             rowIndexForSource = { source -> (source as? Source.Csv)?.takeIf { it.importId == csvImport.id }?.rowIndex },
             onProgress = onProgress,
         )
+    // One batched load instead of a per-row getTransactionById round trip in each of the three
+    // row scans below — on large files those thousands of single-row flow queries dominate the plan phase.
+    onProgress?.invoke(ImportProgress("Loading existing transactions"))
+    val existingTransfers = transactionRepository.getTransactionsByIds(allRows.mapNotNull { it.transferId })
     val rewrites =
         computeReimportRewrites(allRows, mappedPrep, relationshipRepository, onProgress) { transferId ->
-            transactionRepository.getTransactionById(transferId.id).first()
+            existingTransfers[transferId]
         }
     val tradeConversions =
         computeReimportTradeConversions(
@@ -415,7 +419,7 @@ suspend fun planCsvReimport(
             rewrittenRowIndexes = rewrites.map { it.rowIndex }.toSet(),
             relationshipRepository = relationshipRepository,
             onProgress = onProgress,
-        ) { transferId -> transactionRepository.getTransactionById(transferId.id).first() }
+        ) { transferId -> existingTransfers[transferId] }
     // Rows whose transfers a reversal moves back are excluded from value updates: the reversal owns that
     // transfer's account move, and a value update would re-send the pre-reversal (survivor) accounts.
     // Trade-conversion rows are excluded too — their transfer is deleted, not updated.
@@ -428,7 +432,7 @@ suspend fun planCsvReimport(
                 rewrites.map { it.rowIndex }.toSet() +
                     reversalRowIndexes +
                     tradeConversions.map { it.rowIndex },
-            transactionRepository = transactionRepository,
+            existingTransferLookup = { transferId -> existingTransfers[transferId] },
             onProgress = onProgress,
         )
 
@@ -485,12 +489,13 @@ suspend fun planCsvReimport(
  * whose account was mapped away is matched pre-merge, so comparing accounts here would misfire).
  * Pass-through rows are excluded — value changes there invalidate every leg of the chain, so they
  * are handled by the rewrite path instead (see [computeReimportRewrites]).
+ * [existingTransferLookup] loads a row's persisted transfer for the diff; a null result skips the row.
  */
 suspend fun computeReimportValueUpdates(
     allRows: List<CsvRow>,
     mappedPrep: ImportPreparation,
     rewrittenRowIndexes: Set<Long>,
-    transactionRepository: TransactionReadRepository,
+    existingTransferLookup: suspend (TransferId) -> Transfer?,
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): List<ReimportValueUpdate> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
@@ -498,7 +503,7 @@ suspend fun computeReimportValueUpdates(
     val total = mappedPrep.validTransfers.size
     mappedPrep.validTransfers.forEachIndexed { index, mapped ->
         emitRowProgress(onProgress, "Checking rows for value changes", index, total)
-        valueUpdateFor(mapped, rowsByIndex, rewrittenRowIndexes, transactionRepository)?.let { updates += it }
+        valueUpdateFor(mapped, rowsByIndex, rewrittenRowIndexes, existingTransferLookup)?.let { updates += it }
     }
     return updates
 }
@@ -507,13 +512,13 @@ private suspend fun valueUpdateFor(
     mapped: CsvTransferWithAttributes,
     rowsByIndex: Map<Long, CsvRow>,
     rewrittenRowIndexes: Set<Long>,
-    transactionRepository: TransactionReadRepository,
+    existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): ReimportValueUpdate? {
     if (mapped.passThrough != null || mapped.rowIndex in rewrittenRowIndexes) return null
     val row = rowsByIndex[mapped.rowIndex] ?: return null
     if (row.importStatus != ImportStatus.IMPORTED && row.importStatus != ImportStatus.UPDATED) return null
     val transferId = row.transferId ?: return null
-    val existing = transactionRepository.getTransactionById(transferId.id).first() ?: return null
+    val existing = existingTransferLookup(transferId) ?: return null
     val changes =
         buildList {
             if (mapped.transfer.amount != existing.amount) {

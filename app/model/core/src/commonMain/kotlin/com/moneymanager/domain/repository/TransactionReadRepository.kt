@@ -21,6 +21,13 @@ import kotlin.time.Instant
 interface TransactionReadRepository {
     fun getTransactionById(id: Long): Flow<Transfer?>
 
+    /**
+     * Batch lookup of transfers (with attributes) by id, for callers that would otherwise issue one
+     * [getTransactionById] round trip per id — e.g. the re-import planner diffing thousands of
+     * already-imported rows. Ids that no longer resolve are simply absent from the result.
+     */
+    suspend fun getTransactionsByIds(ids: Collection<TransferId>): Map<TransferId, Transfer>
+
     fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>>
 
     fun getTransactionsByDateRange(

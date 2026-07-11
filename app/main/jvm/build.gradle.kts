@@ -65,6 +65,14 @@ compose.desktop {
                 "java.sql",
             )
 
+        // Opt-in CPU profiling: `./gradlew :app:main:jvm:run -Pjfr` records the app JVM
+        // with method sampling enabled and dumps to profile.jfr on exit.
+        if (providers.gradleProperty("jfr").isPresent) {
+            jvmArgs +=
+                "-XX:StartFlightRecording=settings=profile," +
+                "filename=${rootDir.resolve("profile.jfr")},dumponexit=true"
+        }
+
         nativeDistributions {
             // Include java.sql module in the custom runtime
             modules("java.sql")
