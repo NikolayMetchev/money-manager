@@ -47,6 +47,7 @@
         ],
         "minRequiredItemsPerThread": 3
     },
+    "defaultViewer": "FIREFOX_PROFILER",
     "additionalGradleTargets": [
         {
             "targetPrefix": "quarkus",

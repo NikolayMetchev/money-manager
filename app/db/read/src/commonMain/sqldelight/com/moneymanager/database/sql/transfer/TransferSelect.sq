@@ -16,6 +16,24 @@ FROM transfer
 JOIN asset_details ON transfer.asset_id = asset_details.id
 WHERE transfer.id = ?;
 
+selectByIds:
+SELECT
+    transfer.id,
+    transfer.revision_id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    transfer.amount,
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
+FROM transfer
+JOIN asset_details ON transfer.asset_id = asset_details.id
+WHERE transfer.id IN ?;
+
 selectByAccount:
 SELECT
     transfer.id,
