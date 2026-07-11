@@ -38,11 +38,13 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
@@ -84,6 +86,8 @@ fun ReimportDialog(
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
+    cryptoRepository: CryptoReadRepository,
+    tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
@@ -143,6 +147,9 @@ fun ReimportDialog(
                     relationshipRepository = transferRelationshipRepository,
                     transferSourceRepository = transferSourceRepository,
                     passThroughAccounts = passThroughAccounts,
+                    // Crypto tickers on already-imported rows must resolve for the value-update and
+                    // transfer→trade conversion scans, so pass the full asset set.
+                    cryptoAssets = cryptoRepository.getAllCryptoAssets().first(),
                     onProgress = { planProgress = it },
                 )
             errorMessage = null
@@ -244,6 +251,8 @@ fun ReimportDialog(
                                     importEngine = importEngine,
                                     passThroughAccounts = passThroughAccounts,
                                     onProgress = { executeProgress = it },
+                                    cryptoRepository = cryptoRepository,
+                                    tradeRepository = tradeRepository,
                                 )
                             onComplete(result)
                         } catch (expected: CancellationException) {
@@ -407,6 +416,37 @@ private fun ReimportPlanPreview(
                 text =
                     "Each row's old transaction(s) are deleted — including any manual edits made to " +
                         "them — and the row is re-imported through the conduit chain.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (plan.tradeConversions.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Transfers to convert to trades (${plan.tradeConversions.size}):",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            plan.tradeConversions.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { conversion ->
+                Text(
+                    text = "• ${conversion.description}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (plan.tradeConversions.size > VALUE_UPDATE_PREVIEW_LIMIT) {
+                Text(
+                    text = "…and ${plan.tradeConversions.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text =
+                    "These rows exchange one asset for another: each row's old single-asset transaction(s) " +
+                        "are deleted — including any manual edits made to them — and the row is re-imported " +
+                        "as a trade.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

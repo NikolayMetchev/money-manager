@@ -43,6 +43,7 @@ fun DatabaseComponent.toApplication() =
                 attributeTypeRepository = attributeTypeRepository,
                 relationshipTypeRepository = relationshipTypeRepository,
                 transferRelationshipRepository = transferRelationshipRepository,
+                tradeRepository = tradeRepository,
             ),
         people =
             People(

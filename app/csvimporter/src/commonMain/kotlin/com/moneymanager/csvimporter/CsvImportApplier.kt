@@ -155,9 +155,11 @@ private suspend fun cryptoCodesForImport(
         csvImport.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
             ?: strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, sampleRows)
             ?: return emptySet()
+    // Scan ALL rows, not just importable ones: a re-import remaps already-IMPORTED rows too (value
+    // updates, transfer→trade conversions), and their tickers must resolve at plan time. For a fresh
+    // import every row is unimported, so this is the same set.
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
-    val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
-    return collectCryptoCodes(strategy, csvImport.columns, rows, fiatCodes, existingCrypto)
+    return collectCryptoCodes(strategy, csvImport.columns, allRows, fiatCodes, existingCrypto)
 }
 
 /**
@@ -878,28 +880,37 @@ suspend fun runCsvImport(
         }
     }
     // Cross-asset conversion rows are imported as trades, which the engine reports via createdTradeIds
-    // (keyed by LocalTradeKey), NOT via rowOutcomes. Mark those rows IMPORTED and clear their errors too —
-    // otherwise a converted row keeps a stale ERROR status and gets reprocessed on the next import,
-    // creating a duplicate trade (createTrade has no dedup). The key is "csv-<importId>-<rowIndex>".
+    // (keyed by LocalTradeKey), NOT via rowOutcomes. Mark those rows IMPORTED — or DUPLICATE when the
+    // intent matched an existing identical trade (createTrade is idempotent, e.g. a re-import or the
+    // same event arriving from another export) — and clear their errors too, otherwise a converted row
+    // keeps a stale ERROR status and gets reprocessed on the next import. The key is
+    // "csv-<importId>-<rowIndex>".
     val tradeKeyPrefix = "csv-${csvImport.id.id}-"
-    val tradeRowIndices =
-        importResult.createdTradeIds.keys.mapNotNull { key ->
-            if (key.value.startsWith(tradeKeyPrefix)) key.value.removePrefix(tradeKeyPrefix).toLongOrNull() else null
-        }
+
+    fun LocalTradeKey.rowIndexOrNull(): Long? =
+        if (value.startsWith(tradeKeyPrefix)) value.removePrefix(tradeKeyPrefix).toLongOrNull() else null
+
+    val tradeRowsByStatus =
+        importResult.createdTradeIds.keys
+            .mapNotNull { key -> key.rowIndexOrNull()?.let { key to it } }
+            .groupBy(
+                keySelector = { (key, _) -> if (key in importResult.dedupedTradeKeys) ImportStatus.DUPLICATE else ImportStatus.IMPORTED },
+                valueTransform = { (_, rowIndex) -> rowIndex },
+            )
 
     val statusMutations = mutableListOf<CsvImportMutation>()
     if (importedStatuses.isNotEmpty()) {
         statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.IMPORTED.name, importedStatuses)
         statusMutations += CsvImportMutation.ClearErrors(csvImport.id, importedStatuses.keys.toList())
     }
-    if (tradeRowIndices.isNotEmpty()) {
+    for ((status, rowIndices) in tradeRowsByStatus) {
         statusMutations +=
             CsvImportMutation.UpdateRowStatuses(
                 csvImport.id,
-                ImportStatus.IMPORTED.name,
-                tradeRowIndices.associateWith { null },
+                status.name,
+                rowIndices.associateWith { null },
             )
-        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, tradeRowIndices)
+        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, rowIndices)
     }
     if (duplicateStatuses.isNotEmpty()) {
         statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.DUPLICATE.name, duplicateStatuses)
@@ -911,13 +922,13 @@ suspend fun runCsvImport(
         statusMutations += CsvImportMutation.ClearErrors(csvImport.id, updatedStatuses.keys.toList())
     }
     importEngine.applyCsvImportMutations(statusMutations)
-    // Trades aren't counted here: createdTradeIds returns the existing id for a deduped conversion too, so
-    // it can't distinguish new from duplicate — counting it would report re-imported conversions as new.
-    val successCount = importResult.transfersImported + importResult.updated
-    val duplicateCount = importResult.duplicates
+    val newTradeCount = tradeRowsByStatus[ImportStatus.IMPORTED]?.size ?: 0
+    val dedupedTradeCount = tradeRowsByStatus[ImportStatus.DUPLICATE]?.size ?: 0
+    val successCount = importResult.transfersImported + importResult.updated + newTradeCount
+    val duplicateCount = importResult.duplicates + dedupedTradeCount
 
     logger.info {
-        "Transfer import complete: $successCount imported/updated, ${importResult.duplicates} duplicate(s)"
+        "Transfer import complete: $successCount imported/updated, $duplicateCount duplicate(s)"
     }
 
     // Refresh materialized views so transfers are visible (skipped in bulk; refreshed once at the end)

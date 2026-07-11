@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.repository.TradeReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 
 class TradeReadRepositoryImpl(
     database: MoneyManagerDatabase,
@@ -28,4 +29,9 @@ class TradeReadRepositoryImpl(
             .selectByAccount(accountId.id, accountId.id, TradeMapper::mapRaw)
             .asFlow()
             .mapToList(Dispatchers.Default)
+
+    override suspend fun countTradesByAccount(accountId: AccountId): Long =
+        withContext(Dispatchers.Default) {
+            selectQueries.countByAccount(accountId.id).executeAsOne()
+        }
 }

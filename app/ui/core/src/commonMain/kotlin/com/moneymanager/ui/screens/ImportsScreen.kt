@@ -35,6 +35,7 @@ import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
@@ -69,6 +70,7 @@ fun ImportsScreen(
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
+    tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     personRepository: PersonReadRepository,
     importEngine: ImportEngine,
@@ -138,6 +140,7 @@ fun ImportsScreen(
                     transactionRepository = transactionRepository,
                     transferRelationshipRepository = transferRelationshipRepository,
                     transferSourceRepository = transferSourceRepository,
+                    tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
                     onImportClick = onCsvImportClick,

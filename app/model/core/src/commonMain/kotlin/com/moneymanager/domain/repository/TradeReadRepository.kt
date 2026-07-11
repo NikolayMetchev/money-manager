@@ -9,4 +9,7 @@ interface TradeReadRepository {
     fun getTradeById(id: TradeId): Flow<Trade?>
 
     fun getTradesByAccount(accountId: AccountId): Flow<List<Trade>>
+
+    /** Number of trades touching [accountId] on either leg. */
+    suspend fun countTradesByAccount(accountId: AccountId): Long
 }

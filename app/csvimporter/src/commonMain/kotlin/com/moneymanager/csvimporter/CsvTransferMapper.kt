@@ -397,6 +397,23 @@ class CsvTransferMapper(
                 parseCurrency(currencyMapping, values)
                     ?: return MappingResult.Error(row.rowIndex, "Currency not found")
 
+            // Cross-asset conversion: when the strategy maps a TO_CURRENCY/TO_AMOUNT and the credited
+            // asset differs from the debited one, this row is a trade — the credited leg is captured
+            // here and the importer emits a `trade` (debit `amount`, credit `tradeTo`) instead of a
+            // single-asset transfer. Computed before account resolution because a trade may legally
+            // keep both legs in ONE account (e.g. a crypto→crypto exchange inside the same wallet),
+            // which the same-account checks below must not treat as a collision.
+            val tradeTo: Money? =
+                run {
+                    val toCurrencyMapping = strategy.fieldMappings[TransferField.TO_CURRENCY] ?: return@run null
+                    val toAmountMapping = strategy.fieldMappings[TransferField.TO_AMOUNT] ?: return@run null
+                    val toAsset = parseCurrency(toCurrencyMapping, values) ?: return@run null
+                    if (toAsset.id == currency.id) return@run null
+                    val toRaw = parseAmount(toAmountMapping, values).abs()
+                    if (toRaw.compareTo(BigDecimal.ZERO) == 0) return@run null
+                    Money.fromDisplayValue(toRaw, toAsset)
+                }
+
             // Determine if we need to flip accounts (sign-based flip XOR preprocessing flip)
             val amountFlip =
                 amountMapping is AmountParsingMapping &&
@@ -437,9 +454,12 @@ class CsvTransferMapper(
             // description can hijack the source leg too and collapse both onto one account. When the source
             // came from the strategy's own SOURCE_ACCOUNT mapping (no UI override) and now collides with the
             // target, re-resolve the source ignoring persisted mappings — its rule/historical name only —
-            // which restores the intended own-account (e.g. "Crypto.com Card").
+            // which restores the intended own-account (e.g. "Crypto.com Card"). A trade row is exempt:
+            // both legs landing in the same account is the intended shape (cross-asset, same wallet),
+            // so re-resolving would silently move one leg off a user-mapped account.
             var sourceUsedPersistedMappings = true
-            if (sourceAccountOverride == null &&
+            if (tradeTo == null &&
+                sourceAccountOverride == null &&
                 sourceAccountId == targetAccountId &&
                 sourceAccountId != AccountId(-1)
             ) {
@@ -509,7 +529,12 @@ class CsvTransferMapper(
             // resolved to the same real account (e.g. an account mapping that matches this row on both
             // sides), surface it as a per-row error instead of letting one bad row abort the whole file.
             // AccountId(-1) is the "new account" placeholder; two not-yet-created accounts stay distinct.
-            if (effectiveSourceAccountId == effectiveTargetAccountId && effectiveSourceAccountId != AccountId(-1)) {
+            // A trade row is exempt: the trade CHECK only requires the ASSETS to differ, so a same-account
+            // cross-asset exchange (e.g. BTC→ETH inside one wallet) is valid.
+            if (tradeTo == null &&
+                effectiveSourceAccountId == effectiveTargetAccountId &&
+                effectiveSourceAccountId != AccountId(-1)
+            ) {
                 val accountName =
                     existingAccounts.entries.firstOrNull { it.value.id == effectiveSourceAccountId }?.key
                 return MappingResult.Error(
@@ -532,21 +557,6 @@ class CsvTransferMapper(
 
             // Create Money with absolute value (direction is indicated by source/target)
             val amount = Money.fromDisplayValue(rawAmount.abs(), currency)
-
-            // Cross-asset conversion: when the strategy maps a TO_CURRENCY/TO_AMOUNT and the credited
-            // asset differs from the debited one, this row is a trade — the credited leg is captured
-            // here and the importer emits a `trade` (debit `amount`, credit `tradeTo`) instead of a
-            // single-asset transfer.
-            val tradeTo: Money? =
-                run {
-                    val toCurrencyMapping = strategy.fieldMappings[TransferField.TO_CURRENCY] ?: return@run null
-                    val toAmountMapping = strategy.fieldMappings[TransferField.TO_AMOUNT] ?: return@run null
-                    val toAsset = parseCurrency(toCurrencyMapping, values) ?: return@run null
-                    if (toAsset.id == currency.id) return@run null
-                    val toRaw = parseAmount(toAmountMapping, values).abs()
-                    if (toRaw.compareTo(BigDecimal.ZERO) == 0) return@run null
-                    Money.fromDisplayValue(toRaw, toAsset)
-                }
 
             // A fee is modelled as its own movement (linked to this transfer), not folded into the amount.
             val feeMagnitude = parseFeeMagnitude(amountMapping, values)

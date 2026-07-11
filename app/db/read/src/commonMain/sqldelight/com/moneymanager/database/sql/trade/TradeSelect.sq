@@ -63,3 +63,8 @@ JOIN asset_details fa ON trade.from_asset_id = fa.id
 JOIN asset_details ta ON trade.to_asset_id = ta.id
 WHERE trade.from_account_id = ? OR trade.to_account_id = ?
 ORDER BY trade.timestamp DESC;
+
+countByAccount:
+SELECT COUNT(*)
+FROM trade
+WHERE from_account_id = :accountId OR to_account_id = :accountId;

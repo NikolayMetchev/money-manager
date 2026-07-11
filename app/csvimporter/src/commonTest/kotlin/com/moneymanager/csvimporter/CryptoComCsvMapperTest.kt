@@ -34,10 +34,12 @@ class CryptoComCsvMapperTest {
     private val now = Clock.System.now()
     private val cardStrategy = BuiltInCsvStrategies.buildCryptoComCardStrategy(now)
     private val fiatStrategy = BuiltInCsvStrategies.buildCryptoComFiatStrategy(now)
+    private val cryptoStrategy = BuiltInCsvStrategies.buildCryptoComCryptoStrategy(now)
 
     private val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound")
     private val card = Account(id = AccountId(1), name = "Crypto.com Card", openingDate = now)
     private val cash = Account(id = AccountId(2), name = "Crypto.com Cash", openingDate = now)
+    private val cryptoWallet = Account(id = AccountId(3), name = "Crypto.com", openingDate = now)
 
     private val columns =
         listOf(
@@ -54,18 +56,29 @@ class CryptoComCsvMapperTest {
             "Transaction Hash",
         ).mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
 
-    // TGBP is a crypto asset (created on demand by ensureCryptoAssets in the real flow); provide it here
-    // so the mapper resolves it and the conversion rows map to cross-asset trades.
-    private val tgbp = CryptoAsset(id = CryptoId(100), code = "TGBP", name = "TGBP", scaleFactor = 100)
+    // TGBP/CRO are crypto assets (created on demand by ensureCryptoAssets in the real flow); provide
+    // them here so the mapper resolves them and the conversion rows map to cross-asset trades.
+    private val tgbp = CryptoAsset(id = CryptoId(100), code = "TGBP", name = "TGBP")
+    private val cro = CryptoAsset(id = CryptoId(101), code = "CRO", name = "CRO")
 
-    private fun mapper(strategy: CsvImportStrategy): CsvTransferMapper =
+    private fun mapper(
+        strategy: CsvImportStrategy,
+        cryptoWalletExists: Boolean = false,
+    ): CsvTransferMapper =
         CsvTransferMapper(
             strategy = strategy,
             columns = columns,
-            existingAccounts = mapOf(card.name to card, cash.name to cash),
+            existingAccounts =
+                buildMap {
+                    put(card.name, card)
+                    put(cash.name, cash)
+                    // The crypto-strategy tests resolve both legs of a same-account trade to this real
+                    // account; the fiat tests keep it absent so they can assert it gets discovered.
+                    if (cryptoWalletExists) put(cryptoWallet.name, cryptoWallet)
+                },
             existingCurrencies = mapOf(gbp.id to gbp),
             existingCurrenciesByCode = mapOf(gbp.code to gbp),
-            existingCryptoByCode = mapOf(tgbp.code to tgbp),
+            existingCryptoByCode = mapOf(tgbp.code to tgbp, cro.code to cro),
         )
 
     @Suppress("LongParameterList")
@@ -99,7 +112,12 @@ class CryptoComCsvMapperTest {
     private fun map(
         strategy: CsvImportStrategy,
         row: CsvRow,
-    ): MappingResult.Success = assertIs<MappingResult.Success>(mapper(strategy).mapRow(row), "mapping failed")
+        cryptoWalletExists: Boolean = false,
+    ): MappingResult.Success {
+        val result = mapper(strategy, cryptoWalletExists).mapRow(row)
+        if (result is MappingResult.Error) throw AssertionError("mapping failed: ${result.errorMessage}")
+        return assertIs<MappingResult.Success>(result, "mapping failed")
+    }
 
     private fun MappingResult.Success.newAccountName(): String {
         assertTrue(newAccounts.isNotEmpty(), "expected a discovered counterparty account")
@@ -184,6 +202,95 @@ class CryptoComCsvMapperTest {
         assertEquals(cash.id, r.transfer.sourceAccountId)
         assertEquals(card.id, r.transfer.targetAccountId)
         assertTrue(r.newAccounts.isEmpty())
+    }
+
+    // ---- Crypto strategy: cross-asset rows become trades ----
+
+    @Test
+    fun `crypto_exchange is a same-account trade inside the Crypto_com wallet`() {
+        val r =
+            map(
+                cryptoStrategy,
+                row("TGBP -> CRO", "TGBP", "-1499.936259", "CRO", "4965.5", "1499.94", "crypto_exchange"),
+                cryptoWalletExists = true,
+            )
+        // Both legs stay in the one wallet; only the assets differ. Must not be rejected as a
+        // source==target collision, and must not invent a "TGBP -> CRO" counterparty account.
+        assertEquals(cryptoWallet.id, r.transfer.sourceAccountId)
+        assertEquals(cryptoWallet.id, r.transfer.targetAccountId)
+        assertEquals(Money.fromDisplayValue(BigDecimal("1499.936259"), tgbp), r.transfer.amount)
+        assertEquals(Money.fromDisplayValue(BigDecimal("4965.5"), cro), r.tradeTo)
+        assertTrue(r.newAccounts.isEmpty(), "a same-account trade must not create counterparty accounts")
+    }
+
+    @Test
+    fun `crypto file viban_purchase mirrors the fiat trade - Cash GBP into Crypto_com as TGBP`() {
+        // Same event as the fiat file's viban_purchase (identical timestamp/description/amounts, but the
+        // crypto file's Amount is NEGATIVE) — identical accounts make the two files' trades dedupe.
+        val r =
+            map(
+                cryptoStrategy,
+                row("GBP -> TGBP", "GBP", "-5000.0", "TGBP", "5000.0", "5000.0", "viban_purchase"),
+                cryptoWalletExists = true,
+            )
+        assertEquals(cash.id, r.transfer.sourceAccountId)
+        assertEquals(cryptoWallet.id, r.transfer.targetAccountId)
+        assertEquals(Money.fromDisplayValue(BigDecimal("5000.0"), gbp), r.transfer.amount)
+        assertEquals(Money.fromDisplayValue(BigDecimal("5000.0"), tgbp), r.tradeTo)
+    }
+
+    @Test
+    fun `crypto file crypto_viban_exchange mirrors the fiat trade - Crypto_com TGBP into Cash as GBP`() {
+        val r =
+            map(
+                cryptoStrategy,
+                row("TGBP -> GBP", "TGBP", "-46.03", "GBP", "46.03", "46.03", "crypto_viban_exchange"),
+                cryptoWalletExists = true,
+            )
+        assertEquals(cryptoWallet.id, r.transfer.sourceAccountId)
+        assertEquals(cash.id, r.transfer.targetAccountId)
+        assertEquals(Money.fromDisplayValue(BigDecimal("46.03"), tgbp), r.transfer.amount)
+        assertEquals(Money.fromDisplayValue(BigDecimal("46.03"), gbp), r.tradeTo)
+    }
+
+    @Test
+    fun `crypto_payment with matching To Currency stays a plain transfer`() {
+        val r =
+            map(
+                cryptoStrategy,
+                row("Crypto payment", "CRO", "-100.0", "CRO", "-100.0", "10.0", "crypto_payment"),
+                cryptoWalletExists = true,
+            )
+        assertNull(r.tradeTo, "same-asset To Currency must not become a trade")
+        assertEquals(cryptoWallet.id, r.transfer.sourceAccountId)
+        assertEquals("Crypto payment", r.newAccountName())
+    }
+
+    @Test
+    fun `reward row with blank To Currency keeps the description counterparty`() {
+        val r =
+            map(
+                cryptoStrategy,
+                row("Card Cashback", "CRO", "0.37", "", "", "0.09", "referral_card_cashback"),
+                cryptoWalletExists = true,
+            )
+        assertNull(r.tradeTo)
+        // Positive amount flips: the cashback flows INTO the wallet from the discovered counterparty.
+        assertEquals(cryptoWallet.id, r.transfer.targetAccountId)
+        assertEquals("Card Cashback", r.newAccountName())
+    }
+
+    @Test
+    fun `App wallet transfer still routes to the Exchange account`() {
+        val r =
+            map(
+                cryptoStrategy,
+                row("Withdraw to Exchange from App wallet", "CRO", "-500.0", "", "", "50.0", "crypto_to_exchange_transfer"),
+                cryptoWalletExists = true,
+            )
+        assertNull(r.tradeTo)
+        assertEquals(cryptoWallet.id, r.transfer.sourceAccountId)
+        assertEquals("Crypto.com Exchange", r.newAccountName())
     }
 
     // ---- Selection across the three crypto.com export flavours ----

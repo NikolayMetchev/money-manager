@@ -22,21 +22,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.domain.CsvImportParseResult
 import com.moneymanager.domain.CsvReferenceType
 import com.moneymanager.domain.CsvResolution
-import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.CsvUnresolvedReference
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.StrategyKey
+import com.moneymanager.domain.StrategyKind
+import com.moneymanager.domain.StrategyLibrary
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.importengineapi.createAccountMappings
-import com.moneymanager.importengineapi.createCsvStrategy
-import com.moneymanager.importengineapi.deleteCsvStrategy
-import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.ReferenceResolutionRow
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -45,12 +43,15 @@ import kotlinx.coroutines.launch
 /**
  * Dialog for importing a CSV strategy from a JSON file.
  * Shows unresolved references and allows the user to map them to existing entities or create new ones.
+ * Persistence goes through [StrategyLibrary.applyIncoming] — the same path as a catalog/library
+ * install — so a strategy with the same name is updated IN PLACE (keeping its id, so staged imports
+ * referencing it keep working) and its per-strategy account mappings are replaced by the file's.
  */
 @Composable
 fun ImportStrategyDialog(
     parseResult: CsvImportParseResult,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    csvStrategyImportExport: CsvStrategyImportExport,
+    strategyLibrary: StrategyLibrary,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -58,7 +59,6 @@ fun ImportStrategyDialog(
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
 ) {
-    val importEngine = LocalImportEngine.current
     val accounts by accountRepository
         .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -84,11 +84,11 @@ fun ImportStrategyDialog(
             reference.type == CsvReferenceType.ACCOUNT && reference !in resolutions.keys
         }
 
-    // Check for name conflict
+    // A same-named strategy is overwritten in place rather than blocking the import.
     val existingStrategies by csvImportStrategyRepository
         .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val nameConflict = existingStrategies.any { it.name == strategyName }
+    val existingWithName = existingStrategies.firstOrNull { it.name == strategyName }
 
     AlertDialog(
         onDismissRequest = { if (!isImporting) onDismiss() },
@@ -107,14 +107,15 @@ fun ImportStrategyDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !isImporting,
-                    isError = strategyName.isBlank() || nameConflict,
+                    isError = strategyName.isBlank(),
                     supportingText = {
                         when {
                             strategyName.isBlank() -> Text("Name is required")
-                            nameConflict ->
+                            existingWithName != null ->
                                 Text(
-                                    "A strategy with this name already exists",
-                                    color = MaterialTheme.colorScheme.error,
+                                    "A strategy with this name already exists — it will be updated in " +
+                                        "place and its per-strategy account mappings replaced.",
+                                    color = MaterialTheme.colorScheme.tertiary,
                                 )
                         }
                     },
@@ -188,39 +189,25 @@ fun ImportStrategyDialog(
                     isImporting = true
                     errorMessage = null
                     scope.launch {
-                        var createdStrategyId: CsvImportStrategyId? = null
                         try {
-                            // Update the export with the new name if changed
-                            val exportWithNewName = parseResult.export.copy(name = strategyName)
-
-                            // Create the strategy
-                            val result =
-                                csvStrategyImportExport.createStrategyFromExport(
-                                    export = exportWithNewName,
-                                    resolutions = resolutions,
-                                )
-
-                            val persistedStrategyId = importEngine.createCsvStrategy(result.strategy)
-                            createdStrategyId = persistedStrategyId
-                            // Persist the strategy's embedded per-strategy account mappings (they
-                            // FK-reference the strategy row, so create them after the strategy).
-                            if (result.accountMappings.isNotEmpty()) {
-                                importEngine.createAccountMappings(result.accountMappings)
-                            }
+                            // The library path creates or updates-in-place by name, applying the
+                            // strategy and its per-strategy mappings as one engine batch. The key
+                            // carries the (possibly renamed) target name; CSV and QIF strategy files
+                            // share the same artifact format and apply path.
+                            strategyLibrary.applyIncoming(
+                                key = StrategyKey(StrategyKind.CSV, strategyName),
+                                json = CsvStrategyExportCodec.encode(parseResult.export.copy(name = strategyName)),
+                                resolutions = resolutions,
+                            )
                             onImportSuccess()
                             onDismiss()
                         } catch (expected: Exception) {
-                            createdStrategyId?.let { strategyId ->
-                                runCatching {
-                                    importEngine.deleteCsvStrategy(strategyId)
-                                }
-                            }
                             errorMessage = "Failed to import: ${expected.message}"
                             isImporting = false
                         }
                     }
                 },
-                enabled = allResolved && strategyName.isNotBlank() && !nameConflict && !isImporting,
+                enabled = allResolved && strategyName.isNotBlank() && !isImporting,
             ) {
                 if (isImporting) {
                     CircularProgressIndicator(
@@ -228,7 +215,7 @@ fun ImportStrategyDialog(
                         strokeWidth = 2.dp,
                     )
                 }
-                Text("Import")
+                Text(if (existingWithName != null) "Overwrite" else "Import")
             }
         },
         dismissButton = {

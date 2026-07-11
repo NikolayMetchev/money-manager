@@ -38,6 +38,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
@@ -74,6 +75,7 @@ fun CsvReimportAllDialog(
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
+    tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
@@ -192,6 +194,7 @@ fun CsvReimportAllDialog(
                                         onProgress = { done, total -> progress = done to total },
                                         passThroughAccounts = passThroughAccounts,
                                         cryptoRepository = cryptoRepository,
+                                        tradeRepository = tradeRepository,
                                     )
                             } finally {
                                 isRunning = false

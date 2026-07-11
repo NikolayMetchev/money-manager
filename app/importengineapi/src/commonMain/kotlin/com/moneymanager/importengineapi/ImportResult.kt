@@ -62,6 +62,11 @@ data class ImportResult(
     val createdCurrencyIds: Map<LocalCurrencyKey, CurrencyId> = emptyMap(),
     val createdCryptoIds: Map<LocalCryptoKey, CryptoId> = emptyMap(),
     val createdTradeIds: Map<LocalTradeKey, TradeId> = emptyMap(),
+    /**
+     * Keys of trade intents that matched an existing identical trade instead of inserting a new one
+     * (createTrade is idempotent). [createdTradeIds] still maps these keys to the existing trade's id.
+     */
+    val dedupedTradeKeys: Set<LocalTradeKey> = emptySet(),
     /** Resolved (get-or-create) attribute-type ids for each name in [ImportBatch.attributeTypeNames]. */
     val attributeTypeIds: Map<String, AttributeTypeId> = emptyMap(),
     /** Resolved (get-or-create) relationship-type ids for each name in [ImportBatch.relationshipTypeNames]. */

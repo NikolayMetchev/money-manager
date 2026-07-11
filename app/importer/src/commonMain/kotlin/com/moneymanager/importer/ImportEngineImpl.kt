@@ -153,8 +153,9 @@ class ImportEngineImpl(
                 cryptoRepository.upsertCryptoByCode(requireNotNull(intent.code), intent.name, intent.source)
         }
         val createdTradeIds = mutableMapOf<LocalTradeKey, TradeId>()
+        val dedupedTradeKeys = mutableSetOf<LocalTradeKey>()
         for (intent in batch.trades) {
-            createdTradeIds[intent.key] =
+            val tradeResult =
                 tradeRepository.createTrade(
                     timestamp = intent.timestamp,
                     description = intent.description,
@@ -164,6 +165,8 @@ class ImportEngineImpl(
                     toAmount = intent.toAmount,
                     source = intent.source,
                 )
+            createdTradeIds[intent.key] = tradeResult.id
+            if (!tradeResult.created) dedupedTradeKeys += intent.key
         }
         val createdCategoryIds = mutableMapOf<LocalCategoryKey, Long>()
         for (intent in batch.categories.creates()) {
@@ -261,6 +264,7 @@ class ImportEngineImpl(
             createdCurrencyIds = createdCurrencyIds,
             createdCryptoIds = createdCryptoIds,
             createdTradeIds = createdTradeIds,
+            dedupedTradeKeys = dedupedTradeKeys,
             attributeTypeIds = attributeTypeIds,
             relationshipTypeIds = relationshipTypeIds,
             createdCsvStrategyIds = config.csvStrategyIds,
