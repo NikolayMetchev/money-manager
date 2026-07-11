@@ -27,6 +27,7 @@ import com.moneymanager.domain.repository.PersonWriteRepository
 import com.moneymanager.domain.repository.QifImportWriteRepository
 import com.moneymanager.domain.repository.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.SettingsWriteRepository
+import com.moneymanager.domain.repository.TradeWriteRepository
 import com.moneymanager.domain.repository.TransactionWriteRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
@@ -71,6 +72,7 @@ data class Transactions(
     val attributeTypeRepository: AttributeTypeWriteRepository,
     val relationshipTypeRepository: RelationshipTypeWriteRepository,
     val transferRelationshipRepository: TransferRelationshipReadRepository,
+    val tradeRepository: TradeWriteRepository,
 )
 
 data class People(

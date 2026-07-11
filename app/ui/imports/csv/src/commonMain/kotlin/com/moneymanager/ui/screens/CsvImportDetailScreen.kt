@@ -44,6 +44,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
@@ -74,6 +75,7 @@ fun CsvImportDetailScreen(
     transactionRepository: TransactionReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
+    tradeRepository: TradeReadRepository,
     importEngine: ImportEngine,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
@@ -462,6 +464,8 @@ fun CsvImportDetailScreen(
             transactionRepository = transactionRepository,
             transferRelationshipRepository = transferRelationshipRepository,
             transferSourceRepository = transferSourceRepository,
+            cryptoRepository = cryptoRepository,
+            tradeRepository = tradeRepository,
             maintenance = maintenance,
             importEngine = importEngine,
             onDismiss = { showReimportDialog = false },
@@ -478,6 +482,9 @@ fun CsvImportDetailScreen(
                         }
                         if (result.updatedRows.isNotEmpty()) {
                             append(", ${result.updatedRows.size} transaction(s) updated to new values")
+                        }
+                        if (result.convertedRows.isNotEmpty()) {
+                            append(", ${result.convertedRows.size} transfer(s) converted to trades")
                         }
                         result.importResult?.let { append(", ${it.successCount} row(s) imported") }
                         if (result.deletedEmptyAccounts.isNotEmpty()) {

@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
@@ -563,5 +564,139 @@ class CsvReimportDetectionTest {
             val rewrites = computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(emptyMap())) { null }
 
             assertTrue(rewrites.isEmpty())
+        }
+
+    // ============= Retroactive transfer→trade conversions =============
+
+    private val eur = Currency(id = CurrencyId(2), code = "EUR", name = "Euro")
+    private val feeType = RelationshipType(RelationshipTypeId(2), "fee")
+
+    private val tradeColumns =
+        columns +
+            listOf(
+                CsvColumn(CsvColumnId(Uuid.random()), 4, "To Currency"),
+                CsvColumn(CsvColumnId(Uuid.random()), 5, "To Amount"),
+            )
+
+    /** The base strategy plus TO_CURRENCY/TO_AMOUNT mappings, so cross-currency rows map to trades. */
+    private fun tradeStrategy(): CsvImportStrategy {
+        val base = strategy()
+        return base.copy(
+            fieldMappings =
+                base.fieldMappings +
+                    mapOf(
+                        TransferField.TO_CURRENCY to
+                            CurrencyLookupMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TO_CURRENCY,
+                                columnName = "To Currency",
+                            ),
+                        TransferField.TO_AMOUNT to
+                            AmountParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TO_AMOUNT,
+                                mode = AmountMode.SINGLE_COLUMN,
+                                amountColumnName = "To Amount",
+                            ),
+                    ),
+        )
+    }
+
+    private fun tradePrep(rows: List<CsvRow>): ImportPreparation =
+        CsvTransferMapper(
+            strategy = tradeStrategy(),
+            columns = tradeColumns,
+            existingAccounts = listOf(account(1, "Wallet"), account(10, "Broker")).associateBy { it.name },
+            existingCurrencies = mapOf(currencyId to currency, eur.id to eur),
+            existingCurrenciesByCode = mapOf(currency.code.uppercase() to currency, eur.code.uppercase() to eur),
+        ).prepareImport(rows)
+
+    private fun tradeRow(
+        index: Long = 1,
+        toCurrency: String = "EUR",
+        transferId: TransferId? = TransferId(100),
+        importStatus: ImportStatus? = ImportStatus.IMPORTED,
+    ) = CsvRow(
+        rowIndex = index,
+        values = listOf("15/12/2024", "GBP -> EUR", "-50.00", "Broker", toCurrency, "55.00"),
+        transferId = transferId,
+        importStatus = importStatus,
+    )
+
+    @Test
+    fun `imported single-leg transfer whose row now maps to a trade is converted with its linked legs`() =
+        runTest {
+            val rows = listOf(tradeRow())
+            val mappedPrep = tradePrep(rows)
+            val existing =
+                mappedPrep.validTransfers
+                    .single()
+                    .transfer
+                    .copy(id = TransferId(100))
+            // The old transfer carries a linked fee leg; both must be deleted with the conversion.
+            val relationships =
+                mapOf(TransferId(100) to listOf(TransferRelationship(TransferId(100), TransferId(101), feeType)))
+
+            val conversions =
+                computeReimportTradeConversions(rows, mappedPrep, emptySet(), FakeRelationshipRepository(relationships)) { existing }
+
+            val conversion = conversions.single()
+            assertEquals(1L, conversion.rowIndex)
+            assertEquals(listOf(TransferId(100), TransferId(101)), conversion.transferIdsToDelete)
+        }
+
+    @Test
+    fun `duplicate, unimported and already-converted rows are never trade-converted`() =
+        runTest {
+            val rows =
+                listOf(
+                    // DUPLICATE: its transfer belongs to another row.
+                    tradeRow(index = 1, importStatus = ImportStatus.DUPLICATE),
+                    // Already converted: trades write no transfer id back.
+                    tradeRow(index = 2, transferId = null),
+                    // Never imported: applyStagedCsv picks it up anyway.
+                    tradeRow(index = 3, transferId = null, importStatus = null),
+                )
+            val mappedPrep = tradePrep(rows)
+            val existing =
+                mappedPrep.validTransfers
+                    .first()
+                    .transfer
+                    .copy(id = TransferId(100))
+
+            val conversions =
+                computeReimportTradeConversions(rows, mappedPrep, emptySet(), FakeRelationshipRepository(emptyMap())) { existing }
+
+            assertTrue(conversions.isEmpty())
+        }
+
+    @Test
+    fun `rows already planned as rewrites or with dangling transfers are skipped`() =
+        runTest {
+            val rows = listOf(tradeRow(index = 1), tradeRow(index = 2))
+            val mappedPrep = tradePrep(rows)
+
+            // Row 1 is owned by a pass-through rewrite; row 2's transfer id no longer resolves.
+            val conversions =
+                computeReimportTradeConversions(rows, mappedPrep, setOf(1L), FakeRelationshipRepository(emptyMap())) { null }
+
+            assertTrue(conversions.isEmpty())
+        }
+
+    @Test
+    fun `same-currency To column does not convert the row`() =
+        runTest {
+            val rows = listOf(tradeRow(toCurrency = "GBP"))
+            val mappedPrep = tradePrep(rows)
+            val existing =
+                mappedPrep.validTransfers
+                    .single()
+                    .transfer
+                    .copy(id = TransferId(100))
+
+            val conversions =
+                computeReimportTradeConversions(rows, mappedPrep, emptySet(), FakeRelationshipRepository(emptyMap())) { existing }
+
+            assertTrue(conversions.isEmpty())
         }
 }

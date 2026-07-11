@@ -23,6 +23,7 @@ import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
@@ -72,6 +73,9 @@ enum class ReimportSkipReason {
 
     /** Reversing a merge whose accounts no longer consolidate failed; the merge was left as-is. */
     REVERSAL_FAILED,
+
+    /** Deleting a row's old transfer for a transfer→trade conversion failed; the row was left as-is. */
+    TRADE_CONVERSION_FAILED,
 }
 
 /** One duplicate-account merge the re-import will perform (or performed). */
@@ -111,6 +115,21 @@ data class ReimportRewrite(
     val conduitNames: List<String>,
     /** The clean merchant the final spend leg pays. */
     val merchantName: String,
+)
+
+/**
+ * One already-imported row that the current strategy maps to a cross-asset TRADE but whose persisted
+ * transaction is a single-asset transfer (imported before the strategy gained TO_CURRENCY/TO_AMOUNT
+ * mappings, so the credited leg was lost and the counterparty is typically a junk description-named
+ * account): the old transfer(s) are deleted, the row's status is reset, and the strategy re-run
+ * imports it as a trade.
+ */
+data class ReimportTradeConversion(
+    val rowIndex: Long,
+    /** The row's existing transfer plus its linked legs, all deleted before the re-run. */
+    val transferIdsToDelete: List<TransferId>,
+    /** The row's statement description, for the preview. */
+    val description: String,
 )
 
 /**
@@ -160,9 +179,17 @@ data class ReimportPlan(
     val valueUpdates: List<ReimportValueUpdate> = emptyList(),
     /** Prior merges to undo because the current mappings no longer consolidate them. */
     val reversals: List<ReimportReversal> = emptyList(),
+    /** Already-imported single-asset transfers the current strategy now maps to cross-asset trades. */
+    val tradeConversions: List<ReimportTradeConversion> = emptyList(),
 ) {
     val isEmpty: Boolean
-        get() = merges.isEmpty() && skipped.isEmpty() && rewrites.isEmpty() && valueUpdates.isEmpty() && reversals.isEmpty()
+        get() =
+            merges.isEmpty() &&
+                skipped.isEmpty() &&
+                rewrites.isEmpty() &&
+                valueUpdates.isEmpty() &&
+                reversals.isEmpty() &&
+                tradeConversions.isEmpty()
 }
 
 /** The outcome of an executed re-import. */
@@ -179,6 +206,8 @@ data class CsvReimportResult(
     val updatedRows: List<ReimportValueUpdate> = emptyList(),
     /** Prior merges undone because the current mappings no longer consolidate them. */
     val reversedMerges: List<ReimportReversal> = emptyList(),
+    /** Rows whose single-asset transfer was deleted and re-imported as a cross-asset trade. */
+    val convertedRows: List<ReimportTradeConversion> = emptyList(),
 )
 
 /** Raw merge detection output: duplicate → single target, plus duplicates with competing targets. */
@@ -379,14 +408,26 @@ suspend fun planCsvReimport(
         computeReimportRewrites(allRows, mappedPrep, relationshipRepository, onProgress) { transferId ->
             transactionRepository.getTransactionById(transferId.id).first()
         }
+    val tradeConversions =
+        computeReimportTradeConversions(
+            allRows = allRows,
+            mappedPrep = mappedPrep,
+            rewrittenRowIndexes = rewrites.map { it.rowIndex }.toSet(),
+            relationshipRepository = relationshipRepository,
+            onProgress = onProgress,
+        ) { transferId -> transactionRepository.getTransactionById(transferId.id).first() }
     // Rows whose transfers a reversal moves back are excluded from value updates: the reversal owns that
     // transfer's account move, and a value update would re-send the pre-reversal (survivor) accounts.
+    // Trade-conversion rows are excluded too — their transfer is deleted, not updated.
     val reversalRowIndexes = reversals.flatMapTo(mutableSetOf()) { it.rowIndexes }
     val valueUpdates =
         computeReimportValueUpdates(
             allRows = allRows,
             mappedPrep = mappedPrep,
-            rewrittenRowIndexes = rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes,
+            rewrittenRowIndexes =
+                rewrites.map { it.rowIndex }.toSet() +
+                    reversalRowIndexes +
+                    tradeConversions.map { it.rowIndex },
             transactionRepository = transactionRepository,
             onProgress = onProgress,
         )
@@ -433,6 +474,7 @@ suspend fun planCsvReimport(
         rewrites = rewrites,
         valueUpdates = valueUpdates,
         reversals = reversals,
+        tradeConversions = tradeConversions,
     )
 }
 
@@ -572,6 +614,43 @@ private suspend fun rewriteFor(
     )
 }
 
+/**
+ * Finds already-imported rows the current strategy maps to a cross-asset TRADE (`tradeTo` set) whose
+ * persisted transaction is still a single-asset transfer: their old transfer(s) are deleted and the
+ * row re-runs as a trade. Only IMPORTED/UPDATED rows with a transfer id are considered — a DUPLICATE
+ * row's transfer belongs to another row, and an already-converted row has a null transfer id (trades
+ * don't write one back), which keeps this pass idempotent. Rows already planned as pass-through
+ * rewrites are skipped: the rewrite deletes the old legs itself and the re-run imports the row fresh.
+ * [existingTransferLookup] must return null when the id no longer resolves to a transfer.
+ */
+internal suspend fun computeReimportTradeConversions(
+    allRows: List<CsvRow>,
+    mappedPrep: ImportPreparation,
+    rewrittenRowIndexes: Set<Long>,
+    relationshipRepository: TransferRelationshipReadRepository,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    existingTransferLookup: suspend (TransferId) -> Transfer?,
+): List<ReimportTradeConversion> {
+    val rowsByIndex = allRows.associateBy { it.rowIndex }
+    val conversions = mutableListOf<ReimportTradeConversion>()
+    val total = mappedPrep.validTransfers.size
+    mappedPrep.validTransfers.forEachIndexed { index, mapped ->
+        emitRowProgress(onProgress, "Checking rows converting to trades", index, total)
+        if (mapped.tradeTo == null || mapped.rowIndex in rewrittenRowIndexes) return@forEachIndexed
+        val row = rowsByIndex[mapped.rowIndex] ?: return@forEachIndexed
+        if (row.importStatus != ImportStatus.IMPORTED && row.importStatus != ImportStatus.UPDATED) return@forEachIndexed
+        val transferId = row.transferId ?: return@forEachIndexed
+        if (existingTransferLookup(transferId) == null) return@forEachIndexed
+        conversions +=
+            ReimportTradeConversion(
+                rowIndex = row.rowIndex,
+                transferIdsToDelete = collectLinkedLegs(transferId, relationshipRepository).transferIds,
+                description = mapped.transfer.description,
+            )
+    }
+    return conversions
+}
+
 /** A row's transfer plus everything hanging off it via forward relationships. */
 private class LinkedLegs(
     val transferIds: List<TransferId>,
@@ -625,10 +704,13 @@ private suspend fun collectLinkedLegs(
  *    on the newly-mapped accounts, miss the ones still sitting on the duplicates, and import them twice;
  * 3. rewrites each planned pass-through row: deletes its old transfer(s) and resets the row's status —
  *    deleting BEFORE re-running rows for the same reason (dedupe must not match the stale transfer);
- * 4. re-runs the strategy over rows never imported, errored, or just reset, which now resolve via the
+ * 4. converts each planned trade row the same way: deletes its stale single-asset transfer(s) and
+ *    resets the row so the re-run imports it as a cross-asset trade;
+ * 5. re-runs the strategy over rows never imported, errored, or just reset, which now resolve via the
  *    new mappings and route through the current pass-through chains;
- * 5. deletes import-created accounts left with no transfers (e.g. the raw "CRV*…" merchants);
- * 6. refreshes materialized views.
+ * 6. deletes import-created accounts left with no transfers (e.g. the raw "CRV*…" merchants or the
+ *    description-named counterparties emptied by trade conversions);
+ * 7. refreshes materialized views.
  *
  * [onProgress] reports each step (with counts where known) for a progress UI. [valueUpdateChunkSize]
  * is exposed for tests to force multiple update chunks with a small fixture.
@@ -650,6 +732,7 @@ suspend fun executeCsvReimport(
     valueUpdateChunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
     refreshViews: Boolean = true,
     cryptoRepository: CryptoReadRepository? = null,
+    tradeRepository: TradeReadRepository? = null,
 ): CsvReimportResult {
     val merged = mutableListOf<ReimportMerge>()
     val skipped = plan.skipped.toMutableList()
@@ -730,6 +813,46 @@ suspend fun executeCsvReimport(
         }
     }
 
+    // One batch per conversion, mirroring the rewrite loop: the row's stale single-asset transfer(s)
+    // are deleted and its status reset in the same batch, so the re-run below re-imports it as a trade.
+    val converted = mutableListOf<ReimportTradeConversion>()
+    for ((index, conversion) in plan.tradeConversions.withIndex()) {
+        onProgress?.invoke(
+            ImportProgress(
+                "Converting transfers to trades",
+                fraction = index.toFloat() / plan.tradeConversions.size,
+                processed = index,
+                total = plan.tradeConversions.size,
+            ),
+        )
+        try {
+            importEngine.import(
+                ImportBatch(
+                    transfers =
+                        conversion.transferIdsToDelete.map { id ->
+                            ImportTransfer(
+                                source = Source.Csv(csvImport.id),
+                                operation = ImportOperation.DELETE,
+                                existingId = id,
+                            )
+                        },
+                    dedupePolicy = DedupePolicy.None,
+                    csvImportMutations = listOf(CsvImportMutation.ResetRowStatuses(csvImport.id, listOf(conversion.rowIndex))),
+                ),
+            )
+            converted += conversion
+        } catch (expected: Exception) {
+            logger.warn(expected) { "Re-import trade conversion of row ${conversion.rowIndex} ('${conversion.description}') failed" }
+            skipped +=
+                ReimportSkippedAccount(
+                    accountId = null,
+                    accountName = conversion.description,
+                    reason = ReimportSkipReason.TRADE_CONVERSION_FAILED,
+                    detail = expected.message ?: "Trade conversion failed",
+                )
+        }
+    }
+
     val importResult =
         applyStagedCsv(
             csvImport = csvImport,
@@ -749,7 +872,8 @@ suspend fun executeCsvReimport(
         )
 
     onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))
-    val deletedEmptyAccounts = deleteEmptyImportCreatedAccounts(csvImport, accountRepository, csvImportRepository, importEngine)
+    val deletedEmptyAccounts =
+        deleteEmptyImportCreatedAccounts(csvImport, accountRepository, csvImportRepository, importEngine, tradeRepository)
 
     if (refreshViews) {
         onProgress?.invoke(ImportProgress("Refreshing views"))
@@ -764,6 +888,7 @@ suspend fun executeCsvReimport(
         rewrittenRows = rewritten,
         updatedRows = updatedRows,
         reversedMerges = reversedMerges,
+        convertedRows = converted,
     )
 }
 
@@ -888,14 +1013,17 @@ private suspend fun applyValueUpdates(
 }
 
 /**
- * Deletes accounts this import created that hold no transfers (merged-away duplicates are already
- * gone — this catches ones emptied without being merge targets). Returns the deleted names.
+ * Deletes accounts this import created that hold no transactions (merged-away duplicates are already
+ * gone — this catches ones emptied without being merge targets). Returns the deleted names. Trades
+ * count as activity: deleting an account cascades to its trades, so an account whose only movements
+ * are trades (e.g. the wallet a transfer→trade conversion just re-imported into) must survive.
  */
 private suspend fun deleteEmptyImportCreatedAccounts(
     csvImport: CsvImport,
     accountRepository: AccountReadRepository,
     csvImportRepository: CsvImportReadRepository,
     importEngine: ImportEngine,
+    tradeRepository: TradeReadRepository?,
 ): List<String> {
     val importCreated = csvImportRepository.getAccountsCreatedByImport(csvImport.id)
     val remainingById = accountRepository.getAllAccounts().first().associateBy { it.id }
@@ -903,6 +1031,7 @@ private suspend fun deleteEmptyImportCreatedAccounts(
         importCreated
             .mapNotNull { remainingById[it] }
             .filter { accountRepository.countTransfersByAccount(it.id) == 0L }
+            .filter { (tradeRepository?.countTradesByAccount(it.id) ?: 0L) == 0L }
     if (emptyAccounts.isEmpty()) return emptyList()
 
     importEngine.import(
@@ -936,6 +1065,7 @@ data class CsvBulkReimportResult(
     val merges: List<ReimportMerge>,
     val reversals: List<ReimportReversal>,
     val valueUpdates: Int,
+    val tradeConversions: Int,
     val emptyAccountsDeleted: Int,
     val skipped: List<ReimportSkippedAccount>,
 ) : BulkImportResult {
@@ -944,6 +1074,7 @@ data class CsvBulkReimportResult(
             append("Re-imported $filesImported file${if (filesImported == 1) "" else "s"}")
             append(" · $transfersCreated new")
             if (valueUpdates > 0) append(" · $valueUpdates updated")
+            if (tradeConversions > 0) append(" · $tradeConversions converted to trades")
             if (merges.isNotEmpty()) append(" · ${merges.size} account${if (merges.size == 1) "" else "s"} merged")
             if (reversals.isNotEmpty()) append(" · ${reversals.size} merge${if (reversals.size == 1) "" else "s"} reversed")
             if (emptyAccountsDeleted > 0) append(" · $emptyAccountsDeleted empty removed")
@@ -979,6 +1110,7 @@ suspend fun bulkReimportCsv(
     onProgress: (done: Int, total: Int) -> Unit,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
+    tradeRepository: TradeReadRepository? = null,
 ): CsvBulkReimportResult {
     var filesImported = 0
     var transfers = 0
@@ -988,6 +1120,7 @@ suspend fun bulkReimportCsv(
     val merges = mutableListOf<ReimportMerge>()
     val reversals = mutableListOf<ReimportReversal>()
     var valueUpdates = 0
+    var tradeConversions = 0
     var emptyAccountsDeleted = 0
     val skipped = mutableListOf<ReimportSkippedAccount>()
     // Create every crypto asset the batch needs up front, sized to the batch-wide max precision per
@@ -1040,6 +1173,8 @@ suspend fun bulkReimportCsv(
                     importEngine = importEngine,
                     passThroughAccounts = passThroughAccounts,
                     refreshViews = false,
+                    cryptoRepository = cryptoRepository,
+                    tradeRepository = tradeRepository,
                 )
             filesImported++
             transfers += result.importResult?.successCount ?: 0
@@ -1047,6 +1182,7 @@ suspend fun bulkReimportCsv(
             merges += result.mergedAccounts
             reversals += result.reversedMerges
             valueUpdates += result.updatedRows.size
+            tradeConversions += result.convertedRows.size
             emptyAccountsDeleted += result.deletedEmptyAccounts.size
             skipped += result.skipped
         } catch (expected: Exception) {
@@ -1067,6 +1203,7 @@ suspend fun bulkReimportCsv(
         merges = merges,
         reversals = reversals,
         valueUpdates = valueUpdates,
+        tradeConversions = tradeConversions,
         emptyAccountsDeleted = emptyAccountsDeleted,
         skipped = skipped,
     )

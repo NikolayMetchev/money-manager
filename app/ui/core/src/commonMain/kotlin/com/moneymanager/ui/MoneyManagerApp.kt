@@ -516,6 +516,7 @@ fun MoneyManagerApp(
                                                 transactionRepository = services.transactions.transactionRepository,
                                                 transferRelationshipRepository = services.transactions.transferRelationshipRepository,
                                                 transferSourceRepository = services.transactions.transferSourceRepository,
+                                                tradeRepository = services.transactions.tradeRepository,
                                                 maintenance = services.imports.maintenance,
                                                 personRepository = services.people.personRepository,
                                                 importEngine = services.transactions.importEngine,
@@ -618,6 +619,7 @@ fun MoneyManagerApp(
                                                 transactionRepository = services.transactions.transactionRepository,
                                                 transferSourceRepository = services.transactions.transferSourceRepository,
                                                 transferRelationshipRepository = services.transactions.transferRelationshipRepository,
+                                                tradeRepository = services.transactions.tradeRepository,
                                                 importEngine = services.transactions.importEngine,
                                                 onBack = { navigationHistory.navigateBack() },
                                                 onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
@@ -670,6 +672,7 @@ fun MoneyManagerApp(
                                                 currencyRepository = services.accounts.currencyRepository,
                                                 personRepository = services.people.personRepository,
                                                 csvStrategyImportExport = services.imports.csvStrategyImportExport,
+                                                strategyLibrary = services.imports.strategyLibrary,
                                                 appVersion = appVersion,
                                                 onBack = { navigationHistory.navigateBack() },
                                                 onEditStrategy = { strategyId, importId ->

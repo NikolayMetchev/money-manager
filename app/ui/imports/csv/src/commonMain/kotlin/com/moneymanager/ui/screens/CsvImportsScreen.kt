@@ -47,6 +47,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
@@ -78,6 +79,7 @@ fun CsvImportsScreen(
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
+    tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onImportClick: (CsvImportId) -> Unit,
@@ -288,6 +290,7 @@ fun CsvImportsScreen(
                     transactionRepository = transactionRepository,
                     transferRelationshipRepository = transferRelationshipRepository,
                     transferSourceRepository = transferSourceRepository,
+                    tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
                     onDismiss = { showReimportAll = false },

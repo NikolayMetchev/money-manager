@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.repository.TradeCreateResult
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TradeWriteRepository
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,7 @@ class TradeWriteRepositoryImpl(
         toAccountId: AccountId,
         toAmount: Money,
         source: Source,
-    ): TradeId {
+    ): TradeCreateResult {
         // A trade is a cross-asset exchange; a same-asset movement is a transfer. The DB CHECK only
         // blocks the same-account+same-asset degenerate case, so enforce the cross-asset rule here.
         require(fromAmount.currency.id != toAmount.currency.id) {
@@ -57,7 +58,7 @@ class TradeWriteRepositoryImpl(
                             to_amount = toAmount.amount.toString(),
                         ).executeAsOneOrNull()
                 if (existing != null) {
-                    return@transactionWithResult TradeId(existing)
+                    return@transactionWithResult TradeCreateResult(TradeId(existing), created = false)
                 }
                 // Allocate a transaction id (insert + last_insert_rowid must share a connection).
                 transactionIdWriteQueries.insert()
@@ -75,7 +76,7 @@ class TradeWriteRepositoryImpl(
                     to_amount = toAmount.amount.toString(),
                 )
                 database.recordSource(deviceId, EntityType.TRADE, id, 1L, source)
-                TradeId(id)
+                TradeCreateResult(TradeId(id), created = true)
             }
         }
     }

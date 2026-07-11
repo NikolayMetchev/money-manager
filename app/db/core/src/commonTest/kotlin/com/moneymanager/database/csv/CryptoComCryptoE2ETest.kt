@@ -6,12 +6,18 @@ import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.bulkReimportCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
+import com.moneymanager.domain.model.csvstrategy.RegexRule
+import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration
 
@@ -61,7 +67,9 @@ class CryptoComCryptoE2ETest : DbTest() {
         amount: String,
         nativeAmount: String,
         kind: String,
-    ): List<String> = listOf(timestamp, description, currency, amount, "", "", "GBP", nativeAmount, "0.0", kind, "")
+        toCurrency: String = "",
+        toAmount: String = "",
+    ): List<String> = listOf(timestamp, description, currency, amount, toCurrency, toAmount, "GBP", nativeAmount, "0.0", kind, "")
 
     private suspend fun stage(
         fileName: String,
@@ -109,6 +117,7 @@ class CryptoComCryptoE2ETest : DbTest() {
             importEngine = repositories.importEngine,
             onProgress = { _, _ -> },
             cryptoRepository = repositories.cryptoRepository,
+            tradeRepository = repositories.tradeRepository,
         )
 
     @Test
@@ -172,6 +181,240 @@ class CryptoComCryptoE2ETest : DbTest() {
                     .balance
             assertEquals("CRO", balance.currency.code)
             assertEquals("0.79", balance.toDisplayValue().toString())
+        }
+
+    private suspend fun accountByName(name: String) =
+        repositories.accountRepository
+            .getAllAccounts()
+            .first()
+            .firstOrNull { it.name == name }
+
+    private suspend fun balanceOf(
+        accountName: String,
+        assetCode: String,
+    ): String {
+        repositories.maintenanceService.refreshMaterializedViews()
+        val account = assertNotNull(accountByName(accountName))
+        return repositories.transactionRepository
+            .getAccountBalances()
+            .first()
+            .first { it.accountId == account.id && it.balance.currency.code == assetCode }
+            .balance
+            .toDisplayValue()
+            .toString()
+    }
+
+    @Test
+    fun cryptoExchange_importsAsSameAccountTrade() =
+        runTest {
+            // A crypto→crypto exchange inside the App wallet: one row, TGBP out and CRO in, both legs
+            // in the single "Crypto.com" account. Previously this imported as a single-leg transfer
+            // into a junk "TGBP -> CRO" account, losing the bought leg.
+            val file =
+                stage(
+                    "crypto_transactions_record_exchange.csv",
+                    listOf(
+                        row(
+                            "2022-03-12 12:17:57",
+                            "TGBP -> CRO",
+                            "TGBP",
+                            "-1499.936259",
+                            "1499.94",
+                            "crypto_exchange",
+                            toCurrency = "CRO",
+                            toAmount = "4965.5",
+                        ),
+                    ),
+                )
+            applyAll(listOf(file))
+
+            val wallet = assertNotNull(accountByName("Crypto.com"))
+            assertNull(accountByName("TGBP -> CRO"), "must not create a junk description-named account")
+
+            val trades = repositories.tradeRepository.getTradesByAccount(wallet.id).first()
+            assertEquals(1, trades.size)
+            val trade = trades.single()
+            assertEquals(wallet.id, trade.fromAccountId)
+            assertEquals(wallet.id, trade.toAccountId)
+            assertEquals("TGBP", trade.from.currency.code)
+            assertEquals("1499.936259", trade.from.toDisplayValue().toString())
+            assertEquals("CRO", trade.to.currency.code)
+            assertEquals("4965.5", trade.to.toDisplayValue().toString())
+
+            // Both per-asset balances move inside the one account.
+            assertEquals("-1499.936259", balanceOf("Crypto.com", "TGBP"))
+            assertEquals("4965.5", balanceOf("Crypto.com", "CRO"))
+
+            val staged =
+                repositories.csvImportRepository
+                    .getImportRows(file.id, limit = 10, offset = 0)
+                    .single()
+            assertEquals(ImportStatus.IMPORTED, staged.importStatus)
+        }
+
+    @Test
+    fun vibanRows_dedupeAgainstFiatTrades_eitherImportOrder() =
+        runTest {
+            // The same viban purchase appears in BOTH exports (identical timestamp/description/amounts;
+            // the fiat file's Amount is positive, the crypto file's negative). Both strategies must
+            // produce the identical trade so createTrade's exact match books it once — whichever file
+            // imports first — and the second file's row surfaces as DUPLICATE.
+            val fiatRow =
+                row("2022-03-24 22:34:02", "GBP -> TGBP", "GBP", "5000.0", "5000.0", "viban_purchase", "TGBP", "5000.0")
+            val cryptoRow =
+                row("2022-03-24 22:34:02", "GBP -> TGBP", "GBP", "-5000.0", "5000.0", "viban_purchase", "TGBP", "5000.0")
+            val fiat = stage("fiat_transactions_record_20220325_000000.csv", listOf(fiatRow))
+            val crypto = stage("crypto_transactions_record_20220325_000000.csv", listOf(cryptoRow))
+
+            // Fiat first, then crypto.
+            applyAll(listOf(fiat))
+            applyAll(listOf(crypto))
+
+            val wallet = assertNotNull(accountByName("Crypto.com"))
+            val cash = assertNotNull(accountByName("Crypto.com Cash"))
+            val trades = repositories.tradeRepository.getTradesByAccount(wallet.id).first()
+            assertEquals(1, trades.size, "the two files record ONE purchase — exactly one trade")
+            assertEquals(cash.id, trades.single().fromAccountId)
+            assertEquals(wallet.id, trades.single().toAccountId)
+
+            val cryptoStaged = repositories.csvImportRepository.getImportRows(crypto.id, limit = 10, offset = 0).single()
+            assertEquals(ImportStatus.DUPLICATE, cryptoStaged.importStatus, "second source's row must surface as DUPLICATE")
+            val fiatStaged = repositories.csvImportRepository.getImportRows(fiat.id, limit = 10, offset = 0).single()
+            assertEquals(ImportStatus.IMPORTED, fiatStaged.importStatus)
+        }
+
+    @Test
+    fun vibanRows_dedupeAgainstFiatTrades_cryptoFileFirst() =
+        runTest {
+            val fiatRow =
+                row("2022-06-16 04:55:30", "TGBP -> GBP", "TGBP", "46.03", "46.03", "crypto_viban", "GBP", "46.03")
+            val cryptoRow =
+                row("2022-06-16 04:55:30", "TGBP -> GBP", "TGBP", "-46.03", "46.03", "crypto_viban_exchange", "GBP", "46.03")
+            val crypto = stage("crypto_transactions_record_20220617_000000.csv", listOf(cryptoRow))
+            val fiat = stage("fiat_transactions_record_20220617_000000.csv", listOf(fiatRow))
+
+            // Crypto first, then fiat: the dedupe must be symmetric.
+            applyAll(listOf(crypto))
+            applyAll(listOf(fiat))
+
+            val wallet = assertNotNull(accountByName("Crypto.com"))
+            val cash = assertNotNull(accountByName("Crypto.com Cash"))
+            val trades = repositories.tradeRepository.getTradesByAccount(wallet.id).first()
+            assertEquals(1, trades.size)
+            assertEquals(wallet.id, trades.single().fromAccountId)
+            assertEquals(cash.id, trades.single().toAccountId)
+
+            assertEquals(
+                ImportStatus.IMPORTED,
+                repositories.csvImportRepository
+                    .getImportRows(crypto.id, limit = 10, offset = 0)
+                    .single()
+                    .importStatus,
+            )
+            assertEquals(
+                ImportStatus.DUPLICATE,
+                repositories.csvImportRepository
+                    .getImportRows(fiat.id, limit = 10, offset = 0)
+                    .single()
+                    .importStatus,
+            )
+        }
+
+    @Test
+    fun reimport_convertsOldSingleLegTransferToTrade() =
+        runTest {
+            // Upgrade path: a crypto_exchange row imported under the OLD strategy definition (no
+            // TO_CURRENCY/TO_AMOUNT mappings) produced a single-leg transfer into a junk
+            // description-named account. Re-importing under the CURRENT definition must delete that
+            // transfer, import the row as a trade, and remove the emptied junk account.
+            val strategies = repositories.csvImportStrategyRepository.getAllStrategies().first()
+            val current = strategies.first { it.name == "Crypto.com Crypto" }
+            val old =
+                current.copy(
+                    fieldMappings =
+                        current.fieldMappings
+                            .filterKeys { it != TransferField.TO_CURRENCY && it != TransferField.TO_AMOUNT }
+                            .mapValues { (field, mapping) ->
+                                if (field == TransferField.TARGET_ACCOUNT) {
+                                    RegexAccountMapping(
+                                        id = mapping.id,
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Transaction Description",
+                                        rules = listOf(RegexRule(pattern = "App wallet", accountName = "Crypto.com Exchange")),
+                                    )
+                                } else {
+                                    mapping
+                                }
+                            },
+                )
+            repositories.importEngine.updateCsvStrategy(old)
+
+            val file =
+                stage(
+                    "crypto_transactions_record_old.csv",
+                    listOf(
+                        row(
+                            "2021-10-15 03:49:59",
+                            "BTC -> CRO",
+                            "BTC",
+                            "-0.00002502",
+                            "1.06",
+                            "crypto_exchange",
+                            toCurrency = "CRO",
+                            toAmount = "7.8",
+                        ),
+                    ),
+                )
+            applyAll(listOf(file))
+            val wallet = assertNotNull(accountByName("Crypto.com"))
+            assertNotNull(accountByName("BTC -> CRO"), "old strategy creates the junk counterparty account")
+            assertEquals(
+                0,
+                repositories.tradeRepository
+                    .getTradesByAccount(wallet.id)
+                    .first()
+                    .size,
+            )
+
+            // The strategy definition is updated (the catalog-update path) and the file re-imported.
+            repositories.importEngine.updateCsvStrategy(current)
+            val result = reimportAll(repositories.csvImportRepository.getAllImports().first())
+            assertEquals(1, result.tradeConversions, "the junk transfer row must convert to a trade")
+
+            val trades = repositories.tradeRepository.getTradesByAccount(wallet.id).first()
+            assertEquals(1, trades.size)
+            assertEquals(
+                "BTC",
+                trades
+                    .single()
+                    .from.currency.code,
+            )
+            assertEquals(
+                "CRO",
+                trades
+                    .single()
+                    .to.currency.code,
+            )
+            assertNull(accountByName("BTC -> CRO"), "emptied junk account must be deleted")
+            assertEquals(
+                ImportStatus.IMPORTED,
+                repositories.csvImportRepository
+                    .getImportRows(file.id, limit = 10, offset = 0)
+                    .single()
+                    .importStatus,
+            )
+
+            // A second re-import is a no-op: the row now has no transfer id, so the conversion pass
+            // must not fire again, and createTrade's idempotency keeps the single trade.
+            val again = reimportAll(repositories.csvImportRepository.getAllImports().first())
+            assertEquals(0, again.tradeConversions)
+            assertEquals(
+                1,
+                repositories.tradeRepository
+                    .getTradesByAccount(wallet.id)
+                    .first()
+                    .size,
+            )
         }
 
     @Test

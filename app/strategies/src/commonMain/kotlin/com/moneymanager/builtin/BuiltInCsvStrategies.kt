@@ -331,7 +331,7 @@ object BuiltInCsvStrategies {
                 // demand as a crypto asset, so the conversion becomes a trade.
                 TransferField.TO_AMOUNT to
                     AmountParsingMapping(
-                        id = cryptoComFiatMappingId(9),
+                        id = cryptoComFiatMappingId(11),
                         fieldType = TransferField.TO_AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "To Amount",
@@ -406,29 +406,76 @@ object BuiltInCsvStrategies {
      * Cashback") the TARGET; [AmountParsingMapping.flipAccountsOnPositive] then makes a positive amount
      * (rewards) flow INTO the account and a negative amount (a spend/swap out) flow OUT of it —
      * mirroring the card strategy's sign convention.
+     *
+     * Cross-asset rows (To Currency present and different from Currency) become TRADES, exactly like
+     * the fiat strategy's viban conversions:
+     *
+     * - crypto_exchange ("TGBP -> CRO"): a crypto→crypto exchange inside the App wallet — a
+     *   same-account trade Crypto.com(sold) → Crypto.com(bought).
+     * - viban_purchase ("GBP -> TGBP", fiat buy) debits the Cash account and credits Crypto.com;
+     *   crypto_viban_exchange ("TGBP -> GBP", sell) debits Crypto.com and credits Cash. Both events
+     *   ALSO appear in the fiat export (kinds viban_purchase/crypto_viban) with identical
+     *   timestamp/description/amounts, so routing them to the same accounts here makes both files
+     *   produce byte-identical trades — createTrade's exact-match idempotency then books each event
+     *   once regardless of which file imports first. (A UI source-account override bypasses the
+     *   kind-based source rule and would defeat that dedupe; built-ins assume no override.)
+     *
+     * All cross-asset rows carry a NEGATIVE Amount (the debited leg), so flip-on-positive never fires
+     * for them and the debit stays on the source side.
      */
     fun buildCryptoComCryptoStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
                 // All crypto lands in the single "Crypto.com" account (one balance per asset), not a
-                // separate wallet per ticker. The always-matching "^" rule routes every row there.
+                // separate wallet per ticker — except viban_purchase, whose debited leg is the fiat
+                // balance held in the Cash account. The "^" fallback rule routes every other row to
+                // the Crypto.com account.
                 TransferField.SOURCE_ACCOUNT to
                     RegexAccountMapping(
                         id = cryptoComCryptoMappingId(1),
                         fieldType = TransferField.SOURCE_ACCOUNT,
-                        columnName = "Transaction Description",
-                        rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CRYPTO_ACCOUNT)),
+                        columnName = "Transaction Kind",
+                        rules =
+                            listOf(
+                                RegexRule(pattern = "^viban_purchase$", accountName = CRYPTO_COM_CASH_ACCOUNT),
+                                RegexRule(pattern = "^", accountName = CRYPTO_COM_CRYPTO_ACCOUNT),
+                            ),
                     ),
-                // Counterparty (reward source / merchant) looked up from the description, except App<->Exchange
-                // transfers which route to the shared "Crypto.com Exchange" account (see the constant's KDoc).
-                // Both descriptions contain "App wallet"; the flip-on-positive turns the pre-flip target into
-                // the source for the "Exchange -> App wallet" (received) direction.
+                // Cross-asset rows (a trade's credited leg) route to the account holding the credited
+                // asset: fiat from a sell goes to the Cash account, crypto stays in Crypto.com. The
+                // IS_NOT_BLANK condition matters: most rows have a BLANK To Currency and must keep the
+                // single-asset routing below.
+                // Single-asset rows keep the description-derived counterparty (reward source / merchant),
+                // except App<->Exchange transfers which route to the shared "Crypto.com Exchange" account
+                // (see the constant's KDoc). Both descriptions contain "App wallet"; the flip-on-positive
+                // turns the pre-flip target into the source for the "Exchange -> App wallet" direction.
                 TransferField.TARGET_ACCOUNT to
-                    RegexAccountMapping(
+                    ConditionalAccountMapping(
                         id = cryptoComCryptoMappingId(2),
                         fieldType = TransferField.TARGET_ACCOUNT,
-                        columnName = "Transaction Description",
-                        rules = listOf(RegexRule(pattern = "App wallet", accountName = CRYPTO_COM_EXCHANGE_ACCOUNT)),
+                        conditions =
+                            listOf(
+                                RowCondition("To Currency", RowConditionOperator.IS_NOT_BLANK),
+                                RowCondition("Currency", RowConditionOperator.NOT_EQUALS_COLUMN, otherColumnName = "To Currency"),
+                            ),
+                        whenTrue =
+                            RegexAccountMapping(
+                                id = cryptoComCryptoMappingId(10),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Transaction Kind",
+                                rules =
+                                    listOf(
+                                        RegexRule(pattern = "^crypto_viban_exchange$", accountName = CRYPTO_COM_CASH_ACCOUNT),
+                                        RegexRule(pattern = "^", accountName = CRYPTO_COM_CRYPTO_ACCOUNT),
+                                    ),
+                            ),
+                        whenFalse =
+                            RegexAccountMapping(
+                                id = cryptoComCryptoMappingId(11),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Transaction Description",
+                                rules = listOf(RegexRule(pattern = "App wallet", accountName = CRYPTO_COM_EXCHANGE_ACCOUNT)),
+                            ),
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
@@ -465,6 +512,22 @@ object BuiltInCsvStrategies {
                         id = cryptoComCryptoMappingId(7),
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
+                    ),
+                // Credit leg of a cross-asset row → the importer emits a trade when To Currency differs
+                // from Currency (blank To Currency rows are unaffected). Any non-fiat To/From Currency
+                // is created on demand as a crypto asset.
+                TransferField.TO_AMOUNT to
+                    AmountParsingMapping(
+                        id = cryptoComCryptoMappingId(8),
+                        fieldType = TransferField.TO_AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "To Amount",
+                    ),
+                TransferField.TO_CURRENCY to
+                    CurrencyLookupMapping(
+                        id = cryptoComCryptoMappingId(9),
+                        fieldType = TransferField.TO_CURRENCY,
+                        columnName = "To Currency",
                     ),
             )
         val attributeMappings =
