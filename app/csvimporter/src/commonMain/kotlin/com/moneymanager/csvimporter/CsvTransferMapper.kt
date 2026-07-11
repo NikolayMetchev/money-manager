@@ -280,11 +280,20 @@ class CsvTransferMapper(
     private val dateFormatCache = HashMap<String, DateTimeFormat<LocalDate>>()
     private val timeFormatCache = HashMap<String, DateTimeFormat<LocalTime>>()
 
-    private fun dateTimeFormat(pattern: String) = dateTimeFormatCache.getOrPut(pattern) { LocalDateTime.Format { byUnicodePattern(pattern) } }
+    private fun dateTimeFormat(pattern: String): DateTimeFormat<LocalDateTime> =
+        dateTimeFormatCache.getOrPut(pattern) {
+            LocalDateTime.Format { byUnicodePattern(pattern) }
+        }
 
-    private fun dateFormat(pattern: String) = dateFormatCache.getOrPut(pattern) { LocalDate.Format { byUnicodePattern(pattern) } }
+    private fun dateFormat(pattern: String): DateTimeFormat<LocalDate> =
+        dateFormatCache.getOrPut(pattern) {
+            LocalDate.Format { byUnicodePattern(pattern) }
+        }
 
-    private fun timeFormat(pattern: String) = timeFormatCache.getOrPut(pattern) { LocalTime.Format { byUnicodePattern(pattern) } }
+    private fun timeFormat(pattern: String): DateTimeFormat<LocalTime> =
+        timeFormatCache.getOrPut(pattern) {
+            LocalTime.Format { byUnicodePattern(pattern) }
+        }
 
     // Precompiled conversion detection (null when the strategy declares no conversionConfig). Regexes
     // are case-insensitive, matching the file's existing account/content-rule matching convention.

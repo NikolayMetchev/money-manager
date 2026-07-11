@@ -129,18 +129,18 @@ class ImportDeduper(
 
     private fun Transfer.coreKey() = CoreKey(timestamp, sourceAccountId, targetAccountId, amount, description)
 
-    private fun ImportTransfer.coreKey() =
-        CoreKey(timestamp, fromAccount.requireId(), toAccount.requireId(), amount, description)
+    private fun ImportTransfer.coreKey() = CoreKey(timestamp, fromAccount.requireId(), toAccount.requireId(), amount, description)
 
     // Indexes over the existing transfers so classification is a hash lookup (plus a scan of the small
     // matching bucket) instead of a linear pass over the whole DB history per incoming row. Buckets
     // preserve input order, so first-match-in-list-order semantics are unchanged.
-    private val existingByCoreKey: Map<CoreKey, ExistingTransferInfo> = buildMap {
-        for (info in existing) {
-            val key = info.transfer.coreKey()
-            if (key !in this) put(key, info)
+    private val existingByCoreKey: Map<CoreKey, ExistingTransferInfo> =
+        buildMap {
+            for (info in existing) {
+                val key = info.transfer.coreKey()
+                if (key !in this) put(key, info)
+            }
         }
-    }
     private val existingByAmount: Map<Money, List<ExistingTransferInfo>> =
         existing.groupBy { it.transfer.amount }
 
