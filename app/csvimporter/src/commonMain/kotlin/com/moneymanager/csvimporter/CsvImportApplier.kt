@@ -223,7 +223,7 @@ data class CsvBulkResult(
  * skipped and counted. Payee/counterparty accounts auto-create with their detected names (no per-file
  * confirmation). The shared [sourceAccountOverride] is used only for files whose strategy needs a
  * user-chosen source (no SOURCE_ACCOUNT mapping); hard-coded and per-row strategies resolve their own.
- * Refreshes materialized views once at the end. Reports progress via [onProgress].
+ * Refreshes materialized views once at the end. Reports row-weighted run-wide progress via [onProgress].
  */
 @Suppress("LongParameterList")
 suspend fun bulkApplyCsv(
@@ -236,7 +236,7 @@ suspend fun bulkApplyCsv(
     csvImportRepository: CsvImportReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: (done: Int, total: Int) -> Unit,
+    onProgress: suspend (BulkImportProgress) -> Unit,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
 ): CsvBulkResult {
@@ -246,12 +246,15 @@ suspend fun bulkApplyCsv(
     var skippedNoStrategy = 0
     var failed = 0
 
+    val tracker = BulkProgressTracker(imports.map { it.rowCount }, onProgress)
+    tracker.started(detail = "Preparing")
+
     // Create every crypto asset the batch needs up front, sized to the batch-wide max precision per
     // ticker, so cross-file ordering never leaves a ticker missing or a scale factor too small.
     ensureCryptoAssetsForImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository)
 
     imports.forEachIndexed { index, listedImport ->
-        onProgress(index, imports.size)
+        tracker.fileStarted(index, listedImport.originalFileName)
         // getAllImports() doesn't populate columns, so re-fetch the full import (which loads them)
         // for the strategy match below.
         val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
@@ -275,6 +278,8 @@ suspend fun bulkApplyCsv(
                     importEngine = importEngine,
                     refreshViews = false,
                     passThroughAccounts = passThroughAccounts,
+                    onProgress = { tracker.phase(index, csvImport.originalFileName, it) },
+                    engineBatchSize = BULK_ENGINE_BATCH_SIZE,
                     cryptoRepository = cryptoRepository,
                 ) ?: return@forEachIndexed
             filesImported++
@@ -286,7 +291,7 @@ suspend fun bulkApplyCsv(
         }
     }
 
-    onProgress(imports.size, imports.size)
+    tracker.done()
     maintenance.refreshMaterializedViews()
 
     return CsvBulkResult(

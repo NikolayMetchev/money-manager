@@ -2,7 +2,10 @@
 
 package com.moneymanager.qifimporter
 
+import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE
+import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.BulkImportResult
+import com.moneymanager.csvimporter.BulkProgressTracker
 import com.moneymanager.csvimporter.CsvImportResult
 import com.moneymanager.csvimporter.CsvReimportResult
 import com.moneymanager.csvimporter.ReimportMerge
@@ -240,6 +243,8 @@ suspend fun executeQifReimport(
             qifImportRepository = qifImportRepository,
             maintenance = maintenance,
             importEngine = importEngine,
+            onProgress = onProgress,
+            engineBatchSize = BULK_ENGINE_BATCH_SIZE,
         )
 
     onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))
@@ -361,6 +366,8 @@ private suspend fun applyStagedQif(
     qifImportRepository: QifImportReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    engineBatchSize: Int = Int.MAX_VALUE,
 ): QifImportResult? {
     val recordCount = qifImportRepository.countRecords(qifImport.id)
     val records = qifImportRepository.getImportRecords(qifImport.id, recordCount.coerceAtLeast(1), 0)
@@ -391,6 +398,8 @@ private suspend fun applyStagedQif(
         maintenance = maintenance,
         importEngine = importEngine,
         refreshViews = false,
+        onProgress = onProgress,
+        engineBatchSize = engineBatchSize,
     )
 }
 
@@ -465,7 +474,7 @@ data class QifBulkReimportResult(
  * was last imported with ([QifImport.lastAppliedStrategyId], falling back to content-aware
  * auto-selection), then plans and executes a re-import so current strategy/mapping changes apply
  * retroactively. Files with no resolvable strategy are skipped and counted. Refreshes materialized views
- * once at the end. Mirrors [bulkApplyQif]; reports per-file [onProgress].
+ * once at the end. Mirrors [bulkApplyQif]; reports row-weighted run-wide progress via [onProgress].
  */
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 suspend fun bulkReimportQif(
@@ -481,7 +490,7 @@ suspend fun bulkReimportQif(
     transferSourceRepository: TransferSourceReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: (done: Int, total: Int) -> Unit,
+    onProgress: suspend (BulkImportProgress) -> Unit,
 ): QifBulkReimportResult {
     val qifStrategies = strategies.qifCompatible()
     var filesImported = 0
@@ -495,8 +504,11 @@ suspend fun bulkReimportQif(
     var emptyAccountsDeleted = 0
     val skipped = mutableListOf<ReimportSkippedAccount>()
 
+    val tracker = BulkProgressTracker(imports.map { it.recordCount }, onProgress)
+    tracker.started()
+
     imports.forEachIndexed { index, qifImport ->
-        onProgress(index, imports.size)
+        tracker.fileStarted(index, qifImport.originalFileName)
         try {
             val count = qifImportRepository.countRecords(qifImport.id)
             val records = qifImportRepository.getImportRecords(qifImport.id, count.coerceAtLeast(1), 0)
@@ -524,6 +536,7 @@ suspend fun bulkReimportQif(
                     qifImportRepository = qifImportRepository,
                     transactionRepository = transactionRepository,
                     transferSourceRepository = transferSourceRepository,
+                    onProgress = { tracker.phase(index, qifImport.originalFileName, it) },
                 )
             val result =
                 executeQifReimport(
@@ -537,6 +550,7 @@ suspend fun bulkReimportQif(
                     qifImportRepository = qifImportRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
+                    onProgress = { tracker.phase(index, qifImport.originalFileName, it) },
                     refreshViews = false,
                 )
             filesImported++
@@ -553,7 +567,7 @@ suspend fun bulkReimportQif(
         }
     }
 
-    onProgress(imports.size, imports.size)
+    tracker.done()
     maintenance.refreshMaterializedViews()
 
     return QifBulkReimportResult(

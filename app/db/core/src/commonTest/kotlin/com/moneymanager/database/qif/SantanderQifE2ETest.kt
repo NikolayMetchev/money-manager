@@ -2,6 +2,8 @@
 
 package com.moneymanager.database.qif
 
+import com.moneymanager.csvimporter.BulkImportProgress
+import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -110,6 +112,7 @@ class SantanderQifE2ETest : DbTest() {
                 .firstOrNull { it.name == "Santander" }
                 ?.id
                 ?: repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Santander", openingDate = now))
+        val progress = mutableListOf<BulkImportProgress>()
         bulkApplyQif(
             imports = listOf(qifImport),
             sourceAccountId = sourceId,
@@ -120,8 +123,9 @@ class SantanderQifE2ETest : DbTest() {
             qifImportRepository = repositories.qifImportRepository,
             maintenance = maintenance,
             importEngine = repositories.importEngine,
-            onProgress = { _, _ -> },
+            onProgress = { progress += it },
         )
+        assertBulkProgress(progress, filesTotal = 1)
     }
 
     @Test

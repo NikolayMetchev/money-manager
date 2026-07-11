@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.needsSourceAccountOverride
@@ -73,7 +74,7 @@ fun CsvImportAllDialog(
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var progress by remember { mutableStateOf<BulkImportProgress?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
     // Match each file's strategy (filename + content aware), so we can tell how many files will be
@@ -127,9 +128,9 @@ fun CsvImportAllDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    progress?.let { (done, total) ->
+                    progress?.let {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Importing ${done.coerceAtMost(total)} of $total…", style = MaterialTheme.typography.bodySmall)
+                        BulkImportProgressIndicator(it)
                     }
                 }
             }
@@ -155,7 +156,7 @@ fun CsvImportAllDialog(
                                         csvImportRepository = csvImportRepository,
                                         maintenance = maintenance,
                                         importEngine = importEngine,
-                                        onProgress = { done, total -> progress = done to total },
+                                        onProgress = { progress = it },
                                         passThroughAccounts = passThroughAccounts,
                                         cryptoRepository = cryptoRepository,
                                     )

@@ -1096,7 +1096,8 @@ data class CsvBulkReimportResult(
  * then plans and executes a re-import so current strategy/mapping changes apply retroactively (duplicate
  * accounts merged, changed transfer values updated, never-imported/errored rows imported, emptied
  * import-created accounts removed). Files with no resolvable strategy are skipped and counted.
- * Refreshes materialized views once at the end. Mirrors [bulkApplyCsv]; reports per-file [onProgress].
+ * Refreshes materialized views once at the end. Mirrors [bulkApplyCsv]; reports row-weighted
+ * run-wide progress via [onProgress].
  */
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 suspend fun bulkReimportCsv(
@@ -1112,7 +1113,7 @@ suspend fun bulkReimportCsv(
     transferSourceRepository: TransferSourceReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: (done: Int, total: Int) -> Unit,
+    onProgress: suspend (BulkImportProgress) -> Unit,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
     tradeRepository: TradeReadRepository? = null,
@@ -1131,11 +1132,13 @@ suspend fun bulkReimportCsv(
     // Create every crypto asset the batch needs up front, sized to the batch-wide max precision per
     // ticker, so cross-file ordering never leaves a ticker missing or a scale factor too small (the
     // net-new ERROR rows a re-import picks up are denominated in these assets).
+    val tracker = BulkProgressTracker(imports.map { it.rowCount }, onProgress)
+    tracker.started(detail = "Preparing")
     val cryptoAssets =
         ensureCryptoAssetsForImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository)
 
     imports.forEachIndexed { index, listedImport ->
-        onProgress(index, imports.size)
+        tracker.fileStarted(index, listedImport.originalFileName)
         // getAllImports() doesn't populate columns; re-fetch the full import so the strategy match works.
         val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
         val sampleRows = csvImportRepository.getImportRows(csvImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
@@ -1162,6 +1165,7 @@ suspend fun bulkReimportCsv(
                     relationshipRepository = relationshipRepository,
                     transferSourceRepository = transferSourceRepository,
                     passThroughAccounts = passThroughAccounts,
+                    onProgress = { tracker.phase(index, csvImport.originalFileName, it) },
                     cryptoAssets = cryptoAssets,
                 )
             val result =
@@ -1177,6 +1181,7 @@ suspend fun bulkReimportCsv(
                     maintenance = maintenance,
                     importEngine = importEngine,
                     passThroughAccounts = passThroughAccounts,
+                    onProgress = { tracker.phase(index, csvImport.originalFileName, it) },
                     refreshViews = false,
                     cryptoRepository = cryptoRepository,
                     tradeRepository = tradeRepository,
@@ -1196,7 +1201,7 @@ suspend fun bulkReimportCsv(
         }
     }
 
-    onProgress(imports.size, imports.size)
+    tracker.done()
     maintenance.refreshMaterializedViews()
 
     return CsvBulkReimportResult(

@@ -2,7 +2,10 @@
 
 package com.moneymanager.database.csv
 
+import com.moneymanager.csvimporter.BulkImportProgress
+import com.moneymanager.csvimporter.CsvBulkResult
 import com.moneymanager.csvimporter.bulkApplyCsv
+import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
@@ -106,20 +109,25 @@ class CryptoComCsvE2ETest : DbTest() {
         return repositories.csvImportRepository.getImport(id).first()!!
     }
 
-    private suspend fun applyAll(imports: List<CsvImport>) =
-        bulkApplyCsv(
-            imports = imports,
-            sourceAccountOverride = null,
-            strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
-            currencies = repositories.currencyRepository.getAllCurrencies().first(),
-            accountMappingRepository = repositories.accountMappingRepository,
-            accountRepository = repositories.accountRepository,
-            csvImportRepository = repositories.csvImportRepository,
-            maintenance = maintenance,
-            importEngine = repositories.importEngine,
-            onProgress = { _, _ -> },
-            cryptoRepository = repositories.cryptoRepository,
-        )
+    private suspend fun applyAll(imports: List<CsvImport>): CsvBulkResult {
+        val progress = mutableListOf<BulkImportProgress>()
+        val result =
+            bulkApplyCsv(
+                imports = imports,
+                sourceAccountOverride = null,
+                strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
+                currencies = repositories.currencyRepository.getAllCurrencies().first(),
+                accountMappingRepository = repositories.accountMappingRepository,
+                accountRepository = repositories.accountRepository,
+                csvImportRepository = repositories.csvImportRepository,
+                maintenance = maintenance,
+                importEngine = repositories.importEngine,
+                onProgress = { progress += it },
+                cryptoRepository = repositories.cryptoRepository,
+            )
+        assertBulkProgress(progress, imports.size)
+        return result
+    }
 
     @Test
     fun importAll_routesFilesByName_mapsKinds_andReconcilesTheSharedTopUp() =

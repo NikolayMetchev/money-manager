@@ -111,7 +111,7 @@ class QifReimportE2ETest : DbTest() {
             qifImportRepository = repositories.qifImportRepository,
             maintenance = maintenance,
             importEngine = repositories.importEngine,
-            onProgress = { _, _ -> },
+            onProgress = { },
         )
     }
 
@@ -130,7 +130,7 @@ class QifReimportE2ETest : DbTest() {
             transferSourceRepository = repositories.transferSourceRepository,
             maintenance = maintenance,
             importEngine = repositories.importEngine,
-            onProgress = { _, _ -> },
+            onProgress = { },
         )
     }
 

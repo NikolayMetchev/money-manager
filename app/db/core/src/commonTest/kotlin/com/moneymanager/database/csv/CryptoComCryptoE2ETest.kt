@@ -97,7 +97,7 @@ class CryptoComCryptoE2ETest : DbTest() {
             csvImportRepository = repositories.csvImportRepository,
             maintenance = maintenance,
             importEngine = repositories.importEngine,
-            onProgress = { _, _ -> },
+            onProgress = { },
             cryptoRepository = repositories.cryptoRepository,
         )
 
@@ -115,7 +115,7 @@ class CryptoComCryptoE2ETest : DbTest() {
             transferSourceRepository = repositories.transferSourceRepository,
             maintenance = maintenance,
             importEngine = repositories.importEngine,
-            onProgress = { _, _ -> },
+            onProgress = { },
             cryptoRepository = repositories.cryptoRepository,
             tradeRepository = repositories.tradeRepository,
         )

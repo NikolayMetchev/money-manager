@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.CsvBulkReimportResult
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.bulkReimportCsv
@@ -88,7 +89,7 @@ fun CsvReimportAllDialog(
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isRunning by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var progress by remember { mutableStateOf<BulkImportProgress?>(null) }
     var result by remember { mutableStateOf<CsvBulkReimportResult?>(null) }
 
     // Resolve each file's strategy the same way the re-import will: the one it was last imported with,
@@ -157,12 +158,9 @@ fun CsvReimportAllDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    progress?.let { (done, total) ->
+                    progress?.let {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            "Re-importing ${done.coerceAtMost(total)} of $total…",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                        BulkImportProgressIndicator(it)
                     }
                 }
             }
@@ -191,7 +189,7 @@ fun CsvReimportAllDialog(
                                         transferSourceRepository = transferSourceRepository,
                                         maintenance = maintenance,
                                         importEngine = importEngine,
-                                        onProgress = { done, total -> progress = done to total },
+                                        onProgress = { progress = it },
                                         passThroughAccounts = passThroughAccounts,
                                         cryptoRepository = cryptoRepository,
                                         tradeRepository = tradeRepository,
