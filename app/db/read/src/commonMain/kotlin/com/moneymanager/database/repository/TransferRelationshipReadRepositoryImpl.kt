@@ -13,8 +13,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
-private const val MAX_IDS_PER_QUERY = 999
-
 class TransferRelationshipReadRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : TransferRelationshipReadRepository {

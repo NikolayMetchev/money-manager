@@ -34,4 +34,16 @@ class TradeReadRepositoryImpl(
         withContext(Dispatchers.Default) {
             selectQueries.countByAccount(accountId.id).executeAsOne()
         }
+
+    override suspend fun accountsWithTrades(accountIds: Collection<AccountId>): Set<AccountId> =
+        withContext(Dispatchers.Default) {
+            accountIds
+                .asSequence()
+                .map { it.id }
+                .distinct()
+                .chunked(MAX_IDS_PER_QUERY)
+                .flatMap { chunk ->
+                    selectQueries.selectAccountsWithTrades(chunk).executeAsList()
+                }.mapTo(mutableSetOf(), ::AccountId)
+        }
 }
