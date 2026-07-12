@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -240,6 +241,10 @@ fun AccountTransactionsScreen(
     // Backward paging state - tracks if there are more items at the start of the list
     var hasPreviousPage by remember { mutableStateOf(false) }
     var isLoadingPreviousPage by remember { mutableStateOf(false) }
+    // Bumped after every completed first-page (re)load. The scroll-to-target effect keys on this
+    // rather than on runningBalances: list contents can be equal across a reload (so an
+    // equals-based key would not re-fire), while pagination prepends/appends must NOT re-fire it.
+    var pageLoadGeneration by remember { mutableStateOf(0) }
 
     // Loading state - separate tracking for matrix (top) and transactions (bottom)
     var hasLoadedMatrix by remember { mutableStateOf(false) }
@@ -400,6 +405,7 @@ fun AccountTransactionsScreen(
                 logger.error(expected) { "Failed to load transactions: ${expected.message}" }
             } finally {
                 isLoadingPage = false
+                pageLoadGeneration++
             }
         }
 
@@ -893,76 +899,118 @@ fun AccountTransactionsScreen(
 
                 val listState = rememberLazyListState()
 
-                // Scroll to specific transaction if requested
-                LaunchedEffect(scrollToTransferId, runningBalances) {
+                // Scroll to specific transaction if requested. The scroll must run exactly once per
+                // target: keying on pageLoadGeneration re-fires the effect after each first-page
+                // (re)load — including the currency-filtered reload the first pass triggers — while
+                // pagination prepends/appends don't re-fire it, so they can't yank the viewport back
+                // to the anchor. The latch stops later reloads (e.g. after edits) from re-centering.
+                var hasScrolledToTarget by remember(scrollToTransferId) { mutableStateOf(false) }
+                LaunchedEffect(scrollToTransferId, pageLoadGeneration) {
+                    if (hasScrolledToTarget) return@LaunchedEffect
                     scrollToTransferId?.let { targetTransferId ->
                         // Set highlighted transaction (TransferId implements TransactionId)
                         highlightedTransactionId = targetTransferId
 
                         // First find the transaction in unfiltered list to get its currency
-                        val transaction =
-                            runningBalances.find { it.transactionId.id == targetTransferId.id }
-                                ?: return@let
+                        val transaction = runningBalances.find { it.transactionId.id == targetTransferId.id }
+                        if (transaction == null) {
+                            // Absent from a fully loaded page means it doesn't exist in this account;
+                            // latch anyway so pagination (gated on the latch) isn't blocked forever.
+                            if (hasLoadedFirstPage && !isLoadingPage && runningBalances.isNotEmpty()) {
+                                hasScrolledToTarget = true
+                            }
+                            return@let
+                        }
 
-                        // Set currency filter to match the transaction
-                        selectedCurrencyId = CurrencyId(transaction.transactionAmount.currency.id.id)
+                        // Set currency filter to match the transaction; that reloads the page, so the
+                        // centering scroll happens on the next pass over the filtered list
+                        val targetCurrencyId = CurrencyId(transaction.transactionAmount.currency.id.id)
+                        if (selectedCurrencyId != targetCurrencyId) {
+                            selectedCurrencyId = targetCurrencyId
+                            return@let
+                        }
 
-                        // Now find the index in the filtered list (which now includes this currency)
+                        // Find the index in the list the LazyColumn actually renders (currency-filtered
+                        // pages minus hidden excluded rows) so the centering lands on the right row
                         val index =
-                            runningBalances
+                            displayedRunningBalances
                                 .filter {
                                     it.transactionAmount.currency.id == transaction.transactionAmount.currency.id
                                 }.indexOfFirst { it.transactionId.id == targetTransferId.id }
 
-                        if (index >= 0) {
-                            // Centre the target in the viewport instead of pinning it to the very top.
-                            // animateScrollToItem places the item's top at viewport top + scrollOffset, so a
-                            // negative offset of (half viewport - half row) drops it to the middle. Wait for
-                            // the list to be measured first, otherwise viewportSize is still 0.
-                            val viewportHeight =
-                                snapshotFlow { listState.layoutInfo.viewportSize.height }.first { it > 0 }
-                            val rowHeight =
-                                listState.layoutInfo.visibleItemsInfo
-                                    .firstOrNull()
-                                    ?.size ?: 0
-                            val centeringOffset = -(viewportHeight / 2 - rowHeight / 2)
+                        if (index < 0) {
+                            // The target is loaded but not rendered (e.g. excluded while excluded rows
+                            // are hidden) — give up so pagination (gated on the latch) isn't blocked.
+                            hasScrolledToTarget = true
+                            return@let
+                        }
+                        // Centre the target in the viewport instead of pinning it to the very top.
+                        // animateScrollToItem places the item's top at viewport top + scrollOffset, so a
+                        // negative offset of (half viewport - half row) drops it to the middle. Wait for
+                        // the list to be measured first, otherwise viewportSize is still 0.
+                        val viewportHeight =
+                            snapshotFlow { listState.layoutInfo.viewportSize.height }.first { it > 0 }
+                        val rowHeight =
+                            listState.layoutInfo.visibleItemsInfo
+                                .firstOrNull()
+                                ?.size ?: 0
+                        val centeringOffset = -(viewportHeight / 2 - rowHeight / 2)
+                        try {
                             listState.animateScrollToItem(index, centeringOffset)
+                        } finally {
+                            // Latch even when the animation is cancelled (e.g. the user grabs the
+                            // list), otherwise auto-pagination would stay gated forever.
+                            hasScrolledToTarget = true
+                        }
 
-                            // Scroll matrix to show the account and currency
-                            val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
-                            val currencyIndex = uniqueAssets.indexOfAsset(transaction.transactionAmount.currency.id.id)
+                        // Scroll matrix to show the account and currency
+                        val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
+                        val currencyIndex = uniqueAssets.indexOfAsset(transaction.transactionAmount.currency.id.id)
 
-                            if (accountIndex >= 0 && currencyIndex >= 0) {
-                                val targetScrollX =
-                                    horizontalMatrixScrollTarget(
-                                        accountIndex = accountIndex,
-                                        allAccounts = allAccounts,
-                                        accountColumnWidths = accountColumnWidths,
-                                        containerWidthDp = containerWidthDp,
-                                        density = density,
-                                    )
-                                val targetScrollY =
-                                    verticalMatrixScrollTarget(
-                                        currencyIndex = currencyIndex,
-                                        containerHeightDp = containerHeightDp,
-                                        density = density,
-                                    )
-                                launch { horizontalScrollState.animateScrollTo(targetScrollX) }
-                                launch { verticalScrollState.animateScrollTo(targetScrollY) }
-                            }
+                        if (accountIndex >= 0 && currencyIndex >= 0) {
+                            val targetScrollX =
+                                horizontalMatrixScrollTarget(
+                                    accountIndex = accountIndex,
+                                    allAccounts = allAccounts,
+                                    accountColumnWidths = accountColumnWidths,
+                                    containerWidthDp = containerWidthDp,
+                                    density = density,
+                                )
+                            val targetScrollY =
+                                verticalMatrixScrollTarget(
+                                    currencyIndex = currencyIndex,
+                                    containerHeightDp = containerHeightDp,
+                                    density = density,
+                                )
+                            launch { horizontalScrollState.animateScrollTo(targetScrollX) }
+                            launch { verticalScrollState.animateScrollTo(targetScrollY) }
                         }
                     }
                 }
 
-                // Trigger pagination when user scrolls near the end
-                LaunchedEffect(listState, isLoadingPage, currentPagingInfo?.hasMore) {
+                // While a target scroll is pending, the list sits at position 0 (near the trigger
+                // thresholds) and a prepend would shift item indices under the in-flight centering
+                // animation, so hold off auto-pagination until the anchor scroll has run.
+                val anchorScrollPending = scrollToTransferId != null && !hasScrolledToTarget
+
+                // Trigger pagination when user scrolls near the end.
+                // The loading/hasMore flags must NOT be keys of these effects: loadNextPage /
+                // loadPreviousPage flip them, and a key change restarts the effect — cancelling the
+                // very load it just started (withContext discards the result on cancellation even if
+                // the query finished). Loading a page then only succeeded when the query beat the
+                // next recomposition; once a boundary's query was slower than a frame, every retry
+                // was cancelled and scrolling stopped dead. The flags are snapshot state, so the
+                // collect body always reads their current values without them being keys.
+                LaunchedEffect(listState, anchorScrollPending) {
+                    if (anchorScrollPending) return@LaunchedEffect
                     snapshotFlow {
-                        val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-                        lastVisibleItem?.index
-                    }.collect { lastVisibleIndex ->
+                        val layoutInfo = listState.layoutInfo
+                        val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index
+                        lastVisibleIndex?.let { it to layoutInfo.totalItemsCount }
+                    }.collect { indexAndCount ->
+                        val (lastVisibleIndex, totalItemsCount) = indexAndCount ?: return@collect
                         // Load more when within 10 items of the end
-                        if (lastVisibleIndex != null &&
-                            lastVisibleIndex >= displayedRunningBalances.size - 10 &&
+                        if (lastVisibleIndex >= totalItemsCount - 10 &&
                             !isLoadingPage &&
                             currentPagingInfo?.hasMore == true
                         ) {
@@ -972,7 +1020,8 @@ fun AccountTransactionsScreen(
                 }
 
                 // Trigger backward pagination when user scrolls near the beginning
-                LaunchedEffect(listState, isLoadingPreviousPage, hasPreviousPage) {
+                LaunchedEffect(listState, anchorScrollPending) {
+                    if (anchorScrollPending) return@LaunchedEffect
                     snapshotFlow {
                         val firstVisibleItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
                         firstVisibleItem?.index
@@ -991,6 +1040,7 @@ fun AccountTransactionsScreen(
                 Box(modifier = Modifier.fillMaxSize()) {
                     LazyColumn(
                         state = listState,
+                        modifier = Modifier.testTag("accountTransactionsList"),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(

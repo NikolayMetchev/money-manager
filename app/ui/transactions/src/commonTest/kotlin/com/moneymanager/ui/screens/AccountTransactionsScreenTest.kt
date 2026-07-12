@@ -12,8 +12,10 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
@@ -37,6 +39,7 @@ import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
@@ -65,6 +68,7 @@ import dev.mokkery.every
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
 import dev.mokkery.mock
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -74,6 +78,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
@@ -353,6 +359,121 @@ class AccountTransactionsScreenTest {
             // screen scrolls to the same transfer instead of landing on the first page.
             assertEquals(savings.id, clickedAccountId)
             assertEquals(transfer.id, clickedTransferId)
+        }
+
+    @Test
+    fun scrollingUpAfterNavigatingToTransfer_loadsNewerPage_withoutYankingBackToAnchor() =
+        runMoneyManagerComposeUiTest {
+            // Given: a long history where navigation lands on an old transfer, so the screen loads
+            // a window centred on it with newer pages available above (hasPrevious = true).
+            val now = Clock.System.now()
+            val usdCurrency = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val checking = Account(id = AccountId(1L), name = "Checking", openingDate = now)
+            val savings = Account(id = AccountId(2L), name = "Savings", openingDate = now)
+            val transfers =
+                (0 until 200).map { i ->
+                    Transfer(
+                        id = TransferId(i.toLong()),
+                        timestamp = now - i.minutes,
+                        description = "Tx $i",
+                        sourceAccountId = checking.id,
+                        targetAccountId = savings.id,
+                        amount = Money.fromDisplayValue("100", usdCurrency),
+                    )
+                }
+            // Rows are newest-first, so row index i is "Tx i"; the anchor sits 30 rows below the
+            // top of the initial window (rows 160..199) — far enough that a yank back to it would
+            // scroll the window's newest rows out of the viewport.
+            val anchor = transfers[190]
+            val allRows = buildAccountRows(transfers, checking.id)
+            var backwardCalls = 0
+            val transactionRepository: TransactionWriteRepository =
+                mock(MockMode.autoUnit) {
+                    every { getTransactionById(any()) } calls { (id: Long) -> flowOf(transfers.find { it.id.id == id }) }
+                    every { getAccountBalances() } returns flowOf(emptyList())
+                    everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any(), any()) } returns
+                        PagingResult(emptyList(), PagingInfo(null, null, hasMore = false))
+                    everySuspend { getPageContainingTransaction(any(), any(), any(), any()) } calls
+                        { args ->
+                            val currencyId = args.arg<CurrencyId?>(3)
+                            val rows = allRows.filterByCurrency(currencyId)
+                            val window = rows.subList(160, 200)
+                            PageWithTargetIndex(
+                                items = window,
+                                targetIndex = window.indexOfFirst { it.transactionId.id == anchor.id.id },
+                                pagingInfo =
+                                    PagingInfo(
+                                        lastTimestamp = window.last().timestamp,
+                                        lastId = window.last().transactionId,
+                                        hasMore = false,
+                                    ),
+                                hasPrevious = true,
+                            )
+                        }
+                    everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any(), any()) } calls
+                        { args ->
+                            val firstTimestamp = args.arg<Instant>(2)
+                            val firstId = args.arg<TransactionId>(3)
+                            val currencyId = args.arg<CurrencyId?>(4)
+                            backwardCalls++
+                            // Suspend like a real DB query: setting isLoadingPreviousPage recomposes
+                            // before this returns, so if the trigger effect keys on that flag it
+                            // restarts and cancels this very call — the load then never completes.
+                            delay(50)
+                            val rows = allRows.filterByCurrency(currencyId)
+                            val idx =
+                                rows.indexOfFirst {
+                                    it.transactionId.id == firstId.id && it.timestamp == firstTimestamp
+                                }
+                            val start = (idx - 10).coerceAtLeast(0)
+                            PagingResult(
+                                items = rows.subList(start, idx),
+                                pagingInfo = PagingInfo(null, null, hasMore = start > 0),
+                            )
+                        }
+                }
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountTransactionsScreen(
+                        accountId = checking.id,
+                        transactionRepository = transactionRepository,
+                        accountRepository = createAccountRepository(listOf(checking, savings)),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        currencyRepository = createCurrencyRepository(listOf(usdCurrency)),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToTransferId = anchor.id,
+                    )
+                }
+            }
+
+            // The screen centres the viewport on the anchor transaction.
+            waitUntilAtLeastOneExists(hasText("Tx 190"), timeoutMillis = 5_000)
+            waitForIdle()
+
+            // When: the user scrolls to the top of the loaded window, which triggers a backward
+            // load of newer transactions that get prepended to the list. Keep nudging to the top
+            // until the prepended page (Tx 150..159) lands and becomes the new list head.
+            val list = onNodeWithTag("accountTransactionsList")
+            var attempts = 0
+            while (onAllNodesWithText("Tx 150").fetchSemanticsNodes().isEmpty() && attempts < 40) {
+                list.performScrollToIndex(0)
+                mainClock.advanceTimeBy(100)
+                waitForIdle()
+                attempts++
+            }
+
+            // Then: the backward load completed and prepended newer rows (a load that keeps getting
+            // cancelled — e.g. by the trigger effect restarting on its own loading flag — never
+            // completes and Tx 150 never appears), and the viewport followed the user to the top
+            // instead of being yanked back to the anchor.
+            assertTrue(backwardCalls >= 1, "scrolling to the top should trigger a backward page load")
+            onNodeWithText("Tx 150").assertIsDisplayed()
+            onNodeWithText("Tx 190").assertDoesNotExist()
         }
 
     @Test
