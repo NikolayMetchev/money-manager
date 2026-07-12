@@ -41,7 +41,7 @@ class TradeReadRepositoryImpl(
                 .asSequence()
                 .map { it.id }
                 .distinct()
-                .chunked(MAX_IDS_PER_QUERY)
+                .chunked(MAX_IDS_PER_TWO_SIDED_QUERY)
                 .flatMap { chunk ->
                     selectQueries.selectAccountsWithTrades(chunk).executeAsList()
                 }.mapTo(mutableSetOf(), ::AccountId)

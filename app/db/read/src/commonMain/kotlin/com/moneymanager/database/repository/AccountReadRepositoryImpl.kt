@@ -63,7 +63,7 @@ class AccountReadRepositoryImpl(
                 .asSequence()
                 .map { it.id }
                 .distinct()
-                .chunked(MAX_IDS_PER_QUERY)
+                .chunked(MAX_IDS_PER_TWO_SIDED_QUERY)
                 .flatMap { chunk ->
                     transferSelectQueries.selectAccountsWithTransfers(chunk).executeAsList()
                 }.mapTo(mutableSetOf(), ::AccountId)
