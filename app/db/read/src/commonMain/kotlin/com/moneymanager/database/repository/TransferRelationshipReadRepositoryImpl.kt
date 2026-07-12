@@ -11,6 +11,9 @@ import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+
+private const val MAX_IDS_PER_QUERY = 999
 
 class TransferRelationshipReadRepositoryImpl(
     database: MoneyManagerDatabase,
@@ -35,4 +38,29 @@ class TransferRelationshipReadRepositoryImpl(
                     )
                 }
             }
+
+    override suspend fun getByTransfers(transferIds: Collection<TransferId>): List<TransferRelationship> =
+        withContext(Dispatchers.Default) {
+            transferIds
+                .asSequence()
+                .map { it.id }
+                .distinct()
+                .chunked(MAX_IDS_PER_QUERY)
+                .flatMap { chunk ->
+                    selectQueries.selectByTransfers(chunk).executeAsList()
+                }
+                // A relationship whose two sides fall into different chunks is returned by both.
+                .distinct()
+                .map { row ->
+                    TransferRelationship(
+                        id1 = TransferId(row.id1),
+                        id2 = TransferId(row.id2),
+                        relationshipType =
+                            RelationshipType(
+                                id = RelationshipTypeId(row.relationship_type_id),
+                                name = row.relationship_type_name,
+                            ),
+                    )
+                }.toList()
+        }
 }
