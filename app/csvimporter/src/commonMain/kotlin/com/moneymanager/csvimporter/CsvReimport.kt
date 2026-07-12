@@ -579,11 +579,22 @@ internal suspend fun computeReimportRewrites(
     existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): List<ReimportRewrite> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
+    onProgress?.invoke(ImportProgress("Loading transfer links"))
+    val linkedLegsByRoot =
+        collectLinkedLegs(
+            mappedPrep.validTransfers.mapNotNull { mapped ->
+                if (mapped.passThrough == null) return@mapNotNull null
+                rowsByIndex[mapped.rowIndex]
+                    ?.takeIf { it.importStatus == ImportStatus.IMPORTED }
+                    ?.transferId
+            },
+            relationshipRepository,
+        )
     val rewrites = mutableListOf<ReimportRewrite>()
     val total = mappedPrep.validTransfers.size
     mappedPrep.validTransfers.forEachIndexed { index, mapped ->
         emitRowProgress(onProgress, "Checking pass-through rows", index, total)
-        rewriteFor(mapped, rowsByIndex, relationshipRepository, existingTransferLookup)?.let { rewrites += it }
+        rewriteFor(mapped, rowsByIndex, linkedLegsByRoot, existingTransferLookup)?.let { rewrites += it }
     }
     return rewrites
 }
@@ -591,14 +602,14 @@ internal suspend fun computeReimportRewrites(
 private suspend fun rewriteFor(
     mapped: CsvTransferWithAttributes,
     rowsByIndex: Map<Long, CsvRow>,
-    relationshipRepository: TransferRelationshipReadRepository,
+    linkedLegsByRoot: Map<TransferId, LinkedLegs>,
     existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): ReimportRewrite? {
     val passThrough = mapped.passThrough ?: return null
     val row = rowsByIndex[mapped.rowIndex] ?: return null
     if (row.importStatus != ImportStatus.IMPORTED) return null
     val transferId = row.transferId ?: return null
-    val linked = collectLinkedLegs(transferId, relationshipRepository)
+    val linked = linkedLegsByRoot.getValue(transferId)
     val chainChanged = linked.passThroughLegCount != passThrough.conduitNames.size
     // A value change (e.g. the strategy's amount/currency columns moved) must propagate to every
     // spend leg of the chain, so the row is rewritten rather than updated in place.
@@ -637,19 +648,30 @@ internal suspend fun computeReimportTradeConversions(
     existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): List<ReimportTradeConversion> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
+
+    fun tradeConversionRoot(mapped: CsvTransferWithAttributes): TransferId? {
+        if (mapped.tradeTo == null || mapped.rowIndex in rewrittenRowIndexes) return null
+        val row = rowsByIndex[mapped.rowIndex] ?: return null
+        if (row.importStatus != ImportStatus.IMPORTED && row.importStatus != ImportStatus.UPDATED) return null
+        return row.transferId
+    }
+    val linkedLegsByRoot =
+        collectLinkedLegs(
+            mappedPrep.validTransfers
+                .mapNotNull(::tradeConversionRoot)
+                .filter { existingTransferLookup(it) != null },
+            relationshipRepository,
+        )
     val conversions = mutableListOf<ReimportTradeConversion>()
     val total = mappedPrep.validTransfers.size
     mappedPrep.validTransfers.forEachIndexed { index, mapped ->
         emitRowProgress(onProgress, "Checking rows converting to trades", index, total)
-        if (mapped.tradeTo == null || mapped.rowIndex in rewrittenRowIndexes) return@forEachIndexed
-        val row = rowsByIndex[mapped.rowIndex] ?: return@forEachIndexed
-        if (row.importStatus != ImportStatus.IMPORTED && row.importStatus != ImportStatus.UPDATED) return@forEachIndexed
-        val transferId = row.transferId ?: return@forEachIndexed
+        val transferId = tradeConversionRoot(mapped) ?: return@forEachIndexed
         if (existingTransferLookup(transferId) == null) return@forEachIndexed
         conversions +=
             ReimportTradeConversion(
-                rowIndex = row.rowIndex,
-                transferIdsToDelete = collectLinkedLegs(transferId, relationshipRepository).transferIds,
+                rowIndex = mapped.rowIndex,
+                transferIdsToDelete = linkedLegsByRoot.getValue(transferId).transferIds,
                 description = mapped.transfer.description,
             )
     }
@@ -664,39 +686,52 @@ private class LinkedLegs(
 )
 
 /**
- * Collects [rootId] plus every transfer reachable through FORWARD relationships (this transfer as
- * id1): fee legs and pass-through spend legs, transitively. Reversal links are not followed — their
- * id2 is another row's leg and must never be deleted with this row.
+ * For each root in [rootIds], collects the root plus every transfer reachable through FORWARD
+ * relationships (this transfer as id1): fee legs and pass-through spend legs, transitively.
+ * Reversal links are not followed — their id2 is another row's leg and must never be deleted with
+ * that row. All roots are walked together, one batched relationship query per BFS depth, instead
+ * of one query per transfer — on large files those thousands of single-id round trips used to
+ * dominate the pass-through and trade-conversion scans.
  */
 private suspend fun collectLinkedLegs(
-    rootId: TransferId,
+    rootIds: Collection<TransferId>,
     relationshipRepository: TransferRelationshipReadRepository,
-): LinkedLegs {
-    val collected = mutableListOf(rootId)
-    val visited = mutableSetOf(rootId)
-    var passThroughLegCount = 0
-    var frontier = listOf(rootId)
+): Map<TransferId, LinkedLegs> {
+    class MutableLegs(
+        rootId: TransferId,
+    ) {
+        val collected = mutableListOf(rootId)
+        val visited = mutableSetOf(rootId)
+        var passThroughLegCount = 0
+    }
+
+    val legsByRoot = LinkedHashMap<TransferId, MutableLegs>()
+    for (root in rootIds) legsByRoot.getOrPut(root) { MutableLegs(root) }
+    // Each frontier entry pairs the root whose chain is being walked with the transfer to expand.
+    var frontier: List<Pair<TransferId, TransferId>> = legsByRoot.keys.map { it to it }
     while (frontier.isNotEmpty()) {
-        val next = mutableListOf<TransferId>()
-        for (id in frontier) {
+        val forwardById =
             relationshipRepository
-                .getByTransfer(id)
-                .first()
-                .asSequence()
-                .filter { it.id1 == id }
+                .getByTransfers(frontier.map { it.second })
                 .filterNot { it.relationshipType.name == WellKnownIds.REVERSAL_RELATIONSHIP_TYPE_NAME }
-                .filter { visited.add(it.id2) }
+                .groupBy { it.id1 }
+        val next = mutableListOf<Pair<TransferId, TransferId>>()
+        for ((root, id) in frontier) {
+            val legs = legsByRoot.getValue(root)
+            forwardById[id]
+                .orEmpty()
+                .filter { legs.visited.add(it.id2) }
                 .forEach { rel ->
                     if (rel.relationshipType.id.id == WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID) {
-                        passThroughLegCount++
+                        legs.passThroughLegCount++
                     }
-                    collected += rel.id2
-                    next += rel.id2
+                    legs.collected += rel.id2
+                    next += root to rel.id2
                 }
         }
         frontier = next
     }
-    return LinkedLegs(collected, passThroughLegCount)
+    return legsByRoot.mapValues { (_, legs) -> LinkedLegs(legs.collected, legs.passThroughLegCount) }
 }
 
 /**

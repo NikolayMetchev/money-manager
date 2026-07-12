@@ -10,4 +10,11 @@ interface TransferRelationshipReadRepository {
      * Results are ordered by relationship type name.
      */
     fun getByTransfer(transferId: TransferId): Flow<List<TransferRelationship>>
+
+    /**
+     * Batch lookup of all relationships touching any of [transferIds], from either side of the
+     * pair — for callers that would otherwise issue one [getByTransfer] round trip per id, e.g.
+     * the re-import planner walking the conduit chains of thousands of pass-through rows.
+     */
+    suspend fun getByTransfers(transferIds: Collection<TransferId>): List<TransferRelationship>
 }

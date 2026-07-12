@@ -333,6 +333,10 @@ class CsvTransferMapper(
         existingAccounts.values.associateBy { it.id }
     }
 
+    // CSV account values repeat heavily across rows, and findPersistedMapping is called several
+    // times per row — memoizing collapses an O(rows x mappings) regex scan to one pass per value.
+    private val persistedMappingCache = HashMap<String, AccountId?>()
+
     /**
      * Prepares an import by mapping all rows and collecting new accounts to create.
      */
@@ -950,12 +954,10 @@ class CsvTransferMapper(
      * @return The mapped AccountId, or null if no match found
      */
     private fun findPersistedMapping(value: String): AccountId? {
-        for (mapping in scopedAccountMappings) {
-            if (mapping.valuePattern.containsMatchIn(value)) {
-                return mapping.accountId
-            }
-        }
-        return null
+        if (value in persistedMappingCache) return persistedMappingCache[value]
+        val result = scopedAccountMappings.firstOrNull { it.valuePattern.containsMatchIn(value) }?.accountId
+        persistedMappingCache[value] = result
+        return result
     }
 
     /**

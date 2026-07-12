@@ -417,6 +417,9 @@ class CsvReimportDetectionTest {
         private val byTransfer: Map<TransferId, List<TransferRelationship>>,
     ) : TransferRelationshipReadRepository {
         override fun getByTransfer(transferId: TransferId): Flow<List<TransferRelationship>> = flowOf(byTransfer[transferId].orEmpty())
+
+        override suspend fun getByTransfers(transferIds: Collection<TransferId>): List<TransferRelationship> =
+            transferIds.distinct().flatMap { byTransfer[it].orEmpty() }
     }
 
     private val passThroughType = RelationshipType(RelationshipTypeId(3), "pass-through")
@@ -537,10 +540,13 @@ class CsvReimportDetectionTest {
 
             computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(emptyMap()), { progress += it }) { null }
 
-            // Emissions every 25 rows plus the final one; monotonic and complete.
-            assertEquals(listOf(25, 30), progress.mapNotNull { it.processed })
-            assertTrue(progress.all { it.total == 30 })
-            assertTrue(progress.all { it.detail == "Checking pass-through rows" })
+            // A phase emission for the batched relationship load, then per-row progress
+            // every 25 rows plus the final one; monotonic and complete.
+            assertEquals("Loading transfer links", progress.first().detail)
+            val rowProgress = progress.filter { it.processed != null }
+            assertEquals(listOf(25, 30), rowProgress.map { it.processed })
+            assertTrue(rowProgress.all { it.total == 30 })
+            assertTrue(rowProgress.all { it.detail == "Checking pass-through rows" })
         }
 
     @Test

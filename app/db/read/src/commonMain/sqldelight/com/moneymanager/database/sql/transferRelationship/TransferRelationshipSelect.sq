@@ -10,3 +10,16 @@ FROM transfer_relationship
 JOIN relationship_type ON transfer_relationship.relationship_type_id = relationship_type.id
 WHERE transfer_relationship.id1 = ? OR transfer_relationship.id2 = ?
 ORDER BY relationship_type.name;
+
+-- All relationships touching any of the given transfers, from either side of the pair.
+selectByTransfers:
+SELECT
+    transfer_relationship.id1,
+    transfer_relationship.id2,
+    transfer_relationship.relationship_type_id,
+    relationship_type.id AS relationship_type_id,
+    relationship_type.name AS relationship_type_name
+FROM transfer_relationship
+JOIN relationship_type ON transfer_relationship.relationship_type_id = relationship_type.id
+WHERE transfer_relationship.id1 IN :ids OR transfer_relationship.id2 IN :ids
+ORDER BY relationship_type.name;
