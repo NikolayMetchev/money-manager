@@ -125,18 +125,16 @@ fun AccountsScreen(
 
     val displayedAccounts =
         remember(accounts, nameFilter, selectedOwnerIds, ownerIdsByAccount, selectedAssetIds, balancesByAccount) {
-            accounts
-                .filter { account ->
-                    nameFilter.isBlank() || account.name.contains(nameFilter, ignoreCase = true)
-                }
-                .filter { account ->
+            accounts.filter { account ->
+                val matchesName = nameFilter.isBlank() || account.name.contains(nameFilter, ignoreCase = true)
+                val matchesOwner =
                     selectedOwnerIds.isEmpty() ||
                         ownerIdsByAccount[account.id].orEmpty().any { it in selectedOwnerIds }
-                }
-                .filter { account ->
+                val matchesAsset =
                     selectedAssetIds.isEmpty() ||
                         balancesByAccount[account.id].orEmpty().any { it.balance.currency.id in selectedAssetIds }
-                }
+                matchesName && matchesOwner && matchesAsset
+            }
         }
 
     Column(
