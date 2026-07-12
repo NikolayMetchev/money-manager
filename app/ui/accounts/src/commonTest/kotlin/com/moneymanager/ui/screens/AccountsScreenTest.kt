@@ -3,13 +3,19 @@
 package com.moneymanager.ui.screens
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
@@ -440,6 +446,273 @@ class AccountsScreenTest {
             onNodeWithText("Account 3").assertIsDisplayed()
         }
 
+    @Test
+    fun accountsScreen_displaysNameSearchField_whenAccountsExist() =
+        runMoneyManagerComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val accounts =
+                listOf(
+                    Account(id = AccountId(1L), name = "Checking Account", openingDate = now),
+                )
+            val repository = createAccountRepository(accounts)
+
+            // When
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToAccountId = null,
+                        onAccountClick = {},
+                    )
+                }
+            }
+
+            // Then - the name search field should be present
+            onNodeWithText("Search accounts").assertIsDisplayed()
+        }
+
+    @Test
+    fun accountsScreen_nameFilter_hidesNonMatchingAccounts() =
+        runMoneyManagerComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val accounts =
+                listOf(
+                    Account(id = AccountId(1L), name = "Checking Account", openingDate = now),
+                    Account(id = AccountId(2L), name = "Savings Account", openingDate = now),
+                    Account(id = AccountId(3L), name = "Crypto Wallet", openingDate = now),
+                )
+            val repository = createAccountRepository(accounts)
+
+            // When
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToAccountId = null,
+                        onAccountClick = {},
+                    )
+                }
+            }
+
+            // Type a filter that matches only accounts containing "account" (case-insensitive)
+            onNodeWithText("Search accounts").performTextInput("account")
+
+            // Then - only matching accounts are visible; "Crypto Wallet" is hidden
+            onNodeWithText("Checking Account").assertIsDisplayed()
+            onNodeWithText("Savings Account").assertIsDisplayed()
+            onNodeWithText("Crypto Wallet").assertDoesNotExist()
+        }
+
+    @Test
+    fun accountsScreen_nameFilter_isCaseInsensitive() =
+        runMoneyManagerComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val accounts =
+                listOf(
+                    Account(id = AccountId(1L), name = "My Checking", openingDate = now),
+                    Account(id = AccountId(2L), name = "My Savings", openingDate = now),
+                )
+            val repository = createAccountRepository(accounts)
+
+            // When
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToAccountId = null,
+                        onAccountClick = {},
+                    )
+                }
+            }
+
+            // Type in all-caps — should still match both accounts
+            onNodeWithText("Search accounts").performTextInput("MY")
+
+            // Then - both accounts match "MY" case-insensitively
+            onNodeWithText("My Checking").assertIsDisplayed()
+            onNodeWithText("My Savings").assertIsDisplayed()
+        }
+
+    @Test
+    fun accountsScreen_nameFilter_showsEmptyMessage_whenNoMatch() =
+        runMoneyManagerComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val accounts =
+                listOf(
+                    Account(id = AccountId(1L), name = "Checking Account", openingDate = now),
+                )
+            val repository = createAccountRepository(accounts)
+
+            // When
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToAccountId = null,
+                        onAccountClick = {},
+                    )
+                }
+            }
+
+            onNodeWithText("Search accounts").performTextInput("zzznomatch")
+
+            // Then - empty-filter message is shown
+            onNodeWithText("No accounts match the current filters.").assertIsDisplayed()
+        }
+
+    @Test
+    fun accountsScreen_assetFilter_isDisplayed_whenAccountsHaveBalances() =
+        runMoneyManagerComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val gbp = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound")
+            val account = Account(id = AccountId(1L), name = "Checking Account", openingDate = now)
+            val balances = listOf(AccountBalance(accountId = AccountId(1L), balance = Money(10000L, gbp)))
+            val repository = createAccountRepository(listOf(account))
+
+            // When
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(balances),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToAccountId = null,
+                        onAccountClick = {},
+                    )
+                }
+            }
+
+            // Then - the asset filter dropdown should be visible
+            onNodeWithText("Filter by asset").assertIsDisplayed()
+        }
+
+    @Test
+    fun accountsScreen_assetFilter_hidesAccountsWithoutSelectedAsset() =
+        runMoneyManagerComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val gbp = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound")
+            val usd = Currency(id = CurrencyId(2L), code = "USD", name = "US Dollar")
+            val gbpAccount = Account(id = AccountId(1L), name = "GBP Checking", openingDate = now)
+            val usdAccount = Account(id = AccountId(2L), name = "USD Savings", openingDate = now)
+            val balances =
+                listOf(
+                    AccountBalance(accountId = AccountId(1L), balance = Money(10000L, gbp)),
+                    AccountBalance(accountId = AccountId(2L), balance = Money(20000L, usd)),
+                )
+            val repository = createAccountRepository(listOf(gbpAccount, usdAccount))
+
+            // When
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(balances),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToAccountId = null,
+                        onAccountClick = {},
+                    )
+                }
+            }
+
+            // Open the asset filter dropdown and select GBP
+            onNodeWithText("Filter by asset").performClick()
+            onNodeWithText("GBP — British Pound").performClick()
+
+            // Then - only the GBP account is visible
+            onNodeWithText("GBP Checking").assertIsDisplayed()
+            onNodeWithText("USD Savings").assertDoesNotExist()
+        }
+
+    @Test
+    fun accountsScreen_assetFilter_search_filtersByCodeCaseInsensitive() =
+        runMoneyManagerComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val gbp = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound")
+            val usd = Currency(id = CurrencyId(2L), code = "USD", name = "US Dollar")
+            val accounts =
+                listOf(
+                    Account(id = AccountId(1L), name = "GBP Account", openingDate = now),
+                    Account(id = AccountId(2L), name = "USD Account", openingDate = now),
+                )
+            val balances =
+                listOf(
+                    AccountBalance(accountId = AccountId(1L), balance = Money(10000L, gbp)),
+                    AccountBalance(accountId = AccountId(2L), balance = Money(20000L, usd)),
+                )
+            val repository = createAccountRepository(accounts)
+
+            // When
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(balances),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToAccountId = null,
+                        onAccountClick = {},
+                    )
+                }
+            }
+
+            // Open the asset filter dropdown and type "gbp" (lowercase) to search
+            onNodeWithText("Filter by asset").performClick()
+            onNodeWithText("Filter by asset").performTextInput("gbp")
+
+            // Then - only GBP is shown in the dropdown, USD is filtered out
+            onNodeWithText("GBP — British Pound").assertIsDisplayed()
+            onNodeWithText("USD — US Dollar").assertDoesNotExist()
+        }
+
     private fun createAccountRepository(accounts: List<Account>): AccountWriteRepository =
         mock(MockMode.autoUnit) {
             every { getAllAccounts() } returns flowOf(accounts)
@@ -452,13 +725,13 @@ class AccountsScreenTest {
             everySuspend { getTransfersBetweenAccounts(any(), any()) } returns emptyList()
         }
 
-    private fun createTransactionRepository(): TransactionWriteRepository =
+    private fun createTransactionRepository(balances: List<AccountBalance> = emptyList()): TransactionWriteRepository =
         mock(MockMode.autoUnit) {
             every { getTransactionById(any()) } returns flowOf(null)
             every { getTransactionsByAccount(any()) } returns flowOf(emptyList())
             every { getTransactionsByDateRange(any(), any()) } returns flowOf(emptyList())
             every { getTransactionsByAccountAndDateRange(any(), any(), any()) } returns flowOf(emptyList())
-            every { getAccountBalances() } returns flowOf(emptyList())
+            every { getAccountBalances() } returns flowOf(balances)
             everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any(), any()) } returns
                 PagingResult(emptyList(), PagingInfo(null, null, false))
             everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any(), any()) } returns

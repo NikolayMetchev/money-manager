@@ -22,6 +22,8 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
+import com.moneymanager.domain.model.Asset
+import com.moneymanager.domain.model.AssetId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.Source
@@ -84,6 +86,8 @@ fun AccountsScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
     var selectedOwnerIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var nameFilter by remember { mutableStateOf("") }
+    var selectedAssetIds by remember { mutableStateOf<Set<AssetId>>(emptySet()) }
 
     // Drop selections for owners that no longer exist (e.g. a person was deleted).
     val availableOwnerIds = people.map { it.id.id }.toSet()
@@ -94,16 +98,6 @@ fun AccountsScreen(
     val ownerIdsByAccount: Map<AccountId, Set<Long>> =
         remember(ownerships) {
             ownerships.groupBy({ it.accountId }, { it.personId.id }).mapValues { it.value.toSet() }
-        }
-    val displayedAccounts =
-        remember(accounts, selectedOwnerIds, ownerIdsByAccount) {
-            if (selectedOwnerIds.isEmpty()) {
-                accounts
-            } else {
-                accounts.filter { account ->
-                    ownerIdsByAccount[account.id].orEmpty().any { it in selectedOwnerIds }
-                }
-            }
         }
 
     // Precompute per-account lookups once so each card avoids O(accounts)/O(balances) scans.
@@ -116,6 +110,34 @@ fun AccountsScreen(
         }
     val balancesByAccount = remember(balances) { balances.groupBy { it.accountId } }
     val categoriesById = remember(categories) { categories.associateBy { it.id } }
+
+    // Unique assets that appear in at least one account balance, sorted by code for stable display.
+    val availableAssets: List<Asset> =
+        remember(balances) {
+            balances.map { it.balance.currency }.distinctBy { it.id }.sortedBy { it.code }
+        }
+
+    // Drop asset selections for assets that no longer have any balances.
+    val availableAssetIds = availableAssets.map { it.id }.toSet()
+    LaunchedEffect(availableAssetIds) {
+        selectedAssetIds = selectedAssetIds intersect availableAssetIds
+    }
+
+    val displayedAccounts =
+        remember(accounts, nameFilter, selectedOwnerIds, ownerIdsByAccount, selectedAssetIds, balancesByAccount) {
+            accounts
+                .filter { account ->
+                    nameFilter.isBlank() || account.name.contains(nameFilter, ignoreCase = true)
+                }
+                .filter { account ->
+                    selectedOwnerIds.isEmpty() ||
+                        ownerIdsByAccount[account.id].orEmpty().any { it in selectedOwnerIds }
+                }
+                .filter { account ->
+                    selectedAssetIds.isEmpty() ||
+                        balancesByAccount[account.id].orEmpty().any { it.balance.currency.id in selectedAssetIds }
+                }
+        }
 
     Column(
         modifier =
@@ -150,13 +172,32 @@ fun AccountsScreen(
                 )
             }
         } else {
+            OutlinedTextField(
+                value = nameFilter,
+                onValueChange = { nameFilter = it },
+                label = { Text("Search accounts") },
+                placeholder = { Text("Type to search...") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
             if (people.isNotEmpty()) {
                 OwnerFilterDropdown(
                     people = people,
                     selectedOwnerIds = selectedOwnerIds,
                     onSelectionChange = { selectedOwnerIds = it },
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (availableAssets.isNotEmpty()) {
+                AssetFilterDropdown(
+                    assets = availableAssets,
+                    selectedAssetIds = selectedAssetIds,
+                    onSelectionChange = { selectedAssetIds = it },
+                )
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             if (displayedAccounts.isEmpty()) {
@@ -165,7 +206,7 @@ fun AccountsScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "No accounts match the selected owner(s).",
+                        text = "No accounts match the current filters.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -303,6 +344,87 @@ private fun OwnerFilterDropdown(
                                 selectedOwnerIds - person.id.id
                             } else {
                                 selectedOwnerIds + person.id.id
+                            },
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AssetFilterDropdown(
+    assets: List<Asset>,
+    selectedAssetIds: Set<AssetId>,
+    onSelectionChange: (Set<AssetId>) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val selectionLabel =
+        when (selectedAssetIds.size) {
+            0 -> "All assets"
+            1 -> assets.find { it.id in selectedAssetIds }?.code ?: "1 asset"
+            else -> "${selectedAssetIds.size} assets"
+        }
+
+    val filteredAssets =
+        remember(assets, searchQuery) {
+            if (searchQuery.isBlank()) {
+                assets
+            } else {
+                assets.filter {
+                    it.code.contains(searchQuery, ignoreCase = true) ||
+                        it.name.contains(searchQuery, ignoreCase = true)
+                }
+            }
+        }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            // Editable while expanded so the user can type to filter assets;
+            // shows the current selection summary when collapsed.
+            value = if (expanded) searchQuery else selectionLabel,
+            onValueChange = { searchQuery = it },
+            label = { Text("Filter by asset") },
+            placeholder = { Text("Type to search...") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            singleLine = true,
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = {
+                expanded = false
+                searchQuery = ""
+            },
+        ) {
+            DropdownMenuItem(
+                text = { Text("All assets") },
+                onClick = { onSelectionChange(emptySet()) },
+            )
+            filteredAssets.forEach { asset ->
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = selectedAssetIds.contains(asset.id),
+                                onCheckedChange = null,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("${asset.code} — ${asset.name}")
+                        }
+                    },
+                    onClick = {
+                        onSelectionChange(
+                            if (selectedAssetIds.contains(asset.id)) {
+                                selectedAssetIds - asset.id
+                            } else {
+                                selectedAssetIds + asset.id
                             },
                         )
                     },
