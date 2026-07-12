@@ -930,55 +930,60 @@ fun AccountTransactionsScreen(
                             return@let
                         }
 
-                        // Now find the index in the filtered list (which now includes this currency)
+                        // Find the index in the list the LazyColumn actually renders (currency-filtered
+                        // pages minus hidden excluded rows) so the centering lands on the right row
                         val index =
-                            runningBalances
+                            displayedRunningBalances
                                 .filter {
                                     it.transactionAmount.currency.id == transaction.transactionAmount.currency.id
                                 }.indexOfFirst { it.transactionId.id == targetTransferId.id }
 
-                        if (index >= 0) {
-                            // Centre the target in the viewport instead of pinning it to the very top.
-                            // animateScrollToItem places the item's top at viewport top + scrollOffset, so a
-                            // negative offset of (half viewport - half row) drops it to the middle. Wait for
-                            // the list to be measured first, otherwise viewportSize is still 0.
-                            val viewportHeight =
-                                snapshotFlow { listState.layoutInfo.viewportSize.height }.first { it > 0 }
-                            val rowHeight =
-                                listState.layoutInfo.visibleItemsInfo
-                                    .firstOrNull()
-                                    ?.size ?: 0
-                            val centeringOffset = -(viewportHeight / 2 - rowHeight / 2)
-                            try {
-                                listState.animateScrollToItem(index, centeringOffset)
-                            } finally {
-                                // Latch even when the animation is cancelled (e.g. the user grabs the
-                                // list), otherwise auto-pagination would stay gated forever.
-                                hasScrolledToTarget = true
-                            }
+                        if (index < 0) {
+                            // The target is loaded but not rendered (e.g. excluded while excluded rows
+                            // are hidden) — give up so pagination (gated on the latch) isn't blocked.
+                            hasScrolledToTarget = true
+                            return@let
+                        }
+                        // Centre the target in the viewport instead of pinning it to the very top.
+                        // animateScrollToItem places the item's top at viewport top + scrollOffset, so a
+                        // negative offset of (half viewport - half row) drops it to the middle. Wait for
+                        // the list to be measured first, otherwise viewportSize is still 0.
+                        val viewportHeight =
+                            snapshotFlow { listState.layoutInfo.viewportSize.height }.first { it > 0 }
+                        val rowHeight =
+                            listState.layoutInfo.visibleItemsInfo
+                                .firstOrNull()
+                                ?.size ?: 0
+                        val centeringOffset = -(viewportHeight / 2 - rowHeight / 2)
+                        try {
+                            listState.animateScrollToItem(index, centeringOffset)
+                        } finally {
+                            // Latch even when the animation is cancelled (e.g. the user grabs the
+                            // list), otherwise auto-pagination would stay gated forever.
+                            hasScrolledToTarget = true
+                        }
 
-                            // Scroll matrix to show the account and currency
-                            val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
-                            val currencyIndex = uniqueAssets.indexOfAsset(transaction.transactionAmount.currency.id.id)
+                        // Scroll matrix to show the account and currency
+                        val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
+                        val currencyIndex = uniqueAssets.indexOfAsset(transaction.transactionAmount.currency.id.id)
 
-                            if (accountIndex >= 0 && currencyIndex >= 0) {
-                                val targetScrollX =
-                                    horizontalMatrixScrollTarget(
-                                        accountIndex = accountIndex,
-                                        allAccounts = allAccounts,
-                                        accountColumnWidths = accountColumnWidths,
-                                        containerWidthDp = containerWidthDp,
-                                        density = density,
-                                    )
-                                val targetScrollY =
-                                    verticalMatrixScrollTarget(
-                                        currencyIndex = currencyIndex,
-                                        containerHeightDp = containerHeightDp,
-                                        density = density,
-                                    )
-                                launch { horizontalScrollState.animateScrollTo(targetScrollX) }
-                                launch { verticalScrollState.animateScrollTo(targetScrollY) }
-                            }
+                        if (accountIndex >= 0 && currencyIndex >= 0) {
+                            val targetScrollX =
+                                horizontalMatrixScrollTarget(
+                                    accountIndex = accountIndex,
+                                    allAccounts = allAccounts,
+                                    accountColumnWidths = accountColumnWidths,
+                                    containerWidthDp = containerWidthDp,
+                                    density = density,
+                                )
+                            val targetScrollY =
+                                verticalMatrixScrollTarget(
+                                    currencyIndex = currencyIndex,
+                                    containerHeightDp = containerHeightDp,
+                                    density = density,
+                                )
+                            launch { horizontalScrollState.animateScrollTo(targetScrollX) }
+                            launch { verticalScrollState.animateScrollTo(targetScrollY) }
                         }
                     }
                 }
