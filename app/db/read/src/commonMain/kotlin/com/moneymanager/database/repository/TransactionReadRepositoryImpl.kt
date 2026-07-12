@@ -33,9 +33,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
 
-/** Android's SQLite caps bound variables at 999 per statement. */
-private const val MAX_IDS_PER_QUERY = 999
-
 class TransactionReadRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : TransactionReadRepository {

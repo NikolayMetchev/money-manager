@@ -23,6 +23,13 @@ interface AccountReadRepository {
 
     suspend fun countTransfersByAccount(accountId: AccountId): Long
 
+    /**
+     * Which of [accountIds] appear on either side of any transfer — for callers checking many
+     * accounts for emptiness that would otherwise issue one [countTransfersByAccount] per account,
+     * e.g. the re-import empty-account cleanup.
+     */
+    suspend fun accountsWithTransfers(accountIds: Collection<AccountId>): Set<AccountId>
+
     suspend fun getTransfersBetweenAccounts(
         accountA: AccountId,
         accountB: AccountId,

@@ -12,4 +12,7 @@ interface TradeReadRepository {
 
     /** Number of trades touching [accountId] on either leg. */
     suspend fun countTradesByAccount(accountId: AccountId): Long
+
+    /** Which of [accountIds] appear on either leg of any trade (batch emptiness check). */
+    suspend fun accountsWithTrades(accountIds: Collection<AccountId>): Set<AccountId>
 }
