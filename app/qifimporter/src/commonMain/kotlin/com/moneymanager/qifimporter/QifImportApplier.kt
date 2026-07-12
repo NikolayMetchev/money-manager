@@ -2,7 +2,10 @@
 
 package com.moneymanager.qifimporter
 
+import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE
+import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.BulkImportResult
+import com.moneymanager.csvimporter.BulkProgressTracker
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ImportPreparation
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
@@ -39,6 +42,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPersonIntent
+import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalPersonKey
@@ -103,7 +107,7 @@ fun List<CsvImportStrategy>.selectForQifContent(
  * currency comes from each file's auto-detected strategy (QIF data has none, so the strategy's
  * configured currency is authoritative), so there is no per-import currency prompt. Payee/counterparty
  * accounts are auto-created with their detected names (no per-file confirmation). Refreshes
- * materialized views once at the end. Reports progress via [onProgress].
+ * materialized views once at the end. Reports row-weighted run-wide progress via [onProgress].
  */
 @Suppress("LongParameterList")
 suspend fun bulkApplyQif(
@@ -116,7 +120,7 @@ suspend fun bulkApplyQif(
     qifImportRepository: QifImportReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: (done: Int, total: Int) -> Unit,
+    onProgress: suspend (BulkImportProgress) -> Unit,
 ): QifBulkResult {
     val qifStrategies = strategies.qifCompatible()
     var filesImported = 0
@@ -125,8 +129,11 @@ suspend fun bulkApplyQif(
     var skippedNoStrategy = 0
     var failed = 0
 
+    val tracker = BulkProgressTracker(imports.map { it.recordCount }, onProgress)
+    tracker.started()
+
     imports.forEachIndexed { index, qifImport ->
-        onProgress(index, imports.size)
+        tracker.fileStarted(index, qifImport.originalFileName)
         try {
             val count = qifImportRepository.countRecords(qifImport.id)
             val records = qifImportRepository.getImportRecords(qifImport.id, count.coerceAtLeast(1), 0)
@@ -164,6 +171,8 @@ suspend fun bulkApplyQif(
                     maintenance = maintenance,
                     importEngine = importEngine,
                     refreshViews = false,
+                    onProgress = { tracker.phase(index, qifImport.originalFileName, it) },
+                    engineBatchSize = BULK_ENGINE_BATCH_SIZE,
                 )
             filesImported++
             transfers += result.successCount
@@ -174,7 +183,7 @@ suspend fun bulkApplyQif(
         }
     }
 
-    onProgress(imports.size, imports.size)
+    tracker.done()
     maintenance.refreshMaterializedViews()
 
     return QifBulkResult(
@@ -254,6 +263,8 @@ suspend fun runImport(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    engineBatchSize: Int = Int.MAX_VALUE,
 ): QifImportResult {
     // Persist any "map to existing account" selections so future imports reuse them.
     val selectedMappingsToPersist =
@@ -394,7 +405,7 @@ suspend fun runImport(
             peopleToCreate = peopleToCreate,
             ownerships = ownerships,
         )
-    val importResult = importEngine.import(batch)
+    val importResult = importEngine.import(batch, onProgress = onProgress, batchSize = engineBatchSize)
 
     // Reconcile per-record statuses: a record is IMPORTED if any of its split rows imported, else
     // UPDATED if any updated, else DUPLICATE.

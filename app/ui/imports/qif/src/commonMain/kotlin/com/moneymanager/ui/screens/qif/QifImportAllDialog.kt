@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.qif.QifImport
@@ -34,6 +35,7 @@ import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.screens.csv.BulkImportProgressIndicator
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -67,7 +69,7 @@ fun QifImportAllDialog(
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var progress by remember { mutableStateOf<BulkImportProgress?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(accounts) {
@@ -96,9 +98,9 @@ fun QifImportAllDialog(
                         enabled = !isImporting,
                         isError = sourceAccountId == null,
                     )
-                    progress?.let { (done, total) ->
+                    progress?.let {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Importing ${done.coerceAtMost(total)} of $total…", style = MaterialTheme.typography.bodySmall)
+                        BulkImportProgressIndicator(it)
                     }
                 }
             }
@@ -124,7 +126,7 @@ fun QifImportAllDialog(
                                         qifImportRepository = qifImportRepository,
                                         maintenance = maintenance,
                                         importEngine = importEngine,
-                                        onProgress = { done, total -> progress = done to total },
+                                        onProgress = { progress = it },
                                     )
                                 importEngine.setLastQifAccount(source)
                                 summary = result.toSummary()
