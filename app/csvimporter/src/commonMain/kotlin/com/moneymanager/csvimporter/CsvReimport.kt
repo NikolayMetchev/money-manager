@@ -655,19 +655,17 @@ internal suspend fun computeReimportTradeConversions(
         if (row.importStatus != ImportStatus.IMPORTED && row.importStatus != ImportStatus.UPDATED) return null
         return row.transferId
     }
-    val linkedLegsByRoot =
-        collectLinkedLegs(
-            mappedPrep.validTransfers
-                .mapNotNull(::tradeConversionRoot)
-                .filter { existingTransferLookup(it) != null },
-            relationshipRepository,
-        )
+    val eligibleRoots =
+        mappedPrep.validTransfers
+            .mapNotNull(::tradeConversionRoot)
+            .filterTo(mutableSetOf()) { existingTransferLookup(it) != null }
+    val linkedLegsByRoot = collectLinkedLegs(eligibleRoots, relationshipRepository)
     val conversions = mutableListOf<ReimportTradeConversion>()
     val total = mappedPrep.validTransfers.size
     mappedPrep.validTransfers.forEachIndexed { index, mapped ->
         emitRowProgress(onProgress, "Checking rows converting to trades", index, total)
         val transferId = tradeConversionRoot(mapped) ?: return@forEachIndexed
-        if (existingTransferLookup(transferId) == null) return@forEachIndexed
+        if (transferId !in eligibleRoots) return@forEachIndexed
         conversions +=
             ReimportTradeConversion(
                 rowIndex = mapped.rowIndex,
