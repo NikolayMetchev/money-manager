@@ -13,8 +13,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
-private const val MAX_IDS_PER_QUERY = 999
-
 class TransferRelationshipReadRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : TransferRelationshipReadRepository {
@@ -45,7 +43,7 @@ class TransferRelationshipReadRepositoryImpl(
                 .asSequence()
                 .map { it.id }
                 .distinct()
-                .chunked(MAX_IDS_PER_QUERY)
+                .chunked(MAX_IDS_PER_TWO_SIDED_QUERY)
                 .flatMap { chunk ->
                     selectQueries.selectByTransfers(chunk).executeAsList()
                 }

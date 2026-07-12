@@ -1065,11 +1065,11 @@ private suspend fun deleteEmptyImportCreatedAccounts(
 ): List<String> {
     val importCreated = csvImportRepository.getAccountsCreatedByImport(csvImport.id)
     val remainingById = accountRepository.getAllAccounts().first().associateBy { it.id }
-    val emptyAccounts =
-        importCreated
-            .mapNotNull { remainingById[it] }
-            .filter { accountRepository.countTransfersByAccount(it.id) == 0L }
-            .filter { (tradeRepository?.countTradesByAccount(it.id) ?: 0L) == 0L }
+    val candidates = importCreated.mapNotNull { remainingById[it] }
+    // Two batched membership checks instead of two COUNT queries per candidate account.
+    val withTransfers = accountRepository.accountsWithTransfers(candidates.map { it.id })
+    val withTrades = tradeRepository?.accountsWithTrades(candidates.map { it.id }).orEmpty()
+    val emptyAccounts = candidates.filter { it.id !in withTransfers && it.id !in withTrades }
     if (emptyAccounts.isEmpty()) return emptyList()
 
     importEngine.import(

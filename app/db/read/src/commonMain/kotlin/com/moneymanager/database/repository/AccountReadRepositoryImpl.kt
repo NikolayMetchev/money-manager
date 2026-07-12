@@ -57,6 +57,18 @@ class AccountReadRepositoryImpl(
             transferSelectQueries.countTransfersByAccount(accountId.id).executeAsOne()
         }
 
+    override suspend fun accountsWithTransfers(accountIds: Collection<AccountId>): Set<AccountId> =
+        withContext(Dispatchers.Default) {
+            accountIds
+                .asSequence()
+                .map { it.id }
+                .distinct()
+                .chunked(MAX_IDS_PER_TWO_SIDED_QUERY)
+                .flatMap { chunk ->
+                    transferSelectQueries.selectAccountsWithTransfers(chunk).executeAsList()
+                }.mapTo(mutableSetOf(), ::AccountId)
+        }
+
     override suspend fun getTransfersBetweenAccounts(
         accountA: AccountId,
         accountB: AccountId,

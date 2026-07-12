@@ -288,6 +288,12 @@ SELECT COUNT(*)
 FROM transfer
 WHERE source_account_id = :accountId OR target_account_id = :accountId;
 
+-- Which of the given accounts appear on either side of any transfer (batch emptiness check).
+selectAccountsWithTransfers:
+SELECT DISTINCT source_account_id AS account_id FROM transfer WHERE source_account_id IN :accountIds
+UNION
+SELECT DISTINCT target_account_id FROM transfer WHERE target_account_id IN :accountIds;
+
 selectTransfersBetweenAccounts:
 SELECT
     transfer.id,

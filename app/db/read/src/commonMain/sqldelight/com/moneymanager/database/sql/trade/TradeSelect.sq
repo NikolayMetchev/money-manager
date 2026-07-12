@@ -68,3 +68,9 @@ countByAccount:
 SELECT COUNT(*)
 FROM trade
 WHERE from_account_id = :accountId OR to_account_id = :accountId;
+
+-- Which of the given accounts appear on either side of any trade (batch emptiness check).
+selectAccountsWithTrades:
+SELECT DISTINCT from_account_id AS account_id FROM trade WHERE from_account_id IN :accountIds
+UNION
+SELECT DISTINCT to_account_id FROM trade WHERE to_account_id IN :accountIds;

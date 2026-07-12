@@ -415,10 +415,10 @@ private suspend fun deleteEmptyImportCreatedAccounts(
 ): List<String> {
     val importCreated = qifImportRepository.getAccountsCreatedByImport(qifImport.id)
     val remainingById = accountRepository.getAllAccounts().first().associateBy { it.id }
-    val emptyAccounts =
-        importCreated
-            .mapNotNull { remainingById[it] }
-            .filter { accountRepository.countTransfersByAccount(it.id) == 0L }
+    val candidates = importCreated.mapNotNull { remainingById[it] }
+    // One batched membership check instead of a COUNT query per candidate account.
+    val withTransfers = accountRepository.accountsWithTransfers(candidates.map { it.id })
+    val emptyAccounts = candidates.filter { it.id !in withTransfers }
     if (emptyAccounts.isEmpty()) return emptyList()
 
     importEngine.import(
