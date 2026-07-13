@@ -1286,19 +1286,19 @@ class ImportEngineDbTest : DbTest() {
 
             // The trade round-trips with both legs' assets.
             val trade = repositories.tradeRepository.getTradeById(tradeId).first()!!
-            assertEquals("GBP", trade.from.currency.code)
-            assertEquals("ETH", trade.to.currency.code)
+            assertEquals("GBP", trade.from.asset.code)
+            assertEquals("ETH", trade.to.asset.code)
             assertEquals(BigInteger("100000000000000000000"), trade.to.amount)
 
             // Balances reflect the trade's two legs at full precision.
             val balances = repositories.transactionRepository.getAccountBalances().first()
             val walletBalance = balances.first { it.accountId == wallet }.balance
-            assertEquals("ETH", walletBalance.currency.code)
+            assertEquals("ETH", walletBalance.asset.code)
             assertEquals("100", walletBalance.toDisplayValue().toString())
             assertEquals(BigInteger("100000000000000000000"), walletBalance.amount)
 
             val bankBalance = balances.first { it.accountId == bank }.balance
-            assertEquals("GBP", bankBalance.currency.code)
+            assertEquals("GBP", bankBalance.asset.code)
             assertEquals("-250000", bankBalance.toDisplayValue().toString())
 
             // The trade appears in the wallet's transaction list (running balance) as a +100 ETH row.
@@ -1307,7 +1307,7 @@ class ImportEngineDbTest : DbTest() {
                     .getRunningBalanceByAccountPaginated(wallet, pageSize = 10, pagingInfo = null)
                     .items
             val tradeRow = walletRows.single { it.transactionId.id == tradeId.id }
-            assertEquals("ETH", tradeRow.transactionAmount.currency.code)
+            assertEquals("ETH", tradeRow.transactionAmount.asset.code)
             assertEquals(BigInteger("100000000000000000000"), tradeRow.transactionAmount.amount)
             assertEquals(bank, tradeRow.sourceAccountId)
             assertEquals(wallet, tradeRow.targetAccountId)

@@ -132,7 +132,7 @@ fun CategoriesScreen(
     // Get unique currencies that have balances (for column headers)
     val currenciesWithBalances =
         remember(categoryBalances, currencies) {
-            val currencyIdsWithBalances = categoryBalances.map { it.balance.currency.id }.toSet()
+            val currencyIdsWithBalances = categoryBalances.map { it.balance.asset.id }.toSet()
             currencies.filter { it.id in currencyIdsWithBalances }
         }
 
@@ -142,7 +142,7 @@ fun CategoriesScreen(
             currenciesWithBalances.associate { currency ->
                 val maxMoney =
                     categoryBalances
-                        .filter { it.balance.currency.id == currency.id }
+                        .filter { it.balance.asset.id == currency.id }
                         .maxByOrNull { it.balance.amount.abs() }
                         ?.balance
                 val formattedMax = maxMoney?.let { formatAmount(it) } ?: formatAmount(BigDecimal.ZERO, currency)
@@ -449,7 +449,7 @@ fun CategoryTreeItem(
     // Create a map for quick balance lookup by currency
     val balancesByCurrency =
         remember(balances) {
-            balances.associateBy { it.balance.currency.id }
+            balances.associateBy { it.balance.asset.id }
         }
 
     // Main row with two sections: fixed hierarchy column + scrollable balances

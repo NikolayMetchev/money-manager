@@ -55,7 +55,7 @@ class TransactionRepositoryImplTest : DbTest() {
             assertNotNull(retrieved, "Retrieved transaction should not be null for ID: ${createdTransfer.id}")
             assertEquals(sourceAccountId, retrieved.sourceAccountId)
             assertEquals(targetAccountId, retrieved.targetAccountId)
-            assertEquals(currencyId, retrieved.amount.currency.id)
+            assertEquals(currencyId, retrieved.amount.asset.id)
             assertEquals(Money.fromDisplayValue("100", currency), retrieved.amount)
         }
 
@@ -189,8 +189,8 @@ class TransactionRepositoryImplTest : DbTest() {
             val balances = repositories.transactionRepository.getAccountBalances().first()
 
             // Find balances for each account
-            val checkingBalance = balances.find { it.accountId == checkingAccountId && it.balance.currency.id == usdId }
-            val savingsBalance = balances.find { it.accountId == savingsAccountId && it.balance.currency.id == usdId }
+            val checkingBalance = balances.find { it.accountId == checkingAccountId && it.balance.asset.id == usdId }
+            val savingsBalance = balances.find { it.accountId == savingsAccountId && it.balance.asset.id == usdId }
 
             // Verify balances
             assertNotNull(checkingBalance, "Checking account should have a balance")
@@ -266,9 +266,9 @@ class TransactionRepositoryImplTest : DbTest() {
             val balances = repositories.transactionRepository.getAccountBalances().first()
 
             // Find balances for each account
-            val checkingBalance = balances.find { it.accountId == checkingAccountId && it.balance.currency.id == usdId }
-            val savingsBalance = balances.find { it.accountId == savingsAccountId && it.balance.currency.id == usdId }
-            val creditCardBalance = balances.find { it.accountId == creditCardAccountId && it.balance.currency.id == usdId }
+            val checkingBalance = balances.find { it.accountId == checkingAccountId && it.balance.asset.id == usdId }
+            val savingsBalance = balances.find { it.accountId == savingsAccountId && it.balance.asset.id == usdId }
+            val creditCardBalance = balances.find { it.accountId == creditCardAccountId && it.balance.asset.id == usdId }
 
             // Verify balances
             assertNotNull(checkingBalance)
@@ -338,12 +338,12 @@ class TransactionRepositoryImplTest : DbTest() {
             val balances = repositories.transactionRepository.getAccountBalances().first()
 
             // Find balances for checking account
-            val checkingUsdBalance = balances.find { it.accountId == checkingAccountId && it.balance.currency.id == usdId }
-            val checkingEurBalance = balances.find { it.accountId == checkingAccountId && it.balance.currency.id == eurId }
+            val checkingUsdBalance = balances.find { it.accountId == checkingAccountId && it.balance.asset.id == usdId }
+            val checkingEurBalance = balances.find { it.accountId == checkingAccountId && it.balance.asset.id == eurId }
 
             // Find balances for savings account
-            val savingsUsdBalance = balances.find { it.accountId == savingsAccountId && it.balance.currency.id == usdId }
-            val savingsEurBalance = balances.find { it.accountId == savingsAccountId && it.balance.currency.id == eurId }
+            val savingsUsdBalance = balances.find { it.accountId == savingsAccountId && it.balance.asset.id == usdId }
+            val savingsEurBalance = balances.find { it.accountId == savingsAccountId && it.balance.asset.id == eurId }
 
             // Verify balances
             assertNotNull(checkingUsdBalance)

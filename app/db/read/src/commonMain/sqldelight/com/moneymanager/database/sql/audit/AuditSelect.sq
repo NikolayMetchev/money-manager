@@ -599,6 +599,22 @@ SELECT
     audit_type.name AS audit_type,
     trade_audit.trade_id,
     trade_audit.revision_id,
+    trade_audit.timestamp,
+    trade_audit.description,
+    trade_audit.from_account_id,
+    trade_audit.from_amount,
+    trade_audit.to_account_id,
+    trade_audit.to_amount,
+    from_asset.id AS from_asset_id,
+    from_asset.code AS from_asset_code,
+    from_asset.name AS from_asset_name,
+    from_asset.scale_factor AS from_asset_scale_factor,
+    from_asset.kind AS from_asset_kind,
+    to_asset.id AS to_asset_id,
+    to_asset.code AS to_asset_code,
+    to_asset.name AS to_asset_name,
+    to_asset.scale_factor AS to_asset_scale_factor,
+    to_asset.kind AS to_asset_kind,
     -- Source information
     entity_source.id AS source_id,
     entity_source.device_id AS source_device_id,
@@ -621,6 +637,8 @@ SELECT
     qif_import_metadata.original_file_name AS source_qif_file_name
 FROM trade_audit
 JOIN audit_type ON trade_audit.audit_type_id = audit_type.id
+JOIN asset_details from_asset ON trade_audit.from_asset_id = from_asset.id
+JOIN asset_details to_asset ON trade_audit.to_asset_id = to_asset.id
 LEFT JOIN entity_source ON trade_audit.trade_id = entity_source.entity_id
     AND trade_audit.revision_id = entity_source.revision_id
     AND entity_source.entity_type_id = 11

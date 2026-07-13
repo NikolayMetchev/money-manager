@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.moneymanager.ui.screens.transactions
 
 import androidx.compose.foundation.background
@@ -10,17 +12,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,12 +42,31 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.ui.util.ScreenSizeClass
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+
+/** Reconciled tick color; the Material color scheme has no "success" green, so a fixed one. */
+private val RECONCILED_GREEN = Color(0xFF4CAF50)
+
+/** The icon a [TransactionKind] renders as in the type column (and its header legend). */
+internal fun TransactionKind.icon(): ImageVector =
+    when (this) {
+        TransactionKind.TRANSFER -> Icons.AutoMirrored.Filled.ArrowForward
+        TransactionKind.TRADE -> Icons.Filled.Refresh
+        TransactionKind.ORDER -> Icons.Filled.ShoppingCart
+    }
+
+internal fun TransactionKind.displayLabel(): String =
+    when (this) {
+        TransactionKind.TRANSFER -> "Transfer"
+        TransactionKind.TRADE -> "Trade"
+        TransactionKind.ORDER -> "Order"
+    }
 
 @Composable
 fun AccountTransactionCard(
@@ -87,9 +120,42 @@ fun AccountTransactionCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Reconciled column: read-only tick when this transfer is part of a reconciliation
-            Box(modifier = Modifier.width(40.dp), contentAlignment = Alignment.Center) {
-                Checkbox(checked = runningBalance.isReconciled, onCheckedChange = null)
+            // Reconciled column: green tick when this transfer is part of a reconciliation, red cross otherwise.
+            Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                val reconciledLabel = if (runningBalance.isReconciled) "Reconciled" else "Not reconciled"
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                    tooltip = { PlainTooltip { Text(reconciledLabel) } },
+                    state = rememberTooltipState(),
+                ) {
+                    Icon(
+                        imageVector = if (runningBalance.isReconciled) Icons.Filled.Check else Icons.Filled.Close,
+                        contentDescription = reconciledLabel,
+                        tint =
+                            if (runningBalance.isReconciled) {
+                                RECONCILED_GREEN.copy(alpha = mutedAlpha)
+                            } else {
+                                MaterialTheme.colorScheme.error.copy(alpha = mutedAlpha)
+                            },
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            // Transaction type column: transfer / trade / order as an icon with a hover tooltip.
+            Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                    tooltip = { PlainTooltip { Text(runningBalance.kind.displayLabel()) } },
+                    state = rememberTooltipState(),
+                ) {
+                    Icon(
+                        imageVector = runningBalance.kind.icon(),
+                        contentDescription = runningBalance.kind.displayLabel(),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = mutedAlpha),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
 
             // Date column
@@ -232,46 +298,58 @@ fun AccountTransactionCard(
             )
 
             // Edit button - reconstruct Transfer from AccountRow
-            IconButton(
-                onClick = {
-                    // Reconstruct Transfer object from AccountRow fields
-                    // Note: Amount needs to be positive value from the materialized view
-                    val amount =
-                        if (runningBalance.transactionAmount.isNegative()) {
-                            Money(-runningBalance.transactionAmount.amount, runningBalance.transactionAmount.currency)
-                        } else {
-                            runningBalance.transactionAmount
-                        }
-                    val transfer =
-                        Transfer(
-                            id = runningBalance.transactionId as TransferId,
-                            timestamp = runningBalance.timestamp,
-                            description = runningBalance.description,
-                            sourceAccountId = runningBalance.sourceAccountId,
-                            targetAccountId = runningBalance.targetAccountId,
-                            amount = amount,
-                        )
-                    onEditClick(transfer)
-                },
-                modifier = Modifier.size(32.dp),
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                tooltip = { PlainTooltip { Text("Edit transaction") } },
+                state = rememberTooltipState(),
             ) {
-                Text(
-                    text = "\u270F\uFE0F",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+                IconButton(
+                    onClick = {
+                        // Reconstruct Transfer object from AccountRow fields
+                        // Note: Amount needs to be positive value from the materialized view
+                        val amount =
+                            if (runningBalance.transactionAmount.isNegative()) {
+                                Money(-runningBalance.transactionAmount.amount, runningBalance.transactionAmount.asset)
+                            } else {
+                                runningBalance.transactionAmount
+                            }
+                        val transfer =
+                            Transfer(
+                                id = runningBalance.transactionId as TransferId,
+                                timestamp = runningBalance.timestamp,
+                                description = runningBalance.description,
+                                sourceAccountId = runningBalance.sourceAccountId,
+                                targetAccountId = runningBalance.targetAccountId,
+                                amount = amount,
+                            )
+                        onEditClick(transfer)
+                    },
+                    modifier = Modifier.size(24.dp),
+                ) {
+                    Text(
+                        text = "\u270F\uFE0F",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
             }
 
             // Audit button - show audit history for this transaction
-            IconButton(
-                onClick = {
-                    onAuditClick(runningBalance.transactionId as TransferId)
-                },
-                modifier = Modifier.size(32.dp),
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                tooltip = { PlainTooltip { Text("Audit history") } },
+                state = rememberTooltipState(),
             ) {
-                Text(
-                    text = "\uD83D\uDCDC",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+                IconButton(
+                    onClick = {
+                        onAuditClick(runningBalance.transactionId as TransferId)
+                    },
+                    modifier = Modifier.size(24.dp),
+                ) {
+                    Text(
+                        text = "\uD83D\uDCDC",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
             }
         }
     }

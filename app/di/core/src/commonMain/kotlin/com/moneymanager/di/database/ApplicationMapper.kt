@@ -33,6 +33,7 @@ fun DatabaseComponent.toApplication() =
                 strategyLibrary = strategyLibrary,
                 qifImportRepository = qifImportRepository,
                 importDirectoryRepository = importDirectoryRepository,
+                importTimelineRepository = importTimelineRepository,
                 passThroughAccountRepository = passThroughAccountRepository,
                 maintenance = DbMaintenance(maintenanceService),
             ),

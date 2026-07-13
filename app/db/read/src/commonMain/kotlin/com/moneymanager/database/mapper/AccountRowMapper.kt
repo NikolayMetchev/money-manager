@@ -6,6 +6,7 @@ import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.TransferId
 import kotlin.time.Instant.Companion.fromEpochMilliseconds
 
@@ -33,6 +34,7 @@ object AccountRowMapper {
         feeParentTransferId: Long?,
         passThroughSpendId: Long?,
         passThroughFundingId: Long?,
+        transactionKind: String,
     ): AccountRow {
         val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetKind)
         return AccountRow(
@@ -50,6 +52,7 @@ object AccountRowMapper {
             feeParentTransferId = feeParentTransferId?.let { TransferId(it) },
             passThroughSpendId = passThroughSpendId?.let { TransferId(it) },
             passThroughFundingId = passThroughFundingId?.let { TransferId(it) },
+            kind = TransactionKind.valueOf(transactionKind),
         )
     }
 }

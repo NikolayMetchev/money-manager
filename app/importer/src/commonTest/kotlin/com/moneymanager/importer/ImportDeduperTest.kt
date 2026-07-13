@@ -31,7 +31,7 @@ class ImportDeduperTest {
     private val target = AccountId(2)
     private val baseTime = Instant.fromEpochMilliseconds(1_700_000_000_000)
 
-    private fun money(major: Long) = Money(amount = major * 100, currency = currency)
+    private fun money(major: Long) = Money(amount = major * 100, asset = currency)
 
     private fun importTransfer(
         rowIndex: Long,

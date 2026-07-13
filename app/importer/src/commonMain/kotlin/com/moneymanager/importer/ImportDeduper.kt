@@ -309,7 +309,7 @@ class ImportDeduper(
             } else {
                 reconcileCandidates
                     .firstOrNull { (_, existing) ->
-                        existing.amount.currency.id == amount.currency.id &&
+                        existing.amount.asset.id == amount.asset.id &&
                             amountWithinTolerance(amount, existing.amount, policy.internalTransferAmountTolerance) &&
                             (timestamp - existing.timestamp).absoluteValue <= window &&
                             (

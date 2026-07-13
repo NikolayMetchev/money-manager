@@ -85,12 +85,14 @@ import com.moneymanager.domain.model.MonzoCredential
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.importengineapi.markApiSessionImported
@@ -107,11 +109,13 @@ import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.currentCountryCode
+import com.moneymanager.ui.util.displayDate
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -127,6 +131,7 @@ import kotlin.time.Instant
 @Composable
 fun ApiSessionsScreen(
     apiSessionRepository: ApiSessionReadRepository,
+    importTimelineRepository: ImportTimelineReadRepository,
     apiImportStrategyRepository: ApiImportStrategyReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
     accountRepository: AccountReadRepository,
@@ -146,6 +151,9 @@ fun ApiSessionsScreen(
     val clipboard = LocalClipboard.current
     val passThroughAccounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         passThroughAccountRepository.getAll()
+    }
+    val dateRangeBySession by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
+        importTimelineRepository.getApiSessionDateRanges().map { ranges -> ranges.associateBy { it.fileId } }
     }
 
     var credentials by remember { mutableStateOf<List<MonzoCredential>>(emptyList()) }
@@ -470,6 +478,7 @@ fun ApiSessionsScreen(
                             val isDownloading = backgroundTasks.isRunning(monzoDownloadTaskKey(credential.id))
                             CredentialCard(
                                 credential = credential,
+                                dateRangeBySession = dateRangeBySession,
                                 providerLabel = strategyNameByCredential[credential.id],
                                 requiresSigning = requiresSigningByCredential[credential.id] == true,
                                 transactionsBlockReason = transactionsBlockReasonByCredential[credential.id],
@@ -813,6 +822,7 @@ private fun SigningKeySection(
 @Composable
 private fun CredentialCard(
     credential: MonzoCredential,
+    dateRangeBySession: Map<String, ImportFileDateRange>,
     providerLabel: String?,
     requiresSigning: Boolean,
     transactionsBlockReason: String?,
@@ -909,6 +919,7 @@ private fun CredentialCard(
                 sessions.forEach { session ->
                     SessionRow(
                         session = session,
+                        dateRange = dateRangeBySession[session.id.toString()],
                         isImporting = isImportingSession(session.id),
                         isAlreadyImported =
                             sessionImportedAtCurrentRevision(
@@ -932,6 +943,7 @@ private fun CredentialCard(
 @Composable
 private fun SessionRow(
     session: ApiSession,
+    dateRange: ImportFileDateRange?,
     isImporting: Boolean,
     isAlreadyImported: Boolean,
     importResult: ApiSessionImportResult?,
@@ -978,6 +990,16 @@ private fun SessionRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        dateRange?.let { range ->
+            Text(
+                text =
+                    "Transactions ${range.earliest.displayDate()} → ${range.latest.displayDate()} " +
+                        "(${range.transactionCount})",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         session.importDurationMillis?.let { durationMillis ->
             Text(

@@ -30,6 +30,7 @@ import com.moneymanager.database.repository.DeviceReadRepositoryImpl
 import com.moneymanager.database.repository.DeviceWriteRepositoryImpl
 import com.moneymanager.database.repository.ImportDirectoryReadRepositoryImpl
 import com.moneymanager.database.repository.ImportDirectoryWriteRepositoryImpl
+import com.moneymanager.database.repository.ImportTimelineReadRepositoryImpl
 import com.moneymanager.database.repository.PassThroughAccountReadRepositoryImpl
 import com.moneymanager.database.repository.PassThroughAccountWriteRepositoryImpl
 import com.moneymanager.database.repository.PersonAccountOwnershipReadRepositoryImpl
@@ -88,6 +89,7 @@ import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.DeviceWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
@@ -263,6 +265,11 @@ interface RepositoryModule {
         deviceId: DeviceId,
         reader: ImportDirectoryReadRepository,
     ): ImportDirectoryWriteRepository = ImportDirectoryWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideImportTimelineReadRepository(database: MoneyManagerDatabaseWrapper): ImportTimelineReadRepository =
+        ImportTimelineReadRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)

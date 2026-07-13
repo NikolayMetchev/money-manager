@@ -17,7 +17,7 @@ import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.qif.QifImportId
 import kotlinx.serialization.Serializable
 
-enum class ImportTab { DIRECTORIES, CSV, QIF, API, MISC }
+enum class ImportTab { DIRECTORIES, CSV, QIF, API, MISC, TIMELINE }
 
 /**
  * Navigation destinations. Serializable [NavKey]s so the back stack survives process death via

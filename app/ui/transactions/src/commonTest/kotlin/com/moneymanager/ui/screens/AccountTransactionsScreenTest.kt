@@ -11,6 +11,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -40,6 +41,7 @@ import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountAttributeWriteRepository
@@ -546,6 +548,80 @@ class AccountTransactionsScreenTest {
             onNodeWithText("Fee").performClick()
             waitForIdle()
             assertEquals(mainId, linkClicked)
+        }
+
+    @Test
+    fun sameAccountTrade_rendersBothAssetLegs_withoutDuplicateListKeys() =
+        runMoneyManagerComposeUiTest {
+            // A trade inside one account (e.g. BTC→USD on an exchange) produces two running-balance
+            // rows with the same transaction AND account ids, differing only in asset. The list key
+            // must include the asset or LazyColumn throws "Key ... was already used".
+            val now = Clock.System.now()
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val btc = Currency(id = CurrencyId(2L), code = "BTC", name = "Bitcoin")
+            val exchange = Account(id = AccountId(10L), name = "Exchange", openingDate = now)
+            val tradeId = TransferId(19157L)
+            val legs =
+                listOf(
+                    AccountRow(
+                        transactionId = tradeId,
+                        timestamp = now,
+                        description = "BTC to USD trade",
+                        accountId = exchange.id,
+                        transactionAmount = Money(-100, btc),
+                        runningBalance = Money(0, btc),
+                        sourceAccountId = exchange.id,
+                        targetAccountId = exchange.id,
+                        kind = TransactionKind.TRADE,
+                    ),
+                    AccountRow(
+                        transactionId = tradeId,
+                        timestamp = now,
+                        description = "BTC to USD trade",
+                        accountId = exchange.id,
+                        transactionAmount = Money(500, usd),
+                        runningBalance = Money(500, usd),
+                        sourceAccountId = exchange.id,
+                        targetAccountId = exchange.id,
+                        kind = TransactionKind.TRADE,
+                    ),
+                )
+            val transactionRepository =
+                mock<TransactionWriteRepository>(MockMode.autoUnit) {
+                    every { getTransactionById(any()) } returns flowOf(null)
+                    every { getTransactionsByAccount(any()) } returns flowOf(emptyList())
+                    every { getTransactionsByDateRange(any(), any()) } returns flowOf(emptyList())
+                    every { getTransactionsByAccountAndDateRange(any(), any(), any()) } returns flowOf(emptyList())
+                    every { getAccountBalances() } returns flowOf(emptyList())
+                    everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any(), any()) } returns
+                        PagingResult(items = legs, pagingInfo = PagingInfo(null, null, hasMore = false))
+                    everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any(), any()) } returns
+                        PagingResult(emptyList(), PagingInfo(null, null, false))
+                }
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountTransactionsScreen(
+                        accountId = exchange.id,
+                        transactionRepository = transactionRepository,
+                        accountRepository = createAccountRepository(listOf(exchange)),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        currencyRepository = createCurrencyRepository(listOf(usd, btc)),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        onAccountIdChange = {},
+                        onCurrencyIdChange = {},
+                    )
+                }
+            }
+            waitForIdle()
+
+            onAllNodesWithText("BTC to USD trade").assertCountEquals(2)
+            // Both legs carry the trade type icon in the type column.
+            onAllNodesWithContentDescription("Trade").assertCountEquals(2)
         }
 
     @Test
@@ -1326,7 +1402,7 @@ class AccountTransactionsScreenTest {
 
     /** Mirrors the repository's SQL currency filter so the test double matches production semantics. */
     private fun List<AccountRow>.filterByCurrency(currencyId: CurrencyId?): List<AccountRow> =
-        if (currencyId == null) this else filter { it.transactionAmount.currency.id == currencyId }
+        if (currencyId == null) this else filter { it.transactionAmount.asset.id == currencyId }
 
     private fun buildAccountRows(
         transfers: List<Transfer>,
@@ -1344,7 +1420,7 @@ class AccountTransactionsScreenTest {
                         timestamp = transfer.timestamp,
                         description = transfer.description,
                         accountId = transfer.sourceAccountId,
-                        transactionAmount = Money(-transfer.amount.amount, transfer.amount.currency),
+                        transactionAmount = Money(-transfer.amount.amount, transfer.amount.asset),
                         runningBalance = transfer.amount,
                         sourceAccountId = transfer.sourceAccountId,
                         targetAccountId = transfer.targetAccountId,

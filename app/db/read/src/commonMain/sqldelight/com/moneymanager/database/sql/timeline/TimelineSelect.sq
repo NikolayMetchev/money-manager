@@ -1,0 +1,91 @@
+-- Per-import transaction date ranges for the import Timeline view. Transfers are linked to their
+-- originating file via entity_source (entity_type_id = 7) + the per-format side tables. A transfer
+-- can carry several entity_source revisions for the same import (re-imports), so counts use
+-- DISTINCT transfer ids; the INNER JOIN on transfer drops provenance rows whose transfer was
+-- since deleted (entity_source.entity_id has no FK to transfer).
+-- Strategy attribution uses the latest application's snapshot name, so files imported before and
+-- after a strategy rename group separately.
+selectCsvImportDateRanges:
+SELECT
+    csv_import_metadata.id AS import_id,
+    csv_import_metadata.original_file_name AS file_name,
+    csv_import_metadata.ignored,
+    latest_application.strategy_id AS strategy_id,
+    latest_application.strategy_name AS strategy_name,
+    MIN(transfer.timestamp) AS earliest_ms,
+    MAX(transfer.timestamp) AS latest_ms,
+    COUNT(DISTINCT transfer.id) AS transaction_count
+FROM csv_import_metadata
+JOIN csv_entity_source ON csv_entity_source.csv_import_id = csv_import_metadata.id
+JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7
+JOIN transfer ON transfer.id = entity_source.entity_id
+LEFT JOIN csv_import_application latest_application
+    ON latest_application.id = (
+        SELECT application.id
+        FROM csv_import_application application
+        WHERE application.csv_import_id = csv_import_metadata.id
+        ORDER BY application.applied_at DESC, application.id DESC
+        LIMIT 1
+    )
+GROUP BY csv_import_metadata.id;
+
+selectQifImportDateRanges:
+SELECT
+    qif_import_metadata.id AS import_id,
+    qif_import_metadata.original_file_name AS file_name,
+    qif_import_metadata.ignored,
+    latest_application.strategy_id AS strategy_id,
+    latest_application.strategy_name AS strategy_name,
+    MIN(transfer.timestamp) AS earliest_ms,
+    MAX(transfer.timestamp) AS latest_ms,
+    COUNT(DISTINCT transfer.id) AS transaction_count
+FROM qif_import_metadata
+JOIN qif_entity_source ON qif_entity_source.qif_import_id = qif_import_metadata.id
+JOIN entity_source ON entity_source.id = qif_entity_source.id AND entity_source.entity_type_id = 7
+JOIN transfer ON transfer.id = entity_source.entity_id
+LEFT JOIN qif_import_application latest_application
+    ON latest_application.id = (
+        SELECT application.id
+        FROM qif_import_application application
+        WHERE application.qif_import_id = qif_import_metadata.id
+        ORDER BY application.applied_at DESC, application.id DESC
+        LIMIT 1
+    )
+GROUP BY qif_import_metadata.id;
+
+-- One row per API session that produced transactions. strategy_name is NULL for legacy
+-- credential-less / strategy-less (Monzo) sessions — callers fall back to the session type name.
+selectApiSessionDateRanges:
+SELECT
+    api_session.id AS session_id,
+    api_session.created_at AS session_created_at,
+    api_session.type_id AS session_type_id,
+    api_credential.strategy_id AS strategy_id,
+    api_import_strategy.name AS strategy_name,
+    MIN(transfer.timestamp) AS earliest_ms,
+    MAX(transfer.timestamp) AS latest_ms,
+    COUNT(DISTINCT transfer.id) AS transaction_count
+FROM api_session
+JOIN api_entity_source ON api_entity_source.api_session_id = api_session.id
+JOIN entity_source ON entity_source.id = api_entity_source.id AND entity_source.entity_type_id = 7
+JOIN transfer ON transfer.id = entity_source.entity_id
+LEFT JOIN api_credential ON api_credential.id = api_session.credential_id
+LEFT JOIN api_import_strategy ON api_import_strategy.id = api_credential.strategy_id
+GROUP BY api_session.id;
+
+-- Manually *created* transfers only: restricting to each transfer's earliest revision keeps a
+-- later manual edit of an imported transfer out of the Manual row.
+selectManualDateRange:
+SELECT
+    MIN(transfer.timestamp) AS earliest_ms,
+    MAX(transfer.timestamp) AS latest_ms,
+    COUNT(DISTINCT transfer.id) AS transaction_count
+FROM entity_source
+JOIN transfer ON transfer.id = entity_source.entity_id
+WHERE entity_source.entity_type_id = 7
+  AND entity_source.source_type_id = 1
+  AND entity_source.revision_id = (
+      SELECT MIN(creation.revision_id)
+      FROM entity_source creation
+      WHERE creation.entity_type_id = 7 AND creation.entity_id = entity_source.entity_id
+  );

@@ -39,4 +39,4 @@ fun formatAmount(
  * @param money The Money value to format
  * @return Formatted string (e.g., "$1,234.56" for USD, "0.5 BTC" for a crypto asset)
  */
-fun formatAmount(money: Money): String = formatAmount(money.toDisplayValue(), money.currency)
+fun formatAmount(money: Money): String = formatAmount(money.toDisplayValue(), money.asset)

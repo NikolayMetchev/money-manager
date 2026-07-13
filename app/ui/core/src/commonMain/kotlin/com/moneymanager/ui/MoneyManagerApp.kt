@@ -43,12 +43,16 @@ import androidx.navigation3.ui.NavDisplay
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CryptoCatalogRefresher
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.qif.QifImportId
+import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
@@ -100,6 +104,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -496,6 +501,7 @@ fun MoneyManagerApp(
                                                     navigationHistory.replaceCurrentScreen(Screen.Imports(tab))
                                                 },
                                                 importDirectoryRepository = services.imports.importDirectoryRepository,
+                                                importTimelineRepository = services.imports.importTimelineRepository,
                                                 importFileSourceFactory = importFileSourceFactory,
                                                 driveFolderBrowser = driveFolderBrowser,
                                                 csvImportRepository = services.imports.csvImportRepository,
@@ -523,6 +529,23 @@ fun MoneyManagerApp(
                                                 deviceId = services.deviceId,
                                                 onCsvImportClick = { importId ->
                                                     navigationHistory.navigateTo(Screen.CsvImportDetail(importId))
+                                                },
+                                                onTimelineFileClick = { file ->
+                                                    when (file.kind) {
+                                                        TimelineSourceKind.CSV ->
+                                                            navigationHistory.navigateTo(
+                                                                Screen.CsvImportDetail(CsvImportId(Uuid.parse(file.fileId))),
+                                                            )
+                                                        TimelineSourceKind.QIF ->
+                                                            navigationHistory.navigateTo(
+                                                                Screen.QifImportDetail(QifImportId(Uuid.parse(file.fileId))),
+                                                            )
+                                                        TimelineSourceKind.API ->
+                                                            navigationHistory.navigateTo(
+                                                                Screen.ApiSessionTraffic(ApiSessionId(file.fileId.toLong())),
+                                                            )
+                                                        TimelineSourceKind.MANUAL -> {}
+                                                    }
                                                 },
                                                 onCsvStrategiesClick = {
                                                     navigationHistory.navigateTo(Screen.CsvStrategies)

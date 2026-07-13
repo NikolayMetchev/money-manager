@@ -20,6 +20,7 @@ import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
+import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeWriteRepository
@@ -62,6 +63,7 @@ data class Imports(
     val strategyLibrary: StrategyLibrary,
     val qifImportRepository: QifImportWriteRepository,
     val importDirectoryRepository: ImportDirectoryReadRepository,
+    val importTimelineRepository: ImportTimelineReadRepository,
     val passThroughAccountRepository: PassThroughAccountReadRepository,
     val maintenance: Maintenance,
 )

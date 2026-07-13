@@ -36,11 +36,13 @@ import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportId
+import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
@@ -56,8 +58,10 @@ import com.moneymanager.ui.screens.qif.QifImportAllDialog
 import com.moneymanager.ui.screens.qif.QifReimportAllDialog
 import com.moneymanager.ui.screens.qif.dominantAccountType
 import com.moneymanager.ui.screens.qif.toImportRecords
+import com.moneymanager.ui.util.displayDate
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.sha256Hex
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
@@ -66,6 +70,7 @@ import kotlin.time.Clock
 @Suppress("LongParameterList", "DuplicatedCode")
 fun QifImportsScreen(
     qifImportRepository: QifImportReadRepository,
+    importTimelineRepository: ImportTimelineReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
@@ -83,6 +88,9 @@ fun QifImportsScreen(
     val scope = rememberSchemaAwareCoroutineScope()
     val imports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         qifImportRepository.getAllImports()
+    }
+    val dateRanges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
+        importTimelineRepository.getQifImportDateRanges().map { ranges -> ranges.associateBy { it.fileId } }
     }
     var isImporting by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
@@ -310,6 +318,7 @@ fun QifImportsScreen(
                     items(shown, key = { it.id.toString() }) { import ->
                         QifImportCard(
                             import = import,
+                            dateRange = dateRanges[import.id.id.toString()],
                             onClick = { onImportClick(import.id) },
                             ignored = ignoredTab,
                             onSetIgnored = { ignore ->
@@ -328,6 +337,7 @@ fun QifImportsScreen(
 @Composable
 private fun QifImportCard(
     import: QifImport,
+    dateRange: ImportFileDateRange?,
     onClick: () -> Unit,
     ignored: Boolean,
     onSetIgnored: (Boolean) -> Unit,
@@ -429,6 +439,16 @@ private fun QifImportCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = if (isImported) metadataColor else MaterialTheme.colorScheme.secondary,
             )
+            if (dateRange != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text =
+                        "Transactions ${dateRange.earliest.displayDate()} → ${dateRange.latest.displayDate()} " +
+                            "(${dateRange.transactionCount})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = metadataColor,
+                )
+            }
         }
     }
 }

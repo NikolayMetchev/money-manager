@@ -54,7 +54,7 @@ class MoneyTest {
     fun fromDisplayValue_bigDecimal_convertsCorrectly() {
         val money = Money.fromDisplayValue(BigDecimal("123.45"), usd)
         assertEquals(BigInteger(12345L), money.amount)
-        assertEquals(usd.id, money.currency.id)
+        assertEquals(usd.id, money.asset.id)
     }
 
     @Test
@@ -70,7 +70,7 @@ class MoneyTest {
         val result = a + b
 
         assertEquals(BigInteger(15000L), result.amount) // $150.00
-        assertEquals(usd.id, result.currency.id)
+        assertEquals(usd.id, result.asset.id)
     }
 
     @Test
@@ -90,7 +90,7 @@ class MoneyTest {
         val result = a - b
 
         assertEquals(BigInteger(7000L), result.amount) // $70.00
-        assertEquals(usd.id, result.currency.id)
+        assertEquals(usd.id, result.asset.id)
     }
 
     @Test
@@ -109,7 +109,7 @@ class MoneyTest {
         val result = money * 5L
 
         assertEquals(BigInteger(5000L), result.amount) // $50.00
-        assertEquals(usd.id, result.currency.id)
+        assertEquals(usd.id, result.asset.id)
     }
 
     @Test
@@ -118,7 +118,7 @@ class MoneyTest {
         val result = money * 3
 
         assertEquals(BigInteger(3000L), result.amount) // $30.00
-        assertEquals(usd.id, result.currency.id)
+        assertEquals(usd.id, result.asset.id)
     }
 
     @Test
@@ -127,7 +127,7 @@ class MoneyTest {
         val result = money / 4L
 
         assertEquals(BigInteger(2500L), result.amount) // $25.00
-        assertEquals(usd.id, result.currency.id)
+        assertEquals(usd.id, result.asset.id)
     }
 
     @Test
@@ -136,7 +136,7 @@ class MoneyTest {
         val result = money / 2
 
         assertEquals(BigInteger(5000L), result.amount) // $50.00
-        assertEquals(usd.id, result.currency.id)
+        assertEquals(usd.id, result.asset.id)
     }
 
     @Test
@@ -145,7 +145,7 @@ class MoneyTest {
         val result = -money
 
         assertEquals(BigInteger(-10000L), result.amount) // -$100.00
-        assertEquals(usd.id, result.currency.id)
+        assertEquals(usd.id, result.asset.id)
     }
 
     @Test
@@ -232,7 +232,7 @@ class MoneyTest {
     fun zero_createsZeroMoney() {
         val money = Money.zero(usd)
         assertEquals(BigInteger(0L), money.amount)
-        assertEquals(usd.id, money.currency.id)
+        assertEquals(usd.id, money.asset.id)
     }
 
     @Test
@@ -285,7 +285,7 @@ class MoneyTest {
         val money = Money.fromDisplayValue("0.5", btc)
         assertEquals(BigInteger(50_000_000L), money.amount)
         assertEquals("0.5", money.toDisplayValue().toString())
-        assertEquals(btc.id, money.currency.id)
+        assertEquals(btc.id, money.asset.id)
     }
 
     @Test

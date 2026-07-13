@@ -1838,9 +1838,9 @@ private suspend fun prepareValidTransactionItem(
     val amount =
         if (fee != null &&
             setup.strategy.transactionMappings.feeIncludedInAmount &&
-            fee.amount.currency.id == data.money.currency.id
+            fee.amount.asset.id == data.money.asset.id
         ) {
-            Money((data.money.amount - fee.amount.amount).coerceAtLeast(BigInteger.ZERO), data.money.currency)
+            Money((data.money.amount - fee.amount.amount).coerceAtLeast(BigInteger.ZERO), data.money.asset)
         } else {
             data.money
         }

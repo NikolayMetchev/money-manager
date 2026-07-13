@@ -140,10 +140,10 @@ class CryptoTradeCsvE2ETest : DbTest() {
             assertEquals(1, trades.size)
             val trade = trades.single()
             assertEquals(cash, trade.fromAccountId)
-            assertEquals("GBP", trade.from.currency.code)
+            assertEquals("GBP", trade.from.asset.code)
             assertEquals("100", trade.from.toDisplayValue().toString())
             assertEquals(wallet, trade.toAccountId)
-            assertEquals("BTC", trade.to.currency.code)
+            assertEquals("BTC", trade.to.asset.code)
             assertEquals("0.005", trade.to.toDisplayValue().toString())
 
             // Balances reflect both legs.

@@ -115,10 +115,10 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             // Two trades (BUY + SELL BTC/USD) on the exchange account.
             val trades = repositories.tradeRepository.getTradesByAccount(exchange.id).first()
             assertEquals(2, trades.size, "both trades imported")
-            val trade = trades.first { it.to.currency.code == "BTC" }
+            val trade = trades.first { it.to.asset.code == "BTC" }
             // BUY: USD leaves, BTC arrives.
-            assertEquals("USD", trade.from.currency.code)
-            assertEquals("BTC", trade.to.currency.code)
+            assertEquals("USD", trade.from.asset.code)
+            assertEquals("BTC", trade.to.asset.code)
             // 0.5 BTC in.
             assertEquals("0.5", trade.to.toDisplayValue().toString())
             // quote = 0.5 * 40000.54 = 20000.27, exactly representable at USD's 2-decimal scale.
@@ -139,7 +139,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                         endDate = Instant.fromEpochMilliseconds(1_700_000_000_150L),
                     ).first()
                     .first { it.targetAccountId == feesAccount.id }
-            assertEquals("USD", feeTransfer.amount.currency.code)
+            assertEquals("USD", feeTransfer.amount.asset.code)
             assertEquals("0.52", feeTransfer.amount.toDisplayValue().toString())
 
             // Provenance points at the real JSON node so the audit view can expand to it.
@@ -149,7 +149,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                         startDate = Instant.fromEpochMilliseconds(1_700_000_000_500L),
                         endDate = Instant.fromEpochMilliseconds(1_700_000_001_500L),
                     ).first()
-                    .first { it.targetAccountId == exchange.id && it.amount.currency.code == "CRO" }
+                    .first { it.targetAccountId == exchange.id && it.amount.asset.code == "CRO" }
             val depositSource =
                 repositories.transferSourceRepository
                     .getSourcesForTransaction(deposit.id)
@@ -262,7 +262,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                         Instant.fromEpochMilliseconds(1_700_000_000_980L),
                         Instant.fromEpochMilliseconds(1_700_000_001_020L),
                     ).first()
-                    .first { it.amount.currency.code == "CRO" }
+                    .first { it.amount.asset.code == "CRO" }
             // Booked directly App -> Exchange (not via a funding/wallet account).
             assertEquals(app, apiDeposit.sourceAccountId, "internal deposit source should be the App account")
             assertEquals(exchange, apiDeposit.targetAccountId, "internal deposit target should be the Exchange account")
@@ -315,7 +315,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                         endDate = Instant.fromEpochMilliseconds(1_700_000_002_000L),
                     ).first()
             val croDeposit =
-                exchangeTransfers.firstOrNull { it.targetAccountId == exchange.id && it.amount.currency.code == "CRO" }
+                exchangeTransfers.firstOrNull { it.targetAccountId == exchange.id && it.amount.asset.code == "CRO" }
             assertNotNull(croDeposit, "the CRO deposit should target the Exchange account")
             assertEquals(appAccount, croDeposit.sourceAccountId, "deposit rewritten to come from the App account")
 

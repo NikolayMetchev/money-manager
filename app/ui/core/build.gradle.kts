@@ -28,6 +28,7 @@ kotlin {
                 api(projects.app.ui.imports.csv)
                 api(projects.app.ui.imports.importDirectory)
                 api(projects.app.ui.imports.qif)
+                api(projects.app.ui.imports.timeline)
                 api(projects.app.ui.people)
                 api(projects.app.ui.settings)
                 api(projects.app.ui.transactions)

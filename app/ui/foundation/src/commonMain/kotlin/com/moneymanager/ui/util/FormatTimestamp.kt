@@ -20,3 +20,5 @@ private val DISPLAY_FORMAT =
     }
 
 fun Instant.displayDateTime(timeZone: TimeZone = TimeZone.currentSystemDefault()) = toLocalDateTime(timeZone).format(DISPLAY_FORMAT)
+
+fun Instant.displayDate(timeZone: TimeZone = TimeZone.currentSystemDefault()) = toLocalDateTime(timeZone).date.format(LocalDate.Formats.ISO)

@@ -114,7 +114,7 @@ fun AccountsScreen(
     // Unique assets that appear in at least one account balance, sorted by code for stable display.
     val availableAssets: List<Asset> =
         remember(balances) {
-            balances.map { it.balance.currency }.distinctBy { it.id }.sortedBy { it.code }
+            balances.map { it.balance.asset }.distinctBy { it.id }.sortedBy { it.code }
         }
 
     // Drop asset selections for assets that no longer have any balances.
@@ -132,7 +132,7 @@ fun AccountsScreen(
                         ownerIdsByAccount[account.id].orEmpty().any { it in selectedOwnerIds }
                 val matchesAsset =
                     selectedAssetIds.isEmpty() ||
-                        balancesByAccount[account.id].orEmpty().any { it.balance.currency.id in selectedAssetIds }
+                        balancesByAccount[account.id].orEmpty().any { it.balance.asset.id in selectedAssetIds }
                 matchesName && matchesOwner && matchesAsset
             }
         }
@@ -519,7 +519,7 @@ fun AccountCard(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = balance.balance.currency.code,
+                            text = balance.balance.asset.code,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

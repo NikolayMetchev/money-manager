@@ -95,7 +95,7 @@ fun TransactionEditDialog(
         mutableStateOf(
             transaction
                 ?.amount
-                ?.currency
+                ?.asset
                 ?.id
                 ?.let { CurrencyId(it.id) } ?: preSelectedCurrencyId,
         )
@@ -207,7 +207,7 @@ fun TransactionEditDialog(
             } else {
                 sourceAccountId != transaction.sourceAccountId ||
                     targetAccountId != transaction.targetAccountId ||
-                    currencyId != transaction.amount.currency.id ||
+                    currencyId != transaction.amount.asset.id ||
                     parsedAmount != transaction.amount.toDisplayValue() ||
                     description != transaction.description ||
                     selectedDate != transactionDateTime!!.date ||
@@ -288,7 +288,7 @@ fun TransactionEditDialog(
                             val transferFieldsChanged =
                                 sourceAccountId != transaction.sourceAccountId ||
                                     targetAccountId != transaction.targetAccountId ||
-                                    currencyId != transaction.amount.currency.id ||
+                                    currencyId != transaction.amount.asset.id ||
                                     parsedAmount != transaction.amount.toDisplayValue() ||
                                     description.trim() != transaction.description ||
                                     timestamp != transaction.timestamp
