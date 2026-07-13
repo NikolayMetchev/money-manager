@@ -1,6 +1,5 @@
 package com.moneymanager.database
 
-import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.moneymanager.currency.Currency
 import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.domain.model.DEFAULT_DATABASE_PATH
@@ -52,7 +51,7 @@ class JvmDatabaseManager(
                 Properties().apply {
                     put("foreign_keys", "true")
                 }
-            val driver = JdbcSqliteDriver(location.jdbcUrl, properties)
+            val driver = CachingJdbcSqliteDriver(location.jdbcUrl, properties)
 
             onProgress(DatabaseInitializationProgress("Applying database settings...", 4, 7))
             // Apply cross-platform pragmas (foreign_keys already set via Properties above).
