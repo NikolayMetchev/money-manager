@@ -19,6 +19,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.DeviceReadRepository
+import com.moneymanager.domain.repository.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
@@ -75,6 +76,7 @@ data class Transactions(
     val relationshipTypeRepository: RelationshipTypeWriteRepository,
     val transferRelationshipRepository: TransferRelationshipReadRepository,
     val tradeRepository: TradeWriteRepository,
+    val exchangeOrderRepository: ExchangeOrderWriteRepository,
 )
 
 data class People(

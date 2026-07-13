@@ -12,6 +12,8 @@ import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CsvImportStrategyAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.ExchangeOrderAuditEntry
+import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.ImportDirectoryAuditEntry
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
@@ -107,6 +109,8 @@ interface AuditReadRepository {
 
     /** Audit history for a trade. */
     suspend fun getAuditHistoryForTrade(tradeId: TradeId): List<TradeAuditEntry>
+
+    suspend fun getAuditHistoryForExchangeOrder(orderId: ExchangeOrderId): List<ExchangeOrderAuditEntry>
 
     /**
      * Gets the audit history for a specific category.

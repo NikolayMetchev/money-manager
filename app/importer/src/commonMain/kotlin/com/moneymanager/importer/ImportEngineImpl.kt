@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.NewAttribute
@@ -41,7 +42,9 @@ import com.moneymanager.domain.repository.CryptoWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.OrderUpsertResult
 import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonAttributeWriteRepository
@@ -75,6 +78,7 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalCryptoKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
+import com.moneymanager.importengineapi.LocalOrderKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PassThroughMutation
@@ -109,6 +113,7 @@ class ImportEngineImpl(
     private val currencyRepository: CurrencyWriteRepository,
     private val cryptoRepository: CryptoWriteRepository,
     private val tradeRepository: TradeWriteRepository,
+    private val exchangeOrderRepository: ExchangeOrderWriteRepository,
     private val attributeTypeRepository: AttributeTypeWriteRepository,
     private val relationshipTypeRepository: RelationshipTypeWriteRepository,
     private val csvImportStrategyRepository: CsvImportStrategyWriteRepository,
@@ -167,6 +172,42 @@ class ImportEngineImpl(
                 )
             createdTradeIds[intent.key] = tradeResult.id
             if (!tradeResult.created) dedupedTradeKeys += intent.key
+        }
+        val orderIds = mutableMapOf<LocalOrderKey, ExchangeOrderId>()
+        val updatedOrderKeys = mutableSetOf<LocalOrderKey>()
+        val dedupedOrderKeys = mutableSetOf<LocalOrderKey>()
+        for (intent in batch.orders) {
+            val orderResult =
+                exchangeOrderRepository.upsertOrder(
+                    accountId = intent.accountId,
+                    orderRef = intent.orderRef,
+                    clientOid = intent.clientOid,
+                    side = intent.side,
+                    orderType = intent.orderType,
+                    timeInForce = intent.timeInForce,
+                    status = intent.status,
+                    limitPrice = intent.limitPrice,
+                    quantity = intent.quantity,
+                    avgPrice = intent.avgPrice,
+                    createdAt = intent.createdAt,
+                    updatedAt = intent.updatedAt,
+                    source = intent.source,
+                )
+            orderIds[intent.key] = orderResult.id
+            when (orderResult.outcome) {
+                OrderUpsertResult.Outcome.UPDATED -> updatedOrderKeys += intent.key
+                OrderUpsertResult.Outcome.UNCHANGED -> dedupedOrderKeys += intent.key
+                OrderUpsertResult.Outcome.CREATED -> Unit
+            }
+            for (tradeKey in intent.tradeKeys) {
+                // A dangling key means the producer's trade/order keys diverged — losing the link
+                // silently would be far worse than failing the import.
+                val tradeId =
+                    requireNotNull(createdTradeIds[tradeKey]) {
+                        "Order ${intent.orderRef} references trade key '${tradeKey.value}' absent from this batch"
+                    }
+                exchangeOrderRepository.linkTrade(orderResult.id, tradeId)
+            }
         }
         val createdCategoryIds = mutableMapOf<LocalCategoryKey, Long>()
         for (intent in batch.categories.creates()) {
@@ -265,6 +306,9 @@ class ImportEngineImpl(
             createdCryptoIds = createdCryptoIds,
             createdTradeIds = createdTradeIds,
             dedupedTradeKeys = dedupedTradeKeys,
+            orderIds = orderIds,
+            updatedOrderKeys = updatedOrderKeys,
+            dedupedOrderKeys = dedupedOrderKeys,
             attributeTypeIds = attributeTypeIds,
             relationshipTypeIds = relationshipTypeIds,
             createdCsvStrategyIds = config.csvStrategyIds,

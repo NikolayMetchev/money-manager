@@ -34,6 +34,7 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
@@ -49,6 +50,7 @@ import com.moneymanager.domain.repository.AccountWriteRepository
 import com.moneymanager.domain.repository.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.CategoryWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.ExchangeOrderReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.PersonWriteRepository
 import com.moneymanager.domain.repository.TransactionWriteRepository
@@ -114,6 +116,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = createAttributeTypeRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = createMaintenance(),
                         onAccountIdChange = {},
                         onCurrencyIdChange = {},
@@ -184,6 +187,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
+                        exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = maintenance,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
@@ -276,6 +280,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
+                        exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = maintenance,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
@@ -342,6 +347,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = createAttributeTypeRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = createMaintenance(),
                         onAccountClick = { accountId, _, _, transferId ->
                             clickedAccountId = accountId
@@ -447,6 +453,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = createAttributeTypeRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = createMaintenance(),
                         scrollToTransferId = anchor.id,
                     )
@@ -551,6 +558,62 @@ class AccountTransactionsScreenTest {
         }
 
     @Test
+    fun orderBadge_showsOnLinkedTradeRow_andReportsItsOrderId() =
+        runMoneyManagerComposeUiTest {
+            // A trade row filling an exchange order carries the order id from the AccountRow join and
+            // renders a clickable "Order" badge; a trade with no order shows none.
+            val now = Clock.System.now()
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val exchange = Account(id = AccountId(10L), name = "Exchange", openingDate = now)
+            val orderId = ExchangeOrderId(77L)
+            val linkedRow =
+                AccountRow(
+                    transactionId = TransferId(20L),
+                    timestamp = now,
+                    description = "Buy BTC/USD",
+                    accountId = exchange.id,
+                    transactionAmount = Money(500, usd),
+                    runningBalance = Money(500, usd),
+                    sourceAccountId = exchange.id,
+                    targetAccountId = exchange.id,
+                    exchangeOrderId = orderId,
+                    kind = TransactionKind.TRADE,
+                )
+            val unlinkedRow =
+                linkedRow.copy(
+                    transactionId = TransferId(21L),
+                    description = "Sell BTC/USD",
+                    exchangeOrderId = null,
+                )
+
+            var clicked: ExchangeOrderId? = null
+            setContent {
+                ProvideSchemaAwareScope {
+                    Column {
+                        AccountTransactionCard(
+                            runningBalance = linkedRow,
+                            accounts = listOf(exchange),
+                            screenSizeClass = ScreenSizeClass.Expanded,
+                            onOrderLinkClick = { clicked = it },
+                        )
+                        AccountTransactionCard(
+                            runningBalance = unlinkedRow,
+                            accounts = listOf(exchange),
+                            screenSizeClass = ScreenSizeClass.Expanded,
+                            onOrderLinkClick = { clicked = it },
+                        )
+                    }
+                }
+            }
+            waitForIdle()
+
+            onAllNodesWithText("Order").assertCountEquals(1)
+            onNodeWithText("Order").performClick()
+            waitForIdle()
+            assertEquals(orderId, clicked)
+        }
+
+    @Test
     fun sameAccountTrade_rendersBothAssetLegs_withoutDuplicateListKeys() =
         runMoneyManagerComposeUiTest {
             // A trade inside one account (e.g. BTC→USD on an exchange) produces two running-balance
@@ -611,6 +674,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = createAttributeTypeRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = createMaintenance(),
                         onAccountIdChange = {},
                         onCurrencyIdChange = {},
@@ -744,6 +808,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = createAttributeTypeRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = createMaintenance(),
                         onFeeLinkClick = { navigated = true },
                     )
@@ -854,6 +919,7 @@ class AccountTransactionsScreenTest {
                                     attributeTypeRepository = repositories.attributeTypeRepository,
                                     personRepository = repositories.personRepository,
                                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                                    exchangeOrderRepository = repositories.exchangeOrderRepository,
                                     maintenance = createDbMaintenance(repositories),
                                     onAccountIdChange = { currentAccountId = it },
                                     onCurrencyIdChange = {},
@@ -1064,6 +1130,7 @@ class AccountTransactionsScreenTest {
                                     attributeTypeRepository = repositories.attributeTypeRepository,
                                     personRepository = repositories.personRepository,
                                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                                    exchangeOrderRepository = repositories.exchangeOrderRepository,
                                     maintenance = createDbMaintenance(repositories),
                                     onAccountIdChange = { currentAccountId = it },
                                     onCurrencyIdChange = {},
@@ -1244,6 +1311,7 @@ class AccountTransactionsScreenTest {
                                     attributeTypeRepository = repositories.attributeTypeRepository,
                                     personRepository = repositories.personRepository,
                                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                                    exchangeOrderRepository = repositories.exchangeOrderRepository,
                                     maintenance = createDbMaintenance(repositories),
                                     onAccountIdChange = { currentAccountId = it },
                                     onCurrencyIdChange = {},
@@ -1505,6 +1573,15 @@ class AccountTransactionsScreenTest {
             everySuspend { analyze() } returns Duration.ZERO
             everySuspend { refreshMaterializedViews() } returns Duration.ZERO
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
+        }
+
+    private fun createExchangeOrderRepository(): ExchangeOrderReadRepository =
+        mock(MockMode.autoUnit) {
+            every { countOrdersByAccount(any()) } returns flowOf(0L)
+            every { getOrdersByAccount(any()) } returns flowOf(emptyList())
+            every { getFillCountsByAccount(any()) } returns flowOf(emptyMap())
+            every { getOrderById(any()) } returns flowOf(null)
+            every { getFillTradesForOrder(any()) } returns flowOf(emptyList())
         }
 
     private fun createDbMaintenance(repositories: DatabaseComponent): Maintenance = DbMaintenance(repositories.maintenanceService)

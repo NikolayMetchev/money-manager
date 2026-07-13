@@ -1,0 +1,57 @@
+selectById:
+SELECT id, revision_id, account_id, order_ref, client_oid, side, order_type, time_in_force, status, limit_price, quantity, avg_price, created_at, updated_at
+FROM exchange_order
+WHERE id = ?;
+
+selectByAccount:
+SELECT id, revision_id, account_id, order_ref, client_oid, side, order_type, time_in_force, status, limit_price, quantity, avg_price, created_at, updated_at
+FROM exchange_order
+WHERE account_id = ?
+ORDER BY created_at DESC, id DESC;
+
+countByAccount:
+SELECT COUNT(*)
+FROM exchange_order
+WHERE account_id = ?;
+
+-- Upsert probe: an order is identified by (account, exchange order id) across imports.
+selectByAccountAndOrderRef:
+SELECT id, revision_id, account_id, order_ref, client_oid, side, order_type, time_in_force, status, limit_price, quantity, avg_price, created_at, updated_at
+FROM exchange_order
+WHERE account_id = ? AND order_ref = ?;
+
+-- The fill trades linked to an order, with both legs' assets resolved (mirrors trade/TradeSelect.sq).
+selectFillTradesForOrder:
+SELECT
+    trade.id,
+    trade.revision_id,
+    trade.timestamp,
+    trade.description,
+    trade.from_account_id,
+    trade.from_asset_id,
+    trade.from_amount,
+    fa.code AS from_asset_code,
+    fa.name AS from_asset_name,
+    fa.scale_factor AS from_asset_scale_factor,
+    fa.kind AS from_asset_kind,
+    trade.to_account_id,
+    trade.to_asset_id,
+    trade.to_amount,
+    ta.code AS to_asset_code,
+    ta.name AS to_asset_name,
+    ta.scale_factor AS to_asset_scale_factor,
+    ta.kind AS to_asset_kind
+FROM exchange_order_trade
+JOIN trade ON trade.id = exchange_order_trade.trade_id
+JOIN asset_details fa ON trade.from_asset_id = fa.id
+JOIN asset_details ta ON trade.to_asset_id = ta.id
+WHERE exchange_order_trade.order_id = ?
+ORDER BY trade.timestamp ASC, trade.id ASC;
+
+-- Fill counts per order for a whole account's order list (single query, no N+1).
+selectFillCountsByAccount:
+SELECT exchange_order_trade.order_id, COUNT(*) AS fill_count
+FROM exchange_order_trade
+JOIN exchange_order ON exchange_order.id = exchange_order_trade.order_id
+WHERE exchange_order.account_id = ?
+GROUP BY exchange_order_trade.order_id;

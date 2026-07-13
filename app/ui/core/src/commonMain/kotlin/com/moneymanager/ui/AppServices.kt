@@ -20,6 +20,7 @@ import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.DeviceReadRepository
+import com.moneymanager.domain.repository.ExchangeOrderReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
@@ -81,6 +82,7 @@ data class TransactionsDomain(
     val attributeTypeRepository: AttributeTypeReadRepository,
     val transferRelationshipRepository: TransferRelationshipReadRepository,
     val tradeRepository: TradeReadRepository,
+    val exchangeOrderRepository: ExchangeOrderReadRepository,
     val importEngine: ImportEngine,
 )
 
@@ -137,6 +139,7 @@ fun Application.toAppServices(importEngine: ImportEngine) =
                 attributeTypeRepository = transactions.attributeTypeRepository,
                 transferRelationshipRepository = transactions.transferRelationshipRepository,
                 tradeRepository = transactions.tradeRepository,
+                exchangeOrderRepository = transactions.exchangeOrderRepository,
                 importEngine = importEngine,
             ),
         people =

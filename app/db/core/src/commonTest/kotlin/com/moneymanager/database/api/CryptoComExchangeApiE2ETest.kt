@@ -42,11 +42,19 @@ class CryptoComExchangeApiE2ETest : DbTest() {
         ]}}
         """.trimIndent()
 
+    // Field names mirror the live get-order-history payload ("order_type", not "type"). o1/o2 are the
+    // filled orders behind trades t1/t2; o3 is a still-open limit order with no fills.
     private val ordersJson =
         """
         {"code":0,"result":{"data":[
           {"instrument_name":"BTC_USD","side":"BUY","quantity":"0.5","create_time":1700000000000,
-           "order_id":"o1","type":"LIMIT","status":"FILLED"}
+           "order_id":"o1","client_oid":"co-1","order_type":"LIMIT","time_in_force":"GOOD_TILL_CANCEL",
+           "status":"FILLED","limit_price":"40000.54","avg_price":"40000.54","update_time":1700000000050},
+          {"instrument_name":"BTC_USD","side":"SELL","quantity":"0.1","create_time":1700000000100,
+           "order_id":"o2","order_type":"MARKET","status":"FILLED","avg_price":"41000.00"},
+          {"instrument_name":"BTC_USD","side":"BUY","quantity":"2","create_time":1700000000200,
+           "order_id":"o3","order_type":"LIMIT","time_in_force":"GOOD_TILL_CANCEL",
+           "status":"ACTIVE","limit_price":"30000.00"}
         ]}}
         """.trimIndent()
 
@@ -61,6 +69,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
     private suspend fun stageSessionAndImport(
         deposits: String = depositsJson,
         trades: String = tradesJson,
+        orders: String = ordersJson,
     ): Int {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Crypto.com Exchange").first()
         assertNotNull(strategy, "built-in Crypto.com Exchange strategy should be installed")
@@ -81,7 +90,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             repositories.apiSessionRepository.insertResponse(requestId, sessionId, json)
         }
         stage("private/get-trades", trades)
-        stage("private/get-order-history", ordersJson)
+        stage("private/get-order-history", orders)
         stage("private/get-deposit-history", deposits)
 
         importApiSessionExchange(
@@ -123,8 +132,34 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             assertEquals("0.5", trade.to.toDisplayValue().toString())
             // quote = 0.5 * 40000.54 = 20000.27, exactly representable at USD's 2-decimal scale.
             assertEquals("20000.27", trade.from.toDisplayValue().toString())
-            // Order type folded into the description as reference.
-            assertTrue(trade.description.contains("LIMIT"), "order type recorded: ${trade.description}")
+            // The description stays the stable "<verb> BASE/QUOTE" (dedupe keys on it); order metadata
+            // lives on the linked exchange order instead.
+            assertEquals("Buy BTC/USD", trade.description)
+
+            // All three orders imported (o3 has no fills but is still persisted, status ACTIVE).
+            val orders = repositories.exchangeOrderRepository.getOrdersByAccount(exchange.id).first()
+            assertEquals(3, orders.size, "all orders imported: $orders")
+            val o1 = orders.first { it.orderRef == "o1" }
+            assertEquals("LIMIT", o1.orderType)
+            assertEquals("FILLED", o1.status)
+            assertEquals("GOOD_TILL_CANCEL", o1.timeInForce)
+            assertEquals("40000.54", o1.limitPrice)
+            assertEquals("40000.54", o1.avgPrice)
+            assertEquals("co-1", o1.clientOid)
+            assertEquals(1_700_000_000_050L, o1.updatedAt?.toEpochMilliseconds())
+            val o3 = orders.first { it.orderRef == "o3" }
+            assertEquals("ACTIVE", o3.status)
+
+            // o1 is linked to its BUY fill trade, bidirectionally queryable.
+            val o1Fills = repositories.exchangeOrderRepository.getFillTradesForOrder(o1.id).first()
+            assertEquals(listOf(trade.id), o1Fills.map { it.id }, "o1 linked to the BUY fill")
+            assertTrue(
+                repositories.exchangeOrderRepository
+                    .getFillTradesForOrder(o3.id)
+                    .first()
+                    .isEmpty(),
+                "the unfilled order has no fill links",
+            )
 
             // The SELL's fiat fee books as its own movement to the Fees account.
             val feesAccount =
@@ -198,6 +233,50 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                 "re-import must not double-book trades",
             )
             assertEquals(depositsBefore, depositCount(), "re-import must not double-book deposits")
+            val ordersAfter = repositories.exchangeOrderRepository.getOrdersByAccount(exchange.id).first()
+            assertEquals(3, ordersAfter.size, "re-import must not duplicate orders")
+            val o1After = ordersAfter.first { it.orderRef == "o1" }
+            assertEquals(1L, o1After.revisionId, "an unchanged order keeps its revision")
+            assertEquals(
+                1,
+                repositories.exchangeOrderRepository
+                    .getFillTradesForOrder(o1After.id)
+                    .first()
+                    .size,
+                "re-import must not duplicate order-trade links",
+            )
+        }
+
+    @Test
+    fun `re-importing an order whose status changed updates it in place and bumps the revision`() =
+        runTest {
+            stageSessionAndImport()
+            val exchange =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .first { it.name == "Crypto.com Exchange" }
+            val o3Before =
+                repositories.exchangeOrderRepository
+                    .getOrdersByAccount(exchange.id)
+                    .first()
+                    .first { it.orderRef == "o3" }
+            assertEquals("ACTIVE", o3Before.status)
+            assertEquals(1L, o3Before.revisionId)
+
+            // The exchange later reports the same order as cancelled.
+            val cancelledOrders =
+                ordersJson.replace(""""status":"ACTIVE"""", """"status":"CANCELED"""")
+            stageSessionAndImport(orders = cancelledOrders)
+
+            val o3After =
+                repositories.exchangeOrderRepository
+                    .getOrdersByAccount(exchange.id)
+                    .first()
+                    .first { it.orderRef == "o3" }
+            assertEquals(o3Before.id, o3After.id, "the order is updated in place, not duplicated")
+            assertEquals("CANCELED", o3After.status)
+            assertEquals(2L, o3After.revisionId, "a content change bumps the revision")
         }
 
     @Test

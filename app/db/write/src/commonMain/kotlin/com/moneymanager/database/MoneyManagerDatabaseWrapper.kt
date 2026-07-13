@@ -36,6 +36,7 @@ class MoneyManagerDatabaseWrapper(
     val currencyWriteQueries get() = writeDb.currencyWriteQueries
     val deviceWriteQueries get() = writeDb.deviceWriteQueries
     val entitySourceWriteQueries get() = writeDb.entitySourceWriteQueries
+    val exchangeOrderWriteQueries get() = writeDb.exchangeOrderWriteQueries
     val importDirectoryWriteQueries get() = writeDb.importDirectoryWriteQueries
     val maintenanceWriteQueries get() = writeDb.maintenanceWriteQueries
     val personAttributeWriteQueries get() = writeDb.personAttributeWriteQueries
@@ -337,6 +338,8 @@ class MoneyManagerDatabaseWrapper(
             "currency_audit",
             "crypto_audit",
             "trade_audit",
+            "exchange_order_audit",
+            "exchange_order_trade",
             "asset",
             "category_audit",
             "transfer_audit",

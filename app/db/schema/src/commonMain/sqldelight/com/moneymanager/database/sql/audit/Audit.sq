@@ -293,3 +293,30 @@ CREATE INDEX IF NOT EXISTS idx_pass_through_account_audit_account_id ON pass_thr
 CREATE INDEX IF NOT EXISTS idx_pass_through_account_audit_timestamp ON pass_through_account_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_pass_through_account_audit_type ON pass_through_account_audit(audit_type_id);
 CREATE INDEX IF NOT EXISTS idx_pass_through_account_audit_account_id_timestamp ON pass_through_account_audit(pass_through_account_id, audit_timestamp DESC);
+
+-- exchange_order_audit: Audit trail for exchange_order table
+CREATE TABLE exchange_order_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    exchange_order_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    order_ref TEXT NOT NULL,
+    client_oid TEXT,
+    side TEXT NOT NULL,
+    order_type TEXT,
+    time_in_force TEXT,
+    status TEXT,
+    limit_price TEXT,
+    quantity TEXT,
+    avg_price TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_exchange_order_audit_order_id ON exchange_order_audit(exchange_order_id);
+CREATE INDEX IF NOT EXISTS idx_exchange_order_audit_timestamp ON exchange_order_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_exchange_order_audit_type ON exchange_order_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_exchange_order_audit_order_id_timestamp ON exchange_order_audit(exchange_order_id, audit_timestamp DESC);

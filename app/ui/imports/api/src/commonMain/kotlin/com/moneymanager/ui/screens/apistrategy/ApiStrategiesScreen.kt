@@ -43,8 +43,10 @@ import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.deleteApiStrategy
+import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -64,6 +66,9 @@ fun ApiStrategiesScreen(
     }
 
     var strategyPendingDelete by remember { mutableStateOf<ApiImportStrategy?>(null) }
+    // A parsed import waiting on overwrite confirmation: already reconciled onto the existing row's id
+    // (so confirming just calls update), null when no same-named strategy exists.
+    var strategyPendingOverwrite by remember { mutableStateOf<ApiImportStrategy?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -80,7 +85,15 @@ fun ApiStrategiesScreen(
                             val export = ApiStrategyExportCodec.decode(result.content)
                             val strategy =
                                 ApiStrategyExportMapper.fromExport(export, ApiImportStrategyId(Uuid.random()), Clock.System.now())
-                            importEngine.createApiStrategy(strategy)
+                            // Create outright when the name is new; otherwise confirm before clobbering
+                            // the existing same-named strategy (overwriting is a destructive replace of
+                            // its configuration, and the name is UNIQUE so a blind create would fail).
+                            val existing = apiImportStrategyRepository.getStrategyByName(strategy.name).first()
+                            if (existing == null) {
+                                importEngine.createApiStrategy(strategy)
+                            } else {
+                                strategyPendingOverwrite = strategy.copy(id = existing.id, createdAt = existing.createdAt)
+                            }
                             importError = null
                         } catch (expected: Exception) {
                             importError = "Failed to import strategy: ${expected.message}"
@@ -159,6 +172,41 @@ fun ApiStrategiesScreen(
                 }
             }
         }
+    }
+
+    // Overwrite confirmation dialog: the imported file matches an existing strategy by name.
+    strategyPendingOverwrite?.let { updated ->
+        AlertDialog(
+            onDismissRequest = { strategyPendingOverwrite = null },
+            title = { Text("Overwrite Strategy") },
+            text = {
+                Text(
+                    "A strategy named \"${updated.name}\" already exists. Importing this file will replace its " +
+                        "configuration with the imported version. This cannot be undone. Continue?",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            @Suppress("TooGenericExceptionCaught")
+                            try {
+                                importEngine.updateApiStrategy(updated)
+                                importError = null
+                            } catch (expected: Exception) {
+                                importError = "Failed to import strategy: ${expected.message}"
+                            }
+                        }
+                        strategyPendingOverwrite = null
+                    },
+                ) {
+                    Text("Overwrite", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { strategyPendingOverwrite = null }) { Text("Cancel") }
+            },
+        )
     }
 
     // Delete confirmation dialog

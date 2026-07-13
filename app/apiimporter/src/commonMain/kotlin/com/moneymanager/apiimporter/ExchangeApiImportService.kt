@@ -35,10 +35,12 @@ import com.moneymanager.importengineapi.ExistingApiIdExtractor
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportOrderIntent
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalOrderKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeType
@@ -230,6 +232,8 @@ data class ExchangeImportResult(
     val tradesImported: Int,
     val transfersImported: Int,
     val duplicatesSkipped: Int,
+    val ordersImported: Int = 0,
+    val ordersUpdated: Int = 0,
 )
 
 private data class ParsedTrade(
@@ -265,16 +269,27 @@ private data class ParsedExchangeTransfer(
     val aliasAccount: String?,
 )
 
-private data class OrderMeta(
-    val type: String?,
+private data class ParsedOrder(
+    val orderRef: String,
+    val clientOid: String?,
+    val side: String,
+    val orderType: String?,
+    val timeInForce: String?,
     val status: String?,
+    val limitPrice: String?,
+    val quantity: String?,
+    val avgPrice: String?,
+    val createdAt: Instant,
+    val updatedAt: Instant?,
+    val requestId: ApiRequestId,
+    val jsonPath: String,
 )
 
 /** Accumulator for parsed items across all of a session's responses. */
 private class ParsedExchangeData {
     val trades = mutableListOf<ParsedTrade>()
     val transfers = mutableListOf<ParsedExchangeTransfer>()
-    val orderMeta = mutableMapOf<String, OrderMeta>()
+    val orders = mutableListOf<ParsedOrder>()
 }
 
 /** Parses one response item into [into] according to its endpoint kind. */
@@ -289,13 +304,7 @@ private fun parseExchangeItem(
         ApiEndpointKind.TRADES ->
             dataEndpoint.tradeMappings?.let { parseTrade(obj, it, requestId, jsonPath) }?.let(into.trades::add)
         ApiEndpointKind.ORDERS ->
-            dataEndpoint.tradeMappings?.let { tm ->
-                val orderId = tm.orderIdField?.let { obj.str(it) } ?: obj.str(tm.idField)
-                orderId?.let {
-                    into.orderMeta[it] =
-                        OrderMeta(type = tm.orderTypeField?.let { f -> obj.str(f) }, status = tm.orderStatusField?.let { f -> obj.str(f) })
-                }
-            }
+            dataEndpoint.tradeMappings?.let { parseOrder(obj, it, requestId, jsonPath) }?.let(into.orders::add)
         ApiEndpointKind.DEPOSITS ->
             dataEndpoint.transactionMappings
                 ?.let { parseExchangeTransfer(obj, it, TransferDirection.IN, requestId, jsonPath) }
@@ -343,7 +352,13 @@ suspend fun importApiSessionExchange(
     }
     val trades = parsed.trades
     val transfers = parsed.transfers
-    val orderMeta = parsed.orderMeta
+    // An order can surface in several download windows (created in one, updated in another); keep the
+    // freshest snapshot per order id.
+    val orders =
+        parsed.orders
+            .groupBy { it.orderRef }
+            .values
+            .map { snapshots -> snapshots.maxBy { it.updatedAt ?: it.createdAt } }
 
     // Resolve assets: any code that isn't a known fiat currency is treated as a crypto asset and
     // auto-created (the same rule as the CSV importer), sized to the precision the data actually uses.
@@ -420,6 +435,9 @@ suspend fun importApiSessionExchange(
 
     val tradeIntents = mutableListOf<ImportTradeIntent>()
     val transferIntents = mutableListOf<ImportTransfer>()
+    // Fill-trade keys per order id, collected only for trades that actually became intents (a trade
+    // skipped for an unresolvable asset must not surface as a dangling link key).
+    val tradeKeysByOrderRef = mutableMapOf<String, MutableList<LocalTradeKey>>()
 
     trades.forEach forEachTrade@{ t ->
         val baseAsset = asset(t.baseCode)
@@ -427,14 +445,14 @@ suspend fun importApiSessionExchange(
         if (baseAsset == null || quoteAsset == null) return@forEachTrade
         val baseMoney = Money.fromDisplayValue(t.baseQuantity, baseAsset)
         val quoteMoney = moneyExact(t.quoteAmount, quoteAsset, "Trade ${t.id} quote leg")
-        val orderInfo = t.orderId?.let { orderMeta[it] }
-        val description = tradeDescription(t, orderInfo)
+        val description = tradeDescription(t)
         // BUY: quote leaves, base arrives. SELL: base leaves, quote arrives. Both on the one account.
         val fromAmount = if (t.isBuy) quoteMoney else baseMoney
         val toAmount = if (t.isBuy) baseMoney else quoteMoney
+        val tradeKey = LocalTradeKey("api-$sessionId-trade-${t.id}")
         tradeIntents +=
             ImportTradeIntent(
-                key = LocalTradeKey("api-$sessionId-trade-${t.id}"),
+                key = tradeKey,
                 source = Source.Api(sessionId, t.requestId, JsonPath(t.jsonPath)),
                 timestamp = t.timestamp,
                 description = description,
@@ -443,6 +461,7 @@ suspend fun importApiSessionExchange(
                 toAccountId = syntheticId,
                 toAmount = toAmount,
             )
+        t.orderId?.let { tradeKeysByOrderRef.getOrPut(it, ::mutableListOf).add(tradeKey) }
         // A trade carries no fee slot, so emit any fee as its own movement to the fee account.
         val feeCode = t.feeCode
         val feeAmount = t.feeAmount
@@ -534,11 +553,33 @@ suspend fun importApiSessionExchange(
                     ?.let { AccountBridge(exchangeAccountId = syntheticId, appAccountId = it.id) }
             }.orEmpty()
 
+    val orderIntents =
+        orders.map { o ->
+            ImportOrderIntent(
+                key = LocalOrderKey("api-$sessionId-order-${o.orderRef}"),
+                source = Source.Api(sessionId, o.requestId, JsonPath(o.jsonPath)),
+                accountId = syntheticId,
+                orderRef = o.orderRef,
+                clientOid = o.clientOid,
+                side = o.side,
+                orderType = o.orderType,
+                timeInForce = o.timeInForce,
+                status = o.status,
+                limitPrice = o.limitPrice,
+                quantity = o.quantity,
+                avgPrice = o.avgPrice,
+                createdAt = o.createdAt,
+                updatedAt = o.updatedAt,
+                tradeKeys = tradeKeysByOrderRef[o.orderRef].orEmpty(),
+            )
+        }
+
     val result =
         importEngine.import(
             ImportBatch(
                 transfers = transferIntents,
                 trades = tradeIntents,
+                orders = orderIntents,
                 accountsToCreate = counterpartyIntents,
                 dedupePolicy =
                     DedupePolicy.ApiMultiKey(
@@ -565,6 +606,8 @@ suspend fun importApiSessionExchange(
         tradesImported = tradeIntents.size,
         transfersImported = result.transfersImported,
         duplicatesSkipped = result.duplicates,
+        ordersImported = orderIntents.size - result.updatedOrderKeys.size - result.dedupedOrderKeys.size,
+        ordersUpdated = result.updatedOrderKeys.size,
     )
 }
 
@@ -599,14 +642,38 @@ private fun exchangeTransfer(
     )
 }
 
-private fun tradeDescription(
-    trade: ParsedTrade,
-    order: OrderMeta?,
-): String {
+// No order-derived suffix: existing databases were imported with plain "<verb> BASE/QUOTE"
+// descriptions, and trade dedupe is a full-tuple match including description — changing this format
+// would duplicate every trade on re-import. Order type/status live on the linked exchange_order.
+private fun tradeDescription(trade: ParsedTrade): String {
     val verb = if (trade.isBuy) "Buy" else "Sell"
-    val base = "$verb ${trade.baseCode}/${trade.quoteCode}"
-    val suffix = order?.type?.let { " ($it)" } ?: ""
-    return base + suffix
+    return "$verb ${trade.baseCode}/${trade.quoteCode}"
+}
+
+private fun parseOrder(
+    obj: JsonObject,
+    tm: ApiTradeMappings,
+    requestId: ApiRequestId,
+    jsonPath: String,
+): ParsedOrder? {
+    val orderRef = (tm.orderIdField?.let { obj.str(it) } ?: obj.str(tm.idField)) ?: return null
+    val side = obj.str(tm.sideField) ?: return null
+    val createdAt = obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat) } ?: return null
+    return ParsedOrder(
+        orderRef = orderRef,
+        clientOid = tm.clientOidField?.let { obj.str(it) },
+        side = side,
+        orderType = tm.orderTypeField?.let { obj.str(it) },
+        timeInForce = tm.timeInForceField?.let { obj.str(it) },
+        status = tm.orderStatusField?.let { obj.str(it) },
+        limitPrice = tm.limitPriceField?.let { obj.str(it) },
+        quantity = obj.str(tm.baseQuantityField),
+        avgPrice = tm.avgPriceField?.let { obj.str(it) },
+        createdAt = createdAt,
+        updatedAt = tm.updateTimestampField?.let { obj.str(it) }?.let { parseApiTimestamp(it, tm.timestampFormat) },
+        requestId = requestId,
+        jsonPath = jsonPath,
+    )
 }
 
 private fun parseTrade(

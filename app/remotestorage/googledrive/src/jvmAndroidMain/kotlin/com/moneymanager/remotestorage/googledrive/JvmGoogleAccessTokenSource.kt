@@ -28,23 +28,7 @@ class JvmGoogleAccessTokenSource(
         isSignedIn() && accountStore.grantedScopes(credentials.clientId).containsAll(scopes)
 
     override suspend fun signIn() {
-        withContext(Dispatchers.IO) {
-            LoopbackRedirectReceiver().use { receiver ->
-                val state = oauth.newState()
-                browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri, state, scopes))
-                val code = receiver.awaitCode(state)
-                val tokens = oauth.exchangeCode(credentials, code, receiver.redirectUri)
-                val refreshToken =
-                    tokens.refreshToken
-                        ?: throw RemoteAuthException(
-                            "Google did not return a refresh token. Remove Money Manager from your Google " +
-                                "account's third-party access and connect again.",
-                        )
-                accountStore.saveRefreshToken(credentials.clientId, refreshToken)
-                accountStore.saveAccessToken(credentials.clientId, tokens.accessToken, accessTokenExpiry(tokens.expiresInSeconds))
-                accountStore.saveGrantedScopes(credentials.clientId, scopes.toSet())
-            }
-        }
+        performLoopbackSignIn(credentials, accountStore, browser, oauth, scopes)
     }
 
     override suspend fun signOut() {
@@ -55,3 +39,35 @@ class JvmGoogleAccessTokenSource(
 
     override suspend fun accessTokenExpiresAtEpochMs(): Long? = accountStore.accessToken(credentials.clientId)?.expiresAtMillis
 }
+
+/**
+ * The installed-app loopback consent flow: opens the browser, waits for the redirect, exchanges the
+ * code, and persists the refresh/access tokens and granted scopes. Shared between the explicit
+ * [JvmGoogleAccessTokenSource.signIn] and the Bearer client's expired-refresh-token fallback, so a
+ * dead refresh token re-runs the same consent instead of surfacing an error. Returns the new tokens.
+ */
+internal suspend fun performLoopbackSignIn(
+    credentials: GoogleDriveCredentials,
+    accountStore: GoogleDriveAccountStore,
+    browser: BrowserLauncher,
+    oauth: GoogleOAuth,
+    scopes: List<String>,
+): GoogleTokens =
+    withContext(Dispatchers.IO) {
+        LoopbackRedirectReceiver().use { receiver ->
+            val state = oauth.newState()
+            browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri, state, scopes))
+            val code = receiver.awaitCode(state)
+            val tokens = oauth.exchangeCode(credentials, code, receiver.redirectUri)
+            val refreshToken =
+                tokens.refreshToken
+                    ?: throw RemoteAuthException(
+                        "Google did not return a refresh token. Remove Money Manager from your Google " +
+                            "account's third-party access and connect again.",
+                    )
+            accountStore.saveRefreshToken(credentials.clientId, refreshToken)
+            accountStore.saveAccessToken(credentials.clientId, tokens.accessToken, accessTokenExpiry(tokens.expiresInSeconds))
+            accountStore.saveGrantedScopes(credentials.clientId, scopes.toSet())
+            tokens
+        }
+    }
