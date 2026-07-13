@@ -137,7 +137,9 @@ class CachingJdbcSqliteDriver(
             if (cached != null && cached.sql == sql) {
                 cached
             } else {
-                cached?.statement?.close()
+                // Drop the stale entry first: if the re-prepare below throws, the cache must not keep
+                // pointing at a statement this just closed.
+                cache.remove(identifier)?.statement?.close()
                 CachedStatement(sql, connection.prepareStatement(sql)).also { cache[identifier] = it }
             }
         bind(entry.statement, binders)

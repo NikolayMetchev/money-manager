@@ -639,11 +639,14 @@ fun SettingsScreen(
                                     size = sampleDataSize,
                                 )
 
+                                // The final counts come from the flow itself: the collector above feeds the
+                                // progress dialog and may not have delivered the last emission yet.
+                                val finalProgress = progressFlow.value
                                 successMessage = "Sample data generated successfully! " +
-                                    "Created ${generationProgress.accountsCreated} accounts, " +
-                                    "${generationProgress.transactionsCreated} transactions, " +
-                                    "${generationProgress.tradesCreated} trades and " +
-                                    "${generationProgress.ordersCreated} orders."
+                                    "Created ${finalProgress.accountsCreated} accounts, " +
+                                    "${finalProgress.transactionsCreated} transactions, " +
+                                    "${finalProgress.tradesCreated} trades and " +
+                                    "${finalProgress.ordersCreated} orders."
                                 showProgressDialog = false
                             } catch (expected: Exception) {
                                 errorMessage = "Failed to generate sample data: ${expected.message}"
