@@ -42,12 +42,17 @@ kotlin {
                 // sqldelight.runtime + read/write are used directly by jvmMain (JvmDatabaseManager uses
                 // the read Schema); declared here per dependency-analysis (the SQLDelight plugin that
                 // used to supply the runtime now lives in :app:db:read/:write).
+                // CachingJdbcSqliteDriver extends SQLDelight's JdbcDriver.
+                api(libs.sqldelight.jdbc.driver)
                 api(libs.sqldelight.runtime)
                 api(projects.app.db.write)
                 api(projects.utils.currency)
 
-                implementation(libs.sqldelight.sqlite.driver)
                 implementation(projects.app.db.seed)
+
+                // No longer used directly (CachingJdbcSqliteDriver replaces JdbcSqliteDriver), but it
+                // supplies the xerial JDBC driver that DriverManager resolves the `jdbc:sqlite:` URL with.
+                runtimeOnly(libs.sqldelight.sqlite.driver)
             }
         }
 

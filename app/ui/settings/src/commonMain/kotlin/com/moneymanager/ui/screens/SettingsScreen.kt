@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -19,6 +20,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +57,7 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.rememberDatabaseLocationPicker
 import com.moneymanager.ui.util.GenerationProgress
+import com.moneymanager.ui.util.SampleDataSize
 import com.moneymanager.ui.util.generateSampleData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -179,6 +182,7 @@ fun SettingsScreen(
     var showWarningDialog by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
     var showProgressDialog by remember { mutableStateOf(false) }
+    var sampleDataSize by remember { mutableStateOf(SampleDataSize.SMALL) }
     var generationProgress by remember { mutableStateOf(GenerationProgress()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
@@ -583,10 +587,29 @@ fun SettingsScreen(
             onDismissRequest = { showWarningDialog = false },
             title = { Text("Generate Sample Data?") },
             text = {
-                Text(
-                    "This will create 100 accounts with thousands of transactions spanning 2015-2025. " +
-                        "This operation cannot be easily undone. Continue?",
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "This creates accounts, people, categories, crypto assets, transactions " +
+                            "(including fees, pass-throughs and conversions), trades and exchange orders " +
+                            "spanning 2015-2025. This operation cannot be easily undone.",
+                    )
+                    SampleDataSize.entries.forEach { option ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier =
+                                Modifier.selectable(
+                                    selected = sampleDataSize == option,
+                                    onClick = { sampleDataSize = option },
+                                ),
+                        ) {
+                            RadioButton(
+                                selected = sampleDataSize == option,
+                                onClick = { sampleDataSize = option },
+                            )
+                            Text("${option.label} — ${option.accountCount} accounts")
+                        }
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
@@ -613,11 +636,17 @@ fun SettingsScreen(
                                     importEngine = importEngine,
                                     maintenance = maintenance,
                                     progressFlow = progressFlow,
+                                    size = sampleDataSize,
                                 )
 
+                                // The final counts come from the flow itself: the collector above feeds the
+                                // progress dialog and may not have delivered the last emission yet.
+                                val finalProgress = progressFlow.value
                                 successMessage = "Sample data generated successfully! " +
-                                    "Created ${generationProgress.accountsCreated} accounts and " +
-                                    "${generationProgress.transactionsCreated} transactions."
+                                    "Created ${finalProgress.accountsCreated} accounts, " +
+                                    "${finalProgress.transactionsCreated} transactions, " +
+                                    "${finalProgress.tradesCreated} trades and " +
+                                    "${finalProgress.ordersCreated} orders."
                                 showProgressDialog = false
                             } catch (expected: Exception) {
                                 errorMessage = "Failed to generate sample data: ${expected.message}"
@@ -655,35 +684,21 @@ fun SettingsScreen(
                     )
 
                     LinearProgressIndicator(
-                        progress = {
-                            val totalProgress = generationProgress.accountsCreated + generationProgress.transactionsCreated
-                            val totalExpected = generationProgress.totalAccounts + generationProgress.totalTransactions
-                            if (totalExpected > 0) {
-                                totalProgress.toFloat() / totalExpected.toFloat()
-                            } else {
-                                0f
-                            }
-                        },
+                        progress = { generationProgress.fraction },
                         modifier = Modifier.fillMaxWidth(),
                     )
 
                     Text(
                         text =
                             "Created ${generationProgress.accountsCreated}/${generationProgress.totalAccounts} accounts, " +
-                                "${generationProgress.transactionsCreated}/${generationProgress.totalTransactions} transactions",
+                                "${generationProgress.transactionsCreated}/${generationProgress.totalTransactions} transactions, " +
+                                "${generationProgress.tradesCreated}/${generationProgress.totalTrades} trades, " +
+                                "${generationProgress.ordersCreated}/${generationProgress.totalOrders} orders",
                         style = MaterialTheme.typography.bodySmall,
                     )
 
-                    val totalProgress = generationProgress.accountsCreated + generationProgress.transactionsCreated
-                    val totalExpected = generationProgress.totalAccounts + generationProgress.totalTransactions
-                    val percentage =
-                        if (totalExpected > 0) {
-                            (totalProgress.toFloat() / totalExpected.toFloat() * 100).toInt()
-                        } else {
-                            0
-                        }
                     Text(
-                        text = "$percentage% complete",
+                        text = "${(generationProgress.fraction * 100).toInt()}% complete",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
