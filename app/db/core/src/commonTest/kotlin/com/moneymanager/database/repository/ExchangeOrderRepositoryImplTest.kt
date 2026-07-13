@@ -47,7 +47,9 @@ class ExchangeOrderRepositoryImplTest : DbTest() {
         )
 
     @Test
-    fun `upsert creates, dedupes identical, and revises changed orders`() =
+    // Test names in this package are dexed for the Android device test run, whose SimpleName grammar
+    // allows spaces but not commas — keep punctuation out of the backticked names here.
+    fun `upsert creates then dedupes an identical order and revises a changed one`() =
         runTest {
             val accountId = account()
 
