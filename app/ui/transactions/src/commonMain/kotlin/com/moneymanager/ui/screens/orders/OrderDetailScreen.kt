@@ -55,13 +55,14 @@ fun OrderDetailScreen(
         exchangeOrderRepository.getFillTradesForOrder(orderId)
     }
 
-    val currentOrder = order ?: return
     val timeZone = TimeZone.currentSystemDefault()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp).testTag("orderDetail"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // Rendered before the order resolves, so back navigation stays reachable while the flow is
+        // still loading — or forever, if the id names an order that no longer exists.
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -69,9 +70,25 @@ fun OrderDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = onBack) { Text("← Back") }
-                TextButton(onClick = { onAuditClick(orderId) }) { Text("Audit history") }
+                TextButton(
+                    onClick = { onAuditClick(orderId) },
+                    enabled = order != null,
+                ) { Text("Audit history") }
             }
         }
+
+        val currentOrder = order
+        if (currentOrder == null) {
+            item {
+                Text(
+                    text = "Order not found",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            return@LazyColumn
+        }
+
         item {
             Card(elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
                 Column(

@@ -157,6 +157,28 @@ class OrdersScreenTest {
         }
 
     @Test
+    fun orderDetail_backButtonStaysReachable_whenTheOrderDoesNotResolve() =
+        runMoneyManagerComposeUiTest {
+            // A stale/deleted order id never emits an order; the user must still be able to navigate away.
+            var backClicks = 0
+            setContent {
+                ProvideSchemaAwareScope {
+                    OrderDetailScreen(
+                        orderId = orderId,
+                        exchangeOrderRepository = repository(orders = emptyList(), fills = emptyList()),
+                        onBack = { backClicks++ },
+                    )
+                }
+            }
+            waitUntilExactlyOneExists(hasText("Order not found"))
+            waitForIdle()
+
+            onNodeWithText("← Back").performClick()
+            waitForIdle()
+            assertEquals(1, backClicks)
+        }
+
+    @Test
     fun orderDetail_fillTrade_hasOwnAuditButton_reportingTheFill() =
         runMoneyManagerComposeUiTest {
             var auditedFill: Trade? = null
