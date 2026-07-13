@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
@@ -205,6 +206,28 @@ sealed class Screen : NavKey {
     @Serializable
     data object ConnectApi : Screen() {
         override val title: String get() = "Connect API Account"
+    }
+
+    @Serializable
+    data class ExchangeOrders(
+        val accountId: AccountId,
+        val accountName: String,
+    ) : Screen() {
+        override val title: String get() = "$accountName Orders"
+    }
+
+    @Serializable
+    data class ExchangeOrderDetail(
+        val orderId: ExchangeOrderId,
+    ) : Screen() {
+        override val title: String get() = "Order"
+    }
+
+    @Serializable
+    data class ExchangeOrderAuditHistory(
+        val orderId: ExchangeOrderId,
+    ) : Screen() {
+        override val title: String get() = "Order Audit"
     }
 
     @Serializable

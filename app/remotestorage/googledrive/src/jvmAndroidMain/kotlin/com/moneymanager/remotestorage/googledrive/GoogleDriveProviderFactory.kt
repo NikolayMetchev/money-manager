@@ -1,6 +1,7 @@
 package com.moneymanager.remotestorage.googledrive
 
 import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.remotestorage.RemoteAuthException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
@@ -62,7 +63,9 @@ fun googleDriveProvider(
     val oauth = GoogleOAuth(tokenHttpClient)
     val driveClient =
         synchronized(driveClients) {
-            driveClients.getOrPut(credentials.clientId) { buildDriveClient(credentials, accountStore, oauth) }
+            driveClients.getOrPut(credentials.clientId) {
+                buildDriveClient(credentials, accountStore, oauth, browser, listOf(DRIVE_FILE_SCOPE))
+            }
         }
     return GoogleDriveProvider(
         JvmGoogleAccessTokenSource(credentials, accountStore, browser, oauth, driveClient),
@@ -93,7 +96,7 @@ fun googleDriveTokenSource(
         )
     val accountStore = GoogleDriveAccountStore(localSettings)
     val oauth = GoogleOAuth(tokenHttpClient)
-    val driveClient = buildDriveClient(credentials, accountStore, oauth)
+    val driveClient = buildDriveClient(credentials, accountStore, oauth, browser, scopes)
     return JvmGoogleAccessTokenSource(credentials, accountStore, browser, oauth, driveClient, scopes)
 }
 
@@ -107,6 +110,8 @@ private fun buildDriveClient(
     credentials: GoogleDriveCredentials,
     accountStore: GoogleDriveAccountStore,
     oauth: GoogleOAuth,
+    browser: BrowserLauncher,
+    scopes: List<String>,
 ): HttpClient =
     HttpClient(CIO) {
         install(Auth) {
@@ -118,13 +123,23 @@ private fun buildDriveClient(
                 }
                 refreshTokens {
                     accountStore.refreshToken(credentials.clientId)?.let { refresh ->
-                        val tokens = oauth.refresh(credentials, refresh)
+                        val tokens =
+                            try {
+                                oauth.refresh(credentials, refresh).copy(refreshToken = refresh)
+                            } catch (expired: RemoteAuthException) {
+                                // A revoked/expired refresh token comes back as `invalid_grant`. The stored
+                                // token is dead, so clear it and re-run the browser consent flow (the same
+                                // one used to connect originally) instead of surfacing the error.
+                                if ("invalid_grant" !in expired.message.orEmpty()) throw expired
+                                accountStore.clear(credentials.clientId)
+                                performLoopbackSignIn(credentials, accountStore, browser, oauth, scopes)
+                            }
                         accountStore.saveAccessToken(
                             credentials.clientId,
                             tokens.accessToken,
                             accessTokenExpiry(tokens.expiresInSeconds),
                         )
-                        BearerTokens(tokens.accessToken, refresh)
+                        BearerTokens(tokens.accessToken, tokens.refreshToken ?: refresh)
                     }
                 }
                 // Attach the token up front for Drive API hosts instead of waiting for a 401 challenge.

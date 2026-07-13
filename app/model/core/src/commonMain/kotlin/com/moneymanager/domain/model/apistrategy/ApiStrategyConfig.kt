@@ -716,6 +716,12 @@ data class ApiTradeMappings(
     /** Order-only fields surfaced as trade attributes when ORDERS metadata is joined in. */
     val orderTypeField: String? = null,
     val orderStatusField: String? = null,
+    // Order-only fields for persisting the order itself (ORDERS endpoints; ignored for TRADES).
+    val limitPriceField: String? = null,
+    val avgPriceField: String? = null,
+    val updateTimestampField: String? = null,
+    val clientOidField: String? = null,
+    val timeInForceField: String? = null,
 )
 
 /**

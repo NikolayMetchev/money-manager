@@ -289,6 +289,37 @@ data class ImportTradeIntent(
     val toAmount: Money,
 )
 
+/** Builder-chosen placeholder identity for an exchange order upserted in this batch. */
+@JvmInline
+value class LocalOrderKey(
+    val value: String,
+)
+
+/**
+ * An exchange order to upsert, keyed by ([accountId], [orderRef]). Orders are metadata, not
+ * transactions: they never move money (their fills — trades — do), but their status/prices change
+ * between imports, so the engine creates-or-revises rather than create-only. [tradeKeys] name the
+ * fill trades in the same batch to link via `exchange_order_trade`; every key must resolve in
+ * [ImportResult.createdTradeIds]. Orders without fills (ACTIVE/CANCELED) import standalone.
+ */
+data class ImportOrderIntent(
+    val key: LocalOrderKey,
+    val source: Source,
+    val accountId: AccountId,
+    val orderRef: String,
+    val clientOid: String? = null,
+    val side: String,
+    val orderType: String? = null,
+    val timeInForce: String? = null,
+    val status: String? = null,
+    val limitPrice: String? = null,
+    val quantity: String? = null,
+    val avgPrice: String? = null,
+    val createdAt: Instant,
+    val updatedAt: Instant? = null,
+    val tradeKeys: List<LocalTradeKey> = emptyList(),
+)
+
 /** A request to merge [deletedId] into [survivingId] (reassign its transfers, then delete it). */
 data class AccountMergeRequest(
     val deletedId: AccountId,
@@ -470,6 +501,7 @@ data class ImportBatch(
     val currencies: List<ImportCurrencyIntent> = emptyList(),
     val cryptoAssets: List<ImportCryptoIntent> = emptyList(),
     val trades: List<ImportTradeIntent> = emptyList(),
+    val orders: List<ImportOrderIntent> = emptyList(),
     val csvStrategyMutations: List<CsvStrategyMutation> = emptyList(),
     val apiStrategyMutations: List<ApiStrategyMutation> = emptyList(),
     val passThroughMutations: List<PassThroughMutation> = emptyList(),

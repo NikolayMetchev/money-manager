@@ -20,6 +20,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.DeviceWriteRepository
+import com.moneymanager.domain.repository.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
@@ -67,6 +68,7 @@ interface DatabaseComponent {
     val cryptoRepository: CryptoWriteRepository
 
     val tradeRepository: TradeWriteRepository
+    val exchangeOrderRepository: ExchangeOrderWriteRepository
     val deviceRepository: DeviceWriteRepository
     val importDirectoryRepository: ImportDirectoryWriteRepository
     val importTimelineRepository: ImportTimelineReadRepository

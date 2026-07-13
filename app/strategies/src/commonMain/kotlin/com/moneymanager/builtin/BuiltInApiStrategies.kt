@@ -392,8 +392,14 @@ object BuiltInApiStrategies {
                 timestampFormat = TimestampFormat.EPOCH_MS,
                 idField = "order_id",
                 orderIdField = "order_id",
-                orderTypeField = "type",
+                // The live get-order-history payload calls this "order_type" (not "type").
+                orderTypeField = "order_type",
                 orderStatusField = "status",
+                limitPriceField = "limit_price",
+                avgPriceField = "avg_price",
+                updateTimestampField = "update_time",
+                clientOidField = "client_oid",
+                timeInForceField = "time_in_force",
             )
 
         fun transferMappings(addressField: String) =

@@ -1,0 +1,23 @@
+insert:
+INSERT INTO exchange_order(revision_id, account_id, order_ref, client_oid, side, order_type, time_in_force, status, limit_price, quantity, avg_price, created_at, updated_at)
+VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+-- Revises an existing order in place: order status/prices legitimately change between imports
+-- (ACTIVE -> FILLED/CANCELED), so the row is updated and revision bumped instead of duplicated.
+updateByUniqueKey:
+UPDATE exchange_order
+SET revision_id = revision_id + 1,
+    client_oid = ?, side = ?, order_type = ?, time_in_force = ?, status = ?,
+    limit_price = ?, quantity = ?, avg_price = ?, created_at = ?, updated_at = ?
+WHERE account_id = ? AND order_ref = ?;
+
+delete:
+DELETE FROM exchange_order WHERE id = ?;
+
+-- Idempotent: re-importing the same session re-links the same fills.
+linkTrade:
+INSERT OR IGNORE INTO exchange_order_trade(order_id, trade_id)
+VALUES (?, ?);

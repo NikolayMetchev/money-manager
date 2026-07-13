@@ -8,6 +8,7 @@ import com.moneymanager.database.mapper.CategoryAuditEntryMapper
 import com.moneymanager.database.mapper.CryptoAuditEntryMapper
 import com.moneymanager.database.mapper.CsvImportStrategyAuditEntryMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
+import com.moneymanager.database.mapper.ExchangeOrderAuditEntryMapper
 import com.moneymanager.database.mapper.ImportDirectoryAuditEntryMapper
 import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
@@ -29,6 +30,8 @@ import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CsvImportStrategyAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.ExchangeOrderAuditEntry
+import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.ImportDirectoryAuditEntry
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
@@ -130,6 +133,14 @@ class AuditReadRepositoryImpl(
                 .selectAuditHistoryForTrade(tradeId.id)
                 .executeAsList()
                 .map(TradeAuditEntryMapper::map)
+        }
+
+    override suspend fun getAuditHistoryForExchangeOrder(orderId: ExchangeOrderId): List<ExchangeOrderAuditEntry> =
+        withContext(Dispatchers.Default) {
+            auditSelectQueries
+                .selectAuditHistoryForExchangeOrder(orderId.id)
+                .executeAsList()
+                .map(ExchangeOrderAuditEntryMapper::map)
         }
 
     override suspend fun getAuditHistoryForCategory(categoryId: Long): List<CategoryAuditEntry> =

@@ -28,6 +28,8 @@ import com.moneymanager.database.repository.CurrencyReadRepositoryImpl
 import com.moneymanager.database.repository.CurrencyWriteRepositoryImpl
 import com.moneymanager.database.repository.DeviceReadRepositoryImpl
 import com.moneymanager.database.repository.DeviceWriteRepositoryImpl
+import com.moneymanager.database.repository.ExchangeOrderReadRepositoryImpl
+import com.moneymanager.database.repository.ExchangeOrderWriteRepositoryImpl
 import com.moneymanager.database.repository.ImportDirectoryReadRepositoryImpl
 import com.moneymanager.database.repository.ImportDirectoryWriteRepositoryImpl
 import com.moneymanager.database.repository.ImportTimelineReadRepositoryImpl
@@ -87,6 +89,8 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
 import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.DeviceWriteRepository
+import com.moneymanager.domain.repository.ExchangeOrderReadRepository
+import com.moneymanager.domain.repository.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
@@ -309,6 +313,19 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
+    fun provideExchangeOrderReadRepository(database: MoneyManagerDatabaseWrapper): ExchangeOrderReadRepository =
+        ExchangeOrderReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideExchangeOrderWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+        reader: ExchangeOrderReadRepository,
+    ): ExchangeOrderWriteRepository = ExchangeOrderWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
     fun provideDeviceReadRepository(database: MoneyManagerDatabaseWrapper): DeviceReadRepository = DeviceReadRepositoryImpl(database)
 
     @Provides
@@ -504,6 +521,7 @@ interface RepositoryModule {
         currencyRepository: CurrencyWriteRepository,
         cryptoRepository: CryptoWriteRepository,
         tradeRepository: TradeWriteRepository,
+        exchangeOrderRepository: ExchangeOrderWriteRepository,
         attributeTypeRepository: AttributeTypeWriteRepository,
         relationshipTypeRepository: RelationshipTypeWriteRepository,
         csvImportStrategyRepository: CsvImportStrategyWriteRepository,
@@ -527,6 +545,7 @@ interface RepositoryModule {
             currencyRepository = currencyRepository,
             cryptoRepository = cryptoRepository,
             tradeRepository = tradeRepository,
+            exchangeOrderRepository = exchangeOrderRepository,
             attributeTypeRepository = attributeTypeRepository,
             relationshipTypeRepository = relationshipTypeRepository,
             csvImportStrategyRepository = csvImportStrategyRepository,

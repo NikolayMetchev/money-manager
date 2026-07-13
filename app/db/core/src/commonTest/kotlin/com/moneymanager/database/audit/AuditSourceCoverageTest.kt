@@ -208,6 +208,45 @@ class AuditSourceCoverageTest : DbTest() {
             ) { it.source }
             coveredTables.add("trade_audit")
 
+            // Exchange order — upserted directly (the engine's ImportOrderIntent path uses the same
+            // repository call), recording EntityType.EXCHANGE_ORDER provenance on create AND update.
+            val orderResult =
+                repositories.exchangeOrderRepository.upsertOrder(
+                    accountId = sourceAccountId,
+                    orderRef = "coverage-o1",
+                    clientOid = null,
+                    side = "BUY",
+                    orderType = "LIMIT",
+                    timeInForce = "GOOD_TILL_CANCEL",
+                    status = "ACTIVE",
+                    limitPrice = "1.00",
+                    quantity = "10",
+                    avgPrice = null,
+                    createdAt = now,
+                    updatedAt = null,
+                    source = Source.Manual,
+                )
+            repositories.exchangeOrderRepository.upsertOrder(
+                accountId = sourceAccountId,
+                orderRef = "coverage-o1",
+                clientOid = null,
+                side = "BUY",
+                orderType = "LIMIT",
+                timeInForce = "GOOD_TILL_CANCEL",
+                status = "FILLED",
+                limitPrice = "1.00",
+                quantity = "10",
+                avgPrice = "1.00",
+                createdAt = now,
+                updatedAt = now,
+                source = Source.Manual,
+            )
+            assertAllHaveSource(
+                "exchange order",
+                repositories.auditRepository.getAuditHistoryForExchangeOrder(orderResult.id),
+            ) { it.source }
+            coveredTables.add("exchange_order_audit")
+
             // CSV import strategy (dedicated source table, like the API strategy)
             val csvStrategyId =
                 repositories.csvImportStrategyRepository.createStrategy(

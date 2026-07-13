@@ -31,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -61,6 +62,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
@@ -70,6 +72,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ExchangeOrderReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -187,12 +190,15 @@ fun AccountTransactionsScreen(
     attributeTypeRepository: AttributeTypeReadRepository,
     personRepository: PersonReadRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
+    exchangeOrderRepository: ExchangeOrderReadRepository,
     maintenance: Maintenance,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
     onAccountClick: (AccountId, String, CurrencyId?, TransferId?) -> Unit = { _, _, _, _ -> },
     onAuditClick: (TransferId) -> Unit = {},
     onFeeLinkClick: (TransferId) -> Unit = {},
+    onOrdersClick: (AccountId, String) -> Unit = { _, _ -> },
+    onOrderLinkClick: (ExchangeOrderId) -> Unit = {},
     scrollToTransferId: TransferId? = null,
     initialCurrencyId: CurrencyId? = null,
     externalRefreshTrigger: Int = 0,
@@ -1080,6 +1086,27 @@ fun AccountTransactionsScreen(
                     }
                 }
 
+                // Exchange accounts with imported orders get a shortcut to the per-account Orders list.
+                val orderCount by rememberFlowAsStateWithSchemaErrorHandling(selectedAccountId, initial = 0L) {
+                    exchangeOrderRepository.countOrdersByAccount(selectedAccountId)
+                }
+                if (orderCount > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(
+                            onClick = {
+                                val name = allAccounts.firstOrNull { it.id == selectedAccountId }?.name ?: ""
+                                onOrdersClick(selectedAccountId, name)
+                            },
+                            modifier = Modifier.testTag("ordersButton"),
+                        ) {
+                            Text("Orders ($orderCount)")
+                        }
+                    }
+                }
+
                 Box(modifier = Modifier.fillMaxSize()) {
                     LazyColumn(
                         state = listState,
@@ -1107,6 +1134,7 @@ fun AccountTransactionsScreen(
                                     }
                                 },
                                 onAuditClick = onAuditClick,
+                                onOrderLinkClick = onOrderLinkClick,
                                 onFeeLinkClick = { linkedTransferId ->
                                     val targetIndex =
                                         displayedRunningBalances.indexOfFirst { it.transactionId.id == linkedTransferId.id }

@@ -651,3 +651,57 @@ LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
 LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
 WHERE trade_audit.trade_id = ?
 ORDER BY trade_audit.audit_timestamp DESC, trade_audit.id DESC;
+
+selectAuditHistoryForExchangeOrder:
+SELECT
+    exchange_order_audit.id,
+    exchange_order_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    exchange_order_audit.exchange_order_id,
+    exchange_order_audit.revision_id,
+    exchange_order_audit.account_id,
+    exchange_order_audit.order_ref,
+    exchange_order_audit.client_oid,
+    exchange_order_audit.side,
+    exchange_order_audit.order_type,
+    exchange_order_audit.time_in_force,
+    exchange_order_audit.status,
+    exchange_order_audit.limit_price,
+    exchange_order_audit.quantity,
+    exchange_order_audit.avg_price,
+    exchange_order_audit.created_at,
+    exchange_order_audit.updated_at,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path,
+    csv_entity_source.csv_import_id AS source_csv_import_id,
+    csv_entity_source.csv_row_index AS source_csv_row_index,
+    csv_import_metadata.original_file_name AS source_csv_file_name,
+    qif_entity_source.qif_import_id AS source_qif_import_id,
+    qif_entity_source.qif_record_index AS source_qif_record_index,
+    qif_import_metadata.original_file_name AS source_qif_file_name
+FROM exchange_order_audit
+JOIN audit_type ON exchange_order_audit.audit_type_id = audit_type.id
+LEFT JOIN entity_source ON exchange_order_audit.exchange_order_id = entity_source.entity_id
+    AND exchange_order_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 12
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+WHERE exchange_order_audit.exchange_order_id = ?
+ORDER BY exchange_order_audit.audit_timestamp DESC, exchange_order_audit.id DESC;

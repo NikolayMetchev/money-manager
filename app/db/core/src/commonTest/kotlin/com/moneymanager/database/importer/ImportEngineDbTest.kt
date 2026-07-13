@@ -21,14 +21,18 @@ import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.ImportOrderIntent
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.ImportRowKey
+import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
+import com.moneymanager.importengineapi.LocalOrderKey
 import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.createTrade
@@ -61,6 +65,7 @@ class ImportEngineDbTest : DbTest() {
             currencyRepository = repositories.currencyRepository,
             cryptoRepository = repositories.cryptoRepository,
             tradeRepository = repositories.tradeRepository,
+            exchangeOrderRepository = repositories.exchangeOrderRepository,
             attributeTypeRepository = repositories.attributeTypeRepository,
             relationshipTypeRepository = repositories.relationshipTypeRepository,
             csvImportStrategyRepository = repositories.csvImportStrategyRepository,
@@ -1311,5 +1316,91 @@ class ImportEngineDbTest : DbTest() {
             assertEquals(BigInteger("100000000000000000000"), tradeRow.transactionAmount.amount)
             assertEquals(bank, tradeRow.sourceAccountId)
             assertEquals(wallet, tradeRow.targetAccountId)
+        }
+
+    @Test
+    fun orderIntents_upsertOrdersAndLinkFills_andStandaloneOrdersImport() =
+        runTest {
+            val e = engine()
+            val exchange =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Exchange", openingDate = baseTime),
+                )
+            val gbp = repositories.currencyRepository.getCurrencyByCode("GBP").first()!!
+            val eth = repositories.cryptoRepository.getCryptoAssetById(e.createCrypto("ETH")).first()!!
+
+            val tradeKey = LocalTradeKey("t1")
+            val result =
+                e.import(
+                    ImportBatch(
+                        trades =
+                            listOf(
+                                ImportTradeIntent(
+                                    key = tradeKey,
+                                    source = Source.Manual,
+                                    timestamp = baseTime,
+                                    description = "Buy ETH/GBP",
+                                    fromAccountId = exchange,
+                                    fromAmount = Money.fromDisplayValue("100", gbp),
+                                    toAccountId = exchange,
+                                    toAmount = Money.fromDisplayValue("0.05", eth),
+                                ),
+                            ),
+                        orders =
+                            listOf(
+                                ImportOrderIntent(
+                                    key = LocalOrderKey("o1"),
+                                    source = Source.Manual,
+                                    accountId = exchange,
+                                    orderRef = "ref-1",
+                                    side = "BUY",
+                                    status = "FILLED",
+                                    createdAt = baseTime,
+                                    tradeKeys = listOf(tradeKey),
+                                ),
+                                // An order with no fills in the batch (open limit order) imports standalone.
+                                ImportOrderIntent(
+                                    key = LocalOrderKey("o2"),
+                                    source = Source.Manual,
+                                    accountId = exchange,
+                                    orderRef = "ref-2",
+                                    side = "SELL",
+                                    status = "ACTIVE",
+                                    createdAt = baseTime,
+                                ),
+                            ),
+                    ),
+                )
+
+            val o1 = result.orderIds.getValue(LocalOrderKey("o1"))
+            val fills = repositories.exchangeOrderRepository.getFillTradesForOrder(o1).first()
+            assertEquals(listOf(result.createdTradeIds.getValue(tradeKey)), fills.map { it.id })
+            assertEquals(
+                2,
+                repositories.exchangeOrderRepository
+                    .getOrdersByAccount(exchange)
+                    .first()
+                    .size,
+            )
+
+            // A tradeKey that resolves to nothing in the batch must fail loudly, not drop the link.
+            assertFailsWith<IllegalArgumentException> {
+                e.import(
+                    ImportBatch(
+                        orders =
+                            listOf(
+                                ImportOrderIntent(
+                                    key = LocalOrderKey("o3"),
+                                    source = Source.Manual,
+                                    accountId = exchange,
+                                    orderRef = "ref-3",
+                                    side = "BUY",
+                                    createdAt = baseTime,
+                                    tradeKeys = listOf(LocalTradeKey("missing")),
+                                ),
+                            ),
+                    ),
+                )
+            }
         }
 }

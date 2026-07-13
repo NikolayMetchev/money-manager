@@ -22,6 +22,7 @@ fun DatabaseComponent.createImportEngine(editGate: EditGate): ImportEngine =
         currencyRepository = currencyRepository,
         cryptoRepository = cryptoRepository,
         tradeRepository = tradeRepository,
+        exchangeOrderRepository = exchangeOrderRepository,
         attributeTypeRepository = attributeTypeRepository,
         relationshipTypeRepository = relationshipTypeRepository,
         csvImportStrategyRepository = csvImportStrategyRepository,

@@ -139,6 +139,9 @@ SELECT
     -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
     pass_through_as_funding.id2 AS pass_through_spend_id,
     pass_through_as_spend.id1 AS pass_through_funding_id,
+    -- The exchange order this trade fills, when any (exchange_order_trade.trade_id is UNIQUE, so
+    -- the join never multiplies rows and is a point index lookup).
+    order_link.order_id AS exchange_order_id,
     -- Whether this row is a trade (same-transaction asset conversion) or a plain transfer.
     CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
 FROM running_balance_materialized_view
@@ -153,6 +156,7 @@ LEFT JOIN transfer_relationship pass_through_as_funding
     ON pass_through_as_funding.id1 = running_balance_materialized_view.id AND pass_through_as_funding.relationship_type_id = 3
 LEFT JOIN transfer_relationship pass_through_as_spend
     ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
+LEFT JOIN exchange_order_trade order_link ON order_link.trade_id = running_balance_materialized_view.id
 WHERE running_balance_materialized_view.account_id = :accountId
   AND (:currencyId IS NULL OR running_balance_materialized_view.asset_id = :currencyId)
   AND ((:lastTimestamp IS NULL AND :lastId IS NULL)
@@ -197,6 +201,9 @@ SELECT
     -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
     pass_through_as_funding.id2 AS pass_through_spend_id,
     pass_through_as_spend.id1 AS pass_through_funding_id,
+    -- The exchange order this trade fills, when any (exchange_order_trade.trade_id is UNIQUE, so
+    -- the join never multiplies rows and is a point index lookup).
+    order_link.order_id AS exchange_order_id,
     -- Whether this row is a trade (same-transaction asset conversion) or a plain transfer.
     CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
 FROM running_balance_materialized_view
@@ -211,6 +218,7 @@ LEFT JOIN transfer_relationship pass_through_as_funding
     ON pass_through_as_funding.id1 = running_balance_materialized_view.id AND pass_through_as_funding.relationship_type_id = 3
 LEFT JOIN transfer_relationship pass_through_as_spend
     ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
+LEFT JOIN exchange_order_trade order_link ON order_link.trade_id = running_balance_materialized_view.id
 WHERE running_balance_materialized_view.account_id = :accountId
   AND (:currencyId IS NULL OR running_balance_materialized_view.asset_id = :currencyId)
   AND (running_balance_materialized_view.timestamp > :firstTimestamp
@@ -263,6 +271,9 @@ SELECT
     -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
     pass_through_as_funding.id2 AS pass_through_spend_id,
     pass_through_as_spend.id1 AS pass_through_funding_id,
+    -- The exchange order this trade fills, when any (exchange_order_trade.trade_id is UNIQUE, so
+    -- the join never multiplies rows and is a point index lookup).
+    order_link.order_id AS exchange_order_id,
     -- Whether this row is a trade (same-transaction asset conversion) or a plain transfer.
     CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
 FROM running_balance_materialized_view
@@ -277,6 +288,7 @@ LEFT JOIN transfer_relationship pass_through_as_funding
     ON pass_through_as_funding.id1 = running_balance_materialized_view.id AND pass_through_as_funding.relationship_type_id = 3
 LEFT JOIN transfer_relationship pass_through_as_spend
     ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
+LEFT JOIN exchange_order_trade order_link ON order_link.trade_id = running_balance_materialized_view.id
 WHERE running_balance_materialized_view.account_id = :accountId
   AND (:currencyId IS NULL OR running_balance_materialized_view.asset_id = :currencyId)
 ORDER BY running_balance_materialized_view.timestamp DESC, running_balance_materialized_view.id DESC

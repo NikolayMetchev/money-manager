@@ -25,6 +25,7 @@ import com.moneymanager.domain.repository.CryptoWriteRepository
 import com.moneymanager.domain.repository.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.CsvImportWriteRepository
 import com.moneymanager.domain.repository.CurrencyWriteRepository
+import com.moneymanager.domain.repository.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.ImportDirectoryWriteRepository
 import com.moneymanager.domain.repository.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
@@ -71,6 +72,7 @@ class CategoriesScreenTest {
             currencyRepository = mock<CurrencyWriteRepository>(MockMode.autoUnit),
             cryptoRepository = mock<CryptoWriteRepository>(MockMode.autoUnit),
             tradeRepository = mock<TradeWriteRepository>(MockMode.autoUnit),
+            exchangeOrderRepository = mock<ExchangeOrderWriteRepository>(MockMode.autoUnit),
             attributeTypeRepository = mock<AttributeTypeWriteRepository>(MockMode.autoUnit),
             relationshipTypeRepository = mock<RelationshipTypeWriteRepository>(MockMode.autoUnit),
             csvImportStrategyRepository = mock<CsvImportStrategyWriteRepository>(MockMode.autoUnit),

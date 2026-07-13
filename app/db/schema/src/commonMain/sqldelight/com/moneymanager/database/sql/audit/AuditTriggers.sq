@@ -569,3 +569,30 @@ BEGIN
     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.timestamp, old.description, old.source_account_id, old.target_account_id, old.asset_id, old.amount);
 END;
 
+
+-- trigger_exchange_order_delete_audit
+CREATE TRIGGER trigger_exchange_order_delete_audit
+AFTER DELETE ON exchange_order
+FOR EACH ROW
+BEGIN
+    INSERT INTO exchange_order_audit (audit_timestamp, audit_type_id, exchange_order_id, revision_id, account_id, order_ref, client_oid, side, order_type, time_in_force, status, limit_price, quantity, avg_price, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.account_id, old.order_ref, old.client_oid, old.side, old.order_type, old.time_in_force, old.status, old.limit_price, old.quantity, old.avg_price, old.created_at, old.updated_at);
+END;
+
+-- trigger_exchange_order_insert_audit
+CREATE TRIGGER trigger_exchange_order_insert_audit
+AFTER INSERT ON exchange_order
+FOR EACH ROW
+BEGIN
+    INSERT INTO exchange_order_audit (audit_timestamp, audit_type_id, exchange_order_id, revision_id, account_id, order_ref, client_oid, side, order_type, time_in_force, status, limit_price, quantity, avg_price, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.account_id, new.order_ref, new.client_oid, new.side, new.order_type, new.time_in_force, new.status, new.limit_price, new.quantity, new.avg_price, new.created_at, new.updated_at);
+END;
+
+-- trigger_exchange_order_update_audit
+CREATE TRIGGER trigger_exchange_order_update_audit
+AFTER UPDATE ON exchange_order
+FOR EACH ROW
+BEGIN
+    INSERT INTO exchange_order_audit (audit_timestamp, audit_type_id, exchange_order_id, revision_id, account_id, order_ref, client_oid, side, order_type, time_in_force, status, limit_price, quantity, avg_price, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.account_id, old.order_ref, old.client_oid, old.side, old.order_type, old.time_in_force, old.status, old.limit_price, old.quantity, old.avg_price, old.created_at, old.updated_at);
+END;

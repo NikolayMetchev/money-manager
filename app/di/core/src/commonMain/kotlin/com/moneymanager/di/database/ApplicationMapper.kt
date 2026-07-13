@@ -45,6 +45,7 @@ fun DatabaseComponent.toApplication() =
                 relationshipTypeRepository = relationshipTypeRepository,
                 transferRelationshipRepository = transferRelationshipRepository,
                 tradeRepository = tradeRepository,
+                exchangeOrderRepository = exchangeOrderRepository,
             ),
         people =
             People(

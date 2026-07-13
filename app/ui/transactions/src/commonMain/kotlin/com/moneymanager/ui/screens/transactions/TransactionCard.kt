@@ -17,7 +17,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
@@ -58,14 +58,12 @@ internal fun TransactionKind.icon(): ImageVector =
     when (this) {
         TransactionKind.TRANSFER -> Icons.AutoMirrored.Filled.ArrowForward
         TransactionKind.TRADE -> Icons.Filled.Refresh
-        TransactionKind.ORDER -> Icons.Filled.ShoppingCart
     }
 
 internal fun TransactionKind.displayLabel(): String =
     when (this) {
         TransactionKind.TRANSFER -> "Transfer"
         TransactionKind.TRADE -> "Trade"
-        TransactionKind.ORDER -> "Order"
     }
 
 @Composable
@@ -78,6 +76,7 @@ fun AccountTransactionCard(
     onEditClick: (Transfer) -> Unit = {},
     onAuditClick: (TransferId) -> Unit = {},
     onFeeLinkClick: (TransferId) -> Unit = {},
+    onOrderLinkClick: (ExchangeOrderId) -> Unit = {},
 ) {
     // Determine which account to display based on the current view
     // The account column should show the OTHER account in the transaction
@@ -251,6 +250,15 @@ fun AccountTransactionCard(
                         containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = mutedAlpha),
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = mutedAlpha),
                         onClick = { onFeeLinkClick(linkedFundingId) },
+                    )
+                }
+                // A trade that fills an exchange order links to that order's detail screen.
+                runningBalance.exchangeOrderId?.let { orderId ->
+                    FeeBadge(
+                        text = "Order",
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = mutedAlpha),
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = mutedAlpha),
+                        onClick = { onOrderLinkClick(orderId) },
                     )
                 }
                 if (runningBalance.description.isNotBlank()) {

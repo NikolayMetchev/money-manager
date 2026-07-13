@@ -41,4 +41,10 @@ enum class EntityType(
      * [TRANSFER]: a trade's provenance is an `entity_source` row with `entity_type_id = 11`.
      */
     TRADE(11),
+
+    /**
+     * An exchange order (metadata for a set of fill trades). Shares the unified `entity_source`
+     * store, like [TRADE]: provenance is an `entity_source` row with `entity_type_id = 12`.
+     */
+    EXCHANGE_ORDER(12),
 }

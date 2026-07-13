@@ -5,6 +5,7 @@ package com.moneymanager.database.mapper
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.TransferId
@@ -34,6 +35,7 @@ object AccountRowMapper {
         feeParentTransferId: Long?,
         passThroughSpendId: Long?,
         passThroughFundingId: Long?,
+        exchangeOrderId: Long?,
         transactionKind: String,
     ): AccountRow {
         val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetKind)
@@ -52,6 +54,7 @@ object AccountRowMapper {
             feeParentTransferId = feeParentTransferId?.let { TransferId(it) },
             passThroughSpendId = passThroughSpendId?.let { TransferId(it) },
             passThroughFundingId = passThroughFundingId?.let { TransferId(it) },
+            exchangeOrderId = exchangeOrderId?.let { ExchangeOrderId(it) },
             kind = TransactionKind.valueOf(transactionKind),
         )
     }

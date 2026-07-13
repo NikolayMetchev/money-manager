@@ -95,6 +95,9 @@ import com.moneymanager.ui.screens.apistrategy.editor.ApiStrategyEditorScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvImportStrategyAuditScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
+import com.moneymanager.ui.screens.orders.ExchangeOrderAuditScreen
+import com.moneymanager.ui.screens.orders.OrderDetailScreen
+import com.moneymanager.ui.screens.orders.OrdersScreen
 import com.moneymanager.ui.screens.qif.QifStrategyEditorScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TradeEntryDialog
@@ -224,7 +227,12 @@ fun MoneyManagerApp(
                             NavigationBarItem(
                                 icon = { Text("\uD83D\uDCB0") },
                                 label = { Text("Accounts") },
-                                selected = currentScreen is Screen.Accounts || currentScreen is Screen.AccountTransactions,
+                                selected =
+                                    currentScreen is Screen.Accounts ||
+                                        currentScreen is Screen.AccountTransactions ||
+                                        currentScreen is Screen.ExchangeOrders ||
+                                        currentScreen is Screen.ExchangeOrderDetail ||
+                                        currentScreen is Screen.ExchangeOrderAuditHistory,
                                 onClick = { navigationHistory.navigateTo(Screen.Accounts()) },
                             )
                             NavigationBarItem(
@@ -463,6 +471,7 @@ fun MoneyManagerApp(
                                                 attributeTypeRepository = services.transactions.attributeTypeRepository,
                                                 personRepository = services.people.personRepository,
                                                 personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                                exchangeOrderRepository = services.transactions.exchangeOrderRepository,
                                                 maintenance = services.imports.maintenance,
                                                 onAccountIdChange = { accountId ->
                                                     currentlyViewedAccountId = accountId
@@ -488,9 +497,68 @@ fun MoneyManagerApp(
                                                 onFeeLinkClick = { transferId ->
                                                     navigateToTransferAccount(transferId, isPositiveAmount = false)
                                                 },
+                                                onOrdersClick = { accountId, accountName ->
+                                                    navigationHistory.navigateTo(Screen.ExchangeOrders(accountId, accountName))
+                                                },
+                                                onOrderLinkClick = { orderId ->
+                                                    navigationHistory.navigateTo(Screen.ExchangeOrderDetail(orderId))
+                                                },
                                                 scrollToTransferId = screen.scrollToTransferId,
                                                 initialCurrencyId = screen.selectedCurrencyId,
                                                 externalRefreshTrigger = transactionRefreshTrigger,
+                                            )
+                                        }
+                                        entry<Screen.ExchangeOrders> { screen ->
+                                            OrdersScreen(
+                                                accountId = screen.accountId,
+                                                exchangeOrderRepository = services.transactions.exchangeOrderRepository,
+                                                onOrderClick = { orderId ->
+                                                    navigationHistory.navigateTo(Screen.ExchangeOrderDetail(orderId))
+                                                },
+                                                onBack = { navigationHistory.navigateBack() },
+                                            )
+                                        }
+                                        entry<Screen.ExchangeOrderDetail> { screen ->
+                                            OrderDetailScreen(
+                                                orderId = screen.orderId,
+                                                exchangeOrderRepository = services.transactions.exchangeOrderRepository,
+                                                onFillTradeClick = { fill ->
+                                                    // A trade shares the transaction_id space, so the transactions
+                                                    // screen's scroll-to accepts its id as a TransferId.
+                                                    val account = accounts.find { it.id == fill.fromAccountId }
+                                                    navigationHistory.navigateTo(
+                                                        Screen.AccountTransactions(
+                                                            accountId = fill.fromAccountId,
+                                                            accountName = account?.name ?: fill.fromAccountId.toString(),
+                                                            scrollToTransferId = TransferId(fill.id.id),
+                                                        ),
+                                                    )
+                                                },
+                                                onFillTradeAuditClick = { fill ->
+                                                    // The trade audit screen resolves a trade by its shared
+                                                    // transaction id, so its TransferId reaches its trade_audit trail.
+                                                    navigationHistory.navigateTo(Screen.AuditHistory(TransferId(fill.id.id)))
+                                                },
+                                                onAuditClick = { orderId ->
+                                                    navigationHistory.navigateTo(Screen.ExchangeOrderAuditHistory(orderId))
+                                                },
+                                                onBack = { navigationHistory.navigateBack() },
+                                            )
+                                        }
+                                        entry<Screen.ExchangeOrderAuditHistory> { screen ->
+                                            ExchangeOrderAuditScreen(
+                                                orderId = screen.orderId,
+                                                auditRepository = services.audit.auditRepository,
+                                                onApiSourceClick = { sessionId, requestId, jsonPath ->
+                                                    navigationHistory.navigateTo(
+                                                        Screen.ApiSessionTraffic(
+                                                            sessionId = sessionId,
+                                                            highlightRequestId = requestId,
+                                                            highlightJsonPath = jsonPath,
+                                                        ),
+                                                    )
+                                                },
+                                                onBack = { navigationHistory.navigateBack() },
                                             )
                                         }
                                         entry<Screen.Imports>(clazzContentKey = { "Imports" }) { screen ->
