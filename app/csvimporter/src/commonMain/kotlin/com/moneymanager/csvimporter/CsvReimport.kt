@@ -545,7 +545,7 @@ private suspend fun valueUpdateFor(
     )
 }
 
-private fun Money.display(): String = "${toDisplayValue()} ${currency.code}"
+private fun Money.display(): String = "${toDisplayValue()} ${asset.code}"
 
 /** Emits a throttled per-row [ImportProgress] (every [PLAN_PROGRESS_EVERY_ROWS] rows and at the end). */
 private suspend fun emitRowProgress(

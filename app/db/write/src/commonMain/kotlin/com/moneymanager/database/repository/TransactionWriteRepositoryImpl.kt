@@ -96,7 +96,7 @@ class TransactionWriteRepositoryImpl(
                         description = transfer.description,
                         source_account_id = transfer.sourceAccountId.id,
                         target_account_id = transfer.targetAccountId.id,
-                        asset_id = transfer.amount.currency.id.id,
+                        asset_id = transfer.amount.asset.id.id,
                         amount = transfer.amount.amount.toString(),
                         id = transfer.id.id,
                     )
@@ -190,7 +190,7 @@ class TransactionWriteRepositoryImpl(
                         description = updatedTransfer.description,
                         source_account_id = updatedTransfer.sourceAccountId.id,
                         target_account_id = updatedTransfer.targetAccountId.id,
-                        asset_id = updatedTransfer.amount.currency.id.id,
+                        asset_id = updatedTransfer.amount.asset.id.id,
                         amount = updatedTransfer.amount.amount.toString(),
                         id = updatedTransfer.id.id,
                     )
@@ -273,7 +273,7 @@ class TransactionWriteRepositoryImpl(
                 description = transfer.description,
                 source_account_id = transfer.sourceAccountId.id,
                 target_account_id = transfer.targetAccountId.id,
-                asset_id = transfer.amount.currency.id.id,
+                asset_id = transfer.amount.asset.id.id,
                 amount = transfer.amount.amount.toString(),
             )
             newAttributes[transfer.id].orEmpty().forEach { attr ->

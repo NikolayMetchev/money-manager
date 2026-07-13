@@ -200,7 +200,7 @@ private suspend fun createCompanionTransfers(
                 toAccount = AccountRef.Existing(matched.sourceAccountId),
                 timestamp = matched.timestamp,
                 description = rule.companionDescription,
-                amount = Money.fromDisplayValue(amount, matched.amount.currency),
+                amount = Money.fromDisplayValue(amount, matched.amount.asset),
                 attributes = listOf(NewAttribute(linkTypeId, matched.matchValue)),
             )
         }
@@ -290,7 +290,7 @@ private fun PendingCompanionCard(
             OutlinedTextField(
                 value = amountText,
                 onValueChange = onAmountChange,
-                label = { Text("Amount (${matched.amount.currency.code})") },
+                label = { Text("Amount (${matched.amount.asset.code})") },
                 isError = amountText.isNotBlank() && parseAmount(amountText) == null,
                 singleLine = true,
                 modifier = Modifier.width(180.dp),

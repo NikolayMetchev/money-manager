@@ -174,7 +174,7 @@ class CryptoComCsvE2ETest : DbTest() {
                     .getAccountBalances()
                     .first()
                     .filter { it.accountId == cryptoAccountId }
-                    .associate { it.balance.currency.code to it.balance.toDisplayValue().toString() }
+                    .associate { it.balance.asset.code to it.balance.toDisplayValue().toString() }
             assertEquals("0.79", cryptoBalances["CRO"], "CRO cashback 0.37 + 0.42, created on demand")
             // TGBP is an unknown ticker created on demand as crypto; net of the two conversions.
             assertEquals("-9.86", cryptoBalances["TGBP"], "TGBP bought 5000 - sold 5009.86")
@@ -184,18 +184,18 @@ class CryptoComCsvE2ETest : DbTest() {
             assertTrue(
                 cryptoTrades.any {
                     it.fromAccountId == cashId &&
-                        it.from.currency.code == "GBP" &&
+                        it.from.asset.code == "GBP" &&
                         it.toAccountId == cryptoAccountId &&
-                        it.to.currency.code == "TGBP"
+                        it.to.asset.code == "TGBP"
                 },
                 "viban_purchase: Cash GBP -> Crypto.com TGBP",
             )
             assertTrue(
                 cryptoTrades.any {
                     it.fromAccountId == cryptoAccountId &&
-                        it.from.currency.code == "TGBP" &&
+                        it.from.asset.code == "TGBP" &&
                         it.toAccountId == cashId &&
-                        it.to.currency.code == "GBP"
+                        it.to.asset.code == "GBP"
                 },
                 "crypto_viban: Crypto.com TGBP -> Cash GBP",
             )
@@ -316,16 +316,16 @@ class CryptoComCsvE2ETest : DbTest() {
                     .first()
                     .single()
             assertEquals(cashId, trade.fromAccountId)
-            assertEquals("GBP", trade.from.currency.code)
+            assertEquals("GBP", trade.from.asset.code)
             assertEquals("100", trade.from.toDisplayValue().toString())
-            assertEquals("BTC", trade.to.currency.code)
+            assertEquals("BTC", trade.to.asset.code)
             assertEquals("0.005", trade.to.toDisplayValue().toString())
 
             val balances = repositories.transactionRepository.getAccountBalances().first()
             assertEquals(
                 "0.005",
                 balances
-                    .first { it.accountId == cryptoAccountId && it.balance.currency.code == "BTC" }
+                    .first { it.accountId == cryptoAccountId && it.balance.asset.code == "BTC" }
                     .balance
                     .toDisplayValue()
                     .toString(),

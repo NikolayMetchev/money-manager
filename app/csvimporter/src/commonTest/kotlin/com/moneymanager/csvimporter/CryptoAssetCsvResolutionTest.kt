@@ -83,8 +83,8 @@ class CryptoAssetCsvResolutionTest {
         val result = mapper.mapRow(CsvRow(rowIndex = 1, values = listOf("2021-07-04", "48.78055303", "CRO")))
         val success = assertIs<MappingResult.Success>(result, "crypto row should map: ${(result as? MappingResult.Error)?.errorMessage}")
 
-        assertTrue(success.transfer.amount.currency is CryptoAsset, "denominated in a crypto asset")
-        assertEquals("CRO", success.transfer.amount.currency.code)
+        assertTrue(success.transfer.amount.asset is CryptoAsset, "denominated in a crypto asset")
+        assertEquals("CRO", success.transfer.amount.asset.code)
         assertEquals(Money.fromDisplayValue("48.78055303", cro), success.transfer.amount)
     }
 

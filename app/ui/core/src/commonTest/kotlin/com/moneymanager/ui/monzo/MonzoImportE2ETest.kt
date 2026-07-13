@@ -1718,7 +1718,7 @@ class MonzoImportE2ETest : DbTest() {
 
             // API import mirrors CSV semantics: transfer money remains in account currency.
             val foreignTransfer = transfers.single { it.description == "FOREIGN SPEND" }
-            assertEquals("GBP", foreignTransfer.amount.currency.code, "Foreign transfer should remain in account currency")
+            assertEquals("GBP", foreignTransfer.amount.asset.code, "Foreign transfer should remain in account currency")
             assertEquals(
                 com.moneymanager.bigdecimal.BigInteger(1250L),
                 foreignTransfer.amount.amount,
@@ -1726,7 +1726,7 @@ class MonzoImportE2ETest : DbTest() {
             )
 
             val domesticTransfer = transfers.single { it.description == "DOMESTIC SPEND" }
-            assertEquals("GBP", domesticTransfer.amount.currency.code, "Domestic transfer should remain in account currency")
+            assertEquals("GBP", domesticTransfer.amount.asset.code, "Domestic transfer should remain in account currency")
             assertEquals(
                 com.moneymanager.bigdecimal.BigInteger(5000L),
                 domesticTransfer.amount.amount,
@@ -1820,7 +1820,7 @@ class MonzoImportE2ETest : DbTest() {
 
             val feeTransfer = transfers.single { it.description == "Fee" }
             assertEquals(com.moneymanager.bigdecimal.BigInteger(350L), feeTransfer.amount.amount, "Fee transfer carries the atm fee amount")
-            assertEquals("GBP", feeTransfer.amount.currency.code)
+            assertEquals("GBP", feeTransfer.amount.asset.code)
             assertEquals(monzoAccount.id, feeTransfer.sourceAccountId, "Fee leaves the Monzo account")
             assertEquals(feeAccount.id, feeTransfer.targetAccountId, "Fee goes to the consolidated Monzo Fees account")
 

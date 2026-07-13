@@ -126,6 +126,7 @@ dependencyAnalysis {
             ":app:ui:imports:api",
             ":app:ui:imports:importDirectory",
             ":app:ui:imports:qif",
+            ":app:ui:imports:timeline",
             ":test:app:ui",
         ).forEach { p -> project(p) { ignoreSourceSet("jvmDev") } }
 

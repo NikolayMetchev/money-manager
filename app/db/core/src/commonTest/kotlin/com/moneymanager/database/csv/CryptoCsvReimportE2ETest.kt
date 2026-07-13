@@ -133,7 +133,7 @@ class CryptoCsvReimportE2ETest : DbTest() {
                     .first()
                     .first { it.accountId == wallet }
                     .balance
-            assertEquals("CRO", walletBalance.currency.code)
+            assertEquals("CRO", walletBalance.asset.code)
             assertEquals("48.78055303", walletBalance.toDisplayValue().toString())
 
             // Re-import the same file (fresh staged copy): deduped, no new transfer, no new asset.

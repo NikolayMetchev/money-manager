@@ -35,11 +35,12 @@ kotlin {
             dependencies {
                 api(libs.androidx.compose.foundation)
                 api(libs.androidx.compose.foundation.layout)
+                api(libs.androidx.compose.material3)
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
 
                 implementation(libs.androidx.compose.animation.core)
-                implementation(libs.androidx.compose.material3)
+                implementation(libs.androidx.compose.material.icons.core)
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.androidx.compose.ui.unit)
@@ -52,11 +53,12 @@ kotlin {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.desktop)
                 api(libs.compose.foundation.layout.desktop)
+                api(libs.compose.material3.desktop)
                 api(projects.app.model.core)
                 api(projects.app.ui.foundation)
 
                 implementation(libs.compose.animation.core.desktop)
-                implementation(libs.compose.material3.desktop)
+                implementation(libs.compose.material.icons.core.desktop)
                 implementation(libs.compose.ui.desktop)
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)

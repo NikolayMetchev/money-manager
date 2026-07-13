@@ -138,7 +138,9 @@ SELECT
     -- Pass-through (conduit) link, e.g. Curve: the spend leg when this row is the funding leg (id1),
     -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
     pass_through_as_funding.id2 AS pass_through_spend_id,
-    pass_through_as_spend.id1 AS pass_through_funding_id
+    pass_through_as_spend.id1 AS pass_through_funding_id,
+    -- Whether this row is a trade (same-transaction asset conversion) or a plain transfer.
+    CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
 FROM running_balance_materialized_view
 JOIN asset_details ON running_balance_materialized_view.asset_id = asset_details.id
 LEFT JOIN transfer ON running_balance_materialized_view.id = transfer.id
@@ -194,7 +196,9 @@ SELECT
     -- Pass-through (conduit) link, e.g. Curve: the spend leg when this row is the funding leg (id1),
     -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
     pass_through_as_funding.id2 AS pass_through_spend_id,
-    pass_through_as_spend.id1 AS pass_through_funding_id
+    pass_through_as_spend.id1 AS pass_through_funding_id,
+    -- Whether this row is a trade (same-transaction asset conversion) or a plain transfer.
+    CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
 FROM running_balance_materialized_view
 JOIN asset_details ON running_balance_materialized_view.asset_id = asset_details.id
 LEFT JOIN transfer ON running_balance_materialized_view.id = transfer.id
@@ -258,7 +262,9 @@ SELECT
     -- Pass-through (conduit) link, e.g. Curve: the spend leg when this row is the funding leg (id1),
     -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
     pass_through_as_funding.id2 AS pass_through_spend_id,
-    pass_through_as_spend.id1 AS pass_through_funding_id
+    pass_through_as_spend.id1 AS pass_through_funding_id,
+    -- Whether this row is a trade (same-transaction asset conversion) or a plain transfer.
+    CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
 FROM running_balance_materialized_view
 JOIN asset_details ON running_balance_materialized_view.asset_id = asset_details.id
 LEFT JOIN transfer ON running_balance_materialized_view.id = transfer.id

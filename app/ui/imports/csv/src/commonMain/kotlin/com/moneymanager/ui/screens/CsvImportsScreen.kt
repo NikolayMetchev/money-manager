@@ -38,6 +38,7 @@ import com.moneymanager.csv.CsvParser
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -45,6 +46,7 @@ import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
@@ -58,8 +60,10 @@ import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.CsvImportAllDialog
 import com.moneymanager.ui.screens.csv.CsvReimportAllDialog
+import com.moneymanager.ui.util.displayDate
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.sha256Hex
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
@@ -68,6 +72,7 @@ import kotlin.time.Clock
 @Composable
 fun CsvImportsScreen(
     csvImportRepository: CsvImportReadRepository,
+    importTimelineRepository: ImportTimelineReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
@@ -88,6 +93,9 @@ fun CsvImportsScreen(
     val scope = rememberSchemaAwareCoroutineScope()
     val imports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         csvImportRepository.getAllImports()
+    }
+    val dateRanges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
+        importTimelineRepository.getCsvImportDateRanges().map { ranges -> ranges.associateBy { it.fileId } }
     }
     var isImporting by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
@@ -328,6 +336,7 @@ fun CsvImportsScreen(
                     items(shown, key = { it.id.toString() }) { import ->
                         CsvImportCard(
                             import = import,
+                            dateRange = dateRanges[import.id.id.toString()],
                             onClick = { onImportClick(import.id) },
                             ignored = ignoredTab,
                             onSetIgnored = { ignore ->
@@ -346,6 +355,7 @@ fun CsvImportsScreen(
 @Composable
 private fun CsvImportCard(
     import: CsvImport,
+    dateRange: ImportFileDateRange?,
     onClick: () -> Unit,
     ignored: Boolean,
     onSetIgnored: (Boolean) -> Unit,
@@ -454,6 +464,16 @@ private fun CsvImportCard(
                         MaterialTheme.colorScheme.secondary
                     },
             )
+            if (dateRange != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text =
+                        "Transactions ${dateRange.earliest.displayDate()} → ${dateRange.latest.displayDate()} " +
+                            "(${dateRange.transactionCount})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = metadataColor,
+                )
+            }
             if (isImported && import.lastAppliedStrategyName.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(

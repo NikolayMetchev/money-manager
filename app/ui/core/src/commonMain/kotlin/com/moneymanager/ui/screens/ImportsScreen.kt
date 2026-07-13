@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.qif.QifImportId
+import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -31,6 +32,7 @@ import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
+import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
@@ -44,12 +46,14 @@ import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
+import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
 
 @Composable
 fun ImportsScreen(
     selectedTab: ImportTab,
     onTabSelected: (ImportTab) -> Unit,
     importDirectoryRepository: ImportDirectoryReadRepository,
+    importTimelineRepository: ImportTimelineReadRepository,
     importFileSourceFactory: ImportFileSourceFactory?,
     driveFolderBrowser: DriveFolderBrowser?,
     csvImportRepository: CsvImportReadRepository,
@@ -76,6 +80,7 @@ fun ImportsScreen(
     importEngine: ImportEngine,
     deviceId: DeviceId,
     onCsvImportClick: (CsvImportId) -> Unit,
+    onTimelineFileClick: (ImportFileDateRange) -> Unit,
     onCsvStrategiesClick: () -> Unit,
     onQifImportClick: (QifImportId) -> Unit,
     onAddCredentialClick: () -> Unit,
@@ -112,6 +117,11 @@ fun ImportsScreen(
                 onClick = { onTabSelected(ImportTab.MISC) },
                 text = { Text("Misc") },
             )
+            Tab(
+                selected = selectedTab == ImportTab.TIMELINE,
+                onClick = { onTabSelected(ImportTab.TIMELINE) },
+                text = { Text("Timeline") },
+            )
         }
 
         when (selectedTab) {
@@ -129,6 +139,7 @@ fun ImportsScreen(
             ImportTab.CSV ->
                 CsvImportsScreen(
                     csvImportRepository = csvImportRepository,
+                    importTimelineRepository = importTimelineRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
@@ -149,6 +160,7 @@ fun ImportsScreen(
             ImportTab.QIF ->
                 QifImportsScreen(
                     qifImportRepository = qifImportRepository,
+                    importTimelineRepository = importTimelineRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
@@ -166,6 +178,7 @@ fun ImportsScreen(
             ImportTab.API ->
                 ApiSessionsScreen(
                     apiSessionRepository = apiSessionRepository,
+                    importTimelineRepository = importTimelineRepository,
                     apiImportStrategyRepository = apiImportStrategyRepository,
                     accountAttributeRepository = accountAttributeRepository,
                     accountRepository = accountRepository,
@@ -194,6 +207,11 @@ fun ImportsScreen(
                     maintenance = maintenance,
                     onTransactionsImported = onTransactionsImported,
                     onBrowsePassThroughCatalog = onBrowsePassThroughCatalog,
+                )
+            ImportTab.TIMELINE ->
+                ImportTimelineScreen(
+                    importTimelineRepository = importTimelineRepository,
+                    onOpenFile = onTimelineFileClick,
                 )
         }
     }

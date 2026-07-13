@@ -179,7 +179,7 @@ class CryptoComCryptoE2ETest : DbTest() {
                     .first()
                     .first { it.accountId == wallet.id }
                     .balance
-            assertEquals("CRO", balance.currency.code)
+            assertEquals("CRO", balance.asset.code)
             assertEquals("0.79", balance.toDisplayValue().toString())
         }
 
@@ -198,7 +198,7 @@ class CryptoComCryptoE2ETest : DbTest() {
         return repositories.transactionRepository
             .getAccountBalances()
             .first()
-            .first { it.accountId == account.id && it.balance.currency.code == assetCode }
+            .first { it.accountId == account.id && it.balance.asset.code == assetCode }
             .balance
             .toDisplayValue()
             .toString()
@@ -236,9 +236,9 @@ class CryptoComCryptoE2ETest : DbTest() {
             val trade = trades.single()
             assertEquals(wallet.id, trade.fromAccountId)
             assertEquals(wallet.id, trade.toAccountId)
-            assertEquals("TGBP", trade.from.currency.code)
+            assertEquals("TGBP", trade.from.asset.code)
             assertEquals("1499.936259", trade.from.toDisplayValue().toString())
-            assertEquals("CRO", trade.to.currency.code)
+            assertEquals("CRO", trade.to.asset.code)
             assertEquals("4965.5", trade.to.toDisplayValue().toString())
 
             // Both per-asset balances move inside the one account.
@@ -387,13 +387,13 @@ class CryptoComCryptoE2ETest : DbTest() {
                 "BTC",
                 trades
                     .single()
-                    .from.currency.code,
+                    .from.asset.code,
             )
             assertEquals(
                 "CRO",
                 trades
                     .single()
-                    .to.currency.code,
+                    .to.asset.code,
             )
             assertNull(accountByName("BTC -> CRO"), "emptied junk account must be deleted")
             assertEquals(
@@ -448,9 +448,9 @@ class CryptoComCryptoE2ETest : DbTest() {
             val credit = conversionLegs.single { it.sourceAccountId == conversions.id }
             val debits = conversionLegs.filter { it.targetAccountId == conversions.id }
             assertEquals(wallet.id, credit.targetAccountId)
-            assertEquals("CRO", credit.amount.currency.code)
+            assertEquals("CRO", credit.amount.asset.code)
             assertEquals(3, debits.size)
-            assertEquals(setOf("LUNA2", "DOT", "ALI"), debits.map { it.amount.currency.code }.toSet())
+            assertEquals(setOf("LUNA2", "DOT", "ALI"), debits.map { it.amount.asset.code }.toSet())
 
             // Each debit links to the credit with a `conversion` relationship (credit is id2).
             val links = repositories.transferRelationshipRepository.getByTransfer(credit.id).first()
@@ -465,7 +465,7 @@ class CryptoComCryptoE2ETest : DbTest() {
                 repositories.transactionRepository
                     .getAccountBalances()
                     .first()
-                    .first { it.accountId == wallet.id && it.balance.currency.code == "CRO" }
+                    .first { it.accountId == wallet.id && it.balance.asset.code == "CRO" }
                     .balance
             assertEquals("0.53", cro.toDisplayValue().toString())
         }

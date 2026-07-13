@@ -38,8 +38,8 @@ class TradeWriteRepositoryImpl(
     ): TradeCreateResult {
         // A trade is a cross-asset exchange; a same-asset movement is a transfer. The DB CHECK only
         // blocks the same-account+same-asset degenerate case, so enforce the cross-asset rule here.
-        require(fromAmount.currency.id != toAmount.currency.id) {
-            "A trade must exchange two different assets (from and to assets are both ${fromAmount.currency.code})"
+        require(fromAmount.asset.id != toAmount.asset.id) {
+            "A trade must exchange two different assets (from and to assets are both ${fromAmount.asset.code})"
         }
         return withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
@@ -51,10 +51,10 @@ class TradeWriteRepositoryImpl(
                             timestamp = timestamp.toEpochMilliseconds(),
                             description = description,
                             from_account_id = fromAccountId.id,
-                            from_asset_id = fromAmount.currency.id.id,
+                            from_asset_id = fromAmount.asset.id.id,
                             from_amount = fromAmount.amount.toString(),
                             to_account_id = toAccountId.id,
-                            to_asset_id = toAmount.currency.id.id,
+                            to_asset_id = toAmount.asset.id.id,
                             to_amount = toAmount.amount.toString(),
                         ).executeAsOneOrNull()
                 if (existing != null) {
@@ -69,10 +69,10 @@ class TradeWriteRepositoryImpl(
                     timestamp = timestamp.toEpochMilliseconds(),
                     description = description,
                     from_account_id = fromAccountId.id,
-                    from_asset_id = fromAmount.currency.id.id,
+                    from_asset_id = fromAmount.asset.id.id,
                     from_amount = fromAmount.amount.toString(),
                     to_account_id = toAccountId.id,
-                    to_asset_id = toAmount.currency.id.id,
+                    to_asset_id = toAmount.asset.id.id,
                     to_amount = toAmount.amount.toString(),
                 )
                 database.recordSource(deviceId, EntityType.TRADE, id, 1L, source)

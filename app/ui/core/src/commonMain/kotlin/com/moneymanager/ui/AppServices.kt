@@ -21,6 +21,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
+import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
@@ -69,6 +70,7 @@ data class ImportsDomain(
     val strategyLibrary: StrategyLibrary,
     val qifImportRepository: QifImportReadRepository,
     val importDirectoryRepository: ImportDirectoryReadRepository,
+    val importTimelineRepository: ImportTimelineReadRepository,
     val passThroughAccountRepository: PassThroughAccountReadRepository,
     val maintenance: Maintenance,
 )
@@ -124,6 +126,7 @@ fun Application.toAppServices(importEngine: ImportEngine) =
                 strategyLibrary = imports.strategyLibrary,
                 qifImportRepository = imports.qifImportRepository,
                 importDirectoryRepository = imports.importDirectoryRepository,
+                importTimelineRepository = imports.importTimelineRepository,
                 passThroughAccountRepository = imports.passThroughAccountRepository,
                 maintenance = imports.maintenance,
             ),

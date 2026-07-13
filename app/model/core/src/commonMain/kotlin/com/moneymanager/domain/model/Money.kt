@@ -12,26 +12,23 @@ import com.moneymanager.bigdecimal.toBigIntegerExact
  * determines the conversion between stored amounts and display amounts. A [BigInteger] (rather than a
  * [Long]) is required because high-precision crypto scale factors would otherwise overflow.
  *
- * The denominating asset is exposed as [currency] for historical reasons — it may be any [Asset],
- * fiat or crypto, not only a fiat [Currency].
- *
  * For example:
  * - £123.45 is stored as amount=12345 with GBP (scaleFactor=100)
  * - ¥1000 is stored as amount=1000 with JPY (scaleFactor=1)
  * - 0.5 BTC is stored as amount=5·10^17 with BTC (scaleFactor=10^18)
  *
  * @property amount The amount in the asset's smallest unit (pence, satoshis, wei, …)
- * @property currency The asset this monetary amount is denominated in
+ * @property asset The asset this monetary amount is denominated in (fiat or crypto)
  */
 data class Money(
     val amount: BigInteger,
-    val currency: Asset,
+    val asset: Asset,
 ) : Comparable<Money> {
     /** Convenience for constructing from a minor-unit amount that fits in a [Long]. */
-    constructor(amount: Long, currency: Asset) : this(BigInteger(amount), currency)
+    constructor(amount: Long, asset: Asset) : this(BigInteger(amount), asset)
 
     /** Convenience for constructing from a minor-unit amount that fits in an [Int]. */
-    constructor(amount: Int, currency: Asset) : this(BigInteger(amount.toLong()), currency)
+    constructor(amount: Int, asset: Asset) : this(BigInteger(amount.toLong()), asset)
 
     /**
      * Converts the stored amount to a display value using BigDecimal for precision.
@@ -41,7 +38,7 @@ data class Money(
      *
      * @return The display value as BigDecimal (e.g., 12345 with scaleFactor=100 becomes 123.45)
      */
-    fun toDisplayValue(): BigDecimal = amount.toBigDecimal().movePointLeft(currency.decimalPlaces)
+    fun toDisplayValue(): BigDecimal = amount.toBigDecimal().movePointLeft(asset.decimalPlaces)
 
     /**
      * Adds another Money amount to this one.
@@ -50,7 +47,7 @@ data class Money(
      */
     operator fun plus(other: Money): Money {
         requireSameAsset(other)
-        return Money(amount + other.amount, currency)
+        return Money(amount + other.amount, asset)
     }
 
     /**
@@ -60,13 +57,13 @@ data class Money(
      */
     operator fun minus(other: Money): Money {
         requireSameAsset(other)
-        return Money(amount - other.amount, currency)
+        return Money(amount - other.amount, asset)
     }
 
     /**
      * Multiplies this Money amount by a scalar value.
      */
-    operator fun times(multiplier: Long): Money = Money(amount * BigInteger(multiplier), currency)
+    operator fun times(multiplier: Long): Money = Money(amount * BigInteger(multiplier), asset)
 
     /**
      * Multiplies this Money amount by a scalar value.
@@ -76,7 +73,7 @@ data class Money(
     /**
      * Divides this Money amount by a scalar value (integer division, truncated toward zero).
      */
-    operator fun div(divisor: Long): Money = Money(amount / BigInteger(divisor), currency)
+    operator fun div(divisor: Long): Money = Money(amount / BigInteger(divisor), asset)
 
     /**
      * Divides this Money amount by a scalar value (integer division, truncated toward zero).
@@ -86,7 +83,7 @@ data class Money(
     /**
      * Negates this Money amount.
      */
-    operator fun unaryMinus(): Money = Money(-amount, currency)
+    operator fun unaryMinus(): Money = Money(-amount, asset)
 
     /**
      * Compares this Money amount with another.
@@ -116,11 +113,11 @@ data class Money(
     /**
      * Returns the absolute value of this Money amount.
      */
-    fun abs(): Money = if (isNegative()) Money(amount.abs(), currency) else this
+    fun abs(): Money = if (isNegative()) Money(amount.abs(), asset) else this
 
     private fun requireSameAsset(other: Money) {
-        require(currency.id == other.currency.id) {
-            "Cannot perform operation on Money with different assets: ${currency.code} and ${other.currency.code}"
+        require(asset.id == other.asset.id) {
+            "Cannot perform operation on Money with different assets: ${asset.code} and ${other.asset.code}"
         }
     }
 
@@ -136,10 +133,10 @@ data class Money(
          */
         fun fromDisplayValue(
             displayValue: BigDecimal,
-            currency: Asset,
+            asset: Asset,
         ): Money {
-            val scaled = displayValue * BigDecimal(currency.scaleFactor)
-            return Money(scaled.toBigIntegerExact(), currency)
+            val scaled = displayValue * BigDecimal(asset.scaleFactor)
+            return Money(scaled.toBigIntegerExact(), asset)
         }
 
         /**
@@ -147,12 +144,12 @@ data class Money(
          */
         fun fromDisplayValue(
             displayValue: String,
-            currency: Asset,
-        ): Money = fromDisplayValue(BigDecimal(displayValue), currency)
+            asset: Asset,
+        ): Money = fromDisplayValue(BigDecimal(displayValue), asset)
 
         /**
          * Creates a zero Money instance for a given asset.
          */
-        fun zero(currency: Asset): Money = Money(BigInteger.ZERO, currency)
+        fun zero(asset: Asset): Money = Money(BigInteger.ZERO, asset)
     }
 }

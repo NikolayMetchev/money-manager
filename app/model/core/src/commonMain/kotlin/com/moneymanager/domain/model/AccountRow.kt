@@ -26,4 +26,5 @@ data class AccountRow(
     val passThroughSpendId: TransferId? = null,
     /** When this row IS the spend leg of a pass-through charge, the id of its funding leg. */
     val passThroughFundingId: TransferId? = null,
+    val kind: TransactionKind = TransactionKind.TRANSFER,
 )

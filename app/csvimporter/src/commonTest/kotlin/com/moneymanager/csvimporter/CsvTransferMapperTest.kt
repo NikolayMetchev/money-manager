@@ -575,7 +575,7 @@ class CsvTransferMapperTest {
 
         assertIs<MappingResult.Success>(result)
         assertEquals("Test payment", result.transfer.description)
-        assertEquals(testCurrencyId, result.transfer.amount.currency.id)
+        assertEquals(testCurrencyId, result.transfer.amount.asset.id)
         assertEquals(BigInteger(5000L), result.transfer.amount.amount)
     }
 

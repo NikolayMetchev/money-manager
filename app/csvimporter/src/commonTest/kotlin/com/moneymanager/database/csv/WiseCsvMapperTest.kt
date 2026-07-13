@@ -150,7 +150,7 @@ class WiseCsvMapperTest {
         assertEquals(AccountId(-1), result.transfer.targetAccountId)
         assertEquals(listOf(NewAccount("Avolta - Tenerife", -1L)), result.newAccounts)
         assertEquals(BigInteger(2210L), result.transfer.amount.amount)
-        assertEquals(eur, result.transfer.amount.currency)
+        assertEquals(eur, result.transfer.amount.asset)
     }
 
     @Test
@@ -173,7 +173,7 @@ class WiseCsvMapperTest {
         assertEquals(AccountId(30), result.transfer.sourceAccountId)
         assertEquals(wiseGbp.id, result.transfer.targetAccountId)
         assertEquals(BigInteger(250000L), result.transfer.amount.amount)
-        assertEquals(gbp, result.transfer.amount.currency)
+        assertEquals(gbp, result.transfer.amount.asset)
         assertTrue(result.newAccounts.isEmpty())
     }
 
@@ -194,7 +194,7 @@ class WiseCsvMapperTest {
         assertEquals(wiseGbp.id, result.transfer.targetAccountId)
         // Wise-side (source) amount is recorded
         assertEquals(BigInteger(10000L), result.transfer.amount.amount)
-        assertEquals(eur, result.transfer.amount.currency)
+        assertEquals(eur, result.transfer.amount.asset)
     }
 
     @Test
@@ -284,8 +284,8 @@ class WiseCsvMapperTest {
         // 89.19 converted is the main movement; the 1.18 fee is its own linked fee transfer.
         assertEquals(BigInteger(8919L), result.transfer.amount.amount)
         assertEquals(BigInteger(118L), result.feeAmount?.amount)
-        assertEquals(gbp, result.transfer.amount.currency)
-        assertEquals(gbp, result.feeAmount?.currency)
+        assertEquals(gbp, result.transfer.amount.asset)
+        assertEquals(gbp, result.feeAmount?.asset)
         assertTrue(result.attributes.contains("wise-exchange-rate" to "2.24251"))
     }
 

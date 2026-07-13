@@ -92,14 +92,14 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
                 repositories.transactionRepository
                     .getRunningBalanceByAccountPaginated(card, pageSize = 5, pagingInfo = null)
             assertEquals(5, unfiltered.items.size)
-            assertTrue(unfiltered.items.all { it.transactionAmount.currency.code == "GBP" })
+            assertTrue(unfiltered.items.all { it.transactionAmount.asset.code == "GBP" })
 
             // Filtered by USD: both old rows arrive on the FIRST page.
             val usdPage =
                 repositories.transactionRepository
                     .getRunningBalanceByAccountPaginated(card, pageSize = 5, pagingInfo = null, currencyId = usd.id)
             assertEquals(listOf("Old USD 2", "Old USD 1"), usdPage.items.map { it.description })
-            assertTrue(usdPage.items.all { it.transactionAmount.currency.code == "USD" })
+            assertTrue(usdPage.items.all { it.transactionAmount.asset.code == "USD" })
             assertEquals(false, usdPage.pagingInfo.hasMore)
 
             // Running balances accumulate within the filtered currency only (card is the source side).
@@ -112,7 +112,7 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
                     .getPageContainingTransaction(card, TransferId(usdTransferId.id), pageSize = 5, currencyId = usd.id)
             assertEquals(2, page.items.size)
             assertTrue(page.targetIndex >= 0)
-            assertTrue(page.items.all { it.transactionAmount.currency.code == "USD" })
+            assertTrue(page.items.all { it.transactionAmount.asset.code == "USD" })
 
             // Backward pagination from the older USD row: only the newer USD row is returned —
             // the GBP rows between them are skipped by the filter.

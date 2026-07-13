@@ -30,6 +30,8 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
+import com.moneymanager.domain.model.TradeAuditEntry
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.qif.QifImportId
@@ -97,7 +99,7 @@ fun TransactionAuditScreen(
                 currentAttrs = reverseAttributeChanges(currentAttrs, entry)
             }
 
-            val diffs =
+            val transferDiffs =
                 auditEntries.mapIndexed { index, entry ->
                     val newValuesForUpdate =
                         when {
@@ -111,28 +113,216 @@ fun TransactionAuditScreen(
                                 )
                             else -> null
                         }
-                    computeAuditDiff(entry, newValuesForUpdate)
+                    TransferAuditRow(computeAuditDiff(entry, newValuesForUpdate))
+                }
+
+            // A transaction id with no transfer history is a trade (same id space); show its
+            // trade_audit trail instead. Each row carries the next-older entry for update diffs.
+            val diffs: List<TransactionAuditRow> =
+                transferDiffs.ifEmpty {
+                    val tradeEntries = auditRepository.getAuditHistoryForTrade(TradeId(transferId.id))
+                    tradeEntries.mapIndexed { index, entry ->
+                        TradeAuditRow(entry = entry, previous = tradeEntries.getOrNull(index + 1))
+                    }
                 }
             AuditScreenData(
                 title = "Audit History: $transferId",
                 diffs = diffs,
             )
         },
-        diffKey = { it.id },
+        // Only one of the two lists is ever shown (a transaction is a transfer or a trade), so the
+        // per-table audit ids cannot collide within one screen.
+        diffKey = { row ->
+            when (row) {
+                is TransferAuditRow -> row.diff.id
+                is TradeAuditRow -> row.entry.id
+            }
+        },
         onBack = onBack,
-        diffCard = { diff ->
-            TransactionAuditDiffCard(
-                diff = diff,
-                accounts = accounts,
-                auditedAccountNames = auditedAccountNames,
+        diffCard = { row ->
+            when (row) {
+                is TransferAuditRow ->
+                    TransactionAuditDiffCard(
+                        diff = row.diff,
+                        accounts = accounts,
+                        auditedAccountNames = auditedAccountNames,
+                        currentDeviceId = currentDeviceId,
+                        onCsvSourceClick = onCsvSourceClick,
+                        onQifSourceClick = onQifSourceClick,
+                        onApiSourceClick = onApiSourceClick,
+                        onAccountClick = onAccountClick,
+                    )
+                is TradeAuditRow ->
+                    TradeAuditDiffCard(
+                        entry = row.entry,
+                        previous = row.previous,
+                        accounts = accounts,
+                        auditedAccountNames = auditedAccountNames,
+                        currentDeviceId = currentDeviceId,
+                        onCsvSourceClick = onCsvSourceClick,
+                        onQifSourceClick = onQifSourceClick,
+                        onApiSourceClick = onApiSourceClick,
+                        onAccountClick = onAccountClick,
+                    )
+            }
+        },
+    )
+}
+
+/** One row of a transaction's audit trail: a transfer revision diff or a trade revision. */
+private sealed interface TransactionAuditRow
+
+private data class TransferAuditRow(
+    val diff: AuditEntryDiff,
+) : TransactionAuditRow
+
+private data class TradeAuditRow(
+    val entry: TradeAuditEntry,
+    val previous: TradeAuditEntry?,
+) : TransactionAuditRow
+
+@Suppress("LongParameterList")
+@Composable
+private fun TradeAuditDiffCard(
+    entry: TradeAuditEntry,
+    previous: TradeAuditEntry?,
+    accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
+    currentDeviceId: DeviceId? = null,
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
+    onAccountClick: (AccountId) -> Unit = {},
+) {
+    AuditDiffCard(
+        auditType = entry.auditType,
+        auditTimestamp = entry.auditTimestamp,
+        revisionId = entry.revisionId,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            when (entry.auditType) {
+                AuditType.INSERT ->
+                    TradeSnapshotContent("Created with:", entry, accounts, auditedAccountNames, onAccountClick)
+                AuditType.UPDATE ->
+                    TradeUpdateContent(entry, previous, accounts, auditedAccountNames, onAccountClick)
+                AuditType.DELETE ->
+                    TradeSnapshotContent(
+                        header = "Deleted (final values):",
+                        entry = entry,
+                        accounts = accounts,
+                        auditedAccountNames = auditedAccountNames,
+                        onAccountClick = onAccountClick,
+                        valueColor = MaterialTheme.colorScheme.error,
+                    )
+            }
+            SourceInfoSection(
+                entry.source,
                 currentDeviceId = currentDeviceId,
                 onCsvSourceClick = onCsvSourceClick,
                 onQifSourceClick = onQifSourceClick,
                 onApiSourceClick = onApiSourceClick,
-                onAccountClick = onAccountClick,
             )
-        },
+        }
+    }
+}
+
+@Suppress("LongParameterList")
+@Composable
+private fun TradeSnapshotContent(
+    header: String,
+    entry: TradeAuditEntry,
+    accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
+    onAccountClick: (AccountId) -> Unit,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    val tradeDateTime = entry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+    Text(
+        text = header,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    FieldValueRow("Date", "${tradeDateTime.date} ${tradeDateTime.time}", valueColor, labelWidth = LABEL_WIDTH)
+    AccountLinkRow("From", entry.fromAccountId, accounts, auditedAccountNames, onAccountClick)
+    FieldValueRow("Sold", formatAmount(entry.fromAmount), valueColor, labelWidth = LABEL_WIDTH)
+    AccountLinkRow("To", entry.toAccountId, accounts, auditedAccountNames, onAccountClick)
+    FieldValueRow("Bought", formatAmount(entry.toAmount), valueColor, labelWidth = LABEL_WIDTH)
+    FieldValueRow("Description", entry.description.ifBlank { "(none)" }, valueColor, labelWidth = LABEL_WIDTH)
+}
+
+@Composable
+private fun TradeUpdateContent(
+    entry: TradeAuditEntry,
+    previous: TradeAuditEntry?,
+    accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
+    onAccountClick: (AccountId) -> Unit,
+) {
+    // Trade audit rows carry full snapshots, so an update diff is a field-by-field comparison
+    // against the next-older revision; without one, show the full updated snapshot.
+    if (previous == null) {
+        TradeSnapshotContent("Updated to:", entry, accounts, auditedAccountNames, onAccountClick)
+        return
+    }
+    var anyChanges = false
+    Text(
+        text = "Changed:",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (entry.timestamp != previous.timestamp) {
+        anyChanges = true
+        val oldDateTime = previous.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+        val newDateTime = entry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+        FieldChangeRow(
+            label = "Date",
+            oldValue = "${oldDateTime.date} ${oldDateTime.time}",
+            newValue = "${newDateTime.date} ${newDateTime.time}",
+            labelWidth = LABEL_WIDTH,
+        )
+    }
+    if (entry.fromAccountId != previous.fromAccountId) {
+        anyChanges = true
+        AccountChangeRow("From", previous.fromAccountId, entry.fromAccountId, accounts, auditedAccountNames, onAccountClick)
+    }
+    if (entry.fromAmount != previous.fromAmount) {
+        anyChanges = true
+        FieldChangeRow(
+            label = "Sold",
+            oldValue = formatAmount(previous.fromAmount),
+            newValue = formatAmount(entry.fromAmount),
+            labelWidth = LABEL_WIDTH,
+        )
+    }
+    if (entry.toAccountId != previous.toAccountId) {
+        anyChanges = true
+        AccountChangeRow("To", previous.toAccountId, entry.toAccountId, accounts, auditedAccountNames, onAccountClick)
+    }
+    if (entry.toAmount != previous.toAmount) {
+        anyChanges = true
+        FieldChangeRow(
+            label = "Bought",
+            oldValue = formatAmount(previous.toAmount),
+            newValue = formatAmount(entry.toAmount),
+            labelWidth = LABEL_WIDTH,
+        )
+    }
+    if (entry.description != previous.description) {
+        anyChanges = true
+        FieldChangeRow(
+            label = "Description",
+            oldValue = previous.description.ifBlank { "(none)" },
+            newValue = entry.description.ifBlank { "(none)" },
+            labelWidth = LABEL_WIDTH,
+        )
+    }
+    if (!anyChanges) {
+        Text(
+            text = "No visible changes recorded",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable

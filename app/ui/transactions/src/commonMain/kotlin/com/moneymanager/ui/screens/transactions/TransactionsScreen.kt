@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.moneymanager.ui.screens.transactions
 
@@ -23,10 +23,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -54,6 +62,7 @@ import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -264,7 +273,7 @@ fun AccountTransactionsScreen(
     val accountCurrencyIds =
         accountBalances
             .filter { it.accountId == selectedAccountId }
-            .map { it.balance.currency.id }
+            .map { it.balance.asset.id }
             .distinct()
     val accountCurrencies = currencies.filter { it.id in accountCurrencyIds }
 
@@ -311,7 +320,7 @@ fun AccountTransactionsScreen(
                 .groupBy { it.accountId.id }
                 .mapValues { (_, list) ->
                     list.associate { ab ->
-                        ab.balance.currency.id.id to MatrixCell(formatAmount(ab.balance), ab.balance.isNegative())
+                        ab.balance.asset.id.id to MatrixCell(formatAmount(ab.balance), ab.balance.isNegative())
                     }
                 }
         }
@@ -320,7 +329,7 @@ fun AccountTransactionsScreen(
     // Sorted by code for a deterministic row order independent of balance emission order.
     val uniqueAssets =
         remember(accountBalances) {
-            accountBalances.map { it.balance.currency }.distinctBy { it.id.id }.sortedBy { it.code }
+            accountBalances.map { it.balance.asset }.distinctBy { it.id.id }.sortedBy { it.code }
         }
 
     // Calculate column widths for each account based on account name and balance amounts,
@@ -832,15 +841,49 @@ fun AccountTransactionsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = "Rec.",
-                        style = headerStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier.width(40.dp),
-                    )
+                    // Reconciliation column heading: blank; the per-row tick/cross icons are
+                    // self-explanatory via their tooltips.
+                    Spacer(modifier = Modifier.width(24.dp))
+                    // Transaction type column heading: an icon whose tooltip legends the per-row icons.
+                    Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                            tooltip = {
+                                PlainTooltip {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(
+                                            text = "Transaction type",
+                                            style = MaterialTheme.typography.labelMedium,
+                                        )
+                                        TransactionKind.entries.forEach { kind ->
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            ) {
+                                                Icon(
+                                                    imageVector = kind.icon(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                )
+                                                Text(
+                                                    text = kind.displayLabel(),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            state = rememberTooltipState(),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = "Transaction type",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
                     Text(
                         text = "Date",
                         style = headerStyle,
@@ -894,7 +937,7 @@ fun AccountTransactionsScreen(
                         modifier = Modifier.weight(0.15f).padding(start = 8.dp),
                     )
                     // Spacer for edit and audit button columns
-                    Spacer(modifier = Modifier.width(64.dp))
+                    Spacer(modifier = Modifier.width(48.dp))
                 }
 
                 val listState = rememberLazyListState()
@@ -924,7 +967,7 @@ fun AccountTransactionsScreen(
 
                         // Set currency filter to match the transaction; that reloads the page, so the
                         // centering scroll happens on the next pass over the filtered list
-                        val targetCurrencyId = CurrencyId(transaction.transactionAmount.currency.id.id)
+                        val targetCurrencyId = CurrencyId(transaction.transactionAmount.asset.id.id)
                         if (selectedCurrencyId != targetCurrencyId) {
                             selectedCurrencyId = targetCurrencyId
                             return@let
@@ -935,7 +978,7 @@ fun AccountTransactionsScreen(
                         val index =
                             displayedRunningBalances
                                 .filter {
-                                    it.transactionAmount.currency.id == transaction.transactionAmount.currency.id
+                                    it.transactionAmount.asset.id == transaction.transactionAmount.asset.id
                                 }.indexOfFirst { it.transactionId.id == targetTransferId.id }
 
                         if (index < 0) {
@@ -965,7 +1008,7 @@ fun AccountTransactionsScreen(
 
                         // Scroll matrix to show the account and currency
                         val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
-                        val currencyIndex = uniqueAssets.indexOfAsset(transaction.transactionAmount.currency.id.id)
+                        val currencyIndex = uniqueAssets.indexOfAsset(transaction.transactionAmount.asset.id.id)
 
                         if (accountIndex >= 0 && currencyIndex >= 0) {
                             val targetScrollX =
@@ -1045,7 +1088,10 @@ fun AccountTransactionsScreen(
                     ) {
                         items(
                             items = displayedRunningBalances,
-                            key = { "${it.transactionId}-${it.accountId}" },
+                            // A same-account trade (e.g. BTC→ETH inside one exchange account) yields two
+                            // rows with the same transaction and account, one per asset leg — the asset
+                            // code keeps their keys unique.
+                            key = { "${it.transactionId}-${it.accountId}-${it.transactionAmount.asset.code}" },
                         ) { runningBalance ->
                             AccountTransactionCard(
                                 runningBalance = runningBalance,
@@ -1056,7 +1102,7 @@ fun AccountTransactionsScreen(
                                     // TransactionEditDialog is fiat-only (CurrencyPicker + currencyRepository
                                     // save path); opening it on a crypto-denominated transfer would corrupt
                                     // its asset. Only fiat transfers are editable here for now.
-                                    if (transfer.amount.currency is Currency) {
+                                    if (transfer.amount.asset is Currency) {
                                         transactionIdToEdit = transfer.id
                                     }
                                 },
@@ -1088,7 +1134,7 @@ fun AccountTransactionsScreen(
                                 },
                                 onAccountClick = { clickedAccountId ->
                                     highlightedTransactionId = runningBalance.transactionId
-                                    selectedCurrencyId = CurrencyId(runningBalance.transactionAmount.currency.id.id)
+                                    selectedCurrencyId = CurrencyId(runningBalance.transactionAmount.asset.id.id)
 
                                     // Notify parent to switch to the clicked account
                                     onAccountIdChange(clickedAccountId)
@@ -1108,7 +1154,7 @@ fun AccountTransactionsScreen(
                                                 )
                                             // Calculate vertical scroll position for the currency
                                             val currencyIndex =
-                                                uniqueAssets.indexOfAsset(runningBalance.transactionAmount.currency.id.id)
+                                                uniqueAssets.indexOfAsset(runningBalance.transactionAmount.asset.id.id)
                                             if (currencyIndex >= 0) {
                                                 // Each currency row: text + padding + spacing ≈ 28.dp
                                                 val targetScrollY =
@@ -1132,7 +1178,7 @@ fun AccountTransactionsScreen(
                                         onAccountClick(
                                             clickedAccountId,
                                             clickedAccount.name,
-                                            CurrencyId(runningBalance.transactionAmount.currency.id.id),
+                                            CurrencyId(runningBalance.transactionAmount.asset.id.id),
                                             TransferId(runningBalance.transactionId.id),
                                         )
                                     }

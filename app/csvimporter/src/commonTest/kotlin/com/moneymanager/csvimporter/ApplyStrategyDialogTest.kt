@@ -250,7 +250,7 @@ class ApplyStrategyDialogTest {
                     amount =
                         Money.fromDisplayValue(
                             displayValue = BigDecimal("1.00"),
-                            currency =
+                            asset =
                                 Currency(
                                     id = CurrencyId(1),
                                     code = "GBP",
