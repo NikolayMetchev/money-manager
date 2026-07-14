@@ -205,6 +205,47 @@ class CsvTransferMapperTest {
     }
 
     @Test
+    fun `mapRow resolves a conduit whose account is only reachable under its historical name`() {
+        val strategy = createStrategy()
+        val payPal =
+            PassThroughAccount(
+                id = PassThroughAccountId(2),
+                name = "PayPal",
+                conduitAccountName = "PayPal",
+                rules =
+                    listOf(
+                        PassThroughRule(
+                            detectionPattern = "(?i)^PAYPAL\\s*\\*",
+                            merchantPattern = "(?i)^PAYPAL\\s*\\*\\s*(.+?)(?:\\s{2,}.*)?$",
+                        ),
+                    ),
+            )
+        // The live account is "PAYPAL", so the conduit name "PayPal" only resolves through the
+        // historical-name index — the same index accountExists() consults when deciding whether the
+        // conduit needs creating. Resolving it any more narrowly left the conduit side unresolved and
+        // the transfer failed the account foreign key on insert.
+        val payPalAccount = Account(id = AccountId(48), name = "PAYPAL", openingDate = Clock.System.now())
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columns,
+                existingAccounts = mapOf(payPalAccount.name to payPalAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                historicalAccountNames = mapOf("paypal" to payPalAccount.id),
+                passThroughDetector = PassThroughDetector(listOf(payPal)),
+            )
+
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Paypal *Thepihut", "-50.00", "Paypal *Thepihut"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(payPalAccount.id, result.transfer.targetAccountId)
+        // The conduit already exists, so only the merchant is created.
+        assertEquals(listOf("Thepihut"), result.newAccounts.map { it.name })
+    }
+
+    @Test
     fun `mapRow routes a chained Curve-PayPal row through both conduits`() {
         val strategy = createStrategy()
         val curve =

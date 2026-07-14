@@ -136,8 +136,11 @@ suspend fun ImportEngine.getOrCreateAttributeTypes(names: List<String>): Map<Str
     if (names.isEmpty()) emptyMap() else import(ImportBatch(attributeTypeNames = names)).attributeTypeIds
 
 /**
- * Creates [accounts] (always new, no matching), returning their ids in input order. [sourceFor] gives
- * each account's provenance. Mirrors `AccountWriteRepository.createAccountsBatch` but via the engine.
+ * Gets or creates [accounts] by name, returning their ids in input order. [sourceFor] gives each
+ * account's provenance. Matching by name (rather than creating unconditionally) makes the call
+ * idempotent: an importer that believes an account is new because its own name lookup missed — a
+ * case difference, a stale snapshot, the same name twice in one list — reuses the existing account
+ * instead of adding a second one with the same name.
  */
 suspend fun ImportEngine.createAccounts(
     accounts: List<Account>,
@@ -149,7 +152,7 @@ suspend fun ImportEngine.createAccounts(
             ImportAccountIntent(
                 key = LocalAccountKey("create-$index"),
                 source = sourceFor(account),
-                match = AccountMatchKey.AlwaysCreate,
+                match = AccountMatchKey.ByName(account.name),
                 name = account.name,
                 openingDate = account.openingDate,
                 categoryId = account.categoryId,
@@ -159,7 +162,7 @@ suspend fun ImportEngine.createAccounts(
     return intents.map { requireNotNull(result.createdAccountIds[it.key]) { "Account ${it.name} was not created" } }
 }
 
-/** Creates a single new account (always new, no matching) and returns its id. */
+/** Gets or creates a single account by name (see [createAccounts]) and returns its id. */
 suspend fun ImportEngine.createAccount(
     account: Account,
     source: Source,

@@ -639,11 +639,16 @@ class ImportEngineImpl(
                 .toMutableMap()
         val byAttr = buildExistingAccountAttrIndex(batch.accountsToCreate)
         val byPersonalKey = buildExistingPersonalKeyIndex(batch.accountsToCreate)
+        // Names of accounts created earlier in THIS batch, so a later same-named intent with no other
+        // way to match reuses that account instead of forking a duplicate. Kept separate from [byName]
+        // (which also holds pre-existing accounts) because the name fallback must not reach across to a
+        // pre-existing account that merely shares a name — see [matchAccount].
+        val batchCreatedByName = mutableMapOf<String, AccountId>()
 
         val keyToId = mutableMapOf<LocalAccountKey, AccountId>()
         var created = 0
         for (intent in batch.accountsToCreate) {
-            val match = matchAccount(intent, byName, byAttr, byPersonalKey)
+            val match = matchAccount(intent, byName, byAttr, byPersonalKey, batchCreatedByName)
             if (match != null) {
                 // A bank-identity (adopted) match re-points the existing account onto this intent only for
                 // own/source accounts; counterparties merge in silently keeping the existing account as-is.
@@ -655,6 +660,7 @@ class ImportEngineImpl(
             created++
             keyToId[intent.key] = newId
             indexNewAccount(intent, newId, byName, byAttr, byPersonalKey)
+            intent.name?.let { batchCreatedByName.putIfAbsent(it, newId) }
         }
         return AccountResolution(keyToId, created)
     }
@@ -670,6 +676,7 @@ class ImportEngineImpl(
         byName: Map<String, AccountId>,
         byAttr: Map<Pair<AttributeTypeId, String>, AccountId>,
         byPersonalKey: Map<String, AccountId>,
+        batchCreatedByName: Map<String, AccountId>,
     ): AccountMatch? {
         val primary =
             when (val match = intent.match) {
@@ -680,12 +687,24 @@ class ImportEngineImpl(
                 is AccountMatchKey.AlwaysCreate -> null
             }
         if (primary != null) return AccountMatch(primary, adopted = false)
+        val bankKey = intentBankKey(intent)
         // Fallback: an intent that carries bank details (sort code + account number attributes) but didn't
         // match by its primary key adopts a pre-existing account for the same real bank account — e.g. a
         // source account adopting a counterparty another provider created, keeping imports order-independent.
         // The matched account is re-pointed (renamed + the intent's own attributes added) so this provider
         // resolves it by id next time, while its bank attributes keep the other provider matching it.
-        return intentBankKey(intent)?.let { byPersonalKey[it] }?.let { AccountMatch(it, adopted = true) }
+        bankKey?.let { byPersonalKey[it] }?.let { return AccountMatch(it, adopted = true) }
+        // Last resort for an intent with no bank identity — a merchant/conduit counterparty rather than a
+        // real bank account: reuse an account of the same name created earlier IN THIS BATCH. A provider
+        // routinely mints several external ids for one merchant (Monzo issued two for "Curve"), so without
+        // this the second id forks another same-named account. Scoped to batch-created names — never a
+        // pre-existing account — so an own/source account can't merge into an unrelated account that
+        // merely shares its name. Accounts that carry bank details are excluded too: two people can share
+        // a name while owning different accounts.
+        if (bankKey == null && intent.match !is AccountMatchKey.AlwaysCreate) {
+            intent.name?.let { batchCreatedByName[it] }?.let { return AccountMatch(it, adopted = false) }
+        }
+        return null
     }
 
     /**
