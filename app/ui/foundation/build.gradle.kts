@@ -15,6 +15,8 @@ kotlin {
                 api(libs.kotlinx.serialization.core)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.repository.read)
                 api(projects.utils.bigdecimal)
                 api(projects.utils.localsettings)
 
@@ -60,6 +62,8 @@ kotlin {
                 api(libs.compose.ui.desktop)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.repository.read)
                 api(projects.utils.bigdecimal)
 
                 implementation(libs.androidx.compose.runtime.annotation)

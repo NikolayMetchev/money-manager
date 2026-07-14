@@ -54,9 +54,9 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.deleteAccountMapping
-import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.foundation.LocalImportEngine
 import kotlinx.coroutines.launch
 
 /**

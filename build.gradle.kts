@@ -3,6 +3,7 @@ import dev.iurysouza.modulegraph.Orientation
 import dev.iurysouza.modulegraph.Theme
 
 plugins {
+    base
     alias(libs.plugins.gradle.doctor) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.module.graph)
@@ -30,6 +31,65 @@ if (providers.gradleProperty("org.gradle.unsafe.isolated-projects").orNull != "t
 tasks.register("lintFormat") {
     description = "Runs all formatting tasks"
     group = "formatting"
+}
+
+// One package, one module. Split packages defeat the point of the module split: `internal` silently
+// leaks across a boundary the compiler can no longer police, IDE navigation blurs, and it stops being
+// obvious which module owns a type. Test source sets are exempt — they compile separately, so sharing
+// a package there costs nothing.
+//
+// This has to live on the root project: it is the only place that can compare each module's packages
+// against every other's. It reads sources straight off disk rather than querying sibling projects, so
+// it stays compatible with project isolation.
+tasks.register("verifyUniquePackages") {
+    group = "verification"
+    description = "Fails if two modules declare the same Kotlin package in their main sources."
+
+    // Captured as a plain File so the action holds no reference to the build script itself, which the
+    // configuration cache cannot serialize.
+    val repositoryRoot = layout.projectDirectory.asFile
+
+    doLast {
+        val packageRegex = Regex("""^package ([\w.]+)$""", RegexOption.MULTILINE)
+        val owners = mutableMapOf<String, MutableSet<String>>()
+
+        repositoryRoot
+            .walkTopDown()
+            .onEnter { it.name !in setOf("build", ".git", ".gradle", ".idea", ".claude") }
+            .filter { it.isFile && it.extension == "kt" }
+            .forEach { file ->
+                val relativePath = file.relativeTo(repositoryRoot).invariantSeparatorsPath
+                val sourceSet = relativePath.substringAfter("/src/", "").substringBefore('/')
+                if (!sourceSet.endsWith("Main")) return@forEach
+
+                val module = generateSequence(file.parentFile) { it.parentFile }
+                    .takeWhile { it.startsWith(repositoryRoot) }
+                    .firstOrNull { it.resolve("build.gradle.kts").isFile }
+                    ?.relativeTo(repositoryRoot)
+                    ?.invariantSeparatorsPath
+                    ?.ifEmpty { null }
+                    ?: return@forEach
+
+                val declaredPackage = packageRegex.find(file.readText())?.groupValues?.get(1) ?: return@forEach
+                owners.getOrPut(declaredPackage) { mutableSetOf() }.add(module)
+            }
+
+        val split = owners.filterValues { it.size > 1 }.toSortedMap()
+        require(split.isEmpty()) {
+            buildString {
+                appendLine("A Kotlin package must belong to exactly one module, but these are split:")
+                split.forEach { (declaredPackage, modules) ->
+                    appendLine("  $declaredPackage")
+                    modules.sorted().forEach { appendLine("      $it") }
+                }
+                appendLine("Give each module its own package (e.g. append the module name as a sub-package).")
+            }
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn("verifyUniquePackages")
 }
 
 // `createModuleGraph` writes a Mermaid module-dependency graph into this Markdown file.
@@ -61,6 +121,17 @@ dependencyAnalysis {
 
         project(":app:di:core") {
             ignoreSourceSet("commonTest")
+        }
+
+        project(":app:model:passthrough") {
+            sourceSet("commonMain") {
+                onUnusedDependencies {
+                    // PassThroughAccount's only use of :app:model:core is WellKnownIds, whose members are
+                    // `const val` and therefore inlined — no binary reference survives for DAGP to see,
+                    // even though the module does not compile without the dependency.
+                    exclude(":app:model:core")
+                }
+            }
         }
 
         project(":test:app:db") {

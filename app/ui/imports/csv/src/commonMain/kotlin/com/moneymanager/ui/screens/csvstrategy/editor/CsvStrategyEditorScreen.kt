@@ -32,12 +32,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
-import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
@@ -49,9 +49,9 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.createCsvStrategy
 import com.moneymanager.importengineapi.deleteAccountMapping
 import com.moneymanager.importengineapi.updateCsvStrategy
-import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.accountmapping.AccountMappingEditorDialog
 import com.moneymanager.ui.screens.csvstrategy.ColumnDetector
 import kotlinx.coroutines.flow.flowOf

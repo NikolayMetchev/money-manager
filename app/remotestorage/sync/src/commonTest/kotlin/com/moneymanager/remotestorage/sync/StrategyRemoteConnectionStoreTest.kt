@@ -1,7 +1,7 @@
 package com.moneymanager.remotestorage.sync
 
-import com.moneymanager.domain.StrategyKey
-import com.moneymanager.domain.StrategyKind
+import com.moneymanager.domain.strategy.StrategyKey
+import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.localsettings.LocalSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals

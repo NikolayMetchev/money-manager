@@ -1,8 +1,8 @@
 package com.moneymanager.database.json
 
-import com.moneymanager.domain.StrategyFileNaming
-import com.moneymanager.domain.StrategyKey
-import com.moneymanager.domain.StrategyKind
+import com.moneymanager.domain.strategy.StrategyFileNaming
+import com.moneymanager.domain.strategy.StrategyKey
+import com.moneymanager.domain.strategy.StrategyKind
 
 /**
  * Kind-dispatching helpers over the per-kind export codecs, shared by the strategy library (sync,

@@ -1,6 +1,5 @@
 package com.moneymanager.database.json
 
-import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingsExport
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
@@ -10,6 +9,7 @@ import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.FieldMappingExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
+import com.moneymanager.domain.strategy.StrategyKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals

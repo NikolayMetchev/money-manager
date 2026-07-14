@@ -10,7 +10,10 @@ plugins {
 // gitignored, like the SchemaSpy docs). Its tests validate every generated artifact.
 dependencies {
     implementation(projects.app.db.read)
+    implementation(projects.app.model.apistrategy)
     implementation(projects.app.model.core)
+    implementation(projects.app.model.csvstrategy)
+    implementation(projects.app.model.passthrough)
     implementation(projects.app.strategies)
     implementation(projects.app.strategycatalog)
 

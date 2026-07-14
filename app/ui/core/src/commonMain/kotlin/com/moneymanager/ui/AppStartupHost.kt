@@ -24,7 +24,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CryptoCatalogRefresher
 import com.moneymanager.domain.model.DbLocation

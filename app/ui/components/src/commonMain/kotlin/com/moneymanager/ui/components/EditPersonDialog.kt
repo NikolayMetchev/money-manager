@@ -38,9 +38,9 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.getOrCreateAttributeType
-import com.moneymanager.ui.LocalImportEngine
+import com.moneymanager.ui.components.transactions.EditableAttributesSection
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.transactions.EditableAttributesSection
+import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

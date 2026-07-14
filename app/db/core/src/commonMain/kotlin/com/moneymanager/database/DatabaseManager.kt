@@ -1,5 +1,6 @@
 package com.moneymanager.database
 
+import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
 
 /**

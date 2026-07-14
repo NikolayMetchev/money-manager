@@ -13,7 +13,7 @@ import com.moneymanager.localsettings.LocalSettings
  * @property providerConfig provider-specific reconstruction config (e.g. a folder path); null when unused
  * @property syncedRevision the remote [com.moneymanager.remotestorage.RemoteFile.revisionId] this device last
  *   synced to; persisted so remote-change detection survives app restarts. Null until the first sync.
- * @property syncedToken the [com.moneymanager.database.MoneyManagerDatabaseWrapper.dataChangeToken] of the
+ * @property syncedToken the [com.moneymanager.database.write.MoneyManagerDatabaseWrapper.dataChangeToken] of the
  *   working copy the last time it was uploaded; persisted so "has the local file changed since the last
  *   upload?" survives app restarts (the token is content-derived and stable across reopen). Null until the
  *   first sync.

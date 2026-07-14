@@ -5,9 +5,9 @@ package com.moneymanager.database.mapper
 import com.moneymanager.database.json.FieldMappingJsonCodec
 import com.moneymanager.database.sql.audit.SelectAuditHistoryForCsvImportStrategy
 import com.moneymanager.domain.model.AuditType
-import com.moneymanager.domain.model.CsvImportStrategyAuditEntry
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.EntityType
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyAuditEntry
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 

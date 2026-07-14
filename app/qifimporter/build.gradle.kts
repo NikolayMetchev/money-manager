@@ -10,7 +10,12 @@ kotlin {
             dependencies {
                 api(projects.app.csvimporter)
                 api(projects.app.importengineapi)
+                api(projects.app.model.accountmapping)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
 
                 implementation(libs.kmlogging)
             }
@@ -20,7 +25,12 @@ kotlin {
             dependencies {
                 api(projects.app.csvimporter)
                 api(projects.app.importengineapi)
+                api(projects.app.model.accountmapping)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
 
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)

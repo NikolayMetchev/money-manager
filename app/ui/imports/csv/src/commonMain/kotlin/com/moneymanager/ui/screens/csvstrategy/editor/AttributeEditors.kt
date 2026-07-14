@@ -31,7 +31,7 @@ import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
-import com.moneymanager.ui.screens.transactions.AttributeTypeField
+import com.moneymanager.ui.components.transactions.AttributeTypeField
 
 /**
  * Expandable multi-select checkbox list for identification columns.

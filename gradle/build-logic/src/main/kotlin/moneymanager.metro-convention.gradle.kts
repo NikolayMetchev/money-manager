@@ -6,11 +6,15 @@ plugins {
 }
 
 configure<KotlinMultiplatformExtension> {
-    sourceSets {
-        getByName("commonMain") {
+    // api, not implementation: @ContributesTo / @Provides sit on public interfaces, so the Metro runtime
+    // is part of every DI module's ABI. Declared on each platform source set as well as commonMain
+    // because dependency-analysis resolves ABI per platform. `matching` rather than `getByName` so the
+    // android source set is picked up whenever the Android plugin creates it, however late.
+    sourceSets
+        .matching { it.name in setOf("commonMain", "jvmMain", "androidMain") }
+        .configureEach {
             dependencies {
-                implementation(libs.metro.runtime)
+                api(libs.metro.runtime)
             }
         }
-    }
 }

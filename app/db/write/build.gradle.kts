@@ -15,10 +15,20 @@ kotlin {
                 // SqlDriver/QueryResult; the CSV read repository (raw dynamic-table access via the wrapper)
                 // lives here too and uses coroutine Flows.
                 api(projects.app.db.read)
+                api(projects.app.db.repository)
                 // Both a normal dependency (for generated row types) AND the sqldelight dependency() below
                 // (for .sq cross-module schema resolution) are required.
                 api(projects.app.db.schema)
+                api(projects.app.model.accountmapping)
+                api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.importdirectory)
+                api(projects.app.model.passthrough)
+                api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
+                api(projects.app.model.repository.write)
 
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.sqldelight.coroutines.extensions)
@@ -28,9 +38,19 @@ kotlin {
             dependencies {
                 api(projects.app.db.read)
                 api(projects.app.db.schema)
+                api(projects.app.model.accountmapping)
+                api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.importdirectory)
+                api(projects.app.model.passthrough)
+                api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
+                api(projects.app.model.repository.write)
 
                 implementation(libs.kotlinx.serialization.core)
+                implementation(projects.app.db.repository)
                 implementation(projects.utils.bigdecimal)
             }
         }

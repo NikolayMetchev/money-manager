@@ -6,7 +6,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.OrderUpsertResult
+import com.moneymanager.domain.repository.write.OrderUpsertResult
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.test.database.DbTest

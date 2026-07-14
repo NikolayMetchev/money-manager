@@ -7,7 +7,7 @@ import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.ImportDirectoryAuditEntry
-import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
+import com.moneymanager.domain.model.ImportDirectoryId
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 

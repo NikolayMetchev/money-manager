@@ -37,15 +37,15 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.rememberFilePicker
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.database.json.ApiStrategyExportCodec
+import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.deleteApiStrategy
 import com.moneymanager.importengineapi.updateApiStrategy
-import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.foundation.LocalImportEngine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.time.Clock

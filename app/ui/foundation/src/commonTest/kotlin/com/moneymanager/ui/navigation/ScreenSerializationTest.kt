@@ -3,18 +3,18 @@
 package com.moneymanager.ui.navigation
 
 import androidx.navigation3.runtime.NavKey
-import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
-import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
-import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
-import com.moneymanager.domain.model.qif.QifImportId
+import com.moneymanager.domain.strategy.StrategyKind
 import kotlinx.serialization.PolymorphicSerializer
 import kotlinx.serialization.json.Json
 import kotlin.test.Test

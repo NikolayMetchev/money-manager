@@ -9,6 +9,7 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.model.core)
+                api(projects.app.model.repository.read)
 
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)
@@ -46,6 +47,7 @@ kotlin {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
                 api(projects.app.model.core)
+                api(projects.app.model.repository.read)
 
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material3.desktop)
@@ -62,13 +64,20 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.compose.ui.test.desktop)
                 implementation(libs.mokkery.core)
+                implementation(projects.app.model.repository.write)
             }
         }
         getByName("androidDeviceTest") {
             dependencies {
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.mokkery.core)
+                implementation(projects.app.model.repository.write)
                 implementation(projects.test.app.ui)
+            }
+        }
+        getByName("androidHostTest") {
+            dependencies {
+                implementation(projects.app.model.repository.write)
             }
         }
     }

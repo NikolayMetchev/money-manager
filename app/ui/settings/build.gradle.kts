@@ -8,6 +8,8 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.repository.read)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.strategycatalog)
@@ -45,6 +47,8 @@ kotlin {
                 api(libs.compose.foundation.layout.desktop)
                 api(projects.app.db.write)
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.repository.read)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.strategycatalog)

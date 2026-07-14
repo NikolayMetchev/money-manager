@@ -18,8 +18,8 @@ import com.moneymanager.currency.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.setDefaultCurrency
-import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.foundation.LocalImportEngine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 

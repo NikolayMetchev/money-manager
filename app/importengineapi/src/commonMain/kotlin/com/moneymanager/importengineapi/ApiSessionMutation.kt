@@ -2,8 +2,10 @@
 
 package com.moneymanager.importengineapi
 
+import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
+import com.moneymanager.domain.model.ApiResponseTransactionInsert
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSessionType
@@ -11,8 +13,6 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
-import com.moneymanager.domain.repository.ApiResponseTransactionInsert
 import kotlin.time.Instant
 
 /**

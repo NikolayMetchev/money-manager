@@ -1,6 +1,6 @@
 package com.moneymanager.remotestorage.sync
 
-import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.remotestorage.RemoteFile

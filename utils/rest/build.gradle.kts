@@ -9,6 +9,7 @@ kotlin {
             dependencies {
                 api(libs.ktor.client.core)
                 api(projects.app.importengineapi)
+                api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
 
                 // HMAC signing for exchange APIs (Crypto.com/Binance/Kraken), same lib as utils/archive.
@@ -38,10 +39,11 @@ kotlin {
         jvmMain {
             dependencies {
                 api(projects.app.importengineapi)
-                api(projects.app.model.core)
+                api(projects.app.model.apistrategy)
 
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
+                implementation(projects.app.model.core)
 
                 runtimeOnly(libs.cryptography.provider.jdk)
             }

@@ -1,55 +1,51 @@
 plugins {
     id("moneymanager.android-convention")
-    id("moneymanager.kotlin-multiplatform-convention")
-    alias(libs.plugins.metro)
+    id("moneymanager.metro-convention")
 }
 
+// The application graph. Metro merges every @ContributesTo(AppScope) module it finds on this module's
+// compile classpath, so the feature DI modules are dependencies purely to be *seen* — no code here names
+// them. Drop one and the graph quietly loses its bindings, so they stay listed even though nothing
+// imports them.
+//
+// They are `api` rather than `implementation` because Metro makes each contributed module a *supertype*
+// of the generated AppComponent: anything that touches AppComponent needs them on its compile classpath.
 kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.db.core)
-                api(projects.app.importengineapi)
-                api(projects.app.importer)
+                api(projects.app.db.di)
+                api(projects.app.di.params)
+                api(projects.app.di.scope)
                 api(projects.app.model.core)
-                api(projects.utils.localsettings)
-            }
-        }
-
-        getByName("jvmMain") {
-            dependencies {
-                api(libs.metro.runtime)
-                api(projects.app.db.core)
-                api(projects.app.db.write)
-                api(projects.app.importengineapi)
-                api(projects.app.importfilesource.core)
-                api(projects.app.model.core)
-                api(projects.app.remotestorage.core)
+                api(projects.app.remotestorage.di)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.strategycatalog)
+                api(projects.app.strategycatalog.di)
                 api(projects.utils.localsettings)
-
-                implementation(projects.app.db.read)
-                implementation(projects.app.importer)
-                implementation(projects.app.importfilesource.localfolder)
-                implementation(projects.app.remotestorage.googledrive)
+                api(projects.utils.localsettings.di)
             }
         }
-
         getByName("androidMain") {
             dependencies {
-                api(libs.metro.runtime)
-                api(projects.app.db.write)
-                api(projects.app.importfilesource.core)
                 api(projects.app.remotestorage.core)
-                // api (not implementation): GoogleAccessTokenSource is a field type of the Android
-                // AppComponentParams, so it's part of this module's ABI.
-                api(projects.app.remotestorage.googledrive)
+            }
+        }
+        getByName("jvmMain") {
+            dependencies {
+                api(projects.app.db.core)
+                api(projects.app.db.di)
+                api(projects.app.di.params)
+                api(projects.app.di.scope)
+                api(projects.app.model.core)
+                api(projects.app.remotestorage.core)
+                api(projects.app.remotestorage.di)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.strategycatalog)
-
-                implementation(projects.app.db.read)
-                implementation(projects.app.importfilesource.localfolder)
+                api(projects.app.strategycatalog.di)
+                api(projects.utils.localsettings)
+                api(projects.utils.localsettings.di)
             }
         }
     }

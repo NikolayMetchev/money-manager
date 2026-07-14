@@ -1,8 +1,5 @@
 package com.moneymanager.domain.model
 
-import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.model.qif.QifImportId
-
 /**
  * Describes where an entity (account/person/ownership/category/currency/transfer) came from, so its
  * source row can be recorded.

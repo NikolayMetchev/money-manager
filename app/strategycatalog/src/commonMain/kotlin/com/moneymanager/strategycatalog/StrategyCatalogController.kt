@@ -1,11 +1,11 @@
 package com.moneymanager.strategycatalog
 
-import com.moneymanager.domain.CsvResolution
-import com.moneymanager.domain.CsvUnresolvedReference
-import com.moneymanager.domain.StrategyKey
-import com.moneymanager.domain.StrategyLibrary
-import com.moneymanager.domain.StrategyParseResult
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.strategy.CsvResolution
+import com.moneymanager.domain.strategy.CsvUnresolvedReference
+import com.moneymanager.domain.strategy.StrategyKey
+import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.domain.strategy.StrategyParseResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

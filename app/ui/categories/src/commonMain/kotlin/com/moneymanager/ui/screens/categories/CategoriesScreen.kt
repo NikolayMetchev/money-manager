@@ -1,0 +1,880 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    kotlin.uuid.ExperimentalUuidApi::class,
+)
+
+package com.moneymanager.ui.screens.categories
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CategoryBalance
+import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportCategoryIntent
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.LocalCategoryKey
+import com.moneymanager.ui.components.CreateCategoryDialog
+import com.moneymanager.ui.components.ErrorMessageText
+import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.ParentCategorySelector
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
+import com.moneymanager.ui.util.CategoryNode
+import com.moneymanager.ui.util.buildCategoryForest
+import com.moneymanager.ui.util.flattenCategoryForest
+import com.moneymanager.ui.util.formatAmount
+import com.moneymanager.ui.util.getDescendantIds
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import org.lighthousegames.logging.logging
+
+private val logger = logging()
+
+private val BALANCE_COLUMN_WIDTH = 100.dp
+private val HIERARCHY_COLUMN_WIDTH = 250.dp
+
+@Composable
+fun CategoriesScreen(
+    categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyReadRepository,
+    onAuditClick: (Category) -> Unit = {},
+) {
+    val categories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        categoryRepository.getAllCategories()
+    }
+    val categoryBalances by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        categoryRepository.getCategoryBalances()
+    }
+    val currencies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        currencyRepository.getAllCurrencies()
+    }
+
+    var expandedIds by remember { mutableStateOf(emptySet<Long>()) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var editingCategory by remember { mutableStateOf<Category?>(null) }
+
+    // Drag state
+    var draggedCategoryId by remember { mutableStateOf<Long?>(null) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var dropTargetId by remember { mutableStateOf<Long?>(null) }
+    val itemPositions = remember { mutableStateMapOf<Long, Pair<Float, Float>>() }
+
+    val forest = remember(categories) { buildCategoryForest(categories) }
+    val flattenedNodes = remember(forest, expandedIds) { flattenCategoryForest(forest, expandedIds) }
+
+    // Group balances by categoryId for efficient lookup
+    val balancesByCategoryId =
+        remember(categoryBalances) {
+            categoryBalances.groupBy { it.categoryId }
+        }
+
+    // Get unique currencies that have balances (for column headers)
+    val currenciesWithBalances =
+        remember(categoryBalances, currencies) {
+            val currencyIdsWithBalances = categoryBalances.map { it.balance.asset.id }.toSet()
+            currencies.filter { it.id in currencyIdsWithBalances }
+        }
+
+    // Calculate maximum width needed for each currency column
+    val columnWidths =
+        remember(categoryBalances, currenciesWithBalances) {
+            currenciesWithBalances.associate { currency ->
+                val maxMoney =
+                    categoryBalances
+                        .filter { it.balance.asset.id == currency.id }
+                        .maxByOrNull { it.balance.amount.abs() }
+                        ?.balance
+                val formattedMax = maxMoney?.let { formatAmount(it) } ?: formatAmount(BigDecimal.ZERO, currency)
+                // Estimate width: ~8dp per character + 16dp padding
+                val balanceWidth = (formattedMax.length * 8 + 16).dp
+                // Also consider header text width (currency code)
+                val headerWidth = (currency.code.length * 8 + 16).dp
+                currency.id to maxOf(balanceWidth, headerWidth, BALANCE_COLUMN_WIDTH)
+            }
+        }
+
+    val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
+    val listState = rememberLazyListState()
+
+    // Shared horizontal scroll state for header and all rows
+    val balancesScrollState = rememberScrollState()
+
+    // Get descendants of dragged item to prevent invalid drops
+    val draggedDescendants =
+        remember(draggedCategoryId, forest) {
+            draggedCategoryId?.let { getDescendantIds(it, forest) }.orEmpty()
+        }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Your Categories",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            TextButton(onClick = { showCreateDialog = true }) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Add Category")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (categories.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "No categories yet. Add your first category!",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            // Drop zone for making items top-level
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(if (draggedCategoryId != null) 48.dp else 0.dp)
+                        .background(
+                            if (draggedCategoryId != null && dropTargetId == null) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            } else {
+                                MaterialTheme.colorScheme.surface
+                            },
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (draggedCategoryId != null) {
+                    Text(
+                        text = "Drop here to make top-level",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            // Currency column headers (only if there are balances)
+            if (currenciesWithBalances.isNotEmpty()) {
+                CurrencyHeaderRow(
+                    currencies = currenciesWithBalances,
+                    columnWidths = columnWidths,
+                    scrollState = balancesScrollState,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Box(modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    itemsIndexed(
+                        items = flattenedNodes,
+                        key = { _, node -> node.category.id },
+                    ) { index, node ->
+                        val isDragging = node.category.id == draggedCategoryId
+                        val isValidDropTarget =
+                            draggedCategoryId != null &&
+                                node.category.id != draggedCategoryId &&
+                                node.category.id !in draggedDescendants
+                        val isDropTarget = dropTargetId == node.category.id && isValidDropTarget
+
+                        val isUncategorized = node.category.id == Category.UNCATEGORIZED_ID
+
+                        CategoryTreeItem(
+                            node = node,
+                            balances = balancesByCategoryId[node.category.id].orEmpty(),
+                            currenciesWithBalances = currenciesWithBalances,
+                            columnWidths = columnWidths,
+                            balancesScrollState = balancesScrollState,
+                            isExpanded = node.category.id in expandedIds,
+                            onToggleExpand = {
+                                expandedIds =
+                                    if (node.category.id in expandedIds) {
+                                        expandedIds - node.category.id
+                                    } else {
+                                        expandedIds + node.category.id
+                                    }
+                            },
+                            onEditClick = { editingCategory = node.category },
+                            onAuditClick = { onAuditClick(node.category) },
+                            isDraggable = !isUncategorized,
+                            isDragging = isDragging,
+                            isDropTarget = isDropTarget && !isUncategorized,
+                            dragOffset = if (isDragging) dragOffset else Offset.Zero,
+                            onPositionChanged = { top, bottom ->
+                                itemPositions[node.category.id] = top to bottom
+                            },
+                            onDragStart = {
+                                draggedCategoryId = node.category.id
+                                dragOffset = Offset.Zero
+                            },
+                            onDrag = { change ->
+                                dragOffset += change
+
+                                // Determine drop target based on position
+                                val currentY = (itemPositions[node.category.id]?.first ?: 0f) + dragOffset.y
+                                var newDropTarget: Long? = null
+
+                                for ((id, positions) in itemPositions) {
+                                    if (id != draggedCategoryId && id !in draggedDescendants) {
+                                        val (top, bottom) = positions
+                                        if (currentY in top..bottom) {
+                                            newDropTarget = id
+                                            break
+                                        }
+                                    }
+                                }
+
+                                dropTargetId = newDropTarget
+                            },
+                            onDragEnd = {
+                                val draggedId = draggedCategoryId
+                                val targetId = dropTargetId
+
+                                if (draggedId != null) {
+                                    val draggedCategory = categories.find { it.id == draggedId }
+                                    if (draggedCategory != null) {
+                                        val newParentId = targetId // null means top-level
+                                        if (draggedCategory.parentId != newParentId) {
+                                            scope.launch {
+                                                try {
+                                                    importEngine.import(
+                                                        ImportBatch.manualEdits(
+                                                            categories =
+                                                                listOf(
+                                                                    ImportCategoryIntent(
+                                                                        key = LocalCategoryKey("update"),
+                                                                        source = Source.Manual,
+                                                                        operation = ImportOperation.UPDATE,
+                                                                        existingId = draggedCategory.id,
+                                                                        category = draggedCategory.copy(parentId = newParentId),
+                                                                    ),
+                                                                ),
+                                                        ),
+                                                    )
+                                                } catch (expected: Exception) {
+                                                    logger.error(expected) {
+                                                        "Failed to update category hierarchy: ${expected.message}"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                draggedCategoryId = null
+                                dragOffset = Offset.Zero
+                                dropTargetId = null
+                            },
+                            onDragCancel = {
+                                draggedCategoryId = null
+                                dragOffset = Offset.Zero
+                                dropTargetId = null
+                            },
+                        )
+                    }
+                }
+                VerticalScrollbarForLazyList(
+                    lazyListState = listState,
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                )
+            }
+        }
+    }
+
+    if (showCreateDialog) {
+        CreateCategoryDialogInCategories(
+            categoryRepository = categoryRepository,
+            onDismiss = { showCreateDialog = false },
+        )
+    }
+
+    editingCategory?.let { category ->
+        EditCategoryDialog(
+            category = category,
+            categories = categories,
+            onDismiss = { editingCategory = null },
+        )
+    }
+}
+
+@Composable
+private fun CurrencyHeaderRow(
+    currencies: List<Currency>,
+    columnWidths: Map<CurrencyId, Dp>,
+    scrollState: ScrollState,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Fixed-width left column for hierarchy
+        Box(modifier = Modifier.width(HIERARCHY_COLUMN_WIDTH)) {
+            Text(
+                text = "Category",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 12.dp),
+            )
+        }
+
+        // Scrollable currency headers
+        Row(
+            modifier = Modifier.linuxHorizontalScrollWheel(scrollState).horizontalScroll(scrollState),
+        ) {
+            currencies.forEach { currency ->
+                Text(
+                    text = currency.code,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier =
+                        Modifier
+                            .width(columnWidths[currency.id] ?: BALANCE_COLUMN_WIDTH)
+                            .padding(horizontal = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryTreeItem(
+    node: CategoryNode,
+    balances: List<CategoryBalance>,
+    currenciesWithBalances: List<Currency>,
+    columnWidths: Map<CurrencyId, Dp>,
+    balancesScrollState: ScrollState,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onEditClick: () -> Unit,
+    onAuditClick: () -> Unit,
+    isDraggable: Boolean,
+    isDragging: Boolean,
+    isDropTarget: Boolean,
+    dragOffset: Offset,
+    onPositionChanged: (Float, Float) -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
+) {
+    val hasChildren = node.children.isNotEmpty()
+    val rotationAngle by animateFloatAsState(
+        targetValue = if (isExpanded) 90f else 0f,
+        label = "expandIconRotation",
+    )
+
+    // Create a map for quick balance lookup by currency
+    val balancesByCurrency =
+        remember(balances) {
+            balances.associateBy { it.balance.asset.id }
+        }
+
+    // Main row with two sections: fixed hierarchy column + scrollable balances
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .zIndex(if (isDragging) 1f else 0f)
+                .onGloballyPositioned { coordinates ->
+                    val position = coordinates.positionInRoot()
+                    onPositionChanged(position.y, position.y + coordinates.size.height)
+                }.graphicsLayer {
+                    if (isDragging) {
+                        translationY = dragOffset.y
+                        scaleX = 1.02f
+                        scaleY = 1.02f
+                        alpha = 0.9f
+                        shadowElevation = 8f
+                    }
+                }.then(
+                    if (isDraggable) {
+                        Modifier.pointerInput(node.category.id) {
+                            detectDragGestures(
+                                onDragStart = { onDragStart() },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    onDrag(dragAmount)
+                                },
+                                onDragEnd = { onDragEnd() },
+                                onDragCancel = { onDragCancel() },
+                            )
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Left column: fixed width hierarchy with Card
+        Box(modifier = Modifier.width(HIERARCHY_COLUMN_WIDTH)) {
+            Card(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = (node.depth * 16).dp),
+                elevation =
+                    CardDefaults.cardElevation(
+                        defaultElevation = if (node.depth == 0) 2.dp else 1.dp,
+                    ),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor =
+                            when {
+                                isDropTarget -> MaterialTheme.colorScheme.primaryContainer
+                                node.depth == 0 -> MaterialTheme.colorScheme.surface
+                                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            },
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Expand/collapse icon
+                    if (hasChildren) {
+                        IconButton(
+                            onClick = onToggleExpand,
+                            modifier = Modifier.size(20.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                modifier =
+                                    Modifier
+                                        .size(20.dp)
+                                        .rotate(rotationAngle),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(20.dp))
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    // Category name with children count
+                    Text(
+                        text =
+                            buildString {
+                                append(node.category.name)
+                                if (hasChildren) {
+                                    append(" (${node.children.size})")
+                                }
+                            },
+                        style =
+                            if (node.depth == 0) {
+                                MaterialTheme.typography.titleSmall
+                            } else {
+                                MaterialTheme.typography.bodySmall
+                            },
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                    )
+
+                    // Edit button
+                    if (node.category.id != Category.UNCATEGORIZED_ID) {
+                        IconButton(
+                            onClick = onEditClick,
+                            modifier = Modifier.size(20.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    // Audit button
+                    IconButton(
+                        onClick = onAuditClick,
+                        modifier = Modifier.size(20.dp),
+                    ) {
+                        Text(
+                            text = "\uD83D\uDCCB",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+            }
+        }
+
+        // Right column: scrollable balance matrix (aligned with header)
+        if (currenciesWithBalances.isNotEmpty()) {
+            Row(
+                modifier = Modifier.linuxHorizontalScrollWheel(balancesScrollState).horizontalScroll(balancesScrollState),
+            ) {
+                currenciesWithBalances.forEach { currency ->
+                    val balance = balancesByCurrency[currency.id]
+                    Text(
+                        text =
+                            if (balance != null) {
+                                formatAmount(balance.balance)
+                            } else {
+                                ""
+                            },
+                        style = MaterialTheme.typography.labelMedium,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        softWrap = false,
+                        color =
+                            when {
+                                balance == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                                balance.balance.isPositive() -> MaterialTheme.colorScheme.primary
+                                balance.balance.isNegative() -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        modifier =
+                            Modifier
+                                .width(columnWidths[currency.id] ?: BALANCE_COLUMN_WIDTH)
+                                .padding(horizontal = 8.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CreateCategoryDialogInCategories(
+    categoryRepository: CategoryReadRepository,
+    onDismiss: () -> Unit,
+) = CreateCategoryDialog(
+    categoryRepository = categoryRepository,
+    onCategoryCreated = { _, _ -> onDismiss() },
+    onDismiss = onDismiss,
+)
+
+@Composable
+fun EditCategoryDialog(
+    category: Category,
+    categories: List<Category>,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(category.name) }
+    var selectedParentId by remember { mutableStateOf(category.parentId) }
+    var expanded by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
+
+    // Get descendants to prevent selecting them as parent (would create cycle)
+    val forest = remember(categories) { buildCategoryForest(categories) }
+    val descendantIds = remember(category.id, forest) { getDescendantIds(category.id, forest) }
+    val isUncategorized = category.id == Category.UNCATEGORIZED_ID
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text("Edit Category") },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Category Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving && !isUncategorized,
+                )
+
+                if (isUncategorized) {
+                    Text(
+                        text = "The Uncategorized category cannot be modified.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    ParentCategorySelector(
+                        categories = categories,
+                        selectedParentId = selectedParentId,
+                        onParentSelected = { selectedParentId = it },
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it },
+                        enabled = !isSaving,
+                        additionalExcludedIds = descendantIds + category.id,
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    TextButton(
+                        onClick = { showDeleteConfirmation = true },
+                        colors =
+                            ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error,
+                            ),
+                        enabled = !isSaving,
+                    ) {
+                        Text("Delete Category")
+                    }
+                }
+
+                errorMessage?.let { error -> ErrorMessageText(error) }
+            }
+        },
+        confirmButton = {
+            LoadingTextButton(
+                onClick = {
+                    saveCategoryWithValidation(
+                        scope = scope,
+                        name = name,
+                        setSaving = { isSaving = it },
+                        setError = { errorMessage = it },
+                        onSuccess = onDismiss,
+                    ) { trimmedName ->
+                        importEngine.import(
+                            ImportBatch.manualEdits(
+                                categories =
+                                    listOf(
+                                        ImportCategoryIntent(
+                                            key = LocalCategoryKey("update"),
+                                            source = Source.Manual,
+                                            operation = ImportOperation.UPDATE,
+                                            existingId = category.id,
+                                            category = category.copy(name = trimmedName, parentId = selectedParentId),
+                                        ),
+                                    ),
+                            ),
+                        )
+                    }
+                },
+                enabled = !isSaving && !isUncategorized,
+                loading = isSaving,
+                label = "Save",
+            )
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+
+    if (showDeleteConfirmation) {
+        DeleteCategoryDialog(
+            category = category,
+            onDismiss = { showDeleteConfirmation = false },
+            onDeleted = onDismiss,
+        )
+    }
+}
+
+private fun saveCategoryWithValidation(
+    scope: CoroutineScope,
+    name: String,
+    setSaving: (Boolean) -> Unit,
+    setError: (String?) -> Unit,
+    onSuccess: () -> Unit,
+    saveAction: suspend (trimmedName: String) -> Unit,
+) {
+    if (name.isBlank()) {
+        setError("Category name is required")
+        return
+    }
+
+    setSaving(true)
+    setError(null)
+    scope.launch {
+        try {
+            saveAction(name.trim())
+            onSuccess()
+        } catch (expected: Exception) {
+            logger.error(expected) { "Failed to update category: ${expected.message}" }
+            setError("Failed to update category: ${expected.message}")
+            setSaving(false)
+        }
+    }
+}
+
+@Composable
+fun DeleteCategoryDialog(
+    category: Category,
+    onDismiss: () -> Unit,
+    onDeleted: () -> Unit,
+) {
+    var isDeleting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
+
+    AlertDialog(
+        onDismissRequest = { if (!isDeleting) onDismiss() },
+        icon = {
+            Text(
+                text = "⚠️",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+        },
+        title = { Text("Delete Category?") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Are you sure you want to delete \"${category.name}\"?",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text =
+                        "Child categories will be moved to the parent of this category. " +
+                            "Transactions using this category will become uncategorized.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                errorMessage?.let { error ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ErrorMessageText(error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    isDeleting = true
+                    errorMessage = null
+                    scope.launch {
+                        try {
+                            importEngine.import(
+                                ImportBatch.manualEdits(
+                                    categories =
+                                        listOf(
+                                            ImportCategoryIntent(
+                                                key = LocalCategoryKey("delete"),
+                                                source = Source.Manual,
+                                                operation = ImportOperation.DELETE,
+                                                existingId = category.id,
+                                            ),
+                                        ),
+                                ),
+                            )
+                            onDeleted()
+                        } catch (expected: Exception) {
+                            logger.error(expected) { "Failed to delete category: ${expected.message}" }
+                            errorMessage = "Failed to delete category: ${expected.message}"
+                            isDeleting = false
+                        }
+                    }
+                },
+                enabled = !isDeleting,
+                colors =
+                    ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Delete")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isDeleting,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+}

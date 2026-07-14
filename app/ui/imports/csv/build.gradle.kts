@@ -9,7 +9,13 @@ kotlin {
             dependencies {
                 api(projects.app.csvimporter)
                 api(projects.app.importengineapi)
+                api(projects.app.model.accountmapping)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
+                api(projects.app.model.timeline)
 
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
@@ -46,6 +52,7 @@ kotlin {
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.datetime)
                 implementation(projects.app.db.read)
+                implementation(projects.app.model.passthrough)
                 implementation(projects.utils.bigdecimal)
             }
         }
@@ -58,6 +65,10 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
 
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.animation.desktop)
@@ -70,6 +81,9 @@ kotlin {
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.datetime)
                 implementation(projects.app.db.read)
+                implementation(projects.app.model.accountmapping)
+                implementation(projects.app.model.passthrough)
+                implementation(projects.app.model.timeline)
                 implementation(projects.utils.bigdecimal)
             }
         }

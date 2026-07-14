@@ -5,10 +5,16 @@
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/gradle/build-logic/build-logic.iml" filepath="$PROJECT_DIR$/.idea/modules/gradle/build-logic/build-logic.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/money-manager.iml" filepath="$PROJECT_DIR$/.idea/modules/money-manager.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/money-manager.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/money-manager.app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/db/money-manager.app.db.iml" filepath="$PROJECT_DIR$/.idea/modules/app/db/money-manager.app.db.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/db/core/money-manager.app.db.core.commonTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/db/core/money-manager.app.db.core.commonTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/di/money-manager.app.di.iml" filepath="$PROJECT_DIR$/.idea/modules/app/di/money-manager.app.di.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/importfilesource/money-manager.app.importfilesource.iml" filepath="$PROJECT_DIR$/.idea/modules/app/importfilesource/money-manager.app.importfilesource.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/model/money-manager.app.model.iml" filepath="$PROJECT_DIR$/.idea/modules/app/model/money-manager.app.model.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/remotestorage/money-manager.app.remotestorage.iml" filepath="$PROJECT_DIR$/.idea/modules/app/remotestorage/money-manager.app.remotestorage.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/strategycatalog/money-manager.app.strategycatalog.iml" filepath="$PROJECT_DIR$/.idea/modules/app/strategycatalog/money-manager.app.strategycatalog.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/ui/imports/money-manager.app.ui.imports.iml" filepath="$PROJECT_DIR$/.idea/modules/app/ui/imports/money-manager.app.ui.imports.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/test/app/money-manager.test.app.iml" filepath="$PROJECT_DIR$/.idea/modules/test/app/money-manager.test.app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/utils/localsettings/money-manager.utils.localsettings.iml" filepath="$PROJECT_DIR$/.idea/modules/utils/localsettings/money-manager.utils.localsettings.iml" />
     </modules>
   </component>
 </project>

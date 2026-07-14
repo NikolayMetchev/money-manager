@@ -30,7 +30,14 @@ configure<KotlinMultiplatformExtension> {
  * documented device-bootstrap exception), and the engine itself (the sole writer).
  */
 val writeRepositoryExemptModules =
-    setOf(":app:model:core", ":app:db:core", ":app:db:write", ":app:di:core", ":test:app:db")
+    setOf(
+        ":app:model:repository:write",
+        ":app:db:core",
+        ":app:db:write",
+        ":app:di:core",
+        ":app:db:di",
+        ":test:app:db",
+    )
 // The importer module is scanned, but its sole writer — ImportEngineImpl — is allowed by exact path so a
 // new importer file can't quietly re-inject a write repository.
 val allowedWriteRepositoryPathsByModule =

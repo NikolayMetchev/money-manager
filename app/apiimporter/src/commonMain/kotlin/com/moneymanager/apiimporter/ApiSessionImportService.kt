@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiResponseId
+import com.moneymanager.domain.model.ApiResponseTransactionInsert
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
@@ -39,7 +40,6 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
-import com.moneymanager.domain.repository.ApiResponseTransactionInsert
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.AccountMatchKey

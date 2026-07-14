@@ -13,13 +13,13 @@ kotlin {
         // KMP ABI deps are declared per platform source set for dependency-analysis.
         jvmMain {
             dependencies {
-                api(projects.app.model.core)
+                api(projects.app.model.importdirectory)
             }
         }
 
         androidMain {
             dependencies {
-                api(projects.app.model.core)
+                api(projects.app.model.importdirectory)
             }
         }
     }

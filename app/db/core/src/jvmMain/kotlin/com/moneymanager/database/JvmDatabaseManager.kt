@@ -2,6 +2,7 @@ package com.moneymanager.database
 
 import com.moneymanager.currency.Currency
 import com.moneymanager.database.sql.seed.MoneyManagerDatabase
+import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DEFAULT_DATABASE_PATH
 import com.moneymanager.domain.model.DbLocation
 import kotlinx.coroutines.Dispatchers

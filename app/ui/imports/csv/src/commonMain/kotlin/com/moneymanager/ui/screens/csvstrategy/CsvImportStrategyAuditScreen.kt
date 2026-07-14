@@ -6,11 +6,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AuditType
-import com.moneymanager.domain.model.CsvImportStrategyAuditEntry
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyAuditEntry
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
@@ -25,7 +25,7 @@ import com.moneymanager.ui.audit.FieldChangeRow
 import com.moneymanager.ui.audit.FieldValueRow
 import com.moneymanager.ui.audit.NoVisibleChangesText
 import com.moneymanager.ui.audit.SourceInfoSection
-import com.moneymanager.ui.screens.changedOrUnchanged
+import com.moneymanager.ui.audit.changedOrUnchanged
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 

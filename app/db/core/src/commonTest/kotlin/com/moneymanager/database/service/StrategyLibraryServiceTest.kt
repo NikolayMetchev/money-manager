@@ -2,22 +2,22 @@
 
 package com.moneymanager.database.service
 
-import com.moneymanager.domain.StrategyFileNaming
-import com.moneymanager.domain.StrategyKey
-import com.moneymanager.domain.StrategyKind
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.qif.QifColumns
+import com.moneymanager.domain.strategy.StrategyFileNaming
+import com.moneymanager.domain.strategy.StrategyKey
+import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.createCsvStrategy

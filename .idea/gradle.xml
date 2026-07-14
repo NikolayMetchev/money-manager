@@ -64,6 +64,7 @@
             <option value="$PROJECT_DIR$/app/ui/imports/csv" />
             <option value="$PROJECT_DIR$/app/ui/imports/importDirectory" />
             <option value="$PROJECT_DIR$/app/ui/imports/qif" />
+            <option value="$PROJECT_DIR$/app/ui/imports/timeline" />
             <option value="$PROJECT_DIR$/app/ui/people" />
             <option value="$PROJECT_DIR$/app/ui/settings" />
             <option value="$PROJECT_DIR$/app/ui/transactions" />

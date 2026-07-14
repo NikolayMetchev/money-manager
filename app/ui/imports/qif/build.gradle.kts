@@ -8,7 +8,13 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.importengineapi)
+                api(projects.app.model.accountmapping)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
+                api(projects.app.model.timeline)
                 api(projects.app.qifimporter)
                 api(projects.utils.parsers.qif)
 
@@ -43,6 +49,8 @@ kotlin {
                 api(libs.compose.ui.desktop)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
                 api(projects.app.qifimporter)
                 api(projects.utils.parsers.qif)
 
@@ -53,6 +61,10 @@ kotlin {
                 implementation(libs.compose.ui.unit.desktop)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.datetime)
+                implementation(projects.app.model.accountmapping)
+                implementation(projects.app.model.csv)
+                implementation(projects.app.model.csvstrategy)
+                implementation(projects.app.model.timeline)
             }
         }
     }

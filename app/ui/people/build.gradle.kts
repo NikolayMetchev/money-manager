@@ -8,6 +8,7 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.model.core)
+                api(projects.app.model.repository.read)
 
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(projects.app.ui.audit)
@@ -35,6 +36,7 @@ kotlin {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
                 api(projects.app.model.core)
+                api(projects.app.model.repository.read)
 
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material.icons.core.desktop)

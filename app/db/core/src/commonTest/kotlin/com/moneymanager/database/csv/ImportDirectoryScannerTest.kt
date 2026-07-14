@@ -3,12 +3,12 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.scanImportDirectory
+import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.ImportDirectoryId
+import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
-import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
-import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createImportDirectory

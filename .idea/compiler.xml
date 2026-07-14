@@ -138,6 +138,10 @@
       <module name="money-manager.app.ui.imports.qif.jvmDev" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.imports.qif.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.imports.qif.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.imports.timeline" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.imports.timeline.jvmDev" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.imports.timeline.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.imports.timeline.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.people" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.people.jvmDev" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.people.jvmMain" options="-Xlint:all -Werror" />

@@ -2,9 +2,9 @@
 
 package com.moneymanager.test.database
 
-import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.sql.entitySource.EntitySourceWriteQueries
-import com.moneymanager.di.database.DatabaseComponent
+import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
