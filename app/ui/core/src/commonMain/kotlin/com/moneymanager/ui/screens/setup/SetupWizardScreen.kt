@@ -1,8 +1,11 @@
 package com.moneymanager.ui.screens.setup
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -183,15 +186,19 @@ private fun ColumnScope.StepBody(
             }
         SetupWizardStep.STRATEGY_SYNC ->
             if (strategySyncController != null) {
-                StrategyCloudCard(
-                    controller = strategySyncController,
-                    library = services.imports.strategyLibrary,
-                    appVersion = appVersion,
-                    accountRepository = services.accounts.accountRepository,
-                    categoryRepository = services.accounts.categoryRepository,
-                    currencyRepository = services.accounts.currencyRepository,
-                    personRepository = services.people.personRepository,
-                )
+                // The card grows with the strategy list and the wizard body doesn't scroll on its own,
+                // so it would be clipped on a phone once the list is longer than the step.
+                Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    StrategyCloudCard(
+                        controller = strategySyncController,
+                        library = services.imports.strategyLibrary,
+                        appVersion = appVersion,
+                        accountRepository = services.accounts.accountRepository,
+                        categoryRepository = services.accounts.categoryRepository,
+                        currencyRepository = services.accounts.currencyRepository,
+                        personRepository = services.people.personRepository,
+                    )
+                }
             }
         SetupWizardStep.IMPORT_DIRECTORIES ->
             ImportDirectoriesScreen(
