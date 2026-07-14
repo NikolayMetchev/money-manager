@@ -140,9 +140,17 @@ dependencyAnalysis {
 
         project(":app:db:core") {
             sourceSet("commonTest") {
+                // dependency-analysis asks for these to be `api`, but Kotlin deprecates API dependencies
+                // in test source sets (a test source set is never consumable, so nothing can be exposed
+                // transitively to). `implementation` is correct; ignore the advice.
                 onIncorrectConfiguration {
-                    exclude(":app:model:core")
                     exclude(":app:importengineapi")
+                    exclude(":app:model:accountmapping")
+                    exclude(":app:model:apistrategy")
+                    exclude(":app:model:core")
+                    exclude(":app:model:csvstrategy")
+                    exclude(":app:model:repository:read")
+                    exclude(":app:model:repository:write")
                 }
             }
         }

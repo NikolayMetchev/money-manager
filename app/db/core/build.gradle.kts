@@ -34,22 +34,21 @@ kotlin {
 
         getByName("commonTest") {
             dependencies {
-                api(projects.app.model.accountmapping)
-                api(projects.app.model.apistrategy)
-                api(projects.app.model.csvstrategy)
-                api(projects.app.model.repository.read)
-                api(projects.app.model.repository.write)
-
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.app.apiimporter)
                 implementation(projects.app.csvimporter)
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.model.accountmapping)
+                implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.core)
                 implementation(projects.app.model.csv)
+                implementation(projects.app.model.csvstrategy)
                 implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.passthrough)
                 implementation(projects.app.model.qif)
+                implementation(projects.app.model.repository.read)
+                implementation(projects.app.model.repository.write)
                 implementation(projects.app.model.timeline)
                 implementation(projects.app.qifimporter)
                 implementation(projects.app.strategies)
