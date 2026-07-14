@@ -129,9 +129,17 @@ fun ApiConnectionsScreen(
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(sorted, key = { it.id.toString() }) { strategy ->
+                val credential = credentialByStrategy[strategy.id]
                 ApiConnectionRow(
                     strategy = strategy,
-                    credential = credentialByStrategy[strategy.id],
+                    credential = credential,
+                    // The token column is globally unique. Rather than decode a driver-specific constraint
+                    // error after the fact, spot the clash before saving.
+                    tokensUsedElsewhere =
+                        credentials
+                            .filter { it.id != credential?.id }
+                            .map { it.token }
+                            .toSet(),
                     expanded = expandedStrategyId == strategy.id,
                     onExpandedChange = { expand ->
                         expandedStrategyId = strategy.id.takeIf { expand }
@@ -171,6 +179,7 @@ internal fun nextApiToSetUp(
 private fun ApiConnectionRow(
     strategy: ApiImportStrategy,
     credential: MonzoCredential?,
+    tokensUsedElsewhere: Set<String>,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onSaved: () -> Unit,
@@ -219,6 +228,7 @@ private fun ApiConnectionRow(
                 ApiCredentialForm(
                     strategy = strategy,
                     credential = credential,
+                    tokensUsedElsewhere = tokensUsedElsewhere,
                     onOpenTokenPage = { url -> uriHandler.openUri(url) },
                     onSubmit = { token, secret, onFailure ->
                         scope.launch {
@@ -273,6 +283,7 @@ private fun ApiConnectionRow(
 private fun ApiCredentialForm(
     strategy: ApiImportStrategy,
     credential: MonzoCredential?,
+    tokensUsedElsewhere: Set<String>,
     onOpenTokenPage: (String) -> Unit,
     onSubmit: (token: String, secret: String?, onFailure: (String) -> Unit) -> Unit,
     onSkip: (() -> Unit)?,
@@ -333,9 +344,14 @@ private fun ApiCredentialForm(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(
                 onClick = {
+                    val token = tokenInput.trim()
+                    if (token in tokensUsedElsewhere) {
+                        errorMessage = "That token is already used by another connection."
+                        return@Button
+                    }
                     isSaving = true
                     errorMessage = null
-                    onSubmit(tokenInput.trim(), secretInput.trim().takeIf { isSigned }) { message ->
+                    onSubmit(token, secretInput.trim().takeIf { isSigned }) { message ->
                         isSaving = false
                         errorMessage = message
                     }
@@ -355,16 +371,10 @@ private fun ApiCredentialForm(
     }
 }
 
+/** Enough to recognise which token is stored, not enough to be worth a screenshot. */
 private fun maskToken(token: String): String {
-    if (token.length <= 16) return "••••"
-    return "${token.take(8)}…${token.takeLast(8)}"
+    if (token.length <= 8) return "••••"
+    return "${token.take(4)}…${token.takeLast(4)}"
 }
 
-/** The token column is globally unique, so a clash means the token belongs to another connection. */
-private fun saveFailureMessage(error: Throwable): String {
-    val message = error.message.orEmpty().uppercase()
-    if ("UNIQUE" in message && "TOKEN" in message) {
-        return "That token is already used by another connection."
-    }
-    return "Couldn't save the credentials: ${error.message ?: error::class.simpleName}"
-}
+private fun saveFailureMessage(error: Throwable): String = "Couldn't save the credentials: ${error.message ?: error::class.simpleName}"

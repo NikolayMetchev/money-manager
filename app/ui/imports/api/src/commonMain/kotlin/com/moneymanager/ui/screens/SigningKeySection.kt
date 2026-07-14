@@ -3,12 +3,17 @@ package com.moneymanager.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 
@@ -47,9 +52,35 @@ internal fun SigningKeySection(
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            var confirmRegenerate by remember { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onCopyText(publicKey) }) { Text("Copy public key") }
-                TextButton(onClick = onGenerateSigningKey) { Text("Regenerate") }
+                TextButton(onClick = { confirmRegenerate = true }) { Text("Regenerate") }
+            }
+            // Regenerating replaces the key pair irrecoverably: if the old public key is registered with the
+            // provider, signed requests fail until the new one is registered. Never a one-tap action.
+            if (confirmRegenerate) {
+                AlertDialog(
+                    onDismissRequest = { confirmRegenerate = false },
+                    title = { Text("Regenerate signing key?") },
+                    text = {
+                        Text(
+                            "The key registered with your provider will stop working until you register the " +
+                                "new public key. The current key cannot be recovered.",
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                confirmRegenerate = false
+                                onGenerateSigningKey()
+                            },
+                        ) { Text("Regenerate") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { confirmRegenerate = false }) { Text("Cancel") }
+                    },
+                )
             }
         }
     }
