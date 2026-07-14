@@ -4,6 +4,8 @@ package com.moneymanager.database.audit
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -11,9 +13,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
-import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first

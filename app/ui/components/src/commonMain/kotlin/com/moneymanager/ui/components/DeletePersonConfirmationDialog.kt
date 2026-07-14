@@ -24,8 +24,8 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.LocalPersonKey
-import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.foundation.LocalImportEngine
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 

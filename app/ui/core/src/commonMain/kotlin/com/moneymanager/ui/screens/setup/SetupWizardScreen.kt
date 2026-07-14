@@ -24,14 +24,14 @@ import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.AppServices
-import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.ApiConnectionsScreen
-import com.moneymanager.ui.screens.ImportDirectoriesScreen
-import com.moneymanager.ui.screens.StrategyCatalogScreen
-import com.moneymanager.ui.screens.StrategyCloudCard
+import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.screens.apistrategy.ApiConnectionsScreen
+import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesScreen
+import com.moneymanager.ui.screens.settings.StrategyCatalogScreen
+import com.moneymanager.ui.screens.settings.StrategyCloudCard
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 

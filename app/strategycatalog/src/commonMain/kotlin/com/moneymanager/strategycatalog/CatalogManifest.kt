@@ -1,7 +1,7 @@
 package com.moneymanager.strategycatalog
 
-import com.moneymanager.domain.StrategyKey
-import com.moneymanager.domain.StrategyKind
+import com.moneymanager.domain.strategy.StrategyKey
+import com.moneymanager.domain.strategy.StrategyKind
 import kotlinx.serialization.Serializable
 
 /**
@@ -20,7 +20,7 @@ data class CatalogManifest(
  * @property kind Which [StrategyKind] the artifact is.
  * @property fileName The artifact's file name next to index.json (per StrategyFileNaming).
  * @property contentHash Canonical version-independent content hash (StrategyArtifactCodec), compared
- *   against [com.moneymanager.domain.LocalStrategyEntry.contentHash] to detect installed/update states.
+ *   against [com.moneymanager.domain.strategy.LocalStrategyEntry.contentHash] to detect installed/update states.
  */
 @Serializable
 data class CatalogEntry(

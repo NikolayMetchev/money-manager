@@ -12,11 +12,12 @@ import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.port.DbMaintenance
-import com.moneymanager.di.database.DatabaseComponent
+import com.moneymanager.database.DbMaintenance
+import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.csv.CsvColumn
@@ -25,7 +26,6 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId

@@ -1,13 +1,13 @@
 package com.moneymanager.remotestorage.sync
 
-import com.moneymanager.domain.CsvResolution
-import com.moneymanager.domain.CsvUnresolvedReference
-import com.moneymanager.domain.LocalStrategyEntry
-import com.moneymanager.domain.StrategyFileNaming
-import com.moneymanager.domain.StrategyKey
-import com.moneymanager.domain.StrategyLibrary
-import com.moneymanager.domain.StrategyParseResult
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.strategy.CsvResolution
+import com.moneymanager.domain.strategy.CsvUnresolvedReference
+import com.moneymanager.domain.strategy.LocalStrategyEntry
+import com.moneymanager.domain.strategy.StrategyFileNaming
+import com.moneymanager.domain.strategy.StrategyKey
+import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.domain.strategy.StrategyParseResult
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory

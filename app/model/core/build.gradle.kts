@@ -8,7 +8,6 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(libs.kotlinx.coroutines.core)
                 api(projects.utils.bigdecimal)
             }
         }

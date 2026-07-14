@@ -1,0 +1,63 @@
+package com.moneymanager.database.di
+
+import com.moneymanager.database.Accounts
+import com.moneymanager.database.Application
+import com.moneymanager.database.Audit
+import com.moneymanager.database.DbCsvStrategyImportExport
+import com.moneymanager.database.DbMaintenance
+import com.moneymanager.database.Imports
+import com.moneymanager.database.People
+import com.moneymanager.database.Settings
+import com.moneymanager.database.Transactions
+
+fun DatabaseComponent.toApplication() =
+    Application(
+        accounts =
+            Accounts(
+                accountRepository = accountRepository,
+                accountAttributeRepository = accountAttributeRepository,
+                categoryRepository = categoryRepository,
+                currencyRepository = currencyRepository,
+                cryptoRepository = cryptoRepository,
+            ),
+        imports =
+            Imports(
+                apiImportStrategyRepository = apiImportStrategyRepository,
+                apiSessionRepository = apiSessionRepository,
+                accountMappingRepository = accountMappingRepository,
+                csvImportRepository = csvImportRepository,
+                csvImportStrategyRepository = csvImportStrategyRepository,
+                csvStrategyExportService = csvStrategyExportService,
+                csvStrategyImportExport = DbCsvStrategyImportExport(csvStrategyExportService),
+                accountMappingExportService = accountMappingExportService,
+                strategyLibrary = strategyLibrary,
+                qifImportRepository = qifImportRepository,
+                importDirectoryRepository = importDirectoryRepository,
+                importTimelineRepository = importTimelineRepository,
+                passThroughAccountRepository = passThroughAccountRepository,
+                maintenance = DbMaintenance(maintenanceService),
+            ),
+        transactions =
+            Transactions(
+                transactionRepository = transactionRepository,
+                transferSourceRepository = transferSourceRepository,
+                attributeTypeRepository = attributeTypeRepository,
+                relationshipTypeRepository = relationshipTypeRepository,
+                transferRelationshipRepository = transferRelationshipRepository,
+                tradeRepository = tradeRepository,
+                exchangeOrderRepository = exchangeOrderRepository,
+            ),
+        people =
+            People(
+                personRepository = personRepository,
+                personAccountOwnershipRepository = personAccountOwnershipRepository,
+                personAttributeRepository = personAttributeRepository,
+            ),
+        settings =
+            Settings(
+                settingsRepository = settingsRepository,
+                deviceRepository = deviceRepository,
+            ),
+        audit = Audit(auditRepository = auditRepository),
+        deviceId = deviceId,
+    )

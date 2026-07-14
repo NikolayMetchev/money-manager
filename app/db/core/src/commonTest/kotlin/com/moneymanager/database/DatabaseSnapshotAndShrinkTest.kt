@@ -3,6 +3,7 @@
 package com.moneymanager.database
 
 import app.cash.sqldelight.db.QueryResult
+import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money

@@ -45,8 +45,10 @@ device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compil
 | `utils/bigdecimal/` | Arbitrary-precision decimal arithmetic (JVM/Android) |
 | `utils/currency/` | Locale-aware currency formatting |
 | `utils/archive/` | Compress + password-encrypt the DB archive (`ArchiveCodec`); shared by remote backends |
-| `app/model/core/` | Domain models and `*ReadRepository`/`*WriteRepository` interfaces |
-| `app/db/core/` | SQLDelight database, repository implementations, mappers |
+| `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` |
+| `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core`; `qif`→`csv`, `csvstrategy`→`qif`+`accountmapping` |
+| `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces. `write` depends on `read` (each write interface extends its read) |
+| `app/db/schema/`, `app/db/read/`, `app/db/repository/`, `app/db/write/`, `app/db/core/` | SQLDelight schema; generated read SQL + Mappie mappers + JSON codecs; read repository impls; write SQL + impls; `DatabaseManager` and services |
 | `app/importengineapi/` | `ImportEngine` interface + `ImportBatch`/`ImportResult` model + `ImportEngine.*` write helpers (DB-free) |
 | `app/importer/` | `ImportEngineImpl` — the **sole** DB writer (consumes write repositories) |
 | `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Parse/download sources and build an `ImportBatch` (DB-free, enforced) |
@@ -54,7 +56,10 @@ device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compil
 | `app/remotestorage/core/` | Generic `RemoteStorageProvider` interface + factory (DB-free, backend-agnostic) |
 | `app/remotestorage/googledrive/` | Google Drive backend — Drive REST v3 over Ktor (JVM + Android) |
 | `app/remotestorage/sync/` | Hydrate/push orchestration (`RemoteDatabaseSyncService`/`RemoteDatabaseController`) |
-| `app/di/core/` | Metro DI configuration |
+| `app/di/scope/`, `app/di/params/` | The `AppScope`/`DatabaseScope` markers, and `AppComponentParams`. Leaf modules, so contributing a DI module costs nothing else |
+| `app/di/core/` | The `AppComponent` graph only. Metro merges contributors off its compile classpath (see **Dependency Injection**) |
+| `app/db/di/`, `app/remotestorage/di/`, `app/strategycatalog/di/`, `utils/localsettings/di/` | Each feature's Metro modules, next to the code they provide |
+| `app/importfilesource/di/` | Platform factories for import file sources (not Metro — the entry points call these directly) |
 | `app/ui/core/` | Compose UI (JVM/Android only) |
 | `app/main/jvm/` | JVM Desktop entry point |
 | `app/main/android/` | Android entry point |
@@ -110,13 +115,17 @@ database is locked, and provenance/audit recording lives in a single place.
 **Read vs write interfaces:** repositories come in `*ReadRepository` + `*WriteRepository` pairs (write
 extends read). **Only `ImportEngineImpl` (`app/importer`) is injected with write repositories.** The UI
 gets a fully read-only `AppServices` (every field a `*ReadRepository`) plus the prebuilt `ImportEngine`;
-the engine is constructed in di/core via `DatabaseComponent.createImportEngine(editGate)`. In Compose,
+the engine is constructed in `app/db/di` via `DatabaseComponent.createImportEngine(editGate)`. In Compose,
 reach it through `LocalImportEngine.current`.
+
+The interfaces live in two modules — `:app:model:repository:read` and `:app:model:repository:write` — so a
+module that only reads never even has the write interfaces on its compile classpath.
 
 **Enforced in Gradle:** `moneymanager.kotlin-multiplatform-convention` registers a
 `verifyNoWriteRepositoryUsage` check (wired into `check`) that fails if a module's main sources
-reference any `*WriteRepository`. Exempt: `:app:model:core` (interfaces), `:app:db:core` (impls),
-`:app:di:core` (wiring), `:app:importer` (the engine), `:test:app:db` (fixtures).
+reference any `*WriteRepository`. Exempt: `:app:model:repository:write` (interfaces), `:app:db:core` +
+`:app:db:write` (impls), `:app:di:core` + `:app:db:di` (wiring), `:app:importer` (the engine),
+`:test:app:db` (fixtures).
 
 **The one exception:** `DeviceWriteRepository` is injected directly in `DeviceIdModule` (di/core).
 `DeviceId` is a synchronous singleton that every write-repo impl — and therefore the engine — depends
@@ -156,10 +165,31 @@ different databases can use different Google accounts.
 
 ## Dependency Injection
 
-**Metro** provides compile-time DI. Configuration in `app/di/core`:
-- `AppComponent`: Main DI graph interface with `@DependencyGraph(AppScope::class)`
-- Modules use `@ContributesTo(AppScope::class)` and `@Provides` functions
-- Components must be `interface`, not `abstract class` or `object`
+**Metro** provides compile-time DI. The graphs live in `app/di/core` (`AppComponent`,
+`@DependencyGraph(AppScope::class)`) and `app/db/di` (`DatabaseComponent`,
+`@DependencyGraph(DatabaseScope::class)`). Components must be `interface`, not `abstract class` or `object`.
+
+**DI modules live with the code they provide, not in a central hub.** `RemoteStorageModule` is in
+`app/remotestorage/di`, `LocalSettingsModule` in `utils/localsettings/di`, the repository bindings in
+`app/db/di`, and so on. Metro merges every `@ContributesTo(AppScope::class)` module it finds **on the
+graph module's compile classpath** — `AppComponent` names none of them.
+
+Two consequences worth knowing:
+- `app/di/core` depends on each feature DI module purely so Metro can *see* it. Nothing there imports
+  them. Drop one and the graph loses its bindings.
+- Those deps must be `api`, not `implementation`: Metro makes each contributed module a **supertype** of
+  the generated `AppComponent`, so anything touching `AppComponent` needs them on its compile classpath.
+
+To add a binding: put a `@ContributesTo(AppScope::class)` interface in *your* module (apply
+`moneymanager.metro-convention`, depend on `app/di/scope`), then add that module to `app/di/core`.
+
+## Packages
+
+**One package, one module** — no package may be declared by the main sources of two modules. A root
+`verifyUniquePackages` task (wired into `check`) enforces this. Split packages let `internal` leak across
+a module boundary the compiler can no longer police, and hide which module owns a type. When splitting a
+module, give the new one its own package (typically the old package plus a segment). Test source sets are
+exempt: they compile separately, so sharing a package there costs nothing.
 
 ## UI
 

@@ -5,7 +5,7 @@ package com.moneymanager.test.database
 import com.moneymanager.builtin.BuiltInApiStrategies
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.builtin.BuiltInPassThroughs
-import com.moneymanager.di.database.DatabaseComponent
+import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.createCsvStrategy

@@ -5,11 +5,11 @@ package com.moneymanager.ui.screens.apistrategy
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.ApiImportStrategyAuditEntry
+import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
-import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
@@ -23,7 +23,7 @@ import com.moneymanager.ui.audit.FieldChangeRow
 import com.moneymanager.ui.audit.FieldValueRow
 import com.moneymanager.ui.audit.NoVisibleChangesText
 import com.moneymanager.ui.audit.SourceInfoSection
-import com.moneymanager.ui.screens.changedOrUnchanged
+import com.moneymanager.ui.audit.changedOrUnchanged
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 

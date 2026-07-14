@@ -1,7 +1,7 @@
 package com.moneymanager.remotestorage.sync
 
 import app.cash.sqldelight.db.QueryResult
-import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageException

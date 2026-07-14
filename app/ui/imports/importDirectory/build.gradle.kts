@@ -11,6 +11,10 @@ kotlin {
             dependencies {
                 api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.importdirectory)
+                api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
                 api(projects.app.ui.foundation)
 
                 implementation(libs.kotlinx.coroutines.core)
@@ -38,7 +42,8 @@ kotlin {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
                 api(projects.app.importfilesource.core)
-                api(projects.app.model.core)
+                api(projects.app.model.importdirectory)
+                api(projects.app.model.repository.read)
                 api(projects.app.ui.foundation)
 
                 implementation(libs.compose.foundation.desktop)
@@ -47,6 +52,9 @@ kotlin {
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.compose.ui.unit.desktop)
+                implementation(projects.app.model.core)
+                implementation(projects.app.model.csv)
+                implementation(projects.app.model.qif)
             }
         }
     }

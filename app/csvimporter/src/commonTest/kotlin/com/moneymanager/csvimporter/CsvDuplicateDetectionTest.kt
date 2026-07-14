@@ -4,6 +4,7 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
@@ -17,7 +18,6 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId

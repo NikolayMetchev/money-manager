@@ -26,15 +26,15 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeAuditEntry
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository

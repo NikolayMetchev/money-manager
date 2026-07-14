@@ -1,6 +1,8 @@
 package com.moneymanager.di
 
 import com.moneymanager.database.DatabaseManager
+import com.moneymanager.di.params.AppComponentParams
+import com.moneymanager.di.scope.AppScope
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController

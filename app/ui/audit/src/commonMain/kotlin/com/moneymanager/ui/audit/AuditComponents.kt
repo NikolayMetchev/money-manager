@@ -19,11 +19,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
-import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.model.qif.QifImportId
 
 @Composable
 fun FieldValueRow(

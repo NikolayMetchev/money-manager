@@ -1,0 +1,509 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+
+package com.moneymanager.ui.screens.csv
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.selectForCsv
+import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.repository.AccountMappingReadRepository
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
+import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.PassThroughAccountReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.domain.repository.TransferRelationshipReadRepository
+import com.moneymanager.domain.repository.TransferSourceReadRepository
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.deleteCsvImport
+import com.moneymanager.ui.components.csv.CsvPreviewTable
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.screens.csv.ApplyStrategyDialog
+import com.moneymanager.ui.screens.csv.ReimportDialog
+import com.moneymanager.ui.util.displayDateTime
+import kotlinx.coroutines.launch
+
+@Composable
+fun CsvImportDetailScreen(
+    importId: CsvImportId,
+    scrollToRowIndex: Long? = null,
+    csvImportRepository: CsvImportReadRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    accountMappingRepository: AccountMappingReadRepository,
+    accountRepository: AccountReadRepository,
+    categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyReadRepository,
+    personRepository: PersonReadRepository,
+    passThroughAccountRepository: PassThroughAccountReadRepository,
+    cryptoRepository: CryptoReadRepository,
+    maintenance: Maintenance,
+    transactionRepository: TransactionReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
+    transferRelationshipRepository: TransferRelationshipReadRepository,
+    tradeRepository: TradeReadRepository,
+    importEngine: ImportEngine,
+    onBack: () -> Unit,
+    onDeleted: () -> Unit,
+    onCreateStrategy: (CsvImportId) -> Unit = {},
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
+) {
+    val scope = rememberSchemaAwareCoroutineScope()
+    val import by rememberFlowAsStateWithSchemaErrorHandling(importId, initial = null) {
+        csvImportRepository.getImport(importId)
+    }
+    var rows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showApplyStrategyDialog by remember { mutableStateOf(false) }
+    var showReimportDialog by remember { mutableStateOf(false) }
+    var isDeleting by remember { mutableStateOf(false) }
+    var importSuccessMessage by remember { mutableStateOf<String?>(null) }
+    var importFailedRows by remember { mutableStateOf<List<String>>(emptyList()) }
+    var failedRowIndexes by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var rowsRefreshTrigger by remember { mutableStateOf(0) }
+    var hasMatchingStrategy by remember { mutableStateOf(false) }
+
+    // Observe strategies to re-check when new ones are added
+    val strategies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        csvImportStrategyRepository.getAllStrategies()
+    }
+
+    // Check if there's a matching strategy for this import (filename/content-aware selection).
+    // Re-runs when the import, the strategies list, or the loaded rows change.
+    LaunchedEffect(import, strategies, rows) {
+        import?.let { csvImport ->
+            val matchingStrategy = strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, rows)
+            hasMatchingStrategy = matchingStrategy != null
+        }
+    }
+
+    // Determine amount column index by looking for common amount column names
+    val amountColumnIndex =
+        remember(import) {
+            import
+                ?.columns
+                ?.indexOfFirst { column ->
+                    val name = column.originalName.lowercase()
+                    name == "amount" ||
+                        name == "value" ||
+                        name == "total" ||
+                        name == "debit" ||
+                        name == "credit" ||
+                        name.contains("amount")
+                }?.takeIf { it >= 0 }
+        }
+
+    // Load rows when import is available or after import completes
+    LaunchedEffect(import, rowsRefreshTrigger) {
+        scope
+            .launch {
+                val currentImport = import
+                if (currentImport == null) {
+                    rows = emptyList()
+                    isLoading = false
+                    return@launch
+                }
+
+                try {
+                    isLoading = true
+                    // Load all rows - the actual row count is stored in the import metadata
+                    rows = csvImportRepository.getImportRows(importId, limit = currentImport.rowCount, offset = 0)
+                } finally {
+                    isLoading = false
+                }
+            }.join()
+    }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+    ) {
+        // Header with back button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onBack) {
+                Text("< Back")
+            }
+            Row {
+                TextButton(
+                    onClick = { onCreateStrategy(importId) },
+                    enabled = !isDeleting && import != null,
+                ) {
+                    Text(
+                        text = "Create Strategy",
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(
+                    onClick = { showApplyStrategyDialog = true },
+                    enabled = !isDeleting && import != null && rows.isNotEmpty() && hasMatchingStrategy,
+                ) {
+                    Text(
+                        text = "Apply Strategy",
+                        color =
+                            if (hasMatchingStrategy) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            },
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(
+                    onClick = { showReimportDialog = true },
+                    enabled = !isDeleting && import?.lastAppliedStrategyId != null && rows.isNotEmpty(),
+                ) {
+                    Text(
+                        text = "Re-import",
+                        color =
+                            if (import?.lastAppliedStrategyId != null) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            },
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(
+                    onClick = { showDeleteDialog = true },
+                    enabled = !isDeleting,
+                ) {
+                    Text(
+                        text = "Delete",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+
+        // Show import result message
+        importSuccessMessage?.let { message ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        // Show failed rows in scrollable container
+        if (importFailedRows.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Failed rows (${importFailedRows.size}):",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 150.dp)
+                        .verticalScroll(rememberScrollState()),
+            ) {
+                importFailedRows.forEach { errorLine ->
+                    Text(
+                        text = errorLine,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        when (val currentImport = import) {
+            null ->
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Import not found",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            else -> {
+                // File info header
+                Column {
+                    Text(
+                        text = currentImport.originalFileName,
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row {
+                        Text(
+                            text = "${currentImport.rowCount} rows",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = "${currentImport.columnCount} columns",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = "Added: ${currentImport.importTimestamp.displayDateTime()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    currentImport.lastAppliedAt?.let { lastAppliedAt ->
+                        Text(
+                            text =
+                                buildString {
+                                    if (currentImport.applicationCount > 1) {
+                                        append("Latest import: ")
+                                    } else {
+                                        append("Imported: ")
+                                    }
+                                    append(lastAppliedAt.displayDateTime())
+                                    currentImport.lastAppliedStrategyName
+                                        ?.takeIf(String::isNotBlank)
+                                        ?.let { strategyName ->
+                                            append(" via ")
+                                            append(strategyName)
+                                        }
+                                },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (currentImport.applicationCount > 1) {
+                        Text(
+                            text = "Applied ${currentImport.applicationCount} times",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Data table
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else if (rows.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "No data rows",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    CsvPreviewTable(
+                        columns = currentImport.columns,
+                        rows = rows,
+                        modifier = Modifier.fillMaxSize(),
+                        amountColumnIndex = amountColumnIndex,
+                        failedRowIndexes = failedRowIndexes,
+                        scrollToRowIndex = scrollToRowIndex,
+                        onDuplicateSourceClick = { transferId, isPositiveAmount ->
+                            scope.launch {
+                                val csvSource =
+                                    transferSourceRepository
+                                        .getSourcesForTransaction(transferId)
+                                        .mapNotNull { record -> (record.source as? Source.Csv)?.let { record to it } }
+                                        .minByOrNull { (record, _) -> record.revisionId }
+                                        ?.second
+                                if (csvSource != null) {
+                                    onCsvSourceClick(csvSource.importId, csvSource.rowIndex ?: 0)
+                                } else {
+                                    onTransferClick?.invoke(transferId, isPositiveAmount)
+                                }
+                            }
+                        },
+                        onTransferClick = onTransferClick,
+                    )
+                }
+            }
+        }
+    }
+
+    // Delete confirmation dialog
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Import?") },
+            text = {
+                Text("Are you sure you want to delete this CSV import? This action cannot be undone.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isDeleting = true
+                        scope.launch {
+                            importEngine.deleteCsvImport(importId)
+                            showDeleteDialog = false
+                            onDeleted()
+                        }
+                    },
+                    enabled = !isDeleting,
+                ) {
+                    Text(
+                        text = "Delete",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    // Apply Strategy dialog
+    if (showApplyStrategyDialog && import != null) {
+        ApplyStrategyDialog(
+            csvImport = import!!,
+            rows = rows,
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            accountMappingRepository = accountMappingRepository,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            currencyRepository = currencyRepository,
+            personRepository = personRepository,
+            passThroughAccountRepository = passThroughAccountRepository,
+            cryptoRepository = cryptoRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+            onDismiss = { showApplyStrategyDialog = false },
+            onImportComplete = { result ->
+                showApplyStrategyDialog = false
+                failedRowIndexes = result.failedRows.map { it.rowIndex }.toSet()
+                importSuccessMessage = "Successfully imported ${result.successCount} transfers"
+                importFailedRows =
+                    result.failedRows.map { failed ->
+                        "Row ${failed.rowIndex}: ${failed.errorMessage}"
+                    }
+                rowsRefreshTrigger++
+            },
+        )
+    }
+
+    // Re-import dialog: applies newly added account mappings retroactively (merge duplicates,
+    // import remaining rows, delete emptied import-created accounts).
+    if (showReimportDialog && import != null) {
+        ReimportDialog(
+            csvImport = import!!,
+            rows = rows,
+            csvImportRepository = csvImportRepository,
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            accountMappingRepository = accountMappingRepository,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            currencyRepository = currencyRepository,
+            personRepository = personRepository,
+            passThroughAccountRepository = passThroughAccountRepository,
+            transactionRepository = transactionRepository,
+            transferRelationshipRepository = transferRelationshipRepository,
+            transferSourceRepository = transferSourceRepository,
+            cryptoRepository = cryptoRepository,
+            tradeRepository = tradeRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+            onDismiss = { showReimportDialog = false },
+            onComplete = { result ->
+                showReimportDialog = false
+                importSuccessMessage =
+                    buildString {
+                        append("Re-import complete: ")
+                        append("${result.mergedAccounts.size} account(s) merged")
+                        val moved = result.mergedAccounts.sumOf { it.transferCount }
+                        if (moved > 0) append(" ($moved transaction(s) moved)")
+                        if (result.rewrittenRows.isNotEmpty()) {
+                            append(", ${result.rewrittenRows.size} row(s) rerouted through pass-through accounts")
+                        }
+                        if (result.updatedRows.isNotEmpty()) {
+                            append(", ${result.updatedRows.size} transaction(s) updated to new values")
+                        }
+                        if (result.convertedRows.isNotEmpty()) {
+                            append(", ${result.convertedRows.size} transfer(s) converted to trades")
+                        }
+                        result.importResult?.let { append(", ${it.successCount} row(s) imported") }
+                        if (result.deletedEmptyAccounts.isNotEmpty()) {
+                            append(", ${result.deletedEmptyAccounts.size} empty account(s) deleted")
+                        }
+                    }
+                importFailedRows =
+                    result.skipped.map { skip -> "${skip.accountName}: ${skip.detail}" } +
+                    result.importResult?.failedRows.orEmpty().map { failed ->
+                        "Row ${failed.rowIndex}: ${failed.errorMessage}"
+                    }
+                failedRowIndexes =
+                    result.importResult
+                        ?.failedRows
+                        .orEmpty()
+                        .map { it.rowIndex }
+                        .toSet()
+                rowsRefreshTrigger++
+            },
+        )
+    }
+}

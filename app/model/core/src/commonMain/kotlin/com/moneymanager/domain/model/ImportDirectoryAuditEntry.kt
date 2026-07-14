@@ -2,7 +2,6 @@
 
 package com.moneymanager.domain.model
 
-import com.moneymanager.domain.model.importdirectory.ImportDirectoryId
 import kotlin.time.Instant
 
 /**

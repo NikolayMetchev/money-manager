@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.CryptoRegistry
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
@@ -17,7 +18,6 @@ import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
-import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy

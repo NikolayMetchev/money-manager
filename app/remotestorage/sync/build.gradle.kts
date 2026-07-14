@@ -9,6 +9,7 @@ kotlin {
             dependencies {
                 api(projects.app.db.core)
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
 
@@ -24,6 +25,7 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.db.write)
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
             }
@@ -36,6 +38,7 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.db.write)
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
             }

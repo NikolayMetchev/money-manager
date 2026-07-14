@@ -2,11 +2,11 @@
 
 package com.moneymanager.database.service
 
-import com.moneymanager.domain.CsvStrategyImportResult
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.accountmapping.AccountMapping
@@ -15,7 +15,6 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -47,6 +46,7 @@ import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.strategy.CsvStrategyImportResult
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch

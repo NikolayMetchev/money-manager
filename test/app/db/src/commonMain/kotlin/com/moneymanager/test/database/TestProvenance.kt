@@ -8,11 +8,11 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AccountWriteRepository
-import com.moneymanager.domain.repository.CategoryWriteRepository
-import com.moneymanager.domain.repository.CurrencyWriteRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipWriteRepository
-import com.moneymanager.domain.repository.PersonWriteRepository
+import com.moneymanager.domain.repository.write.AccountWriteRepository
+import com.moneymanager.domain.repository.write.CategoryWriteRepository
+import com.moneymanager.domain.repository.write.CurrencyWriteRepository
+import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
+import com.moneymanager.domain.repository.write.PersonWriteRepository
 
 /**
  * Test-only convenience: production repository create/update methods require a [Source] so it can

@@ -2,7 +2,6 @@
 
 package com.moneymanager.domain.model
 
-import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import kotlinx.serialization.Serializable
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant

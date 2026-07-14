@@ -27,8 +27,8 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.importengineapi.createCrypto
-import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch

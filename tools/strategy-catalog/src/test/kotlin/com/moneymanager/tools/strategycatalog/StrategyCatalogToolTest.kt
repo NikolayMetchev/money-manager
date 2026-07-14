@@ -1,8 +1,8 @@
 package com.moneymanager.tools.strategycatalog
 
 import com.moneymanager.database.json.StrategyArtifactCodec
-import com.moneymanager.domain.StrategyFileNaming
-import com.moneymanager.domain.StrategyKind
+import com.moneymanager.domain.strategy.StrategyFileNaming
+import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.strategycatalog.CatalogManifestCodec
 import java.io.File
 import kotlin.test.Test

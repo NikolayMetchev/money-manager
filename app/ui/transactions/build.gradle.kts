@@ -9,6 +9,8 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.repository.read)
                 api(projects.app.ui.foundation)
 
                 implementation(libs.human.readable)
@@ -26,7 +28,6 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.mokkery.runtime)
-                implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
                 implementation(projects.test.app.ui)
             }
@@ -55,6 +56,7 @@ kotlin {
                 api(libs.compose.foundation.layout.desktop)
                 api(libs.compose.material3.desktop)
                 api(projects.app.model.core)
+                api(projects.app.model.repository.read)
                 api(projects.app.ui.foundation)
 
                 implementation(libs.compose.animation.core.desktop)
@@ -65,6 +67,7 @@ kotlin {
                 implementation(libs.compose.ui.unit.desktop)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.datetime)
+                implementation(projects.app.model.csvstrategy)
             }
         }
         getByName("jvmTest") {
@@ -74,15 +77,18 @@ kotlin {
                 implementation(libs.compose.ui.test.desktop)
                 implementation(libs.mokkery.core)
                 implementation(projects.app.db.core)
+                implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
-                implementation(projects.app.di.core)
+                implementation(projects.app.model.repository.write)
                 implementation(projects.test.app.db)
             }
         }
         getByName("androidHostTest") {
             dependencies {
                 implementation(projects.app.db.core)
+                implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
+                implementation(projects.app.model.repository.write)
             }
         }
         getByName("androidDeviceTest") {
@@ -90,8 +96,9 @@ kotlin {
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.mokkery.core)
                 implementation(projects.app.db.core)
+                implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
-                implementation(projects.app.di.core)
+                implementation(projects.app.model.repository.write)
                 implementation(projects.test.app.db)
                 implementation(projects.test.app.ui)
             }

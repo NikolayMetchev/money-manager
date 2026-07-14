@@ -16,10 +16,10 @@ import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
-import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
@@ -46,7 +46,12 @@ import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
+import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
+import com.moneymanager.ui.screens.csv.CsvImportsScreen
+import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesScreen
+import com.moneymanager.ui.screens.qif.QifImportsScreen
 import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
+import com.moneymanager.ui.screens.transactions.ManualEntriesScreen
 
 @Composable
 fun ImportsScreen(

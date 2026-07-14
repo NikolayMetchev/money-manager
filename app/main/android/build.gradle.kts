@@ -48,10 +48,13 @@ dependencies {
     implementation(libs.play.services.auth)
     implementation(projects.app.cryptodata)
     implementation(projects.app.db.core)
+    implementation(projects.app.db.di)
     implementation(projects.app.db.write)
     implementation(projects.app.di.core)
+    implementation(projects.app.di.params)
     implementation(projects.app.importengineapi)
     implementation(projects.app.importfilesource.core)
+    implementation(projects.app.importfilesource.di)
     implementation(projects.app.model.core)
     implementation(projects.app.remotestorage.core)
     // Native Android Google Drive auth (AndroidGoogleAccessTokenSource) implements the googledrive seam.

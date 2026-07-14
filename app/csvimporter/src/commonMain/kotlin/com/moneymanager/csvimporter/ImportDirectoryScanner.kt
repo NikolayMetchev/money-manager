@@ -4,9 +4,9 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
-import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
-import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository

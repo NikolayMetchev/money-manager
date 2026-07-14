@@ -58,11 +58,12 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.getOrCreateAttributeType
-import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.transactions.EditableAttributesSection
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

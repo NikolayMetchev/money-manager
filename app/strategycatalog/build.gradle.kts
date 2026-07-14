@@ -15,6 +15,7 @@ kotlin {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.ktor.client.core)
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
 
                 implementation(libs.kotlinx.serialization.json)
             }
@@ -26,10 +27,11 @@ kotlin {
         jvmMain {
             dependencies {
                 api(libs.kotlinx.serialization.core)
-                api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
 
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
+                implementation(projects.app.model.core)
 
                 runtimeOnly(libs.ktor.client.cio)
             }
@@ -38,10 +40,11 @@ kotlin {
         androidMain {
             dependencies {
                 api(libs.kotlinx.serialization.core)
-                api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
 
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
+                implementation(projects.app.model.core)
 
                 runtimeOnly(libs.ktor.client.cio)
             }

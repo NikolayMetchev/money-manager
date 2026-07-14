@@ -27,14 +27,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.CsvReferenceType
-import com.moneymanager.domain.CsvResolution
-import com.moneymanager.domain.CsvUnresolvedReference
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.strategy.CsvReferenceType
+import com.moneymanager.domain.strategy.CsvResolution
+import com.moneymanager.domain.strategy.CsvUnresolvedReference
 
 /**
  * Row for resolving a single unresolved account/category/currency reference to an existing entity or a

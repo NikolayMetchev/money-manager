@@ -7,7 +7,10 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
+                api(projects.app.model.repository.read)
+                api(projects.app.model.timeline)
 
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
@@ -46,6 +49,7 @@ kotlin {
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
+                implementation(projects.app.model.passthrough)
             }
         }
         getByName("jvmMain") {
@@ -53,7 +57,9 @@ kotlin {
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
+                api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
+                api(projects.app.model.repository.read)
 
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material.icons.core.desktop)
@@ -65,6 +71,8 @@ kotlin {
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
+                implementation(projects.app.model.passthrough)
+                implementation(projects.app.model.timeline)
             }
         }
         getByName("jvmTest") {

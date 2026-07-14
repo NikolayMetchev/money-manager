@@ -3,6 +3,8 @@
 package com.moneymanager.database
 
 import com.moneymanager.currency.Currency
+import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType

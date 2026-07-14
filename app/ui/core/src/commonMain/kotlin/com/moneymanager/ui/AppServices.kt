@@ -3,9 +3,7 @@ package com.moneymanager.ui
 import com.moneymanager.database.Application
 import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.database.service.CsvStrategyExportService
-import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.Maintenance
-import com.moneymanager.domain.StrategyLibrary
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
@@ -33,13 +31,15 @@ import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
+import com.moneymanager.domain.strategy.CsvStrategyImportExport
+import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.importengineapi.ImportEngine
 
 /**
  * The UI's view of the database. Every repository here is a **read** interface — the UI never mutates
  * the database through a repository. All writes go through [TransactionsDomain.importEngine] (the single
  * write seam, which carries the session's edit gate). The engine is built in di/core
- * ([com.moneymanager.di.database.createImportEngine]) so the write repositories never reach this layer.
+ * ([com.moneymanager.database.di.createImportEngine]) so the write repositories never reach this layer.
  */
 data class AppServices(
     val accounts: AccountsDomain,

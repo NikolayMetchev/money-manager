@@ -3,7 +3,7 @@
 package com.moneymanager.database.csv
 
 import app.cash.sqldelight.db.QueryResult
-import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus

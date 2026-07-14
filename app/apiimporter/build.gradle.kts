@@ -9,7 +9,11 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.importengineapi)
+                api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.passthrough)
+                api(projects.app.model.repository.read)
                 api(projects.utils.rest)
 
                 implementation(libs.kmlogging)
@@ -23,13 +27,17 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.serialization.json)
                 api(projects.app.importengineapi)
+                api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
+                api(projects.app.model.passthrough)
+                api(projects.app.model.repository.read)
                 api(projects.utils.rest)
 
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.http)
+                implementation(projects.app.model.csv)
                 implementation(projects.utils.bigdecimal)
             }
         }

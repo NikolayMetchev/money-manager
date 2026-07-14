@@ -1,10 +1,10 @@
 package com.moneymanager.ui.screens.apistrategy.editor
 
+import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig

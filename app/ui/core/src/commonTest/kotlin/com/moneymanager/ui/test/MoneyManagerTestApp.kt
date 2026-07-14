@@ -9,8 +9,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.di.database.DatabaseComponent
-import com.moneymanager.di.database.toApplication
+import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.toApplication
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.ui.MoneyManagerApp

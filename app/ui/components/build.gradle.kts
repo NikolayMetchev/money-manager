@@ -10,6 +10,8 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.repository.read)
                 api(projects.app.ui.foundation)
 
                 implementation(libs.kmlogging)
@@ -39,6 +41,8 @@ kotlin {
                 api(libs.compose.ui.desktop)
                 api(projects.app.db.core)
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.repository.read)
 
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material.icons.core.desktop)

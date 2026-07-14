@@ -4,14 +4,14 @@ package com.moneymanager.database.mapper
 
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.SourceType
-import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.model.qif.QifImportId
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -26,7 +26,7 @@ import kotlin.uuid.Uuid
  * the single read-side [SourceRecord] (with its [Source] sealed value) from them. This is the one
  * place entity- and transfer-source rows are turned into the unified read model.
  */
-internal data class SourceColumns(
+data class SourceColumns(
     val sourceId: Long?,
     val sourceTypeName: String?,
     val deviceId: Long?,
@@ -41,7 +41,7 @@ internal data class SourceColumns(
  * The device-metadata and per-source-type import detail columns shared by every audit/source query.
  * Sources without per-type import detail rows simply pass nulls for the csv/qif/api fields.
  */
-internal data class SourceDetailColumns(
+data class SourceDetailColumns(
     val platformName: String?,
     val osName: String?,
     val machineName: String?,
@@ -64,7 +64,7 @@ internal data class SourceDetailColumns(
  * import ids/indexes/session/request/jsonPath read from the detail columns (when present), while
  * [SourceRecord] carries the row id, device info, join-derived import file name and timestamp.
  */
-internal fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
+fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
     val sourceId = columns.sourceId ?: return null
     val sourceTypeName = columns.sourceTypeName ?: return null
     val deviceId = columns.deviceId ?: return null

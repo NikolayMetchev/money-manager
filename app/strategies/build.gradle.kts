@@ -10,12 +10,21 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.passthrough)
+                api(projects.app.model.qif)
             }
         }
         getByName("jvmMain") {
             dependencies {
-                api(projects.app.model.core)
+                api(projects.app.model.apistrategy)
+                api(projects.app.model.csvstrategy)
+                api(projects.app.model.passthrough)
+
+                implementation(projects.app.model.core)
+                implementation(projects.app.model.qif)
             }
         }
     }

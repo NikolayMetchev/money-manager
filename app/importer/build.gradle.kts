@@ -10,6 +10,9 @@ kotlin {
             dependencies {
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.passthrough)
+                api(projects.app.model.repository.write)
 
                 implementation(libs.kotlinx.coroutines.core)
             }
@@ -17,6 +20,10 @@ kotlin {
 
         getByName("androidMain") {
             dependencies {
+                implementation(projects.app.model.accountmapping)
+                implementation(projects.app.model.apistrategy)
+                implementation(projects.app.model.csvstrategy)
+                implementation(projects.app.model.importdirectory)
                 implementation(projects.utils.bigdecimal)
             }
         }
@@ -25,7 +32,14 @@ kotlin {
             dependencies {
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
+                api(projects.app.model.repository.write)
 
+                implementation(projects.app.model.accountmapping)
+                implementation(projects.app.model.apistrategy)
+                implementation(projects.app.model.csvstrategy)
+                implementation(projects.app.model.importdirectory)
+                implementation(projects.app.model.passthrough)
                 implementation(projects.utils.bigdecimal)
             }
         }
