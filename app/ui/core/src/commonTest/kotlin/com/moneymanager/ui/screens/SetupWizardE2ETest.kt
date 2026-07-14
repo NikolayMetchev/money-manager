@@ -2,6 +2,7 @@ package com.moneymanager.ui.screens
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
@@ -56,6 +57,9 @@ class SetupWizardE2ETest {
             waitUntilAtLeastOneExists(hasText("Set up Money Manager"), timeoutMillis = 20000)
             onNodeWithText(SetupWizardStep.CURRENCY.subtitle).assertExists()
 
+            // Finish only enables once the currency has been preselected, which is an async settings read —
+            // clicking before then is a no-op that would leave the wizard up until the timeout.
+            waitUntilAtLeastOneExists(hasText("Finish") and isEnabled(), timeoutMillis = 20000)
             onNodeWithText("Finish").performClick()
 
             // The wizard gets out of the way and the app proper appears.
