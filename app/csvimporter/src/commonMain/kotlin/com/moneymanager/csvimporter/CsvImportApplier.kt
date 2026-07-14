@@ -562,6 +562,29 @@ fun buildFirstRowByAccountName(
 }
 
 /**
+ * Turns any row still carrying [UNRESOLVED_ACCOUNT_ID] after the post-creation re-map into an error
+ * row. By then every account a row needs exists, so a surviving placeholder means the row's account
+ * could not be resolved; importing it would violate the transfer's account foreign key and abort the
+ * whole file, losing the rows that are fine.
+ */
+private fun ImportPreparation.withUnresolvedAccountsAsErrors(): ImportPreparation {
+    val (unresolved, resolved) =
+        validTransfers.partition {
+            it.transfer.sourceAccountId == UNRESOLVED_ACCOUNT_ID || it.transfer.targetAccountId == UNRESOLVED_ACCOUNT_ID
+        }
+    if (unresolved.isEmpty()) return this
+    logger.warn { "Skipping ${unresolved.size} row(s) whose account could not be resolved after account creation" }
+    return copy(
+        validTransfers = resolved,
+        errorRows =
+            errorRows +
+                unresolved.map {
+                    MappingResult.Error(it.rowIndex, "Account could not be resolved; the row references an account that does not exist")
+                },
+    )
+}
+
+/**
  * Applies [strategy] to [rows] of a single [csvImport] and writes back per-row statuses. Creates new
  * accounts the user accepted, persists/auto-captures account mappings, runs the central import engine,
  * and records the strategy application. Shared by the single-file dialog and the bulk path; the bulk
@@ -652,7 +675,7 @@ suspend fun runCsvImport(
         return CsvImportResult(successCount = 0, failedRows = emptyList())
     }
 
-    val finalPrep = mapper.prepareImport(rows)
+    val finalPrep = mapper.prepareImport(rows).withUnresolvedAccountsAsErrors()
     val validCount = finalPrep.validTransfers.size
     val errorCount = finalPrep.errorRows.size
     logger.info { "Prepared $validCount valid transfers, $errorCount error rows" }

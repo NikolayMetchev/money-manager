@@ -4,6 +4,7 @@ package com.moneymanager.database.importer
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
@@ -34,6 +35,7 @@ import com.moneymanager.importengineapi.LocalOrderKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.createAccounts
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.importengineapi.getOrCreateAttributeType
@@ -129,6 +131,112 @@ class ImportEngineDbTest : DbTest() {
                 ),
         )
     }
+
+    /**
+     * An API counterparty intent: matched by the provider's external id, carrying it as an attribute.
+     * [sortCode] + [accountNumber] give it a bank identity, marking it a real bank account rather than
+     * a merchant.
+     */
+    private fun counterpartyByExternalId(
+        key: LocalAccountKey,
+        name: String,
+        externalId: String,
+        sortCode: String? = null,
+        accountNumber: String? = null,
+    ): ImportAccountIntent {
+        val externalIdType = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
+        val attributes = mutableListOf(NewAttribute(externalIdType, externalId))
+        if (sortCode != null && accountNumber != null) {
+            attributes += NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), sortCode)
+            attributes += NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), accountNumber)
+        }
+        return ImportAccountIntent(
+            key = key,
+            match = AccountMatchKey.ByExternalId(externalIdType, externalId),
+            name = name,
+            openingDate = baseTime,
+            source = Source.SampleGenerator,
+            attributes = attributes,
+        )
+    }
+
+    private suspend fun accountsNamed(name: String): Int =
+        repositories.accountRepository
+            .getAllAccounts()
+            .first()
+            .count { it.name == name }
+
+    @Test
+    fun counterpartiesWithDifferentExternalIdsButOneName_collapseToOneAccount() =
+        runTest {
+            // A provider can mint several external ids for one merchant within a single import (Monzo
+            // issued two ids for "Curve"). Both intents must land on one account, not fork a duplicate.
+            val result =
+                engine().import(
+                    ImportBatch(
+                        accountsToCreate =
+                            listOf(
+                                counterpartyByExternalId(LocalAccountKey("a"), "Curve", "id-1"),
+                                counterpartyByExternalId(LocalAccountKey("b"), "Curve", "id-2"),
+                            ),
+                    ),
+                )
+
+            assertEquals(1, result.accountsCreated)
+            assertEquals(1, accountsNamed("Curve"))
+        }
+
+    @Test
+    fun personalCounterpartiesSharingAName_stayDistinctAccounts() =
+        runTest {
+            // Two people can share a name while owning different bank accounts, so a name collision must
+            // not merge them — the name fallback applies only to accounts with no bank identity.
+            val result =
+                engine().import(
+                    ImportBatch(
+                        accountsToCreate =
+                            listOf(
+                                counterpartyByExternalId(
+                                    LocalAccountKey("a"),
+                                    "Nikolay Metchev",
+                                    "bank:090128:76266558",
+                                    sortCode = "090128",
+                                    accountNumber = "76266558",
+                                ),
+                                counterpartyByExternalId(
+                                    LocalAccountKey("b"),
+                                    "Nikolay Metchev",
+                                    "bank:040004:74006361",
+                                    sortCode = "040004",
+                                    accountNumber = "74006361",
+                                ),
+                            ),
+                    ),
+                )
+
+            assertEquals(2, result.accountsCreated)
+            assertEquals(2, accountsNamed("Nikolay Metchev"))
+        }
+
+    @Test
+    fun createAccounts_reusesAnExistingAccountWithTheSameName() =
+        runTest {
+            val existing = createSourceAccount()
+
+            val ids =
+                engine().createAccounts(
+                    listOf(
+                        Account(id = AccountId(0), name = "Checking", openingDate = baseTime),
+                        // The same name twice in one list must also collapse onto one account.
+                        Account(id = AccountId(0), name = "Curve", openingDate = baseTime),
+                        Account(id = AccountId(0), name = "Curve", openingDate = baseTime),
+                    ),
+                ) { Source.SampleGenerator }
+
+            assertEquals(existing, ids[0])
+            assertEquals(ids[1], ids[2])
+            assertEquals(1, accountsNamed("Curve"))
+        }
 
     @Test
     fun createsAccountAndTransfer_thenDedupesOnReimport() =

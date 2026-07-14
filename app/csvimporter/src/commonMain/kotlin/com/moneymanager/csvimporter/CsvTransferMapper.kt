@@ -112,6 +112,13 @@ sealed interface MappingResult {
 }
 
 /**
+ * Stand-in id for an account that does not exist yet: the mapper's first pass emits it for accounts it
+ * has asked the caller to create. It must never survive the re-map that follows account creation — a
+ * transfer carrying it would violate the transfer's account foreign key and abort the whole file.
+ */
+val UNRESOLVED_ACCOUNT_ID = AccountId(-1)
+
+/**
  * A new account that needs to be created during import.
  */
 data class NewAccount(
@@ -478,7 +485,7 @@ class CsvTransferMapper(
             // source of a debit, the target of a credit). The applier pairs and links the legs afterwards.
             val conversionDetection = detectConversionLeg(values)
             if (conversionDetection != null) {
-                targetAccountId = resolveExistingAccountId(conversionDetection.accountName) ?: AccountId(-1)
+                targetAccountId = resolveExistingAccountId(conversionDetection.accountName) ?: UNRESOLVED_ACCOUNT_ID
             }
 
             // Both account fields can read the same column (e.g. Crypto.com's card strategy resolves both
@@ -493,7 +500,7 @@ class CsvTransferMapper(
             if (tradeTo == null &&
                 sourceAccountOverride == null &&
                 sourceAccountId == targetAccountId &&
-                sourceAccountId != AccountId(-1)
+                sourceAccountId != UNRESOLVED_ACCOUNT_ID
             ) {
                 strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
                     sourceAccountId = parseAccount(it, values, applyPersistedMappings = false)
@@ -525,11 +532,16 @@ class CsvTransferMapper(
             // other way, so the conduit replaces the row's counterparty on whichever side it sits.
             // Detection + the conduit/merchant names come entirely from user-editable config (the
             // engine stays agnostic).
+            // A conduit is resolved exactly the way [accountExists] decides whether to create it (current
+            // name, then historical name): resolving it any more narrowly would leave the conduit side
+            // dangling at AccountId(-1) for a conduit that was never created because it already exists.
             val passThroughMatch = passThroughDetector?.detect(description)
             val chainConduitIds =
-                passThroughMatch?.accounts?.mapNotNull { existingAccounts[it.conduitAccountName]?.id }.orEmpty()
+                passThroughMatch?.accounts?.mapNotNull { resolveExistingAccountId(it.conduitAccountName) }.orEmpty()
             val conduitAccountId =
-                passThroughMatch?.let { existingAccounts[it.accounts.first().conduitAccountName]?.id ?: AccountId(-1) }
+                passThroughMatch?.let {
+                    resolveExistingAccountId(it.accounts.first().conduitAccountName) ?: UNRESOLVED_ACCOUNT_ID
+                }
             // Persisted account mappings apply to the merchant AFTER the full chain of prefixes was
             // peeled (e.g. "Crv*Paypal *Amazoncouk 1234" → "Amazoncouk 1234" → mapping ".*Amazoncouk.*"
             // → Amazon). A mapping that targets any conduit of the chain (or a deleted account) is
@@ -560,12 +572,12 @@ class CsvTransferMapper(
             // A transfer must move between two distinct accounts (enforced by a DB CHECK). If both legs
             // resolved to the same real account (e.g. an account mapping that matches this row on both
             // sides), surface it as a per-row error instead of letting one bad row abort the whole file.
-            // AccountId(-1) is the "new account" placeholder; two not-yet-created accounts stay distinct.
+            // The placeholder id is the "new account" marker; two not-yet-created accounts stay distinct.
             // A trade row is exempt: the trade CHECK only requires the ASSETS to differ, so a same-account
             // cross-asset exchange (e.g. BTC→ETH inside one wallet) is valid.
             if (tradeTo == null &&
                 effectiveSourceAccountId == effectiveTargetAccountId &&
-                effectiveSourceAccountId != AccountId(-1)
+                effectiveSourceAccountId != UNRESOLVED_ACCOUNT_ID
             ) {
                 val accountName =
                     existingAccounts.entries.firstOrNull { it.value.id == effectiveSourceAccountId }?.key
@@ -627,7 +639,7 @@ class CsvTransferMapper(
                         // Discover the source under the same persisted-mapping rule its id was resolved with:
                         // if the source leg was re-resolved without persisted mappings (collision above), a
                         // genuinely new source account must still be discovered/created rather than suppressed
-                        // by a persisted mapping — otherwise it would dangle as AccountId(-1).
+                        // by a persisted mapping — otherwise it would dangle unresolved.
                         strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
                             add(discoverNewAccount(it, values, applyPersistedMappings = sourceUsedPersistedMappings))
                         }
@@ -910,7 +922,7 @@ class CsvTransferMapper(
 
                 val name = templatedAccountName(mapping, csvValue)
                 resolveExistingAccountId(name)
-                    ?: AccountId(-1) // Placeholder for new accounts
+                    ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
             }
             is ConditionalAccountMapping -> parseAccount(resolveConditional(mapping, values), values, applyPersistedMappings)
             is AccountLookupMapping -> {
@@ -924,7 +936,7 @@ class CsvTransferMapper(
                 // Fall back to lookup by name (current, then historical for renamed accounts)
                 val name = getAccountName(mapping, values)
                 resolveExistingAccountId(name)
-                    ?: AccountId(-1) // Placeholder for new accounts
+                    ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
             }
             is RegexAccountMapping -> {
                 // For RegexAccountMapping, we need to determine which column/value
@@ -938,7 +950,7 @@ class CsvTransferMapper(
 
                 // Fall back to lookup by name (current, then historical for renamed accounts)
                 resolveExistingAccountId(result.accountName)
-                    ?: AccountId(-1) // Placeholder for new accounts
+                    ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
             }
             else -> throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
         }
