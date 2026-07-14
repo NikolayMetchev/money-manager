@@ -68,6 +68,8 @@ fun StrategyCatalogScreen(
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     initialKindFilter: StrategyKind? = null,
+    // Cleared when the screen is embedded somewhere that owns navigation itself (the setup wizard).
+    showBackAction: Boolean = true,
     onBack: () -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
@@ -127,7 +129,9 @@ fun StrategyCatalogScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TextButton(onClick = onBack) { Text("Back") }
+            if (showBackAction) {
+                TextButton(onClick = onBack) { Text("Back") }
+            }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

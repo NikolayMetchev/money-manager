@@ -11,6 +11,11 @@ UPDATE api_credential SET strategy_id = ? WHERE id = ?;
 updateCredentialKeys:
 UPDATE api_credential SET private_key = ?, public_key = ? WHERE id = ?;
 
+-- Rotate a token (and, for signed strategies, its api secret) in place, so a connected API is
+-- edited rather than duplicated.
+updateCredentialSecrets:
+UPDATE api_credential SET token = ?, api_secret = ? WHERE id = ?;
+
 insert:
 INSERT INTO api_session(type_id, token, device_id, created_at, expires_at, credential_id)
 VALUES (?, ?, ?, ?, ?, ?);

@@ -3,14 +3,17 @@
 package com.moneymanager.database.repository
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.importengineapi.setSetupWizardCompleted
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 
 class SettingsRepositoryImplTest : DbTest() {
@@ -93,5 +96,45 @@ class SettingsRepositoryImplTest : DbTest() {
 
             assertEquals(accountId, repositories.settingsRepository.getLastQifAccountId().first())
             assertEquals(eur.id, repositories.settingsRepository.getDefaultCurrencyId().first())
+        }
+
+    @Test
+    fun `fresh database has not completed the setup wizard`() =
+        runTest {
+            assertFalse(repositories.settingsRepository.isSetupWizardCompleted().first())
+        }
+
+    @Test
+    fun `set and get setup wizard completed`() =
+        runTest {
+            repositories.settingsRepository.setSetupWizardCompleted(true)
+            assertTrue(repositories.settingsRepository.isSetupWizardCompleted().first())
+
+            repositories.settingsRepository.setSetupWizardCompleted(false)
+            assertFalse(repositories.settingsRepository.isSetupWizardCompleted().first())
+        }
+
+    @Test
+    fun `import engine records setup wizard completion`() =
+        runTest {
+            repositories.importEngine.setSetupWizardCompleted(true)
+
+            assertTrue(repositories.settingsRepository.isSetupWizardCompleted().first())
+        }
+
+    @Test
+    fun `completing the setup wizard does not clear the default currency`() =
+        runTest {
+            val eur =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .first { it.code == "EUR" }
+
+            repositories.settingsRepository.setDefaultCurrencyId(eur.id)
+            repositories.settingsRepository.setSetupWizardCompleted(true)
+
+            assertEquals(eur.id, repositories.settingsRepository.getDefaultCurrencyId().first())
+            assertTrue(repositories.settingsRepository.isSetupWizardCompleted().first())
         }
 }

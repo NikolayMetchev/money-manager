@@ -1,5 +1,7 @@
 CREATE TABLE settings (
     id INTEGER PRIMARY KEY,
     default_currency_id INTEGER REFERENCES currency(id),
-    last_qif_account_id INTEGER REFERENCES account(id)
+    last_qif_account_id INTEGER REFERENCES account(id),
+    -- 0/1; absent (NULL) on a database whose setup wizard has never run to completion.
+    setup_wizard_completed INTEGER
 );

@@ -781,45 +781,6 @@ private fun CounterpartyConfirmationDialog(
 }
 
 @Composable
-private fun SigningKeySection(
-    publicKey: String?,
-    onGenerateSigningKey: () -> Unit,
-    onCopyText: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text = "Request signing (SCA)", style = MaterialTheme.typography.labelLarge)
-        if (publicKey == null) {
-            Text(
-                text =
-                    "This provider protects statements with Strong Customer Authentication. Generate a " +
-                        "signing key, then register its public key in your provider account.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Button(onClick = onGenerateSigningKey) { Text("Generate signing key") }
-        } else {
-            Text(
-                text =
-                    "Public key generated. Register it in your provider account " +
-                        "(e.g. Wise → Settings → API tokens → Manage public keys).",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = publicKey,
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onCopyText(publicKey) }) { Text("Copy public key") }
-                TextButton(onClick = onGenerateSigningKey) { Text("Regenerate") }
-            }
-        }
-    }
-}
-
-@Composable
 private fun CredentialCard(
     credential: MonzoCredential,
     dateRangeBySession: Map<String, ImportFileDateRange>,

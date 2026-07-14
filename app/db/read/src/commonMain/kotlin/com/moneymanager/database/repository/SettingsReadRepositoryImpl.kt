@@ -28,4 +28,11 @@ class SettingsReadRepositoryImpl(
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.last_qif_account_id?.let(::AccountId) }
+
+    override fun isSetupWizardCompleted(): Flow<Boolean> =
+        selectQueries
+            .selectSetupWizardCompleted()
+            .asFlow()
+            .mapToOneOrNull(Dispatchers.Default)
+            .map { it?.setup_wizard_completed == 1L }
 }

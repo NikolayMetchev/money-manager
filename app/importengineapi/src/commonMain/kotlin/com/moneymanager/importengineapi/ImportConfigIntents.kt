@@ -260,4 +260,5 @@ sealed interface ImportDirectoryMutation {
 data class ImportSettings(
     val defaultCurrencyId: CurrencyId? = null,
     val lastQifAccountId: AccountId? = null,
+    val setupWizardCompleted: Boolean? = null,
 )

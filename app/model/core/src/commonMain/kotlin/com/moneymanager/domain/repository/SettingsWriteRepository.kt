@@ -7,4 +7,6 @@ interface SettingsWriteRepository : SettingsReadRepository {
     suspend fun setDefaultCurrencyId(currencyId: CurrencyId)
 
     suspend fun setLastQifAccountId(accountId: AccountId)
+
+    suspend fun setSetupWizardCompleted(completed: Boolean)
 }

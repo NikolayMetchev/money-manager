@@ -164,8 +164,16 @@ fun FirstRunDatabaseSetupScreen(
                     textAlign = TextAlign.Center,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                // This is step 1 of the setup wizard; the rest of it runs once the database is open.
                 Text(
-                    text = "Choose a database to get started.",
+                    text = "Step 1 · Database",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Choose a database to get started. Setup continues once it's open.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

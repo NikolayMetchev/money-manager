@@ -2,6 +2,8 @@
 
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestHeader
@@ -24,6 +26,8 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -37,6 +41,13 @@ class ApiSessionReadRepositoryImpl(
         withContext(Dispatchers.Default) {
             selectQueries.selectAllCredentials().executeAsList().map { it.toMonzoCredential() }
         }
+
+    override fun getCredentialsFlow(): Flow<List<MonzoCredential>> =
+        selectQueries
+            .selectAllCredentials()
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { rows -> rows.map { it.toMonzoCredential() } }
 
     override suspend fun getSessionsByCredential(credentialId: MonzoCredentialId): List<ApiSession> =
         withContext(Dispatchers.Default) {

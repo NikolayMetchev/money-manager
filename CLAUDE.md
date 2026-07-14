@@ -167,6 +167,24 @@ different databases can use different Google accounts.
 
 **Schema Error Handling**: Always use `collectAsStateWithSchemaErrorHandling()` instead of `collectAsState()` for repository Flows to catch and display database schema errors gracefully.
 
+## Setup Wizard
+
+A full-screen stepper (`app/ui/core/.../screens/setup/`) that guides a user through setting up a database:
+default currency → strategy catalog → strategy cloud sync → import folders → API credentials. Each step body
+is the same composable the feature uses elsewhere (`StrategyCatalogScreen`, `StrategyCloudCard`,
+`ImportDirectoriesScreen`, `ApiConnectScreen`), so the wizard adds ordering and explanation, never a parallel
+set of writes.
+
+- **Trigger**: `settings.setup_wizard_completed` is a **per-database** flag, so a freshly created database
+  runs the wizard, and re-running it from Settings ("Run setup wizard") is always available. "Skip setup"
+  exits from any step and records completion.
+- **The database-location step** happens before a database exists, so it lives in `FirstRunDatabaseSetupScreen`
+  (rendered by `AppStartupHost`) and only appears in the wizard's indicator as an already-completed step.
+- **Step list is dynamic** (`setupWizardSteps`): a step whose feature isn't wired in is dropped, and the API
+  step only appears once the database has at least one API strategy — installing one mid-wizard adds it.
+- Tests that render `MoneyManagerApp` must mark the flag (`MoneyManagerTestApp` does this by default), or the
+  wizard takes over the screen.
+
 ## Development Guidelines
 
 ### Dependencies

@@ -9,4 +9,7 @@ interface SettingsReadRepository {
 
     /** The source account used by the most recent QIF import, for pre-selecting it next time. */
     fun getLastQifAccountId(): Flow<AccountId?>
+
+    /** False until the setup wizard has been finished (or skipped) for this database. */
+    fun isSetupWizardCompleted(): Flow<Boolean>
 }

@@ -24,4 +24,9 @@ class SettingsWriteRepositoryImpl(
         withContext(Dispatchers.Default) {
             writeQueries.upsertLastQifAccount(accountId.id)
         }
+
+    override suspend fun setSetupWizardCompleted(completed: Boolean): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.upsertSetupWizardCompleted(if (completed) 1L else 0L)
+        }
 }

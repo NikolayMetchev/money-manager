@@ -168,6 +168,7 @@ fun SettingsScreen(
     onRequestSwitchDatabase: (DbLocation) -> Unit,
     onReloadFromRemote: () -> Unit = {},
     onShowDbSizeBreakdown: () -> Unit = {},
+    onRunSetupWizard: () -> Unit = {},
     remoteController: RemoteDatabaseController? = null,
     database: MoneyManagerDatabaseWrapper? = null,
     strategySyncController: StrategySyncController? = null,
@@ -235,6 +236,15 @@ fun SettingsScreen(
                     currencyRepository = currencyRepository,
                     modifier = Modifier.fillMaxWidth(),
                 )
+
+                Text(
+                    text =
+                        "The setup wizard walks you through currencies, import strategies, strategy sync, " +
+                            "import folders and API connections.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = onRunSetupWizard) { Text("Run setup wizard") }
             }
         }
 

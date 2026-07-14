@@ -1557,6 +1557,12 @@ class ImportEngineImpl(
                         m.privateKey,
                         m.publicKey,
                     )
+                is ApiSessionMutation.UpdateCredentialSecrets ->
+                    apiSessionRepository.updateCredentialSecrets(
+                        m.credentialId,
+                        m.token,
+                        m.apiSecret,
+                    )
                 is ApiSessionMutation.CreateSession ->
                     apiSessionIds.putUnique(
                         m.key,
@@ -1591,6 +1597,7 @@ class ImportEngineImpl(
         batch.settings?.let { s ->
             s.defaultCurrencyId?.let { settingsRepository.setDefaultCurrencyId(it) }
             s.lastQifAccountId?.let { settingsRepository.setLastQifAccountId(it) }
+            s.setupWizardCompleted?.let { settingsRepository.setSetupWizardCompleted(it) }
         }
 
         return ConfigOutcome(

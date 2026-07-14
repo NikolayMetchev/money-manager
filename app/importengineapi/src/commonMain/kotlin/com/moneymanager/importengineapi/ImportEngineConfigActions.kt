@@ -212,6 +212,10 @@ suspend fun ImportEngine.setLastQifAccount(id: AccountId) {
     import(ImportBatch(settings = ImportSettings(lastQifAccountId = id)))
 }
 
+suspend fun ImportEngine.setSetupWizardCompleted(completed: Boolean) {
+    import(ImportBatch(settings = ImportSettings(setupWizardCompleted = completed)))
+}
+
 // endregion
 
 // region API sessions
@@ -255,6 +259,14 @@ suspend fun ImportEngine.updateApiCredentialKeys(
     publicKey: String?,
 ) {
     import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.UpdateCredentialKeys(credentialId, privateKey, publicKey))))
+}
+
+suspend fun ImportEngine.updateApiCredentialSecrets(
+    credentialId: MonzoCredentialId,
+    token: String,
+    apiSecret: String?,
+) {
+    import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.UpdateCredentialSecrets(credentialId, token, apiSecret))))
 }
 
 suspend fun ImportEngine.createApiSession(
