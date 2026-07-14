@@ -1,5 +1,6 @@
 package com.moneymanager.ui.screens
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -134,7 +136,10 @@ fun StrategyCatalogScreen(
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             FilterChip(selected = kindFilter == null, onClick = { kindFilter = null }, label = { Text("All") })
             for ((kind, label) in kindFilterChips) {
                 FilterChip(selected = kindFilter == kind, onClick = { kindFilter = kind }, label = { Text(label) })
@@ -179,7 +184,12 @@ fun StrategyCatalogScreen(
             Text("The catalog is empty.", fontStyle = FontStyle.Italic)
         }
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // weight(1f): without it the list is measured last with whatever height the header and chips
+        // leave over, which on a phone is nothing.
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             items(filteredItems, key = { "${it.entry.kind}:${it.entry.name}" }) { item ->
                 CatalogRow(
                     item = item,
