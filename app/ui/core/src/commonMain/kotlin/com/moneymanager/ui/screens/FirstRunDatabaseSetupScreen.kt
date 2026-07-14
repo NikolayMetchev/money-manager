@@ -34,19 +34,20 @@ import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncProgress
 import com.moneymanager.ui.AppServices
-import com.moneymanager.ui.DatabasePickerMode
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.rememberDatabaseLocationPicker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
  * First-run chooser shown when there is no remembered database and no remote binding: the user picks
- * **Local** or a remote provider (no silent default). Create-vs-open is resolved by what the user then
- * picks/types — the local picker opens an existing file or creates a new one ([DatabasePickerMode.OPEN_OR_CREATE]),
- * and the Google Drive setup dialog opens the existing archive when the typed name already exists,
- * otherwise creates it. Creating a new remote database opens a freshly seeded local working copy first,
- * then uploads it (so [RemoteDatabaseController.createRemote] has an open database to push).
+ * **Local** or a remote provider.
+ *
+ * Local takes the default location straight away rather than opening a file picker — on a first run there is
+ * nothing to choose between, and a file dialog is a poor first thing to meet. The database can be moved or
+ * swapped afterwards from Settings. Remote is still explicit: the Google Drive setup dialog opens the existing
+ * archive when the typed name already exists, otherwise creates it. Creating a new remote database opens a
+ * freshly seeded local working copy first, then uploads it (so [RemoteDatabaseController.createRemote] has an
+ * open database to push).
  *
  * Remote progress is shown **inline** (this screen stays composed) rather than by switching to the
  * shared loading screen: the create/open coroutine runs on this screen's scope, so navigating away
@@ -69,13 +70,7 @@ fun FirstRunDatabaseSetupScreen(
 
     var createRemoteType by remember { mutableStateOf<RemoteStorageType?>(null) }
 
-    // The picker delivers its result asynchronously on both platforms (JVM posts after the blocking AWT
-    // dialog; Android renders the dialog on the next recomposition). A null result = cancelled, so we stay
-    // on this screen — there is no skip.
-    val picker =
-        rememberDatabaseLocationPicker { location ->
-            if (location != null) onLocalReady(location)
-        }
+    val defaultLocation = databaseManager.getDefaultLocation()
 
     // The setup dialog already warned about (and resolved) any name collision before calling this; a
     // non-null [overwriteFileId] means the user chose to replace that existing archive in place.
@@ -164,8 +159,16 @@ fun FirstRunDatabaseSetupScreen(
                     textAlign = TextAlign.Center,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                // This is step 1 of the setup wizard; the rest of it runs once the database is open.
                 Text(
-                    text = "Choose a database to get started.",
+                    text = "Step 1 · Database",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Choose a database to get started. Setup continues once it's open.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -174,10 +177,17 @@ fun FirstRunDatabaseSetupScreen(
 
                 val buttonModifier = Modifier.fillMaxWidth().widthIn(max = 360.dp)
                 OutlinedButton(
-                    onClick = { picker.launch(DatabasePickerMode.OPEN_OR_CREATE) },
+                    onClick = { onLocalReady(defaultLocation) },
                     enabled = !busy,
                     modifier = buttonModifier,
                 ) { Text("Local database") }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Stored at $defaultLocation. You can move it later in Settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
 
                 remoteController?.providerFactory?.types()?.forEach { type ->
                     Spacer(modifier = Modifier.height(8.dp))

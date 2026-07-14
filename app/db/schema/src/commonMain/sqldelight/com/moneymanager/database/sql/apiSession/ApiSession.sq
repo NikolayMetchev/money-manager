@@ -6,12 +6,14 @@ CREATE TABLE api_session_type (
 -- Stores a saved token/credential. One credential can produce many download sessions.
 -- strategy_id links this credential to an api_import_strategy, determining how data is
 -- fetched and mapped. NULL means use the legacy type-specific (Monzo) behaviour.
+-- At most one credential per strategy: the UI connects an API once and edits that credential
+-- thereafter. (SQLite treats NULLs as distinct, so legacy unlinked rows are unaffected.)
 CREATE TABLE api_credential (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type_id INTEGER NOT NULL,
     token TEXT NOT NULL UNIQUE CHECK(length(trim(token)) > 0),
     created_at INTEGER NOT NULL,
-    strategy_id TEXT,
+    strategy_id TEXT UNIQUE,
     -- PEM-encoded RSA key pair for request signing (e.g. Wise SCA); null when not configured.
     -- A signing key is only meaningful as a pair, so enforce both-null or both-present.
     private_key TEXT,

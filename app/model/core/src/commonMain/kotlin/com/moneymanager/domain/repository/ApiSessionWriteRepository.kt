@@ -60,6 +60,16 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
     )
 
     /**
+     * Replaces the token (and, for signed strategies, the api secret) of an existing credential, so a
+     * rotated or mistyped token is edited in place rather than added as a second credential.
+     */
+    suspend fun updateCredentialSecrets(
+        credentialId: MonzoCredentialId,
+        token: String,
+        apiSecret: String?,
+    )
+
+    /**
      * Creates a new API session for the given device.
      *
      * @param token The session token

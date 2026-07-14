@@ -45,6 +45,12 @@ sealed interface ApiSessionMutation {
         val publicKey: String?,
     ) : ApiSessionMutation
 
+    data class UpdateCredentialSecrets(
+        val credentialId: MonzoCredentialId,
+        val token: String,
+        val apiSecret: String?,
+    ) : ApiSessionMutation
+
     data class CreateSession(
         val key: String,
         val token: String,

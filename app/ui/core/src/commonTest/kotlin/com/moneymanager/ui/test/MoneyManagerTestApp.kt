@@ -44,6 +44,7 @@ internal object MoneyManagerTestApp {
     operator fun invoke(
         databaseManager: DatabaseManager,
         appVersion: AppVersion,
+        completeSetupWizard: Boolean = true,
     ) {
         val scope = rememberCoroutineScope()
         var databaseState by remember { mutableStateOf<TestDatabaseState>(TestDatabaseState.Loading) }
@@ -58,6 +59,11 @@ internal object MoneyManagerTestApp {
             val defaultCurrencyId = component.settingsRepository.getDefaultCurrencyId().first()
             if (currencies.isNotEmpty() && defaultCurrencyId == null) {
                 component.settingsRepository.setDefaultCurrencyId(currencies.first().id)
+            }
+            // Likewise mark setup done, so the wizard doesn't take over the screen in tests that aren't
+            // about it. The setup-wizard test opts out.
+            if (completeSetupWizard) {
+                component.settingsRepository.setSetupWizardCompleted(true)
             }
             return TestDatabaseState.Loaded(location, component)
         }

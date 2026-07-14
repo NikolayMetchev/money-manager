@@ -6,3 +6,7 @@ ON CONFLICT(id) DO UPDATE SET default_currency_id = excluded.default_currency_id
 upsertLastQifAccount:
 INSERT INTO settings(id, last_qif_account_id) VALUES (1, ?)
 ON CONFLICT(id) DO UPDATE SET last_qif_account_id = excluded.last_qif_account_id;
+
+upsertSetupWizardCompleted:
+INSERT INTO settings(id, setup_wizard_completed) VALUES (1, ?)
+ON CONFLICT(id) DO UPDATE SET setup_wizard_completed = excluded.setup_wizard_completed;

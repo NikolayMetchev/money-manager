@@ -66,6 +66,7 @@ import com.moneymanager.ui.background.rememberBackgroundTaskManager
 import com.moneymanager.ui.components.DefaultCurrencyInitDialog
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.navigation.NavigationHistory
@@ -74,7 +75,7 @@ import com.moneymanager.ui.navigation.ScreenSavedStateConfiguration
 import com.moneymanager.ui.navigation.mouseButtonNavigation
 import com.moneymanager.ui.screens.AccountAuditScreen
 import com.moneymanager.ui.screens.AccountsScreen
-import com.moneymanager.ui.screens.ApiConnectScreen
+import com.moneymanager.ui.screens.ApiConnectionsScreen
 import com.moneymanager.ui.screens.ApiSessionTrafficScreen
 import com.moneymanager.ui.screens.AssetsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
@@ -99,6 +100,7 @@ import com.moneymanager.ui.screens.orders.ExchangeOrderAuditScreen
 import com.moneymanager.ui.screens.orders.OrderDetailScreen
 import com.moneymanager.ui.screens.orders.OrdersScreen
 import com.moneymanager.ui.screens.qif.QifStrategyEditorScreen
+import com.moneymanager.ui.screens.setup.SetupWizardScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TradeEntryDialog
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
@@ -151,6 +153,14 @@ fun MoneyManagerApp(
             .onEach { defaultCurrencyLoaded = true }
             .collectAsStateWithSchemaErrorHandling(initial = null)
 
+        // Null until the flag has been read: showing the wizard on a `false` we haven't loaded yet would
+        // flash it over an already-configured database on every launch.
+        val setupWizardCompleted by rememberFlowAsStateWithSchemaErrorHandling<Boolean?>(initial = null) {
+            services.settings.settingsRepository.isSetupWizardCompleted()
+        }
+        var setupWizardRequested by remember { mutableStateOf(false) }
+        val showSetupWizard = setupWizardRequested || setupWizardCompleted == false
+
         // Use schema-error-aware collection for flows that may fail on old databases
         val accounts by services.accounts.accountRepository
             .getAllAccounts()
@@ -186,6 +196,21 @@ fun MoneyManagerApp(
                 LocalDeviceId provides services.deviceId,
                 LocalImportEngine provides services.transactions.importEngine,
             ) {
+                if (showSetupWizard) {
+                    SetupWizardScreen(
+                        services = services,
+                        appVersion = appVersion,
+                        strategyCatalogController = strategyCatalogController,
+                        strategySyncController = strategySyncController,
+                        importFileSourceFactory = importFileSourceFactory,
+                        driveFolderBrowser = driveFolderBrowser,
+                        // The database was chosen just before the wizard on a first run; a manual re-run from
+                        // Settings leaves the current database alone, so that step isn't part of it.
+                        includeDatabaseStep = !setupWizardRequested,
+                        onFinished = { setupWizardRequested = false },
+                    )
+                    return@CompositionLocalProvider
+                }
                 Scaffold(
                     modifier =
                         Modifier
@@ -432,6 +457,7 @@ fun MoneyManagerApp(
                                                 onShowDbSizeBreakdown = {
                                                     navigationHistory.navigateTo(Screen.DatabaseSizeBreakdown)
                                                 },
+                                                onRunSetupWizard = { setupWizardRequested = true },
                                                 remoteController = remoteController,
                                                 database = database,
                                                 strategySyncController = strategySyncController,
@@ -941,11 +967,10 @@ fun MoneyManagerApp(
                                         }
                                         entry<Screen.ConnectApi> {
                                             resetViewedIds()
-                                            ApiConnectScreen(
+                                            ApiConnectionsScreen(
                                                 apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
-                                                onCredentialSaved = {
-                                                    navigationHistory.navigateBack()
-                                                },
+                                                apiSessionRepository = services.imports.apiSessionRepository,
+                                                onBack = { navigationHistory.navigateBack() },
                                             )
                                         }
 

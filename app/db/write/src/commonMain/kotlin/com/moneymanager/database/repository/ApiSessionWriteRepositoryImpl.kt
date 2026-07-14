@@ -84,6 +84,22 @@ class ApiSessionWriteRepositoryImpl(
             check(affected == 1L) { "Expected to update one credential ($credentialId) keys, but $affected rows matched" }
         }
 
+    override suspend fun updateCredentialSecrets(
+        credentialId: MonzoCredentialId,
+        token: String,
+        apiSecret: String?,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            val affected =
+                writeQueries
+                    .updateCredentialSecrets(
+                        token = token,
+                        api_secret = apiSecret,
+                        id = credentialId.id,
+                    ).await()
+            check(affected == 1L) { "Expected to update one credential ($credentialId) secrets, but $affected rows matched" }
+        }
+
     override suspend fun createSession(
         token: String,
         deviceId: DeviceId,
