@@ -76,13 +76,21 @@ fun SetupWizardScreen(
     var currentStep by remember { mutableStateOf(SetupWizardStep.CURRENCY) }
 
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
+    // Prefer the currency this database already uses (a re-run should show the current default, not reset it),
+    // and fall back to the locale's currency on a fresh database. The locale need not name one we know.
     LaunchedEffect(Unit) {
-        val localeCode = Currency.getDefaultCurrencyCode() ?: return@LaunchedEffect
-        val currency =
-            services.accounts.currencyRepository
-                .getCurrencyByCode(localeCode)
+        if (selectedCurrencyId != null) return@LaunchedEffect
+        val existing =
+            services.settings.settingsRepository
+                .getDefaultCurrencyId()
                 .firstOrNull()
-        if (selectedCurrencyId == null) selectedCurrencyId = currency?.id
+        val localeCurrency =
+            Currency.getDefaultCurrencyCode()?.let { code ->
+                services.accounts.currencyRepository
+                    .getCurrencyByCode(code)
+                    .firstOrNull()
+            }
+        selectedCurrencyId = existing ?: localeCurrency?.id
     }
 
     fun finish() {
