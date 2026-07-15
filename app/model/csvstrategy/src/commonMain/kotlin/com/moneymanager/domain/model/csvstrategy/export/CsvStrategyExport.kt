@@ -5,6 +5,7 @@ package com.moneymanager.domain.model.csvstrategy.export
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.SortedAccountMappingListSerializer
 import com.moneymanager.domain.model.csvstrategy.AmountMode
+import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
@@ -37,8 +38,8 @@ import kotlinx.serialization.Serializable
  * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.crossSourceReconcileWindowSeconds])
  * @property conversionConfig Asset-conversion configuration (already portable, no IDs)
  * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.conversionConfig])
- * @property fundingCardColumn Name of the column carrying the funding-card last-4 (already portable)
- * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fundingCardColumn])
+ * @property fundingAttributeMatch Attribute-based funding-account match (already portable, no IDs)
+ * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fundingAttributeMatch])
  */
 @Serializable
 data class CsvStrategyExport(
@@ -66,7 +67,7 @@ data class CsvStrategyExport(
     // strategy — only a strategy that actually sets it (Curve) rehashes. Prevents a spurious "all
     // strategies changed" on catalog/Drive sync. See StrategyArtifactCodec.canonicalHash.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val fundingCardColumn: String? = null,
+    val fundingAttributeMatch: AttributeAccountMatch? = null,
 )
 
 /**
@@ -112,6 +113,18 @@ data class RegexAccountExport(
     val columnName: String,
     val rules: List<RegexRule>,
     val fallbackColumns: List<String> = emptyList(),
+    val defaultCategoryName: String,
+) : FieldMappingExport
+
+/**
+ * Export format for [com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping].
+ * Uses category name instead of category ID; columnName + attributeTypeName are already portable.
+ */
+@Serializable
+data class AttributeMatchAccountExport(
+    override val fieldType: TransferField,
+    val columnName: String,
+    val attributeTypeName: String,
     val defaultCategoryName: String,
 ) : FieldMappingExport
 

@@ -4,7 +4,6 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountAttribute
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CryptoAsset
@@ -218,28 +217,6 @@ data class CsvBulkResult(
     override val filesFailed: Int,
 ) : BulkImportResult
 
-/** Splits a `card-last4` attribute value into its individual last-4 tokens (whitespace/comma-separated). */
-private val CARD_LAST4_DELIMITER = Regex("[\\s,]+")
-
-/**
- * Builds the funding-card index used by strategies with a
- * [CsvImportStrategy.fundingCardColumn]: last-4 → the account that funds it. [cardLast4Attributes] are
- * the `card-last4` account attributes (see [com.moneymanager.domain.model.WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_ID]);
- * each may list several last-4s separated by whitespace or commas. A last-4 claimed by more than one
- * account is ambiguous and dropped, so those rows import normally instead of reconciling to the wrong
- * account.
- */
-fun fundingCardAccountIndex(cardLast4Attributes: List<AccountAttribute>): Map<String, AccountId> {
-    val byLast4 = mutableMapOf<String, MutableSet<AccountId>>()
-    for (attribute in cardLast4Attributes) {
-        for (last4 in attribute.value.split(CARD_LAST4_DELIMITER)) {
-            val token = last4.trim()
-            if (token.isNotEmpty()) byLast4.getOrPut(token) { mutableSetOf() } += attribute.accountId
-        }
-    }
-    return byLast4.mapNotNull { (last4, accounts) -> accounts.singleOrNull()?.let { last4 to it } }.toMap()
-}
-
 /**
  * Applies the matching strategy to every [imports] file. Each file's strategy is auto-matched from its
  * column headers, so files from different banks each get the right strategy; files with no match are
@@ -262,7 +239,7 @@ suspend fun bulkApplyCsv(
     onProgress: suspend (BulkImportProgress) -> Unit,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
-    fundingCardAccounts: Map<String, AccountId> = emptyMap(),
+    attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
 ): CsvBulkResult {
     var filesImported = 0
     var transfers = 0
@@ -305,7 +282,7 @@ suspend fun bulkApplyCsv(
                     onProgress = { tracker.phase(index, csvImport.originalFileName, it) },
                     engineBatchSize = BULK_ENGINE_BATCH_SIZE,
                     cryptoRepository = cryptoRepository,
-                    fundingCardAccounts = fundingCardAccounts,
+                    attributeAccountMatchers = attributeAccountMatchers,
                 ) ?: return@forEachIndexed
             filesImported++
             transfers += result.successCount
@@ -351,7 +328,7 @@ suspend fun applyStagedCsv(
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
     cryptoRepository: CryptoReadRepository? = null,
-    fundingCardAccounts: Map<String, AccountId> = emptyMap(),
+    attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
 ): CsvImportResult? {
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
     val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
@@ -392,6 +369,7 @@ suspend fun applyStagedCsv(
             passThroughAccounts,
             historicalAccountNames,
             cryptoAssets,
+            attributeAccountMatchers,
         ).prepareImport(rows)
 
     return runCsvImport(
@@ -413,7 +391,7 @@ suspend fun applyStagedCsv(
         passThroughAccounts = passThroughAccounts,
         onProgress = onProgress,
         engineBatchSize = engineBatchSize,
-        fundingCardAccounts = fundingCardAccounts,
+        attributeAccountMatchers = attributeAccountMatchers,
     )
 }
 
@@ -472,6 +450,7 @@ fun buildCsvMapper(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     historicalAccountNames: Map<String, AccountId> = emptyMap(),
     cryptoAssets: List<CryptoAsset> = emptyList(),
+    attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
 ): CsvTransferMapper =
     CsvTransferMapper(
         strategy = strategy,
@@ -484,6 +463,7 @@ fun buildCsvMapper(
         historicalAccountNames = historicalAccountNames,
         sourceAccountOverride = sourceAccountOverride,
         passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
+        attributeAccountMatchers = attributeAccountMatchers,
     )
 
 /**
@@ -647,7 +627,7 @@ suspend fun runCsvImport(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
-    fundingCardAccounts: Map<String, AccountId> = emptyMap(),
+    attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
 ): CsvImportResult {
     logger.info { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
 
@@ -705,6 +685,7 @@ suspend fun runCsvImport(
             historicalAccountNames = historicalAccountNames,
             sourceAccountOverride = selectedSourceAccountId,
             passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
+            attributeAccountMatchers = attributeAccountMatchers,
         )
 
     // Handle case when all rows are already processed (rows is already filtered by the caller)
@@ -882,12 +863,14 @@ suspend fun runCsvImport(
                         }
                     }
                 }
-            // Funding-card reconcile hint: resolve the row's funding-card last-4 to the account that
-            // must hold the matching funding leg (e.g. Curve's "7721" -> the Crypto.com Card account).
-            // Never point at the row's own source conduit (a self-reconcile makes no sense).
+            // Funding reconcile hint: match the row's funding value against the strategy's funding
+            // attribute type to find the account that must hold the matching funding leg (e.g. Curve's
+            // "7721" -> the Crypto.com Card account, via the `card-last4` attribute regexes). Never point
+            // at the row's own source conduit (a self-reconcile makes no sense).
+            val fundingMatcher = strategy.fundingAttributeMatch?.let { attributeAccountMatchers[it.attributeTypeName] }
             val fundingAccountId =
-                row.fundingCardLast4
-                    ?.let { fundingCardAccounts[it] }
+                row.fundingMatchValue
+                    ?.let { fundingMatcher?.match(it) }
                     ?.takeIf { it != row.transfer.sourceAccountId }
             ImportTransfer(
                 rowKey = ImportRowKey.CsvRow(row.rowIndex),

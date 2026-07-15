@@ -279,6 +279,7 @@ fun CsvStrategyEditorScreen(
                         rows = rows,
                         firstRow = firstRow,
                         enabled = !state.isSaving,
+                        existingAttributeTypes = existingAttributeTypes,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,

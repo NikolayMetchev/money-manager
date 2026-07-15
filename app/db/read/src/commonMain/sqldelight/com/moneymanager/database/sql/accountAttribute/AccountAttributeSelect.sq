@@ -32,3 +32,14 @@ FROM account_attribute
 JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id
 WHERE account_attribute.attribute_type_id = ?
 ORDER BY account_attribute.account_id;
+
+selectAll:
+SELECT
+    account_attribute.id,
+    account_attribute.account_id,
+    account_attribute.attribute_type_id,
+    account_attribute.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM account_attribute
+JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id
+ORDER BY attribute_type.name, account_attribute.account_id;

@@ -2,11 +2,11 @@
 
 package com.moneymanager.database.csv
 
+import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.CsvBulkResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.executeCsvReimport
-import com.moneymanager.csvimporter.fundingCardAccountIndex
 import com.moneymanager.csvimporter.planCsvReimport
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
@@ -119,10 +119,8 @@ class CurveCsvE2ETest : DbTest() {
 
     private suspend fun applyAll(imports: List<CsvImport>): CsvBulkResult {
         val progress = mutableListOf<BulkImportProgress>()
-        val cardLast4 =
-            repositories.accountAttributeRepository
-                .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_ID))
-                .first()
+        val attributeMatchers =
+            AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first())
         val result =
             bulkApplyCsv(
                 imports = imports,
@@ -137,7 +135,7 @@ class CurveCsvE2ETest : DbTest() {
                 onProgress = { progress += it },
                 passThroughAccounts = repositories.passThroughAccountRepository.getAll().first(),
                 cryptoRepository = repositories.cryptoRepository,
-                fundingCardAccounts = fundingCardAccountIndex(cardLast4),
+                attributeAccountMatchers = attributeMatchers,
             )
         assertBulkProgress(progress, imports.size)
         return result
@@ -167,12 +165,8 @@ class CurveCsvE2ETest : DbTest() {
                 .first { it.name == "Curve CSV" }
         val currencies = repositories.currencyRepository.getAllCurrencies().first()
         val passThroughAccounts = repositories.passThroughAccountRepository.getAll().first()
-        val fca =
-            fundingCardAccountIndex(
-                repositories.accountAttributeRepository
-                    .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_ID))
-                    .first(),
-            )
+        val attributeMatchers =
+            AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first())
         val plan =
             planCsvReimport(
                 csvImport = current,
@@ -186,7 +180,7 @@ class CurveCsvE2ETest : DbTest() {
                 relationshipRepository = repositories.transferRelationshipRepository,
                 transferSourceRepository = repositories.transferSourceRepository,
                 passThroughAccounts = passThroughAccounts,
-                fundingCardAccounts = fca,
+                attributeAccountMatchers = attributeMatchers,
             )
         executeCsvReimport(
             plan = plan,
@@ -200,7 +194,7 @@ class CurveCsvE2ETest : DbTest() {
             maintenance = maintenance,
             importEngine = repositories.importEngine,
             passThroughAccounts = passThroughAccounts,
-            fundingCardAccounts = fca,
+            attributeAccountMatchers = attributeMatchers,
         )
     }
 

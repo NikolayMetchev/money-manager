@@ -375,7 +375,7 @@ suspend fun planCsvReimport(
     transferSourceRepository: TransferSourceReadRepository,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoAssets: List<CryptoAsset> = emptyList(),
-    fundingCardAccounts: Map<String, AccountId> = emptyMap(),
+    attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): ReimportPlan {
     onProgress?.invoke(ImportProgress("Loading rows"))
@@ -399,6 +399,7 @@ suspend fun planCsvReimport(
             passThroughAccounts,
             historicalAccountNames,
             cryptoAssets,
+            attributeAccountMatchers,
         ).prepareImport(allRows)
 
     onProgress?.invoke(ImportProgress("Analyzing rows (pass 1 of 2)"))
@@ -418,6 +419,7 @@ suspend fun planCsvReimport(
             effectiveSource,
             passThroughAccounts,
             cryptoAssets = cryptoAssets,
+            attributeAccountMatchers = attributeAccountMatchers,
         ).prepareImport(allRows)
     val reversals =
         computeReimportReversals(
@@ -451,7 +453,7 @@ suspend fun planCsvReimport(
             allRows = allRows,
             mappedPrep = mappedPrep,
             strategy = strategy,
-            fundingCardAccounts = fundingCardAccounts,
+            attributeAccountMatchers = attributeAccountMatchers,
             excludedRowIndexes = rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes + tradeConversions.map { it.rowIndex },
             existingTransfers = existingTransfers,
             loadTransfersTouchingAccount = { accountId, startDate, endDate ->
@@ -602,14 +604,15 @@ suspend fun computeFundingReconcileReruns(
     allRows: List<CsvRow>,
     mappedPrep: ImportPreparation,
     strategy: CsvImportStrategy,
-    fundingCardAccounts: Map<String, AccountId>,
+    attributeAccountMatchers: Map<String, AttributeAccountMatcher>,
     excludedRowIndexes: Set<Long>,
     existingTransfers: Map<TransferId, Transfer>,
     loadTransfersTouchingAccount: suspend (AccountId, Instant, Instant) -> List<Transfer>,
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): List<ReimportFundingReconcile> {
     val window = strategy.crossSourceReconcileWindowSeconds?.seconds ?: return emptyList()
-    if (strategy.fundingCardColumn == null || fundingCardAccounts.isEmpty()) return emptyList()
+    val fundingMatcher =
+        strategy.fundingAttributeMatch?.let { attributeAccountMatchers[it.attributeTypeName] } ?: return emptyList()
     val rowsByIndex = allRows.associateBy { it.rowIndex }
 
     // Candidate rows: already IMPORTED conduit spends that resolve a funding account and are not yet
@@ -629,7 +632,7 @@ suspend fun computeFundingReconcileReruns(
             val row = rowsByIndex[mapped.rowIndex] ?: return@mapNotNull null
             if (row.importStatus != ImportStatus.IMPORTED) return@mapNotNull null
             val transferId = row.transferId ?: return@mapNotNull null
-            val fundingAccount = mapped.fundingCardLast4?.let { fundingCardAccounts[it] } ?: return@mapNotNull null
+            val fundingAccount = mapped.fundingMatchValue?.let { fundingMatcher.match(it) } ?: return@mapNotNull null
             val conduit = mapped.transfer.sourceAccountId
             if (fundingAccount == conduit) return@mapNotNull null
             val existing = existingTransfers[transferId] ?: return@mapNotNull null
@@ -891,7 +894,7 @@ suspend fun executeCsvReimport(
     refreshViews: Boolean = true,
     cryptoRepository: CryptoReadRepository? = null,
     tradeRepository: TradeReadRepository? = null,
-    fundingCardAccounts: Map<String, AccountId> = emptyMap(),
+    attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
 ): CsvReimportResult {
     val merged = mutableListOf<ReimportMerge>()
     val skipped = plan.skipped.toMutableList()
@@ -1068,7 +1071,7 @@ suspend fun executeCsvReimport(
             passThroughAccounts = passThroughAccounts,
             cryptoRepository = cryptoRepository,
             onProgress = onProgress,
-            fundingCardAccounts = fundingCardAccounts,
+            attributeAccountMatchers = attributeAccountMatchers,
             engineBatchSize = REIMPORT_ENGINE_BATCH_SIZE,
         )
 
@@ -1314,7 +1317,7 @@ suspend fun bulkReimportCsv(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
     tradeRepository: TradeReadRepository? = null,
-    fundingCardAccounts: Map<String, AccountId> = emptyMap(),
+    attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
 ): CsvBulkReimportResult {
     var filesImported = 0
     var transfers = 0
@@ -1365,7 +1368,7 @@ suspend fun bulkReimportCsv(
                     passThroughAccounts = passThroughAccounts,
                     onProgress = { tracker.phase(index, csvImport.originalFileName, it) },
                     cryptoAssets = cryptoAssets,
-                    fundingCardAccounts = fundingCardAccounts,
+                    attributeAccountMatchers = attributeAccountMatchers,
                 )
             val result =
                 executeCsvReimport(
@@ -1384,7 +1387,7 @@ suspend fun bulkReimportCsv(
                     refreshViews = false,
                     cryptoRepository = cryptoRepository,
                     tradeRepository = tradeRepository,
-                    fundingCardAccounts = fundingCardAccounts,
+                    attributeAccountMatchers = attributeAccountMatchers,
                 )
             filesImported++
             transfers += result.importResult?.successCount ?: 0

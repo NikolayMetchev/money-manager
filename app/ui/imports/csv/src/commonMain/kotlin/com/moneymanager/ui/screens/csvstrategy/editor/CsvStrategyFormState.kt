@@ -12,7 +12,9 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
@@ -67,6 +69,7 @@ internal enum class SourceAccountMode {
 internal enum class TargetAccountMode {
     DIRECT_LOOKUP,
     REGEX_MATCH,
+    ATTRIBUTE_MATCH,
     TEMPLATE,
     CONDITIONAL,
 }
@@ -176,6 +179,7 @@ internal data class StrategyFormState(
     val targetAccountColumnName: String?,
     val targetAccountFallbackColumns: List<String>,
     val targetAccountMode: TargetAccountMode,
+    val targetAttributeTypeName: String?,
     val regexRules: List<RegexRule>,
     val targetTemplateColumnName: String?,
     val targetTemplatePrefix: String,
@@ -195,7 +199,7 @@ internal data class StrategyFormState(
     val contentMatchRules: List<ContentMatchRule>,
     val fileNamePattern: String?,
     val crossSourceReconcileWindowSeconds: Long?,
-    val fundingCardColumn: String?,
+    val fundingAttributeMatch: AttributeAccountMatch?,
 )
 
 /**
@@ -262,6 +266,7 @@ internal fun extractFormStateFromStrategy(
     val targetAccountFallbackColumns: List<String>
     val targetAccountMode: TargetAccountMode
     val regexRules: List<RegexRule>
+    var targetAttributeTypeName: String? = null
     var targetTemplateColumnName: String? = null
     var targetTemplatePrefix = ""
     var targetTemplateSuffix = ""
@@ -280,6 +285,13 @@ internal fun extractFormStateFromStrategy(
             targetAccountFallbackColumns = targetAccountMapping.fallbackColumns.mapNotNull { columnIfExists(it) }
             targetAccountMode = TargetAccountMode.REGEX_MATCH
             regexRules = targetAccountMapping.rules
+        }
+        is AttributeMatchAccountMapping -> {
+            targetAccountColumnName = columnIfExists(targetAccountMapping.columnName)
+            targetAccountFallbackColumns = emptyList()
+            targetAccountMode = TargetAccountMode.ATTRIBUTE_MATCH
+            regexRules = emptyList()
+            targetAttributeTypeName = targetAccountMapping.attributeTypeName
         }
         is TemplateAccountMapping -> {
             targetAccountColumnName = null
@@ -452,6 +464,7 @@ internal fun extractFormStateFromStrategy(
         targetAccountColumnName = targetAccountColumnName,
         targetAccountFallbackColumns = targetAccountFallbackColumns,
         targetAccountMode = targetAccountMode,
+        targetAttributeTypeName = targetAttributeTypeName,
         regexRules = regexRules,
         targetTemplateColumnName = targetTemplateColumnName,
         targetTemplatePrefix = targetTemplatePrefix,
@@ -471,7 +484,7 @@ internal fun extractFormStateFromStrategy(
         contentMatchRules = strategy.contentMatchRules,
         fileNamePattern = strategy.fileNamePattern,
         crossSourceReconcileWindowSeconds = strategy.crossSourceReconcileWindowSeconds,
-        fundingCardColumn = strategy.fundingCardColumn,
+        fundingAttributeMatch = strategy.fundingAttributeMatch,
     )
 }
 
@@ -533,6 +546,13 @@ internal fun buildStrategyFromFormState(
                             columnName = state.targetAccountColumnName!!,
                             rules = state.regexRules,
                             fallbackColumns = state.targetAccountFallbackColumns,
+                        )
+                    TargetAccountMode.ATTRIBUTE_MATCH ->
+                        AttributeMatchAccountMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TARGET_ACCOUNT,
+                            columnName = state.targetAccountColumnName!!,
+                            attributeTypeName = state.targetAttributeTypeName!!,
                         )
                     TargetAccountMode.TEMPLATE ->
                         TemplateAccountMapping(
@@ -631,7 +651,7 @@ internal fun buildStrategyFromFormState(
         contentMatchRules = state.contentMatchRules,
         fileNamePattern = state.fileNamePattern?.takeIf { it.isNotBlank() },
         crossSourceReconcileWindowSeconds = state.crossSourceReconcileWindowSeconds,
-        fundingCardColumn = state.fundingCardColumn?.takeIf { it.isNotBlank() },
+        fundingAttributeMatch = state.fundingAttributeMatch,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

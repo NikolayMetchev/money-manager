@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -49,7 +50,7 @@ object CsvStrategyExportMapper {
             fileNamePattern = strategy.fileNamePattern,
             crossSourceReconcileWindowSeconds = strategy.crossSourceReconcileWindowSeconds,
             conversionConfig = strategy.conversionConfig,
-            fundingCardColumn = strategy.fundingCardColumn,
+            fundingAttributeMatch = strategy.fundingAttributeMatch,
         )
 
     private fun FieldMapping.toExport(
@@ -76,6 +77,13 @@ object CsvStrategyExportMapper {
                     columnName = columnName,
                     rules = rules,
                     fallbackColumns = fallbackColumns,
+                    defaultCategoryName = categoryNameById(defaultCategoryId) ?: Category.UNCATEGORIZED_NAME,
+                )
+            is AttributeMatchAccountMapping ->
+                AttributeMatchAccountExport(
+                    fieldType = fieldType,
+                    columnName = columnName,
+                    attributeTypeName = attributeTypeName,
                     defaultCategoryName = categoryNameById(defaultCategoryId) ?: Category.UNCATEGORIZED_NAME,
                 )
             is TemplateAccountMapping ->

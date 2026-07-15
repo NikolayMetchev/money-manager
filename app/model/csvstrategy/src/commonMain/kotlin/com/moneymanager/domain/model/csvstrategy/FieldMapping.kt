@@ -118,6 +118,28 @@ data class RegexAccountMapping(
 }
 
 /**
+ * Resolves an account by matching a CSV column value against the regex patterns stored in a given
+ * account-attribute type (see [AttributeAccountMatch] and the importer's attribute-account matcher).
+ * Each account carries an attribute of [attributeTypeName] whose value holds one or more
+ * whitespace/comma-separated regex tokens; the column value is tested (case-insensitively) against
+ * every account's tokens and the single matching account wins. A value matching more than one account
+ * is ambiguous; when nothing matches, the raw column value falls back to ordinary name lookup (as
+ * [RegexAccountMapping] does). Unlike [RegexAccountMapping] the patterns live on the accounts, so the
+ * same strategy routes to whatever accounts the user has tagged without editing the strategy.
+ *
+ * Persisted [CsvAccountMapping] overrides on the raw column value are applied first, so renamed
+ * accounts keep matching.
+ */
+@Serializable
+data class AttributeMatchAccountMapping(
+    override val id: FieldMappingId,
+    override val fieldType: TransferField,
+    val columnName: String,
+    val attributeTypeName: String,
+    val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
+) : FieldMapping
+
+/**
  * Looks up an account by templating a CSV column value into an account name.
  * The looked-up name is `prefix + columnValue + suffix` (e.g. "Wise: " + "EUR").
  * Useful when one logical account exists per currency and the CSV only carries

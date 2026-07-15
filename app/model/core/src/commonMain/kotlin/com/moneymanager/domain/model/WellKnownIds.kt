@@ -32,10 +32,13 @@ object WellKnownIds {
     const val ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID: Long = -7
 
     /**
-     * "card-last4" account attribute: the last-4 digits (whitespace/comma-separated for multiple) of
-     * the cards funded from this account. A CSV strategy with a
-     * [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fundingCardColumn] uses it to
-     * reconcile a conduit (e.g. Curve) spend against the funding leg into this account.
+     * "card-last4" account attribute: one or more whitespace/comma-separated regex tokens (typically the
+     * last-4 digits) identifying the cards funded from this account. It is the default attribute type for
+     * the generic attribute-account matcher: a CSV strategy with a
+     * [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fundingAttributeMatch] (or an
+     * [com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping] field) matches a column
+     * value against these tokens to route a conduit (e.g. Curve) spend to the funding account. Nothing in
+     * code special-cases this id — it is just the built-in Curve strategy's chosen attribute type.
      */
     const val ACCOUNT_CARD_LAST4_ATTR_TYPE_ID: Long = -8
 

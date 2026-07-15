@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -32,6 +34,7 @@ internal fun AccountsTab(
     rows: List<CsvRow>,
     firstRow: CsvRow?,
     enabled: Boolean,
+    existingAttributeTypes: List<AttributeType>,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
@@ -91,7 +94,14 @@ internal fun AccountsTab(
         )
         TargetAccountModeSelector(
             selected = state.targetAccountMode,
-            onSelected = { state.targetAccountMode = it },
+            onSelected = { mode ->
+                state.targetAccountMode = mode
+                // Give the attribute-match mode a sensible default type on first entry so the field
+                // isn't blank; a non-attribute mode keeps its type null (so extract/save round-trips).
+                if (mode == TargetAccountMode.ATTRIBUTE_MATCH && state.targetAttributeTypeName.isNullOrBlank()) {
+                    state.targetAttributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME
+                }
+            },
             enabled = enabled,
         )
 
@@ -136,6 +146,20 @@ internal fun AccountsTab(
                         enabled = enabled,
                     )
                 }
+            }
+            TargetAccountMode.ATTRIBUTE_MATCH -> {
+                Spacer(modifier = Modifier.height(4.dp))
+                AttributeMatchAccountMappingEditor(
+                    columnName = state.targetAccountColumnName,
+                    onColumnChanged = { state.targetAccountColumnName = it },
+                    columnLabel = "Column matched against account attribute",
+                    attributeTypeName = state.targetAttributeTypeName.orEmpty(),
+                    onAttributeTypeChanged = { state.targetAttributeTypeName = it },
+                    columns = csvColumns,
+                    firstRow = firstRow,
+                    existingAttributeTypeNames = existingAttributeTypes.map { it.name },
+                    enabled = enabled,
+                )
             }
             TargetAccountMode.TEMPLATE -> {
                 Spacer(modifier = Modifier.height(4.dp))

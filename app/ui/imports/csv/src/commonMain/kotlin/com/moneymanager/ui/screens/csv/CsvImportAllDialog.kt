@@ -16,16 +16,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.bulkApplyCsv
-import com.moneymanager.csvimporter.fundingCardAccountIndex
 import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -76,8 +74,8 @@ fun CsvImportAllDialog(
     val strategies by csvImportStrategyRepository.getAllStrategies().collectAsStateWithSchemaErrorHandling(emptyList())
     val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(emptyList())
     val passThroughAccounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
-    val cardLast4Attributes by accountAttributeRepository
-        .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_ID))
+    val accountAttributes by accountAttributeRepository
+        .getAll()
         .collectAsStateWithSchemaErrorHandling(emptyList())
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
@@ -167,7 +165,7 @@ fun CsvImportAllDialog(
                                         onProgress = { progress = it },
                                         passThroughAccounts = passThroughAccounts,
                                         cryptoRepository = cryptoRepository,
-                                        fundingCardAccounts = fundingCardAccountIndex(cardLast4Attributes),
+                                        attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
                                     )
                                 summary = result.toSummary()
                             } finally {
