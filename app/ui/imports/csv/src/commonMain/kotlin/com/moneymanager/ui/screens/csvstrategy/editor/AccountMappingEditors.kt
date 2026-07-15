@@ -48,6 +48,7 @@ internal fun TargetAccountModeSelector(
         listOf(
             TargetAccountMode.DIRECT_LOOKUP to "Lookup",
             TargetAccountMode.REGEX_MATCH to "Regex",
+            TargetAccountMode.ATTRIBUTE_MATCH to "Attribute",
             TargetAccountMode.TEMPLATE to "Template",
             TargetAccountMode.CONDITIONAL to "Conditional",
         )
@@ -118,6 +119,59 @@ internal fun TemplateAccountMappingEditor(
                 color = MaterialTheme.colorScheme.primary,
             )
         }
+    }
+}
+
+/**
+ * Editor for an attribute-match account mapping: a CSV [columnName] whose value is matched against the
+ * regex tokens held by every account's [attributeTypeName] attribute (case-insensitive), routing to the
+ * single matching account. Shared by the target-account "Attribute" mode and the funding-reconciliation
+ * section. [existingAttributeTypeNames] are only surfaced as a hint — a not-yet-created type may be typed.
+ */
+@Composable
+internal fun AttributeMatchAccountMappingEditor(
+    columnName: String?,
+    onColumnChanged: (String) -> Unit,
+    columnLabel: String,
+    attributeTypeName: String,
+    onAttributeTypeChanged: (String) -> Unit,
+    columns: List<CsvColumn>,
+    firstRow: CsvRow?,
+    existingAttributeTypeNames: List<String>,
+    enabled: Boolean,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ColumnDropdown(
+            columns = columns,
+            selectedColumn = columnName,
+            onColumnSelected = onColumnChanged,
+            label = columnLabel,
+            sampleValue = getSampleValue(columns, firstRow, columnName),
+            enabled = enabled,
+            isError = columnName == null,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        val suggestions = existingAttributeTypeNames.filter { it != attributeTypeName }.take(5)
+        OutlinedTextField(
+            value = attributeTypeName,
+            onValueChange = onAttributeTypeChanged,
+            label = { Text("Account attribute type *") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = enabled,
+            isError = attributeTypeName.isBlank(),
+            supportingText = {
+                Text(
+                    if (attributeTypeName.isBlank()) {
+                        "Required (e.g. card-last4)"
+                    } else if (suggestions.isNotEmpty()) {
+                        "Existing types: ${suggestions.joinToString(", ")}"
+                    } else {
+                        "Each account's \"$attributeTypeName\" attribute holds the regex tokens to match"
+                    },
+                )
+            },
+        )
     }
 }
 

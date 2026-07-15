@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import kotlinx.datetime.TimeZone
 
@@ -71,6 +73,10 @@ internal class CsvStrategyEditorState(
     var targetAccountColumnName by mutableStateOf(initial?.targetAccountColumnName)
     var targetAccountFallbackColumns by mutableStateOf(initial?.targetAccountFallbackColumns.orEmpty())
     var targetAccountMode by mutableStateOf(initial?.targetAccountMode ?: TargetAccountMode.DIRECT_LOOKUP)
+
+    // Nullable and seeded verbatim so a non-attribute target extracts/round-trips as null; the UI
+    // fills in the card-last4 default only when the user actually switches into attribute-match mode.
+    var targetAttributeTypeName by mutableStateOf(initial?.targetAttributeTypeName)
     var regexRules by mutableStateOf(initial?.regexRules.orEmpty())
     var targetTemplateColumnName by mutableStateOf(initial?.targetTemplateColumnName)
     var targetTemplatePrefix by mutableStateOf(initial?.targetTemplatePrefix.orEmpty())
@@ -89,10 +95,17 @@ internal class CsvStrategyEditorState(
     var companionTransactionRules by mutableStateOf(initial?.companionTransactionRules.orEmpty())
     var fileNamePattern by mutableStateOf(initial?.fileNamePattern.orEmpty())
 
+    // Funding reconciliation: match a CSV column value against an account attribute's regex tokens to
+    // resolve the hidden funding account (e.g. Curve's last-4 -> the underlying card). Edited as two
+    // fields and reassembled into an [AttributeAccountMatch] in [toFormState]; the attribute type
+    // defaults to `card-last4` but a match is only saved when a column is chosen.
+    var fundingMatchColumn by mutableStateOf(initial?.fundingAttributeMatch?.column)
+    var fundingMatchAttributeTypeName by
+        mutableStateOf(initial?.fundingAttributeMatch?.attributeTypeName ?: WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME)
+
     // Not yet editable in the UI; carried through so saving never drops them.
     var contentMatchRules by mutableStateOf(initial?.contentMatchRules.orEmpty())
     var crossSourceReconcileWindowSeconds by mutableStateOf(initial?.crossSourceReconcileWindowSeconds)
-    var fundingAttributeMatch by mutableStateOf(initial?.fundingAttributeMatch)
 
     // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialTargetAccountColumnName: String? = initial?.targetAccountColumnName
@@ -106,6 +119,8 @@ internal class CsvStrategyEditorState(
                     targetAccountColumnName != null &&
                         regexRules.isNotEmpty() &&
                         regexRules.all { it.accountName.isNotBlank() }
+                TargetAccountMode.ATTRIBUTE_MATCH ->
+                    targetAccountColumnName != null && !targetAttributeTypeName.isNullOrBlank()
                 TargetAccountMode.TEMPLATE -> targetTemplateColumnName != null
                 TargetAccountMode.CONDITIONAL ->
                     targetConditions.isNotEmpty() &&
@@ -116,6 +131,10 @@ internal class CsvStrategyEditorState(
 
     private val feeValid: Boolean
         get() = feeColumnName == null || feeConditions.all { it.isComplete() }
+
+    // A funding match is opt-in: valid when no column is chosen, otherwise its attribute type must be set.
+    private val fundingMatchValid: Boolean
+        get() = fundingMatchColumn.isNullOrBlank() || fundingMatchAttributeTypeName.isNotBlank()
 
     private val rowPreprocessingValid: Boolean
         get() =
@@ -167,7 +186,7 @@ internal class CsvStrategyEditorState(
 
     /** Whether the Advanced tab has an unsatisfied required field. */
     val advancedHasError: Boolean
-        get() = !rowPreprocessingValid || !companionRulesValid
+        get() = !rowPreprocessingValid || !companionRulesValid || !fundingMatchValid
 
     fun tabHasError(tab: EditorTab): Boolean =
         when (tab) {
@@ -190,6 +209,7 @@ internal class CsvStrategyEditorState(
                 feeValid &&
                 rowPreprocessingValid &&
                 companionRulesValid &&
+                fundingMatchValid &&
                 currencyValid &&
                 timezoneValid
 
@@ -218,6 +238,7 @@ internal class CsvStrategyEditorState(
             targetAccountColumnName = targetAccountColumnName,
             targetAccountFallbackColumns = targetAccountFallbackColumns,
             targetAccountMode = targetAccountMode,
+            targetAttributeTypeName = targetAttributeTypeName,
             regexRules = regexRules,
             targetTemplateColumnName = targetTemplateColumnName,
             targetTemplatePrefix = targetTemplatePrefix,
@@ -237,7 +258,14 @@ internal class CsvStrategyEditorState(
             contentMatchRules = contentMatchRules,
             fileNamePattern = fileNamePattern.takeIf { it.isNotBlank() },
             crossSourceReconcileWindowSeconds = crossSourceReconcileWindowSeconds,
-            fundingAttributeMatch = fundingAttributeMatch,
+            // Reassemble the funding match only when a column is chosen; the attribute type always has
+            // a value (defaulting to card-last4), so the column presence is what enables the feature.
+            fundingAttributeMatch =
+                fundingMatchColumn?.takeIf { it.isNotBlank() }?.let { column ->
+                    fundingMatchAttributeTypeName.takeIf { it.isNotBlank() }?.let { type ->
+                        AttributeAccountMatch(column = column, attributeTypeName = type)
+                    }
+                },
         )
 }
 

@@ -8,7 +8,9 @@ import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
@@ -51,6 +53,7 @@ class StrategyFormRoundTripTest {
         when (mapping) {
             is AccountLookupMapping -> mapping.copy(id = fixedId)
             is RegexAccountMapping -> mapping.copy(id = fixedId)
+            is AttributeMatchAccountMapping -> mapping.copy(id = fixedId)
             is TemplateAccountMapping -> mapping.copy(id = fixedId)
             is ConditionalAccountMapping ->
                 mapping.copy(
@@ -190,6 +193,62 @@ class StrategyFormRoundTripTest {
         assertIs<ConditionalAccountMapping>(target)
         assertIs<TemplateAccountMapping>(target.whenTrue)
         assertIs<AccountLookupMapping>(target.whenFalse)
+    }
+
+    @Test
+    fun `attribute-match target mode and funding match round-trip`() {
+        val original =
+            CsvImportStrategy(
+                id = CsvImportStrategyId(Uuid.random()),
+                name = "Attr",
+                identificationColumns = setOf("Direction", "Created on"),
+                fieldMappings =
+                    mapOf(
+                        TransferField.SOURCE_ACCOUNT to
+                            TemplateAccountMapping(mappingId(1), TransferField.SOURCE_ACCOUNT, "Source currency", prefix = "Wise: "),
+                        TransferField.TARGET_ACCOUNT to
+                            AttributeMatchAccountMapping(
+                                id = mappingId(2),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Target name",
+                                attributeTypeName = "card-last4",
+                            ),
+                        TransferField.TIMESTAMP to
+                            DateTimeParsingMapping(
+                                id = mappingId(5),
+                                fieldType = TransferField.TIMESTAMP,
+                                dateColumnName = "Created on",
+                                dateFormat = "yyyy-MM-dd",
+                            ),
+                        TransferField.DESCRIPTION to
+                            DirectColumnMapping(mappingId(6), TransferField.DESCRIPTION, "Reference"),
+                        TransferField.AMOUNT to
+                            AmountParsingMapping(
+                                id = mappingId(7),
+                                fieldType = TransferField.AMOUNT,
+                                mode = AmountMode.SINGLE_COLUMN,
+                                amountColumnName = "Source amount (after fees)",
+                            ),
+                        TransferField.CURRENCY to
+                            CurrencyLookupMapping(mappingId(8), TransferField.CURRENCY, "Source currency"),
+                        TransferField.TIMEZONE to
+                            HardCodedTimezoneMapping(mappingId(9), TransferField.TIMEZONE, "Europe/London"),
+                    ),
+                fundingAttributeMatch = AttributeAccountMatch(column = "Reference", attributeTypeName = "card-last4"),
+                createdAt = timestamp,
+                updatedAt = timestamp,
+            )
+        val availableColumns = columns.map { it.originalName }.toSet()
+
+        val state = extractFormStateFromStrategy(original, availableColumns)
+        val rebuilt = buildStrategyFromFormState(state, original.id, original.createdAt, original.updatedAt)
+
+        assertEquals(normalize(original.fieldMappings), normalize(rebuilt.fieldMappings))
+        assertEquals(original.fundingAttributeMatch, rebuilt.fundingAttributeMatch)
+        val target = rebuilt.fieldMappings[TransferField.TARGET_ACCOUNT]
+        assertIs<AttributeMatchAccountMapping>(target)
+        assertEquals("card-last4", target.attributeTypeName)
+        assertEquals("Target name", target.columnName)
     }
 
     @Test

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -15,6 +16,7 @@ import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsSection
+import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
  * Advanced tab: attributes, row preprocessing rules, companion transaction rules, and (in edit mode)
@@ -73,6 +75,48 @@ internal fun AdvancedTab(
                 existingAttributeTypes = existingAttributeTypes,
                 enabled = enabled,
                 firstRow = firstRow,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Funding Reconciliation (Optional)", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Match a column against an account attribute to reconcile each row's hidden funding account " +
+                "(e.g. Curve's last-4 → the underlying card), so the spend isn't double-counted.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        OptionalColumnDropdown(
+            columns = csvColumns,
+            selectedColumn = state.fundingMatchColumn,
+            onColumnSelected = { state.fundingMatchColumn = it },
+            label = "Funding column (e.g. card last 4)",
+            sampleValue = getSampleValue(csvColumns, firstRow, state.fundingMatchColumn),
+            enabled = enabled,
+        )
+        if (!state.fundingMatchColumn.isNullOrBlank()) {
+            val existingTypeNames = existingAttributeTypes.map { it.name }.filter { it != state.fundingMatchAttributeTypeName }.take(5)
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedTextField(
+                value = state.fundingMatchAttributeTypeName,
+                onValueChange = { state.fundingMatchAttributeTypeName = it },
+                label = { Text("Account attribute type *") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                enabled = enabled,
+                isError = state.fundingMatchAttributeTypeName.isBlank(),
+                supportingText = {
+                    Text(
+                        if (state.fundingMatchAttributeTypeName.isBlank()) {
+                            "Required (e.g. card-last4)"
+                        } else if (existingTypeNames.isNotEmpty()) {
+                            "Existing types: ${existingTypeNames.joinToString(", ")}"
+                        } else {
+                            "Each account's \"${state.fundingMatchAttributeTypeName}\" attribute holds the regex tokens to match"
+                        },
+                    )
+                },
             )
         }
 
