@@ -452,6 +452,13 @@ data class ImportTransfer(
     val fee: ImportFee? = null,
     /** An optional conduit pass-through (e.g. Curve), expanded by the engine into a linked spend leg. */
     val passThrough: ImportPassThrough? = null,
+    /**
+     * When set (a conduit-spend import like Curve that named its funding card), the account that must
+     * hold the matching funding leg (funding → this transfer's source conduit). Enables the
+     * funding-card reconcile pass (see [DedupePolicy.FuzzyAllFields]): the row reconciles against an
+     * unconsumed funding leg of the same amount+currency within the window, ignoring the merchant.
+     */
+    val reconcileFundingAccountId: AccountId? = null,
     /** [ImportOperation.CREATE] (default), or UPDATE/DELETE of [existingId]. */
     override val operation: ImportOperation = ImportOperation.CREATE,
     /** The transfer to UPDATE/DELETE (required for those operations). */

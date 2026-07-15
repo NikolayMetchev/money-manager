@@ -91,6 +91,7 @@ import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.personalCounterpartyKey
 import kotlinx.coroutines.flow.first
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
@@ -990,14 +991,24 @@ class ImportEngineImpl(
 
         val accountIds =
             transfers
-                .flatMap { listOf(requireId(it.fromAccount), requireId(it.toAccount)) }
-                .toSet()
+                .flatMap {
+                    // Include any funding-card reconcile account: the funding leg lives on it (and on the
+                    // conduit), so load its history even when the batch never moves money to/from it.
+                    listOfNotNull(requireId(it.fromAccount), requireId(it.toAccount), it.reconcileFundingAccountId)
+                }.toSet()
 
         val rawTransfers =
             when (batch.dedupePolicy) {
                 is DedupePolicy.FuzzyAllFields -> {
-                    val minTs = transfers.minOf { requireNotNull(it.timestamp) }
-                    val maxTs = transfers.maxOf { requireNotNull(it.timestamp) }
+                    val policy = batch.dedupePolicy as DedupePolicy.FuzzyAllFields
+                    // Widen the load window by the dedupe slack so an existing transfer whose timestamp
+                    // sits just outside the incoming batch's own span — but still within the fuzzy date
+                    // tolerance or the cross-source reconcile window — is available as a candidate. This
+                    // matters for date-only exports (e.g. Curve stamps a date that parses to noon) where
+                    // the counterpart card leg lands hours later the same day, or a day or two later.
+                    val slack = maxOf(policy.dateTolerance, policy.reconcileWindow ?: Duration.ZERO)
+                    val minTs = transfers.minOf { requireNotNull(it.timestamp) } - slack
+                    val maxTs = transfers.maxOf { requireNotNull(it.timestamp) } + slack
                     accountIds
                         .flatMap {
                             transactionRepository.getTransactionsByAccountAndDateRange(it, minTs, maxTs).first()

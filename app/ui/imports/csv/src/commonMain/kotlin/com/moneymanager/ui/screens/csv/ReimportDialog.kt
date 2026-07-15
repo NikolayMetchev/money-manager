@@ -26,15 +26,19 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.CsvReimportResult
 import com.moneymanager.csvimporter.ReimportPlan
 import com.moneymanager.csvimporter.executeCsvReimport
+import com.moneymanager.csvimporter.fundingCardAccountIndex
 import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.planCsvReimport
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -79,6 +83,7 @@ fun ReimportDialog(
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
+    accountAttributeRepository: AccountAttributeReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
@@ -99,6 +104,9 @@ fun ReimportDialog(
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val passThroughAccounts by passThroughAccountRepository
         .getAll()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val cardLast4Attributes by accountAttributeRepository
+        .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_ID))
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var strategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
@@ -130,7 +138,7 @@ fun ReimportDialog(
     val sourceReady = !needsSourcePicker || selectedSourceAccountId != null
 
     // Build the read-only merge preview once the inputs are ready.
-    LaunchedEffect(strategy, selectedSourceAccountId, currencies, passThroughAccounts) {
+    LaunchedEffect(strategy, selectedSourceAccountId, currencies, passThroughAccounts, cardLast4Attributes) {
         val currentStrategy = strategy ?: return@LaunchedEffect
         if (currencies.isEmpty()) return@LaunchedEffect
         try {
@@ -150,6 +158,7 @@ fun ReimportDialog(
                     // Crypto tickers on already-imported rows must resolve for the value-update and
                     // transfer→trade conversion scans, so pass the full asset set.
                     cryptoAssets = cryptoRepository.getAllCryptoAssets().first(),
+                    fundingCardAccounts = fundingCardAccountIndex(cardLast4Attributes),
                     onProgress = { planProgress = it },
                 )
             errorMessage = null
@@ -253,6 +262,7 @@ fun ReimportDialog(
                                     onProgress = { executeProgress = it },
                                     cryptoRepository = cryptoRepository,
                                     tradeRepository = tradeRepository,
+                                    fundingCardAccounts = fundingCardAccountIndex(cardLast4Attributes),
                                 )
                             onComplete(result)
                         } catch (expected: CancellationException) {
@@ -447,6 +457,34 @@ private fun ReimportPlanPreview(
                     "These rows exchange one asset for another: each row's old single-asset transaction(s) " +
                         "are deleted — including any manual edits made to them — and the row is re-imported " +
                         "as a trade.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (plan.fundingReconciles.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Conduit spends to reconcile against their funding card (${plan.fundingReconciles.size}):",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            plan.fundingReconciles.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { reconcile ->
+                Text(text = "• ${reconcile.description}", style = MaterialTheme.typography.bodySmall)
+            }
+            if (plan.fundingReconciles.size > VALUE_UPDATE_PREVIEW_LIMIT) {
+                Text(
+                    text = "…and ${plan.fundingReconciles.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text =
+                    "These spends match a funding leg on the account holding their card number, so each is " +
+                        "re-imported linked to that leg and excluded from balances (counted once) instead of " +
+                        "double-counting the underlying card charge.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -31,6 +31,17 @@ object WellKnownIds {
      */
     const val ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID: Long = -7
 
+    /**
+     * "card-last4" account attribute: the last-4 digits (whitespace/comma-separated for multiple) of
+     * the cards funded from this account. A CSV strategy with a
+     * [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fundingCardColumn] uses it to
+     * reconcile a conduit (e.g. Curve) spend against the funding leg into this account.
+     */
+    const val ACCOUNT_CARD_LAST4_ATTR_TYPE_ID: Long = -8
+
+    /** Name of the [ACCOUNT_CARD_LAST4_ATTR_TYPE_ID] attribute type. */
+    const val ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME: String = "card-last4"
+
     /** "reconciled" relationship type: id1 mirrors id2 seen from another source. */
     const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = 1
 

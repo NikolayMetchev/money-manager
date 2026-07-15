@@ -47,6 +47,13 @@ data class ContentMatchRule(
  *                            separate debited/credited rows; the importer routes the legs through a
  *                            shared counterparty account and links each debit to its credit (see
  *                            [ConversionConfig]). Null when the source has no such conversions.
+ * @property fundingCardColumn When set, names the CSV column carrying the last-4 digits of the card
+ *                             that funded each row (e.g. Curve's "Funding Card Last 4 Digits"). A row
+ *                             whose last-4 resolves — via the `card-last4` account attribute — to a
+ *                             single account is reconciled against an unconsumed funding leg into the
+ *                             row's source account (same amount+currency within
+ *                             [crossSourceReconcileWindowSeconds]), ignoring the merchant. Null
+ *                             disables funding-card reconciliation.
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
  */
@@ -62,6 +69,7 @@ data class CsvImportStrategy(
     val fileNamePattern: String? = null,
     val crossSourceReconcileWindowSeconds: Long? = null,
     val conversionConfig: ConversionConfig? = null,
+    val fundingCardColumn: String? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

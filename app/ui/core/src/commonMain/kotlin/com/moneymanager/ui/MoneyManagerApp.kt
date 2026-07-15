@@ -729,6 +729,7 @@ fun MoneyManagerApp(
                                                 csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                                 accountMappingRepository = services.imports.accountMappingRepository,
                                                 accountRepository = services.accounts.accountRepository,
+                                                accountAttributeRepository = services.accounts.accountAttributeRepository,
                                                 categoryRepository = services.accounts.categoryRepository,
                                                 currencyRepository = services.accounts.currencyRepository,
                                                 personRepository = services.people.personRepository,

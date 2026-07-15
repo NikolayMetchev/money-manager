@@ -97,6 +97,8 @@ sealed interface MappingResult {
         val passThrough: CsvPassThrough? = null,
         /** Set when the row is one leg of an asset conversion (see [ConversionConfig]); null otherwise. */
         val conversionLeg: ConversionLegInfo? = null,
+        /** Raw funding-card value from [CsvImportStrategy.fundingCardColumn]; null when unset/blank. */
+        val fundingCardLast4: String? = null,
     ) : MappingResult {
         /** Convenience for flows where only the target side can discover a new account. */
         val newAccountName: String? get() = newAccounts.firstOrNull()?.name
@@ -197,6 +199,12 @@ data class CsvTransferWithAttributes(
     val passThrough: CsvPassThrough? = null,
     /** Set when the row is one leg of an asset conversion (see [ConversionConfig]); null otherwise. */
     val conversionLeg: ConversionLegInfo? = null,
+    /**
+     * Raw value of the strategy's [CsvImportStrategy.fundingCardColumn] for this row (e.g. a card's
+     * last-4 like "7721"); null when the strategy declares no funding-card column or the cell is blank.
+     * The applier resolves it to a funding account for the funding-card reconcile.
+     */
+    val fundingCardLast4: String? = null,
 )
 
 /**
@@ -370,6 +378,7 @@ class CsvTransferMapper(
                             personalCounterpartyName = result.personalCounterpartyName,
                             passThrough = result.passThrough,
                             conversionLeg = result.conversionLeg,
+                            fundingCardLast4 = result.fundingCardLast4,
                         ),
                     )
                     // Count by status
@@ -684,6 +693,8 @@ class CsvTransferMapper(
                 passThrough = passThrough,
                 conversionLeg =
                     conversionDetection?.let { ConversionLegInfo(side = it.side, pairingKey = it.pairingKey) },
+                fundingCardLast4 =
+                    strategy.fundingCardColumn?.let { getColumnValueOrNull(it, originalValues)?.trim()?.takeIf { v -> v.isNotBlank() } },
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")

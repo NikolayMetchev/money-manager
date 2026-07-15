@@ -355,6 +355,121 @@ class ImportDeduperTest {
         assertTrue(result.transfer.relationships.isEmpty())
     }
 
+    // Funding-card reconcile: a conduit (e.g. Curve) spend, `conduit -> merchant`, reconciles against
+    // the funding leg `fundingAccount -> conduit` by amount+window, ignoring the merchant.
+    private val conduit = AccountId(10)
+    private val fundingAcct = AccountId(20)
+    private val merchant = AccountId(2)
+    private val otherMerchant = AccountId(3)
+
+    private fun curveRow(
+        rowIndex: Long,
+        timestamp: Instant = baseTime,
+        amount: Long = 5,
+        merchantId: AccountId = merchant,
+        fundingHint: AccountId? = fundingAcct,
+        description: String = "Merchant",
+    ) = importTransfer(
+        rowIndex = rowIndex,
+        description = description,
+        amount = amount,
+        timestamp = timestamp,
+        src = conduit,
+        tgt = merchantId,
+    ).copy(reconcileFundingAccountId = fundingHint)
+
+    private fun fundingLeg(
+        id: Long,
+        timestamp: Instant = baseTime,
+        amount: Long = 5,
+    ) = existing(id, description = "Crv*Whatever", amount = amount, timestamp = timestamp, src = fundingAcct, tgt = conduit)
+
+    @Test
+    fun fundingReconcile_matchesFundingLegIgnoringMerchant() {
+        // The funding leg has a different account pair and description than the incoming spend, so only
+        // the funding-card reconcile (amount + window, merchant-agnostic) can link them.
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(fundingLeg(9)))
+        val result = deduper.classify(listOf(curveRow(0, timestamp = baseTime + 30.minutes))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertEquals(
+            NewAttribute(AttributeTypeId(-1), "reconciled"),
+            result.transfer.attributes.single { it.typeId == AttributeTypeId(-1) },
+        )
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(9), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
+        )
+    }
+
+    @Test
+    fun fundingReconcile_runsBeforeFuzzyDuplicate() {
+        // The incoming spend is byte-identical to an existing conduit->merchant spend leg (same source
+        // conduit, same amount, same description) — which fuzzy would drop as a DUPLICATE. With a
+        // funding hint it instead reconciles against the funding leg (kept, excluded, linked).
+        val spendLeg = existing(5, description = "Merchant", src = conduit, tgt = merchant)
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(spendLeg, fundingLeg(9)))
+        val result = deduper.classify(listOf(curveRow(0, timestamp = baseTime + 5.minutes))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        // Linked to the FUNDING leg (9), not the spend leg (5).
+        assertEquals(
+            TransferId(9),
+            result.transfer.relationships
+                .single()
+                .relatedTransferId,
+        )
+    }
+
+    @Test
+    fun fundingReconcile_consumesFundingLegOneToOne() {
+        // Two identical Curve rows (repeated daily £5) but only one funding leg: the first reconciles,
+        // the second finds no unconsumed funding leg and imports as a new spend.
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(fundingLeg(9)))
+        val result = deduper.classify(listOf(curveRow(0), curveRow(1)))
+        assertEquals(ImportStatus.IMPORTED, result[0].status)
+        assertTrue(result[0].transfer.attributes.any { it.typeId == AttributeTypeId(-1) }, "first is reconciled")
+        assertEquals(ImportStatus.IMPORTED, result[1].status)
+        assertTrue(result[1].transfer.attributes.none { it.typeId == AttributeTypeId(-1) }, "second is a plain import")
+    }
+
+    @Test
+    fun fundingReconcile_prefersNearestTimestamp() {
+        val far = fundingLeg(8, timestamp = baseTime)
+        val near = fundingLeg(9, timestamp = baseTime + 40.minutes)
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(far, near))
+        val result = deduper.classify(listOf(curveRow(0, timestamp = baseTime + 45.minutes))).single()
+        assertEquals(
+            TransferId(9),
+            result.transfer.relationships
+                .single()
+                .relatedTransferId,
+        )
+    }
+
+    @Test
+    fun fundingReconcile_noHintLeavesRowUnchanged() {
+        // Without a resolved funding account the row is a plain new spend (the funding pass is skipped).
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(fundingLeg(9)))
+        val result = deduper.classify(listOf(curveRow(0, fundingHint = null, merchantId = otherMerchant))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun fundingReconcile_amountMismatchDoesNotMatch() {
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(fundingLeg(9, amount = 5)))
+        val result = deduper.classify(listOf(curveRow(0, amount = 6))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun fundingReconcile_outsideWindowDoesNotMatch() {
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(fundingLeg(9)))
+        val result = deduper.classify(listOf(curveRow(0, timestamp = baseTime + 90.minutes))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
     @Test
     fun fuzzy_sameCoreDifferentAttributesIsUpdated() {
         val typeId = AttributeTypeId(42)
