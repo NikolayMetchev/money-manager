@@ -148,6 +148,7 @@ fun ImportsScreen(
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
+                    accountAttributeRepository = accountAttributeRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,

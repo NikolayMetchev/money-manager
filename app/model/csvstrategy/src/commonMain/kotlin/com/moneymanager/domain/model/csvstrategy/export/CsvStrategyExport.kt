@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package com.moneymanager.domain.model.csvstrategy.export
 
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
@@ -13,6 +15,7 @@ import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
@@ -34,6 +37,8 @@ import kotlinx.serialization.Serializable
  * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.crossSourceReconcileWindowSeconds])
  * @property conversionConfig Asset-conversion configuration (already portable, no IDs)
  * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.conversionConfig])
+ * @property fundingCardColumn Name of the column carrying the funding-card last-4 (already portable)
+ * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fundingCardColumn])
  */
 @Serializable
 data class CsvStrategyExport(
@@ -56,6 +61,12 @@ data class CsvStrategyExport(
     val fileNamePattern: String? = null,
     val crossSourceReconcileWindowSeconds: Long? = null,
     val conversionConfig: ConversionConfig? = null,
+    // Omitted from JSON when null (unlike the fields above, which encode their null under the codec's
+    // encodeDefaults=true) so ADDING this field does not change the canonical hash of every existing
+    // strategy — only a strategy that actually sets it (Curve) rehashes. Prevents a spurious "all
+    // strategies changed" on catalog/Drive sync. See StrategyArtifactCodec.canonicalHash.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val fundingCardColumn: String? = null,
 )
 
 /**

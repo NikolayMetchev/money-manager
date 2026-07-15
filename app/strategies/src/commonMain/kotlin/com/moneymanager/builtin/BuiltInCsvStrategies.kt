@@ -42,6 +42,7 @@ object BuiltInCsvStrategies {
     val cryptoComCardStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000007")
     val cryptoComFiatStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000008")
     val cryptoComCryptoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
+    val curveCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -83,6 +84,21 @@ object BuiltInCsvStrategies {
     /** Account name prefix shared with the Wise API import strategy ("Wise: " + currency code). */
     private const val WISE_ACCOUNT_PREFIX = "Wise: "
 
+    /**
+     * The Curve conduit account. Matches [com.moneymanager.builtin.BuiltInPassThroughs.curve]'s
+     * conduitAccountName, so a Curve CSV row's spend leg (Curve -> merchant) is the same shape as the
+     * spend leg the pass-through detector synthesises from an underlying card's "CRV*<merchant>" row,
+     * letting cross-source reconciliation link the two.
+     */
+    private const val CURVE_CONDUIT_ACCOUNT = "Curve"
+
+    /**
+     * Cross-source reconciliation window for the Curve CSV strategy. Curve's export stamps only a
+     * Created Date (no time), and a card authorisation can settle a day or two later, so allow 48h —
+     * still gated on an exact same-merchant-account + same amount + same currency match.
+     */
+    private const val CURVE_RECONCILE_WINDOW_SECONDS = 172_800L
+
     private fun builtInCsvMappingId(
         strategyGroup: Int,
         index: Int,
@@ -107,6 +123,8 @@ object BuiltInCsvStrategies {
 
     private fun cryptoComCryptoMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 7, index = index)
 
+    private fun curveCsvMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 8, index = index)
+
     /**
      * All built-in CSV import strategies seeded into a fresh database. [qifCurrencyId] is the fixed
      * currency the QIF strategies carry (the default the QIF import dialog pre-selects); it is resolved
@@ -124,6 +142,7 @@ object BuiltInCsvStrategies {
             buildCryptoComCardStrategy(now),
             buildCryptoComFiatStrategy(now),
             buildCryptoComCryptoStrategy(now),
+            buildCurveCsvStrategy(now),
         )
 
     /**
@@ -570,6 +589,116 @@ object BuiltInCsvStrategies {
                     pairingWindowSeconds = CRYPTO_COM_CONVERSION_PAIRING_WINDOW_SECONDS,
                     relationshipTypeName = "conversion",
                 ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in strategy for Curve's "Transaction History <date>.csv" export. Curve is a card
+     * aggregator: a Curve payment is forwarded to an underlying card, so each Curve row is the
+     * merchant-facing side of a movement whose funding side lives on the underlying card's statement.
+     *
+     * Every row is mapped to a spend leg [CURVE_CONDUIT_ACCOUNT] -> merchant, matching the spend leg the
+     * pass-through detector already synthesises from the underlying card's "CRV*<merchant>" row (see
+     * [com.moneymanager.builtin.BuiltInPassThroughs.curve]). Cross-source reconciliation
+     * ([com.moneymanager.importer.ImportDeduper.reconcileMatches]) then links the two whenever they
+     * resolve to the same merchant account, same amount and same currency within
+     * [CURVE_RECONCILE_WINDOW_SECONDS] — so the merchant spend is counted once. The funding leg
+     * (card -> Curve) is contributed by the underlying-card import, not this file.
+     *
+     * Reconciliation is exact on the merchant account, so it links only where both sources resolve the
+     * same account — the merchant text differs across sources (card "Crv*Amzn Mktplace" vs Curve
+     * "AMAZON"), so alignment relies on persisted account mappings, the same normalisation used for the
+     * card variants. Foreign-currency rows (Curve records the merchant-side amount/currency, not the GBP
+     * the card was billed) can never match the GBP funding side, so they import as standalone Curve
+     * spends in their own currency by design.
+     *
+     * The export's first column has a BLANK header (a running row index); it is part of the
+     * identification column set but is otherwise unused. Amounts are always positive spends out of
+     * Curve, so there is deliberately no flip-on-positive.
+     */
+    fun buildCurveCsvStrategy(now: Instant): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                // Fixed conduit source so every Curve row lands in the shared Curve account and lines up
+                // with the pass-through spend leg. The catch-all pattern always matches.
+                TransferField.SOURCE_ACCOUNT to
+                    RegexAccountMapping(
+                        id = curveCsvMappingId(1),
+                        fieldType = TransferField.SOURCE_ACCOUNT,
+                        columnName = "Merchant Name",
+                        rules = listOf(RegexRule(pattern = "^", accountName = CURVE_CONDUIT_ACCOUNT)),
+                    ),
+                // Merchant account, looked up/created from the clean Merchant Name; persisted account
+                // mappings apply, so a user can normalise Curve's name onto the same account the card's
+                // pass-through spend leg resolves to (which is what makes reconciliation link them).
+                TransferField.TARGET_ACCOUNT to
+                    AccountLookupMapping(
+                        id = curveCsvMappingId(2),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = "Merchant Name",
+                    ),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        id = curveCsvMappingId(3),
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = "Created Date",
+                        dateFormat = "yyyy-MM-dd",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        id = curveCsvMappingId(4),
+                        fieldType = TransferField.DESCRIPTION,
+                        columnName = "Merchant Name",
+                    ),
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        id = curveCsvMappingId(5),
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "Txn Amount",
+                    ),
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(
+                        id = curveCsvMappingId(6),
+                        fieldType = TransferField.CURRENCY,
+                        columnName = "Txn Currency",
+                    ),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(
+                        id = curveCsvMappingId(7),
+                        fieldType = TransferField.TIMEZONE,
+                        timezoneId = "UTC",
+                    ),
+            )
+        val attributeMappings =
+            listOf(
+                AttributeColumnMapping("Funding Card Last 4 Digits", "curve-funding-card"),
+                AttributeColumnMapping("Merchant MCC Code", "curve-mcc"),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(curveCsvStrategyId),
+            name = "Curve CSV",
+            identificationColumns =
+                setOf(
+                    "",
+                    "Created Date",
+                    "Merchant Name",
+                    "Funding Card Last 4 Digits",
+                    "Merchant MCC Code",
+                    "Txn Currency",
+                    "Txn Amount",
+                ),
+            fieldMappings = fieldMappings,
+            attributeMappings = attributeMappings,
+            // Only a tiebreaker among column-matched candidates; Curve's column set is disjoint from
+            // Wise's transaction-history.csv, so the two never compete.
+            fileNamePattern = "^Transaction History",
+            crossSourceReconcileWindowSeconds = CURVE_RECONCILE_WINDOW_SECONDS,
+            // Reconcile each spend against the funding leg on the account whose card-last4 matches this
+            // column, so a Curve charge isn't double-counted against the underlying card's own import.
+            fundingCardColumn = "Funding Card Last 4 Digits",
             createdAt = now,
             updatedAt = now,
         )

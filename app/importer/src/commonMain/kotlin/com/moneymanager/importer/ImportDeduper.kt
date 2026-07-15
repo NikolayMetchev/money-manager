@@ -16,6 +16,7 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.StringSimilarity
+import com.moneymanager.importengineapi.selectNearestUnconsumedFundingLeg
 import kotlin.time.Duration
 import kotlin.time.Instant
 
@@ -186,6 +187,16 @@ class ImportDeduper(
     private val batchUniqueKey = mutableMapOf<Map<String, String>, Int>()
     private val batchMatchCandidates = mutableListOf<Pair<Int, Transfer>>()
 
+    // Funding legs already claimed by an earlier funding-card reconcile in this batch. Unlike the other
+    // reconcile paths (which deliberately don't consume), a conduit like Curve emits many rows of the
+    // same amount (e.g. daily £1.75 TFL), so each funding leg must reconcile at most one incoming row.
+    // Scope is a single import() call: this does NOT know which funding legs a previous, separate batch
+    // already consumed, so a later batch's row could re-link to an already-reconciled funding leg if the
+    // amount+window coincide. In practice a conduit export is imported in one batch, so the collision
+    // needs two overlapping conduit imports; CsvReimport.computeFundingReconcileReruns mirrors this same
+    // single-batch limitation.
+    private val consumedFundingIds = mutableSetOf<TransferId>()
+
     fun classify(transfers: List<ImportTransfer>): List<Classified> =
         transfers.mapIndexed { index, transfer -> classifyOne(index, transfer) }
 
@@ -274,6 +285,46 @@ class ImportDeduper(
         return Classified(
             // Drop any fee: a cross-source duplicate's fee is itself a duplicate, so it must not be
             // re-created (it would double-count) — the original source's fee already covers it.
+            transfer.copy(attributes = attributes, relationships = relationships, fee = null),
+            ImportStatus.IMPORTED,
+            existing = null,
+        )
+    }
+
+    /**
+     * Reconciles a conduit spend (e.g. a Curve export row, `conduit -> merchant`) against the funding
+     * leg that put the money into the conduit (`fundingAccount -> conduit`), when the row named its
+     * funding card and it resolved to [ImportTransfer.reconcileFundingAccountId]. Matches on
+     * amount+currency (via [Money] equality) and timestamp within the window, IGNORING the merchant —
+     * so it links across the merchant-naming differences that defeat [classifyAsReconciled]. Each
+     * funding leg is consumed at most once (repeated same-amount rows), preferring the nearest
+     * timestamp. The row is kept IMPORTED but excluded and linked to the funding leg, so the spend is
+     * counted once (the funding leg's own pass-through spend leg remains the merchant record).
+     */
+    private fun classifyAsFundingReconciled(
+        transfer: ImportTransfer,
+        window: Duration?,
+        exclusionTypeId: AttributeTypeId?,
+        relationshipTypeId: RelationshipTypeId?,
+    ): Classified? {
+        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
+        val fundingAccountId = transfer.reconcileFundingAccountId ?: return null
+        val timestamp = transfer.timestamp ?: return null
+        // Funding leg is fundingAccount -> conduit; the incoming row's source IS the conduit.
+        val key = DirectedAmountKey(fundingAccountId, transfer.fromAccount.requireId(), transfer.amount)
+        val matchId =
+            reconcileCandidatesByDirectedAmount[key]
+                ?.let { selectNearestUnconsumedFundingLeg(it, timestamp, window, consumedFundingIds) }
+                ?: return null
+        consumedFundingIds += matchId
+        val attributes =
+            if (transfer.attributes.any { it.typeId == exclusionTypeId }) {
+                transfer.attributes
+            } else {
+                transfer.attributes + NewAttribute(exclusionTypeId, "reconciled")
+            }
+        val relationships = transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId)
+        return Classified(
             transfer.copy(attributes = attributes, relationships = relationships, fee = null),
             ImportStatus.IMPORTED,
             existing = null,
@@ -416,6 +467,15 @@ class ImportDeduper(
                 if (attributesAreIdentical(transfer, existing)) ImportStatus.DUPLICATE else ImportStatus.UPDATED
             return Classified(transfer, status, existing.transferId)
         }
+        // Funding-card reconcile (before fuzzy): a conduit spend whose funding card resolved to an
+        // account reconciles against that account's funding leg by amount+currency+window, ignoring the
+        // merchant — so it links (excluded) instead of dropping as a fuzzy duplicate or double-counting.
+        classifyAsFundingReconciled(
+            transfer,
+            policy.reconcileWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
         // Second pass: tolerate bank re-export drift (close date, similar description) — the amount
         // must still match exactly, so only that bucket needs scanning.
         transfer.amount?.let { amount ->

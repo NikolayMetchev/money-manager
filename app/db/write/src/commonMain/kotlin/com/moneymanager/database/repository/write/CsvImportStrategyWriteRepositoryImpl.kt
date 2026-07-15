@@ -64,6 +64,7 @@ class CsvImportStrategyWriteRepositoryImpl(
                     file_name_pattern = strategy.fileNamePattern,
                     cross_source_reconcile_window_seconds = strategy.crossSourceReconcileWindowSeconds,
                     conversion_config_json = FieldMappingJsonCodec.encodeConversionConfig(strategy.conversionConfig),
+                    funding_card_column = strategy.fundingCardColumn,
                     updated_at = now.toEpochMilliseconds(),
                     id = strategy.id.id.toString(),
                 )

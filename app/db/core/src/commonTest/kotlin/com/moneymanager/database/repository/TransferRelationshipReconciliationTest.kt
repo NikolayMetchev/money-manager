@@ -199,6 +199,91 @@ class TransferRelationshipReconciliationTest : DbTest() {
         }
 
     @Test
+    fun passThroughChain_readsReconciled_whenTheFundingLegIsReconciled() =
+        runTest {
+            // A Curve funding-card reconcile links the conduit's export spend to the FUNDING leg
+            // (card -> conduit). The sibling SPEND leg (conduit -> merchant, the "Via conduit" row) must
+            // then also read as reconciled — the whole chain is reconciled, not just the funding leg.
+            val currency = gbp()
+            val cardId = createAccount("Crypto.com Card")
+            val conduitId = createAccount("Curve")
+            val merchantId = createAccount("Sainsburys London")
+            val curveMerchantId = createAccount("SAINSBURYS")
+            val passThroughTypeId = RelationshipTypeId(DatabaseConfig.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
+
+            fun funding() =
+                Transfer(
+                    id = TransferId(-1),
+                    timestamp = baseTime,
+                    description = "Curve",
+                    sourceAccountId = cardId,
+                    targetAccountId = conduitId,
+                    amount = Money(2293, currency),
+                )
+
+            fun spend() =
+                Transfer(
+                    id = TransferId(-2),
+                    timestamp = baseTime,
+                    description = "Sainsburys London",
+                    sourceAccountId = conduitId,
+                    targetAccountId = merchantId,
+                    amount = Money(2293, currency),
+                )
+            val chainIds =
+                repositories.transactionRepository.importTransfers(
+                    transfers = listOf(funding(), spend()),
+                    newAttributes = emptyMap(),
+                    newRelationships =
+                        mapOf(
+                            TransferId(-1) to
+                                listOf(NewRelationship(relatedTransferId = TransferId(-2), typeId = passThroughTypeId)),
+                        ),
+                    sources = List(2) { Source.SampleGenerator },
+                    updates = emptyList(),
+                    updateSources = emptyList(),
+                )
+            val fundingId = chainIds[0]
+            val spendId = chainIds[1]
+
+            // The Curve export's own record of the spend, reconciled (excluded + linked) against the funding leg.
+            val excludedTypeId = AttributeTypeId(DatabaseConfig.EXCLUDED_ATTR_TYPE_ID)
+            val reconciledTypeId = RelationshipTypeId(DatabaseConfig.RECONCILED_RELATIONSHIP_TYPE_ID)
+            val curveSpendId =
+                repositories.transactionRepository
+                    .importTransfers(
+                        transfers =
+                            listOf(
+                                Transfer(
+                                    id = TransferId(-1),
+                                    timestamp = baseTime,
+                                    description = "SAINSBURYS",
+                                    sourceAccountId = conduitId,
+                                    targetAccountId = curveMerchantId,
+                                    amount = Money(2293, currency),
+                                ),
+                            ),
+                        newAttributes = mapOf(TransferId(-1) to listOf(NewAttribute(excludedTypeId, "reconciled"))),
+                        newRelationships =
+                            mapOf(TransferId(-1) to listOf(NewRelationship(relatedTransferId = fundingId, typeId = reconciledTypeId))),
+                        sources = listOf(Source.SampleGenerator),
+                        updates = emptyList(),
+                        updateSources = emptyList(),
+                    ).single()
+
+            repositories.maintenanceService.fullRefreshMaterializedViews()
+            val conduitRows =
+                repositories.transactionRepository
+                    .getRunningBalanceByAccountPaginated(conduitId, pageSize = 50, pagingInfo = null)
+                    .items
+                    .associateBy { it.transactionId }
+
+            assertEquals(true, conduitRows.getValue(fundingId).isReconciled, "funding leg is directly reconciled")
+            assertEquals(true, conduitRows.getValue(spendId).isReconciled, "spend leg reads reconciled via its funding leg")
+            assertEquals(true, conduitRows.getValue(curveSpendId).isReconciled, "the Curve export spend is reconciled")
+        }
+
+    @Test
     fun feeTransfer_inBatchRelationshipResolvesToSiblingsRealId() =
         runTest {
             val currency = gbp()

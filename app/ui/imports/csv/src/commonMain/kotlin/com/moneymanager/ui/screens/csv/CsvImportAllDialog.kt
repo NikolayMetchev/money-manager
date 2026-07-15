@@ -19,12 +19,16 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.bulkApplyCsv
+import com.moneymanager.csvimporter.fundingCardAccountIndex
 import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -56,6 +60,7 @@ fun CsvImportAllDialog(
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
+    accountAttributeRepository: AccountAttributeReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     cryptoRepository: CryptoReadRepository,
@@ -71,6 +76,9 @@ fun CsvImportAllDialog(
     val strategies by csvImportStrategyRepository.getAllStrategies().collectAsStateWithSchemaErrorHandling(emptyList())
     val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(emptyList())
     val passThroughAccounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
+    val cardLast4Attributes by accountAttributeRepository
+        .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_ID))
+        .collectAsStateWithSchemaErrorHandling(emptyList())
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
@@ -159,6 +167,7 @@ fun CsvImportAllDialog(
                                         onProgress = { progress = it },
                                         passThroughAccounts = passThroughAccounts,
                                         cryptoRepository = cryptoRepository,
+                                        fundingCardAccounts = fundingCardAccountIndex(cardLast4Attributes),
                                     )
                                 summary = result.toSummary()
                             } finally {

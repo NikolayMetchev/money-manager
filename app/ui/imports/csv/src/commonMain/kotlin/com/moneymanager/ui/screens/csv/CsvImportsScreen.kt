@@ -39,6 +39,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
+import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -76,6 +77,7 @@ fun CsvImportsScreen(
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
+    accountAttributeRepository: AccountAttributeReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     cryptoRepository: CryptoReadRepository,
@@ -270,6 +272,7 @@ fun CsvImportsScreen(
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
+                    accountAttributeRepository = accountAttributeRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,
@@ -289,6 +292,7 @@ fun CsvImportsScreen(
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
+                    accountAttributeRepository = accountAttributeRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,

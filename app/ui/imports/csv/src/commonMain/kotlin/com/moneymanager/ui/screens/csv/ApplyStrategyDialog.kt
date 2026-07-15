@@ -50,14 +50,17 @@ import com.moneymanager.csvimporter.NewAccount
 import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.csvimporter.ensureCryptoAssets
+import com.moneymanager.csvimporter.fundingCardAccountIndex
 import com.moneymanager.csvimporter.hasBlankNewAccountNames
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
@@ -66,6 +69,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -96,6 +100,7 @@ fun ApplyStrategyDialog(
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
+    accountAttributeRepository: AccountAttributeReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
@@ -120,6 +125,9 @@ fun ApplyStrategyDialog(
         .getAll()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) }
+    val cardLast4Attributes by accountAttributeRepository
+        .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_ID))
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var selectedStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var selectedSourceAccountId by remember { mutableStateOf<AccountId?>(null) }
@@ -416,6 +424,7 @@ fun ApplyStrategyDialog(
                                     importEngine = importEngine,
                                     cryptoAssets = resolvedCrypto,
                                     passThroughAccounts = passThroughAccounts,
+                                    fundingCardAccounts = fundingCardAccountIndex(cardLast4Attributes),
                                 )
                             onImportComplete(result)
                         } catch (expected: Exception) {

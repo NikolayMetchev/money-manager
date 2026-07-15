@@ -38,8 +38,10 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.selectNearestUnconsumedFundingLeg
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -76,6 +78,9 @@ enum class ReimportSkipReason {
 
     /** Deleting a row's old transfer for a transfer→trade conversion failed; the row was left as-is. */
     TRADE_CONVERSION_FAILED,
+
+    /** Deleting a row's old transfer for a funding-card reconcile failed; the row was left as-is. */
+    FUNDING_RECONCILE_FAILED,
 }
 
 /** One duplicate-account merge the re-import will perform (or performed). */
@@ -115,6 +120,20 @@ data class ReimportRewrite(
     val conduitNames: List<String>,
     /** The clean merchant the final spend leg pays. */
     val merchantName: String,
+)
+
+/**
+ * One already-imported conduit-spend row (e.g. a Curve spend) that now resolves a funding card to an
+ * account holding a matching funding leg, so re-running it makes the engine reconcile it (excluded +
+ * linked) instead of double-counting. The plain transfer is deleted and the row reset so the re-run
+ * imports it reconciled. Only rows that will actually reconcile (a matching unconsumed funding leg
+ * exists) are listed, so rows whose funder isn't imported don't churn on every re-import.
+ */
+data class ReimportFundingReconcile(
+    val rowIndex: Long,
+    val transferId: TransferId,
+    /** The row's statement description, for the preview. */
+    val description: String,
 )
 
 /**
@@ -181,6 +200,8 @@ data class ReimportPlan(
     val reversals: List<ReimportReversal> = emptyList(),
     /** Already-imported single-asset transfers the current strategy now maps to cross-asset trades. */
     val tradeConversions: List<ReimportTradeConversion> = emptyList(),
+    /** Already-imported conduit spends that will reconcile against a funding leg once re-run. */
+    val fundingReconciles: List<ReimportFundingReconcile> = emptyList(),
 ) {
     val isEmpty: Boolean
         get() =
@@ -189,7 +210,8 @@ data class ReimportPlan(
                 rewrites.isEmpty() &&
                 valueUpdates.isEmpty() &&
                 reversals.isEmpty() &&
-                tradeConversions.isEmpty()
+                tradeConversions.isEmpty() &&
+                fundingReconciles.isEmpty()
 }
 
 /** The outcome of an executed re-import. */
@@ -208,6 +230,8 @@ data class CsvReimportResult(
     val reversedMerges: List<ReimportReversal> = emptyList(),
     /** Rows whose single-asset transfer was deleted and re-imported as a cross-asset trade. */
     val convertedRows: List<ReimportTradeConversion> = emptyList(),
+    /** Conduit-spend rows deleted and re-imported so they reconcile against a funding leg. */
+    val reconciledRows: List<ReimportFundingReconcile> = emptyList(),
 )
 
 /** Raw merge detection output: duplicate → single target, plus duplicates with competing targets. */
@@ -351,6 +375,7 @@ suspend fun planCsvReimport(
     transferSourceRepository: TransferSourceReadRepository,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoAssets: List<CryptoAsset> = emptyList(),
+    fundingCardAccounts: Map<String, AccountId> = emptyMap(),
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): ReimportPlan {
     onProgress?.invoke(ImportProgress("Loading rows"))
@@ -420,10 +445,23 @@ suspend fun planCsvReimport(
             relationshipRepository = relationshipRepository,
             onProgress = onProgress,
         ) { transferId -> existingTransfers[transferId] }
+    val reversalRowIndexes = reversals.flatMapTo(mutableSetOf()) { it.rowIndexes }
+    val fundingReconciles =
+        computeFundingReconcileReruns(
+            allRows = allRows,
+            mappedPrep = mappedPrep,
+            strategy = strategy,
+            fundingCardAccounts = fundingCardAccounts,
+            excludedRowIndexes = rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes + tradeConversions.map { it.rowIndex },
+            existingTransfers = existingTransfers,
+            loadTransfersTouchingAccount = { accountId, startDate, endDate ->
+                transactionRepository.getTransactionsByAccountAndDateRange(accountId, startDate, endDate).first()
+            },
+            onProgress = onProgress,
+        )
     // Rows whose transfers a reversal moves back are excluded from value updates: the reversal owns that
     // transfer's account move, and a value update would re-send the pre-reversal (survivor) accounts.
-    // Trade-conversion rows are excluded too — their transfer is deleted, not updated.
-    val reversalRowIndexes = reversals.flatMapTo(mutableSetOf()) { it.rowIndexes }
+    // Trade-conversion + funding-reconcile rows are excluded too — their transfer is deleted, not updated.
     val valueUpdates =
         computeReimportValueUpdates(
             allRows = allRows,
@@ -431,7 +469,8 @@ suspend fun planCsvReimport(
             rewrittenRowIndexes =
                 rewrites.map { it.rowIndex }.toSet() +
                     reversalRowIndexes +
-                    tradeConversions.map { it.rowIndex },
+                    tradeConversions.map { it.rowIndex } +
+                    fundingReconciles.map { it.rowIndex },
             existingTransferLookup = { transferId -> existingTransfers[transferId] },
             onProgress = onProgress,
         )
@@ -479,6 +518,7 @@ suspend fun planCsvReimport(
         valueUpdates = valueUpdates,
         reversals = reversals,
         tradeConversions = tradeConversions,
+        fundingReconciles = fundingReconciles,
     )
 }
 
@@ -543,6 +583,86 @@ private suspend fun valueUpdateFor(
         sourceAccountId = existing.sourceAccountId,
         targetAccountId = existing.targetAccountId,
     )
+}
+
+/**
+ * Finds already-imported conduit-spend rows that were imported plain (unreconciled) but now — because
+ * their funding card resolves to an account holding a matching funding leg — would reconcile if re-run.
+ * Only rows for which an unconsumed funding leg actually exists (same funding account → conduit, same
+ * amount+currency within [CsvImportStrategy.crossSourceReconcileWindowSeconds]) are returned, so rows
+ * whose funder was never imported don't get reset on every re-import. Consumes each funding leg once
+ * (nearest timestamp), matching the engine's [com.moneymanager.importer] funding-reconcile so the
+ * plan and the re-run agree on which rows will link.
+ *
+ * NB: does not exclude funding legs already consumed by a PRE-EXISTING reconcile (needs a bulk
+ * relationship load); mirrors the engine's documented "candidates aren't consumed across the persisted
+ * set" imperfection. Already-reconciled rows are skipped (their transfer carries the exclusion attr).
+ */
+suspend fun computeFundingReconcileReruns(
+    allRows: List<CsvRow>,
+    mappedPrep: ImportPreparation,
+    strategy: CsvImportStrategy,
+    fundingCardAccounts: Map<String, AccountId>,
+    excludedRowIndexes: Set<Long>,
+    existingTransfers: Map<TransferId, Transfer>,
+    loadTransfersTouchingAccount: suspend (AccountId, Instant, Instant) -> List<Transfer>,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+): List<ReimportFundingReconcile> {
+    val window = strategy.crossSourceReconcileWindowSeconds?.seconds ?: return emptyList()
+    if (strategy.fundingCardColumn == null || fundingCardAccounts.isEmpty()) return emptyList()
+    val rowsByIndex = allRows.associateBy { it.rowIndex }
+
+    // Candidate rows: already IMPORTED conduit spends that resolve a funding account and are not yet
+    // reconciled (their persisted transfer carries no "excluded" attribute).
+    data class Candidate(
+        val rowIndex: Long,
+        val transferId: TransferId,
+        val conduit: AccountId,
+        val fundingAccount: AccountId,
+        val amount: Money,
+        val timestamp: Instant,
+        val description: String,
+    )
+    val candidates =
+        mappedPrep.validTransfers.mapNotNull { mapped ->
+            if (mapped.rowIndex in excludedRowIndexes) return@mapNotNull null
+            val row = rowsByIndex[mapped.rowIndex] ?: return@mapNotNull null
+            if (row.importStatus != ImportStatus.IMPORTED) return@mapNotNull null
+            val transferId = row.transferId ?: return@mapNotNull null
+            val fundingAccount = mapped.fundingCardLast4?.let { fundingCardAccounts[it] } ?: return@mapNotNull null
+            val conduit = mapped.transfer.sourceAccountId
+            if (fundingAccount == conduit) return@mapNotNull null
+            val existing = existingTransfers[transferId] ?: return@mapNotNull null
+            if (existing.attributes.any { it.attributeType.name == "excluded" }) return@mapNotNull null
+            Candidate(mapped.rowIndex, transferId, conduit, fundingAccount, existing.amount, existing.timestamp, existing.description)
+        }
+    if (candidates.isEmpty()) return emptyList()
+
+    // Funding legs (fundingAccount -> conduit) bucketed by (source, amount); the conduit is shared by
+    // all conduit spends of one strategy, so one load per distinct conduit covers every candidate. Bound
+    // the load to the candidates' timestamp span ± the reconcile window (a matching leg must fall inside
+    // it), so a long-lived conduit isn't fully scanned on this UI-triggered path — mirrors the bounded
+    // candidate load in ImportEngineImpl.loadExisting.
+    onProgress?.invoke(ImportProgress("Checking funding-card reconciliation"))
+    val minTs = candidates.minOf { it.timestamp } - window
+    val maxTs = candidates.maxOf { it.timestamp } + window
+    val legsByConduitAmount = mutableMapOf<Triple<AccountId, AccountId, Money>, MutableList<Transfer>>()
+    for (conduit in candidates.map { it.conduit }.toSet()) {
+        for (leg in loadTransfersTouchingAccount(conduit, minTs, maxTs)) {
+            if (leg.targetAccountId != conduit) continue
+            legsByConduitAmount.getOrPut(Triple(leg.sourceAccountId, conduit, leg.amount)) { mutableListOf() } += leg
+        }
+    }
+    val consumed = mutableSetOf<TransferId>()
+    return candidates.mapNotNull { candidate ->
+        val bucket = legsByConduitAmount[Triple(candidate.fundingAccount, candidate.conduit, candidate.amount)] ?: return@mapNotNull null
+        // Same one-to-one, nearest-timestamp choice the engine's funding reconcile makes, so plan and re-run agree.
+        val legId =
+            selectNearestUnconsumedFundingLeg(bucket.map { it.id to it }, candidate.timestamp, window, consumed)
+                ?: return@mapNotNull null
+        consumed += legId
+        ReimportFundingReconcile(candidate.rowIndex, candidate.transferId, candidate.description)
+    }
 }
 
 private fun Money.display(): String = "${toDisplayValue()} ${asset.code}"
@@ -771,6 +891,7 @@ suspend fun executeCsvReimport(
     refreshViews: Boolean = true,
     cryptoRepository: CryptoReadRepository? = null,
     tradeRepository: TradeReadRepository? = null,
+    fundingCardAccounts: Map<String, AccountId> = emptyMap(),
 ): CsvReimportResult {
     val merged = mutableListOf<ReimportMerge>()
     val skipped = plan.skipped.toMutableList()
@@ -891,6 +1012,47 @@ suspend fun executeCsvReimport(
         }
     }
 
+    // One batch per reconcile: the plain conduit-spend transfer is deleted and its row status reset in
+    // the same batch, so the re-run below re-imports it through the engine's funding-card reconcile
+    // (which links it to the funding leg + excludes it instead of double-counting).
+    val reconciled = mutableListOf<ReimportFundingReconcile>()
+    for ((index, reconcile) in plan.fundingReconciles.withIndex()) {
+        onProgress?.invoke(
+            ImportProgress(
+                "Reconciling conduit spends",
+                fraction = index.toFloat() / plan.fundingReconciles.size,
+                processed = index,
+                total = plan.fundingReconciles.size,
+            ),
+        )
+        try {
+            importEngine.import(
+                ImportBatch(
+                    transfers =
+                        listOf(
+                            ImportTransfer(
+                                source = Source.Csv(csvImport.id),
+                                operation = ImportOperation.DELETE,
+                                existingId = reconcile.transferId,
+                            ),
+                        ),
+                    dedupePolicy = DedupePolicy.None,
+                    csvImportMutations = listOf(CsvImportMutation.ResetRowStatuses(csvImport.id, listOf(reconcile.rowIndex))),
+                ),
+            )
+            reconciled += reconcile
+        } catch (expected: Exception) {
+            logger.warn(expected) { "Re-import funding reconcile of row ${reconcile.rowIndex} ('${reconcile.description}') failed" }
+            skipped +=
+                ReimportSkippedAccount(
+                    accountId = null,
+                    accountName = reconcile.description,
+                    reason = ReimportSkipReason.FUNDING_RECONCILE_FAILED,
+                    detail = expected.message ?: "Funding reconcile failed",
+                )
+        }
+    }
+
     val importResult =
         applyStagedCsv(
             csvImport = csvImport,
@@ -906,6 +1068,7 @@ suspend fun executeCsvReimport(
             passThroughAccounts = passThroughAccounts,
             cryptoRepository = cryptoRepository,
             onProgress = onProgress,
+            fundingCardAccounts = fundingCardAccounts,
             engineBatchSize = REIMPORT_ENGINE_BATCH_SIZE,
         )
 
@@ -927,6 +1090,7 @@ suspend fun executeCsvReimport(
         updatedRows = updatedRows,
         reversedMerges = reversedMerges,
         convertedRows = converted,
+        reconciledRows = reconciled,
     )
 }
 
@@ -1150,6 +1314,7 @@ suspend fun bulkReimportCsv(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
     tradeRepository: TradeReadRepository? = null,
+    fundingCardAccounts: Map<String, AccountId> = emptyMap(),
 ): CsvBulkReimportResult {
     var filesImported = 0
     var transfers = 0
@@ -1200,6 +1365,7 @@ suspend fun bulkReimportCsv(
                     passThroughAccounts = passThroughAccounts,
                     onProgress = { tracker.phase(index, csvImport.originalFileName, it) },
                     cryptoAssets = cryptoAssets,
+                    fundingCardAccounts = fundingCardAccounts,
                 )
             val result =
                 executeCsvReimport(
@@ -1218,6 +1384,7 @@ suspend fun bulkReimportCsv(
                     refreshViews = false,
                     cryptoRepository = cryptoRepository,
                     tradeRepository = tradeRepository,
+                    fundingCardAccounts = fundingCardAccounts,
                 )
             filesImported++
             transfers += result.importResult?.successCount ?: 0

@@ -49,6 +49,7 @@ object CsvStrategyExportMapper {
             fileNamePattern = strategy.fileNamePattern,
             crossSourceReconcileWindowSeconds = strategy.crossSourceReconcileWindowSeconds,
             conversionConfig = strategy.conversionConfig,
+            fundingCardColumn = strategy.fundingCardColumn,
         )
 
     private fun FieldMapping.toExport(

@@ -167,26 +167,32 @@ fun SourceInfoSection(
                     }
                 }
                 is Source.Csv -> {
-                    val rowIndex = origin.rowIndex ?: 0
+                    val rowIndex = origin.rowIndex
                     val fileName = source.fileName
                     FieldValueRow("Origin", "CSV Import", labelWidth = labelWidth)
                     if (onCsvSourceClick != null) {
+                        // The File link always opens the import; entities derived from the import as a
+                        // whole (e.g. a pass-through conduit/merchant account, which has no single
+                        // originating row) only show a Row link when the row is actually known — otherwise
+                        // it would link to the non-existent "row 0".
                         CsvSourceLinkRow(
                             label = "File",
                             value = fileName ?: "Unknown file",
                             importId = origin.importId,
-                            rowIndex = rowIndex,
+                            rowIndex = rowIndex ?: 0,
                             onCsvSourceClick = onCsvSourceClick,
                             labelWidth = labelWidth,
                         )
-                        CsvSourceLinkRow(
-                            label = "Row",
-                            value = rowIndex.toString(),
-                            importId = origin.importId,
-                            rowIndex = rowIndex,
-                            onCsvSourceClick = onCsvSourceClick,
-                            labelWidth = labelWidth,
-                        )
+                        if (rowIndex != null) {
+                            CsvSourceLinkRow(
+                                label = "Row",
+                                value = rowIndex.toString(),
+                                importId = origin.importId,
+                                rowIndex = rowIndex,
+                                onCsvSourceClick = onCsvSourceClick,
+                                labelWidth = labelWidth,
+                            )
+                        }
                     } else if (fileName != null) {
                         FieldValueRow("File", fileName, labelWidth = labelWidth)
                     }

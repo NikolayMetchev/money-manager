@@ -2,6 +2,7 @@
 
 package com.moneymanager.csvimporter
 
+import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
@@ -200,5 +201,89 @@ class StrategySelectorTest {
         val a = strategy("A")
         val selected = listOf(b, a).selectForCsv("x.csv", columns, rows(""))
         assertEquals("A", selected?.name)
+    }
+
+    @Test
+    fun `a Curve export selects the Curve CSV strategy`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val curveColumns =
+            listOf(
+                CsvColumn(CsvColumnId(Uuid.random()), 0, ""),
+                CsvColumn(CsvColumnId(Uuid.random()), 1, "Created Date"),
+                CsvColumn(CsvColumnId(Uuid.random()), 2, "Merchant Name"),
+                CsvColumn(CsvColumnId(Uuid.random()), 3, "Funding Card Last 4 Digits"),
+                CsvColumn(CsvColumnId(Uuid.random()), 4, "Merchant MCC Code"),
+                CsvColumn(CsvColumnId(Uuid.random()), 5, "Txn Currency"),
+                CsvColumn(CsvColumnId(Uuid.random()), 6, "Txn Amount"),
+            )
+        val curveRows =
+            listOf(
+                CsvRow(rowIndex = 1L, values = listOf("1", "2026-06-16", "TFL", "7721", "4111", "GBP", "1.75")),
+                CsvRow(rowIndex = 2L, values = listOf("2", "2026-06-15", "AMAZON", "1142", "5999", "GBP", "62.24")),
+            )
+        val selected = builtIns.selectForCsv("Transaction History 2026-06-16.csv", curveColumns, curveRows)
+        assertEquals("Curve CSV", selected?.name)
+    }
+
+    @Test
+    fun `a Wise export still selects the Wise CSV strategy alongside Curve`() {
+        // Both Curve and Wise name their export "transaction-history"-ish, so this guards against the
+        // Curve fileNamePattern hijacking a Wise file — the disjoint column sets must keep them apart.
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val wiseHeaders =
+            listOf(
+                "ID",
+                "Status",
+                "Direction",
+                "Created on",
+                "Finished on",
+                "Source fee amount",
+                "Source fee currency",
+                "Target fee amount",
+                "Target fee currency",
+                "Source name",
+                "Source amount (after fees)",
+                "Source currency",
+                "Target name",
+                "Target amount (after fees)",
+                "Target currency",
+                "Exchange rate",
+                "Reference",
+                "Batch",
+                "Created by",
+                "Category",
+                "Note",
+            )
+        val wiseColumns = wiseHeaders.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+        val wiseRow =
+            CsvRow(
+                rowIndex = 1L,
+                values =
+                    listOf(
+                        "TRANSFER-1",
+                        "COMPLETED",
+                        "OUT",
+                        "2026-05-30 08:01:36",
+                        "2026-05-30 08:01:50",
+                        "0.00",
+                        "EUR",
+                        "",
+                        "",
+                        "Nikolay",
+                        "150.0",
+                        "EUR",
+                        "Teodora",
+                        "150.0",
+                        "EUR",
+                        "1.0",
+                        "gift",
+                        "",
+                        "Nikolay",
+                        "General",
+                        "",
+                    ),
+            )
+        val selected = builtIns.selectForCsv("transaction-history.csv", wiseColumns, listOf(wiseRow))
+        assertEquals("Wise CSV", selected?.name)
     }
 }

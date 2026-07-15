@@ -122,10 +122,18 @@ SELECT
     COALESCE(transfer.source_account_id, trade.from_account_id) AS source_account_id,
     COALESCE(transfer.target_account_id, trade.to_account_id) AS target_account_id,
     running_balance_materialized_view.is_excluded,
+    -- A pass-through (conduit) leg reads as reconciled when its chain counterpart is: a funding-card
+    -- reconcile links the conduit spend to the FUNDING leg, so the sibling SPEND leg (the "Via conduit"
+    -- row) — and vice versa — must show reconciled too, since the whole chain is reconciled.
+    -- pass_through_as_funding.id2 is this row's spend leg (when this row is the funding leg);
+    -- pass_through_as_spend.id1 is this row's funding leg (when this row is the spend leg); both are NULL
+    -- for non-conduit rows, so the extra checks are no-ops there.
     CASE WHEN EXISTS (
         SELECT 1 FROM transfer_relationship tr
-        WHERE (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id)
-          AND tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+        WHERE tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+          AND (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id
+               OR tr.id1 = pass_through_as_funding.id2 OR tr.id2 = pass_through_as_funding.id2
+               OR tr.id1 = pass_through_as_spend.id1 OR tr.id2 = pass_through_as_spend.id1)
     ) THEN 1 ELSE 0 END AS is_reconciled,
     -- The linked fee transfer when this row is the main transaction (id1 of a `fee` relationship),
     -- and the linked main transaction when this row is the fee transfer (id2). FEE_RELATIONSHIP_TYPE_ID = 2.
@@ -184,10 +192,18 @@ SELECT
     COALESCE(transfer.source_account_id, trade.from_account_id) AS source_account_id,
     COALESCE(transfer.target_account_id, trade.to_account_id) AS target_account_id,
     running_balance_materialized_view.is_excluded,
+    -- A pass-through (conduit) leg reads as reconciled when its chain counterpart is: a funding-card
+    -- reconcile links the conduit spend to the FUNDING leg, so the sibling SPEND leg (the "Via conduit"
+    -- row) — and vice versa — must show reconciled too, since the whole chain is reconciled.
+    -- pass_through_as_funding.id2 is this row's spend leg (when this row is the funding leg);
+    -- pass_through_as_spend.id1 is this row's funding leg (when this row is the spend leg); both are NULL
+    -- for non-conduit rows, so the extra checks are no-ops there.
     CASE WHEN EXISTS (
         SELECT 1 FROM transfer_relationship tr
-        WHERE (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id)
-          AND tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+        WHERE tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+          AND (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id
+               OR tr.id1 = pass_through_as_funding.id2 OR tr.id2 = pass_through_as_funding.id2
+               OR tr.id1 = pass_through_as_spend.id1 OR tr.id2 = pass_through_as_spend.id1)
     ) THEN 1 ELSE 0 END AS is_reconciled,
     -- The linked fee transfer when this row is the main transaction (id1 of a `fee` relationship),
     -- and the linked main transaction when this row is the fee transfer (id2). FEE_RELATIONSHIP_TYPE_ID = 2.
@@ -254,10 +270,18 @@ SELECT
     COALESCE(transfer.source_account_id, trade.from_account_id) AS source_account_id,
     COALESCE(transfer.target_account_id, trade.to_account_id) AS target_account_id,
     running_balance_materialized_view.is_excluded,
+    -- A pass-through (conduit) leg reads as reconciled when its chain counterpart is: a funding-card
+    -- reconcile links the conduit spend to the FUNDING leg, so the sibling SPEND leg (the "Via conduit"
+    -- row) — and vice versa — must show reconciled too, since the whole chain is reconciled.
+    -- pass_through_as_funding.id2 is this row's spend leg (when this row is the funding leg);
+    -- pass_through_as_spend.id1 is this row's funding leg (when this row is the spend leg); both are NULL
+    -- for non-conduit rows, so the extra checks are no-ops there.
     CASE WHEN EXISTS (
         SELECT 1 FROM transfer_relationship tr
-        WHERE (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id)
-          AND tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+        WHERE tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+          AND (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id
+               OR tr.id1 = pass_through_as_funding.id2 OR tr.id2 = pass_through_as_funding.id2
+               OR tr.id1 = pass_through_as_spend.id1 OR tr.id2 = pass_through_as_spend.id1)
     ) THEN 1 ELSE 0 END AS is_reconciled,
     -- The linked fee transfer when this row is the main transaction (id1 of a `fee` relationship),
     -- and the linked main transaction when this row is the fee transfer (id2). FEE_RELATIONSHIP_TYPE_ID = 2.

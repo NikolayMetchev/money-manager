@@ -12,6 +12,7 @@ CREATE TABLE csv_import_strategy (
     file_name_pattern TEXT,
     cross_source_reconcile_window_seconds INTEGER,
     conversion_config_json TEXT,
+    funding_card_column TEXT,
     created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
     updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000)
 );

@@ -195,6 +195,7 @@ internal data class StrategyFormState(
     val contentMatchRules: List<ContentMatchRule>,
     val fileNamePattern: String?,
     val crossSourceReconcileWindowSeconds: Long?,
+    val fundingCardColumn: String?,
 )
 
 /**
@@ -470,6 +471,7 @@ internal fun extractFormStateFromStrategy(
         contentMatchRules = strategy.contentMatchRules,
         fileNamePattern = strategy.fileNamePattern,
         crossSourceReconcileWindowSeconds = strategy.crossSourceReconcileWindowSeconds,
+        fundingCardColumn = strategy.fundingCardColumn,
     )
 }
 
@@ -629,6 +631,7 @@ internal fun buildStrategyFromFormState(
         contentMatchRules = state.contentMatchRules,
         fileNamePattern = state.fileNamePattern?.takeIf { it.isNotBlank() },
         crossSourceReconcileWindowSeconds = state.crossSourceReconcileWindowSeconds,
+        fundingCardColumn = state.fundingCardColumn?.takeIf { it.isNotBlank() },
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
