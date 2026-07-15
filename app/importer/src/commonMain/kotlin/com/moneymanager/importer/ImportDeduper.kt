@@ -16,6 +16,7 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.StringSimilarity
+import com.moneymanager.importengineapi.selectNearestUnconsumedFundingLeg
 import kotlin.time.Duration
 import kotlin.time.Instant
 
@@ -189,6 +190,11 @@ class ImportDeduper(
     // Funding legs already claimed by an earlier funding-card reconcile in this batch. Unlike the other
     // reconcile paths (which deliberately don't consume), a conduit like Curve emits many rows of the
     // same amount (e.g. daily £1.75 TFL), so each funding leg must reconcile at most one incoming row.
+    // Scope is a single import() call: this does NOT know which funding legs a previous, separate batch
+    // already consumed, so a later batch's row could re-link to an already-reconciled funding leg if the
+    // amount+window coincide. In practice a conduit export is imported in one batch, so the collision
+    // needs two overlapping conduit imports; CsvReimport.computeFundingReconcileReruns mirrors this same
+    // single-batch limitation.
     private val consumedFundingIds = mutableSetOf<TransferId>()
 
     fun classify(transfers: List<ImportTransfer>): List<Classified> =
@@ -308,11 +314,7 @@ class ImportDeduper(
         val key = DirectedAmountKey(fundingAccountId, transfer.fromAccount.requireId(), transfer.amount)
         val matchId =
             reconcileCandidatesByDirectedAmount[key]
-                ?.asSequence()
-                ?.filter { (id, existing) ->
-                    id !in consumedFundingIds && (timestamp - existing.timestamp).absoluteValue <= window
-                }?.minByOrNull { (_, existing) -> (timestamp - existing.timestamp).absoluteValue }
-                ?.first
+                ?.let { selectNearestUnconsumedFundingLeg(it, timestamp, window, consumedFundingIds) }
                 ?: return null
         consumedFundingIds += matchId
         val attributes =

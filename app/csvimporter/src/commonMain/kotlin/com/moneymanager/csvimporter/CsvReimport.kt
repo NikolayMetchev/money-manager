@@ -38,6 +38,7 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.selectNearestUnconsumedFundingLeg
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Duration.Companion.seconds
@@ -77,6 +78,9 @@ enum class ReimportSkipReason {
 
     /** Deleting a row's old transfer for a transfer→trade conversion failed; the row was left as-is. */
     TRADE_CONVERSION_FAILED,
+
+    /** Deleting a row's old transfer for a funding-card reconcile failed; the row was left as-is. */
+    FUNDING_RECONCILE_FAILED,
 }
 
 /** One duplicate-account merge the re-import will perform (or performed). */
@@ -450,7 +454,9 @@ suspend fun planCsvReimport(
             fundingCardAccounts = fundingCardAccounts,
             excludedRowIndexes = rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes + tradeConversions.map { it.rowIndex },
             existingTransfers = existingTransfers,
-            loadTransfersTouchingAccount = { accountId -> transactionRepository.getTransactionsByAccount(accountId).first() },
+            loadTransfersTouchingAccount = { accountId, startDate, endDate ->
+                transactionRepository.getTransactionsByAccountAndDateRange(accountId, startDate, endDate).first()
+            },
             onProgress = onProgress,
         )
     // Rows whose transfers a reversal moves back are excluded from value updates: the reversal owns that
@@ -599,7 +605,7 @@ suspend fun computeFundingReconcileReruns(
     fundingCardAccounts: Map<String, AccountId>,
     excludedRowIndexes: Set<Long>,
     existingTransfers: Map<TransferId, Transfer>,
-    loadTransfersTouchingAccount: suspend (AccountId) -> List<Transfer>,
+    loadTransfersTouchingAccount: suspend (AccountId, Instant, Instant) -> List<Transfer>,
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): List<ReimportFundingReconcile> {
     val window = strategy.crossSourceReconcileWindowSeconds?.seconds ?: return emptyList()
@@ -633,11 +639,16 @@ suspend fun computeFundingReconcileReruns(
     if (candidates.isEmpty()) return emptyList()
 
     // Funding legs (fundingAccount -> conduit) bucketed by (source, amount); the conduit is shared by
-    // all conduit spends of one strategy, so one load per distinct conduit covers every candidate.
+    // all conduit spends of one strategy, so one load per distinct conduit covers every candidate. Bound
+    // the load to the candidates' timestamp span ± the reconcile window (a matching leg must fall inside
+    // it), so a long-lived conduit isn't fully scanned on this UI-triggered path — mirrors the bounded
+    // candidate load in ImportEngineImpl.loadExisting.
     onProgress?.invoke(ImportProgress("Checking funding-card reconciliation"))
+    val minTs = candidates.minOf { it.timestamp } - window
+    val maxTs = candidates.maxOf { it.timestamp } + window
     val legsByConduitAmount = mutableMapOf<Triple<AccountId, AccountId, Money>, MutableList<Transfer>>()
     for (conduit in candidates.map { it.conduit }.toSet()) {
-        for (leg in loadTransfersTouchingAccount(conduit)) {
+        for (leg in loadTransfersTouchingAccount(conduit, minTs, maxTs)) {
             if (leg.targetAccountId != conduit) continue
             legsByConduitAmount.getOrPut(Triple(leg.sourceAccountId, conduit, leg.amount)) { mutableListOf() } += leg
         }
@@ -645,11 +656,11 @@ suspend fun computeFundingReconcileReruns(
     val consumed = mutableSetOf<TransferId>()
     return candidates.mapNotNull { candidate ->
         val bucket = legsByConduitAmount[Triple(candidate.fundingAccount, candidate.conduit, candidate.amount)] ?: return@mapNotNull null
-        val leg =
-            bucket
-                .filter { it.id !in consumed && (candidate.timestamp - it.timestamp).absoluteValue <= window }
-                .minByOrNull { (candidate.timestamp - it.timestamp).absoluteValue } ?: return@mapNotNull null
-        consumed += leg.id
+        // Same one-to-one, nearest-timestamp choice the engine's funding reconcile makes, so plan and re-run agree.
+        val legId =
+            selectNearestUnconsumedFundingLeg(bucket.map { it.id to it }, candidate.timestamp, window, consumed)
+                ?: return@mapNotNull null
+        consumed += legId
         ReimportFundingReconcile(candidate.rowIndex, candidate.transferId, candidate.description)
     }
 }
@@ -1036,7 +1047,7 @@ suspend fun executeCsvReimport(
                 ReimportSkippedAccount(
                     accountId = null,
                     accountName = reconcile.description,
-                    reason = ReimportSkipReason.REWRITE_FAILED,
+                    reason = ReimportSkipReason.FUNDING_RECONCILE_FAILED,
                     detail = expected.message ?: "Funding reconcile failed",
                 )
         }

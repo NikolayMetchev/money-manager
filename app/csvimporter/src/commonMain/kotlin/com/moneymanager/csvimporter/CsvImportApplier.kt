@@ -218,6 +218,9 @@ data class CsvBulkResult(
     override val filesFailed: Int,
 ) : BulkImportResult
 
+/** Splits a `card-last4` attribute value into its individual last-4 tokens (whitespace/comma-separated). */
+private val CARD_LAST4_DELIMITER = Regex("[\\s,]+")
+
 /**
  * Builds the funding-card index used by strategies with a
  * [CsvImportStrategy.fundingCardColumn]: last-4 → the account that funds it. [cardLast4Attributes] are
@@ -229,7 +232,7 @@ data class CsvBulkResult(
 fun fundingCardAccountIndex(cardLast4Attributes: List<AccountAttribute>): Map<String, AccountId> {
     val byLast4 = mutableMapOf<String, MutableSet<AccountId>>()
     for (attribute in cardLast4Attributes) {
-        for (last4 in attribute.value.split(Regex("[\\s,]+"))) {
+        for (last4 in attribute.value.split(CARD_LAST4_DELIMITER)) {
             val token = last4.trim()
             if (token.isNotEmpty()) byLast4.getOrPut(token) { mutableSetOf() } += attribute.accountId
         }
