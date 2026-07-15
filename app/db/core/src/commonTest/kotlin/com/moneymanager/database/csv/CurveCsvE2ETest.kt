@@ -165,7 +165,7 @@ class CurveCsvE2ETest : DbTest() {
                 .first { it.name == "Curve CSV" }
         val currencies = repositories.currencyRepository.getAllCurrencies().first()
         val passThroughAccounts = repositories.passThroughAccountRepository.getAll().first()
-        val fca =
+        val attributeMatchers =
             AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first())
         val plan =
             planCsvReimport(
@@ -180,7 +180,7 @@ class CurveCsvE2ETest : DbTest() {
                 relationshipRepository = repositories.transferRelationshipRepository,
                 transferSourceRepository = repositories.transferSourceRepository,
                 passThroughAccounts = passThroughAccounts,
-                attributeAccountMatchers = fca,
+                attributeAccountMatchers = attributeMatchers,
             )
         executeCsvReimport(
             plan = plan,
@@ -194,7 +194,7 @@ class CurveCsvE2ETest : DbTest() {
             maintenance = maintenance,
             importEngine = repositories.importEngine,
             passThroughAccounts = passThroughAccounts,
-            attributeAccountMatchers = fca,
+            attributeAccountMatchers = attributeMatchers,
         )
     }
 
