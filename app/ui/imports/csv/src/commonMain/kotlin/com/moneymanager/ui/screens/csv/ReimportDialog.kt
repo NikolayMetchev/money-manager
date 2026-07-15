@@ -23,17 +23,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.CsvReimportResult
 import com.moneymanager.csvimporter.ReimportPlan
 import com.moneymanager.csvimporter.executeCsvReimport
-import com.moneymanager.csvimporter.fundingCardAccountIndex
 import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.planCsvReimport
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -105,8 +103,8 @@ fun ReimportDialog(
     val passThroughAccounts by passThroughAccountRepository
         .getAll()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val cardLast4Attributes by accountAttributeRepository
-        .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_ID))
+    val accountAttributes by accountAttributeRepository
+        .getAll()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var strategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
@@ -138,7 +136,7 @@ fun ReimportDialog(
     val sourceReady = !needsSourcePicker || selectedSourceAccountId != null
 
     // Build the read-only merge preview once the inputs are ready.
-    LaunchedEffect(strategy, selectedSourceAccountId, currencies, passThroughAccounts, cardLast4Attributes) {
+    LaunchedEffect(strategy, selectedSourceAccountId, currencies, passThroughAccounts, accountAttributes) {
         val currentStrategy = strategy ?: return@LaunchedEffect
         if (currencies.isEmpty()) return@LaunchedEffect
         try {
@@ -158,7 +156,7 @@ fun ReimportDialog(
                     // Crypto tickers on already-imported rows must resolve for the value-update and
                     // transfer→trade conversion scans, so pass the full asset set.
                     cryptoAssets = cryptoRepository.getAllCryptoAssets().first(),
-                    fundingCardAccounts = fundingCardAccountIndex(cardLast4Attributes),
+                    attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
                     onProgress = { planProgress = it },
                 )
             errorMessage = null
@@ -262,7 +260,7 @@ fun ReimportDialog(
                                     onProgress = { executeProgress = it },
                                     cryptoRepository = cryptoRepository,
                                     tradeRepository = tradeRepository,
-                                    fundingCardAccounts = fundingCardAccountIndex(cardLast4Attributes),
+                                    attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
                                 )
                             onComplete(result)
                         } catch (expected: CancellationException) {

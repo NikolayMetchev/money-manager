@@ -20,6 +20,21 @@ data class ContentMatchRule(
 )
 
 /**
+ * Selects an account by matching a CSV [column]'s value against the regex patterns held by a given
+ * account-attribute type. Each account carries an attribute of [attributeTypeName] whose value is one
+ * or more whitespace/comma-separated regex tokens (e.g. the `card-last4` attribute lists a card's
+ * last-4 digits — a trivial regex — but any pattern is allowed; use `\s` for a literal space). A
+ * column value is matched (case-insensitively, [Regex.containsMatchIn]) against every token; when
+ * exactly one account matches it wins, and a value claimed by more than one account is ambiguous and
+ * ignored. Fully portable across databases: it names a column and an attribute type, never an account id.
+ */
+@Serializable
+data class AttributeAccountMatch(
+    val column: String,
+    val attributeTypeName: String,
+)
+
+/**
  * Represents a reusable CSV import strategy that defines how to map CSV columns
  * to Transfer fields.
  *
@@ -47,13 +62,13 @@ data class ContentMatchRule(
  *                            separate debited/credited rows; the importer routes the legs through a
  *                            shared counterparty account and links each debit to its credit (see
  *                            [ConversionConfig]). Null when the source has no such conversions.
- * @property fundingCardColumn When set, names the CSV column carrying the last-4 digits of the card
- *                             that funded each row (e.g. Curve's "Funding Card Last 4 Digits"). A row
- *                             whose last-4 resolves — via the `card-last4` account attribute — to a
- *                             single account is reconciled against an unconsumed funding leg into the
- *                             row's source account (same amount+currency within
- *                             [crossSourceReconcileWindowSeconds]), ignoring the merchant. Null
- *                             disables funding-card reconciliation.
+ * @property fundingAttributeMatch When set, resolves each row's hidden funding account by matching a
+ *                             CSV column against an account-attribute type (see [AttributeAccountMatch];
+ *                             e.g. Curve's "Funding Card Last 4 Digits" column against the `card-last4`
+ *                             attribute). A row whose value resolves to a single account is reconciled
+ *                             against an unconsumed funding leg into the row's source account (same
+ *                             amount+currency within [crossSourceReconcileWindowSeconds]), ignoring the
+ *                             merchant. Null disables funding reconciliation.
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
  */
@@ -69,7 +84,7 @@ data class CsvImportStrategy(
     val fileNamePattern: String? = null,
     val crossSourceReconcileWindowSeconds: Long? = null,
     val conversionConfig: ConversionConfig? = null,
-    val fundingCardColumn: String? = null,
+    val fundingAttributeMatch: AttributeAccountMatch? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

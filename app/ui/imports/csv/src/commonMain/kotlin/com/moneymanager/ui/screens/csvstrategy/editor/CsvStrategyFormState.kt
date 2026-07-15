@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
@@ -195,7 +196,7 @@ internal data class StrategyFormState(
     val contentMatchRules: List<ContentMatchRule>,
     val fileNamePattern: String?,
     val crossSourceReconcileWindowSeconds: Long?,
-    val fundingCardColumn: String?,
+    val fundingAttributeMatch: AttributeAccountMatch?,
 )
 
 /**
@@ -471,7 +472,7 @@ internal fun extractFormStateFromStrategy(
         contentMatchRules = strategy.contentMatchRules,
         fileNamePattern = strategy.fileNamePattern,
         crossSourceReconcileWindowSeconds = strategy.crossSourceReconcileWindowSeconds,
-        fundingCardColumn = strategy.fundingCardColumn,
+        fundingAttributeMatch = strategy.fundingAttributeMatch,
     )
 }
 
@@ -631,7 +632,7 @@ internal fun buildStrategyFromFormState(
         contentMatchRules = state.contentMatchRules,
         fileNamePattern = state.fileNamePattern?.takeIf { it.isNotBlank() },
         crossSourceReconcileWindowSeconds = state.crossSourceReconcileWindowSeconds,
-        fundingCardColumn = state.fundingCardColumn?.takeIf { it.isNotBlank() },
+        fundingAttributeMatch = state.fundingAttributeMatch,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -29,6 +30,7 @@ import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
+import com.moneymanager.domain.model.csvstrategy.export.AttributeMatchAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.ConditionalAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExportMapper
@@ -239,6 +241,8 @@ class CsvStrategyExportService(
                 addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
             is TemplateAccountExport ->
                 addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
+            is AttributeMatchAccountExport ->
+                addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
             is ConditionalAccountExport -> {
                 collectUnresolvedReferences(mappingExport.whenTrue, fieldType, referenceData, unresolvedReferences)
                 collectUnresolvedReferences(mappingExport.whenFalse, fieldType, referenceData, unresolvedReferences)
@@ -415,7 +419,7 @@ class CsvStrategyExportService(
                 fileNamePattern = export.fileNamePattern,
                 crossSourceReconcileWindowSeconds = export.crossSourceReconcileWindowSeconds,
                 conversionConfig = export.conversionConfig,
-                fundingCardColumn = export.fundingCardColumn,
+                fundingAttributeMatch = export.fundingAttributeMatch,
                 createdAt = now,
                 updatedAt = now,
             )
@@ -509,6 +513,16 @@ class CsvStrategyExportService(
                     columnName = columnName,
                     rules = rules,
                     fallbackColumns = fallbackColumns,
+                    defaultCategoryId =
+                        categoriesByName[defaultCategoryName]?.id
+                            ?: Category.UNCATEGORIZED_ID,
+                )
+            is AttributeMatchAccountExport ->
+                AttributeMatchAccountMapping(
+                    id = newId,
+                    fieldType = fieldType,
+                    columnName = columnName,
+                    attributeTypeName = attributeTypeName,
                     defaultCategoryId =
                         categoriesByName[defaultCategoryName]?.id
                             ?: Category.UNCATEGORIZED_ID,

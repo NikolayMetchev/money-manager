@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
@@ -97,8 +98,8 @@ sealed interface MappingResult {
         val passThrough: CsvPassThrough? = null,
         /** Set when the row is one leg of an asset conversion (see [ConversionConfig]); null otherwise. */
         val conversionLeg: ConversionLegInfo? = null,
-        /** Raw funding-card value from [CsvImportStrategy.fundingCardColumn]; null when unset/blank. */
-        val fundingCardLast4: String? = null,
+        /** Raw funding value from [CsvImportStrategy.fundingAttributeMatch]'s column; null when unset/blank. */
+        val fundingMatchValue: String? = null,
     ) : MappingResult {
         /** Convenience for flows where only the target side can discover a new account. */
         val newAccountName: String? get() = newAccounts.firstOrNull()?.name
@@ -200,11 +201,11 @@ data class CsvTransferWithAttributes(
     /** Set when the row is one leg of an asset conversion (see [ConversionConfig]); null otherwise. */
     val conversionLeg: ConversionLegInfo? = null,
     /**
-     * Raw value of the strategy's [CsvImportStrategy.fundingCardColumn] for this row (e.g. a card's
-     * last-4 like "7721"); null when the strategy declares no funding-card column or the cell is blank.
-     * The applier resolves it to a funding account for the funding-card reconcile.
+     * Raw value of the strategy's [CsvImportStrategy.fundingAttributeMatch] column for this row (e.g. a
+     * card's last-4 like "7721"); null when the strategy declares no funding match or the cell is blank.
+     * The applier matches it against the funding attribute type to resolve the funding account.
      */
-    val fundingCardLast4: String? = null,
+    val fundingMatchValue: String? = null,
 )
 
 /**
@@ -279,6 +280,12 @@ class CsvTransferMapper(
     private val sourceAccountOverride: AccountId? = null,
     /** Detects pass-through (conduit) charges (e.g. Curve) from the row description; null disables it. */
     private val passThroughDetector: PassThroughDetector? = null,
+    /**
+     * Attribute-account matchers keyed by attribute-type name (see [AttributeAccountMatcher]). Consulted
+     * by [AttributeMatchAccountMapping] account fields to resolve an account from a column value's regex
+     * match against account attributes. The applier uses the same registry for funding reconciliation.
+     */
+    private val attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
 ) {
     private val columnIndexByName: Map<String, Int> =
         columns.associate { it.originalName to it.columnIndex }
@@ -378,7 +385,7 @@ class CsvTransferMapper(
                             personalCounterpartyName = result.personalCounterpartyName,
                             passThrough = result.passThrough,
                             conversionLeg = result.conversionLeg,
-                            fundingCardLast4 = result.fundingCardLast4,
+                            fundingMatchValue = result.fundingMatchValue,
                         ),
                     )
                     // Count by status
@@ -693,8 +700,10 @@ class CsvTransferMapper(
                 passThrough = passThrough,
                 conversionLeg =
                     conversionDetection?.let { ConversionLegInfo(side = it.side, pairingKey = it.pairingKey) },
-                fundingCardLast4 =
-                    strategy.fundingCardColumn?.let { getColumnValueOrNull(it, originalValues)?.trim()?.takeIf { v -> v.isNotBlank() } },
+                fundingMatchValue =
+                    strategy.fundingAttributeMatch?.let {
+                        getColumnValueOrNull(it.column, originalValues)?.trim()?.takeIf { v -> v.isNotBlank() }
+                    },
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
@@ -936,6 +945,19 @@ class CsvTransferMapper(
                     ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
             }
             is ConditionalAccountMapping -> parseAccount(resolveConditional(mapping, values), values, applyPersistedMappings)
+            is AttributeMatchAccountMapping -> {
+                val csvValue = getColumnValue(mapping.columnName, values).trim()
+
+                // Persisted mappings win first (renamed accounts), then the account-attribute regex match.
+                if (applyPersistedMappings) {
+                    findPersistedMapping(csvValue)?.let { return it }
+                }
+                attributeAccountMatchers[mapping.attributeTypeName]?.match(csvValue)?.let { return it }
+
+                // No attribute matched: fall back to ordinary name lookup on the raw value.
+                resolveExistingAccountId(csvValue)
+                    ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
+            }
             is AccountLookupMapping -> {
                 val csvValue = getColumnValue(mapping.columnName, values)
 
@@ -1039,6 +1061,21 @@ class CsvTransferMapper(
                 } else {
                     NewAccount(name, mapping.defaultCategoryId) to
                         DiscoveredAccountMapping(csvValue, name)
+                }
+            }
+            is AttributeMatchAccountMapping -> {
+                val csvValue = getColumnValue(mapping.columnName, values).trim()
+                // No new account when a persisted mapping or an attribute regex resolves the value, or
+                // when the raw value is blank / already an existing account.
+                if ((applyPersistedMappings && findPersistedMapping(csvValue) != null) ||
+                    attributeAccountMatchers[mapping.attributeTypeName]?.match(csvValue) != null ||
+                    csvValue.isBlank() ||
+                    accountExists(csvValue)
+                ) {
+                    null
+                } else {
+                    NewAccount(csvValue, mapping.defaultCategoryId) to
+                        DiscoveredAccountMapping(csvValue, csvValue)
                 }
             }
             is ConditionalAccountMapping -> discoverNewAccount(resolveConditional(mapping, values), values, applyPersistedMappings)

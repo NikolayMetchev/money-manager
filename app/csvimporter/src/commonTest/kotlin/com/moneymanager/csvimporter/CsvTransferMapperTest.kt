@@ -4,7 +4,10 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountAttribute
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
@@ -15,6 +18,7 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -1592,5 +1596,82 @@ class CsvTransferMapperTest {
         assertEquals(true, result.passThrough?.incoming)
         assertEquals("Amazon", result.passThrough?.merchantName)
         assertEquals(amazonAccount.id, result.passThrough?.merchantAccountId)
+    }
+
+    // ============= AttributeMatchAccountMapping (regex-against-attribute account resolution) =============
+
+    private fun attributeMatchStrategy(): CsvImportStrategy {
+        val base = createStrategy()
+        return base.copy(
+            fieldMappings =
+                base.fieldMappings +
+                    (
+                        TransferField.TARGET_ACCOUNT to
+                            AttributeMatchAccountMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Payee",
+                                attributeTypeName = "card-last4",
+                            )
+                    ),
+        )
+    }
+
+    private fun cardLast4Matchers(
+        accountId: AccountId,
+        value: String,
+    ): Map<String, AttributeAccountMatcher> =
+        mapOf(
+            "card-last4" to
+                AttributeAccountMatcher.from(
+                    listOf(
+                        AccountAttribute(
+                            id = 1,
+                            accountId = accountId,
+                            attributeType = AttributeType(id = AttributeTypeId(-8), name = "card-last4"),
+                            value = value,
+                        ),
+                    ),
+                ),
+        )
+
+    @Test
+    fun `AttributeMatchAccountMapping resolves the target account by attribute regex`() {
+        val mapper =
+            CsvTransferMapper(
+                strategy = attributeMatchStrategy(),
+                columns = columns,
+                existingAccounts = mapOf("PayPal" to testTargetAccount.copy(name = "PayPal")),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                attributeAccountMatchers = cardLast4Matchers(testTargetAccountId, "9999"),
+            )
+
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Some payment", "-50.00", "9999"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(testTargetAccountId, result.transfer.targetAccountId)
+        assertTrue(result.newAccounts.isEmpty())
+    }
+
+    @Test
+    fun `AttributeMatchAccountMapping falls back to name lookup when no attribute matches`() {
+        val mapper =
+            CsvTransferMapper(
+                strategy = attributeMatchStrategy(),
+                columns = columns,
+                existingAccounts = emptyMap(),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                attributeAccountMatchers = cardLast4Matchers(testTargetAccountId, "9999"),
+            )
+
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Some payment", "-50.00", "Netflix"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        // No attribute matched "Netflix", so it falls back to a name lookup that creates a new account.
+        assertEquals(listOf("Netflix"), result.newAccounts.map { it.name })
     }
 }

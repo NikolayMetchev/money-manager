@@ -1,5 +1,6 @@
 package com.moneymanager.database.json
 
+import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
@@ -90,4 +91,14 @@ object FieldMappingJsonCodec {
      * Decodes an optional conversion config from a JSON string (null when the column is null).
      */
     fun decodeConversionConfig(jsonString: String?): ConversionConfig? = jsonString?.let { json.decodeFromString(it) }
+
+    /**
+     * Encodes an optional funding attribute-account match to a JSON string, or null when absent.
+     */
+    fun encodeAttributeAccountMatch(match: AttributeAccountMatch?): String? = match?.let { json.encodeToString(it) }
+
+    /**
+     * Decodes an optional funding attribute-account match from a JSON string (null when the column is null).
+     */
+    fun decodeAttributeAccountMatch(jsonString: String?): AttributeAccountMatch? = jsonString?.let { json.decodeFromString(it) }
 }

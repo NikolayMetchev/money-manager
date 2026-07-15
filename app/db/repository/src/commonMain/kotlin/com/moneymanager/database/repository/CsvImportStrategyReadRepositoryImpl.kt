@@ -57,7 +57,7 @@ class CsvImportStrategyReadRepositoryImpl(
             fileNamePattern = entity.file_name_pattern,
             crossSourceReconcileWindowSeconds = entity.cross_source_reconcile_window_seconds,
             conversionConfig = FieldMappingJsonCodec.decodeConversionConfig(entity.conversion_config_json),
-            fundingCardColumn = entity.funding_card_column,
+            fundingAttributeMatch = FieldMappingJsonCodec.decodeAttributeAccountMatch(entity.funding_attribute_match_json),
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
         )

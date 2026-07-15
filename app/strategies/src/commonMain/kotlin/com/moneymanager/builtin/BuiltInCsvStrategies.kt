@@ -4,9 +4,11 @@ package com.moneymanager.builtin
 
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
@@ -696,9 +698,14 @@ object BuiltInCsvStrategies {
             // Wise's transaction-history.csv, so the two never compete.
             fileNamePattern = "^Transaction History",
             crossSourceReconcileWindowSeconds = CURVE_RECONCILE_WINDOW_SECONDS,
-            // Reconcile each spend against the funding leg on the account whose card-last4 matches this
-            // column, so a Curve charge isn't double-counted against the underlying card's own import.
-            fundingCardColumn = "Funding Card Last 4 Digits",
+            // Reconcile each spend against the funding leg on the account whose card-last4 attribute
+            // matches this column, so a Curve charge isn't double-counted against the underlying card's
+            // own import.
+            fundingAttributeMatch =
+                AttributeAccountMatch(
+                    column = "Funding Card Last 4 Digits",
+                    attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
+                ),
             createdAt = now,
             updatedAt = now,
         )

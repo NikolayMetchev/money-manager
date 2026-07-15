@@ -92,7 +92,7 @@ internal class CsvStrategyEditorState(
     // Not yet editable in the UI; carried through so saving never drops them.
     var contentMatchRules by mutableStateOf(initial?.contentMatchRules.orEmpty())
     var crossSourceReconcileWindowSeconds by mutableStateOf(initial?.crossSourceReconcileWindowSeconds)
-    var fundingCardColumn by mutableStateOf(initial?.fundingCardColumn)
+    var fundingAttributeMatch by mutableStateOf(initial?.fundingAttributeMatch)
 
     // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialTargetAccountColumnName: String? = initial?.targetAccountColumnName
@@ -237,7 +237,7 @@ internal class CsvStrategyEditorState(
             contentMatchRules = contentMatchRules,
             fileNamePattern = fileNamePattern.takeIf { it.isNotBlank() },
             crossSourceReconcileWindowSeconds = crossSourceReconcileWindowSeconds,
-            fundingCardColumn = fundingCardColumn,
+            fundingAttributeMatch = fundingAttributeMatch,
         )
 }
 

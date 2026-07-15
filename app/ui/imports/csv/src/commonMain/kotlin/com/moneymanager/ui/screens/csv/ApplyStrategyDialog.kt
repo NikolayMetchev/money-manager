@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.CsvImportResult
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.DiscoveredAccountMapping
@@ -50,17 +51,14 @@ import com.moneymanager.csvimporter.NewAccount
 import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.csvimporter.ensureCryptoAssets
-import com.moneymanager.csvimporter.fundingCardAccountIndex
 import com.moneymanager.csvimporter.hasBlankNewAccountNames
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
@@ -125,8 +123,8 @@ fun ApplyStrategyDialog(
         .getAll()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) }
-    val cardLast4Attributes by accountAttributeRepository
-        .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_ID))
+    val accountAttributes by accountAttributeRepository
+        .getAll()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var selectedStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
@@ -424,7 +422,7 @@ fun ApplyStrategyDialog(
                                     importEngine = importEngine,
                                     cryptoAssets = resolvedCrypto,
                                     passThroughAccounts = passThroughAccounts,
-                                    fundingCardAccounts = fundingCardAccountIndex(cardLast4Attributes),
+                                    attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
                                 )
                             onImportComplete(result)
                         } catch (expected: Exception) {
