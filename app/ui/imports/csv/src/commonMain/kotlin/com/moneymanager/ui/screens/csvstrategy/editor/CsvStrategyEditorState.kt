@@ -103,9 +103,12 @@ internal class CsvStrategyEditorState(
     var fundingMatchAttributeTypeName by
         mutableStateOf(initial?.fundingAttributeMatch?.attributeTypeName ?: WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME)
 
-    // Not yet editable in the UI; carried through so saving never drops them.
     var contentMatchRules by mutableStateOf(initial?.contentMatchRules.orEmpty())
     var crossSourceReconcileWindowSeconds by mutableStateOf(initial?.crossSourceReconcileWindowSeconds)
+
+    // Conversion config: pairs debited/credited rows into transfers routed through a shared account.
+    // Edited via ConversionConfigEditor (Advanced tab); null when the source has no such conversions.
+    var conversionConfig by mutableStateOf(initial?.conversionConfig)
 
     // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialTargetAccountColumnName: String? = initial?.targetAccountColumnName
@@ -149,6 +152,24 @@ internal class CsvStrategyEditorState(
                 it.name.isNotBlank() && it.matchAttributeName.isNotBlank() && it.matchValuePattern.isNotBlank()
             }
 
+    private val contentMatchValid: Boolean
+        get() = contentMatchRules.all { it.columnName.isNotBlank() && it.pattern.isNotBlank() }
+
+    // A conversion config is opt-in: valid when absent, otherwise its required scalars must be set, at
+    // least one of name/rules must resolve, and every routing rule must be fully specified.
+    private val conversionConfigValid: Boolean
+        get() =
+            conversionConfig?.let { c ->
+                c.signalColumn.isNotBlank() &&
+                    c.debitPattern.isNotBlank() &&
+                    c.creditPattern.isNotBlank() &&
+                    c.relationshipTypeName.isNotBlank() &&
+                    (!c.conversionAccountName.isNullOrBlank() || c.conversionAccountRules.isNotEmpty()) &&
+                    c.conversionAccountRules.all {
+                        it.column.isNotBlank() && it.pattern.isNotBlank() && it.accountName.isNotBlank()
+                    }
+            } ?: true
+
     private val currencyValid: Boolean
         get() =
             when (currencyMode) {
@@ -186,7 +207,12 @@ internal class CsvStrategyEditorState(
 
     /** Whether the Advanced tab has an unsatisfied required field. */
     val advancedHasError: Boolean
-        get() = !rowPreprocessingValid || !companionRulesValid || !fundingMatchValid
+        get() =
+            !rowPreprocessingValid ||
+                !companionRulesValid ||
+                !fundingMatchValid ||
+                !contentMatchValid ||
+                !conversionConfigValid
 
     fun tabHasError(tab: EditorTab): Boolean =
         when (tab) {
@@ -210,6 +236,8 @@ internal class CsvStrategyEditorState(
                 rowPreprocessingValid &&
                 companionRulesValid &&
                 fundingMatchValid &&
+                contentMatchValid &&
+                conversionConfigValid &&
                 currencyValid &&
                 timezoneValid
 
@@ -266,6 +294,7 @@ internal class CsvStrategyEditorState(
                         AttributeAccountMatch(column = column, attributeTypeName = type)
                     }
                 },
+            conversionConfig = conversionConfig,
         )
 }
 

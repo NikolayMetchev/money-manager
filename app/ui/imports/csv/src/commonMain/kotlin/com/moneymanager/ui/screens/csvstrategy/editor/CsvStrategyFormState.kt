@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
+import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -200,6 +201,7 @@ internal data class StrategyFormState(
     val fileNamePattern: String?,
     val crossSourceReconcileWindowSeconds: Long?,
     val fundingAttributeMatch: AttributeAccountMatch?,
+    val conversionConfig: ConversionConfig?,
 )
 
 /**
@@ -485,6 +487,9 @@ internal fun extractFormStateFromStrategy(
         fileNamePattern = strategy.fileNamePattern,
         crossSourceReconcileWindowSeconds = strategy.crossSourceReconcileWindowSeconds,
         fundingAttributeMatch = strategy.fundingAttributeMatch,
+        // Carried through verbatim (like content-match/companion rules): its column references may
+        // name columns absent from the uploaded sample, but dropping them would corrupt the strategy.
+        conversionConfig = strategy.conversionConfig,
     )
 }
 
@@ -652,6 +657,7 @@ internal fun buildStrategyFromFormState(
         fileNamePattern = state.fileNamePattern?.takeIf { it.isNotBlank() },
         crossSourceReconcileWindowSeconds = state.crossSourceReconcileWindowSeconds,
         fundingAttributeMatch = state.fundingAttributeMatch,
+        conversionConfig = state.conversionConfig,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

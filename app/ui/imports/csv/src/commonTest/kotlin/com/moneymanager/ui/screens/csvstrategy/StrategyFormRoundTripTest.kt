@@ -14,6 +14,9 @@ import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
+import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
+import com.moneymanager.domain.model.csvstrategy.ConversionAccountRule
+import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -249,6 +252,42 @@ class StrategyFormRoundTripTest {
         assertIs<AttributeMatchAccountMapping>(target)
         assertEquals("card-last4", target.attributeTypeName)
         assertEquals("Target name", target.columnName)
+    }
+
+    @Test
+    fun `conversion config, content-match rules and cross-source window round-trip`() {
+        val original =
+            advancedStrategy().copy(
+                contentMatchRules =
+                    listOf(
+                        ContentMatchRule(columnName = "Direction", pattern = "OUT"),
+                        ContentMatchRule(columnName = "Reference", pattern = "CRV\\*"),
+                    ),
+                crossSourceReconcileWindowSeconds = 120,
+                conversionConfig =
+                    ConversionConfig(
+                        signalColumn = "Direction",
+                        debitPattern = "(?i)_debited$",
+                        creditPattern = "(?i)_credited$",
+                        conversionAccountName = "Crypto.com Conversions",
+                        conversionAccountRules =
+                            listOf(
+                                ConversionAccountRule(column = "Source currency", pattern = "(?i)^DUST$", accountName = "Dust"),
+                            ),
+                        pairingKeyPattern = "(?i)^(.*)_(?:debited|credited)$",
+                        pairingKeyColumns = listOf("Reference"),
+                        pairingWindowSeconds = 60,
+                        relationshipTypeName = "conversion",
+                    ),
+            )
+        val availableColumns = columns.map { it.originalName }.toSet()
+
+        val state = extractFormStateFromStrategy(original, availableColumns)
+        val rebuilt = buildStrategyFromFormState(state, original.id, original.createdAt, original.updatedAt)
+
+        assertEquals(original.contentMatchRules, rebuilt.contentMatchRules)
+        assertEquals(original.crossSourceReconcileWindowSeconds, rebuilt.crossSourceReconcileWindowSeconds)
+        assertEquals(original.conversionConfig, rebuilt.conversionConfig)
     }
 
     @Test

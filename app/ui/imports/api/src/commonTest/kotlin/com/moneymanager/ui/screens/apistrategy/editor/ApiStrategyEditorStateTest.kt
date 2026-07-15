@@ -3,23 +3,40 @@
 package com.moneymanager.ui.screens.apistrategy.editor
 
 import com.moneymanager.domain.model.ApiImportStrategyId
+import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
+import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
+import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
+import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
+import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
+import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
+import com.moneymanager.domain.model.apistrategy.FieldPlacement
+import com.moneymanager.domain.model.apistrategy.NonceFormat
+import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.PredicateOp
 import com.moneymanager.domain.model.apistrategy.RulePredicate
 import com.moneymanager.domain.model.apistrategy.RuleSign
+import com.moneymanager.domain.model.apistrategy.SecretEncoding
+import com.moneymanager.domain.model.apistrategy.SigFieldLocation
+import com.moneymanager.domain.model.apistrategy.SigPart
+import com.moneymanager.domain.model.apistrategy.SignatureEncoding
+import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
+import com.moneymanager.domain.model.apistrategy.TransferDirection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -100,6 +117,49 @@ class ApiStrategyEditorStateTest {
                     ownsAllAccounts = true,
                 ),
             personExternalIdAttribute = "example-external-id",
+            // A Kraken-style recipe: exercises the recursive Sha256 SigPart nesting.
+            requestSigning =
+                ApiRequestSigningConfig(
+                    algorithm = SigningAlgorithm.HMAC_SHA512,
+                    secretEncoding = SecretEncoding.BASE64,
+                    signatureEncoding = SignatureEncoding.BASE64,
+                    message = listOf(SigPart.Path, SigPart.Sha256(listOf(SigPart.Nonce, SigPart.Body))),
+                    apiKey = FieldPlacement(SigFieldLocation.HEADER, "API-Key"),
+                    nonce = NonceSpec(format = NonceFormat.EPOCH_MS, placement = FieldPlacement(SigFieldLocation.BODY_FIELD, "nonce")),
+                    signature = FieldPlacement(SigFieldLocation.HEADER, "API-Sign"),
+                    bodyFormat = BodyFormat.FORM_URLENCODED,
+                ),
+            dataEndpoints =
+                listOf(
+                    ApiDataEndpoint(
+                        endpoint = ApiEndpointConfig(path = "/private/get-trades", responseArrayKey = "result"),
+                        kind = ApiEndpointKind.TRADES,
+                        tradeMappings =
+                            ApiTradeMappings(
+                                instrumentField = "instrument_name",
+                                sideField = "side",
+                                baseQuantityField = "quantity",
+                                priceField = "price",
+                                timestampField = "create_time",
+                                idField = "trade_id",
+                                orderIdField = "order_id",
+                            ),
+                    ),
+                    ApiDataEndpoint(
+                        endpoint = ApiEndpointConfig(path = "/private/get-deposits", responseArrayKey = "result"),
+                        kind = ApiEndpointKind.DEPOSITS,
+                        transactionMappings = ApiTransactionMappings(amountField = "amount", currencyField = "currency"),
+                        fixedDirection = TransferDirection.IN,
+                        counterpartyAccountName = "Crypto.com Exchange Funding",
+                    ),
+                ),
+            syntheticAccount = ApiSyntheticAccount(name = "Crypto.com Exchange", externalId = "cryptocom-exchange"),
+            internalTransferReconcile =
+                ApiInternalTransferReconcile(
+                    bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
+                    windowSeconds = 3600,
+                    amountTolerancePercent = "0.5",
+                ),
             createdAt = now,
             updatedAt = now,
         )
