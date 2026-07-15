@@ -255,7 +255,7 @@ class StrategyFormRoundTripTest {
     }
 
     @Test
-    fun `conversion config, content-match rules and cross-source window round-trip`() {
+    fun `conversion config plus content-match rules and cross-source window round-trip`() {
         val original =
             advancedStrategy().copy(
                 contentMatchRules =
