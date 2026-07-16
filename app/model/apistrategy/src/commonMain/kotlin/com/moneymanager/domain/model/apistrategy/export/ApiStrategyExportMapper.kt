@@ -47,6 +47,8 @@ object ApiStrategyExportMapper {
             rateLimitErrorSubstrings = export.rateLimitErrorSubstrings,
             rateLimitBackoffMillis = export.rateLimitBackoffMillis,
             maxRateLimitRetries = export.maxRateLimitRetries,
+            assetSuffixesToStrip = export.assetSuffixesToStrip,
+            minorUnitDivisorOverrides = export.minorUnitDivisorOverrides,
             createdAt = now,
             updatedAt = now,
         )
@@ -82,5 +84,7 @@ object ApiStrategyExportMapper {
             rateLimitErrorSubstrings = strategy.rateLimitErrorSubstrings,
             rateLimitBackoffMillis = strategy.rateLimitBackoffMillis,
             maxRateLimitRetries = strategy.maxRateLimitRetries,
+            assetSuffixesToStrip = strategy.assetSuffixesToStrip,
+            minorUnitDivisorOverrides = strategy.minorUnitDivisorOverrides,
         )
 }

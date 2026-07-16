@@ -71,6 +71,8 @@ object ApiImportStrategyAuditEntryMapper {
                 rateLimitErrorSubstrings = raw.rateLimitErrorSubstrings,
                 rateLimitBackoffMillis = raw.rateLimitBackoffMillis,
                 maxRateLimitRetries = raw.maxRateLimitRetries,
+                assetSuffixesToStrip = raw.assetSuffixesToStrip,
+                minorUnitDivisorOverrides = raw.minorUnitDivisorOverrides,
             )
         return ApiImportStrategyAuditEntry(
             id = from.id,

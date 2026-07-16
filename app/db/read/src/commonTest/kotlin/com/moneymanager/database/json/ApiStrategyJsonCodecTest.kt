@@ -168,6 +168,8 @@ class ApiStrategyJsonCodecTest {
                 rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
                 rateLimitBackoffMillis = 5_000L,
                 maxRateLimitRetries = 6,
+                assetSuffixesToStrip = setOf(".F", ".S", ".M"),
+                minorUnitDivisorOverrides = mapOf("GBP" to 1000L),
                 dataEndpoints =
                     listOf(
                         ApiDataEndpoint(

@@ -69,7 +69,7 @@ object DatabaseConfig {
                         assetWriteQueries.insert()
                         assetWriteQueries.lastInsertedId().executeAsOne()
                     }
-                currencyWriteQueries.insert(currencyId, currency.code, currency.displayName, scaleFactor.toLong())
+                currencyWriteQueries.insert(currencyId, currency.code, currency.displayName, scaleFactor)
                 recordSource(
                     DeviceId(WellKnownIds.SYSTEM_DEVICE_ID),
                     EntityType.CURRENCY,

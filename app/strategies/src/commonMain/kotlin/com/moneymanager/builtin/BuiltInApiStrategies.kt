@@ -83,6 +83,10 @@ object BuiltInApiStrategies {
             accountMappings =
                 ApiAccountMappings(
                     ownerNameField = "preferred_name",
+                    // Monzo's account "description" is the account holder's own user id, not a
+                    // display name — Monzo's API has no field meant for this, so use a fixed name
+                    // ("Monzo Joint" for a joint account, detected by having more than one owner).
+                    staticAccountName = "Monzo",
                 ),
             transactionMappings =
                 ApiTransactionMappings(
@@ -722,6 +726,33 @@ object BuiltInApiStrategies {
                         fixedDirection = TransferDirection.OUT,
                         transactionMappings = ledgerMappings("refid"),
                     ),
+                    // Earn/staking reward payouts. Kraken's own docs disagree on the ledger type value
+                    // ("reward" vs "staking") between endpoints — both are requested; whichever the
+                    // account doesn't use simply returns an empty ledger.
+                    ApiDataEndpoint(
+                        signed(
+                            "0/private/Ledgers",
+                            "result.ledger",
+                            responseObjectValues = true,
+                            itemKeyField = "ledger_id",
+                            queryParams = listOf(ApiQueryParam(name = "type", value = "reward")),
+                        ),
+                        ApiEndpointKind.DEPOSITS,
+                        fixedDirection = TransferDirection.IN,
+                        transactionMappings = ledgerMappings("refid"),
+                    ),
+                    ApiDataEndpoint(
+                        signed(
+                            "0/private/Ledgers",
+                            "result.ledger",
+                            responseObjectValues = true,
+                            itemKeyField = "ledger_id",
+                            queryParams = listOf(ApiQueryParam(name = "type", value = "staking")),
+                        ),
+                        ApiEndpointKind.DEPOSITS,
+                        fixedDirection = TransferDirection.IN,
+                        transactionMappings = ledgerMappings("refid"),
+                    ),
                     // Known limitation: Kraken paginates these funding-status endpoints with an opaque
                     // cursor token (not the offset/date-window shapes the generic engine implements), so
                     // only the first page is fetched here — enrichment (on-chain address/txid) beyond
@@ -743,6 +774,10 @@ object BuiltInApiStrategies {
                     ),
                 ),
             assetAliases = assetAliasMap,
+            // Kraken Earn holdings use a suffixed asset code for the same underlying asset (e.g. the
+            // "Flexible Earn" ETH position is "XETH.F", staked is "XETH.S"); strip it so the position's
+            // deposit/withdrawal ledger entries resolve to the ordinary "ETH" asset like any other.
+            assetSuffixesToStrip = setOf(".F", ".S", ".M"),
             // Starter-tier decay is 0.33 counter/sec (Kraken's slowest verification tier), so 1 unit of
             // cost needs ~3.03s to fully decay; 3100ms per unit keeps even the slowest tier clear of
             // "EAPI:Rate limit exceeded" with a small margin. requestCostWeight above scales this per

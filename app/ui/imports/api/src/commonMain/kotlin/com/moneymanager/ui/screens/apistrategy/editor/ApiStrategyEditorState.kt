@@ -87,6 +87,8 @@ internal class ApiStrategyEditorState(
     var syntheticAccount by mutableStateOf(initial?.syntheticAccount)
     var internalTransferReconcile by mutableStateOf(initial?.internalTransferReconcile)
     var assetAliases by mutableStateOf(initial?.assetAliases.orEmpty())
+    var assetSuffixesToStrip by mutableStateOf(initial?.assetSuffixesToStrip.orEmpty())
+    var minorUnitDivisorOverrides by mutableStateOf(initial?.minorUnitDivisorOverrides.orEmpty())
 
     val generalHasError: Boolean
         get() =
@@ -182,6 +184,8 @@ internal class ApiStrategyEditorState(
             syntheticAccount = syntheticAccount,
             internalTransferReconcile = internalTransferReconcile,
             assetAliases = assetAliases,
+            assetSuffixesToStrip = assetSuffixesToStrip,
+            minorUnitDivisorOverrides = minorUnitDivisorOverrides,
         )
 }
 

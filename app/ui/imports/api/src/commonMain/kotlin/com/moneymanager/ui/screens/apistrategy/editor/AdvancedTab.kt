@@ -88,5 +88,37 @@ internal fun AdvancedTab(
             valueLabel = "Canonical code",
             enabled = enabled,
         )
+        Text(
+            text =
+                "Suffixes stripped from a raw code before the alias/currency lookup above (e.g. Kraken's " +
+                    "Earn holding \"XETH.F\" -> \"XETH\").",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        StringSetEditor(
+            label = "Suffixes to strip",
+            values = state.assetSuffixesToStrip,
+            onChange = { state.assetSuffixesToStrip = it },
+            enabled = enabled,
+        )
+
+        HorizontalDivider()
+        SectionHeader("Minor-unit divisor overrides")
+        Text(
+            text =
+                "Only used when a transaction/fee amount is in \"integer minor units\" format (e.g. " +
+                    "Monzo's pence). Overrides the ISO 4217 standard divisor for a currency this " +
+                    "provider reports differently (e.g. 1000 instead of the standard 100).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        StringLongMapEditor(
+            label = "Overrides (currency code -> divisor)",
+            entries = state.minorUnitDivisorOverrides,
+            onChange = { state.minorUnitDivisorOverrides = it },
+            keyLabel = "Currency code",
+            valueLabel = "Divisor",
+            enabled = enabled,
+        )
     }
 }

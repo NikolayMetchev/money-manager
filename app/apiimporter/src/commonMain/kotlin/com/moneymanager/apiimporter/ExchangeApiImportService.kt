@@ -508,16 +508,22 @@ suspend fun importApiSessionExchange(
                 ?: strategy.dataEndpoints.firstOrNull { request.url.contains(it.endpoint.path) }
                 ?: return@forEach
         val items =
-            responseItemsArray(
+            responseItemsWithKeys(
                 response.json,
                 dataEndpoint.endpoint.responseArrayKey,
                 dataEndpoint.endpoint.responseObjectValues,
                 dataEndpoint.endpoint.itemKeyField,
             ) ?: return@forEach
-        items.forEachIndexed { index, element ->
+        items.forEachIndexed { index, (key, element) ->
             (element as? JsonObject)?.let {
-                // The real JSON path of this item so the audit view can expand to the exact node.
-                val jsonPath = arrayItemJsonPath(dataEndpoint.endpoint.responseArrayKey, index).value
+                // The real JSON path of this item so the audit view can expand to the exact node —
+                // the object's own key for a keyed-object response (Kraken), else an array index.
+                val jsonPath =
+                    if (key != null) {
+                        keyedItemJsonPath(dataEndpoint.endpoint.responseArrayKey, key).value
+                    } else {
+                        arrayItemJsonPath(dataEndpoint.endpoint.responseArrayKey, index).value
+                    }
                 parseExchangeItem(it, dataEndpoint, response.requestId, jsonPath, parsed)
             }
         }
@@ -527,7 +533,16 @@ suspend fun importApiSessionExchange(
     // currency/crypto lookup, so an aliased code and its canonical form always resolve to one asset.
     val aliases = strategy.assetAliases.mapKeys { it.key.uppercase() }
 
-    fun canonicalAsset(code: String): String = aliases[code.uppercase()] ?: code
+    // Strip a suffix that marks a sub-holding of the same asset (e.g. Kraken's Earn positions
+    // "XETH.F"/"XETH.S") before alias/currency lookup — otherwise the suffixed code fails resolution
+    // and the item is silently dropped.
+    fun stripAssetSuffix(code: String): String =
+        strategy.assetSuffixesToStrip
+            .firstOrNull { code.endsWith(it, ignoreCase = true) }
+            ?.let { code.dropLast(it.length) }
+            ?: code
+
+    fun canonicalAsset(code: String): String = stripAssetSuffix(code).let { aliases[it.uppercase()] ?: it }
     val trades =
         parsed.trades.map {
             it.copy(

@@ -206,6 +206,13 @@ data class ApiAccountMappings(
     val currencyField: String? = null,
     val customFields: Map<String, String> = emptyMap(),
     val uniqueIdentifierFields: Set<String> = emptySet(),
+    /**
+     * A fixed display name for every account this strategy creates, overriding [descriptionField]
+     * (some providers' account "description" is an internal identifier never meant for display, e.g.
+     * Monzo's is the account holder's own user id). A joint account (more than one resolved owner)
+     * gets " Joint" appended so it's distinguishable from the holder's individual account.
+     */
+    val staticAccountName: String? = null,
 )
 
 /** How a transaction amount value is encoded in the API response. */
@@ -883,4 +890,12 @@ data class ApiStrategyConfig(
     val rateLimitBackoffMillis: Long = 5_000L,
     /** Maximum retries for a request repeatedly classified as rate-limited before giving up. */
     val maxRateLimitRetries: Int = 5,
+    /**
+     * Suffixes stripped from a raw asset code before [assetAliases]/currency lookup (e.g. Kraken's
+     * Earn-holding codes "XETH.F"/"XETH.S" -> "XETH"). Without this, a suffixed code fails asset
+     * resolution and its transfer is silently dropped.
+     */
+    val assetSuffixesToStrip: Set<String> = emptySet(),
+    /** Overrides the ISO 4217 minor-unit divisor for a MINOR_UNITS_INTEGER amount (see the field doc). */
+    val minorUnitDivisorOverrides: Map<String, Long> = emptyMap(),
 )

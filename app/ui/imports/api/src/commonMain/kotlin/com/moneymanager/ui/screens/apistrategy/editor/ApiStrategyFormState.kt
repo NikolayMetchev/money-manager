@@ -50,6 +50,8 @@ data class ApiStrategyFormState(
     val syntheticAccount: ApiSyntheticAccount?,
     val internalTransferReconcile: ApiInternalTransferReconcile?,
     val assetAliases: Map<String, String>,
+    val assetSuffixesToStrip: Set<String>,
+    val minorUnitDivisorOverrides: Map<String, Long>,
 )
 
 /** Projects a mapping's `customFields` map + `uniqueIdentifierFields` set onto editable rows. */
@@ -96,6 +98,8 @@ fun extractFormStateFromStrategy(strategy: ApiImportStrategy): ApiStrategyFormSt
         syntheticAccount = strategy.syntheticAccount,
         internalTransferReconcile = strategy.internalTransferReconcile,
         assetAliases = strategy.assetAliases,
+        assetSuffixesToStrip = strategy.assetSuffixesToStrip,
+        minorUnitDivisorOverrides = strategy.minorUnitDivisorOverrides,
     )
 
 /** Reassembles an [ApiImportStrategy] from edited form state. The DB regenerates revisionId/configJson. */
@@ -140,6 +144,8 @@ fun buildStrategyFromApiFormState(
         syntheticAccount = state.syntheticAccount,
         internalTransferReconcile = state.internalTransferReconcile,
         assetAliases = state.assetAliases,
+        assetSuffixesToStrip = state.assetSuffixesToStrip,
+        minorUnitDivisorOverrides = state.minorUnitDivisorOverrides,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

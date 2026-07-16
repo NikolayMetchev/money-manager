@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.IsoMinorUnitDivisors
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -21,6 +22,7 @@ import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
@@ -1013,7 +1015,7 @@ private suspend fun resolveOwnAccountKey(
     val (sortCode, accountNumber) = account.bankDetails()
     return setup.accountResolver.resolveSourceAccount(
         externalId = account.id,
-        name = account.displayName(),
+        name = account.displayName(setup.strategy.accountMappings),
         sortCode = sortCode,
         accountNumber = accountNumber,
         source = setup.accountApiSourceByExternalId[account.id]?.toSource() ?: Source.Api(setup.sessionId),
@@ -1775,7 +1777,7 @@ private suspend fun prepareValidTransactionItem(
             requestId = context.requestId,
             jsonPath = item.counterpartyJsonPath(setup.strategy.peopleMappings),
         )
-    val data = item.toTransferData(currency)
+    val data = item.toTransferData(currency, setup.strategy.minorUnitDivisorOverrides)
     // A pass-through (conduit) charge such as Curve, detected from the description (e.g. "CRV*…"). An
     // outgoing spend becomes the funding leg own -> conduit and the engine adds the spend leg conduit ->
     // merchant; an incoming refund/cancellation ("Refund: CRV*…") runs both legs the other way. Detection
@@ -1931,7 +1933,8 @@ private suspend fun buildImportFee(
         }
     val feeMoney =
         when {
-            item.feeAmountMinorUnits != null -> Money(item.feeAmountMinorUnits.absoluteValue, feeCurrency)
+            item.feeAmountMinorUnits != null ->
+                minorUnitsToMoney(item.feeAmountMinorUnits.absoluteValue, feeCurrency, setup.strategy.minorUnitDivisorOverrides)
             item.feeAmountDecimalMajor != null -> Money.fromDisplayValue(item.feeAmountDecimalMajor, feeCurrency)
             else -> return null
         }
@@ -2178,6 +2181,12 @@ internal fun arrayItemJsonPath(
     index: Int,
 ): JsonPath = if (responseArrayKey.isBlank()) JsonPath("$[$index]") else JsonPath("$.$responseArrayKey[$index]")
 
+/** The real JSON path of an item inside a keyed-object response (see [responseItemsWithKeys]). */
+internal fun keyedItemJsonPath(
+    responseArrayKey: String,
+    key: String,
+): JsonPath = if (responseArrayKey.isBlank()) JsonPath("$.$key") else JsonPath("$.$responseArrayKey.$key")
+
 /**
  * Extracts the items array from a response body; a blank [responseArrayKey] means the body is the
  * array. A bare JSON object body (e.g. a single-resource endpoint like Starling's account holder) is
@@ -2194,29 +2203,44 @@ internal fun responseItemsArray(
     responseObjectValues: Boolean = false,
     itemKeyField: String? = null,
 ): JsonArray? =
+    responseItemsWithKeys(json, responseArrayKey, responseObjectValues, itemKeyField)
+        ?.let { items -> JsonArray(items.map { (_, item) -> item }) }
+
+/**
+ * Like [responseItemsArray], but pairs each item with the real JSON-path key it lives at: the
+ * object's own key for a keyed-object response ([responseObjectValues] — e.g. Kraken's
+ * `result.trades`/`result.ledger`), or null for a plain array (callers fall back to an index-based
+ * path via [arrayItemJsonPath]). Without this, an audit entry for a keyed-object item stored a
+ * fabricated array-index path (e.g. `result.trades[3]`) that doesn't exist in the actual response, so
+ * the "view origin" link couldn't locate it.
+ */
+internal fun responseItemsWithKeys(
+    json: String,
+    responseArrayKey: String,
+    responseObjectValues: Boolean = false,
+    itemKeyField: String? = null,
+): List<Pair<String?, JsonElement>>? =
     try {
         val root = Json.parseToJsonElement(json)
         val resolved = if (responseArrayKey.isBlank()) root else root.resolveJsonPathElement(responseArrayKey)
         if (responseObjectValues) {
-            (resolved as? JsonObject)?.let { obj ->
-                JsonArray(
-                    obj.entries.map { (key, value) ->
-                        if (itemKeyField != null && value is JsonObject) {
-                            JsonObject(value.toMutableMap().apply { put(itemKeyField, JsonPrimitive(key)) })
-                        } else {
-                            value
-                        }
-                    },
-                )
+            (resolved as? JsonObject)?.entries?.map { (key, value) ->
+                val item =
+                    if (itemKeyField != null && value is JsonObject) {
+                        JsonObject(value.toMutableMap().apply { put(itemKeyField, JsonPrimitive(key)) })
+                    } else {
+                        value
+                    }
+                key to item
             }
         } else if (responseArrayKey.isBlank()) {
             when (root) {
-                is JsonArray -> root
-                is JsonObject -> JsonArray(listOf(root))
+                is JsonArray -> root.map { null to it }
+                is JsonObject -> listOf(null to root)
                 else -> null
             }
         } else {
-            resolved as? JsonArray
+            (resolved as? JsonArray)?.map { null to it }
         }
     } catch (e: SerializationException) {
         logger.error(e) { "Failed to parse API response array (key='$responseArrayKey')" }
@@ -2862,7 +2886,9 @@ private class CurrencyCache(
         }
 }
 
-private fun ApiImportAccount.displayName(): String = description.ifBlank { id }
+private fun ApiImportAccount.displayName(mappings: ApiAccountMappings): String =
+    mappings.staticAccountName?.let { if (owners.size > 1) "$it Joint" else it }
+        ?: description.ifBlank { id }
 
 private fun ApiTransactionPageItem.counterpartyName(nameMappings: CounterpartyNameMappings): String =
     cleanCounterpartyName(nameMappings) ?: description.ifBlank { "Unknown" }
@@ -2892,10 +2918,31 @@ private data class TransferData(
     val isIncoming: Boolean,
 )
 
-private fun ApiTransactionPageItem.toTransferData(currency: Currency): TransferData {
+/**
+ * Converts a raw integer a bank API reports in its own ISO 4217 minor units (e.g. Monzo's `1234`
+ * meaning £12.34) into [Money] at the app's storage precision. Constructing `Money` directly from
+ * the raw integer would treat it as already being in the app's own (much higher) storage scale,
+ * silently truncating every amount toward zero — the provider's minor-unit width and the app's
+ * storage scale are unrelated (see [IsoMinorUnitDivisors]). [divisorOverrides] lets a strategy correct
+ * a provider that doesn't follow the ISO standard for a given currency.
+ */
+internal fun minorUnitsToMoney(
+    rawMinorUnits: Long,
+    currency: Currency,
+    divisorOverrides: Map<String, Long>,
+): Money {
+    val divisor = divisorOverrides[currency.code.uppercase()] ?: IsoMinorUnitDivisors.getDivisor(currency.code)
+    val displayValue = BigDecimal(rawMinorUnits) / BigDecimal(divisor)
+    return Money.fromDisplayValue(displayValue, currency)
+}
+
+private fun ApiTransactionPageItem.toTransferData(
+    currency: Currency,
+    minorUnitDivisorOverrides: Map<String, Long>,
+): TransferData {
     val money =
         when {
-            amountMinorUnits != null -> Money(amountMinorUnits.absoluteValue, currency)
+            amountMinorUnits != null -> minorUnitsToMoney(amountMinorUnits.absoluteValue, currency, minorUnitDivisorOverrides)
             amountDecimalMajor != null -> Money.fromDisplayValue(amountDecimalMajor, currency)
             else -> Money(0L, currency)
         }

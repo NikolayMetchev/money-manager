@@ -1,115 +1,37 @@
 package com.moneymanager.domain.model
 
 /**
- * ISO 4217 currency scale factor lookup utility.
+ * Scale factor for newly-created currencies.
  *
- * Provides scale factors for currencies based on ISO 4217 standard.
- * Scale factor is 10^decimalPlaces (e.g., for 2 decimal places, scale factor is 100).
- *
- * Most currencies use 2 decimal places (scale factor 100).
- * Some currencies use 0 decimal places (scale factor 1).
- * A few currencies use 3 decimal places (scale factor 1000).
+ * Every currency uses the same scale as crypto assets ([CryptoAsset.CRYPTO_SCALE_FACTOR]) rather
+ * than its ISO 4217 decimal-place count. An exchange-reported amount can legitimately carry more
+ * precision than a currency's nominal decimal places (e.g. Kraken quotes a GBP trade's cost/fee at
+ * the crypto pair's price precision, landing sub-penny), and that precision must not be rounded
+ * away to fit a narrower scale. Display formatting is unaffected: it is locale/ISO-currency driven
+ * (see `utils/currency`), independent of the stored scale.
  */
 object CurrencyScaleFactors {
     /**
-     * Default scale factor for currencies not explicitly listed.
-     * Follows the ISO 4217 standard default of 2 decimal places.
+     * The scale factor assigned to every currency (fiat or otherwise) — see the class doc for why
+     * this isn't ISO-4217-based.
      */
-    const val DEFAULT_SCALE_FACTOR = 100
+    const val DEFAULT_SCALE_FACTOR: Long = CryptoAsset.CRYPTO_SCALE_FACTOR
 
     /**
-     * Map of ISO 4217 currency codes to their scale factors.
-     * Only includes currencies that differ from the default (100).
+     * The scale factor for a given ISO 4217 currency code. Always [DEFAULT_SCALE_FACTOR] — kept as a
+     * function (rather than callers referencing the constant directly) so a future currency-specific
+     * override has one call site to change.
      */
-    private val scaleFactors =
-        mapOf(
-            // Currencies with 0 decimal places (scale factor = 1)
-            // Burundian Franc
-            "BIF" to 1,
-            // Chilean Peso
-            "CLP" to 1,
-            // Djiboutian Franc
-            "DJF" to 1,
-            // Guinean Franc
-            "GNF" to 1,
-            // Icelandic Króna
-            "ISK" to 1,
-            // Japanese Yen
-            "JPY" to 1,
-            // Comorian Franc
-            "KMF" to 1,
-            // South Korean Won
-            "KRW" to 1,
-            // Paraguayan Guaraní
-            "PYG" to 1,
-            // Rwandan Franc
-            "RWF" to 1,
-            // Ugandan Shilling
-            "UGX" to 1,
-            // Uruguay Peso en Unidades Indexadas
-            "UYI" to 1,
-            // Vietnamese Đồng
-            "VND" to 1,
-            // Vanuatu Vatu
-            "VUV" to 1,
-            // Central African CFA Franc
-            "XAF" to 1,
-            // West African CFA Franc
-            "XOF" to 1,
-            // CFP Franc
-            "XPF" to 1,
-            // Currencies with 3 decimal places (scale factor = 1000)
-            // Bahraini Dinar
-            "BHD" to 1000,
-            // Iraqi Dinar
-            "IQD" to 1000,
-            // Jordanian Dinar
-            "JOD" to 1000,
-            // Kuwaiti Dinar
-            "KWD" to 1000,
-            // Libyan Dinar
-            "LYD" to 1000,
-            // Omani Rial
-            "OMR" to 1000,
-            // Tunisian Dinar
-            "TND" to 1000,
-            // Cryptocurrencies and special currencies (4-8 decimal places)
-            // Note: These are not officially ISO 4217 but included for completeness
-            // BTC: 8 decimal places = 100,000,000 satoshis
-            // ETH: 18 decimal places (impractical for INTEGER storage)
-            // For now, we only include traditional fiat currencies
-        )
+    fun getScaleFactor(currencyCode: String): Long = DEFAULT_SCALE_FACTOR
 
-    /**
-     * Gets the scale factor for a given ISO 4217 currency code.
-     *
-     * @param currencyCode The ISO 4217 currency code (e.g., "USD", "JPY", "BHD")
-     * @return The scale factor for the currency (e.g., 100 for USD, 1 for JPY, 1000 for BHD)
-     */
-    fun getScaleFactor(currencyCode: String): Int = scaleFactors[currencyCode.uppercase()] ?: DEFAULT_SCALE_FACTOR
-
-    /**
-     * Gets the number of decimal places for a given ISO 4217 currency code.
-     *
-     * @param currencyCode The ISO 4217 currency code (e.g., "USD", "JPY", "BHD")
-     * @return The number of decimal places for the currency (e.g., 2 for USD, 0 for JPY, 3 for BHD)
-     */
-    fun getDecimalPlaces(currencyCode: String): Int =
-        when (val scaleFactor = getScaleFactor(currencyCode)) {
-            1 -> 0
-            10 -> 1
-            100 -> 2
-            1000 -> 3
-            10000 -> 4
-            else -> {
-                // Calculate decimal places from scale factor
-                var factor = scaleFactor
-                var places = 0
-                while (factor > 1) {
-                    factor /= 10
-                    places++
-                }
-                places
-            }
+    /** The number of decimal places implied by [getScaleFactor]. */
+    fun getDecimalPlaces(currencyCode: String): Int {
+        var factor = getScaleFactor(currencyCode)
+        var places = 0
+        while (factor > 1) {
+            factor /= 10
+            places++
         }
+        return places
+    }
 }

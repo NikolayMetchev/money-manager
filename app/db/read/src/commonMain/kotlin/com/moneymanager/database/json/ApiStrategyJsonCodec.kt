@@ -45,6 +45,8 @@ data class ApiStrategyConfigJson(
     val rateLimitErrorSubstrings: List<String> = emptyList(),
     val rateLimitBackoffMillis: Long = 5_000L,
     val maxRateLimitRetries: Int = 5,
+    val assetSuffixesToStrip: Set<String> = emptySet(),
+    val minorUnitDivisorOverrides: Map<String, Long> = emptyMap(),
 )
 
 /**

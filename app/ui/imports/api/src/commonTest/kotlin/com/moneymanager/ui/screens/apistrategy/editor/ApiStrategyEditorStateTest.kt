@@ -125,6 +125,8 @@ class ApiStrategyEditorStateTest {
             rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
             rateLimitBackoffMillis = 5_000L,
             maxRateLimitRetries = 6,
+            assetSuffixesToStrip = setOf(".F", ".S", ".M"),
+            minorUnitDivisorOverrides = mapOf("GBP" to 1000L),
             // A Kraken-style recipe: exercises the recursive Sha256 SigPart nesting.
             requestSigning =
                 ApiRequestSigningConfig(

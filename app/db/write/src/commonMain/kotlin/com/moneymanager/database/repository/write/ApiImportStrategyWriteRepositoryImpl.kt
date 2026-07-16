@@ -109,5 +109,7 @@ class ApiImportStrategyWriteRepositoryImpl(
             rateLimitErrorSubstrings = rateLimitErrorSubstrings,
             rateLimitBackoffMillis = rateLimitBackoffMillis,
             maxRateLimitRetries = maxRateLimitRetries,
+            assetSuffixesToStrip = assetSuffixesToStrip,
+            minorUnitDivisorOverrides = minorUnitDivisorOverrides,
         )
 }

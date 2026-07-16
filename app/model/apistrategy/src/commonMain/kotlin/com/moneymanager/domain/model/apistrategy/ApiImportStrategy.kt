@@ -65,6 +65,20 @@ data class ApiImportStrategy(
     val rateLimitBackoffMillis: Long = 5_000L,
     /** Maximum retries for a request repeatedly classified as rate-limited before giving up. */
     val maxRateLimitRetries: Int = 5,
+    /**
+     * Suffixes stripped from a raw asset code before [assetAliases]/currency lookup (e.g. Kraken's
+     * Earn-holding codes "XETH.F"/"XETH.S" -> "XETH"). Without this, a suffixed code fails asset
+     * resolution and its transfer is silently dropped.
+     */
+    val assetSuffixesToStrip: Set<String> = emptySet(),
+    /**
+     * Overrides [com.moneymanager.domain.model.IsoMinorUnitDivisors]' per-currency divisor for
+     * interpreting a [com.moneymanager.domain.model.apistrategy.ApiAmountFormat.MINOR_UNITS_INTEGER]
+     * amount (a bank API's raw integer in its own minor units). Only meaningful for a strategy using
+     * that format; a provider whose minor-unit width doesn't follow the ISO 4217 standard for a given
+     * currency can be corrected here instead of the global table.
+     */
+    val minorUnitDivisorOverrides: Map<String, Long> = emptyMap(),
     val createdAt: Instant,
     val updatedAt: Instant,
     val revisionId: Long = 1,

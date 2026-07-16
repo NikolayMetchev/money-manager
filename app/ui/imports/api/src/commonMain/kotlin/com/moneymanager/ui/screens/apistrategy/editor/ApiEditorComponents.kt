@@ -480,6 +480,81 @@ internal fun StringMapEditor(
     }
 }
 
+/** Like [StringMapEditor], but the value is a [Long] (e.g. a per-currency divisor override). */
+@Composable
+internal fun StringLongMapEditor(
+    label: String,
+    entries: Map<String, Long>,
+    onChange: (Map<String, Long>) -> Unit,
+    keyLabel: String = "Key",
+    valueLabel: String = "Value",
+    enabled: Boolean = true,
+) {
+    val rows = remember { entries.toList().toMutableStateList() }
+    val valueText = remember { rows.map { (_, value) -> value.toString() }.toMutableStateList() }
+
+    fun emit() {
+        onChange(
+            rows.indices
+                .mapNotNull { index ->
+                    val key = rows[index].first
+                    val value = valueText[index].toLongOrNull()
+                    if (key.isBlank() || value == null) null else key to value
+                }.toMap(),
+        )
+    }
+    Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    rows.forEachIndexed { index, (key, _) ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = key,
+                onValueChange = { updated ->
+                    rows[index] = updated to rows[index].second
+                    emit()
+                },
+                label = { Text(keyLabel) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                enabled = enabled,
+            )
+            OutlinedTextField(
+                value = valueText[index],
+                onValueChange = { updated ->
+                    valueText[index] = updated
+                    emit()
+                },
+                label = { Text(valueLabel) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                enabled = enabled,
+                isError = valueText[index].toLongOrNull() == null,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+            IconButton(
+                onClick = {
+                    rows.removeAt(index)
+                    valueText.removeAt(index)
+                    emit()
+                },
+                enabled = enabled,
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Remove entry", tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    TextButton(
+        onClick = {
+            rows.add("" to 0L)
+            valueText.add("")
+        },
+        enabled = enabled,
+    ) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(Modifier.width(4.dp))
+        Text("Add entry")
+    }
+}
+
 /** Expandable list of user-defined custom field mappings with add and remove controls. */
 @Composable
 internal fun CustomFieldsSection(

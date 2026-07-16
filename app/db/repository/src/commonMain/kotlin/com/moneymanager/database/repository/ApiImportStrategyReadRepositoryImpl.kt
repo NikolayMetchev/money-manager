@@ -74,6 +74,8 @@ class ApiImportStrategyReadRepositoryImpl(
             rateLimitErrorSubstrings = config.rateLimitErrorSubstrings,
             rateLimitBackoffMillis = config.rateLimitBackoffMillis,
             maxRateLimitRetries = config.maxRateLimitRetries,
+            assetSuffixesToStrip = config.assetSuffixesToStrip,
+            minorUnitDivisorOverrides = config.minorUnitDivisorOverrides,
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
             revisionId = entity.revision_id,

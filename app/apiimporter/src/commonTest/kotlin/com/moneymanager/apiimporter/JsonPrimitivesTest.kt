@@ -1,5 +1,8 @@
 package com.moneymanager.apiimporter
 
+import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -71,6 +74,44 @@ class JsonPrimitivesTest {
         val plain = responseItemsArray(json, "result.ledger", responseObjectValues = true)
         assertEquals(2, plain?.size)
         assertEquals(null, (plain?.first() as? JsonObject)?.get("ledger_id"))
+    }
+
+    @Test
+    fun `keyed-object items report their real key so audit paths can locate them`() {
+        val json = """{ "result": { "ledger": {
+            "LG1": { "asset": "XXBT", "amount": "0.01" },
+            "LG2": { "asset": "ZUSD", "amount": "100" }
+        } } }"""
+        val items = responseItemsWithKeys(json, "result.ledger", responseObjectValues = true, itemKeyField = "ledger_id")
+        assertEquals(listOf("LG1", "LG2"), items?.map { (key, _) -> key })
+        assertEquals(JsonPath("$.result.ledger.LG1"), keyedItemJsonPath("result.ledger", "LG1"))
+
+        // Round-trips through the app's own path resolver, proving the audit link actually finds it.
+        val root = Json.parseToJsonElement(json)
+        val resolved = root.resolveJsonPathElement(keyedItemJsonPath("result.ledger", "LG1").value.removePrefix("$."))
+        assertEquals("0.01", ((resolved as? JsonObject)?.get("amount") as? JsonPrimitive)?.content)
+    }
+
+    @Test
+    fun `plain array items report no key, falling back to index paths`() {
+        val json = """{ "trades": [ { "id": "T1" }, { "id": "T2" } ] }"""
+        val items = responseItemsWithKeys(json, "trades")
+        assertEquals(listOf<String?>(null, null), items?.map { (key, _) -> key })
+    }
+
+    @Test
+    fun `minor-units integer is divided by the ISO standard divisor, not the storage scale`() {
+        val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = 1_000_000_000_000_000_000L)
+        // 4194 pence == £41.94, regardless of GBP's much larger internal storage scale.
+        val money = minorUnitsToMoney(4194L, gbp, divisorOverrides = emptyMap())
+        assertEquals("41.94", money.toDisplayValue().toString())
+    }
+
+    @Test
+    fun `a strategy divisor override wins over the ISO standard`() {
+        val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = 1_000_000_000_000_000_000L)
+        val money = minorUnitsToMoney(4194L, gbp, divisorOverrides = mapOf("GBP" to 1000L))
+        assertEquals("4.194", money.toDisplayValue().toString())
     }
 
     @Test
