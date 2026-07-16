@@ -332,6 +332,23 @@ private fun defaultRequestSigning(): ApiRequestSigningConfig =
         signature = FieldPlacement(SigFieldLocation.QUERY, "signature"),
     )
 
-/** Whether a request-signing config has its required fields set (used for tab validation). */
+/**
+ * Whether a message part is complete. Only the composite [SigPart.Sha256] can be incomplete — an empty
+ * nested list signs nothing — so it must have parts that are themselves valid; leaf parts are always OK.
+ */
+private fun SigPart.isValidForSave(): Boolean =
+    when (this) {
+        is SigPart.Sha256 -> parts.isNotEmpty() && parts.all { it.isValidForSave() }
+        else -> true
+    }
+
+/** Whether a request-signing config has every required (and enabled-conditional) field set. */
 internal fun ApiRequestSigningConfig.isValidForSave(): Boolean =
-    message.isNotEmpty() && apiKey.name.isNotBlank() && signature.name.isNotBlank() && nonce.placement.name.isNotBlank()
+    message.isNotEmpty() &&
+        message.all { it.isValidForSave() } &&
+        apiKey.name.isNotBlank() &&
+        signature.name.isNotBlank() &&
+        nonce.placement.name.isNotBlank() &&
+        (requestId?.placement?.name?.isNotBlank() ?: true) &&
+        (method?.name?.isNotBlank() ?: true) &&
+        (bodyFormat != BodyFormat.JSON_ENVELOPE || !paramsEnvelopeKey.isNullOrBlank())

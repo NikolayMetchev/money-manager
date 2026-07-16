@@ -17,6 +17,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
@@ -117,7 +118,12 @@ private fun DataEndpointEditor(
         label = "Kind",
         options = ApiEndpointKind.entries,
         selected = dataEndpoint.kind,
-        onSelect = { onChange(dataEndpoint.copy(kind = it)) },
+        // Persist the direction the UI shows by default (IN) when switching to a directional kind,
+        // so a saved deposit/withdrawal endpoint never keeps a null direction the UI rendered as IN.
+        onSelect = { newKind ->
+            val direction = dataEndpoint.fixedDirection ?: TransferDirection.IN.takeIf { newKind in DIRECTIONAL_KINDS }
+            onChange(dataEndpoint.copy(kind = newKind, fixedDirection = direction))
+        },
         optionLabel = { it.name },
         enabled = enabled,
     )
@@ -434,12 +440,20 @@ internal fun InternalTransferReconcileEditor(
             Spacer(Modifier.width(4.dp))
             Text("Add bridge")
         }
-        IntFieldRow("Window (seconds)", c.windowSeconds.toInt(), { onChange(c.copy(windowSeconds = it.toLong())) }, enabled)
+        LongFieldRow(
+            label = "Window (seconds)",
+            value = c.windowSeconds,
+            onValueChange = { onChange(c.copy(windowSeconds = it)) },
+            enabled = enabled,
+            isError = c.windowSeconds <= 0,
+            supportingText = "Must be a positive number of seconds",
+        )
         TextFieldRow(
             label = "Amount tolerance percent",
             value = c.amountTolerancePercent,
             onValueChange = { onChange(c.copy(amountTolerancePercent = it)) },
             enabled = enabled,
+            isError = !c.amountTolerancePercent.isNonNegativeDecimal(),
             supportingText = "Decimal string, e.g. \"0.5\" (allowed amount difference as a percentage)",
         )
     }
@@ -454,32 +468,52 @@ private fun defaultTradeMappings(): ApiTradeMappings =
         idField = "",
     )
 
+private fun ApiTradeMappings.isValidForSave(): Boolean =
+    instrumentField.isNotBlank() &&
+        sideField.isNotBlank() &&
+        baseQuantityField.isNotBlank() &&
+        timestampField.isNotBlank() &&
+        idField.isNotBlank() &&
+        // The base×price / explicit-quote-quantity derivation needs at least one of these.
+        (!priceField.isNullOrBlank() || !quoteQuantityField.isNullOrBlank()) &&
+        when (splitMode) {
+            InstrumentSplitMode.SEPARATOR -> instrumentSeparator.isNotBlank()
+            InstrumentSplitMode.EXPLICIT_FIELDS -> !baseAssetField.isNullOrBlank() && !quoteAssetField.isNullOrBlank()
+            InstrumentSplitMode.QUOTE_SUFFIX -> quoteAssets.isNotEmpty()
+        }
+
+private fun ApiTransactionMappings.isValidForSave(): Boolean =
+    amountField.isNotBlank() &&
+        timestampField.isNotBlank() &&
+        currencyField.isNotBlank() &&
+        descriptionField.isNotBlank() &&
+        idField.isNotBlank() &&
+        (signSource != ApiSignSource.FIELD || !signField.isNullOrBlank())
+
 /** Whether a data-endpoint list is complete enough to save (used for tab validation). */
 internal fun List<ApiDataEndpoint>.isValidForSave(): Boolean =
     all { de ->
         de.endpoint.path.isNotBlank() &&
+            (de.kind !in DIRECTIONAL_KINDS || de.fixedDirection != null) &&
             if (de.kind in TRADE_KINDS) {
-                de.tradeMappings?.let {
-                    it.instrumentField.isNotBlank() &&
-                        it.sideField.isNotBlank() &&
-                        it.baseQuantityField.isNotBlank() &&
-                        it.timestampField.isNotBlank() &&
-                        it.idField.isNotBlank()
-                } ?: false
+                de.tradeMappings?.isValidForSave() ?: false
             } else {
-                de.transactionMappings?.let {
-                    it.amountField.isNotBlank() &&
-                        it.timestampField.isNotBlank() &&
-                        it.currencyField.isNotBlank() &&
-                        it.descriptionField.isNotBlank() &&
-                        it.idField.isNotBlank()
-                } ?: false
+                de.transactionMappings?.isValidForSave() ?: false
             }
     }
 
 /** Whether an internal-transfer-reconcile config is complete enough to save. */
 internal fun ApiInternalTransferReconcile.isValidForSave(): Boolean =
-    bridges.isNotEmpty() && bridges.all { it.otherAccountName.isNotBlank() }
+    bridges.isNotEmpty() &&
+        bridges.all { it.otherAccountName.isNotBlank() } &&
+        windowSeconds > 0 &&
+        amountTolerancePercent.isNonNegativeDecimal()
 
 /** Whether a synthetic-account config is complete enough to save. */
 internal fun ApiSyntheticAccount.isValidForSave(): Boolean = name.isNotBlank() && externalId.isNotBlank()
+
+/**
+ * Whether [this] parses as an exact non-negative decimal. Uses [BigDecimal] (parsed from the string)
+ * rather than a Double, per the repository's monetary-parsing guideline.
+ */
+internal fun String.isNonNegativeDecimal(): Boolean = runCatching { BigDecimal(trim()) }.getOrNull()?.let { it >= BigDecimal.ZERO } ?: false

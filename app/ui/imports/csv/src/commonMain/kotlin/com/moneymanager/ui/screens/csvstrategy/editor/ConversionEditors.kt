@@ -304,7 +304,9 @@ internal fun LongField(
     label: String,
     enabled: Boolean,
 ) {
-    var text by remember { mutableStateOf(value.toString()) }
+    // Keyed on value so an external change to the backing Long resyncs the buffer, while
+    // intermediate invalid input (which doesn't change value) is preserved.
+    var text by remember(value) { mutableStateOf(value.toString()) }
     OutlinedTextField(
         value = text,
         onValueChange = {
