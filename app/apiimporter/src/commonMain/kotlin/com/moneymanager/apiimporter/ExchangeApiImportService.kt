@@ -157,9 +157,10 @@ suspend fun downloadApiSessionExchange(
                 // The nonce must be fresh on every real attempt (a repeated nonce is rejected), so a
                 // retried request is re-signed from scratch rather than resent as-is.
                 val effectiveDelayMillis = (strategy.rateLimitMillis ?: rateLimitMillis) * endpoint.requestCostWeight
-                var pageBody: String?
+                var pageBody: String? = null
                 var rateLimitRetries = 0
-                retryLoop@ while (true) {
+                var keepRetrying = true
+                while (keepRetrying) {
                     val endpointUrl = buildExchangeEndpointUrl(strategy.baseUrl, endpoint.path)
                     val nonce = nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds())
                     lastNonce = nonce
@@ -192,55 +193,56 @@ suspend fun downloadApiSessionExchange(
 
                     if (recordedUrl in downloadedUrls) {
                         pageBody = existingResponseJsonByUrl[recordedUrl]
-                        break@retryLoop
-                    }
-
-                    val method = endpoint.method.name
-                    val response =
-                        apiClient.send(
-                            method,
-                            signed.url,
-                            signed.headers,
-                            signed.body,
-                            signed.contentType,
-                            recordUrl = recordedUrl.takeIf { it != signed.url },
-                        )
-                    val error =
-                        when {
-                            response.statusCode != 200 -> "HTTP ${response.statusCode}: ${response.body}"
-                            !responseCodeOk(
-                                response.body,
-                                endpoint.successCodeField,
-                                endpoint.successCodeOkValue,
-                                endpoint.errorArrayField,
-                            ) -> "API error: ${response.body}"
-                            else -> null
+                        keepRetrying = false
+                    } else {
+                        val method = endpoint.method.name
+                        val response =
+                            apiClient.send(
+                                method,
+                                signed.url,
+                                signed.headers,
+                                signed.body,
+                                signed.contentType,
+                                recordUrl = recordedUrl.takeIf { it != signed.url },
+                            )
+                        val error =
+                            when {
+                                response.statusCode != 200 -> "HTTP ${response.statusCode}: ${response.body}"
+                                !responseCodeOk(
+                                    response.body,
+                                    endpoint.successCodeField,
+                                    endpoint.successCodeOkValue,
+                                    endpoint.errorArrayField,
+                                ) -> "API error: ${response.body}"
+                                else -> null
+                            }
+                        if (error == null) {
+                            responseCount += 1
+                            pageBody = response.body
+                            if (effectiveDelayMillis > 0) delay(effectiveDelayMillis)
+                            keepRetrying = false
+                        } else {
+                            // A rate-limit-shaped error (per the strategy's own config) is transient:
+                            // back off and retry the same request rather than abandoning the rest of
+                            // the endpoint's windows, which previously turned one rate-limit hit into a
+                            // near-empty download.
+                            val isRateLimited = strategy.rateLimitErrorSubstrings.any { error.contains(it, ignoreCase = true) }
+                            if (!isRateLimited || rateLimitRetries >= strategy.maxRateLimitRetries) {
+                                logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
+                                endpointBroken = true
+                                return@forEachIndexed
+                            }
+                            rateLimitRetries += 1
+                            val backoffMillis =
+                                (strategy.rateLimitBackoffMillis * (1L shl (rateLimitRetries - 1)))
+                                    .coerceAtMost(MAX_RATE_LIMIT_BACKOFF_MILLIS)
+                            logger.warn {
+                                "Rate-limited on '${endpoint.path}' " +
+                                    "(attempt $rateLimitRetries/${strategy.maxRateLimitRetries}); retrying in ${backoffMillis}ms"
+                            }
+                            delay(backoffMillis)
                         }
-                    if (error == null) {
-                        responseCount += 1
-                        pageBody = response.body
-                        if (effectiveDelayMillis > 0) delay(effectiveDelayMillis)
-                        break@retryLoop
                     }
-
-                    // A rate-limit-shaped error (per the strategy's own config) is transient: back off
-                    // and retry the same request rather than abandoning the rest of the endpoint's
-                    // windows, which previously turned one rate-limit hit into a near-empty download.
-                    val isRateLimited = strategy.rateLimitErrorSubstrings.any { error.contains(it, ignoreCase = true) }
-                    if (!isRateLimited || rateLimitRetries >= strategy.maxRateLimitRetries) {
-                        logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
-                        endpointBroken = true
-                        return@forEachIndexed
-                    }
-                    rateLimitRetries += 1
-                    val backoffMillis =
-                        (strategy.rateLimitBackoffMillis * (1L shl (rateLimitRetries - 1)))
-                            .coerceAtMost(MAX_RATE_LIMIT_BACKOFF_MILLIS)
-                    logger.warn {
-                        "Rate-limited on '${endpoint.path}' (attempt $rateLimitRetries/${strategy.maxRateLimitRetries}); " +
-                            "retrying in ${backoffMillis}ms"
-                    }
-                    delay(backoffMillis)
                 }
 
                 keepPaging =

@@ -1007,7 +1007,15 @@ private suspend fun buildGlobalHolderOwnerships(
     }
 }
 
-/** Resolves (allocating if needed) the [LocalAccountKey] for a downloaded own account, with its bank details. */
+/**
+ * Resolves (allocating if needed) the [LocalAccountKey] for a downloaded own account, with its bank
+ * details. When [ApiAccountMappings.staticAccountName] is set and this account has no bank details to
+ * disambiguate it, the import engine's own-account matching falls back to reusing an existing
+ * same-named account from this batch (a heuristic meant for merchant/counterparty dedup, e.g. one
+ * provider minting two external ids for one merchant) — which would wrongly merge two genuinely
+ * distinct own accounts that share the static name. [siblingAccounts] lets [displayName] detect that
+ * and append a short disambiguator only when it's actually needed.
+ */
 private suspend fun resolveOwnAccountKey(
     setup: ImportSetup,
     account: ApiImportAccount,
@@ -1015,7 +1023,7 @@ private suspend fun resolveOwnAccountKey(
     val (sortCode, accountNumber) = account.bankDetails()
     return setup.accountResolver.resolveSourceAccount(
         externalId = account.id,
-        name = account.displayName(setup.strategy.accountMappings),
+        name = account.displayName(setup.strategy.accountMappings, setup.accountsById.values),
         sortCode = sortCode,
         accountNumber = accountNumber,
         source = setup.accountApiSourceByExternalId[account.id]?.toSource() ?: Source.Api(setup.sessionId),
@@ -2886,9 +2894,23 @@ private class CurrencyCache(
         }
 }
 
-private fun ApiImportAccount.displayName(mappings: ApiAccountMappings): String =
-    mappings.staticAccountName?.let { if (owners.size > 1) "$it Joint" else it }
-        ?: description.ifBlank { id }
+private fun ApiImportAccount.staticDisplayName(staticName: String): String = if (owners.size > 1) "$staticName Joint" else staticName
+
+/**
+ * Display name for a downloaded own account. When [ApiAccountMappings.staticAccountName] is set, two
+ * genuinely distinct accounts can still land on the identical name (e.g. two personal accounts with no
+ * bank details to tell them apart) — appending a short id suffix only in that case keeps every account
+ * uniquely named without cluttering the common single-account case (see [resolveOwnAccountKey]).
+ */
+private fun ApiImportAccount.displayName(
+    mappings: ApiAccountMappings,
+    siblingAccounts: Collection<ApiImportAccount>,
+): String {
+    val staticName = mappings.staticAccountName ?: return description.ifBlank { id }
+    val name = staticDisplayName(staticName)
+    val collides = siblingAccounts.any { it.id != id && it.staticDisplayName(staticName) == name }
+    return if (collides) "$name (${id.takeLast(6)})" else name
+}
 
 private fun ApiTransactionPageItem.counterpartyName(nameMappings: CounterpartyNameMappings): String =
     cleanCounterpartyName(nameMappings) ?: description.ifBlank { "Unknown" }
