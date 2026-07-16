@@ -146,6 +146,46 @@ internal fun IntFieldRow(
     )
 }
 
+/**
+ * A field that edits a [Long] without narrowing. Keeps its own text buffer (keyed on [value] so an
+ * external change resyncs it) so intermediate empty/invalid input is shown without corrupting the model.
+ */
+@Composable
+internal fun LongFieldRow(
+    label: String,
+    value: Long,
+    onValueChange: (Long) -> Unit,
+    enabled: Boolean = true,
+    isError: Boolean = false,
+    supportingText: String? = null,
+) {
+    var text by remember(value) { mutableStateOf(value.toString()) }
+    val parseError = text.trim().toLongOrNull() == null
+    OutlinedTextField(
+        value = text,
+        onValueChange = {
+            text = it
+            it.trim().toLongOrNull()?.let(onValueChange)
+        },
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        enabled = enabled,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        isError = isError || parseError,
+        supportingText =
+            when {
+                parseError -> {
+                    { Text("Must be a whole number") }
+                }
+                supportingText != null -> {
+                    { Text(supportingText) }
+                }
+                else -> null
+            },
+    )
+}
+
 /** A Switch + label row. */
 @Composable
 internal fun ToggleRow(

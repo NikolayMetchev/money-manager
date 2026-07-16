@@ -3,6 +3,7 @@ package com.moneymanager.ui.screens.apistrategy.editor
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,5 +40,35 @@ internal fun AdvancedTab(
                 enabled = enabled,
             )
         }
+
+        HorizontalDivider()
+        SectionHeader("Proactive request signing (exchanges)")
+        Text(
+            text =
+                "A per-request HMAC signature computed for every call (Crypto.com/Binance/Kraken). Used " +
+                    "when the authentication type is SIGNED.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        RequestSigningEditor(
+            config = state.requestSigning,
+            onChange = { state.requestSigning = it },
+            enabled = enabled,
+        )
+
+        HorizontalDivider()
+        SectionHeader("Internal-transfer reconciliation")
+        Text(
+            text =
+                "Collapse this account's transfers that another owned account records at its own end " +
+                    "(e.g. App→Exchange) into one internal transfer.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        InternalTransferReconcileEditor(
+            config = state.internalTransferReconcile,
+            onChange = { state.internalTransferReconcile = it },
+            enabled = enabled,
+        )
     }
 }

@@ -1,13 +1,17 @@
 package com.moneymanager.ui.screens.csvstrategy.editor
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
@@ -121,6 +125,38 @@ internal fun AdvancedTab(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        Text("Cross-source Reconciliation (Optional)", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Import rows that fuzzy-match an existing transfer from another source (same accounts and " +
+                "amount, timestamps within this window) as excluded+reconciled instead of double-counting. " +
+                "Funding reconciliation above reuses this window.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(
+                checked = state.crossSourceReconcileWindowSeconds != null,
+                onCheckedChange = { checked -> state.crossSourceReconcileWindowSeconds = if (checked) 60 else null },
+                enabled = enabled,
+            )
+            Text(
+                "Enable cross-source reconciliation",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+        state.crossSourceReconcileWindowSeconds?.let { window ->
+            Spacer(modifier = Modifier.height(4.dp))
+            LongField(
+                value = window,
+                onValueChange = { state.crossSourceReconcileWindowSeconds = it },
+                label = "Reconcile window (seconds)",
+                enabled = enabled,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
         Text("Row Preprocessing Rules (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
             "Swap column values and/or flip source/target accounts when conditions match",
@@ -146,6 +182,40 @@ internal fun AdvancedTab(
         CompanionTransactionRulesEditor(
             rules = state.companionTransactionRules,
             onRulesChanged = { state.companionTransactionRules = it },
+            enabled = enabled,
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Content Match Rules (Optional)", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Auto-detect this strategy from row content when the column set is fixed and can't " +
+                "distinguish formats (e.g. QIF). No rules means this strategy is the fallback.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        ContentMatchRulesEditor(
+            rules = state.contentMatchRules,
+            onRulesChanged = { state.contentMatchRules = it },
+            columns = csvColumns,
+            firstRow = firstRow,
+            enabled = enabled,
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Asset Conversions (Optional)", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "For sources that express a conversion as separate debited/credited rows (e.g. crypto.com " +
+                "\"Convert Dust\"): route both legs through a shared account and link them as one event.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        ConversionConfigEditor(
+            config = state.conversionConfig,
+            onConfigChanged = { state.conversionConfig = it },
+            columns = csvColumns,
+            firstRow = firstRow,
             enabled = enabled,
         )
 

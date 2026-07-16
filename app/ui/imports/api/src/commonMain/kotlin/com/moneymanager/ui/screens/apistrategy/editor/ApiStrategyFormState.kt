@@ -3,11 +3,15 @@ package com.moneymanager.ui.screens.apistrategy.editor
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
+import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
+import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
+import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import kotlin.time.Instant
@@ -35,6 +39,10 @@ data class ApiStrategyFormState(
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule>,
     val signing: ApiSigningConfig?,
     val peopleDownload: ApiPersonImportConfig?,
+    val requestSigning: ApiRequestSigningConfig?,
+    val dataEndpoints: List<ApiDataEndpoint>,
+    val syntheticAccount: ApiSyntheticAccount?,
+    val internalTransferReconcile: ApiInternalTransferReconcile?,
 )
 
 /** Projects a mapping's `customFields` map + `uniqueIdentifierFields` set onto editable rows. */
@@ -70,6 +78,10 @@ fun extractFormStateFromStrategy(strategy: ApiImportStrategy): ApiStrategyFormSt
         builtInCounterpartyRules = strategy.builtInCounterpartyRules,
         signing = strategy.signing,
         peopleDownload = strategy.peopleDownload,
+        requestSigning = strategy.requestSigning,
+        dataEndpoints = strategy.dataEndpoints,
+        syntheticAccount = strategy.syntheticAccount,
+        internalTransferReconcile = strategy.internalTransferReconcile,
     )
 
 /** Reassembles an [ApiImportStrategy] from edited form state. The DB regenerates revisionId/configJson. */
@@ -103,6 +115,10 @@ fun buildStrategyFromApiFormState(
         signing = state.signing,
         peopleDownload = state.peopleDownload,
         personExternalIdAttribute = state.personExternalIdAttribute?.trim()?.ifBlank { null },
+        requestSigning = state.requestSigning,
+        dataEndpoints = state.dataEndpoints,
+        syntheticAccount = state.syntheticAccount,
+        internalTransferReconcile = state.internalTransferReconcile,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

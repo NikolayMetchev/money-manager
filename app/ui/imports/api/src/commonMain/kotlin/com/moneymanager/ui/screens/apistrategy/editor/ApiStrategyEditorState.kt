@@ -73,6 +73,14 @@ internal class ApiStrategyEditorState(
     var signing by mutableStateOf(initial?.signing)
     var peopleDownload by mutableStateOf(initial?.peopleDownload)
 
+    // Config-driven exchange fields (crypto.com/Binance/Kraken). Held as domain types directly and
+    // edited on the Endpoints tab (synthetic account, data endpoints) and Advanced tab (request
+    // signing, internal-transfer reconciliation).
+    var requestSigning by mutableStateOf(initial?.requestSigning)
+    var dataEndpoints by mutableStateOf(initial?.dataEndpoints.orEmpty())
+    var syntheticAccount by mutableStateOf(initial?.syntheticAccount)
+    var internalTransferReconcile by mutableStateOf(initial?.internalTransferReconcile)
+
     val generalHasError: Boolean
         get() = name.isBlank() || baseUrl.isBlank()
 
@@ -81,7 +89,14 @@ internal class ApiStrategyEditorState(
             accountsEndpoint.path.isBlank() ||
                 transactionsEndpoint.path.isBlank() ||
                 accountIdentifiersEndpoint?.path?.isBlank() == true ||
-                ancestorEndpoints.any { it.path.isBlank() }
+                ancestorEndpoints.any { it.path.isBlank() } ||
+                syntheticAccount?.let { !it.isValidForSave() } == true ||
+                !dataEndpoints.isValidForSave()
+
+    val advancedHasError: Boolean
+        get() =
+            requestSigning?.let { !it.isValidForSave() } == true ||
+                internalTransferReconcile?.let { !it.isValidForSave() } == true
 
     val accountMappingsHasError: Boolean
         get() = accountMappings.idField.isBlank() || accountMappings.descriptionField.isBlank()
@@ -113,8 +128,7 @@ internal class ApiStrategyEditorState(
             EditorTab.TRANSACTION_MAPPINGS -> transactionMappingsHasError
             EditorTab.PEOPLE -> peopleHasError
             EditorTab.RULES -> rulesHasError
-            // The Advanced tab (request signing) has no required fields, so it never blocks saving.
-            EditorTab.ADVANCED -> false
+            EditorTab.ADVANCED -> advancedHasError
         }
 
     val isValid: Boolean
@@ -124,7 +138,8 @@ internal class ApiStrategyEditorState(
                 !accountMappingsHasError &&
                 !transactionMappingsHasError &&
                 !peopleHasError &&
-                !rulesHasError
+                !rulesHasError &&
+                !advancedHasError
 
     fun toFormState(): ApiStrategyFormState =
         ApiStrategyFormState(
@@ -144,6 +159,10 @@ internal class ApiStrategyEditorState(
             builtInCounterpartyRules = builtInCounterpartyRules,
             signing = signing,
             peopleDownload = peopleDownload,
+            requestSigning = requestSigning,
+            dataEndpoints = dataEndpoints,
+            syntheticAccount = syntheticAccount,
+            internalTransferReconcile = internalTransferReconcile,
         )
 }
 

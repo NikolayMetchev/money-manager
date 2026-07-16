@@ -26,6 +26,22 @@ internal fun EndpointsTab(
     enabled: Boolean,
 ) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        SectionHeader("Synthetic account")
+        Text(
+            text =
+                "For exchanges that hold all assets in one account instead of an accounts endpoint. " +
+                    "When enabled, the accounts endpoint below is not fetched.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SyntheticAccountEditor(
+            account = state.syntheticAccount,
+            onChange = { state.syntheticAccount = it },
+            enabled = enabled,
+        )
+
+        Spacer(Modifier.padding(top = 4.dp))
+        HorizontalDivider()
         SectionHeader("Accounts endpoint")
         EndpointEditor(
             endpoint = state.accountsEndpoint,
@@ -111,5 +127,21 @@ internal fun EndpointsTab(
             Spacer(Modifier.width(4.dp))
             Text("Add ancestor endpoint")
         }
+
+        Spacer(Modifier.padding(top = 4.dp))
+        HorizontalDivider()
+        SectionHeader("Data endpoints")
+        Text(
+            text =
+                "Additional endpoints an exchange exposes (trades, orders, deposits, withdrawals), each " +
+                    "producing a different kind of record.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        DataEndpointsEditor(
+            endpoints = state.dataEndpoints,
+            onChange = { state.dataEndpoints = it },
+            enabled = enabled,
+        )
     }
 }
