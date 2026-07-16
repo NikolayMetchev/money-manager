@@ -58,6 +58,8 @@ internal class ApiStrategyEditorState(
     var baseUrl by mutableStateOf(initial?.baseUrl.orEmpty())
     var authType by mutableStateOf(initial?.authType ?: ApiAuthType.BEARER_TOKEN)
     var personExternalIdAttribute by mutableStateOf(initial?.personExternalIdAttribute.orEmpty())
+    var tokenPageUrl by mutableStateOf(initial?.tokenPageUrl.orEmpty())
+    var connectInstructions by mutableStateOf(initial?.connectInstructions.orEmpty())
 
     var accountsEndpoint by mutableStateOf(initial?.accountsEndpoint ?: DEFAULT_ACCOUNTS_ENDPOINT)
     var transactionsEndpoint by mutableStateOf(initial?.transactionsEndpoint ?: DEFAULT_TRANSACTIONS_ENDPOINT)
@@ -148,6 +150,8 @@ internal class ApiStrategyEditorState(
             baseUrl = baseUrl,
             authType = authType,
             personExternalIdAttribute = personExternalIdAttribute,
+            tokenPageUrl = tokenPageUrl,
+            connectInstructions = connectInstructions,
             accountsEndpoint = accountsEndpoint,
             transactionsEndpoint = transactionsEndpoint,
             accountIdentifiersEndpoint = accountIdentifiersEndpoint,

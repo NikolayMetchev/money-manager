@@ -119,6 +119,8 @@ class ApiStrategyEditorStateTest {
                     ownsAllAccounts = true,
                 ),
             personExternalIdAttribute = "example-external-id",
+            tokenPageUrl = "https://example.com/developer/tokens",
+            connectInstructions = listOf("Sign in.", "Create a token.", "Paste it below."),
             // A Kraken-style recipe: exercises the recursive Sha256 SigPart nesting.
             requestSigning =
                 ApiRequestSigningConfig(

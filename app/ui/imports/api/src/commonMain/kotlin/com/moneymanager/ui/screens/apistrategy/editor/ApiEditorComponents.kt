@@ -342,6 +342,40 @@ internal fun StringSetEditor(
 }
 
 /**
+ * Edits an ordered `List<String>` as numbered rows (e.g. connect instructions), with add/remove/reorder
+ * by index. Unlike [StringMapEditor] there is no key/identity conflict to guard against — a blank or
+ * duplicate row is simply another list entry — so [onChange] can be called directly on every edit.
+ */
+@Composable
+internal fun StringListEditor(
+    label: String,
+    items: List<String>,
+    onChange: (List<String>) -> Unit,
+    enabled: Boolean = true,
+) {
+    Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    items.forEachIndexed { index, item ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = item,
+                onValueChange = { updated -> onChange(items.toMutableList().also { it[index] = updated }) },
+                label = { Text("Step ${index + 1}") },
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+            )
+            IconButton(onClick = { onChange(items.filterIndexed { i, _ -> i != index }) }, enabled = enabled) {
+                Icon(Icons.Default.Close, contentDescription = "Remove step", tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    TextButton(onClick = { onChange(items + "") }, enabled = enabled) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(Modifier.width(4.dp))
+        Text("Add step")
+    }
+}
+
+/**
  * Edits a `Map<String, String>` as rows of key/value text fields (e.g. asset aliases, account aliases).
  * Row identity is a local, independent editing buffer (seeded once from [entries], not recomputed from
  * it) so an in-progress blank or duplicate key never collapses or drops another row mid-edit — only the

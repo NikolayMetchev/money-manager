@@ -44,5 +44,18 @@ internal fun GeneralTab(
             enabled = enabled,
             placeholder = "e.g. monzo-external-id",
         )
+        TextFieldRow(
+            label = "Token page URL (optional)",
+            value = state.tokenPageUrl,
+            onValueChange = { state.tokenPageUrl = it },
+            enabled = enabled,
+            placeholder = "https://provider.example.com/developer/tokens",
+        )
+        StringListEditor(
+            label = "Connect instructions (shown as numbered steps)",
+            items = state.connectInstructions,
+            onChange = { state.connectInstructions = it },
+            enabled = enabled,
+        )
     }
 }
