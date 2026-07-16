@@ -24,7 +24,32 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .map { it.name }
                     .toSet()
-            assertEquals(setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange"), names)
+            assertEquals(setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken"), names)
+        }
+
+    @Test
+    fun `the Kraken strategy installs with its signed-exchange configuration`() =
+        runTest {
+            repositories.installBuiltInApiStrategies()
+            val kraken =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Kraken" }
+
+            assertEquals(com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED, kraken.authType)
+            val signing = assertNotNull(kraken.requestSigning, "signing recipe persisted")
+            assertEquals(com.moneymanager.domain.model.apistrategy.SigningAlgorithm.HMAC_SHA512, signing.algorithm)
+            assertEquals(com.moneymanager.domain.model.apistrategy.SecretEncoding.BASE64, signing.secretEncoding)
+            assertEquals(com.moneymanager.domain.model.apistrategy.SignatureEncoding.BASE64, signing.signatureEncoding)
+            assertEquals("Kraken", assertNotNull(kraken.syntheticAccount).name)
+            assertTrue(kraken.dataEndpoints.isNotEmpty(), "data endpoints persisted")
+            assertTrue(kraken.assetAliases.containsKey("XXBT"), "asset aliases persisted")
+            val trades = kraken.dataEndpoints.first { it.kind == com.moneymanager.domain.model.apistrategy.ApiEndpointKind.TRADES }
+            assertTrue(trades.endpoint.responseObjectValues, "trades response is a keyed object")
+            assertEquals("error", trades.endpoint.errorArrayField)
+            val enrichers = kraken.dataEndpoints.filter { it.enrichesTransfers }
+            assertTrue(enrichers.isNotEmpty(), "at least one enrichment-only endpoint persisted")
         }
 
     @Test

@@ -102,5 +102,6 @@ class ApiImportStrategyWriteRepositoryImpl(
             dataEndpoints = dataEndpoints,
             syntheticAccount = syntheticAccount,
             internalTransferReconcile = internalTransferReconcile,
+            assetAliases = assetAliases,
         )
 }

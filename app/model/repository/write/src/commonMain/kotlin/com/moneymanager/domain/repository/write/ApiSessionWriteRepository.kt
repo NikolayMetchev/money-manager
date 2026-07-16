@@ -9,7 +9,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiResponseTransactionInsert
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.MonzoCredentialId
@@ -29,7 +28,6 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
     suspend fun createCredential(
         token: String,
         createdAt: Instant,
-        type: ApiSessionType = ApiSessionType.MONZO,
         strategyId: ApiImportStrategyId? = null,
         privateKey: String? = null,
         publicKey: String? = null,
@@ -78,7 +76,6 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
         deviceId: DeviceId,
         createdAt: Instant,
         expiresAt: Instant?,
-        type: ApiSessionType = ApiSessionType.MONZO,
         credentialId: MonzoCredentialId? = null,
     ): ApiSessionId
 

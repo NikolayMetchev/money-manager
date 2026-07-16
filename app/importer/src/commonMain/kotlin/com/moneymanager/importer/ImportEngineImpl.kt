@@ -1568,7 +1568,6 @@ class ImportEngineImpl(
                         apiSessionRepository.createCredential(
                             m.token,
                             m.createdAt,
-                            m.type,
                             m.strategyId,
                             m.privateKey,
                             m.publicKey,
@@ -1596,7 +1595,7 @@ class ImportEngineImpl(
                 is ApiSessionMutation.CreateSession ->
                     apiSessionIds.putUnique(
                         m.key,
-                        apiSessionRepository.createSession(m.token, m.deviceId, m.createdAt, expiresAt = null, m.type, m.credentialId),
+                        apiSessionRepository.createSession(m.token, m.deviceId, m.createdAt, expiresAt = null, m.credentialId),
                         "ApiSession",
                     )
                 is ApiSessionMutation.InsertRequest ->

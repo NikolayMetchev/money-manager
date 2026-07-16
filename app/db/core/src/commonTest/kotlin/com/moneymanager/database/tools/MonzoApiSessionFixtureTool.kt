@@ -52,13 +52,9 @@ private fun exportFixtures(
     outputDir.mkdirs()
     DriverManager.getConnection("jdbc:sqlite:$dbPath").use { connection ->
         connection.autoCommit = false
-        exportTable(connection, outputDir, "api_session_type", "api_session_type.json", ApiSessionTypeRow.serializer()) { row ->
-            ApiSessionTypeRow(row.getLong("id"), row.getString("name"))
-        }
         exportTable(connection, outputDir, "api_credential", "api_credential.json", ApiCredentialRow.serializer()) { row ->
             ApiCredentialRow(
                 id = row.getLong("id"),
-                typeId = row.getLong("type_id"),
                 token = row.getString("token"),
                 createdAt = row.getLong("created_at"),
                 strategyId = row.getString("strategy_id"),
@@ -67,7 +63,6 @@ private fun exportFixtures(
         exportTable(connection, outputDir, "api_session", "api_session.json", ApiSessionRow.serializer()) { row ->
             ApiSessionRow(
                 id = row.getLong("id"),
-                typeId = row.getLong("type_id"),
                 token = row.getString("token"),
                 deviceId = row.getLong("device_id"),
                 createdAt = row.getLong("created_at"),
@@ -138,38 +133,29 @@ private fun importFixtures(
         connection.autoCommit = false
         connection.createStatement().use { stmt -> stmt.execute("PRAGMA foreign_keys = OFF") }
         try {
-            insertTable(inputDir, "api_session_type.json", ApiSessionTypeRow.serializer()) { row ->
-                connection.prepareStatement("INSERT OR IGNORE INTO api_session_type(id, name) VALUES (?, ?)").use { ps ->
-                    ps.setLong(1, row.id)
-                    ps.setString(2, row.name)
-                    ps.executeUpdate()
-                }
-            }
             insertTable(inputDir, "api_credential.json", ApiCredentialRow.serializer()) { row ->
                 connection
                     .prepareStatement(
-                        "INSERT OR IGNORE INTO api_credential(id, type_id, token, created_at, strategy_id) VALUES (?, ?, ?, ?, ?)",
+                        "INSERT OR IGNORE INTO api_credential(id, token, created_at, strategy_id) VALUES (?, ?, ?, ?)",
                     ).use { ps ->
                         ps.setLong(1, row.id)
-                        ps.setLong(2, row.typeId)
-                        ps.setString(3, row.token)
-                        ps.setLong(4, row.createdAt)
-                        if (row.strategyId == null) ps.setNull(5, java.sql.Types.VARCHAR) else ps.setString(5, row.strategyId)
+                        ps.setString(2, row.token)
+                        ps.setLong(3, row.createdAt)
+                        if (row.strategyId == null) ps.setNull(4, java.sql.Types.VARCHAR) else ps.setString(4, row.strategyId)
                         ps.executeUpdate()
                     }
             }
             insertTable(inputDir, "api_session.json", ApiSessionRow.serializer()) { row ->
                 connection
                     .prepareStatement(
-                        "INSERT OR IGNORE INTO api_session(id, type_id, token, device_id, created_at, expires_at, credential_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT OR IGNORE INTO api_session(id, token, device_id, created_at, expires_at, credential_id) VALUES (?, ?, ?, ?, ?, ?)",
                     ).use { ps ->
                         ps.setLong(1, row.id)
-                        ps.setLong(2, row.typeId)
-                        ps.setString(3, row.token)
-                        ps.setLong(4, row.deviceId)
-                        ps.setLong(5, row.createdAt)
-                        if (row.expiresAt == null) ps.setNull(6, java.sql.Types.INTEGER) else ps.setLong(6, row.expiresAt)
-                        if (row.credentialId == null) ps.setNull(7, java.sql.Types.INTEGER) else ps.setLong(7, row.credentialId)
+                        ps.setString(2, row.token)
+                        ps.setLong(3, row.deviceId)
+                        ps.setLong(4, row.createdAt)
+                        if (row.expiresAt == null) ps.setNull(5, java.sql.Types.INTEGER) else ps.setLong(5, row.expiresAt)
+                        if (row.credentialId == null) ps.setNull(6, java.sql.Types.INTEGER) else ps.setLong(6, row.credentialId)
                         ps.executeUpdate()
                     }
             }
@@ -307,15 +293,8 @@ private fun java.sql.ResultSet.getLongOrNull(column: String): Long? =
     }
 
 @Serializable
-private data class ApiSessionTypeRow(
-    val id: Long,
-    val name: String,
-)
-
-@Serializable
 private data class ApiCredentialRow(
     val id: Long,
-    val typeId: Long,
     val token: String,
     val createdAt: Long,
     val strategyId: String? = null,
@@ -324,7 +303,6 @@ private data class ApiCredentialRow(
 @Serializable
 private data class ApiSessionRow(
     val id: Long,
-    val typeId: Long,
     val token: String,
     val deviceId: Long,
     val createdAt: Long,

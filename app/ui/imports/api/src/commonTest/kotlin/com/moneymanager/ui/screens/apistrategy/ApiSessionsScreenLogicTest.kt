@@ -12,7 +12,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.MonzoCredential
@@ -204,7 +203,6 @@ class ApiSessionsScreenLogicTest {
         strategyId: ApiImportStrategyId?,
     ) = MonzoCredential(
         id = MonzoCredentialId(id),
-        type = ApiSessionType.MONZO,
         token = "token-$id",
         createdAt = Instant.DISTANT_PAST,
         strategyId = strategyId,
@@ -215,7 +213,6 @@ class ApiSessionsScreenLogicTest {
         credentialId: MonzoCredentialId,
     ) = ApiSession(
         id = ApiSessionId(id),
-        type = ApiSessionType.MONZO,
         token = "token",
         deviceId = DeviceId(1),
         createdAt = Instant.DISTANT_PAST,

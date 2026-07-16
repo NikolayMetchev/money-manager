@@ -8,7 +8,6 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(libs.kotlinx.datetime)
-                api(projects.app.model.core)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
 
@@ -51,7 +50,6 @@ kotlin {
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.compose.ui.unit.desktop)
                 implementation(libs.kotlinx.coroutines.core)
-                implementation(projects.app.model.core)
             }
         }
         getByName("jvmTest") {

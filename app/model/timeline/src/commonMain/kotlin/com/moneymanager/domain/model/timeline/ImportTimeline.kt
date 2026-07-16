@@ -2,7 +2,6 @@
 
 package com.moneymanager.domain.model.timeline
 
-import com.moneymanager.domain.model.ApiSessionType
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -25,8 +24,6 @@ data class ImportFileDateRange(
     val fileName: String,
     /** Latest applied strategy name (CSV/QIF) or API strategy name; null for manual/legacy API. */
     val strategyName: String?,
-    /** Row-grouping fallback for legacy API sessions without a strategy. */
-    val apiSessionType: ApiSessionType? = null,
     val ignored: Boolean = false,
     val earliest: Instant,
     val latest: Instant,

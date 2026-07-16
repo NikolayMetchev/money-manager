@@ -40,6 +40,7 @@ object ApiStrategyExportMapper {
             dataEndpoints = export.dataEndpoints,
             syntheticAccount = export.syntheticAccount,
             internalTransferReconcile = export.internalTransferReconcile,
+            assetAliases = export.assetAliases,
             createdAt = now,
             updatedAt = now,
         )
@@ -68,5 +69,6 @@ object ApiStrategyExportMapper {
             dataEndpoints = strategy.dataEndpoints,
             syntheticAccount = strategy.syntheticAccount,
             internalTransferReconcile = strategy.internalTransferReconcile,
+            assetAliases = strategy.assetAliases,
         )
 }

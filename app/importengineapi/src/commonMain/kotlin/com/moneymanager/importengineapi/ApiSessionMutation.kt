@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiResponseTransactionInsert
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.MonzoCredentialId
@@ -26,7 +25,6 @@ sealed interface ApiSessionMutation {
         val key: String,
         val token: String,
         val createdAt: Instant,
-        val type: ApiSessionType = ApiSessionType.MONZO,
         val strategyId: ApiImportStrategyId? = null,
         val privateKey: String? = null,
         val publicKey: String? = null,
@@ -56,7 +54,6 @@ sealed interface ApiSessionMutation {
         val token: String,
         val deviceId: DeviceId,
         val createdAt: Instant,
-        val type: ApiSessionType = ApiSessionType.MONZO,
         val credentialId: MonzoCredentialId? = null,
     ) : ApiSessionMutation
 

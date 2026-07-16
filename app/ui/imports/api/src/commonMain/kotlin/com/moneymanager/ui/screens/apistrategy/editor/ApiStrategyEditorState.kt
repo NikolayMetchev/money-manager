@@ -80,6 +80,7 @@ internal class ApiStrategyEditorState(
     var dataEndpoints by mutableStateOf(initial?.dataEndpoints.orEmpty())
     var syntheticAccount by mutableStateOf(initial?.syntheticAccount)
     var internalTransferReconcile by mutableStateOf(initial?.internalTransferReconcile)
+    var assetAliases by mutableStateOf(initial?.assetAliases.orEmpty())
 
     val generalHasError: Boolean
         get() = name.isBlank() || baseUrl.isBlank()
@@ -163,6 +164,7 @@ internal class ApiStrategyEditorState(
             dataEndpoints = dataEndpoints,
             syntheticAccount = syntheticAccount,
             internalTransferReconcile = internalTransferReconcile,
+            assetAliases = assetAliases,
         )
 }
 

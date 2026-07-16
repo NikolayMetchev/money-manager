@@ -43,6 +43,7 @@ data class ApiStrategyFormState(
     val dataEndpoints: List<ApiDataEndpoint>,
     val syntheticAccount: ApiSyntheticAccount?,
     val internalTransferReconcile: ApiInternalTransferReconcile?,
+    val assetAliases: Map<String, String>,
 )
 
 /** Projects a mapping's `customFields` map + `uniqueIdentifierFields` set onto editable rows. */
@@ -82,6 +83,7 @@ fun extractFormStateFromStrategy(strategy: ApiImportStrategy): ApiStrategyFormSt
         dataEndpoints = strategy.dataEndpoints,
         syntheticAccount = strategy.syntheticAccount,
         internalTransferReconcile = strategy.internalTransferReconcile,
+        assetAliases = strategy.assetAliases,
     )
 
 /** Reassembles an [ApiImportStrategy] from edited form state. The DB regenerates revisionId/configJson. */
@@ -119,6 +121,7 @@ fun buildStrategyFromApiFormState(
         dataEndpoints = state.dataEndpoints,
         syntheticAccount = state.syntheticAccount,
         internalTransferReconcile = state.internalTransferReconcile,
+        assetAliases = state.assetAliases,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

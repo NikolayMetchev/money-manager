@@ -67,6 +67,7 @@ class ApiImportStrategyReadRepositoryImpl(
             dataEndpoints = config.dataEndpoints,
             syntheticAccount = config.syntheticAccount,
             internalTransferReconcile = config.internalTransferReconcile,
+            assetAliases = config.assetAliases,
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
             revisionId = entity.revision_id,

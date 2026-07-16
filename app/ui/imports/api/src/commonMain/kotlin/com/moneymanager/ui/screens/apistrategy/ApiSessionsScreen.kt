@@ -814,13 +814,7 @@ private fun CredentialCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text =
-                    "Credential · " +
-                        (
-                            providerLabel
-                                ?: credential.type.name
-                                    .lowercase()
-                                    .replaceFirstChar { it.uppercase() }
-                        ),
+                    "Credential · " + (providerLabel ?: "API"),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
@@ -1118,8 +1112,7 @@ fun ApiSessionTrafficScreen(
                 )
                 Text(
                     text =
-                        session?.let { "${it.type.name.lowercase().replaceFirstChar { char -> char.uppercase() }} session #${it.id}" }
-                            ?: "Session #$sessionId",
+                        session?.let { "API session #${it.id}" } ?: "Session #$sessionId",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -237,7 +237,6 @@ private fun ApiConnectionRow(
                                     importEngine.createApiCredential(
                                         token = token,
                                         createdAt = Clock.System.now(),
-                                        type = defaultSessionTypeFor(strategy),
                                         strategyId = strategy.id,
                                         apiSecret = secret,
                                     )

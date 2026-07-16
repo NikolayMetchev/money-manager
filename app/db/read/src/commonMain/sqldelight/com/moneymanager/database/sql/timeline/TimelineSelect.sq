@@ -54,12 +54,11 @@ LEFT JOIN qif_import_application latest_application
 GROUP BY qif_import_metadata.id;
 
 -- One row per API session that produced transactions. strategy_name is NULL for legacy
--- credential-less / strategy-less (Monzo) sessions — callers fall back to the session type name.
+-- credential-less / strategy-less sessions — callers fall back to a generic label.
 selectApiSessionDateRanges:
 SELECT
     api_session.id AS session_id,
     api_session.created_at AS session_created_at,
-    api_session.type_id AS session_type_id,
     api_credential.strategy_id AS strategy_id,
     api_import_strategy.name AS strategy_name,
     MIN(transfer.timestamp) AS earliest_ms,

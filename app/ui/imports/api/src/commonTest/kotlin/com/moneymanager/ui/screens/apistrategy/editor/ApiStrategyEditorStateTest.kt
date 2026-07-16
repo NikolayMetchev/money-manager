@@ -25,6 +25,7 @@ import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import com.moneymanager.domain.model.apistrategy.FieldPlacement
+import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.NonceFormat
 import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.PaginationMode
@@ -37,6 +38,7 @@ import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -132,7 +134,25 @@ class ApiStrategyEditorStateTest {
             dataEndpoints =
                 listOf(
                     ApiDataEndpoint(
-                        endpoint = ApiEndpointConfig(path = "/private/get-trades", responseArrayKey = "result"),
+                        // Kraken-shaped: keyed-object response, error-array success check, offset paging.
+                        endpoint =
+                            ApiEndpointConfig(
+                                path = "/private/get-trades",
+                                responseArrayKey = "result.trades",
+                                method = HttpMethodType.POST,
+                                successCodeField = "code",
+                                successCodeOkValue = "0",
+                                errorArrayField = "error",
+                                responseObjectValues = true,
+                                itemKeyField = "trade_id",
+                                pagination =
+                                    ApiPaginationConfig(
+                                        mode = PaginationMode.DATE_WINDOW,
+                                        windowBoundFormat = WindowBoundFormat.EPOCH_S,
+                                        offsetParam = "ofs",
+                                        totalCountField = "result.count",
+                                    ),
+                            ),
                         kind = ApiEndpointKind.TRADES,
                         tradeMappings =
                             ApiTradeMappings(
@@ -148,9 +168,22 @@ class ApiStrategyEditorStateTest {
                     ApiDataEndpoint(
                         endpoint = ApiEndpointConfig(path = "/private/get-deposits", responseArrayKey = "result"),
                         kind = ApiEndpointKind.DEPOSITS,
-                        transactionMappings = ApiTransactionMappings(amountField = "amount", currencyField = "currency"),
+                        transactionMappings =
+                            ApiTransactionMappings(
+                                amountField = "amount",
+                                currencyField = "currency",
+                                joinKeyField = "refid",
+                                counterpartyAliasField = "address",
+                                counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Crypto.com"),
+                            ),
                         fixedDirection = TransferDirection.IN,
                         counterpartyAccountName = "Crypto.com Exchange Funding",
+                    ),
+                    ApiDataEndpoint(
+                        endpoint = ApiEndpointConfig(path = "/private/deposit-status", responseArrayKey = "result"),
+                        kind = ApiEndpointKind.DEPOSITS,
+                        transactionMappings = ApiTransactionMappings(idField = "refid", txidField = "txid"),
+                        enrichesTransfers = true,
                     ),
                 ),
             syntheticAccount = ApiSyntheticAccount(name = "Crypto.com Exchange", externalId = "cryptocom-exchange"),
@@ -160,6 +193,7 @@ class ApiStrategyEditorStateTest {
                     windowSeconds = 3600,
                     amountTolerancePercent = "0.5",
                 ),
+            assetAliases = mapOf("XXBT" to "BTC", "ZUSD" to "USD"),
             createdAt = now,
             updatedAt = now,
         )

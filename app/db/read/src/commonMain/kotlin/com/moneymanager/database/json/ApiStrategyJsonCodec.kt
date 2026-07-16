@@ -38,6 +38,7 @@ data class ApiStrategyConfigJson(
     val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
     val syntheticAccount: ApiSyntheticAccount? = null,
     val internalTransferReconcile: ApiInternalTransferReconcile? = null,
+    val assetAliases: Map<String, String> = emptyMap(),
 )
 
 /**

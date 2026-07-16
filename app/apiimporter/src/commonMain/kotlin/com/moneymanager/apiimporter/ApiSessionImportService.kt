@@ -2182,22 +2182,41 @@ internal fun arrayItemJsonPath(
  * Extracts the items array from a response body; a blank [responseArrayKey] means the body is the
  * array. A bare JSON object body (e.g. a single-resource endpoint like Starling's account holder) is
  * wrapped as a one-element array so single-object responses parse like any other.
+ *
+ * When [responseObjectValues] is set, the element at [responseArrayKey] is itself a JSON object keyed
+ * by id (Kraken `result.trades`/`result.ledger`) rather than an array; its values become the items. When
+ * [itemKeyField] is also set, each entry's map key is spliced into that entry's object under this field
+ * name first, since the id sometimes appears only as the key (Kraken ledger entries).
  */
 internal fun responseItemsArray(
     json: String,
     responseArrayKey: String,
+    responseObjectValues: Boolean = false,
+    itemKeyField: String? = null,
 ): JsonArray? =
     try {
         val root = Json.parseToJsonElement(json)
-        if (responseArrayKey.isBlank()) {
+        val resolved = if (responseArrayKey.isBlank()) root else root.resolveJsonPathElement(responseArrayKey)
+        if (responseObjectValues) {
+            (resolved as? JsonObject)?.let { obj ->
+                JsonArray(
+                    obj.entries.map { (key, value) ->
+                        if (itemKeyField != null && value is JsonObject) {
+                            JsonObject(value.toMutableMap().apply { put(itemKeyField, JsonPrimitive(key)) })
+                        } else {
+                            value
+                        }
+                    },
+                )
+            }
+        } else if (responseArrayKey.isBlank()) {
             when (root) {
                 is JsonArray -> root
                 is JsonObject -> JsonArray(listOf(root))
                 else -> null
             }
         } else {
-            // Supports a dot-path key so nested envelopes (e.g. Crypto.com "result.data") resolve.
-            root.resolveJsonPathElement(responseArrayKey) as? JsonArray
+            resolved as? JsonArray
         }
     } catch (e: SerializationException) {
         logger.error(e) { "Failed to parse API response array (key='$responseArrayKey')" }
@@ -2206,25 +2225,32 @@ internal fun responseItemsArray(
 
 /**
  * Whether a response passed its envelope status check. Strategies with a [successCodeField]
- * (Crypto.com "code") require the value at that path to equal [successCodeOkValue] (e.g. "0");
- * a null field means no check (bank APIs rely on the HTTP status alone).
+ * (Crypto.com "code") require the value at that path to equal [successCodeOkValue] (e.g. "0").
+ * Strategies with an [errorArrayField] (Kraken "error") require the array at that path to be absent or
+ * empty. When both are null, no envelope check is applied (bank APIs rely on the HTTP status alone).
  */
 internal fun responseCodeOk(
     json: String,
     successCodeField: String?,
     successCodeOkValue: String?,
+    errorArrayField: String? = null,
 ): Boolean {
+    val root =
+        try {
+            Json.parseToJsonElement(json)
+        } catch (e: SerializationException) {
+            return false
+        }
+    if (errorArrayField != null) {
+        val errors = root.resolveJsonPathElement(errorArrayField) as? JsonArray
+        if (errors != null && errors.isNotEmpty()) return false
+    }
     if (successCodeField == null) return true
     // Fail closed: a configured status field with no expected value must never pass (an absent code
     // would otherwise equal a null expected value and let an error envelope through).
     val expected = successCodeOkValue ?: return false
-    return try {
-        val actual =
-            (Json.parseToJsonElement(json).resolveJsonPathElement(successCodeField) as? JsonPrimitive)?.contentOrNull
-        actual == expected
-    } catch (e: SerializationException) {
-        false
-    }
+    val actual = (root.resolveJsonPathElement(successCodeField) as? JsonPrimitive)?.contentOrNull
+    return actual == expected
 }
 
 private const val MILLIS_PER_DAY = 86_400_000L

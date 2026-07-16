@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiResponseTransactionInsert
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
@@ -223,7 +222,6 @@ suspend fun ImportEngine.setSetupWizardCompleted(completed: Boolean) {
 suspend fun ImportEngine.createApiCredential(
     token: String,
     createdAt: Instant,
-    type: ApiSessionType = ApiSessionType.MONZO,
     strategyId: ApiImportStrategyId? = null,
     privateKey: String? = null,
     publicKey: String? = null,
@@ -241,7 +239,6 @@ suspend fun ImportEngine.createApiCredential(
                             key,
                             token,
                             createdAt,
-                            type,
                             strategyId,
                             privateKey,
                             publicKey,
@@ -273,7 +270,6 @@ suspend fun ImportEngine.createApiSession(
     token: String,
     deviceId: DeviceId,
     createdAt: Instant,
-    type: ApiSessionType = ApiSessionType.MONZO,
     credentialId: MonzoCredentialId? = null,
 ): ApiSessionId {
     // The read-back key is echoed through ImportResult, so derive it from the (non-secret) createdAt
@@ -283,7 +279,7 @@ suspend fun ImportEngine.createApiSession(
         import(
             ImportBatch(
                 apiSessionMutations =
-                    listOf(ApiSessionMutation.CreateSession(key, token, deviceId, createdAt, type, credentialId)),
+                    listOf(ApiSessionMutation.CreateSession(key, token, deviceId, createdAt, credentialId)),
             ),
         ).apiSessionIds[key],
     )

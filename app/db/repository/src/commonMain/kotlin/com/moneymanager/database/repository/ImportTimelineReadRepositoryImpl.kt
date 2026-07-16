@@ -6,7 +6,6 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOne
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
@@ -76,7 +75,6 @@ class ImportTimelineReadRepositoryImpl(
                         fileId = row.session_id.toString(),
                         fileName = "Session ${row.session_id}",
                         strategyName = row.strategy_name,
-                        apiSessionType = ApiSessionType.fromId(row.session_type_id),
                         earliest = Instant.fromEpochMilliseconds(requireNotNull(row.earliest_ms)),
                         latest = Instant.fromEpochMilliseconds(requireNotNull(row.latest_ms)),
                         transactionCount = row.transaction_count,

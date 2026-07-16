@@ -16,9 +16,6 @@ INSERT INTO source_type (id, name) VALUES (6, 'QIF_IMPORT');
 INSERT INTO source_type (id, name) VALUES (7, 'MERGE_UNDO');
 INSERT INTO source_type (id, name) VALUES (8, 'MERGE');
 
-INSERT INTO api_session_type (id, name) VALUES (1, 'Monzo');
-INSERT INTO api_session_type (id, name) VALUES (2, 'Crypto.com Exchange');
-
 INSERT INTO import_directory_provider (id, name) VALUES (1, 'LOCAL');
 INSERT INTO import_directory_provider (id, name) VALUES (2, 'GDRIVE');
 

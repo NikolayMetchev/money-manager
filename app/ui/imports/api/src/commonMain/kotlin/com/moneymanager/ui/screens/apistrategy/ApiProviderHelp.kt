@@ -1,6 +1,5 @@
 package com.moneymanager.ui.screens.apistrategy
 
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 
@@ -64,10 +63,3 @@ internal fun connectInstructions(strategy: ApiImportStrategy?): List<String> =
 
 /** True when the strategy authenticates with an api-key + secret pair rather than a single bearer token. */
 internal fun ApiImportStrategy.isSigned(): Boolean = authType == ApiAuthType.SIGNED
-
-/**
- * The session type recorded against a new credential. The type predates strategies and is now only a coarse
- * bearer-vs-signed marker, so it is derived in exactly one place rather than re-guessed at each call site.
- */
-internal fun defaultSessionTypeFor(strategy: ApiImportStrategy): ApiSessionType =
-    if (strategy.isSigned()) ApiSessionType.CRYPTO_COM_EXCHANGE else ApiSessionType.MONZO

@@ -9,7 +9,6 @@ import kotlin.uuid.ExperimentalUuidApi
 
 data class MonzoCredential(
     val id: MonzoCredentialId,
-    val type: ApiSessionType,
     val token: String,
     val createdAt: Instant,
     val strategyId: ApiImportStrategyId? = null,
@@ -17,13 +16,13 @@ data class MonzoCredential(
     val privateKey: String? = null,
     val publicKey: String? = null,
     /**
-     * HMAC secret for signed exchange APIs (ApiAuthType.SIGNED; e.g. Crypto.com). For these strategies
-     * [token] holds the api key and this holds the api secret. Null for bearer/SCA strategies.
+     * HMAC secret for signed exchange APIs (ApiAuthType.SIGNED; e.g. Crypto.com, Kraken). For these
+     * strategies [token] holds the api key and this holds the api secret. Null for bearer/SCA strategies.
      */
     val apiSecret: String? = null,
 ) {
     override fun toString(): String =
-        "MonzoCredential(id=$id, type=$type, token=<redacted>, createdAt=$createdAt, " +
+        "MonzoCredential(id=$id, token=<redacted>, createdAt=$createdAt, " +
             "strategyId=$strategyId, privateKey=${if (privateKey != null) "<redacted>" else "null"}, " +
             "publicKey=${if (publicKey != null) "<redacted>" else "null"}, " +
             "apiSecret=${if (apiSecret != null) "<redacted>" else "null"})"
@@ -38,7 +37,6 @@ value class MonzoCredentialId(
 
 data class ApiSession(
     val id: ApiSessionId,
-    val type: ApiSessionType,
     val token: String,
     val deviceId: DeviceId,
     val createdAt: Instant,
@@ -46,20 +44,6 @@ data class ApiSession(
     val credentialId: MonzoCredentialId?,
     val importDurationMillis: Long? = null,
 )
-
-enum class ApiSessionType(
-    val id: Long,
-) {
-    MONZO(1),
-    CRYPTO_COM_EXCHANGE(2),
-    ;
-
-    companion object {
-        fun fromId(id: Long): ApiSessionType =
-            entries.firstOrNull { it.id == id }
-                ?: error("Unknown API session type id: $id")
-    }
-}
 
 data class ApiRequest(
     val id: ApiRequestId,

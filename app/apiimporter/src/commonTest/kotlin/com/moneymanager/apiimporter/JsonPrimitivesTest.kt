@@ -2,6 +2,7 @@ package com.moneymanager.apiimporter
 
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlin.test.Test
@@ -36,6 +37,40 @@ class JsonPrimitivesTest {
         assertEquals(true, responseCodeOk(bad, null, null))
         // A configured field with no expected value fails closed (never passes an error envelope).
         assertEquals(false, responseCodeOk(ok, "code", null))
+    }
+
+    @Test
+    fun `error array check honors an empty or absent array as success (Kraken)`() {
+        val ok = """{ "error": [], "result": { "trades": {} } }"""
+        val okAbsent = """{ "result": { "trades": {} } }"""
+        val bad = """{ "error": ["EGeneral:Invalid arguments"] }"""
+        assertEquals(true, responseCodeOk(ok, null, null, errorArrayField = "error"))
+        assertEquals(true, responseCodeOk(okAbsent, null, null, errorArrayField = "error"))
+        assertEquals(false, responseCodeOk(bad, null, null, errorArrayField = "error"))
+    }
+
+    @Test
+    fun `keyed-object response array splices the map key into each item`() {
+        // Kraken's TradesHistory/Ledgers shape: an object keyed by id, not an array.
+        val json = """{ "result": { "ledger": {
+            "LG1": { "asset": "XXBT", "amount": "0.01" },
+            "LG2": { "asset": "ZUSD", "amount": "100" }
+        } } }"""
+        val items = responseItemsArray(json, "result.ledger", responseObjectValues = true, itemKeyField = "ledger_id")
+        assertEquals(2, items?.size)
+        val byAsset =
+            items
+                .orEmpty()
+                .associate { entry ->
+                    val obj = entry as JsonObject
+                    (obj["asset"] as JsonPrimitive).content to (obj["ledger_id"] as JsonPrimitive).content
+                }
+        assertEquals(mapOf("XXBT" to "LG1", "ZUSD" to "LG2"), byAsset)
+
+        // Without itemKeyField, items pass through unmodified (still splits the object into values).
+        val plain = responseItemsArray(json, "result.ledger", responseObjectValues = true)
+        assertEquals(2, plain?.size)
+        assertEquals(null, (plain?.first() as? JsonObject)?.get("ledger_id"))
     }
 
     @Test

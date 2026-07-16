@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiResponseTransactionInsert
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.MonzoCredentialId
@@ -31,7 +30,6 @@ class ApiSessionWriteRepositoryImpl(
     override suspend fun createCredential(
         token: String,
         createdAt: Instant,
-        type: ApiSessionType,
         strategyId: ApiImportStrategyId?,
         privateKey: String?,
         publicKey: String?,
@@ -41,7 +39,6 @@ class ApiSessionWriteRepositoryImpl(
             val id =
                 writeQueries.transactionWithResult {
                     writeQueries.insertCredential(
-                        type_id = type.id,
                         token = token,
                         created_at = createdAt.toEpochMilliseconds(),
                         strategy_id = strategyId?.id?.toString(),
@@ -105,14 +102,12 @@ class ApiSessionWriteRepositoryImpl(
         deviceId: DeviceId,
         createdAt: Instant,
         expiresAt: Instant?,
-        type: ApiSessionType,
         credentialId: MonzoCredentialId?,
     ): ApiSessionId =
         withContext(Dispatchers.Default) {
             val id =
                 writeQueries.transactionWithResult {
                     writeQueries.insert(
-                        type_id = type.id,
                         token = token,
                         device_id = deviceId.id,
                         created_at = createdAt.toEpochMilliseconds(),

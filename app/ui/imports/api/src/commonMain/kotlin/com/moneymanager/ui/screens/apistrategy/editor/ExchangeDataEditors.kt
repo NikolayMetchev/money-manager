@@ -149,7 +149,14 @@ private fun DataEndpointEditor(
         )
     }
 
-    if (dataEndpoint.kind in DIRECTIONAL_KINDS) {
+    ToggleRow(
+        label = "Enrichment only (no money movement — supplies fields for another endpoint's joinKeyField)",
+        checked = dataEndpoint.enrichesTransfers,
+        onCheckedChange = { onChange(dataEndpoint.copy(enrichesTransfers = it)) },
+        enabled = enabled,
+    )
+
+    if (dataEndpoint.kind in DIRECTIONAL_KINDS && !dataEndpoint.enrichesTransfers) {
         EnumDropdown(
             label = "Fixed direction",
             options = TransferDirection.entries,
@@ -258,6 +265,26 @@ internal fun TransactionMappingsFields(
             m.counterpartyNetworkField.orEmpty(),
             { onChange(m.copy(counterpartyNetworkField = it.ifBlank { null })) },
             enabled,
+        )
+        TextFieldRow(
+            "Join key field (optional, matches an enrichesTransfers endpoint's id)",
+            m.joinKeyField.orEmpty(),
+            { onChange(m.copy(joinKeyField = it.ifBlank { null })) },
+            enabled,
+        )
+        TextFieldRow(
+            "Counterparty alias field (optional, e.g. address)",
+            m.counterpartyAliasField.orEmpty(),
+            { onChange(m.copy(counterpartyAliasField = it.ifBlank { null })) },
+            enabled,
+        )
+        StringMapEditor(
+            label = "Counterparty account aliases (alias value -> owned account name)",
+            entries = m.counterpartyAccountAliases,
+            onChange = { onChange(m.copy(counterpartyAccountAliases = it)) },
+            keyLabel = "Alias value",
+            valueLabel = "Account name",
+            enabled = enabled,
         )
     }
 }
@@ -490,15 +517,24 @@ private fun ApiTransactionMappings.isValidForSave(): Boolean =
         idField.isNotBlank() &&
         (signSource != ApiSignSource.FIELD || !signField.isNullOrBlank())
 
+/** Whether an [ApiEndpointConfig] is complete enough to save, independent of what kind of record it produces. */
+private fun ApiEndpointConfig.isValidForSave(): Boolean =
+    path.isNotBlank() && (successCodeField == null || !successCodeOkValue.isNullOrBlank())
+
 /** Whether a data-endpoint list is complete enough to save (used for tab validation). */
 internal fun List<ApiDataEndpoint>.isValidForSave(): Boolean =
     all { de ->
-        de.endpoint.path.isNotBlank() &&
-            (de.kind !in DIRECTIONAL_KINDS || de.fixedDirection != null) &&
-            if (de.kind in TRADE_KINDS) {
-                de.tradeMappings?.isValidForSave() ?: false
+        de.endpoint.isValidForSave() &&
+            if (de.enrichesTransfers) {
+                // An enrichment endpoint moves no money, so only its id field (the join index key) matters.
+                de.transactionMappings?.idField?.isNotBlank() ?: false
             } else {
-                de.transactionMappings?.isValidForSave() ?: false
+                (de.kind !in DIRECTIONAL_KINDS || de.fixedDirection != null) &&
+                    if (de.kind in TRADE_KINDS) {
+                        de.tradeMappings?.isValidForSave() ?: false
+                    } else {
+                        de.transactionMappings?.isValidForSave() ?: false
+                    }
             }
     }
 

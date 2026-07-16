@@ -64,6 +64,7 @@ object ApiImportStrategyAuditEntryMapper {
                 dataEndpoints = raw.dataEndpoints,
                 syntheticAccount = raw.syntheticAccount,
                 internalTransferReconcile = raw.internalTransferReconcile,
+                assetAliases = raw.assetAliases,
             )
         return ApiImportStrategyAuditEntry(
             id = from.id,

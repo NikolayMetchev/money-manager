@@ -17,7 +17,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.MonzoCredential
@@ -167,7 +166,6 @@ class ApiSessionReadRepositoryImpl(
     private fun com.moneymanager.database.sql.apiSession.Api_credential.toMonzoCredential(): MonzoCredential =
         MonzoCredential(
             id = MonzoCredentialId(id),
-            type = ApiSessionType.fromId(type_id),
             token = token,
             createdAt = Instant.fromEpochMilliseconds(created_at),
             strategyId = strategy_id?.let { ApiImportStrategyId(Uuid.parse(it)) },
@@ -179,7 +177,6 @@ class ApiSessionReadRepositoryImpl(
     private fun com.moneymanager.database.sql.apiSession.Api_session_with_latest_import.toApiSession(): ApiSession =
         ApiSession(
             id = ApiSessionId(id),
-            type = ApiSessionType.fromId(type_id),
             token = token,
             deviceId = DeviceId(device_id),
             createdAt = Instant.fromEpochMilliseconds(created_at),

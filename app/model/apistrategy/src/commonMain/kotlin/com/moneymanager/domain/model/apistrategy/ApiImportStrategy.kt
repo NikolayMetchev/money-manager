@@ -49,6 +49,7 @@ data class ApiImportStrategy(
     val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
     val syntheticAccount: ApiSyntheticAccount? = null,
     val internalTransferReconcile: ApiInternalTransferReconcile? = null,
+    val assetAliases: Map<String, String> = emptyMap(),
     val createdAt: Instant,
     val updatedAt: Instant,
     val revisionId: Long = 1,

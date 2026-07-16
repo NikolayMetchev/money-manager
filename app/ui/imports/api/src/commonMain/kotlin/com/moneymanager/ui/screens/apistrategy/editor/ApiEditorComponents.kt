@@ -46,7 +46,9 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
+import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.PaginationMode
+import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Requests the JSON-path picker dialog over [paths], routing the chosen path to [setter]. */
@@ -338,6 +340,52 @@ internal fun StringSetEditor(
     }
 }
 
+/** Edits a `Map<String, String>` as rows of key/value text fields (e.g. asset aliases, account aliases). */
+@Composable
+internal fun StringMapEditor(
+    label: String,
+    entries: Map<String, String>,
+    onChange: (Map<String, String>) -> Unit,
+    keyLabel: String = "Key",
+    valueLabel: String = "Value",
+    enabled: Boolean = true,
+) {
+    val rows = remember(entries) { entries.toList() }
+    Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    rows.forEachIndexed { index, (key, value) ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = key,
+                onValueChange = { updated ->
+                    onChange(rows.toMutableList().also { it[index] = updated to value }.toMap())
+                },
+                label = { Text(keyLabel) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                enabled = enabled,
+            )
+            OutlinedTextField(
+                value = value,
+                onValueChange = { updated ->
+                    onChange(rows.toMutableList().also { it[index] = key to updated }.toMap())
+                },
+                label = { Text(valueLabel) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                enabled = enabled,
+            )
+            IconButton(onClick = { onChange(rows.filterIndexed { i, _ -> i != index }.toMap()) }, enabled = enabled) {
+                Icon(Icons.Default.Close, contentDescription = "Remove entry", tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    TextButton(onClick = { onChange((rows + ("" to "")).toMap()) }, enabled = enabled) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(Modifier.width(4.dp))
+        Text("Add entry")
+    }
+}
+
 /** Expandable list of user-defined custom field mappings with add and remove controls. */
 @Composable
 internal fun CustomFieldsSection(
@@ -513,10 +561,33 @@ internal fun PaginationEditor(
         PaginationMode.DATE_WINDOW -> {
             TextFieldRow("Start param", config.startParam, { onChange(config.copy(startParam = it)) }, enabled)
             TextFieldRow("End param", config.endParam, { onChange(config.copy(endParam = it)) }, enabled)
+            EnumDropdown(
+                label = "Window bound format",
+                options = WindowBoundFormat.entries,
+                selected = config.windowBoundFormat,
+                onSelect = { onChange(config.copy(windowBoundFormat = it)) },
+                optionLabel = { it.name },
+                enabled = enabled,
+            )
             IntFieldRow("Window days", config.windowDays, { onChange(config.copy(windowDays = it)) }, enabled)
             IntFieldRow("Lookback days", config.lookbackDays, { onChange(config.copy(lookbackDays = it)) }, enabled)
             QueryParamsEditor(params = config.extraParams, onChange = { onChange(config.copy(extraParams = it)) }, enabled = enabled)
         }
+    }
+    ToggleRow(
+        label = "Offset paging (e.g. Kraken \"ofs\")",
+        checked = config.offsetParam != null,
+        onCheckedChange = { onChange(config.copy(offsetParam = if (it) "ofs" else null)) },
+        enabled = enabled,
+    )
+    config.offsetParam?.let { offsetParam ->
+        TextFieldRow("Offset param", offsetParam, { onChange(config.copy(offsetParam = it)) }, enabled)
+        TextFieldRow(
+            "Total count field (optional)",
+            config.totalCountField.orEmpty(),
+            { onChange(config.copy(totalCountField = it.ifBlank { null })) },
+            enabled,
+        )
     }
 }
 
@@ -542,6 +613,49 @@ internal fun EndpointEditor(
         onValueChange = { onChange(endpoint.copy(responseArrayKey = it)) },
         enabled = enabled,
         placeholder = "accounts (blank = response is a bare array)",
+    )
+    EnumDropdown(
+        label = "HTTP method",
+        options = HttpMethodType.entries,
+        selected = endpoint.method,
+        onSelect = { onChange(endpoint.copy(method = it)) },
+        optionLabel = { it.name },
+        enabled = enabled,
+    )
+    ToggleRow(
+        label = "Response array key is a keyed object (e.g. Kraken result.trades)",
+        checked = endpoint.responseObjectValues,
+        onCheckedChange = { onChange(endpoint.copy(responseObjectValues = it)) },
+        enabled = enabled,
+    )
+    if (endpoint.responseObjectValues) {
+        TextFieldRow(
+            label = "Splice object key into field (optional, e.g. ledger_id)",
+            value = endpoint.itemKeyField.orEmpty(),
+            onValueChange = { onChange(endpoint.copy(itemKeyField = it.ifBlank { null })) },
+            enabled = enabled,
+        )
+    }
+    TextFieldRow(
+        label = "Success code field (optional, e.g. code)",
+        value = endpoint.successCodeField.orEmpty(),
+        onValueChange = { onChange(endpoint.copy(successCodeField = it.ifBlank { null })) },
+        enabled = enabled,
+    )
+    if (endpoint.successCodeField != null) {
+        TextFieldRow(
+            label = "Success code value (e.g. 0)",
+            value = endpoint.successCodeOkValue.orEmpty(),
+            onValueChange = { onChange(endpoint.copy(successCodeOkValue = it.ifBlank { null })) },
+            enabled = enabled,
+            isError = endpoint.successCodeOkValue.isNullOrBlank(),
+        )
+    }
+    TextFieldRow(
+        label = "Error array field (optional, e.g. error)",
+        value = endpoint.errorArrayField.orEmpty(),
+        onValueChange = { onChange(endpoint.copy(errorArrayField = it.ifBlank { null })) },
+        enabled = enabled,
     )
     QueryParamsEditor(
         params = endpoint.queryParams,

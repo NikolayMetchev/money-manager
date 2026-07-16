@@ -1,6 +1,6 @@
 insertCredential:
-INSERT INTO api_credential(type_id, token, created_at, strategy_id, private_key, public_key, api_secret)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO api_credential(token, created_at, strategy_id, private_key, public_key, api_secret)
+VALUES (?, ?, ?, ?, ?, ?);
 
 lastInsertCredentialRowId:
 SELECT last_insert_rowid();
@@ -17,8 +17,8 @@ updateCredentialSecrets:
 UPDATE api_credential SET token = ?, api_secret = ? WHERE id = ?;
 
 insert:
-INSERT INTO api_session(type_id, token, device_id, created_at, expires_at, credential_id)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT INTO api_session(token, device_id, created_at, expires_at, credential_id)
+VALUES (?, ?, ?, ?, ?);
 
 insertRequest:
 INSERT INTO api_request(session_id, method, url)
