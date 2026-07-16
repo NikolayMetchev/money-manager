@@ -515,6 +515,15 @@ object BuiltInApiStrategies {
                     windowSeconds = 24 * 3600,
                     amountTolerancePercent = "2",
                 ),
+            tokenPageUrl = "https://exchange.crypto.com/settings/api-management",
+            connectInstructions =
+                listOf(
+                    "Open the Crypto.com Exchange API management page in your browser and sign in.",
+                    "Create a new API key with read-only permissions (do not grant withdrawal or " +
+                        "trading permissions).",
+                    "Copy the API key and paste it below as the API key.",
+                    "Copy the Secret Key and paste it below as the API secret.",
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -729,6 +738,16 @@ object BuiltInApiStrategies {
                     ),
                 ),
             assetAliases = assetAliasMap,
+            tokenPageUrl = "https://www.kraken.com/u/security/api",
+            connectInstructions =
+                listOf(
+                    "Open the Kraken API management page in your browser and sign in.",
+                    "Create a new API key with the \"Query Funds\", \"Query Ledger Entries\", " +
+                        "\"Query Open/Closed Orders & Trades\" and \"Export Data\" permissions (read-only " +
+                        "access is sufficient; do not grant withdrawal or trading permissions).",
+                    "Copy the API key and paste it below as the API key.",
+                    "Copy the Private Key and paste it below as the API secret.",
+                ),
             createdAt = now,
             updatedAt = now,
         )
