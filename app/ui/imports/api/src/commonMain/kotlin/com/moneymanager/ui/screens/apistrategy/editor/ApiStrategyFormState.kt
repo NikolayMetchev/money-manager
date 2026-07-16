@@ -122,7 +122,7 @@ fun buildStrategyFromApiFormState(
         peopleDownload = state.peopleDownload,
         personExternalIdAttribute = state.personExternalIdAttribute?.trim()?.ifBlank { null },
         tokenPageUrl = state.tokenPageUrl?.trim()?.ifBlank { null },
-        connectInstructions = state.connectInstructions.filter { it.isNotBlank() },
+        connectInstructions = state.connectInstructions.map { it.trim() }.filter { it.isNotEmpty() },
         requestSigning = state.requestSigning,
         dataEndpoints = state.dataEndpoints,
         syntheticAccount = state.syntheticAccount,

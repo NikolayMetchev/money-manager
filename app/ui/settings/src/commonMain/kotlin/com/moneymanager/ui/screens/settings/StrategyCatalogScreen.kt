@@ -85,6 +85,9 @@ fun StrategyCatalogScreen(
 
     fun applyLocalDirectory() {
         controller.setLocalDirectoryOverride(if (localDirEnabled) localDirPath else null)
+        // A blank path falls back to the remote source without an error, so re-read the controller's
+        // actual state rather than trusting the switch — otherwise it can show ON while reading remote.
+        localDirEnabled = controller.localDirectoryOverride != null
         scope.launch {
             controller.beginBusy()
             controller.refresh(library, appVersion)
@@ -157,6 +160,7 @@ fun StrategyCatalogScreen(
                             localDirEnabled = it
                             applyLocalDirectory()
                         },
+                        enabled = !state.busy,
                     )
                     Text(
                         "Read from a local directory instead (for testing built-in strategy changes)",
@@ -172,9 +176,10 @@ fun StrategyCatalogScreen(
                             label = { Text("Local strategy-library directory") },
                             placeholder = { Text("e.g. webpage/strategy-library") },
                             singleLine = true,
+                            enabled = !state.busy,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { applyLocalDirectory() }) { Text("Apply") }
+                        TextButton(onClick = { applyLocalDirectory() }, enabled = !state.busy) { Text("Apply") }
                     }
                 }
             }
