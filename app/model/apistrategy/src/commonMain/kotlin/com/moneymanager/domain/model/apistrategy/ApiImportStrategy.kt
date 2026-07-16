@@ -54,6 +54,17 @@ data class ApiImportStrategy(
     val tokenPageUrl: String? = null,
     /** Ordered, numbered steps shown to the user for obtaining credentials from this provider. */
     val connectInstructions: List<String> = emptyList(),
+    /** Delay between exchange-download requests; null uses the download function's own default. */
+    val rateLimitMillis: Long? = null,
+    /**
+     * Case-insensitive substrings that mark an exchange error response as transient rate-limiting
+     * (retried with backoff) rather than a hard failure (which abandons the rest of the endpoint).
+     */
+    val rateLimitErrorSubstrings: List<String> = emptyList(),
+    /** Base backoff before the first retry of a rate-limited request; doubles each subsequent retry. */
+    val rateLimitBackoffMillis: Long = 5_000L,
+    /** Maximum retries for a request repeatedly classified as rate-limited before giving up. */
+    val maxRateLimitRetries: Int = 5,
     val createdAt: Instant,
     val updatedAt: Instant,
     val revisionId: Long = 1,

@@ -530,7 +530,8 @@ private fun ApiEndpointConfig.isValidForSave(): Boolean {
     return path.isNotBlank() &&
         (successCodeField == null || !successCodeOkValue.isNullOrBlank()) &&
         // A non-positive limitValue would never advance the offset, looping on the same page forever.
-        (pagination?.offsetParam == null || pagination.limitValue > 0)
+        (pagination?.offsetParam == null || pagination.limitValue > 0) &&
+        requestCostWeight >= 1
 }
 
 /** Whether a data-endpoint list is complete enough to save (used for tab validation). */

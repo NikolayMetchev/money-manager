@@ -60,6 +60,10 @@ internal class ApiStrategyEditorState(
     var personExternalIdAttribute by mutableStateOf(initial?.personExternalIdAttribute.orEmpty())
     var tokenPageUrl by mutableStateOf(initial?.tokenPageUrl.orEmpty())
     var connectInstructions by mutableStateOf(initial?.connectInstructions.orEmpty())
+    var rateLimitMillis by mutableStateOf(initial?.rateLimitMillis)
+    var rateLimitErrorSubstrings by mutableStateOf(initial?.rateLimitErrorSubstrings.orEmpty())
+    var rateLimitBackoffMillis by mutableStateOf(initial?.rateLimitBackoffMillis ?: 5_000L)
+    var maxRateLimitRetries by mutableStateOf(initial?.maxRateLimitRetries ?: 5)
 
     var accountsEndpoint by mutableStateOf(initial?.accountsEndpoint ?: DEFAULT_ACCOUNTS_ENDPOINT)
     var transactionsEndpoint by mutableStateOf(initial?.transactionsEndpoint ?: DEFAULT_TRANSACTIONS_ENDPOINT)
@@ -85,7 +89,12 @@ internal class ApiStrategyEditorState(
     var assetAliases by mutableStateOf(initial?.assetAliases.orEmpty())
 
     val generalHasError: Boolean
-        get() = name.isBlank() || baseUrl.isBlank()
+        get() =
+            name.isBlank() ||
+                baseUrl.isBlank() ||
+                (rateLimitMillis?.let { it < 0 } == true) ||
+                rateLimitBackoffMillis <= 0 ||
+                maxRateLimitRetries < 0
 
     val endpointsHasError: Boolean
         get() =
@@ -152,6 +161,10 @@ internal class ApiStrategyEditorState(
             personExternalIdAttribute = personExternalIdAttribute,
             tokenPageUrl = tokenPageUrl,
             connectInstructions = connectInstructions,
+            rateLimitMillis = rateLimitMillis,
+            rateLimitErrorSubstrings = rateLimitErrorSubstrings,
+            rateLimitBackoffMillis = rateLimitBackoffMillis,
+            maxRateLimitRetries = maxRateLimitRetries,
             accountsEndpoint = accountsEndpoint,
             transactionsEndpoint = transactionsEndpoint,
             accountIdentifiersEndpoint = accountIdentifiersEndpoint,

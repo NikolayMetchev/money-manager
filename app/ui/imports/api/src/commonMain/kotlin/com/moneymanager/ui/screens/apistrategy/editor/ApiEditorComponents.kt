@@ -189,6 +189,47 @@ internal fun LongFieldRow(
     )
 }
 
+/**
+ * A field that edits an optional [Long]. A blank buffer commits `null`; keeps its own text buffer
+ * (keyed on [value] so an external change resyncs it) so intermediate empty/invalid input is shown
+ * without corrupting the model.
+ */
+@Composable
+internal fun OptionalLongFieldRow(
+    label: String,
+    value: Long?,
+    onValueChange: (Long?) -> Unit,
+    enabled: Boolean = true,
+    placeholder: String? = null,
+) {
+    var text by remember(value) { mutableStateOf(value?.toString().orEmpty()) }
+    val parseError = text.isNotBlank() && text.trim().toLongOrNull() == null
+    OutlinedTextField(
+        value = text,
+        onValueChange = {
+            text = it
+            if (it.isBlank()) {
+                onValueChange(null)
+            } else {
+                it.trim().toLongOrNull()?.let(onValueChange)
+            }
+        },
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it) } },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        enabled = enabled,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        isError = parseError,
+        supportingText =
+            if (parseError) {
+                { Text("Must be a whole number, or blank for the default") }
+            } else {
+                null
+            },
+    )
+}
+
 /** A Switch + label row. */
 @Composable
 internal fun ToggleRow(
@@ -708,6 +749,12 @@ internal fun EndpointEditor(
         label = "Error array field (optional, e.g. error)",
         value = endpoint.errorArrayField.orEmpty(),
         onValueChange = { onChange(endpoint.copy(errorArrayField = it.ifBlank { null })) },
+        enabled = enabled,
+    )
+    IntFieldRow(
+        label = "Relative rate-limit cost (e.g. Kraken's history calls cost 2 vs 1 for others)",
+        value = endpoint.requestCostWeight,
+        onValueChange = { onChange(endpoint.copy(requestCostWeight = it)) },
         enabled = enabled,
     )
     QueryParamsEditor(

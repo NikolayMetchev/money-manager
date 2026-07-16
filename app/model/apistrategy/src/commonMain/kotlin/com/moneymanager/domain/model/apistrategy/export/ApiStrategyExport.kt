@@ -49,4 +49,8 @@ data class ApiStrategyExport(
     val assetAliases: Map<String, String> = emptyMap(),
     val tokenPageUrl: String? = null,
     val connectInstructions: List<String> = emptyList(),
+    val rateLimitMillis: Long? = null,
+    val rateLimitErrorSubstrings: List<String> = emptyList(),
+    val rateLimitBackoffMillis: Long = 5_000L,
+    val maxRateLimitRetries: Int = 5,
 )

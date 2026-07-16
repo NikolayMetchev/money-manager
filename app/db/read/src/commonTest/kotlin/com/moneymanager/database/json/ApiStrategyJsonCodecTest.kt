@@ -164,6 +164,10 @@ class ApiStrategyJsonCodecTest {
                     ),
                 syntheticAccount = ApiSyntheticAccount(name = "Kraken", externalId = "kraken"),
                 assetAliases = mapOf("XXBT" to "BTC", "ZUSD" to "USD"),
+                rateLimitMillis = 3_100L,
+                rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
+                rateLimitBackoffMillis = 5_000L,
+                maxRateLimitRetries = 6,
                 dataEndpoints =
                     listOf(
                         ApiDataEndpoint(

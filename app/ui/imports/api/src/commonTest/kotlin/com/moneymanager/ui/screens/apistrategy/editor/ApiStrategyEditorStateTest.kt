@@ -121,6 +121,10 @@ class ApiStrategyEditorStateTest {
             personExternalIdAttribute = "example-external-id",
             tokenPageUrl = "https://example.com/developer/tokens",
             connectInstructions = listOf("Sign in.", "Create a token.", "Paste it below."),
+            rateLimitMillis = 3_100L,
+            rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
+            rateLimitBackoffMillis = 5_000L,
+            maxRateLimitRetries = 6,
             // A Kraken-style recipe: exercises the recursive Sha256 SigPart nesting.
             requestSigning =
                 ApiRequestSigningConfig(
@@ -147,6 +151,7 @@ class ApiStrategyEditorStateTest {
                                 errorArrayField = "error",
                                 responseObjectValues = true,
                                 itemKeyField = "trade_id",
+                                requestCostWeight = 2,
                                 pagination =
                                     ApiPaginationConfig(
                                         mode = PaginationMode.DATE_WINDOW,

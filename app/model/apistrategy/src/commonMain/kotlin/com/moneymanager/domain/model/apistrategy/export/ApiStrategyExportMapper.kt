@@ -43,6 +43,10 @@ object ApiStrategyExportMapper {
             assetAliases = export.assetAliases,
             tokenPageUrl = export.tokenPageUrl,
             connectInstructions = export.connectInstructions,
+            rateLimitMillis = export.rateLimitMillis,
+            rateLimitErrorSubstrings = export.rateLimitErrorSubstrings,
+            rateLimitBackoffMillis = export.rateLimitBackoffMillis,
+            maxRateLimitRetries = export.maxRateLimitRetries,
             createdAt = now,
             updatedAt = now,
         )
@@ -74,5 +78,9 @@ object ApiStrategyExportMapper {
             assetAliases = strategy.assetAliases,
             tokenPageUrl = strategy.tokenPageUrl,
             connectInstructions = strategy.connectInstructions,
+            rateLimitMillis = strategy.rateLimitMillis,
+            rateLimitErrorSubstrings = strategy.rateLimitErrorSubstrings,
+            rateLimitBackoffMillis = strategy.rateLimitBackoffMillis,
+            maxRateLimitRetries = strategy.maxRateLimitRetries,
         )
 }

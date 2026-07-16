@@ -67,6 +67,10 @@ object ApiImportStrategyAuditEntryMapper {
                 assetAliases = raw.assetAliases,
                 tokenPageUrl = raw.tokenPageUrl,
                 connectInstructions = raw.connectInstructions,
+                rateLimitMillis = raw.rateLimitMillis,
+                rateLimitErrorSubstrings = raw.rateLimitErrorSubstrings,
+                rateLimitBackoffMillis = raw.rateLimitBackoffMillis,
+                maxRateLimitRetries = raw.maxRateLimitRetries,
             )
         return ApiImportStrategyAuditEntry(
             id = from.id,

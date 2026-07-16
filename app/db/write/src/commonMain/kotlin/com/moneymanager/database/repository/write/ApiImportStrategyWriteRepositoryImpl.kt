@@ -105,5 +105,9 @@ class ApiImportStrategyWriteRepositoryImpl(
             assetAliases = assetAliases,
             tokenPageUrl = tokenPageUrl,
             connectInstructions = connectInstructions,
+            rateLimitMillis = rateLimitMillis,
+            rateLimitErrorSubstrings = rateLimitErrorSubstrings,
+            rateLimitBackoffMillis = rateLimitBackoffMillis,
+            maxRateLimitRetries = maxRateLimitRetries,
         )
 }

@@ -567,6 +567,10 @@ object BuiltInApiStrategies {
             responseObjectValues: Boolean = false,
             itemKeyField: String? = null,
             queryParams: List<ApiQueryParam> = emptyList(),
+            // Kraken's ledger/trade-history calls cost 2 rate-limit counter units against 1 for other
+            // endpoints (per Kraken's published REST rate-limit docs); TradesHistory/Ledgers are the
+            // only callers relying on this default, DepositStatus/WithdrawStatus pass 1 explicitly.
+            requestCostWeight: Int = 2,
         ) = ApiEndpointConfig(
             path = path,
             responseArrayKey = key,
@@ -577,6 +581,7 @@ object BuiltInApiStrategies {
             pagination = pagination,
             responseObjectValues = responseObjectValues,
             itemKeyField = itemKeyField,
+            requestCostWeight = requestCostWeight,
         )
 
         // Kraken's legacy asset codes, normalized to their canonical ISO/ticker form before any
@@ -725,19 +730,28 @@ object BuiltInApiStrategies {
                     // exchange engine to cover this needs the real cursor field verified against a live
                     // response before it's worth adding.
                     ApiDataEndpoint(
-                        signed("0/private/DepositStatus", "result", pagination = null),
+                        signed("0/private/DepositStatus", "result", pagination = null, requestCostWeight = 1),
                         ApiEndpointKind.DEPOSITS,
                         transactionMappings = enrichMappings,
                         enrichesTransfers = true,
                     ),
                     ApiDataEndpoint(
-                        signed("0/private/WithdrawStatus", "result", pagination = null),
+                        signed("0/private/WithdrawStatus", "result", pagination = null, requestCostWeight = 1),
                         ApiEndpointKind.WITHDRAWALS,
                         transactionMappings = enrichMappings,
                         enrichesTransfers = true,
                     ),
                 ),
             assetAliases = assetAliasMap,
+            // Starter-tier decay is 0.33 counter/sec (Kraken's slowest verification tier), so 1 unit of
+            // cost needs ~3.03s to fully decay; 3100ms per unit keeps even the slowest tier clear of
+            // "EAPI:Rate limit exceeded" with a small margin. requestCostWeight above scales this per
+            // endpoint (2 for ledger/trade-history calls, 1 for the rest) so cheaper endpoints aren't
+            // paced as conservatively as the most expensive ones.
+            rateLimitMillis = 3_100L,
+            rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Too many requests", "Throttled"),
+            rateLimitBackoffMillis = 5_000L,
+            maxRateLimitRetries = 6,
             tokenPageUrl = "https://pro.kraken.com/app/settings/api",
             connectInstructions =
                 listOf(

@@ -167,6 +167,13 @@ data class ApiEndpointConfig(
     val errorArrayField: String? = null,
     val responseObjectValues: Boolean = false,
     val itemKeyField: String? = null,
+    /**
+     * Relative rate-limit cost of one request to this endpoint (e.g. Kraken's ledger/trade-history
+     * calls cost 2 counter units against 1 for other endpoints). Multiplies the strategy's
+     * [ApiImportStrategy.rateLimitMillis] delay so a mixed-cost exchange doesn't have to pace every
+     * endpoint as slowly as its most expensive one.
+     */
+    val requestCostWeight: Int = 1,
 )
 
 /**
@@ -868,4 +875,12 @@ data class ApiStrategyConfig(
      * a user-defined strategy simply gets none, which is why connecting never requires them.
      */
     val connectInstructions: List<String> = emptyList(),
+    /** Delay between exchange-download requests; null uses the download function's own default. */
+    val rateLimitMillis: Long? = null,
+    /** Case-insensitive substrings marking an error response as transient rate-limiting to retry. */
+    val rateLimitErrorSubstrings: List<String> = emptyList(),
+    /** Base backoff before the first retry of a rate-limited request; doubles each subsequent retry. */
+    val rateLimitBackoffMillis: Long = 5_000L,
+    /** Maximum retries for a request repeatedly classified as rate-limited before giving up. */
+    val maxRateLimitRetries: Int = 5,
 )

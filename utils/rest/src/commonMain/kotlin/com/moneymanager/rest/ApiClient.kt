@@ -61,6 +61,10 @@ class ApiClient(
      * by signed exchange APIs (the signature/api-key/nonce are already baked into [headers]/[body]/[url]
      * by [ApiRequestSigner]). The traffic interceptor records only method/url/(redacted) headers, never
      * the body, so a secret carried in the JSON body (Crypto.com) is never persisted.
+     *
+     * [recordUrl] is persisted by the traffic recorder in place of the wire [url] when set. Exchanges
+     * that sign the request path (Kraken) reject any unsigned query marker appended to the real URL, so
+     * bookkeeping markers must travel out-of-band of the wire request.
      */
     suspend fun send(
         method: String,
@@ -68,10 +72,12 @@ class ApiClient(
         headers: Map<String, String> = emptyMap(),
         body: String? = null,
         contentType: String? = null,
+        recordUrl: String? = null,
     ): ApiHttpResponse {
         val response =
             httpClient.request(url) {
                 this.method = HttpMethod.parse(method)
+                recordUrl?.let { attributes.put(apiRecordUrlKey, it) }
                 headers.forEach { (name, value) -> header(name, value) }
                 if (body != null) {
                     contentType?.let { header(HttpHeaders.ContentType, it) }
@@ -120,7 +126,7 @@ fun createApiClient(
         val requestId =
             trafficRecorder.recordRequest(
                 method = request.method.value,
-                url = request.url.buildString(),
+                url = request.attributes.getOrNull(apiRecordUrlKey) ?: request.url.buildString(),
                 headers =
                     request.headers
                         .entries()
@@ -165,6 +171,7 @@ private fun isSensitiveHeader(key: String): Boolean {
         lower.contains("api-sign")
 }
 
+private val apiRecordUrlKey = AttributeKey<String>("ApiRecordUrl")
 private val apiResponseBodyKey = AttributeKey<String>("ApiResponseBody")
 private val apiResponseIdKey = AttributeKey<Long>("ApiResponseId")
 private val apiRequestIdKey = AttributeKey<Long>("ApiRequestId")

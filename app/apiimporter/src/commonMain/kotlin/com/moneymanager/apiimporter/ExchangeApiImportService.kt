@@ -82,6 +82,9 @@ private const val WALLET_ADDRESS_ATTR = "blockchain-wallet-address"
 /** Cross-source unique-id attribute holding a transfer's on-chain transaction id. */
 private const val BLOCKCHAIN_TXID_ATTR = "blockchain-txid"
 
+/** Upper bound on exponential rate-limit backoff, so a misconfigured base delay can't stall for hours. */
+private const val MAX_RATE_LIMIT_BACKOFF_MILLIS = 60_000L
+
 /**
  * Downloads every data endpoint of an exchange [strategy] into [sessionId] as signed POST/GET requests,
  * paged by date window. Incremental: a window already stored (recorded URL present) is skipped. The
@@ -142,33 +145,6 @@ suspend fun downloadApiSessionExchange(
                 }
                 if (offsetParam != null) params[offsetParam] = offset.toString()
 
-                val endpointUrl = buildExchangeEndpointUrl(strategy.baseUrl, endpoint.path)
-                val nonce = nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds())
-                lastNonce = nonce
-                val signed =
-                    signer.sign(
-                        endpointUrl = endpointUrl,
-                        path = uriPathOf(endpointUrl),
-                        methodName = endpoint.path,
-                        params = params,
-                        apiKey = apiKey,
-                        apiSecret = apiSecret,
-                        nonce = nonce,
-                        requestId = requestId,
-                    )
-                requestId += 1
-
-                // Make the recorded URL unique per (endpoint, window, offset) so incremental skip works.
-                // For a signed query string (Binance) the signed URL already encodes the window, and
-                // appending an unsigned marker would break the signature — so only mark body-based
-                // requests (Crypto.com/Kraken).
-                val sendUrl =
-                    if (signing.bodyFormat == BodyFormat.QUERY_ONLY) {
-                        signed.url
-                    } else {
-                        appendMarker(signed.url, endpointDedupeKey(endpoint), window, offsetParam?.let { offset })
-                    }
-
                 onProgress(
                     ApiTransactionsDownloadProgress(
                         accountIndex = endpointIndex + 1,
@@ -178,10 +154,57 @@ suspend fun downloadApiSessionExchange(
                     ),
                 )
 
-                val pageBody: String?
-                if (sendUrl !in downloadedUrls) {
+                // The nonce must be fresh on every real attempt (a repeated nonce is rejected), so a
+                // retried request is re-signed from scratch rather than resent as-is.
+                val effectiveDelayMillis = (strategy.rateLimitMillis ?: rateLimitMillis) * endpoint.requestCostWeight
+                var pageBody: String?
+                var rateLimitRetries = 0
+                retryLoop@ while (true) {
+                    val endpointUrl = buildExchangeEndpointUrl(strategy.baseUrl, endpoint.path)
+                    val nonce = nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds())
+                    lastNonce = nonce
+                    val signed =
+                        signer.sign(
+                            endpointUrl = endpointUrl,
+                            path = uriPathOf(endpointUrl),
+                            methodName = endpoint.path,
+                            params = params,
+                            apiKey = apiKey,
+                            apiSecret = apiSecret,
+                            nonce = nonce,
+                            requestId = requestId,
+                        )
+                    requestId += 1
+
+                    // Make the recorded URL unique per (endpoint, window, offset) so incremental skip
+                    // works and a stored response can be matched back to its data endpoint. The marker
+                    // is recorded out-of-band, never sent on the wire: Kraken verifies its signature
+                    // against the full request path+query, so an unsigned query marker breaks
+                    // authentication (surfacing as EAPI:Invalid key). For a signed query string
+                    // (Binance) the signed URL already encodes the window, so body-based requests
+                    // (Crypto.com/Kraken) are the only ones marked.
+                    val recordedUrl =
+                        if (signing.bodyFormat == BodyFormat.QUERY_ONLY) {
+                            signed.url
+                        } else {
+                            appendMarker(signed.url, endpointDedupeKey(endpoint), window, offsetParam?.let { offset })
+                        }
+
+                    if (recordedUrl in downloadedUrls) {
+                        pageBody = existingResponseJsonByUrl[recordedUrl]
+                        break@retryLoop
+                    }
+
                     val method = endpoint.method.name
-                    val response = apiClient.send(method, sendUrl, signed.headers, signed.body, signed.contentType)
+                    val response =
+                        apiClient.send(
+                            method,
+                            signed.url,
+                            signed.headers,
+                            signed.body,
+                            signed.contentType,
+                            recordUrl = recordedUrl.takeIf { it != signed.url },
+                        )
                     val error =
                         when {
                             response.statusCode != 200 -> "HTTP ${response.statusCode}: ${response.body}"
@@ -193,16 +216,31 @@ suspend fun downloadApiSessionExchange(
                             ) -> "API error: ${response.body}"
                             else -> null
                         }
-                    if (error != null) {
+                    if (error == null) {
+                        responseCount += 1
+                        pageBody = response.body
+                        if (effectiveDelayMillis > 0) delay(effectiveDelayMillis)
+                        break@retryLoop
+                    }
+
+                    // A rate-limit-shaped error (per the strategy's own config) is transient: back off
+                    // and retry the same request rather than abandoning the rest of the endpoint's
+                    // windows, which previously turned one rate-limit hit into a near-empty download.
+                    val isRateLimited = strategy.rateLimitErrorSubstrings.any { error.contains(it, ignoreCase = true) }
+                    if (!isRateLimited || rateLimitRetries >= strategy.maxRateLimitRetries) {
                         logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
                         endpointBroken = true
                         return@forEachIndexed
                     }
-                    responseCount += 1
-                    pageBody = response.body
-                    if (rateLimitMillis > 0) delay(rateLimitMillis)
-                } else {
-                    pageBody = existingResponseJsonByUrl[sendUrl]
+                    rateLimitRetries += 1
+                    val backoffMillis =
+                        (strategy.rateLimitBackoffMillis * (1L shl (rateLimitRetries - 1)))
+                            .coerceAtMost(MAX_RATE_LIMIT_BACKOFF_MILLIS)
+                    logger.warn {
+                        "Rate-limited on '${endpoint.path}' (attempt $rateLimitRetries/${strategy.maxRateLimitRetries}); " +
+                            "retrying in ${backoffMillis}ms"
+                    }
+                    delay(backoffMillis)
                 }
 
                 keepPaging =
