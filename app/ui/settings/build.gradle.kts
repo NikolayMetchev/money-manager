@@ -21,6 +21,7 @@ kotlin {
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.app.ui.components)
+                implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
             }
         }

@@ -33,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
+import com.moneymanager.compose.filepicker.manualFolderEntrySupported
+import com.moneymanager.compose.filepicker.rememberFolderPicker
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -82,6 +84,7 @@ fun StrategyCatalogScreen(
     var pendingInstall by remember { mutableStateOf<PendingInstall?>(null) }
     var localDirEnabled by remember { mutableStateOf(controller.localDirectoryOverride != null) }
     var localDirPath by remember { mutableStateOf(controller.localDirectoryOverride.orEmpty()) }
+    var localDirDisplayName by remember { mutableStateOf<String?>(null) }
 
     fun applyLocalDirectory() {
         controller.setLocalDirectoryOverride(if (localDirEnabled) localDirPath else null)
@@ -93,6 +96,16 @@ fun StrategyCatalogScreen(
             controller.refresh(library, appVersion)
         }
     }
+
+    val localDirPicker =
+        rememberFolderPicker { picked ->
+            if (picked != null) {
+                localDirPath = picked.ref
+                localDirDisplayName = picked.displayName
+                localDirEnabled = true
+                applyLocalDirectory()
+            }
+        }
 
     LaunchedEffect(Unit) {
         controller.beginBusy()
@@ -170,16 +183,35 @@ fun StrategyCatalogScreen(
                 }
                 if (localDirEnabled) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = localDirPath,
-                            onValueChange = { localDirPath = it },
-                            label = { Text("Local strategy-library directory") },
-                            placeholder = { Text("e.g. webpage/strategy-library") },
-                            singleLine = true,
-                            enabled = !state.busy,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(onClick = { applyLocalDirectory() }, enabled = !state.busy) { Text("Apply") }
+                        if (manualFolderEntrySupported) {
+                            OutlinedTextField(
+                                value = localDirPath,
+                                onValueChange = {
+                                    localDirPath = it
+                                    // A hand-typed path is its own display; drop any stale picked name.
+                                    localDirDisplayName = null
+                                },
+                                label = { Text("Local strategy-library directory") },
+                                placeholder = { Text("e.g. webpage/strategy-library") },
+                                singleLine = true,
+                                enabled = !state.busy,
+                                modifier = Modifier.weight(1f),
+                            )
+                            OutlinedButton(onClick = { localDirPicker.launch() }, enabled = !state.busy) { Text("Browse…") }
+                            TextButton(onClick = { applyLocalDirectory() }, enabled = !state.busy) { Text("Apply") }
+                        } else {
+                            // SAF-only platforms: the folder ref is an opaque content:// URI, so never show
+                            // or edit it directly — only the picked folder's display name.
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    localDirDisplayName ?: "No folder selected",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                            OutlinedButton(onClick = { localDirPicker.launch() }, enabled = !state.busy) {
+                                Text(if (localDirDisplayName == null) "Choose folder…" else "Change folder")
+                            }
+                        }
                     }
                 }
             }
