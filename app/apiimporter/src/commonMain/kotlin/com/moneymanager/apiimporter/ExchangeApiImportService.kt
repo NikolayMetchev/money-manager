@@ -126,7 +126,9 @@ suspend fun downloadApiSessionExchange(
         var endpointBroken = false
         windows.forEachIndexed { windowIndex, window ->
             if (endpointBroken) return@forEachIndexed
-            val offsetParam = endpoint.pagination?.offsetParam
+            // A non-positive limitValue would never advance the offset (see below), looping forever on
+            // the same page; treat a misconfigured limit as "no offset paging" rather than hang.
+            val offsetParam = endpoint.pagination?.offsetParam?.takeIf { (endpoint.pagination?.limitValue ?: 0) > 0 }
             var offset = 0
             var itemsSeenInWindow = 0
             var keepPaging = true

@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -340,7 +341,13 @@ internal fun StringSetEditor(
     }
 }
 
-/** Edits a `Map<String, String>` as rows of key/value text fields (e.g. asset aliases, account aliases). */
+/**
+ * Edits a `Map<String, String>` as rows of key/value text fields (e.g. asset aliases, account aliases).
+ * Row identity is a local, independent editing buffer (seeded once from [entries], not recomputed from
+ * it) so an in-progress blank or duplicate key never collapses or drops another row mid-edit — only the
+ * well-formed rows (non-blank key) are converted to the map handed to [onChange], with the usual
+ * last-key-wins behavior on duplicates.
+ */
 @Composable
 internal fun StringMapEditor(
     label: String,
@@ -350,14 +357,19 @@ internal fun StringMapEditor(
     valueLabel: String = "Value",
     enabled: Boolean = true,
 ) {
-    val rows = remember(entries) { entries.toList() }
+    val rows = remember { entries.toList().toMutableStateList() }
+
+    fun emit() {
+        onChange(rows.filter { it.first.isNotBlank() }.associate { it.first to it.second })
+    }
     Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     rows.forEachIndexed { index, (key, value) ->
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             OutlinedTextField(
                 value = key,
                 onValueChange = { updated ->
-                    onChange(rows.toMutableList().also { it[index] = updated to value }.toMap())
+                    rows[index] = updated to value
+                    emit()
                 },
                 label = { Text(keyLabel) },
                 modifier = Modifier.weight(1f),
@@ -367,19 +379,26 @@ internal fun StringMapEditor(
             OutlinedTextField(
                 value = value,
                 onValueChange = { updated ->
-                    onChange(rows.toMutableList().also { it[index] = key to updated }.toMap())
+                    rows[index] = key to updated
+                    emit()
                 },
                 label = { Text(valueLabel) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 enabled = enabled,
             )
-            IconButton(onClick = { onChange(rows.filterIndexed { i, _ -> i != index }.toMap()) }, enabled = enabled) {
+            IconButton(
+                onClick = {
+                    rows.removeAt(index)
+                    emit()
+                },
+                enabled = enabled,
+            ) {
                 Icon(Icons.Default.Close, contentDescription = "Remove entry", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
-    TextButton(onClick = { onChange((rows + ("" to "")).toMap()) }, enabled = enabled) {
+    TextButton(onClick = { rows.add("" to "") }, enabled = enabled) {
         Icon(Icons.Default.Add, contentDescription = null)
         Spacer(Modifier.width(4.dp))
         Text("Add entry")

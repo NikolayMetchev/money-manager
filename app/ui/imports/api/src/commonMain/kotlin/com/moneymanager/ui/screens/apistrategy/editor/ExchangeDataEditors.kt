@@ -120,9 +120,12 @@ private fun DataEndpointEditor(
         selected = dataEndpoint.kind,
         // Persist the direction the UI shows by default (IN) when switching to a directional kind,
         // so a saved deposit/withdrawal endpoint never keeps a null direction the UI rendered as IN.
+        // A trade/order endpoint has no transactionMappings, so enrichesTransfers (which needs one) can
+        // never be valid there — clear it when switching to a trade kind.
         onSelect = { newKind ->
             val direction = dataEndpoint.fixedDirection ?: TransferDirection.IN.takeIf { newKind in DIRECTIONAL_KINDS }
-            onChange(dataEndpoint.copy(kind = newKind, fixedDirection = direction))
+            val enriches = dataEndpoint.enrichesTransfers && newKind !in TRADE_KINDS
+            onChange(dataEndpoint.copy(kind = newKind, fixedDirection = direction, enrichesTransfers = enriches))
         },
         optionLabel = { it.name },
         enabled = enabled,
@@ -149,12 +152,16 @@ private fun DataEndpointEditor(
         )
     }
 
-    ToggleRow(
-        label = "Enrichment only (no money movement — supplies fields for another endpoint's joinKeyField)",
-        checked = dataEndpoint.enrichesTransfers,
-        onCheckedChange = { onChange(dataEndpoint.copy(enrichesTransfers = it)) },
-        enabled = enabled,
-    )
+    // Trade/order endpoints have no transactionMappings, which enrichesTransfers validation requires —
+    // hiding the toggle there keeps every reachable state saveable.
+    if (dataEndpoint.kind !in TRADE_KINDS) {
+        ToggleRow(
+            label = "Enrichment only (no money movement — supplies fields for another endpoint's joinKeyField)",
+            checked = dataEndpoint.enrichesTransfers,
+            onCheckedChange = { onChange(dataEndpoint.copy(enrichesTransfers = it)) },
+            enabled = enabled,
+        )
+    }
 
     if (dataEndpoint.kind in DIRECTIONAL_KINDS && !dataEndpoint.enrichesTransfers) {
         EnumDropdown(
@@ -518,8 +525,13 @@ private fun ApiTransactionMappings.isValidForSave(): Boolean =
         (signSource != ApiSignSource.FIELD || !signField.isNullOrBlank())
 
 /** Whether an [ApiEndpointConfig] is complete enough to save, independent of what kind of record it produces. */
-private fun ApiEndpointConfig.isValidForSave(): Boolean =
-    path.isNotBlank() && (successCodeField == null || !successCodeOkValue.isNullOrBlank())
+private fun ApiEndpointConfig.isValidForSave(): Boolean {
+    val pagination = pagination
+    return path.isNotBlank() &&
+        (successCodeField == null || !successCodeOkValue.isNullOrBlank()) &&
+        // A non-positive limitValue would never advance the offset, looping on the same page forever.
+        (pagination?.offsetParam == null || pagination.limitValue > 0)
+}
 
 /** Whether a data-endpoint list is complete enough to save (used for tab validation). */
 internal fun List<ApiDataEndpoint>.isValidForSave(): Boolean =

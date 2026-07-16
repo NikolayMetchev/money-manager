@@ -555,6 +555,9 @@ object BuiltInApiStrategies {
                 "XZEC" to "ZEC",
                 "XETC" to "ETC",
                 "XREP" to "REP",
+                "XXDG" to "DOGE",
+                "XDG" to "DOGE",
+                "XMLN" to "MLN",
                 "ZUSD" to "USD",
                 "ZEUR" to "EUR",
                 "ZGBP" to "GBP",
@@ -568,10 +571,14 @@ object BuiltInApiStrategies {
             ApiTradeMappings(
                 instrumentField = "pair",
                 splitMode = InstrumentSplitMode.QUOTE_SUFFIX,
-                // Longest-match wins, so list 4-letter legacy codes before the 3-letter ISO codes they
-                // alias (e.g. "XXBTZUSD" must match "ZUSD", not the "USD" it also ends with).
+                // The longest matching suffix always wins (see splitInstrument), so shorter codes that
+                // are also suffixes of longer ones (e.g. "ZUSD" ends with "USD") are listed safely.
+                // "XXBT"/"XETH" cover crypto/crypto pairs quoted in BTC or ETH (e.g. "XETHXXBT" is
+                // ETH/BTC, not a BTC/USD-style fiat pair).
                 quoteAssets =
                     listOf(
+                        "XXBT",
+                        "XETH",
                         "ZUSD",
                         "ZEUR",
                         "ZGBP",
@@ -672,6 +679,13 @@ object BuiltInApiStrategies {
                         fixedDirection = TransferDirection.OUT,
                         transactionMappings = ledgerMappings("refid"),
                     ),
+                    // Known limitation: Kraken paginates these funding-status endpoints with an opaque
+                    // cursor token (not the offset/date-window shapes the generic engine implements), so
+                    // only the first page is fetched here — enrichment (on-chain address/txid) beyond
+                    // that page is silently skipped, though the underlying deposit/withdrawal transfer
+                    // itself (from Ledgers, above) is unaffected. Extending PaginationMode.CURSOR to the
+                    // exchange engine to cover this needs the real cursor field verified against a live
+                    // response before it's worth adding.
                     ApiDataEndpoint(
                         signed("0/private/DepositStatus", "result", pagination = null),
                         ApiEndpointKind.DEPOSITS,
