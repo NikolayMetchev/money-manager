@@ -2,6 +2,8 @@
 
 package com.moneymanager.ui.screens.apistrategy
 
+import com.moneymanager.domain.model.ApiCredential
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
@@ -14,8 +16,6 @@ import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.MonzoCredential
-import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.repository.ApiSessionImportRevision
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -131,20 +131,20 @@ class ApiSessionsScreenLogicTest {
     }
 
     @Test
-    fun filterCredentialsByStrategy_keepsOnlyMatchingCredentialsIncludingLegacyFallback() {
-        val modern = credential(1, strategyA)
-        val other = credential(2, strategyB)
-        val legacy = credential(3, strategyId = null)
-        val credentials = listOf(modern, other, legacy)
-        // The screen resolves legacy (null-strategy) credentials to the fallback strategy before filtering.
-        val strategyByCredential =
-            mapOf(modern.id to strategyA, other.id to strategyB, legacy.id to strategyA)
+    fun filterCredentialsByStrategy_keepsOnlyMatchingCredentials() {
+        val a = credential(1, strategyA)
+        val b = credential(2, strategyB)
+        // An orphaned credential (its strategy was deleted, or never linked) resolves to no strategy id
+        // and so never matches a specific selectedStrategyId filter — only "All strategies" (null) shows it.
+        val orphaned = credential(3, strategyId = null)
+        val credentials = listOf(a, b, orphaned)
+        val strategyByCredential = credentials.associate { it.id to it.strategyId }
         assertEquals(
-            listOf(modern, legacy),
+            listOf(a),
             filterCredentialsByStrategy(credentials, strategyByCredential, selectedStrategyId = strategyA),
         )
         assertEquals(
-            listOf(other),
+            listOf(b),
             filterCredentialsByStrategy(credentials, strategyByCredential, selectedStrategyId = strategyB),
         )
     }
@@ -201,8 +201,8 @@ class ApiSessionsScreenLogicTest {
     private fun credential(
         id: Long,
         strategyId: ApiImportStrategyId?,
-    ) = MonzoCredential(
-        id = MonzoCredentialId(id),
+    ) = ApiCredential(
+        id = ApiCredentialId(id),
         token = "token-$id",
         createdAt = Instant.DISTANT_PAST,
         strategyId = strategyId,
@@ -210,7 +210,7 @@ class ApiSessionsScreenLogicTest {
 
     private fun session(
         id: Long,
-        credentialId: MonzoCredentialId,
+        credentialId: ApiCredentialId,
     ) = ApiSession(
         id = ApiSessionId(id),
         token = "token",

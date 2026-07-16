@@ -50,6 +50,10 @@ data class ApiImportStrategy(
     val syntheticAccount: ApiSyntheticAccount? = null,
     val internalTransferReconcile: ApiInternalTransferReconcile? = null,
     val assetAliases: Map<String, String> = emptyMap(),
+    /** Deep-link to the provider's own page for creating/managing API tokens; null shows no button. */
+    val tokenPageUrl: String? = null,
+    /** Ordered, numbered steps shown to the user for obtaining credentials from this provider. */
+    val connectInstructions: List<String> = emptyList(),
     val createdAt: Instant,
     val updatedAt: Instant,
     val revisionId: Long = 1,

@@ -1,6 +1,7 @@
 package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
@@ -13,7 +14,6 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.RelationshipTypeId
@@ -85,7 +85,7 @@ data class ImportResult(
     val createdCsvImportIds: Map<String, CsvImportId> = emptyMap(),
     val createdQifImportIds: Map<String, QifImportId> = emptyMap(),
     val createdImportDirectoryIds: Map<String, ImportDirectoryId> = emptyMap(),
-    val apiCredentialIds: Map<String, MonzoCredentialId> = emptyMap(),
+    val apiCredentialIds: Map<String, ApiCredentialId> = emptyMap(),
     val apiSessionIds: Map<String, ApiSessionId> = emptyMap(),
     val apiRequestIds: Map<String, ApiRequestId> = emptyMap(),
     val apiResponseIds: Map<String, ApiResponseId> = emptyMap(),

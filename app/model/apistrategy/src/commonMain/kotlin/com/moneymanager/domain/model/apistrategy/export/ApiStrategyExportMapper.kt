@@ -41,6 +41,8 @@ object ApiStrategyExportMapper {
             syntheticAccount = export.syntheticAccount,
             internalTransferReconcile = export.internalTransferReconcile,
             assetAliases = export.assetAliases,
+            tokenPageUrl = export.tokenPageUrl,
+            connectInstructions = export.connectInstructions,
             createdAt = now,
             updatedAt = now,
         )
@@ -70,5 +72,7 @@ object ApiStrategyExportMapper {
             syntheticAccount = strategy.syntheticAccount,
             internalTransferReconcile = strategy.internalTransferReconcile,
             assetAliases = strategy.assetAliases,
+            tokenPageUrl = strategy.tokenPageUrl,
+            connectInstructions = strategy.connectInstructions,
         )
 }

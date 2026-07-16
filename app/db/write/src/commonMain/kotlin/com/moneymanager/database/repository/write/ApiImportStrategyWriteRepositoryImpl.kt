@@ -103,5 +103,7 @@ class ApiImportStrategyWriteRepositoryImpl(
             syntheticAccount = syntheticAccount,
             internalTransferReconcile = internalTransferReconcile,
             assetAliases = assetAliases,
+            tokenPageUrl = tokenPageUrl,
+            connectInstructions = connectInstructions,
         )
 }

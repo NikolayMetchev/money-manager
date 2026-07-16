@@ -72,6 +72,8 @@ import com.moneymanager.apiimporter.importApiSessionPeople
 import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.ApiCredential
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
@@ -82,8 +84,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.MonzoCredential
-import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -140,7 +140,7 @@ fun ApiSessionsScreen(
     passThroughAccountRepository: PassThroughAccountReadRepository,
     maintenance: Maintenance,
     deviceId: DeviceId,
-    onMonzoConnectClick: () -> Unit = {},
+    onAddCredentialClick: () -> Unit = {},
     onApiStrategiesClick: () -> Unit = {},
     onSessionClick: (ApiSession) -> Unit = {},
     onTransactionsImported: () -> Unit = {},
@@ -156,15 +156,15 @@ fun ApiSessionsScreen(
         importTimelineRepository.getApiSessionDateRanges().map { ranges -> ranges.associateBy { it.fileId } }
     }
 
-    var credentials by remember { mutableStateOf<List<MonzoCredential>>(emptyList()) }
-    var sessionsByCredential by remember { mutableStateOf<Map<MonzoCredentialId, List<ApiSession>>>(emptyMap()) }
+    var credentials by remember { mutableStateOf<List<ApiCredential>>(emptyList()) }
+    var sessionsByCredential by remember { mutableStateOf<Map<ApiCredentialId, List<ApiSession>>>(emptyMap()) }
     var importedSessionRevisions by remember { mutableStateOf<Set<ApiSessionImportRevision>>(emptySet()) }
-    var currentStrategyRevisionByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Long?>>(emptyMap()) }
-    var strategyNameByCredential by remember { mutableStateOf<Map<MonzoCredentialId, String>>(emptyMap()) }
-    var requiresSigningByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Boolean>>(emptyMap()) }
-    var transactionsBlockReasonByCredential by remember { mutableStateOf<Map<MonzoCredentialId, String>>(emptyMap()) }
+    var currentStrategyRevisionByCredential by remember { mutableStateOf<Map<ApiCredentialId, Long?>>(emptyMap()) }
+    var strategyNameByCredential by remember { mutableStateOf<Map<ApiCredentialId, String>>(emptyMap()) }
+    var requiresSigningByCredential by remember { mutableStateOf<Map<ApiCredentialId, Boolean>>(emptyMap()) }
+    var transactionsBlockReasonByCredential by remember { mutableStateOf<Map<ApiCredentialId, String>>(emptyMap()) }
     var strategies by remember { mutableStateOf<List<ApiImportStrategy>>(emptyList()) }
-    var strategyIdByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiImportStrategyId?>>(emptyMap()) }
+    var strategyIdByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiImportStrategyId?>>(emptyMap()) }
     var selectedStrategyId by remember { mutableStateOf<ApiImportStrategyId?>(null) }
     var selectedTab by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
@@ -174,20 +174,21 @@ fun ApiSessionsScreen(
     var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportProgress>>(emptyMap()) }
 
     // Per-credential download result state (cleared when a new download starts)
-    var downloadResultByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiSessionDownloadResult>>(emptyMap()) }
-    var downloadProgressByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiTransactionsDownloadProgress?>>(emptyMap()) }
+    var downloadResultByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiSessionDownloadResult>>(emptyMap()) }
+    var downloadProgressByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiTransactionsDownloadProgress?>>(emptyMap()) }
     var pendingImport by remember { mutableStateOf<PendingApiImport?>(null) }
 
-    suspend fun resolveStrategy(credential: MonzoCredential): ApiImportStrategy? =
-        credential.strategyId
-            ?.let { apiImportStrategyRepository.getStrategyById(it).first() }
-            ?: legacyDefaultStrategy(apiImportStrategyRepository.getAllStrategies().first())
+    // A credential with no linked strategyId is orphaned (its strategy was deleted, or it was never
+    // linked) — null propagates to the call sites below, which surface a clear error rather than
+    // guessing a provider.
+    suspend fun resolveStrategy(credential: ApiCredential): ApiImportStrategy? =
+        credential.strategyId?.let { apiImportStrategyRepository.getStrategyById(it).first() }
 
     // Builds the SCA request-signing params when the strategy is SCA-protected and the credential
     // has a signing key (e.g. Wise statements). Null disables signing (e.g. Monzo).
     fun scaParamsFor(
         strategy: ApiImportStrategy,
-        credential: MonzoCredential,
+        credential: ApiCredential,
     ): ScaParams? {
         val signing = strategy.signing ?: return null
         val privateKey = credential.privateKey ?: return null
@@ -211,44 +212,30 @@ fun ApiSessionsScreen(
                         .groupBy { it.credentialId!! }
                 val allStrategies = apiImportStrategyRepository.getAllStrategies().first()
                 val strategyById = allStrategies.associateBy { it.id }
-                // Credentials created before strategy linking are, by definition, Monzo. Resolve them
-                // to the Monzo strategy by name rather than relying on repository ordering, which can
-                // change once additional providers (e.g. Wise) are seeded.
-                val fallbackStrategy = legacyDefaultStrategy(allStrategies)
-                val fallbackStrategyRevision = fallbackStrategy?.revisionId
                 strategies = allStrategies.sortedBy { it.name.lowercase() }
                 strategyIdByCredential =
-                    allCredentials.associate { credential ->
-                        credential.id to (credential.strategyId ?: fallbackStrategy?.id)
-                    }
+                    allCredentials.associate { credential -> credential.id to credential.strategyId }
                 currentStrategyRevisionByCredential =
                     allCredentials.associate { credential ->
-                        credential.id to (
-                            credential.strategyId
-                                ?.let { strategyById[it]?.revisionId }
-                                ?: fallbackStrategyRevision
-                        )
+                        credential.id to credential.strategyId?.let { strategyById[it]?.revisionId }
                     }
-                // Label each credential by its linked strategy (the actual provider), not the legacy
-                // session type which is always "Monzo".
                 strategyNameByCredential =
                     allCredentials
                         .mapNotNull { credential ->
-                            val name =
-                                credential.strategyId?.let { strategyById[it]?.name }
-                                    ?: fallbackStrategy?.name
-                            name?.let { credential.id to it }
+                            credential.strategyId
+                                ?.let { strategyById[it]?.name }
+                                ?.let { credential.id to it }
                         }.toMap()
                 requiresSigningByCredential =
                     allCredentials.associate { credential ->
-                        val strategy = credential.strategyId?.let { strategyById[it] } ?: fallbackStrategy
+                        val strategy = credential.strategyId?.let { strategyById[it] }
                         credential.id to (strategy?.signing != null)
                     }
                 val country = currentCountryCode()
                 transactionsBlockReasonByCredential =
                     allCredentials
                         .mapNotNull { credential ->
-                            val strategy = credential.strategyId?.let { strategyById[it] } ?: fallbackStrategy
+                            val strategy = credential.strategyId?.let { strategyById[it] }
                             val countries = strategy?.signing?.statementCountries.orEmpty()
                             if (countries.isNotEmpty() && (country == null || country !in countries)) {
                                 credential.id to
@@ -273,7 +260,7 @@ fun ApiSessionsScreen(
         counterpartyAccountNames: Map<String, String>,
     ) {
         backgroundTasks.startTask(
-            key = monzoImportTaskKey(session.id),
+            key = apiImportTaskKey(session.id),
             title = "Import",
             initialDetail = "Starting import for session #${session.id}.",
         ) {
@@ -383,7 +370,7 @@ fun ApiSessionsScreen(
             Text(text = "API Sessions", style = MaterialTheme.typography.headlineMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = onApiStrategiesClick) { Text("Strategies") }
-                TextButton(onClick = onMonzoConnectClick) { Text("+ Connect") }
+                TextButton(onClick = onAddCredentialClick) { Text("+ Connect") }
             }
         }
 
@@ -475,7 +462,7 @@ fun ApiSessionsScreen(
                                 } else {
                                     split.importedByCredential[credential.id].orEmpty()
                                 }
-                            val isDownloading = backgroundTasks.isRunning(monzoDownloadTaskKey(credential.id))
+                            val isDownloading = backgroundTasks.isRunning(apiDownloadTaskKey(credential.id))
                             CredentialCard(
                                 credential = credential,
                                 dateRangeBySession = dateRangeBySession,
@@ -503,13 +490,13 @@ fun ApiSessionsScreen(
                                 importProgressBySession = importProgressBySession,
                                 importedSessionRevisions = importedSessionRevisions,
                                 selectedStrategyRevision = currentStrategyRevisionByCredential[credential.id],
-                                isImportingSession = { sessionId -> backgroundTasks.isRunning(monzoImportTaskKey(sessionId)) },
+                                isImportingSession = { sessionId -> backgroundTasks.isRunning(apiImportTaskKey(sessionId)) },
                                 onDownload = {
                                     downloadResultByCredential = downloadResultByCredential - credential.id
                                     downloadProgressByCredential = downloadProgressByCredential - credential.id
                                     val transactionsBlocked = transactionsBlockReasonByCredential[credential.id] != null
                                     scope.launch {
-                                        val strategy = resolveStrategy(credential) ?: return@launch
+                                        val resolvedStrategy = resolveStrategy(credential)
                                         val newSessionId =
                                             importEngine.createApiSession(
                                                 token = credential.token,
@@ -519,10 +506,15 @@ fun ApiSessionsScreen(
                                             )
                                         refresh()
                                         backgroundTasks.startTask(
-                                            key = monzoDownloadTaskKey(credential.id),
+                                            key = apiDownloadTaskKey(credential.id),
                                             title = "Download",
                                             initialDetail = "Starting download for session #$newSessionId.",
                                         ) {
+                                            // An orphaned credential (its strategy was deleted, or it was
+                                            // never linked) has nothing to download with.
+                                            val strategy =
+                                                resolvedStrategy
+                                                    ?: return@startTask "No import strategy is linked to this credential; reconnect it."
                                             // One client/session for accounts, transactions and people.
                                             val apiClient =
                                                 createApiClient(
@@ -782,7 +774,7 @@ private fun CounterpartyConfirmationDialog(
 
 @Composable
 private fun CredentialCard(
-    credential: MonzoCredential,
+    credential: ApiCredential,
     dateRangeBySession: Map<String, ImportFileDateRange>,
     providerLabel: String?,
     requiresSigning: Boolean,
@@ -1802,17 +1794,6 @@ private fun ApiSessionImportResult.displaySummary(): String =
         append(".")
     }
 
-/** Legacy provider name for credentials created before strategy linking existed. */
-private const val LEGACY_DEFAULT_STRATEGY_NAME = "Monzo"
-
-/**
- * Resolves the strategy for credentials with no linked [MonzoCredential.strategyId]. These predate
- * strategy linking and are always Monzo, so match by name rather than relying on repository ordering,
- * which is not stable once additional providers are seeded.
- */
-private fun legacyDefaultStrategy(strategies: List<ApiImportStrategy>): ApiImportStrategy? =
-    strategies.firstOrNull { it.name == LEGACY_DEFAULT_STRATEGY_NAME }
-
 /**
  * A session counts as imported only at the credential's current strategy revision — a session
  * imported under an older revision is outstanding again, because re-importing it would apply the
@@ -1828,10 +1809,10 @@ internal fun sessionImportedAtCurrentRevision(
     } == true
 
 internal fun filterCredentialsByStrategy(
-    credentials: List<MonzoCredential>,
-    strategyIdByCredential: Map<MonzoCredentialId, ApiImportStrategyId?>,
+    credentials: List<ApiCredential>,
+    strategyIdByCredential: Map<ApiCredentialId, ApiImportStrategyId?>,
     selectedStrategyId: ApiImportStrategyId?,
-): List<MonzoCredential> =
+): List<ApiCredential> =
     if (selectedStrategyId == null) {
         credentials
     } else {
@@ -1839,21 +1820,21 @@ internal fun filterCredentialsByStrategy(
     }
 
 internal data class ApiSessionsSplit(
-    val outstandingByCredential: Map<MonzoCredentialId, List<ApiSession>>,
-    val importedByCredential: Map<MonzoCredentialId, List<ApiSession>>,
+    val outstandingByCredential: Map<ApiCredentialId, List<ApiSession>>,
+    val importedByCredential: Map<ApiCredentialId, List<ApiSession>>,
 ) {
     val outstandingCount: Int get() = outstandingByCredential.values.sumOf { it.size }
     val importedCount: Int get() = importedByCredential.values.sumOf { it.size }
 }
 
 internal fun splitSessionsByImportState(
-    credentials: List<MonzoCredential>,
-    sessionsByCredential: Map<MonzoCredentialId, List<ApiSession>>,
-    currentStrategyRevisionByCredential: Map<MonzoCredentialId, Long?>,
+    credentials: List<ApiCredential>,
+    sessionsByCredential: Map<ApiCredentialId, List<ApiSession>>,
+    currentStrategyRevisionByCredential: Map<ApiCredentialId, Long?>,
     importedSessionRevisions: Set<ApiSessionImportRevision>,
 ): ApiSessionsSplit {
-    val outstanding = mutableMapOf<MonzoCredentialId, List<ApiSession>>()
-    val imported = mutableMapOf<MonzoCredentialId, List<ApiSession>>()
+    val outstanding = mutableMapOf<ApiCredentialId, List<ApiSession>>()
+    val imported = mutableMapOf<ApiCredentialId, List<ApiSession>>()
     credentials.forEach { credential ->
         val (importedSessions, outstandingSessions) =
             sessionsByCredential[credential.id].orEmpty().partition { session ->
@@ -1919,9 +1900,9 @@ private fun StrategyFilterDropdown(
 
 private const val ALL_STRATEGIES_LABEL = "All strategies"
 
-private fun monzoDownloadTaskKey(credentialId: MonzoCredentialId): String = "monzo-download-cred-${credentialId.id}"
+private fun apiDownloadTaskKey(credentialId: ApiCredentialId): String = "api-download-cred-${credentialId.id}"
 
-private fun monzoImportTaskKey(sessionId: ApiSessionId): String = "monzo-import-${sessionId.id}"
+private fun apiImportTaskKey(sessionId: ApiSessionId): String = "api-import-${sessionId.id}"
 
 private fun JsonElement.childCount(): Int =
     when (this) {

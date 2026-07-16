@@ -7,8 +7,8 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 
-data class MonzoCredential(
-    val id: MonzoCredentialId,
+data class ApiCredential(
+    val id: ApiCredentialId,
     val token: String,
     val createdAt: Instant,
     val strategyId: ApiImportStrategyId? = null,
@@ -22,14 +22,14 @@ data class MonzoCredential(
     val apiSecret: String? = null,
 ) {
     override fun toString(): String =
-        "MonzoCredential(id=$id, token=<redacted>, createdAt=$createdAt, " +
+        "ApiCredential(id=$id, token=<redacted>, createdAt=$createdAt, " +
             "strategyId=$strategyId, privateKey=${if (privateKey != null) "<redacted>" else "null"}, " +
             "publicKey=${if (publicKey != null) "<redacted>" else "null"}, " +
             "apiSecret=${if (apiSecret != null) "<redacted>" else "null"})"
 }
 
 @JvmInline
-value class MonzoCredentialId(
+value class ApiCredentialId(
     val id: Long,
 ) {
     override fun toString() = id.toString()
@@ -41,7 +41,7 @@ data class ApiSession(
     val deviceId: DeviceId,
     val createdAt: Instant,
     val expiresAt: Instant?,
-    val credentialId: MonzoCredentialId?,
+    val credentialId: ApiCredentialId?,
     val importDurationMillis: Long? = null,
 )
 

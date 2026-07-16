@@ -3,6 +3,7 @@
 package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
@@ -13,7 +14,6 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.accountmapping.AccountMapping
@@ -226,7 +226,7 @@ suspend fun ImportEngine.createApiCredential(
     privateKey: String? = null,
     publicKey: String? = null,
     apiSecret: String? = null,
-): MonzoCredentialId {
+): ApiCredentialId {
     // The read-back key is echoed through ImportResult, so derive it from the (non-secret) createdAt
     // timestamp rather than the secret token. A helper creates exactly one credential per batch.
     val key = createdAt.toString()
@@ -251,7 +251,7 @@ suspend fun ImportEngine.createApiCredential(
 }
 
 suspend fun ImportEngine.updateApiCredentialKeys(
-    credentialId: MonzoCredentialId,
+    credentialId: ApiCredentialId,
     privateKey: String?,
     publicKey: String?,
 ) {
@@ -259,7 +259,7 @@ suspend fun ImportEngine.updateApiCredentialKeys(
 }
 
 suspend fun ImportEngine.updateApiCredentialSecrets(
-    credentialId: MonzoCredentialId,
+    credentialId: ApiCredentialId,
     token: String,
     apiSecret: String?,
 ) {
@@ -270,7 +270,7 @@ suspend fun ImportEngine.createApiSession(
     token: String,
     deviceId: DeviceId,
     createdAt: Instant,
-    credentialId: MonzoCredentialId? = null,
+    credentialId: ApiCredentialId? = null,
 ): ApiSessionId {
     // The read-back key is echoed through ImportResult, so derive it from the (non-secret) createdAt
     // timestamp rather than the secret token. A helper creates exactly one session per batch.

@@ -2,6 +2,7 @@
 
 package com.moneymanager.domain.repository.write
 
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
@@ -11,7 +12,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import kotlin.time.Instant
@@ -32,13 +32,13 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
         privateKey: String? = null,
         publicKey: String? = null,
         apiSecret: String? = null,
-    ): MonzoCredentialId
+    ): ApiCredentialId
 
     /**
      * Updates the strategy associated with a credential.
      */
     suspend fun updateCredentialStrategy(
-        credentialId: MonzoCredentialId,
+        credentialId: ApiCredentialId,
         strategyId: ApiImportStrategyId?,
     )
 
@@ -46,7 +46,7 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
      * Stores (or replaces) the PEM-encoded RSA signing key pair on a credential.
      */
     suspend fun updateCredentialKeys(
-        credentialId: MonzoCredentialId,
+        credentialId: ApiCredentialId,
         privateKey: String?,
         publicKey: String?,
     )
@@ -56,7 +56,7 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
      * rotated or mistyped token is edited in place rather than added as a second credential.
      */
     suspend fun updateCredentialSecrets(
-        credentialId: MonzoCredentialId,
+        credentialId: ApiCredentialId,
         token: String,
         apiSecret: String?,
     )
@@ -76,7 +76,7 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
         deviceId: DeviceId,
         createdAt: Instant,
         expiresAt: Instant?,
-        credentialId: MonzoCredentialId? = null,
+        credentialId: ApiCredentialId? = null,
     ): ApiSessionId
 
     /**

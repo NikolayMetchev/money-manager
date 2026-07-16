@@ -860,4 +860,12 @@ data class ApiStrategyConfig(
      * use canonical codes.
      */
     val assetAliases: Map<String, String> = emptyMap(),
+    /** Deep-link to the provider's own page for creating/managing API tokens; null shows no button. */
+    val tokenPageUrl: String? = null,
+    /**
+     * Ordered, numbered steps shown to the user for obtaining credentials from this provider (e.g.
+     * "Open the developer portal…", "Create a token with these scopes…"). Empty shows no instructions —
+     * a user-defined strategy simply gets none, which is why connecting never requires them.
+     */
+    val connectInstructions: List<String> = emptyList(),
 )

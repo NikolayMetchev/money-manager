@@ -5,6 +5,8 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
+import com.moneymanager.domain.model.ApiCredential
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestHeader
@@ -19,8 +21,6 @@ import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.MonzoCredential
-import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionReadRepository
@@ -36,19 +36,19 @@ class ApiSessionReadRepositoryImpl(
 ) : ApiSessionReadRepository {
     private val selectQueries = database.apiSessionSelectQueries
 
-    override suspend fun getAllCredentials(): List<MonzoCredential> =
+    override suspend fun getAllCredentials(): List<ApiCredential> =
         withContext(Dispatchers.Default) {
-            selectQueries.selectAllCredentials().executeAsList().map { it.toMonzoCredential() }
+            selectQueries.selectAllCredentials().executeAsList().map { it.toApiCredential() }
         }
 
-    override fun getCredentialsFlow(): Flow<List<MonzoCredential>> =
+    override fun getCredentialsFlow(): Flow<List<ApiCredential>> =
         selectQueries
             .selectAllCredentials()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { rows -> rows.map { it.toMonzoCredential() } }
+            .map { rows -> rows.map { it.toApiCredential() } }
 
-    override suspend fun getSessionsByCredential(credentialId: MonzoCredentialId): List<ApiSession> =
+    override suspend fun getSessionsByCredential(credentialId: ApiCredentialId): List<ApiSession> =
         withContext(Dispatchers.Default) {
             selectQueries.selectByCredentialId(credentialId.id).executeAsList().map { it.toApiSession() }
         }
@@ -163,9 +163,9 @@ class ApiSessionReadRepositoryImpl(
             json = json,
         )
 
-    private fun com.moneymanager.database.sql.apiSession.Api_credential.toMonzoCredential(): MonzoCredential =
-        MonzoCredential(
-            id = MonzoCredentialId(id),
+    private fun com.moneymanager.database.sql.apiSession.Api_credential.toApiCredential(): ApiCredential =
+        ApiCredential(
+            id = ApiCredentialId(id),
             token = token,
             createdAt = Instant.fromEpochMilliseconds(created_at),
             strategyId = strategy_id?.let { ApiImportStrategyId(Uuid.parse(it)) },
@@ -181,7 +181,7 @@ class ApiSessionReadRepositoryImpl(
             deviceId = DeviceId(device_id),
             createdAt = Instant.fromEpochMilliseconds(created_at),
             expiresAt = expires_at?.let { Instant.fromEpochMilliseconds(it) },
-            credentialId = credential_id?.let { MonzoCredentialId(it) },
+            credentialId = credential_id?.let { ApiCredentialId(it) },
             importDurationMillis = import_duration_millis,
         )
 

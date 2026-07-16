@@ -3,6 +3,7 @@
 package com.moneymanager.database.repository.write
 
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
@@ -12,7 +13,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.write.ApiSessionWriteRepository
@@ -34,7 +34,7 @@ class ApiSessionWriteRepositoryImpl(
         privateKey: String?,
         publicKey: String?,
         apiSecret: String?,
-    ): MonzoCredentialId =
+    ): ApiCredentialId =
         withContext(Dispatchers.Default) {
             val id =
                 writeQueries.transactionWithResult {
@@ -48,11 +48,11 @@ class ApiSessionWriteRepositoryImpl(
                     )
                     writeQueries.lastInsertCredentialRowId().executeAsOne()
                 }
-            MonzoCredentialId(id)
+            ApiCredentialId(id)
         }
 
     override suspend fun updateCredentialStrategy(
-        credentialId: MonzoCredentialId,
+        credentialId: ApiCredentialId,
         strategyId: ApiImportStrategyId?,
     ): Unit =
         withContext(Dispatchers.Default) {
@@ -66,7 +66,7 @@ class ApiSessionWriteRepositoryImpl(
         }
 
     override suspend fun updateCredentialKeys(
-        credentialId: MonzoCredentialId,
+        credentialId: ApiCredentialId,
         privateKey: String?,
         publicKey: String?,
     ): Unit =
@@ -82,7 +82,7 @@ class ApiSessionWriteRepositoryImpl(
         }
 
     override suspend fun updateCredentialSecrets(
-        credentialId: MonzoCredentialId,
+        credentialId: ApiCredentialId,
         token: String,
         apiSecret: String?,
     ): Unit =
@@ -102,7 +102,7 @@ class ApiSessionWriteRepositoryImpl(
         deviceId: DeviceId,
         createdAt: Instant,
         expiresAt: Instant?,
-        credentialId: MonzoCredentialId?,
+        credentialId: ApiCredentialId?,
     ): ApiSessionId =
         withContext(Dispatchers.Default) {
             val id =

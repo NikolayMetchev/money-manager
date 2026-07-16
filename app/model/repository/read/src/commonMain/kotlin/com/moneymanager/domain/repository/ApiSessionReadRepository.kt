@@ -2,6 +2,8 @@
 
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.ApiCredential
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiResponseId
@@ -9,8 +11,6 @@ import com.moneymanager.domain.model.ApiResponseTransaction
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.MonzoCredential
-import com.moneymanager.domain.model.MonzoCredentialId
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
@@ -18,18 +18,18 @@ interface ApiSessionReadRepository {
     /**
      * Returns all credentials, newest first.
      */
-    suspend fun getAllCredentials(): List<MonzoCredential>
+    suspend fun getAllCredentials(): List<ApiCredential>
 
     /**
      * All credentials, newest first, re-emitted on every change — for UI that must reflect an API
      * becoming connected without a manual refresh.
      */
-    fun getCredentialsFlow(): Flow<List<MonzoCredential>>
+    fun getCredentialsFlow(): Flow<List<ApiCredential>>
 
     /**
      * Returns all sessions for the given credential, newest first.
      */
-    suspend fun getSessionsByCredential(credentialId: MonzoCredentialId): List<ApiSession>
+    suspend fun getSessionsByCredential(credentialId: ApiCredentialId): List<ApiSession>
 
     /**
      * Returns the session with the given ID, or null if not found.

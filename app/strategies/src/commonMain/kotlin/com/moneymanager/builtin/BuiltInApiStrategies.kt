@@ -105,6 +105,16 @@ object BuiltInApiStrategies {
             peopleMappings = ApiPeopleMappings(ephemeralCounterpartyIdPrefixes = setOf("anonuser_")),
             builtInCounterpartyRules = monzoAtmRules,
             personExternalIdAttribute = "monzo-external-id",
+            tokenPageUrl = "https://developers.monzo.com/",
+            connectInstructions =
+                listOf(
+                    "Open the Monzo Developer Playground in your browser.",
+                    "Log in with your Monzo account credentials.",
+                    "Monzo will send a magic link to your email or app. Approve the login.",
+                    "Copy the access token shown on the playground page.",
+                    "Paste the token below and save.",
+                    "In the Monzo app, approve the API access notification so transactions can be read.",
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -220,6 +230,17 @@ object BuiltInApiStrategies {
                     accountOwnerAncestorExpr = "ancestor[0].id",
                 ),
             personExternalIdAttribute = "wise-external-id",
+            tokenPageUrl = "https://wise.com/your-account/integrations-and-tools/api-tokens",
+            connectInstructions =
+                listOf(
+                    "Open the Wise API tokens page in your browser and sign in.",
+                    "Create a new API token (read access is sufficient) and copy it.",
+                    "Paste the token below and save.",
+                    "Statements are protected by Strong Customer Authentication: generate a signing key below and " +
+                        "register its public key in Wise (Settings → API tokens → Manage public keys).",
+                    "Note: retrieving statements via the API is only supported for accounts based in the US, Canada, " +
+                        "Australia, New Zealand, Singapore, and Malaysia.",
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -328,6 +349,14 @@ object BuiltInApiStrategies {
                     ownsAllAccounts = true,
                 ),
             personExternalIdAttribute = "starling-external-id",
+            tokenPageUrl = "https://developer.starlingbank.com/",
+            connectInstructions =
+                listOf(
+                    "Open the Starling Developer portal in your browser and sign in with your Starling account.",
+                    "Create a personal access token with the account:read, transaction:read and " +
+                        "account-holder-name:read scopes.",
+                    "Copy the token, paste it below and save.",
+                ),
             createdAt = now,
             updatedAt = now,
         )

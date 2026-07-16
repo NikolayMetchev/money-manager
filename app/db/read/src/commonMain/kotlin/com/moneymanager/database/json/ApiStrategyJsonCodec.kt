@@ -39,6 +39,8 @@ data class ApiStrategyConfigJson(
     val syntheticAccount: ApiSyntheticAccount? = null,
     val internalTransferReconcile: ApiInternalTransferReconcile? = null,
     val assetAliases: Map<String, String> = emptyMap(),
+    val tokenPageUrl: String? = null,
+    val connectInstructions: List<String> = emptyList(),
 )
 
 /**
