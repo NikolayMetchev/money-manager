@@ -2,6 +2,7 @@
 
 package com.moneymanager.database.csv
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.CsvBulkResult
 import com.moneymanager.csvimporter.bulkApplyCsv
@@ -200,9 +201,6 @@ class CryptoComCsvE2ETest : DbTest() {
                 "crypto_viban: Crypto.com TGBP -> Cash GBP",
             )
 
-            // Amounts in GBP minor units (scale factor 100).
-            fun Money.pence(): Long = amount.toLong()
-
             val cashTransfers = repositories.transactionRepository.getTransactionsByAccount(cashId).first()
             // Directions per Transaction Kind (the sign alone does not encode them).
             assertTrue(
@@ -217,7 +215,8 @@ class CryptoComCsvE2ETest : DbTest() {
             // The shared top-up: both records exist as Cash -> Card...
             val topUps =
                 cashTransfers.filter {
-                    it.sourceAccountId == cashId && it.targetAccountId == cardId && it.amount.pence() == 40_000L
+                    it.sourceAccountId == cashId && it.targetAccountId == cardId &&
+                        it.amount.toDisplayValue().compareTo(BigDecimal("400.00")) == 0
                 }
             assertEquals(2, topUps.size, "both files' top-up records are kept")
 
