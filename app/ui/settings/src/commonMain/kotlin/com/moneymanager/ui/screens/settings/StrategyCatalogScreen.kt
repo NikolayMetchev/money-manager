@@ -18,6 +18,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -78,6 +80,16 @@ fun StrategyCatalogScreen(
     val state by controller.state.collectAsState()
     var kindFilter by remember { mutableStateOf(initialKindFilter) }
     var pendingInstall by remember { mutableStateOf<PendingInstall?>(null) }
+    var localDirEnabled by remember { mutableStateOf(controller.localDirectoryOverride != null) }
+    var localDirPath by remember { mutableStateOf(controller.localDirectoryOverride.orEmpty()) }
+
+    fun applyLocalDirectory() {
+        controller.setLocalDirectoryOverride(if (localDirEnabled) localDirPath else null)
+        scope.launch {
+            controller.beginBusy()
+            controller.refresh(library, appVersion)
+        }
+    }
 
     LaunchedEffect(Unit) {
         controller.beginBusy()
@@ -133,6 +145,38 @@ fun StrategyCatalogScreen(
             }
             if (showBackAction) {
                 TextButton(onClick = onBack) { Text("Back") }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Switch(
+                        checked = localDirEnabled,
+                        onCheckedChange = {
+                            localDirEnabled = it
+                            applyLocalDirectory()
+                        },
+                    )
+                    Text(
+                        "Read from a local directory instead (for testing built-in strategy changes)",
+                        modifier = Modifier.padding(start = 8.dp).weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                if (localDirEnabled) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = localDirPath,
+                            onValueChange = { localDirPath = it },
+                            label = { Text("Local strategy-library directory") },
+                            placeholder = { Text("e.g. webpage/strategy-library") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { applyLocalDirectory() }) { Text("Apply") }
+                    }
+                }
             }
         }
 

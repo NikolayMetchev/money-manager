@@ -6,6 +6,8 @@ import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.domain.strategy.StrategyParseResult
+import com.moneymanager.localsettings.KEY_STRATEGY_CATALOG_LOCAL_DIRECTORY
+import com.moneymanager.localsettings.LocalSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,12 +48,43 @@ data class CatalogState(
  * refresh costs a single manifest fetch. The per-database [StrategyLibrary] is passed into each call,
  * so one controller serves every open database; installs go through [StrategyLibrary.applyIncoming]
  * (the sole-writer engine underneath).
+ *
+ * The catalog [source] defaults to the published site ([remoteSource]) but can be pointed at a local
+ * directory instead — a developer testing changes to built-in strategies doesn't need to publish them
+ * first. The override is persisted in [localSettings] so it survives restarts, and
+ * [localDirectorySourceFactory] builds the platform-specific local-directory source (plain
+ * `java.io.File`, so JVM and Android both implement it identically).
  */
 class StrategyCatalogController(
-    private val client: StrategyCatalogClient,
+    private val remoteSource: StrategyCatalogSource,
+    private val localDirectorySourceFactory: (String) -> StrategyCatalogSource,
+    private val localSettings: LocalSettings,
 ) {
     private val _state = MutableStateFlow(CatalogState())
     val state: StateFlow<CatalogState> = _state.asStateFlow()
+
+    /** Absolute path of the local-directory override, or null when reading from the published site. */
+    val localDirectoryOverride: String?
+        get() = localSettings.getString(KEY_STRATEGY_CATALOG_LOCAL_DIRECTORY)?.takeIf { it.isNotBlank() }
+
+    private var source: StrategyCatalogSource = localDirectoryOverride?.let(localDirectorySourceFactory) ?: remoteSource
+
+    /**
+     * Switches the catalog source and persists the choice; null/blank reverts to the published site.
+     * The cached state is cleared since it reflects the previous source — call [refresh] afterward.
+     */
+    fun setLocalDirectoryOverride(directoryPath: String?) {
+        val trimmed = directoryPath?.trim()?.ifBlank { null }
+        source =
+            if (trimmed == null) {
+                localSettings.remove(KEY_STRATEGY_CATALOG_LOCAL_DIRECTORY)
+                remoteSource
+            } else {
+                localSettings.putString(KEY_STRATEGY_CATALOG_LOCAL_DIRECTORY, trimmed)
+                localDirectorySourceFactory(trimmed)
+            }
+        _state.value = CatalogState()
+    }
 
     /** Marks the state busy so the UI can disable actions the instant one is triggered. */
     fun beginBusy() {
@@ -64,7 +97,7 @@ class StrategyCatalogController(
         appVersion: AppVersion,
     ) {
         runCatching {
-            val manifest = client.fetchManifest()
+            val manifest = source.fetchManifest()
             val localHashes = library.listLocal(appVersion).associate { it.key to it.contentHash }
             manifest.entries
                 .map { entry -> CatalogItem(entry, classify(localHashes[entry.key], entry.contentHash)) }
@@ -83,7 +116,7 @@ class StrategyCatalogController(
     ): List<StrategyParseResult> =
         clearingBusyOnFailure {
             entriesFor(keys).map { entry ->
-                library.parseIncoming(entry.key, client.fetchArtifact(entry.fileName))
+                library.parseIncoming(entry.key, source.fetchArtifact(entry.fileName))
             }
         }
 
@@ -101,7 +134,7 @@ class StrategyCatalogController(
         var failure: Throwable? = null
         try {
             for (entry in entriesFor(keys)) {
-                val json = client.fetchArtifact(entry.fileName)
+                val json = source.fetchArtifact(entry.fileName)
                 library.applyIncoming(entry.key, json, resolutions[entry.key] ?: emptyMap())
                 installed++
             }

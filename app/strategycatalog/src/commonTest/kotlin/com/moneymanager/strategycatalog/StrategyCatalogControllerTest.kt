@@ -8,6 +8,7 @@ import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.domain.strategy.StrategyParseResult
+import com.moneymanager.localsettings.LocalSettings
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -24,6 +25,24 @@ import kotlin.test.assertTrue
 
 class StrategyCatalogControllerTest {
     private val version = AppVersion("test")
+
+    /** In-memory [LocalSettings]; no test here exercises the local-directory override. */
+    private class InMemoryLocalSettings : LocalSettings {
+        private val values = mutableMapOf<String, String>()
+
+        override fun getString(key: String): String? = values[key]
+
+        override fun putString(
+            key: String,
+            value: String,
+        ) {
+            values[key] = value
+        }
+
+        override fun remove(key: String) {
+            values.remove(key)
+        }
+    }
 
     // The library fake hashes by json content ("hash:<json>"), so catalog-vs-local comparison is
     // driven purely by what applyIncoming recorded.
@@ -83,7 +102,11 @@ class StrategyCatalogControllerTest {
                     else -> respondError(HttpStatusCode.NotFound)
                 }
             }
-        return StrategyCatalogController(StrategyCatalogClient(HttpClient(engine), "https://example.test/site"))
+        return StrategyCatalogController(
+            remoteSource = StrategyCatalogClient(HttpClient(engine), "https://example.test/site"),
+            localDirectorySourceFactory = { error("not exercised") },
+            localSettings = InMemoryLocalSettings(),
+        )
     }
 
     @Test
@@ -128,25 +151,28 @@ class StrategyCatalogControllerTest {
             var flag = false
             val flaky =
                 StrategyCatalogController(
-                    StrategyCatalogClient(
-                        HttpClient(
-                            MockEngine { request ->
-                                if (flag) {
-                                    respondError(HttpStatusCode.ServiceUnavailable)
-                                } else {
-                                    when (
-                                        request.url.encodedPath
-                                            .decodeURLPart()
-                                            .substringAfterLast('/')
-                                    ) {
-                                        "index.json" -> respond(manifest())
-                                        else -> respondError(HttpStatusCode.NotFound)
+                    remoteSource =
+                        StrategyCatalogClient(
+                            HttpClient(
+                                MockEngine { request ->
+                                    if (flag) {
+                                        respondError(HttpStatusCode.ServiceUnavailable)
+                                    } else {
+                                        when (
+                                            request.url.encodedPath
+                                                .decodeURLPart()
+                                                .substringAfterLast('/')
+                                        ) {
+                                            "index.json" -> respond(manifest())
+                                            else -> respondError(HttpStatusCode.NotFound)
+                                        }
                                     }
-                                }
-                            },
+                                },
+                            ),
+                            "https://example.test/site",
                         ),
-                        "https://example.test/site",
-                    ),
+                    localDirectorySourceFactory = { error("not exercised") },
+                    localSettings = InMemoryLocalSettings(),
                 )
             flaky.refresh(library, version)
             assertEquals(2, flaky.state.value.items.size)
