@@ -738,7 +738,7 @@ object BuiltInApiStrategies {
                     ),
                 ),
             assetAliases = assetAliasMap,
-            tokenPageUrl = "https://www.kraken.com/u/security/api",
+            tokenPageUrl = "https://pro.kraken.com/app/settings/api",
             connectInstructions =
                 listOf(
                     "Open the Kraken API management page in your browser and sign in.",
