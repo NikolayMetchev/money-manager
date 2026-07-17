@@ -312,6 +312,10 @@ suspend fun ImportEngine.insertApiResponseTransactions(transactions: List<ApiRes
     import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.InsertResponseTransactions(transactions))))
 }
 
+suspend fun ImportEngine.deleteApiResponseTransactionsBySession(sessionId: ApiSessionId) {
+    import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.DeleteResponseTransactionsBySession(sessionId))))
+}
+
 suspend fun ImportEngine.markApiSessionImported(
     id: ApiSessionId,
     revisionId: Long,

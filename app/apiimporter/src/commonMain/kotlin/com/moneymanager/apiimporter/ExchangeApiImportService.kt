@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
@@ -710,8 +711,12 @@ suspend fun importApiSessionExchange(
     // Counterparty accounts. An aliased counterparty (e.g. an internal deposit whose `address` is
     // "INTERNAL_DEPOSIT") is booked against a named owned account (the Crypto.com App account) so the
     // same movement recorded by the CSV export reconciles to it. Otherwise each distinct blockchain
-    // address becomes its own wallet account (keyed by the address); a missing address falls back to the
-    // generic funding account.
+    // address on a CRYPTO-denominated transfer becomes its own wallet account (keyed by the address); a
+    // missing address, or any address on a FIAT transfer, falls back to the generic funding account. The
+    // fiat exclusion matters because a provider's "address"-shaped field can carry something else entirely
+    // for fiat movements — e.g. Kraken's WithdrawStatus `info` is a blockchain address for a crypto
+    // withdrawal but the user's own bank-transfer label (e.g. "Monzo") for a fiat one, and minting a wallet
+    // account from that label collides by name with the user's real bank account.
     val accountKeys = mutableMapOf<String, LocalAccountKey>()
     val counterpartyIntents = mutableListOf<ImportAccountIntent>()
     transfers.mapNotNull { it.aliasAccount }.distinct().forEach { name ->
@@ -720,26 +725,35 @@ suspend fun importApiSessionExchange(
         counterpartyIntents +=
             ImportAccountIntent(key = key, source = source, match = AccountMatchKey.ByName(name), name = name, openingDate = openingDate)
     }
-    transfers.filter { it.aliasAccount == null }.mapNotNull { it.counterpartyAddress }.distinct().forEach { address ->
-        val key = LocalAccountKey("wallet-$address")
-        accountKeys[address] = key
-        val network = transfers.firstOrNull { it.counterpartyAddress == address && it.network != null }?.network
-        counterpartyIntents +=
-            ImportAccountIntent(
-                key = key,
-                source = source,
-                match = AccountMatchKey.ByExternalId(walletAddrAttr, address),
-                name = if (network != null) "$network:$address" else address,
-                openingDate = openingDate,
-                attributes = listOf(NewAttribute(walletAddrAttr, address)),
-            )
-    }
+    transfers
+        .filter { it.aliasAccount == null && asset(it.currencyCode) is CryptoAsset }
+        .mapNotNull { it.counterpartyAddress }
+        .distinct()
+        .forEach { address ->
+            val key = LocalAccountKey("wallet-$address")
+            accountKeys[address] = key
+            val network = transfers.firstOrNull { it.counterpartyAddress == address && it.network != null }?.network
+            counterpartyIntents +=
+                ImportAccountIntent(
+                    key = key,
+                    source = source,
+                    match = AccountMatchKey.ByExternalId(walletAddrAttr, address),
+                    name = if (network != null) "$network:$address" else address,
+                    openingDate = openingDate,
+                    attributes = listOf(NewAttribute(walletAddrAttr, address)),
+                )
+        }
 
     val exchangeRef = AccountRef.Existing(syntheticId)
     for (tx in transfers) {
         val txAsset = asset(tx.currencyCode) ?: continue // single jump — allowed
         val money = Money.fromDisplayValue(tx.amount, txAsset)
-        val counterpartyKey = tx.aliasAccount?.let { accountKeys[it] } ?: tx.counterpartyAddress?.let { accountKeys[it] }
+        // Only look up a wallet account for a crypto-denominated transfer — see the minting comment
+        // above. Guarded explicitly (not just relying on accountKeys missing the entry) so a fiat
+        // transfer can never resolve a wallet account that a same-valued crypto address happened to mint.
+        val counterpartyKey =
+            tx.aliasAccount?.let { accountKeys[it] }
+                ?: tx.counterpartyAddress?.takeIf { txAsset is CryptoAsset }?.let { accountKeys[it] }
         val counterparty = counterpartyKey?.let { AccountRef.Local(it) } ?: AccountRef.Existing(fundingId)
         val (from, to) = if (tx.direction == TransferDirection.IN) counterparty to exchangeRef else exchangeRef to counterparty
         transferIntents +=

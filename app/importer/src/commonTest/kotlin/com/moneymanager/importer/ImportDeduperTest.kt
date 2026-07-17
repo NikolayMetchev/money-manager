@@ -2,6 +2,7 @@
 
 package com.moneymanager.importer
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
@@ -14,6 +15,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.importengineapi.AccountBridge
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportRowKey
@@ -21,7 +23,9 @@ import com.moneymanager.importengineapi.ImportTransfer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
@@ -275,6 +279,113 @@ class ImportDeduperTest {
         assertEquals(ImportStatus.IMPORTED, result[0].status)
         assertEquals(ImportStatus.DUPLICATE, result[1].status)
         assertEquals(ImportStatus.IMPORTED, result[2].status)
+    }
+
+    // Internal-transfer reconciliation (exchange <-> bridged app account). `source` (AccountId(1)) plays
+    // the exchange account; `appAccount` is the bridged bank account (e.g. Monzo); incoming transfers run
+    // exchange -> dangling counterparty (`target`, AccountId(2)) until rewritten onto the bridge.
+    private val appAccount = AccountId(3)
+
+    private fun internalTransferPolicy(
+        window: Duration = 24.hours,
+        tolerance: BigDecimal = BigDecimal.ZERO,
+    ) = DedupePolicy.ApiMultiKey(
+        reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+        reconciledRelationshipTypeId = RelationshipTypeId(1),
+        internalTransferBridges = listOf(AccountBridge(exchangeAccountId = source, appAccountId = appAccount)),
+        internalTransferWindow = window,
+        internalTransferAmountTolerance = tolerance,
+    )
+
+    @Test
+    fun internalTransfer_consumesEachExistingLegAtMostOnce() {
+        // The real Kraken/Monzo shape: seven same-amount exchange withdrawals all fall within the 24h
+        // window of a SINGLE existing bank credit. `selectNearestUnconsumedLeg` picks the nearest
+        // EXISTING candidate for a given incoming row — with only one existing candidate here, whichever
+        // incoming row is processed first (batch/list order) claims it; consumption then MUST stop any
+        // of the other six from also claiming it (which would otherwise fabricate six phantom bank
+        // credits). See internalTransfer_prefersNearestExistingLeg for the true nearest-selection case
+        // (one incoming row, multiple existing candidates).
+        val bankCredit = existing(50, timestamp = baseTime, src = AccountId(4), tgt = appAccount)
+        val offsetsHours = listOf(-15.0, -13.0, -6.0, 0.1, 6.0, 13.0, 15.0)
+        val incoming =
+            offsetsHours.mapIndexed { i, h ->
+                importTransfer(i.toLong(), timestamp = baseTime + (h * 60).minutes)
+            }
+        val result = ImportDeduper(internalTransferPolicy(), existing = listOf(bankCredit)).classify(incoming)
+
+        // A withdrawal (exchange is source) rewrites `toAccount`, not `fromAccount` — see
+        // classifyAsInternalTransferReconciled: fromAccount only changes for a deposit (exchange target).
+        val rewritten = result.filter { it.transfer.toAccount == AccountRef.Existing(appAccount) }
+        assertEquals(1, rewritten.size)
+        val rewrittenSingle = rewritten.single()
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(50), typeId = RelationshipTypeId(1)),
+            rewrittenSingle.transfer.relationships.single(),
+        )
+        (result - rewrittenSingle).forEach {
+            assertEquals(AccountRef.Existing(target), it.transfer.toAccount)
+            assertTrue(it.transfer.relationships.isEmpty())
+        }
+    }
+
+    @Test
+    fun internalTransfer_prefersNearestExistingLeg() {
+        val nearLeg = existing(50, timestamp = baseTime, src = AccountId(4), tgt = appAccount)
+        val farLeg = existing(51, timestamp = baseTime + 6.hours, src = AccountId(5), tgt = appAccount)
+        val incoming = importTransfer(0, timestamp = baseTime + 10.minutes)
+        val result =
+            ImportDeduper(internalTransferPolicy(), existing = listOf(farLeg, nearLeg)).classify(listOf(incoming)).single()
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(50), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
+        )
+    }
+
+    @Test
+    fun internalTransfer_matchesRegardlessOfExistingLegCounterparty() {
+        // Three existing legs from three different bank-side counterparty accounts, all crediting the
+        // bridged app account: the match only cares that the app account received it, not who sent it.
+        val legs =
+            listOf(
+                existing(50, amount = 10, src = AccountId(4), tgt = appAccount),
+                existing(51, amount = 20, src = AccountId(5), tgt = appAccount),
+                existing(52, amount = 30, src = AccountId(6), tgt = appAccount),
+            )
+        val incoming = listOf(importTransfer(0, amount = 20, timestamp = baseTime + 10.minutes))
+        val result = ImportDeduper(internalTransferPolicy(), existing = legs).classify(incoming).single()
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(51), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
+        )
+    }
+
+    @Test
+    fun internalTransfer_zeroToleranceRejectsAnyAmountDifference() {
+        val bankCredit = existing(50, amount = 100, src = AccountId(4), tgt = appAccount)
+        val incoming = importTransfer(0, amount = 101, timestamp = baseTime + 10.minutes)
+        val result =
+            ImportDeduper(internalTransferPolicy(tolerance = BigDecimal.ZERO), existing = listOf(bankCredit))
+                .classify(listOf(incoming))
+                .single()
+        assertEquals(AccountRef.Existing(target), result.transfer.toAccount)
+        assertTrue(result.transfer.relationships.isEmpty())
+    }
+
+    @Test
+    fun internalTransfer_toleranceAllowsConfiguredAmountDifference() {
+        val bankCredit = existing(50, amount = 100, src = AccountId(4), tgt = appAccount)
+        // 101 vs 100 is within a 2% tolerance.
+        val incoming = importTransfer(0, amount = 101, timestamp = baseTime + 10.minutes)
+        val result =
+            ImportDeduper(internalTransferPolicy(tolerance = BigDecimal("2")), existing = listOf(bankCredit))
+                .classify(listOf(incoming))
+                .single()
+        assertEquals(AccountRef.Existing(appAccount), result.transfer.toAccount)
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(50), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
+        )
     }
 
     private val reconcilingFuzzyPolicy =

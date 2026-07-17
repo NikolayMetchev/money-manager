@@ -61,6 +61,10 @@ fun CreateAccountDialog(
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
     initialName: String = "",
+    // Account names are globally unique (account.name UNIQUE). Passing the current names lets the dialog
+    // reject a clash before submitting instead of surfacing a raw constraint-violation message; callers
+    // that don't have the list handy still fail safely via the submit-time catch below.
+    existingNames: Set<String> = emptySet(),
 ) {
     val accountState = rememberAccountDialogState(initialName = initialName, initialCategoryId = -1L)
     var selectedOwnerIds by remember { mutableStateOf(setOf<Long>()) }
@@ -86,6 +90,10 @@ fun CreateAccountDialog(
         if (accountState.isSaving) return@submit
         if (accountState.name.isBlank()) {
             accountState.errorMessage = "Account name is required"
+            accountState.nameError = true
+            nameFocusRequester.requestFocus()
+        } else if (existingNames.contains(accountState.name.trim())) {
+            accountState.errorMessage = "An account named \"${accountState.name.trim()}\" already exists"
             accountState.nameError = true
             nameFocusRequester.requestFocus()
         } else {
@@ -122,7 +130,12 @@ fun CreateAccountDialog(
                     onDismiss()
                 } catch (expected: Exception) {
                     logger.error(expected) { "Failed to create account: ${expected.message}" }
-                    accountState.errorMessage = "Failed to create account: ${expected.message}"
+                    accountState.errorMessage =
+                        if (expected.message.isAccountNameUniqueViolation()) {
+                            "An account named \"${accountState.name.trim()}\" already exists"
+                        } else {
+                            "Failed to create account: ${expected.message}"
+                        }
                     accountState.isSaving = false
                 }
             }

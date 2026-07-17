@@ -210,6 +210,11 @@ class ApiSessionWriteRepositoryImpl(
             }
         }
 
+    override suspend fun deleteResponseTransactionsBySession(sessionId: ApiSessionId): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.deleteResponseTransactionsBySession(sessionId.id)
+        }
+
     override suspend fun markSessionImported(
         id: ApiSessionId,
         revisionId: Long,

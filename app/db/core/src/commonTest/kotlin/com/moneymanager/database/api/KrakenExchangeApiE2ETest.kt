@@ -66,6 +66,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
         deposits: String = depositLedgerJson,
         withdrawals: String = withdrawalLedgerJson,
         depositStatus: String = depositStatusJson,
+        withdrawStatus: String? = null,
     ): Int {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Kraken").first()
         assertNotNull(strategy, "built-in Kraken strategy should be installed")
@@ -91,6 +92,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
         stage("0/private/Ledgers?type=deposit", deposits)
         stage("0/private/Ledgers?type=withdrawal", withdrawals)
         stage("0/private/DepositStatus", depositStatus)
+        withdrawStatus?.let { stage("0/private/WithdrawStatus", it) }
 
         importApiSessionExchange(
             apiSessionRepository = repositories.apiSessionRepository,
@@ -168,5 +170,46 @@ class KrakenExchangeApiE2ETest : DbTest() {
                     .size,
                 "re-import must not double-book trades",
             )
+        }
+
+    @Test
+    fun `a fiat withdrawal's WithdrawStatus enrichment books against the funding account, not a bogus wallet account`() =
+        runTest {
+            // Real shape observed from Kraken's WithdrawStatus for a fiat withdrawal: "info" carries the
+            // user's own bank-transfer label ("Monzo"), not a blockchain address — unlike the crypto case
+            // (depositStatusJson above), where "info" IS a real on-chain address. Minting a wallet account
+            // from a fiat "info" value used to collide by name with the user's real "Monzo" bank account.
+            val fiatWithdrawalLedgerJson =
+                """
+                {"error":[],"result":{"ledger":{
+                  "LG3":{"refid":"REF3","time":1700000003.5,"asset":"ZGBP","amount":"1998.05","fee":"1.95"}
+                },"count":1}}
+                """.trimIndent()
+            val withdrawStatusJson =
+                """
+                {"error":[],"result":[
+                  {"method":"Banking Circle UK EMI (FPS)","asset":"ZGBP","refid":"REF3","txid":"010F27426","info":"Monzo","amount":"1998.0500","fee":"1.9500","time":1700000003,"status":"Success","key":"My Monzo"}
+                ]}
+                """.trimIndent()
+
+            stageSessionAndImport(withdrawals = fiatWithdrawalLedgerJson, withdrawStatus = withdrawStatusJson)
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            assertEquals(
+                null,
+                allAccounts.firstOrNull { it.name == "Monzo" },
+                "no wallet account should be minted from a fiat withdrawal's bank-label \"info\": $allAccounts",
+            )
+
+            val exchange = allAccounts.first { it.name == "Kraken" }
+            val funding = allAccounts.first { it.name == "Kraken Funding" }
+            val withdrawal =
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        startDate = Instant.fromEpochMilliseconds(1_700_000_003_000L),
+                        endDate = Instant.fromEpochMilliseconds(1_700_000_004_000L),
+                    ).first()
+                    .first { it.sourceAccountId == exchange.id && it.amount.asset.code == "GBP" }
+            assertEquals(funding.id, withdrawal.targetAccountId, "fiat withdrawal should book against the funding account")
         }
 }

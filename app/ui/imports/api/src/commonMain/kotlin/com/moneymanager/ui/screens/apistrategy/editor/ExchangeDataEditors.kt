@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
@@ -31,6 +32,11 @@ import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 
 /** Kinds whose records are interpreted by [ApiTradeMappings]; the rest use [ApiTransactionMappings]. */
 private val TRADE_KINDS = setOf(ApiEndpointKind.TRADES, ApiEndpointKind.ORDERS)
@@ -420,6 +426,9 @@ internal fun InternalTransferReconcileEditor(
     config: ApiInternalTransferReconcile?,
     onChange: (ApiInternalTransferReconcile?) -> Unit,
     enabled: Boolean,
+    accountRepository: AccountReadRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
 ) {
     ToggleRow(
         label = "Enable internal-transfer reconciliation",
@@ -430,6 +439,10 @@ internal fun InternalTransferReconcileEditor(
         enabled = enabled,
     )
     val c = config ?: return
+
+    // account.name is the cross-source key a bridge matches by, so picking from existing accounts (or
+    // creating a new one inline) avoids a typo that silently fails to match at import time.
+    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) { accountRepository.getAllAccounts() }
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Bridged accounts", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -444,25 +457,23 @@ internal fun InternalTransferReconcileEditor(
                         onRemove = { onChange(c.copy(bridges = c.bridges.filterIndexed { i, _ -> i != index })) },
                         enabled = enabled,
                     )
-                    TextFieldRow(
-                        label = "Other account name",
-                        value = bridge.otherAccountName,
-                        onValueChange = { updated ->
+                    AccountPicker(
+                        selectedAccountId = accounts.firstOrNull { it.name == bridge.otherAccountName }?.id,
+                        onAccountSelected = { accountId ->
+                            val selectedName = accounts.firstOrNull { it.id == accountId }?.name ?: return@AccountPicker
                             onChange(
                                 c.copy(
                                     bridges =
                                         c.bridges.mapIndexed { i, b ->
-                                            if (i ==
-                                                index
-                                            ) {
-                                                b.copy(otherAccountName = updated)
-                                            } else {
-                                                b
-                                            }
+                                            if (i == index) b.copy(otherAccountName = selectedName) else b
                                         },
                                 ),
                             )
                         },
+                        label = "Other account",
+                        accountRepository = accountRepository,
+                        categoryRepository = categoryRepository,
+                        personRepository = personRepository,
                         enabled = enabled,
                         isError = bridge.otherAccountName.isBlank(),
                     )

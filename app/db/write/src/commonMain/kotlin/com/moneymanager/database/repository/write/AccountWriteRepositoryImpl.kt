@@ -245,10 +245,20 @@ class AccountWriteRepositoryImpl(
                 // (rather than colliding with the merge's delete revision and looking like a fresh
                 // account / wiped history).
                 val restoredRevision = merge.deleted_account_revision_id + 1
+                // account.name is UNIQUE: another account may have taken the deleted account's name since
+                // the merge. Disambiguate with a counter rather than let insertWithId throw a raw
+                // constraint violation.
+                val takenNames =
+                    selectQueries
+                        .selectAll()
+                        .executeAsList()
+                        .map { it.name }
+                        .toSet()
+                val restoredName = uniqueRestoreName(merge.deleted_account_name, takenNames)
                 writeQueries.insertWithId(
                     id = merge.deleted_account_id,
                     revision_id = restoredRevision,
-                    name = merge.deleted_account_name,
+                    name = restoredName,
                     opening_date = merge.deleted_account_opening_date,
                     category_id = merge.deleted_account_category_id,
                 )
@@ -299,6 +309,15 @@ class AccountWriteRepositoryImpl(
                 mergeWriteQueries.markReversed(mergeId.id)
             }
         }
+
+    /** [desired] if free, else [desired] with an incrementing counter suffix until one is (always terminates). */
+    private fun uniqueRestoreName(
+        desired: String,
+        taken: Set<String>,
+    ): String {
+        if (desired !in taken) return desired
+        return generateSequence(2) { it + 1 }.map { "$desired ($it)" }.first { it !in taken }
+    }
 
     /** Records [transferId]'s current revision in entity_source for a merge/unmerge [source]. */
     private fun recordTransferMergeSource(

@@ -51,3 +51,9 @@ ON CONFLICT(session_id, revision_id) DO UPDATE SET
 
 lastInsertApiResponseTransactionId:
 SELECT last_insert_rowid();
+
+-- Clears a session's api_response_transaction rows before a re-import re-inserts a fresh set,
+-- avoiding a UNIQUE(response_id, json_path) violation against records from a prior run.
+deleteResponseTransactionsBySession:
+DELETE FROM api_response_transaction
+WHERE response_id IN (SELECT id FROM api_response WHERE session_id = ?);

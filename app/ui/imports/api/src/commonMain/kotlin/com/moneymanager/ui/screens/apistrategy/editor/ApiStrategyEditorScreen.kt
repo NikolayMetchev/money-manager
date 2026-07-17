@@ -33,8 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -59,6 +62,9 @@ fun ApiStrategyEditorScreen(
     strategyId: ApiImportStrategyId?,
     apiImportStrategyRepository: ApiImportStrategyReadRepository,
     apiSessionRepository: ApiSessionReadRepository,
+    accountRepository: AccountReadRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
     onBack: () -> Unit,
 ) {
     val isEditMode = strategyId != null
@@ -220,7 +226,7 @@ fun ApiStrategyEditorScreen(
                     TransactionMappingsTab(state, txJsonPaths, txSampleItem != null, onRequestPick, enabled)
                 EditorTab.PEOPLE -> PeopleTab(state, txJsonPaths, onRequestPick, enabled)
                 EditorTab.RULES -> RulesTab(state, txJsonPaths, onRequestPick, enabled)
-                EditorTab.ADVANCED -> AdvancedTab(state, enabled)
+                EditorTab.ADVANCED -> AdvancedTab(state, enabled, accountRepository, categoryRepository, personRepository)
             }
 
             state.errorMessage?.let {

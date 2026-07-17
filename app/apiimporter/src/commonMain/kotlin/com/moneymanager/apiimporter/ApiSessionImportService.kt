@@ -63,6 +63,7 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.deleteApiResponseTransactionsBySession
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.insertApiResponseTransactions
 import com.moneymanager.importengineapi.normalizeNameKey
@@ -1715,6 +1716,10 @@ private suspend fun runImportEngine(
             )
     }
 
+    // Clear any response-transaction rows from a prior run of this session before inserting the
+    // fresh set — otherwise a re-import (e.g. after a strategy edit bumps the revision) violates the
+    // (response_id, json_path) unique index.
+    setup.importEngine.deleteApiResponseTransactionsBySession(setup.sessionId)
     setup.importEngine.insertApiResponseTransactions(
         responseRecords
             .sortedWith(compareBy<ResponseTransactionImportRecord> { it.pageIndex }.thenBy { it.itemIndex })

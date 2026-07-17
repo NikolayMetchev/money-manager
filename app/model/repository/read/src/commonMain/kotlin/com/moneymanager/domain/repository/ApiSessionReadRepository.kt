@@ -2,6 +2,7 @@
 
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiCredential
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiRequest
@@ -11,6 +12,8 @@ import com.moneymanager.domain.model.ApiResponseTransaction
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransferId
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
@@ -77,6 +80,24 @@ interface ApiSessionReadRepository {
      * Returns all imported (session, revision) pairs.
      */
     suspend fun getImportedSessionRevisions(): Set<ApiSessionImportRevision>
+
+    /**
+     * Accounts created (not merely touched) by the given session — used by re-import to scope
+     * empty-account cleanup to what the session itself produced.
+     */
+    suspend fun getAccountIdsCreatedBySession(sessionId: ApiSessionId): Set<AccountId>
+
+    /**
+     * Transfers created (not merely touched) by the given session — used by re-import to scope
+     * deletes to what the session itself produced.
+     */
+    suspend fun getTransferIdsCreatedBySession(sessionId: ApiSessionId): Set<TransferId>
+
+    /**
+     * Trades created (not merely touched) by the given session — used by re-import to scope
+     * deletes to what the session itself produced.
+     */
+    suspend fun getTradeIdsCreatedBySession(sessionId: ApiSessionId): Set<TradeId>
 }
 
 data class ApiSessionImportRevision(

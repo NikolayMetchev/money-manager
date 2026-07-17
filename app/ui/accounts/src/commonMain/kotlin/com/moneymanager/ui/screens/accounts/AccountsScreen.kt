@@ -257,6 +257,7 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             onDismiss = { showCreateDialog = false },
+            existingNames = accounts.map { it.name }.toSet(),
         )
     }
 
@@ -270,6 +271,7 @@ fun AccountsScreen(
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
             onDismiss = { accountToEdit = null },
+            existingNames = accounts.filter { it.id != currentAccountToEdit.id }.map { it.name }.toSet(),
         )
     }
 }

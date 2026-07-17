@@ -10,11 +10,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 
 @Composable
 internal fun AdvancedTab(
     state: ApiStrategyEditorState,
     enabled: Boolean,
+    accountRepository: AccountReadRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
 ) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader("Request signing (Strong Customer Authentication)")
@@ -69,6 +75,9 @@ internal fun AdvancedTab(
             config = state.internalTransferReconcile,
             onChange = { state.internalTransferReconcile = it },
             enabled = enabled,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
         )
 
         HorizontalDivider()

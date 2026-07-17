@@ -160,15 +160,15 @@ class ImportEngineImpl(
         }
         val createdTradeIds = mutableMapOf<LocalTradeKey, TradeId>()
         val dedupedTradeKeys = mutableSetOf<LocalTradeKey>()
-        for (intent in batch.trades) {
+        for (intent in batch.trades.creates()) {
             val tradeResult =
                 tradeRepository.createTrade(
-                    timestamp = intent.timestamp,
-                    description = intent.description,
-                    fromAccountId = intent.fromAccountId,
-                    fromAmount = intent.fromAmount,
-                    toAccountId = intent.toAccountId,
-                    toAmount = intent.toAmount,
+                    timestamp = requireNotNull(intent.timestamp),
+                    description = requireNotNull(intent.description),
+                    fromAccountId = requireNotNull(intent.fromAccountId),
+                    fromAmount = requireNotNull(intent.fromAmount),
+                    toAccountId = requireNotNull(intent.toAccountId),
+                    toAmount = requireNotNull(intent.toAmount),
                     source = intent.source,
                 )
             createdTradeIds[intent.key] = tradeResult.id
@@ -283,6 +283,7 @@ class ImportEngineImpl(
         // ----- DELETE phase (dependents first) -----
         batch.ownerships.deletes().forEach { ownershipRepository.deleteOwnership(requireNotNull(it.existingId)) }
         batch.transfers.deletes().forEach { transactionRepository.deleteTransaction(requireNotNull(it.existingId).id) }
+        batch.trades.deletes().forEach { tradeRepository.deleteTrade(requireNotNull(it.existingId)) }
         batch.accountsToCreate.deletes().forEach { accountRepository.deleteAccount(requireNotNull(it.existingId)) }
         batch.categories.deletes().forEach { categoryRepository.deleteCategory(requireNotNull(it.existingId)) }
         batch.currencies.deletes().forEach { currencyRepository.deleteCurrency(requireNotNull(it.existingId)) }
@@ -657,13 +658,63 @@ class ImportEngineImpl(
                 keyToId[intent.key] = match.id
                 continue
             }
-            val newId = createAccount(intent)
+            val resolvedName = uniqueName(requireNotNull(intent.name), intent, byName)
+            val newId = createAccount(intent, resolvedName)
             created++
             keyToId[intent.key] = newId
-            indexNewAccount(intent, newId, byName, byAttr, byPersonalKey)
-            intent.name?.let { batchCreatedByName.putIfAbsent(it, newId) }
+            indexNewAccount(intent, newId, resolvedName, byName, byAttr, byPersonalKey)
+            batchCreatedByName.putIfAbsent(resolvedName, newId)
         }
         return AccountResolution(keyToId, created)
+    }
+
+    /**
+     * A display name no other account holds, so the `account.name` UNIQUE constraint can never reject a
+     * create/rename. Identity still decides WHICH account an intent matches (see [matchAccount]) — this
+     * only disambiguates the display name, so genuinely distinct accounts that share a real-world name
+     * (e.g. five different people all named "Nikolay Metchev", two banks both trading as "Payward Ltd.")
+     * stay separate and readable rather than colliding. Shape matches the sibling-collision convention
+     * already used for Monzo-style accounts: "Name (1234)" (see `ApiSessionImportService.displayName`).
+     *
+     * [selfId] excludes the intent's own current account from the collision check (for [adoptAccount]
+     * renaming an account to a name it may already hold, or re-resolving to a name it already suffixed on
+     * an earlier import) so re-imports don't grow an extra suffix each time.
+     */
+    private fun uniqueName(
+        desired: String,
+        intent: ImportAccountIntent,
+        byName: Map<String, AccountId>,
+        selfId: AccountId? = null,
+    ): String {
+        fun free(candidate: String) = byName[candidate].let { it == null || it == selfId }
+        if (free(desired)) return desired
+        discriminatorFor(intent)?.let { discriminator ->
+            val candidate = "$desired ($discriminator)"
+            if (free(candidate)) return candidate
+        }
+        // Last resort: no identity attribute distinguishes this intent, or even the discriminated name is
+        // taken. An incrementing counter always terminates, so the UNIQUE insert can never fail — but it is
+        // the only branch whose outcome depends on import order (which duplicate got the counter suffix);
+        // every duplicate cluster seen in practice (bank accounts, wallets, exchange external ids) resolves
+        // via the identity branch above instead.
+        return generateSequence(2) { it + 1 }.map { "$desired ($it)" }.first(::free)
+    }
+
+    /**
+     * An identity-derived discriminator for [intent], preferring a bank account number (last 4 digits,
+     * matching how banks themselves distinguish same-named accounts) and falling back to the intent's own
+     * match value (covers a wallet address or an exchange/provider external id — the last 6 characters is
+     * enough to disambiguate without making the name unreadably long).
+     */
+    private fun discriminatorFor(intent: ImportAccountIntent): String? {
+        val accountNumberTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
+        val accountNumberDiscriminator =
+            intent.attributes
+                .firstOrNull { it.typeId == accountNumberTypeId }
+                ?.value
+                ?.takeLast(4)
+        if (accountNumberDiscriminator != null) return accountNumberDiscriminator
+        return (intent.match as? AccountMatchKey.ByExternalId)?.value?.takeLast(6)
     }
 
     /** A matched existing account; [adopted] is true for a bank-key fallback match that must be re-pointed. */
@@ -721,8 +772,10 @@ class ImportEngineImpl(
         val existing = accountRepository.getAccountById(id).first() ?: return
         val intentName = requireNotNull(intent.name)
         if (existing.name != intentName) {
-            accountRepository.updateAccount(existing.copy(name = intentName), intent.source)
-            byName.getOrPut(intentName) { id }
+            val resolvedName = uniqueName(intentName, intent, byName, selfId = id)
+            accountRepository.updateAccount(existing.copy(name = resolvedName), intent.source)
+            byName.remove(existing.name)
+            byName[resolvedName] = id
         }
         val currentAttrs = accountAttributeRepository.getByAccount(id).first()
         for (attr in intent.attributes) {
@@ -743,12 +796,15 @@ class ImportEngineImpl(
         return if (sortCode != null && accountNumber != null) personalCounterpartyKey(sortCode, accountNumber) else null
     }
 
-    private suspend fun createAccount(intent: ImportAccountIntent): AccountId {
+    private suspend fun createAccount(
+        intent: ImportAccountIntent,
+        name: String,
+    ): AccountId {
         val newId =
             accountRepository.createAccount(
                 Account(
                     id = AccountId(0),
-                    name = requireNotNull(intent.name),
+                    name = name,
                     openingDate = requireNotNull(intent.openingDate),
                     categoryId = intent.categoryId,
                 ),
@@ -763,11 +819,12 @@ class ImportEngineImpl(
     private fun indexNewAccount(
         intent: ImportAccountIntent,
         id: AccountId,
+        name: String,
         byName: MutableMap<String, AccountId>,
         byAttr: MutableMap<Pair<AttributeTypeId, String>, AccountId>,
         byPersonalKey: MutableMap<String, AccountId>,
     ) {
-        byName.getOrPut(requireNotNull(intent.name)) { id }
+        byName.getOrPut(name) { id }
         intent.attributes.forEach { attr -> byAttr.getOrPut(attr.typeId to attr.value) { id } }
         when (val match = intent.match) {
             is AccountMatchKey.ByPersonalCounterparty -> byPersonalKey.getOrPut(match.key) { id }
@@ -1618,6 +1675,8 @@ class ImportEngineImpl(
                         "ApiResponseTransaction",
                     )
                 is ApiSessionMutation.InsertResponseTransactions -> apiSessionRepository.insertResponseTransactions(m.transactions)
+                is ApiSessionMutation.DeleteResponseTransactionsBySession ->
+                    apiSessionRepository.deleteResponseTransactionsBySession(m.sessionId)
                 is ApiSessionMutation.MarkSessionImported ->
                     apiSessionRepository.markSessionImported(m.id, m.revisionId, m.importedAt, m.importDurationMillis)
             }
