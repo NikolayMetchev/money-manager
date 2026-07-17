@@ -205,7 +205,12 @@ class MonzoImportAuditE2ETest {
                     importEngine = dc.importEngine,
                 )
 
-                monzoAccountId = dc.accountRepository.getAllAccounts().first().single { it.name == "Monzo" }.id.id
+                monzoAccountId =
+                    dc.accountRepository
+                        .getAllAccounts()
+                        .first()
+                        .single { it.name == "Monzo" }
+                        .id.id
             }
 
             val testDatabaseManager =
