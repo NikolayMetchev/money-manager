@@ -282,13 +282,15 @@ class CryptoComExchangeApiE2ETest : DbTest() {
     @Test
     fun `a value with more precision than the asset's scale fails the import instead of rounding`() =
         runTest {
-            // The fiat fee "-0.525570" USD (6 decimals against USD's scale of 100) is not exactly
-            // representable, so the import must throw rather than silently round.
+            // Every currency shares crypto's 10^18 storage scale, so a realistic exchange-reported value
+            // (e.g. Kraken's 5-decimal GBP trade legs) is always representable — only a value exceeding
+            // even that (19+ decimals) still can't be represented exactly, so the import must throw
+            // rather than silently round.
             val excessPrecisionTrades =
                 """
                 {"code":0,"result":{"data":[
                   {"instrument_name":"BTC_USD","side":"SELL","traded_quantity":"0.1","traded_price":"41000.00",
-                   "fees":"-0.525570","fee_instrument_name":"USD","create_time":1700000000100,"trade_id":"t9","order_id":"o9"}
+                   "fees":"-0.5255701234567890123","fee_instrument_name":"USD","create_time":1700000000100,"trade_id":"t9","order_id":"o9"}
                 ]}}
                 """.trimIndent()
             val failure =

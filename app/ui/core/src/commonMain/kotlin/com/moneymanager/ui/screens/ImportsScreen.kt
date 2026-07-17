@@ -193,7 +193,7 @@ fun ImportsScreen(
                     passThroughAccountRepository = passThroughAccountRepository,
                     maintenance = maintenance,
                     deviceId = deviceId,
-                    onMonzoConnectClick = onAddCredentialClick,
+                    onAddCredentialClick = onAddCredentialClick,
                     onApiStrategiesClick = onApiStrategiesClick,
                     onSessionClick = onSessionClick,
                     onTransactionsImported = onTransactionsImported,

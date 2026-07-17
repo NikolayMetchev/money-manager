@@ -49,6 +49,36 @@ data class ApiImportStrategy(
     val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
     val syntheticAccount: ApiSyntheticAccount? = null,
     val internalTransferReconcile: ApiInternalTransferReconcile? = null,
+    val assetAliases: Map<String, String> = emptyMap(),
+    /** Deep-link to the provider's own page for creating/managing API tokens; null shows no button. */
+    val tokenPageUrl: String? = null,
+    /** Ordered, numbered steps shown to the user for obtaining credentials from this provider. */
+    val connectInstructions: List<String> = emptyList(),
+    /** Delay between exchange-download requests; null uses the download function's own default. */
+    val rateLimitMillis: Long? = null,
+    /**
+     * Case-insensitive substrings that mark an exchange error response as transient rate-limiting
+     * (retried with backoff) rather than a hard failure (which abandons the rest of the endpoint).
+     */
+    val rateLimitErrorSubstrings: List<String> = emptyList(),
+    /** Base backoff before the first retry of a rate-limited request; doubles each subsequent retry. */
+    val rateLimitBackoffMillis: Long = 5_000L,
+    /** Maximum retries for a request repeatedly classified as rate-limited before giving up. */
+    val maxRateLimitRetries: Int = 5,
+    /**
+     * Suffixes stripped from a raw asset code before [assetAliases]/currency lookup (e.g. Kraken's
+     * Earn-holding codes "XETH.F"/"XETH.S" -> "XETH"). Without this, a suffixed code fails asset
+     * resolution and its transfer is silently dropped.
+     */
+    val assetSuffixesToStrip: Set<String> = emptySet(),
+    /**
+     * Overrides [com.moneymanager.domain.model.IsoMinorUnitDivisors]' per-currency divisor for
+     * interpreting a [com.moneymanager.domain.model.apistrategy.ApiAmountFormat.MINOR_UNITS_INTEGER]
+     * amount (a bank API's raw integer in its own minor units). Only meaningful for a strategy using
+     * that format; a provider whose minor-unit width doesn't follow the ISO 4217 standard for a given
+     * currency can be corrected here instead of the global table.
+     */
+    val minorUnitDivisorOverrides: Map<String, Long> = emptyMap(),
     val createdAt: Instant,
     val updatedAt: Instant,
     val revisionId: Long = 1,

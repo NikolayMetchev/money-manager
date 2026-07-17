@@ -38,6 +38,15 @@ data class ApiStrategyConfigJson(
     val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
     val syntheticAccount: ApiSyntheticAccount? = null,
     val internalTransferReconcile: ApiInternalTransferReconcile? = null,
+    val assetAliases: Map<String, String> = emptyMap(),
+    val tokenPageUrl: String? = null,
+    val connectInstructions: List<String> = emptyList(),
+    val rateLimitMillis: Long? = null,
+    val rateLimitErrorSubstrings: List<String> = emptyList(),
+    val rateLimitBackoffMillis: Long = 5_000L,
+    val maxRateLimitRetries: Int = 5,
+    val assetSuffixesToStrip: Set<String> = emptySet(),
+    val minorUnitDivisorOverrides: Map<String, Long> = emptyMap(),
 )
 
 /**

@@ -2,16 +2,15 @@
 
 package com.moneymanager.importengineapi
 
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiResponseTransactionInsert
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
 import kotlin.time.Instant
 
@@ -26,7 +25,6 @@ sealed interface ApiSessionMutation {
         val key: String,
         val token: String,
         val createdAt: Instant,
-        val type: ApiSessionType = ApiSessionType.MONZO,
         val strategyId: ApiImportStrategyId? = null,
         val privateKey: String? = null,
         val publicKey: String? = null,
@@ -35,18 +33,18 @@ sealed interface ApiSessionMutation {
     ) : ApiSessionMutation
 
     data class UpdateCredentialStrategy(
-        val credentialId: MonzoCredentialId,
+        val credentialId: ApiCredentialId,
         val strategyId: ApiImportStrategyId?,
     ) : ApiSessionMutation
 
     data class UpdateCredentialKeys(
-        val credentialId: MonzoCredentialId,
+        val credentialId: ApiCredentialId,
         val privateKey: String?,
         val publicKey: String?,
     ) : ApiSessionMutation
 
     data class UpdateCredentialSecrets(
-        val credentialId: MonzoCredentialId,
+        val credentialId: ApiCredentialId,
         val token: String,
         val apiSecret: String?,
     ) : ApiSessionMutation
@@ -56,8 +54,7 @@ sealed interface ApiSessionMutation {
         val token: String,
         val deviceId: DeviceId,
         val createdAt: Instant,
-        val type: ApiSessionType = ApiSessionType.MONZO,
-        val credentialId: MonzoCredentialId? = null,
+        val credentialId: ApiCredentialId? = null,
     ) : ApiSessionMutation
 
     data class InsertRequest(

@@ -26,6 +26,7 @@ import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import com.moneymanager.domain.model.apistrategy.FieldPlacement
 import com.moneymanager.domain.model.apistrategy.HttpMethodType
+import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.NonceFormat
 import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.PaginationMode
@@ -34,10 +35,14 @@ import com.moneymanager.domain.model.apistrategy.PredicateOp
 import com.moneymanager.domain.model.apistrategy.RequestIdSpec
 import com.moneymanager.domain.model.apistrategy.RulePredicate
 import com.moneymanager.domain.model.apistrategy.RuleSign
+import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SigFieldLocation
 import com.moneymanager.domain.model.apistrategy.SigPart
+import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
+import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -47,9 +52,11 @@ object BuiltInApiStrategies {
     val wiseStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000002")
     val starlingStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000005")
     val cryptoComExchangeStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
+    val krakenStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
 
     /** All built-in API import strategies. */
-    fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> = listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now))
+    fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> =
+        listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now), kraken(now))
 
     /** The built-in Monzo API import strategy. */
     fun monzo(now: Instant): ApiImportStrategy =
@@ -76,6 +83,10 @@ object BuiltInApiStrategies {
             accountMappings =
                 ApiAccountMappings(
                     ownerNameField = "preferred_name",
+                    // Monzo's account "description" is the account holder's own user id, not a
+                    // display name — Monzo's API has no field meant for this, so use a fixed name
+                    // ("Monzo Joint" for a joint account, detected by having more than one owner).
+                    staticAccountName = "Monzo",
                 ),
             transactionMappings =
                 ApiTransactionMappings(
@@ -98,6 +109,16 @@ object BuiltInApiStrategies {
             peopleMappings = ApiPeopleMappings(ephemeralCounterpartyIdPrefixes = setOf("anonuser_")),
             builtInCounterpartyRules = monzoAtmRules,
             personExternalIdAttribute = "monzo-external-id",
+            tokenPageUrl = "https://developers.monzo.com/",
+            connectInstructions =
+                listOf(
+                    "Open the Monzo Developer Playground in your browser.",
+                    "Log in with your Monzo account credentials.",
+                    "Monzo will send a magic link to your email or app. Approve the login.",
+                    "Copy the access token shown on the playground page.",
+                    "Paste the token below and save.",
+                    "In the Monzo app, approve the API access notification so transactions can be read.",
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -213,6 +234,17 @@ object BuiltInApiStrategies {
                     accountOwnerAncestorExpr = "ancestor[0].id",
                 ),
             personExternalIdAttribute = "wise-external-id",
+            tokenPageUrl = "https://wise.com/your-account/integrations-and-tools/api-tokens",
+            connectInstructions =
+                listOf(
+                    "Open the Wise API tokens page in your browser and sign in.",
+                    "Create a new API token (read access is sufficient) and copy it.",
+                    "Paste the token below and save.",
+                    "Statements are protected by Strong Customer Authentication: generate a signing key below and " +
+                        "register its public key in Wise (Settings → API tokens → Manage public keys).",
+                    "Note: retrieving statements via the API is only supported for accounts based in the US, Canada, " +
+                        "Australia, New Zealand, Singapore, and Malaysia.",
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -321,6 +353,14 @@ object BuiltInApiStrategies {
                     ownsAllAccounts = true,
                 ),
             personExternalIdAttribute = "starling-external-id",
+            tokenPageUrl = "https://developer.starlingbank.com/",
+            connectInstructions =
+                listOf(
+                    "Open the Starling Developer portal in your browser and sign in with your Starling account.",
+                    "Create a personal access token with the account:read, transaction:read and " +
+                        "account-holder-name:read scopes.",
+                    "Copy the token, paste it below and save.",
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -478,6 +518,284 @@ object BuiltInApiStrategies {
                     bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
                     windowSeconds = 24 * 3600,
                     amountTolerancePercent = "2",
+                ),
+            tokenPageUrl = "https://exchange.crypto.com/settings/api-management",
+            connectInstructions =
+                listOf(
+                    "Open the Crypto.com Exchange API management page in your browser and sign in.",
+                    "Create a new API key with read-only permissions (do not grant withdrawal or " +
+                        "trading permissions).",
+                    "Copy the API key and paste it below as the API key.",
+                    "Copy the Secret Key and paste it below as the API secret.",
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in Kraken API strategy — pure config over the generic signed-exchange engine (no provider
+     * code). Kraken's REST auth is HMAC-SHA512 over `path + SHA256(nonce + form-body)`, with a
+     * Base64-decoded secret and Base64 signature — the [ApiRequestSigningConfig] KDoc covers exactly
+     * this shape. Trades come from `TradesHistory`; deposits/withdrawals come from the single `Ledgers`
+     * endpoint filtered by `type` (deposit/withdrawal), enriched with on-chain address/txid from
+     * `DepositStatus`/`WithdrawStatus` (endpoints that supply no money movement of their own, just
+     * enrichment — see [ApiDataEndpoint.enrichesTransfers]). Both TradesHistory and Ledgers return a
+     * JSON object keyed by id (not an array) and cap ~50 rows/response, paged by an integer `ofs`.
+     *
+     * Field paths follow the Kraken REST v0 docs; verify against a live response when connecting real
+     * keys (same caveat as the Crypto.com built-in).
+     */
+    fun kraken(now: Instant): ApiImportStrategy {
+        val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
+        // Both TradesHistory and Ledgers page the same way: a date window (Kraken's start/end are whole
+        // seconds, not millis) further paged by an offset ("ofs") in `limitValue`-sized chunks, bounded
+        // by the response's total `result.count`.
+        val historyWindow =
+            ApiPaginationConfig(
+                mode = PaginationMode.DATE_WINDOW,
+                startParam = "start",
+                endParam = "end",
+                windowBoundFormat = WindowBoundFormat.EPOCH_S,
+                windowDays = 90,
+                lookbackDays = 365 * 6,
+                offsetParam = "ofs",
+                limitValue = 50,
+                totalCountField = "result.count",
+            )
+
+        fun signed(
+            path: String,
+            key: String,
+            pagination: ApiPaginationConfig? = historyWindow,
+            responseObjectValues: Boolean = false,
+            itemKeyField: String? = null,
+            queryParams: List<ApiQueryParam> = emptyList(),
+            // Kraken's ledger/trade-history calls cost 2 rate-limit counter units against 1 for other
+            // endpoints (per Kraken's published REST rate-limit docs); TradesHistory/Ledgers are the
+            // only callers relying on this default, DepositStatus/WithdrawStatus pass 1 explicitly.
+            requestCostWeight: Int = 2,
+        ) = ApiEndpointConfig(
+            path = path,
+            responseArrayKey = key,
+            queryParams = queryParams,
+            method = HttpMethodType.POST,
+            // Kraken signals success/failure via an empty/absent "error" array, never a status code.
+            errorArrayField = "error",
+            pagination = pagination,
+            responseObjectValues = responseObjectValues,
+            itemKeyField = itemKeyField,
+            requestCostWeight = requestCostWeight,
+        )
+
+        // Kraken's legacy asset codes, normalized to their canonical ISO/ticker form before any
+        // currency/crypto lookup.
+        val assetAliasMap =
+            mapOf(
+                "XXBT" to "BTC",
+                "XBT" to "BTC",
+                "XETH" to "ETH",
+                "XXRP" to "XRP",
+                "XLTC" to "LTC",
+                "XXLM" to "XLM",
+                "XXMR" to "XMR",
+                "XZEC" to "ZEC",
+                "XETC" to "ETC",
+                "XREP" to "REP",
+                "XXDG" to "DOGE",
+                "XDG" to "DOGE",
+                "XMLN" to "MLN",
+                "ZUSD" to "USD",
+                "ZEUR" to "EUR",
+                "ZGBP" to "GBP",
+                "ZCAD" to "CAD",
+                "ZJPY" to "JPY",
+                "ZCHF" to "CHF",
+                "ZAUD" to "AUD",
+            )
+
+        val tradeMappings =
+            ApiTradeMappings(
+                instrumentField = "pair",
+                splitMode = InstrumentSplitMode.QUOTE_SUFFIX,
+                // The longest matching suffix always wins (see splitInstrument), so shorter codes that
+                // are also suffixes of longer ones (e.g. "ZUSD" ends with "USD") are listed safely.
+                // "XXBT"/"XETH" cover crypto/crypto pairs quoted in BTC or ETH (e.g. "XETHXXBT" is
+                // ETH/BTC, not a BTC/USD-style fiat pair).
+                quoteAssets =
+                    listOf(
+                        "XXBT",
+                        "XETH",
+                        "ZUSD",
+                        "ZEUR",
+                        "ZGBP",
+                        "ZCAD",
+                        "ZJPY",
+                        "ZCHF",
+                        "ZAUD",
+                        "USDT",
+                        "USDC",
+                        "DAI",
+                        "USD",
+                        "EUR",
+                        "GBP",
+                    ),
+                sideField = "type",
+                buyValues = setOf("buy"),
+                baseQuantityField = "vol",
+                quoteQuantityField = "cost",
+                feeField = "fee",
+                timestampField = "time",
+                timestampFormat = TimestampFormat.EPOCH_S_FLOAT,
+                idField = "trade_id",
+                orderIdField = "ordertxid",
+            )
+
+        fun ledgerMappings(joinKey: String) =
+            ApiTransactionMappings(
+                amountField = "amount",
+                currencyField = "asset",
+                timestampField = "time",
+                timestampFormat = TimestampFormat.EPOCH_S_FLOAT,
+                // Ledger entries carry their id only as the response object's key, spliced in by
+                // itemKeyField below under this field name.
+                idField = "ledger_id",
+                amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                feeAmountField = "fee",
+                joinKeyField = joinKey,
+            )
+
+        // DepositStatus/WithdrawStatus supply no money movement of their own — they only enrich the
+        // Ledgers-sourced transfer that shares the same refid with on-chain address/txid.
+        val enrichMappings =
+            ApiTransactionMappings(
+                idField = "refid",
+                counterpartyAddressField = "info",
+                txidField = "txid",
+            )
+
+        return ApiImportStrategy(
+            id = ApiImportStrategyId(krakenStrategyId),
+            name = "Kraken",
+            baseUrl = "https://api.kraken.com",
+            authType = ApiAuthType.SIGNED,
+            accountsEndpoint = unused,
+            transactionsEndpoint = unused,
+            accountMappings = ApiAccountMappings(),
+            transactionMappings = ApiTransactionMappings(),
+            requestSigning =
+                ApiRequestSigningConfig(
+                    algorithm = SigningAlgorithm.HMAC_SHA512,
+                    secretEncoding = SecretEncoding.BASE64,
+                    signatureEncoding = SignatureEncoding.BASE64,
+                    message = listOf(SigPart.Path, SigPart.Sha256(listOf(SigPart.Nonce, SigPart.Body))),
+                    apiKey = FieldPlacement(SigFieldLocation.HEADER, "API-Key"),
+                    nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.BODY_FIELD, "nonce")),
+                    signature = FieldPlacement(SigFieldLocation.HEADER, "API-Sign"),
+                    bodyFormat = BodyFormat.FORM_URLENCODED,
+                ),
+            syntheticAccount = ApiSyntheticAccount(name = "Kraken", externalId = "kraken"),
+            dataEndpoints =
+                listOf(
+                    ApiDataEndpoint(
+                        signed("0/private/TradesHistory", "result.trades", responseObjectValues = true),
+                        ApiEndpointKind.TRADES,
+                        tradeMappings = tradeMappings,
+                    ),
+                    ApiDataEndpoint(
+                        signed(
+                            "0/private/Ledgers",
+                            "result.ledger",
+                            responseObjectValues = true,
+                            itemKeyField = "ledger_id",
+                            queryParams = listOf(ApiQueryParam(name = "type", value = "deposit")),
+                        ),
+                        ApiEndpointKind.DEPOSITS,
+                        fixedDirection = TransferDirection.IN,
+                        transactionMappings = ledgerMappings("refid"),
+                    ),
+                    ApiDataEndpoint(
+                        signed(
+                            "0/private/Ledgers",
+                            "result.ledger",
+                            responseObjectValues = true,
+                            itemKeyField = "ledger_id",
+                            queryParams = listOf(ApiQueryParam(name = "type", value = "withdrawal")),
+                        ),
+                        ApiEndpointKind.WITHDRAWALS,
+                        fixedDirection = TransferDirection.OUT,
+                        transactionMappings = ledgerMappings("refid"),
+                    ),
+                    // Earn/staking reward payouts. Kraken's own docs disagree on the ledger type value
+                    // ("reward" vs "staking") between endpoints — both are requested; whichever the
+                    // account doesn't use simply returns an empty ledger.
+                    ApiDataEndpoint(
+                        signed(
+                            "0/private/Ledgers",
+                            "result.ledger",
+                            responseObjectValues = true,
+                            itemKeyField = "ledger_id",
+                            queryParams = listOf(ApiQueryParam(name = "type", value = "reward")),
+                        ),
+                        ApiEndpointKind.DEPOSITS,
+                        fixedDirection = TransferDirection.IN,
+                        transactionMappings = ledgerMappings("refid"),
+                    ),
+                    ApiDataEndpoint(
+                        signed(
+                            "0/private/Ledgers",
+                            "result.ledger",
+                            responseObjectValues = true,
+                            itemKeyField = "ledger_id",
+                            queryParams = listOf(ApiQueryParam(name = "type", value = "staking")),
+                        ),
+                        ApiEndpointKind.DEPOSITS,
+                        fixedDirection = TransferDirection.IN,
+                        transactionMappings = ledgerMappings("refid"),
+                    ),
+                    // Known limitation: Kraken paginates these funding-status endpoints with an opaque
+                    // cursor token (not the offset/date-window shapes the generic engine implements), so
+                    // only the first page is fetched here — enrichment (on-chain address/txid) beyond
+                    // that page is silently skipped, though the underlying deposit/withdrawal transfer
+                    // itself (from Ledgers, above) is unaffected. Extending PaginationMode.CURSOR to the
+                    // exchange engine to cover this needs the real cursor field verified against a live
+                    // response before it's worth adding.
+                    ApiDataEndpoint(
+                        signed("0/private/DepositStatus", "result", pagination = null, requestCostWeight = 1),
+                        ApiEndpointKind.DEPOSITS,
+                        transactionMappings = enrichMappings,
+                        enrichesTransfers = true,
+                    ),
+                    ApiDataEndpoint(
+                        signed("0/private/WithdrawStatus", "result", pagination = null, requestCostWeight = 1),
+                        ApiEndpointKind.WITHDRAWALS,
+                        transactionMappings = enrichMappings,
+                        enrichesTransfers = true,
+                    ),
+                ),
+            assetAliases = assetAliasMap,
+            // Kraken Earn holdings use a suffixed asset code for the same underlying asset (e.g. the
+            // "Flexible Earn" ETH position is "XETH.F", staked is "XETH.S"); strip it so the position's
+            // deposit/withdrawal ledger entries resolve to the ordinary "ETH" asset like any other.
+            assetSuffixesToStrip = setOf(".F", ".S", ".M"),
+            // Starter-tier decay is 0.33 counter/sec (Kraken's slowest verification tier), so 1 unit of
+            // cost needs ~3.03s to fully decay; 3100ms per unit keeps even the slowest tier clear of
+            // "EAPI:Rate limit exceeded" with a small margin. requestCostWeight above scales this per
+            // endpoint (2 for ledger/trade-history calls, 1 for the rest) so cheaper endpoints aren't
+            // paced as conservatively as the most expensive ones.
+            rateLimitMillis = 3_100L,
+            rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Too many requests", "Throttled"),
+            rateLimitBackoffMillis = 5_000L,
+            maxRateLimitRetries = 6,
+            tokenPageUrl = "https://pro.kraken.com/app/settings/api",
+            connectInstructions =
+                listOf(
+                    "Open the Kraken API management page in your browser and sign in.",
+                    "Create a new API key with the \"Query Funds\", \"Query Ledger Entries\", " +
+                        "\"Query Open/Closed Orders & Trades\" and \"Export Data\" permissions (read-only " +
+                        "access is sufficient; do not grant withdrawal or trading permissions).",
+                    "Copy the API key and paste it below as the API key.",
+                    "Copy the Private Key and paste it below as the API secret.",
                 ),
             createdAt = now,
             updatedAt = now,

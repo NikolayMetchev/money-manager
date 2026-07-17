@@ -64,6 +64,15 @@ object ApiImportStrategyAuditEntryMapper {
                 dataEndpoints = raw.dataEndpoints,
                 syntheticAccount = raw.syntheticAccount,
                 internalTransferReconcile = raw.internalTransferReconcile,
+                assetAliases = raw.assetAliases,
+                tokenPageUrl = raw.tokenPageUrl,
+                connectInstructions = raw.connectInstructions,
+                rateLimitMillis = raw.rateLimitMillis,
+                rateLimitErrorSubstrings = raw.rateLimitErrorSubstrings,
+                rateLimitBackoffMillis = raw.rateLimitBackoffMillis,
+                maxRateLimitRetries = raw.maxRateLimitRetries,
+                assetSuffixesToStrip = raw.assetSuffixesToStrip,
+                minorUnitDivisorOverrides = raw.minorUnitDivisorOverrides,
             )
         return ApiImportStrategyAuditEntry(
             id = from.id,

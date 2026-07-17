@@ -2,7 +2,6 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.importengineapi.updateApiCredentialSecrets
 import com.moneymanager.test.database.DbTest
@@ -32,7 +31,6 @@ class ApiCredentialConnectionTest : DbTest() {
             repositories.apiSessionRepository.createCredential(
                 token = "first-token",
                 createdAt = now,
-                type = ApiSessionType.MONZO,
                 strategyId = strategy.id,
             )
 
@@ -40,7 +38,6 @@ class ApiCredentialConnectionTest : DbTest() {
                 repositories.apiSessionRepository.createCredential(
                     token = "second-token",
                     createdAt = now,
-                    type = ApiSessionType.MONZO,
                     strategyId = strategy.id,
                 )
             }
@@ -51,8 +48,8 @@ class ApiCredentialConnectionTest : DbTest() {
         runTest {
             val (first, second) = strategies().take(2)
 
-            repositories.apiSessionRepository.createCredential("token-one", now, ApiSessionType.MONZO, first.id)
-            repositories.apiSessionRepository.createCredential("token-two", now, ApiSessionType.MONZO, second.id)
+            repositories.apiSessionRepository.createCredential("token-one", now, first.id)
+            repositories.apiSessionRepository.createCredential("token-two", now, second.id)
 
             val byStrategy = repositories.apiSessionRepository.getAllCredentials().associateBy { it.strategyId }
             assertEquals("token-one", byStrategy[first.id]?.token)
@@ -67,7 +64,6 @@ class ApiCredentialConnectionTest : DbTest() {
                 repositories.apiSessionRepository.createCredential(
                     token = "old-key",
                     createdAt = now,
-                    type = ApiSessionType.CRYPTO_COM_EXCHANGE,
                     strategyId = strategy.id,
                     apiSecret = "old-secret",
                 )
@@ -89,7 +85,7 @@ class ApiCredentialConnectionTest : DbTest() {
             val strategy = strategies().first()
             assertEquals(emptyList(), repositories.apiSessionRepository.getCredentialsFlow().first())
 
-            repositories.apiSessionRepository.createCredential("a-token", now, ApiSessionType.MONZO, strategy.id)
+            repositories.apiSessionRepository.createCredential("a-token", now, strategy.id)
 
             val credential =
                 repositories.apiSessionRepository

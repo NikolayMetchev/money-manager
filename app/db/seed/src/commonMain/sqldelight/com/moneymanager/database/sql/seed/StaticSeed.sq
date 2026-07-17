@@ -16,9 +16,6 @@ INSERT INTO source_type (id, name) VALUES (6, 'QIF_IMPORT');
 INSERT INTO source_type (id, name) VALUES (7, 'MERGE_UNDO');
 INSERT INTO source_type (id, name) VALUES (8, 'MERGE');
 
-INSERT INTO api_session_type (id, name) VALUES (1, 'Monzo');
-INSERT INTO api_session_type (id, name) VALUES (2, 'Crypto.com Exchange');
-
 INSERT INTO import_directory_provider (id, name) VALUES (1, 'LOCAL');
 INSERT INTO import_directory_provider (id, name) VALUES (2, 'GDRIVE');
 
@@ -57,7 +54,7 @@ INSERT INTO relationship_type (id, name) VALUES (5, 'conversion');
 -- Every asset id (currency/crypto) is drawn from the shared `asset` id space, so GBP's fixed id=1
 -- must first exist in `asset` before the currency row can reference it.
 INSERT INTO asset (id) VALUES (1);
-INSERT INTO currency (id, revision_id, code, name, scale_factor) VALUES (1, 1, 'GBP', 'British Pound', 100);
+INSERT INTO currency (id, revision_id, code, name, scale_factor) VALUES (1, 1, 'GBP', 'British Pound', 1000000000000000000);
 INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
 VALUES (3, 1, 1, 4, 1);
 

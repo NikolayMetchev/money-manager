@@ -2,7 +2,6 @@
 
 package com.moneymanager.ui.screens.timeline
 
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import kotlinx.datetime.LocalDate
@@ -28,7 +27,6 @@ class TimelineModelTest {
         fileId: String = "id-$start",
         fileName: String = "file-$start.csv",
         strategyName: String? = "Strategy A",
-        apiSessionType: ApiSessionType? = null,
         ignored: Boolean = false,
         count: Long = 10,
     ): ImportFileDateRange =
@@ -37,7 +35,6 @@ class TimelineModelTest {
             fileId = fileId,
             fileName = fileName,
             strategyName = strategyName,
-            apiSessionType = apiSessionType,
             ignored = ignored,
             earliest = instant(start),
             latest = instant(end),
@@ -140,7 +137,7 @@ class TimelineModelTest {
     }
 
     @Test
-    fun apiRowsUseStrategyNameWithSessionTypeFallback() {
+    fun apiRowsUseStrategyNameWithUnknownFallback() {
         val matrix =
             buildTimelineMatrix(
                 listOf(
@@ -148,21 +145,19 @@ class TimelineModelTest {
                         "2024-01-01",
                         "2024-01-31",
                         kind = TimelineSourceKind.API,
-                        strategyName = "Crypto.com REST",
-                        apiSessionType = ApiSessionType.CRYPTO_COM_EXCHANGE,
+                        strategyName = "Kraken",
                     ),
                     range(
                         "2024-01-01",
                         "2024-01-31",
                         kind = TimelineSourceKind.API,
                         strategyName = null,
-                        apiSessionType = ApiSessionType.MONZO,
                     ),
                 ),
                 timeZone,
                 todayDay = day("2024-01-31"),
             )!!
-        assertEquals(listOf("Crypto.com REST", "Monzo"), matrix.rows.map { it.label })
+        assertEquals(listOf("Kraken", "Unknown strategy"), matrix.rows.map { it.label })
     }
 
     @Test

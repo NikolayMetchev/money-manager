@@ -35,11 +35,11 @@ class CurrencyWriteRepositoryImpl(
                 val existing = selectQueries.selectByCode(code).executeAsOneOrNull()
                 existing?.let { CurrencyId(it.id) }
                     ?: run {
-                        val scaleFactor = CurrencyScaleFactors.getScaleFactor(code)
+                        val scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR
                         // Allocate an id from the shared `asset` id space, then insert the currency with it.
                         assetWriteQueries.insert()
                         val newId = assetWriteQueries.lastInsertedId().executeAsOne()
-                        writeQueries.insert(newId, code, name, scaleFactor.toLong())
+                        writeQueries.insert(newId, code, name, scaleFactor)
                         // Only a freshly inserted currency records a source (the existing branch keeps its own).
                         database.recordSource(deviceId, EntityType.CURRENCY, newId, 1L, source)
                         CurrencyId(newId)

@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.IsoMinorUnitDivisors
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -21,6 +22,7 @@ import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
@@ -1005,7 +1007,15 @@ private suspend fun buildGlobalHolderOwnerships(
     }
 }
 
-/** Resolves (allocating if needed) the [LocalAccountKey] for a downloaded own account, with its bank details. */
+/**
+ * Resolves (allocating if needed) the [LocalAccountKey] for a downloaded own account, with its bank
+ * details. When [ApiAccountMappings.staticAccountName] is set and this account has no bank details to
+ * disambiguate it, the import engine's own-account matching falls back to reusing an existing
+ * same-named account from this batch (a heuristic meant for merchant/counterparty dedup, e.g. one
+ * provider minting two external ids for one merchant) — which would wrongly merge two genuinely
+ * distinct own accounts that share the static name. [siblingAccounts] lets [displayName] detect that
+ * and append a short disambiguator only when it's actually needed.
+ */
 private suspend fun resolveOwnAccountKey(
     setup: ImportSetup,
     account: ApiImportAccount,
@@ -1013,7 +1023,7 @@ private suspend fun resolveOwnAccountKey(
     val (sortCode, accountNumber) = account.bankDetails()
     return setup.accountResolver.resolveSourceAccount(
         externalId = account.id,
-        name = account.displayName(),
+        name = account.displayName(setup.strategy.accountMappings, setup.accountsById.values),
         sortCode = sortCode,
         accountNumber = accountNumber,
         source = setup.accountApiSourceByExternalId[account.id]?.toSource() ?: Source.Api(setup.sessionId),
@@ -1775,7 +1785,7 @@ private suspend fun prepareValidTransactionItem(
             requestId = context.requestId,
             jsonPath = item.counterpartyJsonPath(setup.strategy.peopleMappings),
         )
-    val data = item.toTransferData(currency)
+    val data = item.toTransferData(currency, setup.strategy.minorUnitDivisorOverrides)
     // A pass-through (conduit) charge such as Curve, detected from the description (e.g. "CRV*…"). An
     // outgoing spend becomes the funding leg own -> conduit and the engine adds the spend leg conduit ->
     // merchant; an incoming refund/cancellation ("Refund: CRV*…") runs both legs the other way. Detection
@@ -1931,7 +1941,8 @@ private suspend fun buildImportFee(
         }
     val feeMoney =
         when {
-            item.feeAmountMinorUnits != null -> Money(item.feeAmountMinorUnits.absoluteValue, feeCurrency)
+            item.feeAmountMinorUnits != null ->
+                minorUnitsToMoney(item.feeAmountMinorUnits.absoluteValue, feeCurrency, setup.strategy.minorUnitDivisorOverrides)
             item.feeAmountDecimalMajor != null -> Money.fromDisplayValue(item.feeAmountDecimalMajor, feeCurrency)
             else -> return null
         }
@@ -2178,26 +2189,66 @@ internal fun arrayItemJsonPath(
     index: Int,
 ): JsonPath = if (responseArrayKey.isBlank()) JsonPath("$[$index]") else JsonPath("$.$responseArrayKey[$index]")
 
+/** The real JSON path of an item inside a keyed-object response (see [responseItemsWithKeys]). */
+internal fun keyedItemJsonPath(
+    responseArrayKey: String,
+    key: String,
+): JsonPath = if (responseArrayKey.isBlank()) JsonPath("$.$key") else JsonPath("$.$responseArrayKey.$key")
+
 /**
  * Extracts the items array from a response body; a blank [responseArrayKey] means the body is the
  * array. A bare JSON object body (e.g. a single-resource endpoint like Starling's account holder) is
  * wrapped as a one-element array so single-object responses parse like any other.
+ *
+ * When [responseObjectValues] is set, the element at [responseArrayKey] is itself a JSON object keyed
+ * by id (Kraken `result.trades`/`result.ledger`) rather than an array; its values become the items. When
+ * [itemKeyField] is also set, each entry's map key is spliced into that entry's object under this field
+ * name first, since the id sometimes appears only as the key (Kraken ledger entries).
  */
 internal fun responseItemsArray(
     json: String,
     responseArrayKey: String,
+    responseObjectValues: Boolean = false,
+    itemKeyField: String? = null,
 ): JsonArray? =
+    responseItemsWithKeys(json, responseArrayKey, responseObjectValues, itemKeyField)
+        ?.let { items -> JsonArray(items.map { (_, item) -> item }) }
+
+/**
+ * Like [responseItemsArray], but pairs each item with the real JSON-path key it lives at: the
+ * object's own key for a keyed-object response ([responseObjectValues] — e.g. Kraken's
+ * `result.trades`/`result.ledger`), or null for a plain array (callers fall back to an index-based
+ * path via [arrayItemJsonPath]). Without this, an audit entry for a keyed-object item stored a
+ * fabricated array-index path (e.g. `result.trades[3]`) that doesn't exist in the actual response, so
+ * the "view origin" link couldn't locate it.
+ */
+internal fun responseItemsWithKeys(
+    json: String,
+    responseArrayKey: String,
+    responseObjectValues: Boolean = false,
+    itemKeyField: String? = null,
+): List<Pair<String?, JsonElement>>? =
     try {
         val root = Json.parseToJsonElement(json)
-        if (responseArrayKey.isBlank()) {
+        val resolved = if (responseArrayKey.isBlank()) root else root.resolveJsonPathElement(responseArrayKey)
+        if (responseObjectValues) {
+            (resolved as? JsonObject)?.entries?.map { (key, value) ->
+                val item =
+                    if (itemKeyField != null && value is JsonObject) {
+                        JsonObject(value.toMutableMap().apply { put(itemKeyField, JsonPrimitive(key)) })
+                    } else {
+                        value
+                    }
+                key to item
+            }
+        } else if (responseArrayKey.isBlank()) {
             when (root) {
-                is JsonArray -> root
-                is JsonObject -> JsonArray(listOf(root))
+                is JsonArray -> root.map { null to it }
+                is JsonObject -> listOf(null to root)
                 else -> null
             }
         } else {
-            // Supports a dot-path key so nested envelopes (e.g. Crypto.com "result.data") resolve.
-            root.resolveJsonPathElement(responseArrayKey) as? JsonArray
+            (resolved as? JsonArray)?.map { null to it }
         }
     } catch (e: SerializationException) {
         logger.error(e) { "Failed to parse API response array (key='$responseArrayKey')" }
@@ -2206,25 +2257,32 @@ internal fun responseItemsArray(
 
 /**
  * Whether a response passed its envelope status check. Strategies with a [successCodeField]
- * (Crypto.com "code") require the value at that path to equal [successCodeOkValue] (e.g. "0");
- * a null field means no check (bank APIs rely on the HTTP status alone).
+ * (Crypto.com "code") require the value at that path to equal [successCodeOkValue] (e.g. "0").
+ * Strategies with an [errorArrayField] (Kraken "error") require the array at that path to be absent or
+ * empty. When both are null, no envelope check is applied (bank APIs rely on the HTTP status alone).
  */
 internal fun responseCodeOk(
     json: String,
     successCodeField: String?,
     successCodeOkValue: String?,
+    errorArrayField: String? = null,
 ): Boolean {
+    val root =
+        try {
+            Json.parseToJsonElement(json)
+        } catch (e: SerializationException) {
+            return false
+        }
+    if (errorArrayField != null) {
+        val errors = root.resolveJsonPathElement(errorArrayField) as? JsonArray
+        if (errors != null && errors.isNotEmpty()) return false
+    }
     if (successCodeField == null) return true
     // Fail closed: a configured status field with no expected value must never pass (an absent code
     // would otherwise equal a null expected value and let an error envelope through).
     val expected = successCodeOkValue ?: return false
-    return try {
-        val actual =
-            (Json.parseToJsonElement(json).resolveJsonPathElement(successCodeField) as? JsonPrimitive)?.contentOrNull
-        actual == expected
-    } catch (e: SerializationException) {
-        false
-    }
+    val actual = (root.resolveJsonPathElement(successCodeField) as? JsonPrimitive)?.contentOrNull
+    return actual == expected
 }
 
 private const val MILLIS_PER_DAY = 86_400_000L
@@ -2836,7 +2894,23 @@ private class CurrencyCache(
         }
 }
 
-private fun ApiImportAccount.displayName(): String = description.ifBlank { id }
+private fun ApiImportAccount.staticDisplayName(staticName: String): String = if (owners.size > 1) "$staticName Joint" else staticName
+
+/**
+ * Display name for a downloaded own account. When [ApiAccountMappings.staticAccountName] is set, two
+ * genuinely distinct accounts can still land on the identical name (e.g. two personal accounts with no
+ * bank details to tell them apart) — appending a short id suffix only in that case keeps every account
+ * uniquely named without cluttering the common single-account case (see [resolveOwnAccountKey]).
+ */
+private fun ApiImportAccount.displayName(
+    mappings: ApiAccountMappings,
+    siblingAccounts: Collection<ApiImportAccount>,
+): String {
+    val staticName = mappings.staticAccountName ?: return description.ifBlank { id }
+    val name = staticDisplayName(staticName)
+    val collides = siblingAccounts.any { it.id != id && it.staticDisplayName(staticName) == name }
+    return if (collides) "$name (${id.takeLast(6)})" else name
+}
 
 private fun ApiTransactionPageItem.counterpartyName(nameMappings: CounterpartyNameMappings): String =
     cleanCounterpartyName(nameMappings) ?: description.ifBlank { "Unknown" }
@@ -2866,10 +2940,31 @@ private data class TransferData(
     val isIncoming: Boolean,
 )
 
-private fun ApiTransactionPageItem.toTransferData(currency: Currency): TransferData {
+/**
+ * Converts a raw integer a bank API reports in its own ISO 4217 minor units (e.g. Monzo's `1234`
+ * meaning £12.34) into [Money] at the app's storage precision. Constructing `Money` directly from
+ * the raw integer would treat it as already being in the app's own (much higher) storage scale,
+ * silently truncating every amount toward zero — the provider's minor-unit width and the app's
+ * storage scale are unrelated (see [IsoMinorUnitDivisors]). [divisorOverrides] lets a strategy correct
+ * a provider that doesn't follow the ISO standard for a given currency.
+ */
+internal fun minorUnitsToMoney(
+    rawMinorUnits: Long,
+    currency: Currency,
+    divisorOverrides: Map<String, Long>,
+): Money {
+    val divisor = divisorOverrides[currency.code.uppercase()] ?: IsoMinorUnitDivisors.getDivisor(currency.code)
+    val displayValue = BigDecimal(rawMinorUnits) / BigDecimal(divisor)
+    return Money.fromDisplayValue(displayValue, currency)
+}
+
+private fun ApiTransactionPageItem.toTransferData(
+    currency: Currency,
+    minorUnitDivisorOverrides: Map<String, Long>,
+): TransferData {
     val money =
         when {
-            amountMinorUnits != null -> Money(amountMinorUnits.absoluteValue, currency)
+            amountMinorUnits != null -> minorUnitsToMoney(amountMinorUnits.absoluteValue, currency, minorUnitDivisorOverrides)
             amountDecimalMajor != null -> Money.fromDisplayValue(amountDecimalMajor, currency)
             else -> Money(0L, currency)
         }

@@ -74,6 +74,21 @@ enum class PaginationMode {
 }
 
 /**
+ * How a [PaginationMode.DATE_WINDOW] window bound is encoded into the [ApiPaginationConfig.startParam]/
+ * [ApiPaginationConfig.endParam] request parameters.
+ *
+ * [EPOCH_MS] — integer milliseconds since the epoch (Crypto.com).
+ * [EPOCH_S] — integer whole seconds since the epoch (Kraken `start`/`end`).
+ * [ISO_8601] — an ISO-8601 instant string.
+ */
+@Serializable
+enum class WindowBoundFormat {
+    EPOCH_MS,
+    EPOCH_S,
+    ISO_8601,
+}
+
+/**
  * Pagination strategy for an API endpoint. A single flat shape carries the parameters for both
  * schemes; [mode] selects which set applies. A flat (rather than sealed) shape keeps this model
  * module free of the serialization-json artifact and stays backward compatible: legacy configs
@@ -85,7 +100,13 @@ enum class PaginationMode {
  * Date-window fields: history is fetched in [windowDays]-long windows back to [lookbackDays] ago,
  * each request bounded by [startParam]/[endParam] (also exposed to templating as window.start/end),
  * with [extraParams] appended. Windows are anchored to fixed boundaries so earlier windows produce
- * stable, cacheable URLs; only the final window (ending "now") shifts across re-imports.
+ * stable, cacheable URLs; only the final window (ending "now") shifts across re-imports. The bound
+ * values are encoded per [windowBoundFormat].
+ *
+ * Offset sub-paging: when [offsetParam] is set, each date window (or the single non-windowed request)
+ * is further paged by an integer offset that starts at 0 and advances by [limitValue] until a page
+ * returns fewer than [limitValue] items — or, when [totalCountField] is set, until that many items
+ * have been read. This covers APIs that cap results per response and page with an offset (Kraken `ofs`).
  */
 @Serializable
 data class ApiPaginationConfig(
@@ -99,6 +120,12 @@ data class ApiPaginationConfig(
     val windowDays: Int = 469,
     val lookbackDays: Int = 365 * 6,
     val extraParams: List<ApiQueryParam> = emptyList(),
+    /** Encoding of the [startParam]/[endParam] window bounds; defaults to epoch-millis. */
+    val windowBoundFormat: WindowBoundFormat = WindowBoundFormat.EPOCH_MS,
+    /** When set, page each window by this offset parameter (page size = [limitValue]); e.g. Kraken "ofs". */
+    val offsetParam: String? = null,
+    /** Optional dot-path to a total-count field in the response envelope, used to bound the offset loop. */
+    val totalCountField: String? = null,
 )
 
 /**
@@ -118,6 +145,15 @@ data class ApiPaginationConfig(
  *                            envelope (e.g. Crypto.com "code"). When set, a response whose value at
  *                            this path differs from [successCodeOkValue] is treated as an error.
  * @property successCodeOkValue The [successCodeField] value that means success (e.g. "0").
+ * @property errorArrayField Optional dot-path to an errors array in the response envelope (Kraken
+ *                           "error"). When set, a response is treated as an error if the array at this
+ *                           path is present and non-empty (success = empty or absent array).
+ * @property responseObjectValues When true, the element at [responseArrayKey] is a JSON *object*
+ *                                whose values are the items (Kraken `result.trades`/`result.ledger`,
+ *                                keyed by trade/ledger id), rather than a JSON array.
+ * @property itemKeyField When [responseObjectValues] is set, the map key of each entry is spliced into
+ *                        that entry's JSON object under this field name before mapping (e.g. Kraken's
+ *                        ledger id, which appears only as the object key, not as a value field).
  */
 @Serializable
 data class ApiEndpointConfig(
@@ -128,6 +164,16 @@ data class ApiEndpointConfig(
     val method: HttpMethodType = HttpMethodType.GET,
     val successCodeField: String? = null,
     val successCodeOkValue: String? = null,
+    val errorArrayField: String? = null,
+    val responseObjectValues: Boolean = false,
+    val itemKeyField: String? = null,
+    /**
+     * Relative rate-limit cost of one request to this endpoint (e.g. Kraken's ledger/trade-history
+     * calls cost 2 counter units against 1 for other endpoints). Multiplies the strategy's
+     * [ApiImportStrategy.rateLimitMillis] delay so a mixed-cost exchange doesn't have to pace every
+     * endpoint as slowly as its most expensive one.
+     */
+    val requestCostWeight: Int = 1,
 )
 
 /**
@@ -160,6 +206,13 @@ data class ApiAccountMappings(
     val currencyField: String? = null,
     val customFields: Map<String, String> = emptyMap(),
     val uniqueIdentifierFields: Set<String> = emptySet(),
+    /**
+     * A fixed display name for every account this strategy creates, overriding [descriptionField]
+     * (some providers' account "description" is an internal identifier never meant for display, e.g.
+     * Monzo's is the account holder's own user id). A joint account (more than one resolved owner)
+     * gets " Joint" appended so it's distinguishable from the holder's individual account.
+     */
+    val staticAccountName: String? = null,
 )
 
 /** How a transaction amount value is encoded in the API response. */
@@ -274,6 +327,13 @@ data class ApiTransactionMappings(
      * by another strategy (the CSV "Crypto.com" App export) reconciles to it regardless of import order.
      */
     val counterpartyAccountAliases: Map<String, String> = emptyMap(),
+    /**
+     * Dot-path to a field on this item whose value is looked up against the id index built from any
+     * [ApiDataEndpoint.enrichesTransfers] endpoint (e.g. Kraken Ledgers `refid`, matched against
+     * DepositStatus/WithdrawStatus `refid`). A hit fills in [counterpartyAddressField]/[txidField]/
+     * [counterpartyNetworkField] from the enrichment item. Null disables enrichment for this mapping.
+     */
+    val joinKeyField: String? = null,
 )
 
 @Serializable
@@ -648,6 +708,11 @@ enum class TransferDirection {
  * @property fixedDirection For DEPOSITS/WITHDRAWALS, the movement direction (amounts are unsigned).
  * @property counterpartyAccountName For DEPOSITS/WITHDRAWALS, the fixed external/funding account name
  *                                   the money comes from / goes to (e.g. "Crypto.com Exchange Funding").
+ * @property enrichesTransfers When true, this endpoint produces no transfers/trades of its own; its
+ *                             items are indexed by [transactionMappings]' `idField` and used only to
+ *                             enrich transfers built from other endpoints whose mapping sets a matching
+ *                             `joinKeyField` (Kraken DepositStatus/WithdrawStatus supplying on-chain
+ *                             address/txid/network for Ledgers-sourced deposits/withdrawals).
  */
 @Serializable
 data class ApiDataEndpoint(
@@ -657,6 +722,7 @@ data class ApiDataEndpoint(
     val tradeMappings: ApiTradeMappings? = null,
     val fixedDirection: TransferDirection? = null,
     val counterpartyAccountName: String? = null,
+    val enrichesTransfers: Boolean = false,
 )
 
 /** How a trading pair symbol is split into its base and quote assets. */
@@ -801,4 +867,35 @@ data class ApiStrategyConfig(
     val syntheticAccount: ApiSyntheticAccount? = null,
     /** Reconcile internal transfers against another owned account (e.g. the Crypto.com App account). */
     val internalTransferReconcile: ApiInternalTransferReconcile? = null,
+    /**
+     * Maps a raw asset/currency code as it appears in the API response to its canonical code (e.g.
+     * Kraken's legacy `"XXBT" -> "BTC"`, `"ZUSD" -> "USD"`). Applied to every asset code resolved from
+     * a trade or transfer item before currency/crypto-asset lookup. Empty for providers that already
+     * use canonical codes.
+     */
+    val assetAliases: Map<String, String> = emptyMap(),
+    /** Deep-link to the provider's own page for creating/managing API tokens; null shows no button. */
+    val tokenPageUrl: String? = null,
+    /**
+     * Ordered, numbered steps shown to the user for obtaining credentials from this provider (e.g.
+     * "Open the developer portal…", "Create a token with these scopes…"). Empty shows no instructions —
+     * a user-defined strategy simply gets none, which is why connecting never requires them.
+     */
+    val connectInstructions: List<String> = emptyList(),
+    /** Delay between exchange-download requests; null uses the download function's own default. */
+    val rateLimitMillis: Long? = null,
+    /** Case-insensitive substrings marking an error response as transient rate-limiting to retry. */
+    val rateLimitErrorSubstrings: List<String> = emptyList(),
+    /** Base backoff before the first retry of a rate-limited request; doubles each subsequent retry. */
+    val rateLimitBackoffMillis: Long = 5_000L,
+    /** Maximum retries for a request repeatedly classified as rate-limited before giving up. */
+    val maxRateLimitRetries: Int = 5,
+    /**
+     * Suffixes stripped from a raw asset code before [assetAliases]/currency lookup (e.g. Kraken's
+     * Earn-holding codes "XETH.F"/"XETH.S" -> "XETH"). Without this, a suffixed code fails asset
+     * resolution and its transfer is silently dropped.
+     */
+    val assetSuffixesToStrip: Set<String> = emptySet(),
+    /** Overrides the ISO 4217 minor-unit divisor for a MINOR_UNITS_INTEGER amount (see the field doc). */
+    val minorUnitDivisorOverrides: Map<String, Long> = emptyMap(),
 )

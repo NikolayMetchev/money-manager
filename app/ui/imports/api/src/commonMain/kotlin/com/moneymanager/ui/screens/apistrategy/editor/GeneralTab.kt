@@ -44,5 +44,44 @@ internal fun GeneralTab(
             enabled = enabled,
             placeholder = "e.g. monzo-external-id",
         )
+        TextFieldRow(
+            label = "Token page URL (optional)",
+            value = state.tokenPageUrl,
+            onValueChange = { state.tokenPageUrl = it },
+            enabled = enabled,
+            placeholder = "https://provider.example.com/developer/tokens",
+        )
+        StringListEditor(
+            label = "Connect instructions (shown as numbered steps)",
+            items = state.connectInstructions,
+            onChange = { state.connectInstructions = it },
+            enabled = enabled,
+        )
+        OptionalLongFieldRow(
+            label = "Rate-limit delay per request (ms, optional)",
+            value = state.rateLimitMillis,
+            onValueChange = { state.rateLimitMillis = it },
+            enabled = enabled,
+            placeholder = "blank uses the download engine's default",
+        )
+        StringListEditor(
+            label = "Rate-limit error substrings (case-insensitive; a match triggers backoff + retry)",
+            items = state.rateLimitErrorSubstrings,
+            onChange = { state.rateLimitErrorSubstrings = it },
+            enabled = enabled,
+        )
+        LongFieldRow(
+            label = "Rate-limit retry base backoff (ms)",
+            value = state.rateLimitBackoffMillis,
+            onValueChange = { state.rateLimitBackoffMillis = it },
+            enabled = enabled,
+            isError = state.rateLimitBackoffMillis <= 0,
+        )
+        IntFieldRow(
+            label = "Max rate-limit retries",
+            value = state.maxRateLimitRetries,
+            onValueChange = { state.maxRateLimitRetries = it },
+            enabled = enabled,
+        )
     }
 }

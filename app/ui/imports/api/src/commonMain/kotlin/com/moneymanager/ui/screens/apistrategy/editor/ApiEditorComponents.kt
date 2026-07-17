@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -46,7 +47,9 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
+import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.PaginationMode
+import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Requests the JSON-path picker dialog over [paths], routing the chosen path to [setter]. */
@@ -182,6 +185,47 @@ internal fun LongFieldRow(
                     { Text(supportingText) }
                 }
                 else -> null
+            },
+    )
+}
+
+/**
+ * A field that edits an optional [Long]. A blank buffer commits `null`; keeps its own text buffer
+ * (keyed on [value] so an external change resyncs it) so intermediate empty/invalid input is shown
+ * without corrupting the model.
+ */
+@Composable
+internal fun OptionalLongFieldRow(
+    label: String,
+    value: Long?,
+    onValueChange: (Long?) -> Unit,
+    enabled: Boolean = true,
+    placeholder: String? = null,
+) {
+    var text by remember(value) { mutableStateOf(value?.toString().orEmpty()) }
+    val parseError = text.isNotBlank() && text.trim().toLongOrNull() == null
+    OutlinedTextField(
+        value = text,
+        onValueChange = {
+            text = it
+            if (it.isBlank()) {
+                onValueChange(null)
+            } else {
+                it.trim().toLongOrNull()?.let(onValueChange)
+            }
+        },
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it) } },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        enabled = enabled,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        isError = parseError,
+        supportingText =
+            if (parseError) {
+                { Text("Must be a whole number, or blank for the default") }
+            } else {
+                null
             },
     )
 }
@@ -335,6 +379,189 @@ internal fun StringSetEditor(
         Icon(Icons.Default.Add, contentDescription = null)
         Spacer(Modifier.width(4.dp))
         Text("Add value")
+    }
+}
+
+/**
+ * Edits an ordered `List<String>` as numbered rows (e.g. connect instructions), with add/remove/reorder
+ * by index. Unlike [StringMapEditor] there is no key/identity conflict to guard against — a blank or
+ * duplicate row is simply another list entry — so [onChange] can be called directly on every edit.
+ */
+@Composable
+internal fun StringListEditor(
+    label: String,
+    items: List<String>,
+    onChange: (List<String>) -> Unit,
+    enabled: Boolean = true,
+) {
+    Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    items.forEachIndexed { index, item ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = item,
+                onValueChange = { updated -> onChange(items.toMutableList().also { it[index] = updated }) },
+                label = { Text("Step ${index + 1}") },
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+            )
+            IconButton(onClick = { onChange(items.filterIndexed { i, _ -> i != index }) }, enabled = enabled) {
+                Icon(Icons.Default.Close, contentDescription = "Remove step", tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    TextButton(onClick = { onChange(items + "") }, enabled = enabled) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(Modifier.width(4.dp))
+        Text("Add step")
+    }
+}
+
+/**
+ * Edits a `Map<String, String>` as rows of key/value text fields (e.g. asset aliases, account aliases).
+ * Row identity is a local, independent editing buffer (seeded once from [entries], not recomputed from
+ * it) so an in-progress blank or duplicate key never collapses or drops another row mid-edit — only the
+ * well-formed rows (non-blank key) are converted to the map handed to [onChange], with the usual
+ * last-key-wins behavior on duplicates.
+ */
+@Composable
+internal fun StringMapEditor(
+    label: String,
+    entries: Map<String, String>,
+    onChange: (Map<String, String>) -> Unit,
+    keyLabel: String = "Key",
+    valueLabel: String = "Value",
+    enabled: Boolean = true,
+) {
+    val rows = remember { entries.toList().toMutableStateList() }
+
+    fun emit() {
+        onChange(rows.filter { it.first.isNotBlank() }.associate { it.first to it.second })
+    }
+    Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    rows.forEachIndexed { index, (key, value) ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = key,
+                onValueChange = { updated ->
+                    rows[index] = updated to value
+                    emit()
+                },
+                label = { Text(keyLabel) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                enabled = enabled,
+            )
+            OutlinedTextField(
+                value = value,
+                onValueChange = { updated ->
+                    rows[index] = key to updated
+                    emit()
+                },
+                label = { Text(valueLabel) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                enabled = enabled,
+            )
+            IconButton(
+                onClick = {
+                    rows.removeAt(index)
+                    emit()
+                },
+                enabled = enabled,
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Remove entry", tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    TextButton(onClick = { rows.add("" to "") }, enabled = enabled) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(Modifier.width(4.dp))
+        Text("Add entry")
+    }
+}
+
+/** Like [StringMapEditor], but the value is a [Long] (e.g. a per-currency divisor override). */
+@Composable
+internal fun StringLongMapEditor(
+    label: String,
+    entries: Map<String, Long>,
+    onChange: (Map<String, Long>) -> Unit,
+    keyLabel: String = "Key",
+    valueLabel: String = "Value",
+    enabled: Boolean = true,
+) {
+    val rows = remember { entries.toList().toMutableStateList() }
+    val valueText = remember { rows.map { (_, value) -> value.toString() }.toMutableStateList() }
+
+    fun emit() {
+        onChange(
+            rows.indices
+                .mapNotNull { index ->
+                    val key = rows[index].first
+                    val value = valueText[index].toLongOrNull()
+                    if (key.isBlank() || value == null) null else key to value
+                }.toMap(),
+        )
+    }
+    Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    rows.forEachIndexed { index, (key, _) ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            // A duplicate key silently collapses to one entry (last wins) in emit()'s toMap(); flag it
+            // so the user sees which row won't be saved as its own entry.
+            val isDuplicateKey = key.isNotBlank() && rows.count { it.first == key } > 1
+            OutlinedTextField(
+                value = key,
+                onValueChange = { updated ->
+                    rows[index] = updated to rows[index].second
+                    emit()
+                },
+                label = { Text(keyLabel) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                enabled = enabled,
+                isError = isDuplicateKey,
+                supportingText =
+                    if (isDuplicateKey) {
+                        { Text("Duplicate key") }
+                    } else {
+                        null
+                    },
+            )
+            OutlinedTextField(
+                value = valueText[index],
+                onValueChange = { updated ->
+                    valueText[index] = updated
+                    emit()
+                },
+                label = { Text(valueLabel) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                enabled = enabled,
+                isError = valueText[index].toLongOrNull() == null,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+            IconButton(
+                onClick = {
+                    rows.removeAt(index)
+                    valueText.removeAt(index)
+                    emit()
+                },
+                enabled = enabled,
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Remove entry", tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    TextButton(
+        onClick = {
+            rows.add("" to 0L)
+            valueText.add("")
+        },
+        enabled = enabled,
+    ) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(Modifier.width(4.dp))
+        Text("Add entry")
     }
 }
 
@@ -513,10 +740,33 @@ internal fun PaginationEditor(
         PaginationMode.DATE_WINDOW -> {
             TextFieldRow("Start param", config.startParam, { onChange(config.copy(startParam = it)) }, enabled)
             TextFieldRow("End param", config.endParam, { onChange(config.copy(endParam = it)) }, enabled)
+            EnumDropdown(
+                label = "Window bound format",
+                options = WindowBoundFormat.entries,
+                selected = config.windowBoundFormat,
+                onSelect = { onChange(config.copy(windowBoundFormat = it)) },
+                optionLabel = { it.name },
+                enabled = enabled,
+            )
             IntFieldRow("Window days", config.windowDays, { onChange(config.copy(windowDays = it)) }, enabled)
             IntFieldRow("Lookback days", config.lookbackDays, { onChange(config.copy(lookbackDays = it)) }, enabled)
             QueryParamsEditor(params = config.extraParams, onChange = { onChange(config.copy(extraParams = it)) }, enabled = enabled)
         }
+    }
+    ToggleRow(
+        label = "Offset paging (e.g. Kraken \"ofs\")",
+        checked = config.offsetParam != null,
+        onCheckedChange = { onChange(config.copy(offsetParam = if (it) "ofs" else null)) },
+        enabled = enabled,
+    )
+    config.offsetParam?.let { offsetParam ->
+        TextFieldRow("Offset param", offsetParam, { onChange(config.copy(offsetParam = it)) }, enabled)
+        TextFieldRow(
+            "Total count field (optional)",
+            config.totalCountField.orEmpty(),
+            { onChange(config.copy(totalCountField = it.ifBlank { null })) },
+            enabled,
+        )
     }
 }
 
@@ -542,6 +792,55 @@ internal fun EndpointEditor(
         onValueChange = { onChange(endpoint.copy(responseArrayKey = it)) },
         enabled = enabled,
         placeholder = "accounts (blank = response is a bare array)",
+    )
+    EnumDropdown(
+        label = "HTTP method",
+        options = HttpMethodType.entries,
+        selected = endpoint.method,
+        onSelect = { onChange(endpoint.copy(method = it)) },
+        optionLabel = { it.name },
+        enabled = enabled,
+    )
+    ToggleRow(
+        label = "Response array key is a keyed object (e.g. Kraken result.trades)",
+        checked = endpoint.responseObjectValues,
+        onCheckedChange = { onChange(endpoint.copy(responseObjectValues = it)) },
+        enabled = enabled,
+    )
+    if (endpoint.responseObjectValues) {
+        TextFieldRow(
+            label = "Splice object key into field (optional, e.g. ledger_id)",
+            value = endpoint.itemKeyField.orEmpty(),
+            onValueChange = { onChange(endpoint.copy(itemKeyField = it.ifBlank { null })) },
+            enabled = enabled,
+        )
+    }
+    TextFieldRow(
+        label = "Success code field (optional, e.g. code)",
+        value = endpoint.successCodeField.orEmpty(),
+        onValueChange = { onChange(endpoint.copy(successCodeField = it.ifBlank { null })) },
+        enabled = enabled,
+    )
+    if (endpoint.successCodeField != null) {
+        TextFieldRow(
+            label = "Success code value (e.g. 0)",
+            value = endpoint.successCodeOkValue.orEmpty(),
+            onValueChange = { onChange(endpoint.copy(successCodeOkValue = it.ifBlank { null })) },
+            enabled = enabled,
+            isError = endpoint.successCodeOkValue.isNullOrBlank(),
+        )
+    }
+    TextFieldRow(
+        label = "Error array field (optional, e.g. error)",
+        value = endpoint.errorArrayField.orEmpty(),
+        onValueChange = { onChange(endpoint.copy(errorArrayField = it.ifBlank { null })) },
+        enabled = enabled,
+    )
+    IntFieldRow(
+        label = "Relative rate-limit cost (e.g. Kraken's history calls cost 2 vs 1 for others)",
+        value = endpoint.requestCostWeight,
+        onValueChange = { onChange(endpoint.copy(requestCostWeight = it.coerceAtLeast(1))) },
+        enabled = enabled,
     )
     QueryParamsEditor(
         params = endpoint.queryParams,

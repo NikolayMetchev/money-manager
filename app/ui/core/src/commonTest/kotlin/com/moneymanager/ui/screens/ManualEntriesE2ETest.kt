@@ -24,6 +24,7 @@ import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.hasDisplayValue
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.upsertCurrencyByCode
 import com.moneymanager.ui.test.MoneyManagerTestApp
@@ -154,7 +155,7 @@ class ManualEntriesE2ETest {
                 assertEquals(wiseEur, companion.targetAccountId)
                 assertEquals(feeTimestamp.toEpochMilliseconds(), companion.timestamp.toEpochMilliseconds())
                 assertEquals("EUR", companion.amount.asset.code)
-                assertEquals(com.moneymanager.bigdecimal.BigInteger(123L), companion.amount.amount)
+                assertTrue(companion.amount.hasDisplayValue("1.23"))
                 val link = companion.attributes.single { it.attributeType.name == "wise-interest-for" }
                 assertEquals("ACCRUAL_CHARGE-18326272", link.value)
 

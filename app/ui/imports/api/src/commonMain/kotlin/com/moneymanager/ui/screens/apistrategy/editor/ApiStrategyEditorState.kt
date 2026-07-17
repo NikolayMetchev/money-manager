@@ -58,6 +58,12 @@ internal class ApiStrategyEditorState(
     var baseUrl by mutableStateOf(initial?.baseUrl.orEmpty())
     var authType by mutableStateOf(initial?.authType ?: ApiAuthType.BEARER_TOKEN)
     var personExternalIdAttribute by mutableStateOf(initial?.personExternalIdAttribute.orEmpty())
+    var tokenPageUrl by mutableStateOf(initial?.tokenPageUrl.orEmpty())
+    var connectInstructions by mutableStateOf(initial?.connectInstructions.orEmpty())
+    var rateLimitMillis by mutableStateOf(initial?.rateLimitMillis)
+    var rateLimitErrorSubstrings by mutableStateOf(initial?.rateLimitErrorSubstrings.orEmpty())
+    var rateLimitBackoffMillis by mutableStateOf(initial?.rateLimitBackoffMillis ?: 5_000L)
+    var maxRateLimitRetries by mutableStateOf(initial?.maxRateLimitRetries ?: 5)
 
     var accountsEndpoint by mutableStateOf(initial?.accountsEndpoint ?: DEFAULT_ACCOUNTS_ENDPOINT)
     var transactionsEndpoint by mutableStateOf(initial?.transactionsEndpoint ?: DEFAULT_TRANSACTIONS_ENDPOINT)
@@ -80,9 +86,17 @@ internal class ApiStrategyEditorState(
     var dataEndpoints by mutableStateOf(initial?.dataEndpoints.orEmpty())
     var syntheticAccount by mutableStateOf(initial?.syntheticAccount)
     var internalTransferReconcile by mutableStateOf(initial?.internalTransferReconcile)
+    var assetAliases by mutableStateOf(initial?.assetAliases.orEmpty())
+    var assetSuffixesToStrip by mutableStateOf(initial?.assetSuffixesToStrip.orEmpty())
+    var minorUnitDivisorOverrides by mutableStateOf(initial?.minorUnitDivisorOverrides.orEmpty())
 
     val generalHasError: Boolean
-        get() = name.isBlank() || baseUrl.isBlank()
+        get() =
+            name.isBlank() ||
+                baseUrl.isBlank() ||
+                (rateLimitMillis?.let { it < 0 } == true) ||
+                rateLimitBackoffMillis <= 0 ||
+                maxRateLimitRetries < 0
 
     val endpointsHasError: Boolean
         get() =
@@ -147,6 +161,12 @@ internal class ApiStrategyEditorState(
             baseUrl = baseUrl,
             authType = authType,
             personExternalIdAttribute = personExternalIdAttribute,
+            tokenPageUrl = tokenPageUrl,
+            connectInstructions = connectInstructions,
+            rateLimitMillis = rateLimitMillis,
+            rateLimitErrorSubstrings = rateLimitErrorSubstrings,
+            rateLimitBackoffMillis = rateLimitBackoffMillis,
+            maxRateLimitRetries = maxRateLimitRetries,
             accountsEndpoint = accountsEndpoint,
             transactionsEndpoint = transactionsEndpoint,
             accountIdentifiersEndpoint = accountIdentifiersEndpoint,
@@ -163,6 +183,9 @@ internal class ApiStrategyEditorState(
             dataEndpoints = dataEndpoints,
             syntheticAccount = syntheticAccount,
             internalTransferReconcile = internalTransferReconcile,
+            assetAliases = assetAliases,
+            assetSuffixesToStrip = assetSuffixesToStrip,
+            minorUnitDivisorOverrides = minorUnitDivisorOverrides,
         )
 }
 

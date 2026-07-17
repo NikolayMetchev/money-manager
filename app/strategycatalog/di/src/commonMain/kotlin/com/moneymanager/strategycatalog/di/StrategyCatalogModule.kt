@@ -1,6 +1,7 @@
 package com.moneymanager.strategycatalog.di
 
 import com.moneymanager.di.scope.AppScope
+import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.strategycatalog.createStrategyCatalogController
 import dev.zacsweers.metro.ContributesTo
@@ -12,5 +13,6 @@ import dev.zacsweers.metro.SingleIn
 interface StrategyCatalogModule {
     @Provides
     @SingleIn(AppScope::class)
-    fun provideStrategyCatalogController(): StrategyCatalogController = createStrategyCatalogController()
+    fun provideStrategyCatalogController(localSettings: LocalSettings): StrategyCatalogController =
+        createStrategyCatalogController(localSettings)
 }

@@ -25,8 +25,11 @@ import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
+import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ApiStrategyJsonCodecTest {
     private fun config(pagination: ApiPaginationConfig?) =
@@ -141,6 +144,113 @@ class ApiStrategyJsonCodecTest {
                 .single()
                 .endpoint.method,
         )
+    }
+
+    @Test
+    fun `kraken-shaped keyed-object, offset paging, enrichment and asset aliases round-trip`() {
+        val original =
+            config(null).copy(
+                authType = ApiAuthType.SIGNED,
+                requestSigning =
+                    ApiRequestSigningConfig(
+                        algorithm = SigningAlgorithm.HMAC_SHA512,
+                        secretEncoding = SecretEncoding.BASE64,
+                        signatureEncoding = SignatureEncoding.BASE64,
+                        message = listOf(SigPart.Path, SigPart.Sha256(listOf(SigPart.Nonce, SigPart.Body))),
+                        apiKey = FieldPlacement(SigFieldLocation.HEADER, "API-Key"),
+                        nonce = NonceSpec(placement = FieldPlacement(SigFieldLocation.BODY_FIELD, "nonce")),
+                        signature = FieldPlacement(SigFieldLocation.HEADER, "API-Sign"),
+                        bodyFormat = BodyFormat.FORM_URLENCODED,
+                    ),
+                syntheticAccount = ApiSyntheticAccount(name = "Kraken", externalId = "kraken"),
+                assetAliases = mapOf("XXBT" to "BTC", "ZUSD" to "USD"),
+                rateLimitMillis = 3_100L,
+                rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
+                rateLimitBackoffMillis = 5_000L,
+                maxRateLimitRetries = 6,
+                assetSuffixesToStrip = setOf(".F", ".S", ".M"),
+                minorUnitDivisorOverrides = mapOf("GBP" to 1000L),
+                dataEndpoints =
+                    listOf(
+                        ApiDataEndpoint(
+                            endpoint =
+                                ApiEndpointConfig(
+                                    path = "0/private/TradesHistory",
+                                    responseArrayKey = "result.trades",
+                                    method = HttpMethodType.POST,
+                                    errorArrayField = "error",
+                                    responseObjectValues = true,
+                                    pagination =
+                                        ApiPaginationConfig(
+                                            mode = PaginationMode.DATE_WINDOW,
+                                            startParam = "start",
+                                            endParam = "end",
+                                            windowBoundFormat = WindowBoundFormat.EPOCH_S,
+                                            offsetParam = "ofs",
+                                            limitValue = 50,
+                                            totalCountField = "result.count",
+                                        ),
+                                ),
+                            kind = ApiEndpointKind.TRADES,
+                            tradeMappings =
+                                ApiTradeMappings(
+                                    instrumentField = "pair",
+                                    sideField = "type",
+                                    baseQuantityField = "vol",
+                                    quoteQuantityField = "cost",
+                                    timestampField = "time",
+                                    timestampFormat = TimestampFormat.EPOCH_S_FLOAT,
+                                    idField = "trade_id",
+                                ),
+                        ),
+                        ApiDataEndpoint(
+                            endpoint =
+                                ApiEndpointConfig(
+                                    path = "0/private/Ledgers",
+                                    responseArrayKey = "result.ledger",
+                                    method = HttpMethodType.POST,
+                                    errorArrayField = "error",
+                                    responseObjectValues = true,
+                                    itemKeyField = "ledger_id",
+                                    queryParams = listOf(ApiQueryParam(name = "type", value = "deposit")),
+                                ),
+                            kind = ApiEndpointKind.DEPOSITS,
+                            fixedDirection = TransferDirection.IN,
+                            transactionMappings =
+                                ApiTransactionMappings(
+                                    idField = "ledger_id",
+                                    joinKeyField = "refid",
+                                    counterpartyAliasField = "address",
+                                    counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Kraken App"),
+                                ),
+                        ),
+                        ApiDataEndpoint(
+                            endpoint = ApiEndpointConfig(path = "0/private/DepositStatus", responseArrayKey = "result"),
+                            kind = ApiEndpointKind.DEPOSITS,
+                            transactionMappings = ApiTransactionMappings(idField = "refid", txidField = "txid"),
+                            enrichesTransfers = true,
+                        ),
+                    ),
+            )
+        val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
+        assertEquals(original, decoded)
+        assertEquals(mapOf("XXBT" to "BTC", "ZUSD" to "USD"), decoded.assetAliases)
+        assertEquals(
+            WindowBoundFormat.EPOCH_S,
+            decoded.dataEndpoints[0]
+                .endpoint.pagination
+                ?.windowBoundFormat,
+        )
+        assertEquals(
+            "ofs",
+            decoded.dataEndpoints[0]
+                .endpoint.pagination
+                ?.offsetParam,
+        )
+        assertTrue(decoded.dataEndpoints[0].endpoint.responseObjectValues)
+        assertEquals("ledger_id", decoded.dataEndpoints[1].endpoint.itemKeyField)
+        assertEquals("refid", decoded.dataEndpoints[1].transactionMappings?.joinKeyField)
+        assertTrue(decoded.dataEndpoints[2].enrichesTransfers)
     }
 
     @Test

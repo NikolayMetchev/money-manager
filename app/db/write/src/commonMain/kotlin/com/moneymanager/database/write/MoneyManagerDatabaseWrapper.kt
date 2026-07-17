@@ -400,7 +400,6 @@ class MoneyManagerDatabaseWrapper(
             "account_merge",
             "account_merge_transfer",
             "settings",
-            "api_session_type",
             "api_credential",
             "api_session",
             "api_import",

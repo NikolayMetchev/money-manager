@@ -13,10 +13,10 @@ import io.ktor.http.appendPathSegments
 class StrategyCatalogClient(
     private val httpClient: HttpClient,
     private val baseUrl: String = DEFAULT_BASE_URL,
-) {
-    suspend fun fetchManifest(): CatalogManifest = CatalogManifestCodec.decode(fetch("index.json"))
+) : StrategyCatalogSource {
+    override suspend fun fetchManifest(): CatalogManifest = CatalogManifestCodec.decode(fetch("index.json"))
 
-    suspend fun fetchArtifact(fileName: String): String = fetch(fileName)
+    override suspend fun fetchArtifact(fileName: String): String = fetch(fileName)
 
     private suspend fun fetch(fileName: String): String =
         httpClient

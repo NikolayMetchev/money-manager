@@ -5,7 +5,6 @@ package com.moneymanager.database.repository
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Currency
@@ -238,7 +237,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `api session ranges group by session with type fallback`() =
+    fun `api session ranges group by session for a strategy-less credential`() =
         runTest {
             setupAccountsAndCurrency()
             val sessionId =
@@ -277,7 +276,6 @@ class ImportTimelineRepositoryImplTest : DbTest() {
             assertEquals(TimelineSourceKind.API, range.kind)
             assertEquals(sessionId.id.toString(), range.fileId)
             assertNull(range.strategyName)
-            assertEquals(ApiSessionType.MONZO, range.apiSessionType)
             assertEquals(latestTimestamp, range.earliest)
             assertEquals(latestTimestamp, range.latest)
         }

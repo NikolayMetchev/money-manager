@@ -32,8 +32,9 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.ApiCredential
 import com.moneymanager.domain.model.ApiImportStrategyId
-import com.moneymanager.domain.model.MonzoCredential
+import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
@@ -178,7 +179,7 @@ internal fun nextApiToSetUp(
 @Composable
 private fun ApiConnectionRow(
     strategy: ApiImportStrategy,
-    credential: MonzoCredential?,
+    credential: ApiCredential?,
     tokensUsedElsewhere: Set<String>,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
@@ -202,7 +203,7 @@ private fun ApiConnectionRow(
                         text =
                             when {
                                 credential != null -> "Connected · ${maskToken(credential.token)}"
-                                strategy.isSigned() -> "Needs an API key and secret"
+                                strategy.authType == ApiAuthType.SIGNED -> "Needs an API key and secret"
                                 else -> "Needs an access token"
                             },
                         style = MaterialTheme.typography.bodySmall,
@@ -237,7 +238,6 @@ private fun ApiConnectionRow(
                                     importEngine.createApiCredential(
                                         token = token,
                                         createdAt = Clock.System.now(),
-                                        type = defaultSessionTypeFor(strategy),
                                         strategyId = strategy.id,
                                         apiSecret = secret,
                                     )
@@ -282,27 +282,27 @@ private fun ApiConnectionRow(
 @Composable
 private fun ApiCredentialForm(
     strategy: ApiImportStrategy,
-    credential: MonzoCredential?,
+    credential: ApiCredential?,
     tokensUsedElsewhere: Set<String>,
     onOpenTokenPage: (String) -> Unit,
     onSubmit: (token: String, secret: String?, onFailure: (String) -> Unit) -> Unit,
     onSkip: (() -> Unit)?,
 ) {
-    val isSigned = strategy.isSigned()
+    val isSigned = strategy.authType == ApiAuthType.SIGNED
     var tokenInput by remember(strategy.id) { mutableStateOf("") }
     var secretInput by remember(strategy.id) { mutableStateOf("") }
     var isSaving by remember(strategy.id) { mutableStateOf(false) }
     var errorMessage by remember(strategy.id) { mutableStateOf<String?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        val instructions = connectInstructions(strategy)
+        val instructions = strategy.connectInstructions
         if (instructions.isNotEmpty()) {
             Text("How to connect ${strategy.name}", style = MaterialTheme.typography.labelLarge)
             instructions.forEachIndexed { index, step ->
                 Text("${index + 1}. $step", style = MaterialTheme.typography.bodySmall)
             }
         }
-        providerTokenPageUrl(strategy)?.let { url ->
+        strategy.tokenPageUrl?.let { url ->
             OutlinedButton(onClick = { onOpenTokenPage(url) }) { Text("Open ${strategy.name} token page") }
         }
 

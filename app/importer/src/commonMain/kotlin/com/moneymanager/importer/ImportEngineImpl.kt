@@ -4,6 +4,7 @@ package com.moneymanager.importer
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
@@ -18,7 +19,6 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
@@ -1410,7 +1410,7 @@ class ImportEngineImpl(
         val csvImportIds: Map<String, CsvImportId>,
         val qifImportIds: Map<String, QifImportId>,
         val importDirectoryIds: Map<String, ImportDirectoryId>,
-        val apiCredentialIds: Map<String, MonzoCredentialId>,
+        val apiCredentialIds: Map<String, ApiCredentialId>,
         val apiSessionIds: Map<String, ApiSessionId>,
         val apiRequestIds: Map<String, ApiRequestId>,
         val apiResponseIds: Map<String, ApiResponseId>,
@@ -1555,7 +1555,7 @@ class ImportEngineImpl(
             }
         }
 
-        val apiCredentialIds = mutableMapOf<String, MonzoCredentialId>()
+        val apiCredentialIds = mutableMapOf<String, ApiCredentialId>()
         val apiSessionIds = mutableMapOf<String, ApiSessionId>()
         val apiRequestIds = mutableMapOf<String, ApiRequestId>()
         val apiResponseIds = mutableMapOf<String, ApiResponseId>()
@@ -1568,7 +1568,6 @@ class ImportEngineImpl(
                         apiSessionRepository.createCredential(
                             m.token,
                             m.createdAt,
-                            m.type,
                             m.strategyId,
                             m.privateKey,
                             m.publicKey,
@@ -1596,7 +1595,7 @@ class ImportEngineImpl(
                 is ApiSessionMutation.CreateSession ->
                     apiSessionIds.putUnique(
                         m.key,
-                        apiSessionRepository.createSession(m.token, m.deviceId, m.createdAt, expiresAt = null, m.type, m.credentialId),
+                        apiSessionRepository.createSession(m.token, m.deviceId, m.createdAt, expiresAt = null, m.credentialId),
                         "ApiSession",
                     )
                 is ApiSessionMutation.InsertRequest ->

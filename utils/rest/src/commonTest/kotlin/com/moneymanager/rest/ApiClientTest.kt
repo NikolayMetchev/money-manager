@@ -142,6 +142,48 @@ class ApiClientTest {
         }
 
     @Test
+    fun `send requests the wire url but records the recordUrl override`() =
+        runTest {
+            val recorder = FakeTrafficRecorder(testRequestId, testResponseId)
+            var requestedUrl: String? = null
+            val engine =
+                MockEngine { request ->
+                    requestedUrl = request.url.toString()
+                    respond(
+                        content = testBody,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val client = createApiClient(recorder, engine)
+
+            val result = client.send("POST", testUrl, recordUrl = "$testUrl?ep=marker")
+
+            assertEquals(200, result.statusCode)
+            assertEquals(testUrl, requestedUrl, "the marker must never reach the wire")
+            assertEquals("$testUrl?ep=marker", recorder.lastRecordedRequest!!.url)
+        }
+
+    @Test
+    fun `send records the wire url when no recordUrl is given`() =
+        runTest {
+            val recorder = FakeTrafficRecorder(testRequestId, testResponseId)
+            val engine =
+                MockEngine { _ ->
+                    respond(
+                        content = testBody,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val client = createApiClient(recorder, engine)
+
+            client.send("POST", testUrl)
+
+            assertEquals(testUrl, recorder.lastRecordedRequest!!.url)
+        }
+
+    @Test
     fun `get does not record Authorization header`() =
         runTest {
             val recorder = FakeTrafficRecorder(testRequestId, testResponseId)

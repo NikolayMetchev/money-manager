@@ -14,6 +14,8 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
+import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
@@ -23,6 +25,7 @@ import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -48,7 +51,10 @@ import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.DurationUnit
@@ -75,6 +81,9 @@ private const val WALLET_ADDRESS_ATTR = "blockchain-wallet-address"
 
 /** Cross-source unique-id attribute holding a transfer's on-chain transaction id. */
 private const val BLOCKCHAIN_TXID_ATTR = "blockchain-txid"
+
+/** Upper bound on exponential rate-limit backoff, so a misconfigured base delay can't stall for hours. */
+private const val MAX_RATE_LIMIT_BACKOFF_MILLIS = 60_000L
 
 /**
  * Downloads every data endpoint of an exchange [strategy] into [sessionId] as signed POST/GET requests,
@@ -107,6 +116,11 @@ suspend fun downloadApiSessionExchange(
     var requestId = 1L
     val now = Clock.System.now()
 
+    // Bodies of previously downloaded requests, keyed by url — lets a resumed offset-paged window (see
+    // below) decide whether to keep paging without re-fetching pages it already has.
+    val existingResponseJsonByUrl =
+        existingRequests.mapNotNull { req -> existingResponses[req.id]?.let { req.url to it.json } }.toMap()
+
     strategy.dataEndpoints.forEachIndexed { endpointIndex, dataEndpoint ->
         val endpoint = dataEndpoint.endpoint
         val windows = dateWindowsOrSingle(endpoint.pagination, now)
@@ -115,66 +129,142 @@ suspend fun downloadApiSessionExchange(
         var endpointBroken = false
         windows.forEachIndexed { windowIndex, window ->
             if (endpointBroken) return@forEachIndexed
-            val params = linkedMapOf<String, String>()
-            endpoint.queryParams.forEach { p -> p.value?.let { params[p.name] = it } }
-            if (window != null) {
-                val pagination = endpoint.pagination!!
-                params[pagination.startParam] = window.start.toEpochMilliseconds().toString()
-                params[pagination.endParam] = window.end.toEpochMilliseconds().toString()
-            }
+            // A non-positive limitValue would never advance the offset (see below), looping forever on
+            // the same page; treat a misconfigured limit as "no offset paging" rather than hang.
+            val offsetParam = endpoint.pagination?.offsetParam?.takeIf { (endpoint.pagination?.limitValue ?: 0) > 0 }
+            var offset = 0
+            var itemsSeenInWindow = 0
+            var keepPaging = true
+            while (keepPaging) {
+                val params = linkedMapOf<String, String>()
+                endpoint.queryParams.forEach { p -> p.value?.let { params[p.name] = it } }
+                if (window != null) {
+                    val pagination = endpoint.pagination!!
+                    params[pagination.startParam] = formatWindowBound(window.start, pagination.windowBoundFormat)
+                    params[pagination.endParam] = formatWindowBound(window.end, pagination.windowBoundFormat)
+                }
+                if (offsetParam != null) params[offsetParam] = offset.toString()
 
-            val endpointUrl = buildExchangeEndpointUrl(strategy.baseUrl, endpoint.path)
-            val nonce = nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds())
-            lastNonce = nonce
-            val signed =
-                signer.sign(
-                    endpointUrl = endpointUrl,
-                    path = uriPathOf(endpointUrl),
-                    methodName = endpoint.path,
-                    params = params,
-                    apiKey = apiKey,
-                    apiSecret = apiSecret,
-                    nonce = nonce,
-                    requestId = requestId,
+                onProgress(
+                    ApiTransactionsDownloadProgress(
+                        accountIndex = endpointIndex + 1,
+                        accountCount = strategy.dataEndpoints.size,
+                        page = windowIndex + 1,
+                        downloadedResponsePageCount = responseCount,
+                    ),
                 )
-            requestId += 1
 
-            // Make the recorded URL unique per (endpoint, window) so incremental skip works. For a signed
-            // query string (Binance) the signed URL already encodes the window, and appending an unsigned
-            // marker would break the signature — so only mark body-based requests (Crypto.com/Kraken).
-            val sendUrl =
-                if (signing.bodyFormat == BodyFormat.QUERY_ONLY) {
-                    signed.url
-                } else {
-                    appendMarker(signed.url, endpoint.path, window)
-                }
+                // The nonce must be fresh on every real attempt (a repeated nonce is rejected), so a
+                // retried request is re-signed from scratch rather than resent as-is.
+                val effectiveDelayMillis = (strategy.rateLimitMillis ?: rateLimitMillis) * endpoint.requestCostWeight
+                var pageBody: String? = null
+                var rateLimitRetries = 0
+                var keepRetrying = true
+                while (keepRetrying) {
+                    val endpointUrl = buildExchangeEndpointUrl(strategy.baseUrl, endpoint.path)
+                    val nonce = nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds())
+                    lastNonce = nonce
+                    val signed =
+                        signer.sign(
+                            endpointUrl = endpointUrl,
+                            path = uriPathOf(endpointUrl),
+                            methodName = endpoint.path,
+                            params = params,
+                            apiKey = apiKey,
+                            apiSecret = apiSecret,
+                            nonce = nonce,
+                            requestId = requestId,
+                        )
+                    requestId += 1
 
-            onProgress(
-                ApiTransactionsDownloadProgress(
-                    accountIndex = endpointIndex + 1,
-                    accountCount = strategy.dataEndpoints.size,
-                    page = windowIndex + 1,
-                    downloadedResponsePageCount = responseCount,
-                ),
-            )
+                    // Make the recorded URL unique per (endpoint, window, offset) so incremental skip
+                    // works and a stored response can be matched back to its data endpoint. The marker
+                    // is recorded out-of-band, never sent on the wire: Kraken verifies its signature
+                    // against the full request path+query, so an unsigned query marker breaks
+                    // authentication (surfacing as EAPI:Invalid key). For a signed query string
+                    // (Binance) the signed URL already encodes the window, so body-based requests
+                    // (Crypto.com/Kraken) are the only ones marked.
+                    val recordedUrl =
+                        if (signing.bodyFormat == BodyFormat.QUERY_ONLY) {
+                            signed.url
+                        } else {
+                            appendMarker(signed.url, endpointDedupeKey(endpoint), window, offsetParam?.let { offset })
+                        }
 
-            if (sendUrl !in downloadedUrls) {
-                val method = endpoint.method.name
-                val response = apiClient.send(method, sendUrl, signed.headers, signed.body, signed.contentType)
-                val error =
-                    when {
-                        response.statusCode != 200 -> "HTTP ${response.statusCode}: ${response.body}"
-                        !responseCodeOk(response.body, endpoint.successCodeField, endpoint.successCodeOkValue) ->
-                            "API error: ${response.body}"
-                        else -> null
+                    if (recordedUrl in downloadedUrls) {
+                        pageBody = existingResponseJsonByUrl[recordedUrl]
+                        keepRetrying = false
+                    } else {
+                        val method = endpoint.method.name
+                        val response =
+                            apiClient.send(
+                                method,
+                                signed.url,
+                                signed.headers,
+                                signed.body,
+                                signed.contentType,
+                                recordUrl = recordedUrl.takeIf { it != signed.url },
+                            )
+                        val error =
+                            when {
+                                response.statusCode != 200 -> "HTTP ${response.statusCode}: ${response.body}"
+                                !responseCodeOk(
+                                    response.body,
+                                    endpoint.successCodeField,
+                                    endpoint.successCodeOkValue,
+                                    endpoint.errorArrayField,
+                                ) -> "API error: ${response.body}"
+                                else -> null
+                            }
+                        if (error == null) {
+                            responseCount += 1
+                            pageBody = response.body
+                            if (effectiveDelayMillis > 0) delay(effectiveDelayMillis)
+                            keepRetrying = false
+                        } else {
+                            // A rate-limit-shaped error (per the strategy's own config) is transient:
+                            // back off and retry the same request rather than abandoning the rest of
+                            // the endpoint's windows, which previously turned one rate-limit hit into a
+                            // near-empty download.
+                            val isRateLimited = strategy.rateLimitErrorSubstrings.any { error.contains(it, ignoreCase = true) }
+                            if (!isRateLimited || rateLimitRetries >= strategy.maxRateLimitRetries) {
+                                logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
+                                endpointBroken = true
+                                return@forEachIndexed
+                            }
+                            rateLimitRetries += 1
+                            val backoffMillis =
+                                (strategy.rateLimitBackoffMillis * (1L shl (rateLimitRetries - 1)))
+                                    .coerceAtMost(MAX_RATE_LIMIT_BACKOFF_MILLIS)
+                            logger.warn {
+                                "Rate-limited on '${endpoint.path}' " +
+                                    "(attempt $rateLimitRetries/${strategy.maxRateLimitRetries}); retrying in ${backoffMillis}ms"
+                            }
+                            delay(backoffMillis)
+                        }
                     }
-                if (error != null) {
-                    logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
-                    endpointBroken = true
-                    return@forEachIndexed
                 }
-                responseCount += 1
-                if (rateLimitMillis > 0) delay(rateLimitMillis)
+
+                keepPaging =
+                    if (offsetParam == null) {
+                        false
+                    } else {
+                        val pagination = endpoint.pagination!!
+                        val pageItemCount =
+                            pageBody
+                                ?.let {
+                                    responseItemsArray(
+                                        it,
+                                        endpoint.responseArrayKey,
+                                        endpoint.responseObjectValues,
+                                        endpoint.itemKeyField,
+                                    )
+                                }?.size ?: 0
+                        itemsSeenInWindow += pageItemCount
+                        offset += pagination.limitValue
+                        val totalCount = pagination.totalCountField?.let { field -> pageBody?.let { totalCountFromJson(it, field) } }
+                        pageItemCount >= pagination.limitValue && (totalCount == null || itemsSeenInWindow < totalCount)
+                    }
             }
         }
     }
@@ -207,6 +297,23 @@ private fun buildExchangeEndpointUrl(
     path: String,
 ): String = baseUrl.trimEnd('/') + "/" + path.trimStart('/')
 
+/**
+ * A key identifying an endpoint uniquely enough to disambiguate two [ApiDataEndpoint]s that share the
+ * same [ApiEndpointConfig.path] but differ only by a static query param baked into the signed body
+ * (Kraken's `Ledgers` endpoint fetched once with `type=deposit` and once with `type=withdrawal`, neither
+ * of which appears in the request URL since Kraken signs params into the POST body, not the query
+ * string). Used both for the incremental-download marker and for matching a stored response back to the
+ * data endpoint that produced it.
+ */
+private fun endpointDedupeKey(endpoint: ApiEndpointConfig): String {
+    val staticParams =
+        endpoint.queryParams
+            .filter { it.value != null }
+            .sortedBy { it.name }
+            .joinToString("&") { "${it.name}=${it.value}" }
+    return if (staticParams.isEmpty()) endpoint.path else "${endpoint.path}?$staticParams"
+}
+
 private fun uriPathOf(url: String): String {
     val afterScheme = url.substringAfter("://", url)
     val slash = afterScheme.indexOf('/')
@@ -215,13 +322,37 @@ private fun uriPathOf(url: String): String {
 
 private fun appendMarker(
     url: String,
-    endpointPath: String,
+    endpointKey: String,
     window: ApiDateWindow?,
+    offset: Int? = null,
 ): String {
     val sep = if (url.contains('?')) '&' else '?'
     val windowMarker = window?.let { "&ws=${it.start.toEpochMilliseconds()}&we=${it.end.toEpochMilliseconds()}" } ?: ""
-    return "$url${sep}ep=$endpointPath$windowMarker"
+    val offsetMarker = offset?.let { "&ofs=$it" } ?: ""
+    return "$url${sep}ep=$endpointKey$windowMarker$offsetMarker"
 }
+
+/** Formats a date-window bound per [WindowBoundFormat] for a request parameter. */
+private fun formatWindowBound(
+    instant: Instant,
+    format: WindowBoundFormat,
+): String =
+    when (format) {
+        WindowBoundFormat.EPOCH_MS -> instant.toEpochMilliseconds().toString()
+        WindowBoundFormat.EPOCH_S -> instant.epochSeconds.toString()
+        WindowBoundFormat.ISO_8601 -> instant.toString()
+    }
+
+/** Reads an integer total-count field from a response envelope (e.g. Kraken `result.count`). */
+private fun totalCountFromJson(
+    json: String,
+    field: String,
+): Int? =
+    try {
+        (Json.parseToJsonElement(json).resolveJsonPathElement(field) as? JsonPrimitive)?.content?.toIntOrNull()
+    } catch (e: SerializationException) {
+        null
+    }
 
 // -------------------------------------------------------------------------------------------------
 // Import: parse stored responses into trades + transfers and hand one ImportBatch to the engine.
@@ -267,6 +398,8 @@ private data class ParsedExchangeTransfer(
     val txid: String?,
     /** Name of an owned account the counterparty aliases to (e.g. "Crypto.com" for an internal deposit). */
     val aliasAccount: String?,
+    /** Value looked up against an [ApiDataEndpoint.enrichesTransfers] index (e.g. Kraken Ledgers `refid`). */
+    val joinKey: String?,
 )
 
 private data class ParsedOrder(
@@ -285,21 +418,37 @@ private data class ParsedOrder(
     val jsonPath: String,
 )
 
+/**
+ * An enrichment item (e.g. Kraken DepositStatus/WithdrawStatus) supplying on-chain details for a
+ * transfer built from another endpoint (e.g. Ledgers), matched by [ApiTransactionMappings.joinKeyField].
+ */
+private data class ParsedEnrichment(
+    val id: String,
+    val address: String?,
+    val network: String?,
+    val txid: String?,
+)
+
 /** Accumulator for parsed items across all of a session's responses. */
 private class ParsedExchangeData {
     val trades = mutableListOf<ParsedTrade>()
     val transfers = mutableListOf<ParsedExchangeTransfer>()
     val orders = mutableListOf<ParsedOrder>()
+    val enrichments = mutableListOf<ParsedEnrichment>()
 }
 
 /** Parses one response item into [into] according to its endpoint kind. */
 private fun parseExchangeItem(
     obj: JsonObject,
-    dataEndpoint: com.moneymanager.domain.model.apistrategy.ApiDataEndpoint,
+    dataEndpoint: ApiDataEndpoint,
     requestId: ApiRequestId,
     jsonPath: String,
     into: ParsedExchangeData,
 ) {
+    if (dataEndpoint.enrichesTransfers) {
+        dataEndpoint.transactionMappings?.let { parseEnrichment(obj, it) }?.let(into.enrichments::add)
+        return
+    }
     when (dataEndpoint.kind) {
         ApiEndpointKind.TRADES ->
             dataEndpoint.tradeMappings?.let { parseTrade(obj, it, requestId, jsonPath) }?.let(into.trades::add)
@@ -315,6 +464,19 @@ private fun parseExchangeItem(
                 ?.let(into.transfers::add)
         ApiEndpointKind.BANK_TRANSACTIONS -> Unit
     }
+}
+
+private fun parseEnrichment(
+    obj: JsonObject,
+    tm: ApiTransactionMappings,
+): ParsedEnrichment? {
+    val id = obj.str(tm.idField) ?: return null
+    return ParsedEnrichment(
+        id = id,
+        address = tm.counterpartyAddressField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+        network = tm.counterpartyNetworkField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+        txid = tm.txidField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+    )
 }
 
 /**
@@ -340,18 +502,75 @@ suspend fun importApiSessionExchange(
     val parsed = ParsedExchangeData()
     responses.forEach { response ->
         val request = requestsById[response.requestId] ?: return@forEach
-        val dataEndpoint = strategy.dataEndpoints.firstOrNull { request.url.contains(it.endpoint.path) } ?: return@forEach
-        val items = responseItemsArray(response.json, dataEndpoint.endpoint.responseArrayKey) ?: return@forEach
-        items.forEachIndexed { index, element ->
+        // Prefer the precise "ep=<key>" marker (disambiguates endpoints sharing a path, e.g. Kraken's
+        // Ledgers deposit/withdrawal split); a QUERY_ONLY signed URL (Binance) carries no marker, so fall
+        // back to a plain path match, which is unambiguous there since query params live in the URL.
+        val dataEndpoint =
+            strategy.dataEndpoints.firstOrNull { request.url.contains("ep=${endpointDedupeKey(it.endpoint)}") }
+                ?: strategy.dataEndpoints.firstOrNull { request.url.contains(it.endpoint.path) }
+                ?: return@forEach
+        val items =
+            responseItemsWithKeys(
+                response.json,
+                dataEndpoint.endpoint.responseArrayKey,
+                dataEndpoint.endpoint.responseObjectValues,
+                dataEndpoint.endpoint.itemKeyField,
+            ) ?: return@forEach
+        items.forEachIndexed { index, (key, element) ->
             (element as? JsonObject)?.let {
-                // The real JSON path of this item so the audit view can expand to the exact node.
-                val jsonPath = arrayItemJsonPath(dataEndpoint.endpoint.responseArrayKey, index).value
+                // The real JSON path of this item so the audit view can expand to the exact node —
+                // the object's own key for a keyed-object response (Kraken), else an array index.
+                val jsonPath =
+                    if (key != null) {
+                        keyedItemJsonPath(dataEndpoint.endpoint.responseArrayKey, key).value
+                    } else {
+                        arrayItemJsonPath(dataEndpoint.endpoint.responseArrayKey, index).value
+                    }
                 parseExchangeItem(it, dataEndpoint, response.requestId, jsonPath, parsed)
             }
         }
     }
-    val trades = parsed.trades
-    val transfers = parsed.transfers
+
+    // Normalize legacy/provider-specific asset codes (e.g. Kraken "XXBT" -> "BTC") before any
+    // currency/crypto lookup, so an aliased code and its canonical form always resolve to one asset.
+    val aliases = strategy.assetAliases.mapKeys { it.key.uppercase() }
+
+    // Strip a suffix that marks a sub-holding of the same asset (e.g. Kraken's Earn positions
+    // "XETH.F"/"XETH.S") before alias/currency lookup — otherwise the suffixed code fails resolution
+    // and the item is silently dropped.
+    fun stripAssetSuffix(code: String): String =
+        strategy.assetSuffixesToStrip
+            .firstOrNull { code.endsWith(it, ignoreCase = true) }
+            ?.let { code.dropLast(it.length) }
+            ?: code
+
+    fun canonicalAsset(code: String): String = stripAssetSuffix(code).let { aliases[it.uppercase()] ?: it }
+    val trades =
+        parsed.trades.map {
+            it.copy(
+                baseCode = canonicalAsset(it.baseCode),
+                quoteCode = canonicalAsset(it.quoteCode),
+                feeCode = it.feeCode?.let(::canonicalAsset),
+            )
+        }
+    // Enrichment endpoints (e.g. Kraken DepositStatus/WithdrawStatus) supply on-chain address/network/
+    // txid for transfers built from a different endpoint (Ledgers), matched by joinKey; a transfer's own
+    // fields win when present.
+    val enrichByKey = parsed.enrichments.associateBy { it.id }
+    val transfers =
+        parsed.transfers.map { tx ->
+            val enrichment = tx.joinKey?.let { enrichByKey[it] }
+            val aliased = tx.copy(currencyCode = canonicalAsset(tx.currencyCode))
+            if (enrichment == null) {
+                aliased
+            } else {
+                aliased.copy(
+                    counterpartyAddress = aliased.counterpartyAddress ?: enrichment.address,
+                    network = aliased.network ?: enrichment.network,
+                    txid = aliased.txid ?: enrichment.txid,
+                )
+            }
+        }
     // An order can surface in several download windows (created in one, updated in another); keep the
     // freshest snapshot per order id.
     val orders =
@@ -709,7 +928,9 @@ private fun parseTrade(
         baseQuantity = baseQty.abs(),
         quoteAmount = quoteAmount.abs(),
         feeAmount = tm.feeField?.let { obj.str(it)?.let { v -> runCatching { BigDecimal(v).abs() }.getOrNull() } },
-        feeCode = tm.feeCurrencyField?.let { obj.str(it) },
+        // Most exchanges charge the trade fee in the quote asset without a separate field for it
+        // (Kraken); an explicit feeCurrencyField (Crypto.com) overrides this default.
+        feeCode = tm.feeCurrencyField?.let { obj.str(it) } ?: quoteCode,
         orderId = tm.orderIdField?.let { obj.str(it) },
         requestId = requestId,
         jsonPath = jsonPath,
@@ -760,6 +981,7 @@ private fun parseExchangeTransfer(
         network = tm.counterpartyNetworkField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
         txid = tm.txidField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
         aliasAccount = tm.counterpartyAliasField?.let { obj.str(it) }?.let { tm.counterpartyAccountAliases[it] },
+        joinKey = tm.joinKeyField?.let { obj.str(it) },
     )
 }
 

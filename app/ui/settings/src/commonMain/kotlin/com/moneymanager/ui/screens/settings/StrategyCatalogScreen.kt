@@ -18,6 +18,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,6 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
+import com.moneymanager.compose.filepicker.manualFolderEntrySupported
+import com.moneymanager.compose.filepicker.rememberFolderPicker
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -78,6 +81,26 @@ fun StrategyCatalogScreen(
     val state by controller.state.collectAsState()
     var kindFilter by remember { mutableStateOf(initialKindFilter) }
     var pendingInstall by remember { mutableStateOf<PendingInstall?>(null) }
+    var localDirPath by remember { mutableStateOf(controller.localDirectoryOverride.orEmpty()) }
+    var localDirDisplayName by remember { mutableStateOf<String?>(null) }
+    val usingLocalDir = controller.localDirectoryOverride != null
+
+    fun applyLocalDirectory(path: String?) {
+        controller.setLocalDirectoryOverride(path)
+        scope.launch {
+            controller.beginBusy()
+            controller.refresh(library, appVersion)
+        }
+    }
+
+    val localDirPicker =
+        rememberFolderPicker { picked ->
+            if (picked != null) {
+                localDirPath = picked.ref
+                localDirDisplayName = picked.displayName
+                applyLocalDirectory(picked.ref)
+            }
+        }
 
     LaunchedEffect(Unit) {
         controller.beginBusy()
@@ -133,6 +156,67 @@ fun StrategyCatalogScreen(
             }
             if (showBackAction) {
                 TextButton(onClick = onBack) { Text("Back") }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    if (usingLocalDir) {
+                        "Reading strategies from a local directory (for testing built-in strategy changes)"
+                    } else {
+                        "Read from a local directory instead (for testing built-in strategy changes)"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                val pickedFolderName = localDirDisplayName
+                if (usingLocalDir && !manualFolderEntrySupported && pickedFolderName != null) {
+                    Text(
+                        pickedFolderName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    if (manualFolderEntrySupported) {
+                        OutlinedTextField(
+                            value = localDirPath,
+                            onValueChange = {
+                                localDirPath = it
+                                // A hand-typed path is its own display; drop any stale picked name.
+                                localDirDisplayName = null
+                            },
+                            label = { Text("Local strategy-library directory") },
+                            placeholder = { Text("e.g. webpage/strategy-library") },
+                            singleLine = true,
+                            enabled = !state.busy,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedButton(onClick = { localDirPicker.launch() }, enabled = !state.busy) { Text("Browse…") }
+                        TextButton(
+                            onClick = { applyLocalDirectory(localDirPath.trim().ifBlank { null }) },
+                            enabled = !state.busy,
+                        ) { Text("Apply") }
+                    } else {
+                        // SAF-only platforms: the folder ref is an opaque content:// URI, so never show
+                        // or edit it directly — only the picked folder's display name.
+                        OutlinedButton(
+                            onClick = { localDirPicker.launch() },
+                            enabled = !state.busy,
+                            modifier = Modifier.weight(1f),
+                        ) { Text(if (usingLocalDir) "Change folder…" else "Choose folder…") }
+                    }
+                    if (usingLocalDir) {
+                        TextButton(
+                            onClick = {
+                                localDirPath = ""
+                                localDirDisplayName = null
+                                applyLocalDirectory(null)
+                            },
+                            enabled = !state.busy,
+                        ) { Text("Use remote catalog") }
+                    }
+                }
             }
         }
 

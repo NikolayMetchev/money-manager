@@ -36,6 +36,13 @@ internal fun AccountMappingsTab(
             onRequestPick,
             enabled,
         )
+        TextFieldRow(
+            label = "Static account name (optional)",
+            value = mappings.staticAccountName.orEmpty(),
+            onValueChange = { state.accountMappings = mappings.copy(staticAccountName = it.ifBlank { null }) },
+            enabled = enabled,
+            placeholder = "Overrides the description field above (e.g. \"Monzo\") — \"Joint\" is appended for a joint account",
+        )
         PathFieldRow(
             "Owner name field (optional)",
             mappings.ownerNameField.orEmpty(),

@@ -102,5 +102,14 @@ class ApiImportStrategyWriteRepositoryImpl(
             dataEndpoints = dataEndpoints,
             syntheticAccount = syntheticAccount,
             internalTransferReconcile = internalTransferReconcile,
+            assetAliases = assetAliases,
+            tokenPageUrl = tokenPageUrl,
+            connectInstructions = connectInstructions,
+            rateLimitMillis = rateLimitMillis,
+            rateLimitErrorSubstrings = rateLimitErrorSubstrings,
+            rateLimitBackoffMillis = rateLimitBackoffMillis,
+            maxRateLimitRetries = maxRateLimitRetries,
+            assetSuffixesToStrip = assetSuffixesToStrip,
+            minorUnitDivisorOverrides = minorUnitDivisorOverrides,
         )
 }

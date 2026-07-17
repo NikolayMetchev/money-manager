@@ -22,3 +22,10 @@ const val KEY_LAST_DATABASE: String = "lastDatabase"
 
 /** Directory last used in a file open/save dialog, so subsequent dialogs reopen there. */
 const val KEY_LAST_DIRECTORY: String = "lastDirectory"
+
+/**
+ * Absolute path to a local directory the strategy catalog should read from instead of the published
+ * GitHub Pages site (e.g. a freshly generated `strategy-library/` folder), so changes to built-in
+ * strategies can be tested without publishing first. Absent/blank means use the published site.
+ */
+const val KEY_STRATEGY_CATALOG_LOCAL_DIRECTORY: String = "strategyCatalogLocalDirectory"

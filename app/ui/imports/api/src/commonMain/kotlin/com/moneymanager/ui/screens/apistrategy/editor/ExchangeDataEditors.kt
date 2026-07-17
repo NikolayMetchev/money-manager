@@ -120,9 +120,12 @@ private fun DataEndpointEditor(
         selected = dataEndpoint.kind,
         // Persist the direction the UI shows by default (IN) when switching to a directional kind,
         // so a saved deposit/withdrawal endpoint never keeps a null direction the UI rendered as IN.
+        // A trade/order endpoint has no transactionMappings, so enrichesTransfers (which needs one) can
+        // never be valid there — clear it when switching to a trade kind.
         onSelect = { newKind ->
             val direction = dataEndpoint.fixedDirection ?: TransferDirection.IN.takeIf { newKind in DIRECTIONAL_KINDS }
-            onChange(dataEndpoint.copy(kind = newKind, fixedDirection = direction))
+            val enriches = dataEndpoint.enrichesTransfers && newKind !in TRADE_KINDS
+            onChange(dataEndpoint.copy(kind = newKind, fixedDirection = direction, enrichesTransfers = enriches))
         },
         optionLabel = { it.name },
         enabled = enabled,
@@ -149,7 +152,18 @@ private fun DataEndpointEditor(
         )
     }
 
-    if (dataEndpoint.kind in DIRECTIONAL_KINDS) {
+    // Trade/order endpoints have no transactionMappings, which enrichesTransfers validation requires —
+    // hiding the toggle there keeps every reachable state saveable.
+    if (dataEndpoint.kind !in TRADE_KINDS) {
+        ToggleRow(
+            label = "Enrichment only (no money movement — supplies fields for another endpoint's joinKeyField)",
+            checked = dataEndpoint.enrichesTransfers,
+            onCheckedChange = { onChange(dataEndpoint.copy(enrichesTransfers = it)) },
+            enabled = enabled,
+        )
+    }
+
+    if (dataEndpoint.kind in DIRECTIONAL_KINDS && !dataEndpoint.enrichesTransfers) {
         EnumDropdown(
             label = "Fixed direction",
             options = TransferDirection.entries,
@@ -258,6 +272,26 @@ internal fun TransactionMappingsFields(
             m.counterpartyNetworkField.orEmpty(),
             { onChange(m.copy(counterpartyNetworkField = it.ifBlank { null })) },
             enabled,
+        )
+        TextFieldRow(
+            "Join key field (optional, matches an enrichesTransfers endpoint's id)",
+            m.joinKeyField.orEmpty(),
+            { onChange(m.copy(joinKeyField = it.ifBlank { null })) },
+            enabled,
+        )
+        TextFieldRow(
+            "Counterparty alias field (optional, e.g. address)",
+            m.counterpartyAliasField.orEmpty(),
+            { onChange(m.copy(counterpartyAliasField = it.ifBlank { null })) },
+            enabled,
+        )
+        StringMapEditor(
+            label = "Counterparty account aliases (alias value -> owned account name)",
+            entries = m.counterpartyAccountAliases,
+            onChange = { onChange(m.copy(counterpartyAccountAliases = it)) },
+            keyLabel = "Alias value",
+            valueLabel = "Account name",
+            enabled = enabled,
         )
     }
 }
@@ -490,15 +524,30 @@ private fun ApiTransactionMappings.isValidForSave(): Boolean =
         idField.isNotBlank() &&
         (signSource != ApiSignSource.FIELD || !signField.isNullOrBlank())
 
+/** Whether an [ApiEndpointConfig] is complete enough to save, independent of what kind of record it produces. */
+private fun ApiEndpointConfig.isValidForSave(): Boolean {
+    val pagination = pagination
+    return path.isNotBlank() &&
+        (successCodeField == null || !successCodeOkValue.isNullOrBlank()) &&
+        // A non-positive limitValue would never advance the offset, looping on the same page forever.
+        (pagination?.offsetParam == null || pagination.limitValue > 0) &&
+        requestCostWeight >= 1
+}
+
 /** Whether a data-endpoint list is complete enough to save (used for tab validation). */
 internal fun List<ApiDataEndpoint>.isValidForSave(): Boolean =
     all { de ->
-        de.endpoint.path.isNotBlank() &&
-            (de.kind !in DIRECTIONAL_KINDS || de.fixedDirection != null) &&
-            if (de.kind in TRADE_KINDS) {
-                de.tradeMappings?.isValidForSave() ?: false
+        de.endpoint.isValidForSave() &&
+            if (de.enrichesTransfers) {
+                // An enrichment endpoint moves no money, so only its id field (the join index key) matters.
+                de.transactionMappings?.idField?.isNotBlank() ?: false
             } else {
-                de.transactionMappings?.isValidForSave() ?: false
+                (de.kind !in DIRECTIONAL_KINDS || de.fixedDirection != null) &&
+                    if (de.kind in TRADE_KINDS) {
+                        de.tradeMappings?.isValidForSave() ?: false
+                    } else {
+                        de.transactionMappings?.isValidForSave() ?: false
+                    }
             }
     }
 
