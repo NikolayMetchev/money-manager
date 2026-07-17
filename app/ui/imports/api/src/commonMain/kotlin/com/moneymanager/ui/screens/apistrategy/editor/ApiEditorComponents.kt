@@ -520,7 +520,12 @@ internal fun StringLongMapEditor(
                 singleLine = true,
                 enabled = enabled,
                 isError = isDuplicateKey,
-                supportingText = if (isDuplicateKey) { { Text("Duplicate key") } } else null,
+                supportingText =
+                    if (isDuplicateKey) {
+                        { Text("Duplicate key") }
+                    } else {
+                        null
+                    },
             )
             OutlinedTextField(
                 value = valueText[index],
