@@ -31,6 +31,7 @@ kotlin {
                 implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.csvstrategy)
                 implementation(projects.app.model.passthrough)
+                implementation(projects.utils.bigdecimal)
             }
         }
         getByName("androidMain") {
@@ -44,6 +45,7 @@ kotlin {
                 implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.csvstrategy)
                 implementation(projects.app.model.passthrough)
+                implementation(projects.utils.bigdecimal)
             }
         }
     }
