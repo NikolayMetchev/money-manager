@@ -504,6 +504,10 @@ fun ApiSessionsScreen(
                                     sessionsByCredential[credential.id].orEmpty().count { session ->
                                         importedSessionRevisions.any { it.sessionId == session.id }
                                     },
+                                isAnySessionImporting =
+                                    sessionsByCredential[credential.id].orEmpty().any {
+                                        backgroundTasks.isRunning(apiImportTaskKey(it.id))
+                                    },
                                 onDownload = {
                                     downloadResultByCredential = downloadResultByCredential - credential.id
                                     downloadProgressByCredential = downloadProgressByCredential - credential.id
@@ -896,6 +900,7 @@ private fun CredentialCard(
     isImportingSession: (ApiSessionId) -> Boolean,
     hasEverBeenImported: (ApiSessionId) -> Boolean,
     importedSessionCount: Int,
+    isAnySessionImporting: Boolean,
     onDownload: () -> Unit,
     onImport: (ApiSession) -> Unit,
     onReimport: (ApiSession) -> Unit,
@@ -968,7 +973,11 @@ private fun CredentialCard(
                 )
             }
             if (importedSessionCount > 0) {
-                OutlinedButton(onClick = { onReimportAll(importedSessionCount) }, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { onReimportAll(importedSessionCount) },
+                    enabled = !isAnySessionImporting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Text("Re-import all ($importedSessionCount)")
                 }
             }
@@ -1104,7 +1113,10 @@ private fun SessionRow(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = onImport,
-                    enabled = !isImporting && !isAlreadyImported,
+                    // Once a session has ever been imported, plain Import can't retroactively apply a
+                    // changed strategy (its own entities dedupe it to a no-op) — Re-import is the only
+                    // path that deletes and re-runs, so it's the only enabled action from here on.
+                    enabled = !isImporting && !isAlreadyImported && !hasEverBeenImported,
                     modifier = Modifier.weight(1f),
                 ) {
                     if (isImporting) {

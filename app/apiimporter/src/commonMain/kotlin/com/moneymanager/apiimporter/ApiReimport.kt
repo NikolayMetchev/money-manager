@@ -51,7 +51,7 @@ data class ApiReimportPlan(
     val tradeIds: Set<TradeId>,
     val accountIds: Set<AccountId>,
 ) {
-    val isEmpty: Boolean get() = transferIds.isEmpty() && tradeIds.isEmpty()
+    val isEmpty: Boolean get() = transferIds.isEmpty() && tradeIds.isEmpty() && accountIds.isEmpty()
 }
 
 suspend fun planApiReimport(
@@ -108,6 +108,9 @@ suspend fun executeApiReimport(
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
     refreshViews: Boolean = true,
 ): ApiReimportResult {
+    require(plan.sessionId == session.id) {
+        "plan is for session ${plan.sessionId} but executeApiReimport was called with session ${session.id}"
+    }
     val importStartedAt = Clock.System.now()
 
     // Snapshot RECONCILED-relationship partners of every to-be-deleted transfer BEFORE deleting: the
@@ -157,7 +160,9 @@ suspend fun executeApiReimport(
                     .flatMap { listOf(it.id1, it.id2) }
                     .toSet()
             val toUnexclude = reconciledPartners - stillReconciled
-            if (toUnexclude.isNotEmpty()) {
+            if (toUnexclude.isEmpty()) {
+                emptySet()
+            } else {
                 val partnerTransfers = transactionRepository.getTransactionsByIds(toUnexclude)
                 val updates =
                     toUnexclude.mapNotNull { id ->
@@ -176,8 +181,10 @@ suspend fun executeApiReimport(
                     onProgress?.invoke(ImportProgress("Un-hiding reconciled transactions"))
                     importEngine.import(ImportBatch(transfers = updates, dedupePolicy = DedupePolicy.None))
                 }
+                // Only the transfers actually represented by an update (i.e. that still carried the
+                // exclusion attribute) were un-excluded — a candidate missing it contributes nothing.
+                updates.mapNotNull { it.existingId }.toSet()
             }
-            toUnexclude
         }
 
     onProgress?.invoke(ImportProgress("Re-importing"))

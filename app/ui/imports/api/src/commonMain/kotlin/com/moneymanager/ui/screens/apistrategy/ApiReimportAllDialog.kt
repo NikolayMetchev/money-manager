@@ -36,7 +36,11 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.lighthousegames.logging.logging
+
+private val logger = logging()
 
 /**
  * Re-imports every already-imported session of a credential in one go, oldest first, so a strategy
@@ -66,6 +70,7 @@ fun ApiReimportAllDialog(
     var isRunning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<ImportProgress?>(null) }
     var result by remember { mutableStateOf<ApiBulkReimportResult?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = { if (!isRunning) onDismiss() },
@@ -101,6 +106,10 @@ fun ApiReimportAllDialog(
                         )
                     }
                 }
+                errorMessage?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
             }
         },
         confirmButton = {
@@ -110,6 +119,7 @@ fun ApiReimportAllDialog(
                 LoadingTextButton(
                     onClick = {
                         isRunning = true
+                        errorMessage = null
                         scope.launch {
                             try {
                                 result =
@@ -128,8 +138,14 @@ fun ApiReimportAllDialog(
                                         importEngine = importEngine,
                                         onProgress = { progress = it },
                                     )
+                            } catch (expected: CancellationException) {
+                                throw expected
+                            } catch (expected: Exception) {
+                                logger.error(expected) { "Bulk re-import failed: ${expected.message}" }
+                                errorMessage = "Re-import failed: ${expected.message}"
                             } finally {
                                 isRunning = false
+                                progress = null
                             }
                         }
                     },

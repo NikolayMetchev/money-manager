@@ -658,12 +658,17 @@ class ImportEngineImpl(
                 keyToId[intent.key] = match.id
                 continue
             }
-            val resolvedName = uniqueName(requireNotNull(intent.name), intent, byName)
+            val requestedName = requireNotNull(intent.name)
+            val resolvedName = uniqueName(requestedName, intent, byName)
             val newId = createAccount(intent, resolvedName)
             created++
             keyToId[intent.key] = newId
             indexNewAccount(intent, newId, resolvedName, byName, byAttr, byPersonalKey)
-            batchCreatedByName.putIfAbsent(resolvedName, newId)
+            // Keyed by the REQUESTED name (matchAccount's lookup key), not resolvedName: a later
+            // same-batch intent asking for the same name (e.g. a second external id for the same
+            // merchant) must find this account even when resolvedName was suffixed to dodge a
+            // pre-existing account's UNIQUE collision.
+            batchCreatedByName.putIfAbsent(requestedName, newId)
         }
         return AccountResolution(keyToId, created)
     }

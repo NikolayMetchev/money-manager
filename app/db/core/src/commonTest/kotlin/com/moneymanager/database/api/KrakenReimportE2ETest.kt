@@ -196,7 +196,7 @@ class KrakenReimportE2ETest : DbTest() {
                         endDate = Instant.fromEpochMilliseconds(1_700_000_004_000L),
                     ).first()
                     .filter { it.amount.asset.code == "GBP" }
-            val rewritten = withdrawalsAfter.first { it.sourceAccountId != it.targetAccountId }
+            val rewritten = withdrawalsAfter.first { it.id != monzoCredit && it.sourceAccountId != it.targetAccountId }
             assertEquals(monzoId, rewritten.targetAccountId, "the withdrawal should now be rewritten onto Monzo")
 
             val monzoCreditAfter = repositories.transactionRepository.getTransactionsByIds(setOf(monzoCredit))[monzoCredit]

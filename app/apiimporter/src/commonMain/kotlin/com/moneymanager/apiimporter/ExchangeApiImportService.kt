@@ -727,7 +727,7 @@ suspend fun importApiSessionExchange(
     }
     transfers
         .filter { it.aliasAccount == null && asset(it.currencyCode) is CryptoAsset }
-        .mapNotNull { it.counterpartyAddress }
+        .mapNotNull { it.counterpartyAddress?.takeIf(String::isNotBlank) }
         .distinct()
         .forEach { address ->
             val key = LocalAccountKey("wallet-$address")
@@ -753,7 +753,9 @@ suspend fun importApiSessionExchange(
         // transfer can never resolve a wallet account that a same-valued crypto address happened to mint.
         val counterpartyKey =
             tx.aliasAccount?.let { accountKeys[it] }
-                ?: tx.counterpartyAddress?.takeIf { txAsset is CryptoAsset }?.let { accountKeys[it] }
+                ?: tx.counterpartyAddress
+                    ?.takeIf { txAsset is CryptoAsset && it.isNotBlank() }
+                    ?.let { accountKeys[it] }
         val counterparty = counterpartyKey?.let { AccountRef.Local(it) } ?: AccountRef.Existing(fundingId)
         val (from, to) = if (tx.direction == TransferDirection.IN) counterparty to exchangeRef else exchangeRef to counterparty
         transferIntents +=
