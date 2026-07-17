@@ -15,6 +15,7 @@ import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createPerson
+import com.moneymanager.test.database.hasDisplayValue
 import com.moneymanager.test.database.updateAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import io.ktor.client.engine.mock.MockEngine
@@ -659,7 +660,7 @@ class MonzoImportE2ETest : DbTest() {
 
             // --- Account audit ---
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val monzoAccount = allAccounts.single { it.name == "Monzo" }
 
             val accountAuditEntries = repositories.auditRepository.getAuditHistoryForAccount(monzoAccount.id)
             assertEquals(1, accountAuditEntries.size, "Monzo account should have exactly one audit entry (INSERT)")
@@ -842,14 +843,14 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals(0, importResult.errorCount)
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val monzoAccount = allAccounts.single { it.name == "Monzo" }
             val transfers =
                 repositories.transactionRepository
                     .getTransactionsByAccount(monzoAccount.id)
                     .first()
             assertEquals(3, transfers.size, "All 3 transactions (2 excluded + 1 settled) should be stored as transfers")
             val settledTransfer = transfers.single { it.attributes.none { attr -> attr.attributeType.name == "excluded" } }
-            assertEquals(com.moneymanager.bigdecimal.BigInteger(2500L), settledTransfer.amount.amount)
+            assertTrue(settledTransfer.amount.hasDisplayValue("25.00"))
         }
 
     @Test
@@ -927,7 +928,7 @@ class MonzoImportE2ETest : DbTest() {
 
             assertEquals(2, importResult.transactionCount)
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val monzoAccount = allAccounts.single { it.name == "Monzo" }
             val counterpartyAccounts = allAccounts.filter { it.id != monzoAccount.id }
             assertEquals(1, counterpartyAccounts.size, "The same counterparty.id should create one account")
             val counterpartyAttributes =
@@ -1094,7 +1095,7 @@ class MonzoImportE2ETest : DbTest() {
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val monzoAccount = allAccounts.single { it.name == "Monzo" }
             val counterpartyAccounts = allAccounts.filter { it.id != monzoAccount.id }
             assertEquals(1, counterpartyAccounts.size, "Matching bank details should create one counterparty account")
             val counterpartyAttrs =
@@ -1709,7 +1710,7 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val monzoAccount = allAccounts.single { it.name == "Monzo" }
             val transfers =
                 repositories.transactionRepository
                     .getTransactionsByAccount(monzoAccount.id)
@@ -1719,17 +1720,15 @@ class MonzoImportE2ETest : DbTest() {
             // API import mirrors CSV semantics: transfer money remains in account currency.
             val foreignTransfer = transfers.single { it.description == "FOREIGN SPEND" }
             assertEquals("GBP", foreignTransfer.amount.asset.code, "Foreign transfer should remain in account currency")
-            assertEquals(
-                com.moneymanager.bigdecimal.BigInteger(1250L),
-                foreignTransfer.amount.amount,
+            assertTrue(
+                foreignTransfer.amount.hasDisplayValue("12.50"),
                 "Foreign transfer should use the main GBP amount",
             )
 
             val domesticTransfer = transfers.single { it.description == "DOMESTIC SPEND" }
             assertEquals("GBP", domesticTransfer.amount.asset.code, "Domestic transfer should remain in account currency")
-            assertEquals(
-                com.moneymanager.bigdecimal.BigInteger(5000L),
-                domesticTransfer.amount.amount,
+            assertTrue(
+                domesticTransfer.amount.hasDisplayValue("50.00"),
                 "Domestic transfer should use the main GBP amount",
             )
         }
@@ -1803,7 +1802,7 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val monzoAccount = allAccounts.single { it.name == "Monzo" }
             val feeAccount = allAccounts.single { it.name == "Monzo Fees" }
 
             // The Monzo account has two movements: the £200 withdrawal and the £3.50 fee.
@@ -1816,10 +1815,10 @@ class MonzoImportE2ETest : DbTest() {
             // Monzo's `amount` (-20000) is gross: it already includes the £3.50 fee, so the fee is carved
             // out (main 19650 + fee 350 = 20000) rather than double-charged.
             val withdrawal = transfers.single { it.description == "FOREIGN ATM MADRID ESP" }
-            assertEquals(com.moneymanager.bigdecimal.BigInteger(19650L), withdrawal.amount.amount, "Fee is carved out of the gross amount")
+            assertTrue(withdrawal.amount.hasDisplayValue("196.50"), "Fee is carved out of the gross amount")
 
             val feeTransfer = transfers.single { it.description == "Fee" }
-            assertEquals(com.moneymanager.bigdecimal.BigInteger(350L), feeTransfer.amount.amount, "Fee transfer carries the atm fee amount")
+            assertTrue(feeTransfer.amount.hasDisplayValue("3.50"), "Fee transfer carries the atm fee amount")
             assertEquals("GBP", feeTransfer.amount.asset.code)
             assertEquals(monzoAccount.id, feeTransfer.sourceAccountId, "Fee leaves the Monzo account")
             assertEquals(feeAccount.id, feeTransfer.targetAccountId, "Fee goes to the consolidated Monzo Fees account")
@@ -1915,7 +1914,7 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val monzoAccount = allAccounts.single { it.name == "Monzo" }
             val counterpartyAccounts = allAccounts.filter { it.id != monzoAccount.id }
             assertEquals(
                 1,
@@ -1997,7 +1996,7 @@ class MonzoImportE2ETest : DbTest() {
             importSession(TRANSACTIONS_WITH_EPHEMERAL_COUNTERPARTY_SECOND_IMPORT_JSON)
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val monzoAccount = allAccounts.single { it.name == ACCOUNT_DESCRIPTION }
+            val monzoAccount = allAccounts.single { it.name == "Monzo" }
             val counterpartyAccounts = allAccounts.filter { it.id != monzoAccount.id }
             assertEquals(
                 1,

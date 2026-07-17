@@ -6,7 +6,6 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
-import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
@@ -114,11 +113,9 @@ private val AUDIT_E2E_TRANSACTIONS_JSON =
  *   1. The imported Monzo account shows "API Import" as the source in its audit history.
  *   2. Clicking "API Import" navigates to the API Traffic screen for that session.
  *
- * Account ordering note: the DB orders accounts by name (SQLite binary collation). The own account
- * is named after its description, "user_..." (lowercase initial), while the counterparties have
- * uppercase initials ("Alice Example", "Coffee Shop Ltd", "Void"). Lowercase letters sort AFTER
- * uppercase in binary collation, so the own Monzo account is always last in the list, which lets us
- * use onLast() to click its audit button.
+ * Account ordering note: the DB orders accounts by name (SQLite binary collation). Alphabetically
+ * among the fixture's accounts — "Alice Example", "Coffee Shop Ltd", "Monzo" (the own account, named
+ * via the strategy's staticAccountName), "Void" — the own Monzo account is third, at index 2.
  */
 private class AuditTestDatabaseManager(
     private val databaseManager: DatabaseManager,
@@ -221,14 +218,12 @@ class MonzoImportAuditE2ETest {
 
             // Wait for the Accounts screen to load
             waitForIdle()
-            val monzoAccountName = AUDIT_E2E_ACCOUNT_DESCRIPTION
+            val monzoAccountName = "Monzo"
             waitUntilAtLeastOneExists(hasText(monzoAccountName), timeoutMillis = 20000)
 
             // --- Part 1: Monzo account audit shows API Import ---
-            // Accounts ordered by name: the uppercase-initial counterparties ("Alice Example",
-            // "Coffee Shop Ltd", "Void") sort before the lowercase-initial own account ("user_..."),
-            // so the Monzo account is last — use onLast().
-            onAllNodesWithText("📋").onLast().performClick()
+            // Alphabetically third among the four fixture accounts (see class doc) — index 2.
+            onAllNodesWithText("📋")[2].performClick()
             waitForIdle()
 
             waitUntilAtLeastOneExists(hasText("API Import"), timeoutMillis = 10000)

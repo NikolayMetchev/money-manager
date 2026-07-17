@@ -384,7 +384,7 @@ class CsvReimportE2ETest {
                         ?.amount
                 }
             assertEquals(
-                setOf(Money(4000, usd), Money(2000, usd)),
+                setOf(Money.fromDisplayValue("40.00", usd), Money.fromDisplayValue("20.00", usd)),
                 amountsById.values.filterNotNull().toSet(),
             )
 

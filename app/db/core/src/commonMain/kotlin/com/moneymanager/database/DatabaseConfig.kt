@@ -59,7 +59,7 @@ object DatabaseConfig {
         with(database) {
             currencies.forEach { currency ->
                 if (currency.code == GBP_CODE) return@forEach
-                val scaleFactor = CurrencyScaleFactors.getScaleFactor(currency.code)
+                val scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR
                 // Allocate an id from the shared `asset` id space first (asset has no triggers, so
                 // last_insert_rowid() is reliable), then insert the currency with that id.
                 // insert + last_insert_rowid() must share one connection (the driver may pool

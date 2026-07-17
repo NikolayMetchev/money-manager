@@ -20,6 +20,7 @@ import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
+import com.moneymanager.test.database.hasDisplayValue
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -300,11 +301,11 @@ class StarlingImportE2ETest : DbTest() {
             val coffee = allAccounts.single { it.name == "Coffee Shop" }
             val acme = allAccounts.single { it.name == "ACME Ltd" }
 
-            val outgoing = transfers.single { it.amount.amount == com.moneymanager.bigdecimal.BigInteger(1250L) }
+            val outgoing = transfers.single { it.amount.hasDisplayValue("12.50") }
             assertEquals(ownAccount.id, outgoing.sourceAccountId, "OUT direction: money leaves the user's account")
             assertEquals(coffee.id, outgoing.targetAccountId)
 
-            val incoming = transfers.single { it.amount.amount == com.moneymanager.bigdecimal.BigInteger(50000L) }
+            val incoming = transfers.single { it.amount.hasDisplayValue("500.00") }
             assertEquals(acme.id, incoming.sourceAccountId)
             assertEquals(ownAccount.id, incoming.targetAccountId, "IN direction: money arrives at the user's account")
         }
@@ -541,7 +542,7 @@ class StarlingImportE2ETest : DbTest() {
             // it by excluding the pre-existing account's id.
             val ownAccount = allAccounts.single { it.name == "Personal" && it.id != existingId }
             val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
-            val acmeIncoming = transfers.single { it.amount.amount == com.moneymanager.bigdecimal.BigInteger(50000L) }
+            val acmeIncoming = transfers.single { it.amount.hasDisplayValue("500.00") }
             assertEquals(existingId, acmeIncoming.sourceAccountId, "The ACME transfer should link to the pre-existing account")
         }
 
@@ -1039,11 +1040,10 @@ class StarlingImportE2ETest : DbTest() {
             val balances = repositories.transactionRepository.getAccountBalances().first()
             val ownBalance = balances.single { it.accountId == ownAccount.id }
 
-            // Balance reflects only the two settled items (+50000 in, -1250 out); the 200000 declined
-            // outgoing is excluded. Were it counted, the balance would be -151250 instead of 48750.
-            assertEquals(
-                com.moneymanager.bigdecimal.BigInteger(48750L),
-                ownBalance.balance.amount,
+            // Balance reflects only the two settled items (+500.00 in, -12.50 out); the 2000.00 declined
+            // outgoing is excluded. Were it counted, the balance would be -1512.50 instead of 487.50.
+            assertTrue(
+                ownBalance.balance.hasDisplayValue("487.50"),
                 "Declined item must not affect the balance",
             )
         }

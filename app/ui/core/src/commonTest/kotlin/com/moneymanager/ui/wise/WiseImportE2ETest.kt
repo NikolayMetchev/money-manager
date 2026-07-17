@@ -14,6 +14,7 @@ import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createPerson
+import com.moneymanager.test.database.hasDisplayValue
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -166,12 +167,12 @@ class WiseImportE2ETest : DbTest() {
             val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
             assertEquals(2, transfers.size, "Own account should have exactly two transfers")
 
-            // CREDIT: 500.00 GBP incoming (target is our account); decimal -> 50000 minor units.
-            val credit = transfers.single { it.amount.amount == com.moneymanager.bigdecimal.BigInteger(50_000L) }
+            // CREDIT: 500.00 GBP incoming (target is our account).
+            val credit = transfers.single { it.amount.hasDisplayValue("500.00") }
             assertEquals(ownAccount.id, credit.targetAccountId, "Credit should be incoming to the Wise account")
 
-            // DEBIT: 12.34 GBP outgoing (source is our account); decimal -> 1234 minor units.
-            val debit = transfers.single { it.amount.amount == com.moneymanager.bigdecimal.BigInteger(1_234L) }
+            // DEBIT: 12.34 GBP outgoing (source is our account).
+            val debit = transfers.single { it.amount.hasDisplayValue("12.34") }
             assertEquals(ownAccount.id, debit.sourceAccountId, "Debit should be outgoing from the Wise account")
 
             assertTrue(credit.amount.isPositive() && debit.amount.isPositive(), "Stored magnitudes are positive")
