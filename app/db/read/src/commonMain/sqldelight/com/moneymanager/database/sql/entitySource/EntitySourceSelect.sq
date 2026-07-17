@@ -14,6 +14,42 @@ FROM entity_source
 JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
 WHERE qif_entity_source.qif_import_id = ? AND entity_source.entity_type_id = 1;
 
+-- Accounts (entity_type_id = 1) created (not merely touched) by the given API session — revision_id = 1
+-- means the entity's creating write is still its only recorded revision. Joined against `account` so a
+-- row whose account a PRIOR re-import already deleted (entity_source is never cascade-cleaned) doesn't
+-- resurface. Used by API re-import to scope deletes/cleanup to what the session itself produced.
+selectAccountIdsCreatedByApiSession:
+SELECT DISTINCT entity_source.entity_id
+FROM entity_source
+JOIN api_entity_source ON entity_source.id = api_entity_source.id
+JOIN account ON account.id = entity_source.entity_id
+WHERE api_entity_source.api_session_id = ?
+  AND entity_source.entity_type_id = 1
+  AND entity_source.revision_id = 1;
+
+-- Transfers (entity_type_id = 7) created by the given API session, still-existing only — see
+-- selectAccountIdsCreatedByApiSession for why the join against `transfer` matters: re-importing the
+-- same session more than once must not keep re-discovering ids a prior pass already deleted.
+selectTransferIdsCreatedByApiSession:
+SELECT DISTINCT entity_source.entity_id
+FROM entity_source
+JOIN api_entity_source ON entity_source.id = api_entity_source.id
+JOIN transfer ON transfer.id = entity_source.entity_id
+WHERE api_entity_source.api_session_id = ?
+  AND entity_source.entity_type_id = 7
+  AND entity_source.revision_id = 1;
+
+-- Trades (entity_type_id = 11) created by the given API session, still-existing only — see
+-- selectAccountIdsCreatedByApiSession for why the join against `trade` matters.
+selectTradeIdsCreatedByApiSession:
+SELECT DISTINCT entity_source.entity_id
+FROM entity_source
+JOIN api_entity_source ON entity_source.id = api_entity_source.id
+JOIN trade ON trade.id = entity_source.entity_id
+WHERE api_entity_source.api_session_id = ?
+  AND entity_source.entity_type_id = 11
+  AND entity_source.revision_id = 1;
+
 selectEntitySourceForRevision:
 SELECT id, source_type_id
 FROM entity_source

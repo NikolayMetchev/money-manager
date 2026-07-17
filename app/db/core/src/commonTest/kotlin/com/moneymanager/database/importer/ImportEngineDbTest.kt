@@ -190,7 +190,9 @@ class ImportEngineDbTest : DbTest() {
     fun personalCounterpartiesSharingAName_stayDistinctAccounts() =
         runTest {
             // Two people can share a name while owning different bank accounts, so a name collision must
-            // not merge them — the name fallback applies only to accounts with no bank identity.
+            // not merge them — the name fallback applies only to accounts with no bank identity. Account
+            // names are globally unique, so the second one is disambiguated by account-number last-4
+            // rather than colliding — but it remains a genuinely separate account, not a merge.
             val result =
                 engine().import(
                     ImportBatch(
@@ -215,7 +217,8 @@ class ImportEngineDbTest : DbTest() {
                 )
 
             assertEquals(2, result.accountsCreated)
-            assertEquals(2, accountsNamed("Nikolay Metchev"))
+            assertEquals(1, accountsNamed("Nikolay Metchev"))
+            assertEquals(1, accountsNamed("Nikolay Metchev (6361)"))
         }
 
     @Test

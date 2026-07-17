@@ -65,6 +65,10 @@ fun EditAccountDialog(
     personAttributeRepository: PersonAttributeReadRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     onDismiss: () -> Unit,
+    // Account names are globally unique (account.name UNIQUE). Passing the other accounts' current names
+    // (excluding this one) lets the dialog reject a clash before submitting; callers that don't have the
+    // list handy still fail safely via the submit-time catch below.
+    existingNames: Set<String> = emptySet(),
 ) {
     val accountState = rememberAccountDialogState(initialName = account.name, initialCategoryId = account.categoryId)
 
@@ -123,6 +127,10 @@ fun EditAccountDialog(
         if (accountState.isSaving) return@submit
         if (accountState.name.isBlank()) {
             accountState.errorMessage = "Account name is required"
+            accountState.nameError = true
+            nameFocusRequester.requestFocus()
+        } else if (existingNames.contains(accountState.name.trim())) {
+            accountState.errorMessage = "An account named \"${accountState.name.trim()}\" already exists"
             accountState.nameError = true
             nameFocusRequester.requestFocus()
         } else {
@@ -216,7 +224,12 @@ fun EditAccountDialog(
                     onDismiss()
                 } catch (expected: Exception) {
                     logger.error(expected) { "Failed to update account: ${expected.message}" }
-                    accountState.errorMessage = "Failed to update account: ${expected.message}"
+                    accountState.errorMessage =
+                        if (expected.message.isAccountNameUniqueViolation()) {
+                            "An account named \"${accountState.name.trim()}\" already exists"
+                        } else {
+                            "Failed to update account: ${expected.message}"
+                        }
                     accountState.isSaving = false
                 }
             }

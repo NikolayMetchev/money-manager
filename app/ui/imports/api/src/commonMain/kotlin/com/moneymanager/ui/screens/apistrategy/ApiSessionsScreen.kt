@@ -94,6 +94,9 @@ import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.updateApiCredentialKeys
@@ -138,6 +141,9 @@ fun ApiSessionsScreen(
     currencyRepository: CurrencyReadRepository,
     cryptoRepository: com.moneymanager.domain.repository.CryptoReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
+    transactionRepository: TransactionReadRepository,
+    transferRelationshipRepository: TransferRelationshipReadRepository,
+    tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     deviceId: DeviceId,
     onAddCredentialClick: () -> Unit = {},
@@ -177,6 +183,8 @@ fun ApiSessionsScreen(
     var downloadResultByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiSessionDownloadResult>>(emptyMap()) }
     var downloadProgressByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiTransactionsDownloadProgress?>>(emptyMap()) }
     var pendingImport by remember { mutableStateOf<PendingApiImport?>(null) }
+    var pendingReimport by remember { mutableStateOf<PendingApiReimport?>(null) }
+    var pendingReimportAll by remember { mutableStateOf<PendingApiReimportAll?>(null) }
 
     // A credential with no linked strategyId is orphaned (its strategy was deleted, or it was never
     // linked) — null propagates to the call sites below, which surface a clear error rather than
@@ -491,6 +499,15 @@ fun ApiSessionsScreen(
                                 importedSessionRevisions = importedSessionRevisions,
                                 selectedStrategyRevision = currentStrategyRevisionByCredential[credential.id],
                                 isImportingSession = { sessionId -> backgroundTasks.isRunning(apiImportTaskKey(sessionId)) },
+                                hasEverBeenImported = { sessionId -> importedSessionRevisions.any { it.sessionId == sessionId } },
+                                importedSessionCount =
+                                    sessionsByCredential[credential.id].orEmpty().count { session ->
+                                        importedSessionRevisions.any { it.sessionId == session.id }
+                                    },
+                                isAnySessionImporting =
+                                    sessionsByCredential[credential.id].orEmpty().any {
+                                        backgroundTasks.isRunning(apiImportTaskKey(it.id))
+                                    },
                                 onDownload = {
                                     downloadResultByCredential = downloadResultByCredential - credential.id
                                     downloadProgressByCredential = downloadProgressByCredential - credential.id
@@ -667,6 +684,28 @@ fun ApiSessionsScreen(
                                         }
                                     }
                                 },
+                                onReimport = { session ->
+                                    scope.launch {
+                                        val strategy =
+                                            resolveStrategy(credential) ?: run {
+                                                importErrorBySession =
+                                                    importErrorBySession + (session.id to "No import strategy configured")
+                                                return@launch
+                                            }
+                                        pendingReimport = PendingApiReimport(session = session, strategy = strategy)
+                                    }
+                                },
+                                onReimportAll = { importedCount ->
+                                    scope.launch {
+                                        val strategy = resolveStrategy(credential) ?: return@launch
+                                        pendingReimportAll =
+                                            PendingApiReimportAll(
+                                                credentialId = credential.id,
+                                                strategy = strategy,
+                                                importedSessionCount = importedCount,
+                                            )
+                                    }
+                                },
                                 onSessionClick = onSessionClick,
                                 onCopyError = { error -> scope.launch { clipboard.setPlainText(error) } },
                             )
@@ -695,12 +734,80 @@ fun ApiSessionsScreen(
             },
         )
     }
+
+    pendingReimport?.let { reimport ->
+        ApiReimportDialog(
+            session = reimport.session,
+            strategy = reimport.strategy,
+            apiSessionRepository = apiSessionRepository,
+            accountRepository = accountRepository,
+            currencyRepository = currencyRepository,
+            cryptoRepository = cryptoRepository,
+            accountAttributeRepository = accountAttributeRepository,
+            transactionRepository = transactionRepository,
+            transferRelationshipRepository = transferRelationshipRepository,
+            tradeRepository = tradeRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+            onDismiss = { pendingReimport = null },
+            onComplete = { result ->
+                pendingReimport = null
+                importResultBySession =
+                    importResultBySession +
+                    (
+                        reimport.session.id to
+                            ApiSessionImportResult(
+                                accountCount = 0,
+                                transactionCount = result.transactionsImported + result.tradesImported,
+                                duplicateCount = 0,
+                            )
+                    )
+                refresh()
+                onTransactionsImported()
+            },
+        )
+    }
+
+    pendingReimportAll?.let { reimportAll ->
+        ApiReimportAllDialog(
+            credentialId = reimportAll.credentialId,
+            importedSessionCount = reimportAll.importedSessionCount,
+            strategy = reimportAll.strategy,
+            apiSessionRepository = apiSessionRepository,
+            accountRepository = accountRepository,
+            currencyRepository = currencyRepository,
+            cryptoRepository = cryptoRepository,
+            accountAttributeRepository = accountAttributeRepository,
+            transactionRepository = transactionRepository,
+            transferRelationshipRepository = transferRelationshipRepository,
+            tradeRepository = tradeRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+            onDismiss = { pendingReimportAll = null },
+            onComplete = {
+                pendingReimportAll = null
+                refresh()
+                onTransactionsImported()
+            },
+        )
+    }
 }
 
 private data class PendingApiImport(
     val session: ApiSession,
     val strategy: ApiImportStrategy,
     val counterparties: List<ApiCounterpartySuggestion>,
+)
+
+private data class PendingApiReimport(
+    val session: ApiSession,
+    val strategy: ApiImportStrategy,
+)
+
+private data class PendingApiReimportAll(
+    val credentialId: ApiCredentialId,
+    val strategy: ApiImportStrategy,
+    val importedSessionCount: Int,
 )
 
 @Composable
@@ -791,8 +898,13 @@ private fun CredentialCard(
     importedSessionRevisions: Set<ApiSessionImportRevision>,
     selectedStrategyRevision: Long?,
     isImportingSession: (ApiSessionId) -> Boolean,
+    hasEverBeenImported: (ApiSessionId) -> Boolean,
+    importedSessionCount: Int,
+    isAnySessionImporting: Boolean,
     onDownload: () -> Unit,
     onImport: (ApiSession) -> Unit,
+    onReimport: (ApiSession) -> Unit,
+    onReimportAll: (Int) -> Unit,
     onSessionClick: (ApiSession) -> Unit,
     onCopyError: (String) -> Unit,
 ) {
@@ -860,6 +972,15 @@ private fun CredentialCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+            if (importedSessionCount > 0) {
+                OutlinedButton(
+                    onClick = { onReimportAll(importedSessionCount) },
+                    enabled = !isAnySessionImporting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Re-import all ($importedSessionCount)")
+                }
+            }
 
             if (sessions.isNotEmpty()) {
                 HorizontalDivider()
@@ -874,10 +995,12 @@ private fun CredentialCard(
                                 currentRevision = selectedStrategyRevision,
                                 importedSessionRevisions = importedSessionRevisions,
                             ),
+                        hasEverBeenImported = hasEverBeenImported(session.id),
                         importResult = importResultBySession[session.id],
                         importError = importErrorBySession[session.id],
                         importProgress = importProgressBySession[session.id],
                         onImport = { onImport(session) },
+                        onReimport = { onReimport(session) },
                         onOpenTraffic = { onSessionClick(session) },
                         onCopyError = onCopyError,
                     )
@@ -893,10 +1016,12 @@ private fun SessionRow(
     dateRange: ImportFileDateRange?,
     isImporting: Boolean,
     isAlreadyImported: Boolean,
+    hasEverBeenImported: Boolean,
     importResult: ApiSessionImportResult?,
     importError: String?,
     importProgress: ApiSessionImportProgress?,
     onImport: () -> Unit,
+    onReimport: () -> Unit,
     onOpenTraffic: () -> Unit,
     onCopyError: (String) -> Unit,
 ) {
@@ -988,7 +1113,10 @@ private fun SessionRow(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = onImport,
-                    enabled = !isImporting && !isAlreadyImported,
+                    // Once a session has ever been imported, plain Import can't retroactively apply a
+                    // changed strategy (its own entities dedupe it to a no-op) — Re-import is the only
+                    // path that deletes and re-runs, so it's the only enabled action from here on.
+                    enabled = !isImporting && !isAlreadyImported && !hasEverBeenImported,
                     modifier = Modifier.weight(1f),
                 ) {
                     if (isImporting) {
@@ -997,10 +1125,22 @@ private fun SessionRow(
                         Text("Import")
                     }
                 }
+                if (hasEverBeenImported) {
+                    OutlinedButton(onClick = onReimport, enabled = !isImporting, modifier = Modifier.weight(1f)) {
+                        Text("Re-import")
+                    }
+                }
                 OutlinedButton(onClick = onOpenTraffic) { Text("Traffic") }
             }
         } else {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Re-import is network-free (it replays the session's stored responses), so it stays
+                // available even once the session's token has expired — unlike a fresh Import.
+                if (hasEverBeenImported) {
+                    OutlinedButton(onClick = onReimport, enabled = !isImporting, modifier = Modifier.weight(1f)) {
+                        Text("Re-import")
+                    }
+                }
                 OutlinedButton(onClick = onOpenTraffic) { Text("Traffic") }
             }
         }

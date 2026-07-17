@@ -16,7 +16,7 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.StringSimilarity
-import com.moneymanager.importengineapi.selectNearestUnconsumedFundingLeg
+import com.moneymanager.importengineapi.selectNearestUnconsumedLeg
 import kotlin.time.Duration
 import kotlin.time.Instant
 
@@ -187,15 +187,17 @@ class ImportDeduper(
     private val batchUniqueKey = mutableMapOf<Map<String, String>, Int>()
     private val batchMatchCandidates = mutableListOf<Pair<Int, Transfer>>()
 
-    // Funding legs already claimed by an earlier funding-card reconcile in this batch. Unlike the other
-    // reconcile paths (which deliberately don't consume), a conduit like Curve emits many rows of the
-    // same amount (e.g. daily £1.75 TFL), so each funding leg must reconcile at most one incoming row.
-    // Scope is a single import() call: this does NOT know which funding legs a previous, separate batch
-    // already consumed, so a later batch's row could re-link to an already-reconciled funding leg if the
-    // amount+window coincide. In practice a conduit export is imported in one batch, so the collision
-    // needs two overlapping conduit imports; CsvReimport.computeFundingReconcileReruns mirrors this same
-    // single-batch limitation.
-    private val consumedFundingIds = mutableSetOf<TransferId>()
+    // Existing legs already claimed by an earlier funding-card or internal-transfer reconcile in this
+    // batch. Unlike plain cross-source reconcile (which deliberately doesn't consume), both of these rules
+    // must claim each existing leg at most once: a conduit like Curve emits many rows of the same amount
+    // (e.g. daily £1.75 TFL), and an exchange bridge sees repeated round-amount withdrawals that could
+    // otherwise all link to a single existing bank credit, fabricating phantom duplicates on that side.
+    // Scope is a single import() call: this does NOT know which legs a previous, separate batch already
+    // consumed, so a later batch's row could re-link to an already-reconciled leg if the amount+window
+    // coincide. In practice a conduit/exchange export is imported in one batch, so the collision needs two
+    // overlapping imports; CsvReimport.computeFundingReconcileReruns mirrors this same single-batch
+    // limitation for the funding-card path.
+    private val consumedReconcileIds = mutableSetOf<TransferId>()
 
     fun classify(transfers: List<ImportTransfer>): List<Classified> =
         transfers.mapIndexed { index, transfer -> classifyOne(index, transfer) }
@@ -314,9 +316,9 @@ class ImportDeduper(
         val key = DirectedAmountKey(fundingAccountId, transfer.fromAccount.requireId(), transfer.amount)
         val matchId =
             reconcileCandidatesByDirectedAmount[key]
-                ?.let { selectNearestUnconsumedFundingLeg(it, timestamp, window, consumedFundingIds) }
+                ?.let { selectNearestUnconsumedLeg(it, timestamp, window, consumedReconcileIds) }
                 ?: return null
-        consumedFundingIds += matchId
+        consumedReconcileIds += matchId
         val attributes =
             if (transfer.attributes.any { it.typeId == exclusionTypeId }) {
                 transfer.attributes
@@ -338,6 +340,11 @@ class ImportDeduper(
      * direction) touches the bridge's app account. On a match the incoming leg is rewritten to run
      * directly between the two owned accounts (so balances net correctly in one movement), linked to the
      * existing leg via the `reconciled` relationship, and the existing app-side leg is flagged excluded.
+     *
+     * Each existing leg is claimed at most once (nearest-timestamp preferred), via the shared
+     * [consumedReconcileIds] set: repeated same-amount exchange movements (e.g. round-number withdrawals)
+     * would otherwise all link to the same single existing bank credit, fabricating phantom duplicates on
+     * the bank side.
      */
     private fun classifyAsInternalTransferReconciled(
         transfer: ImportTransfer,
@@ -358,31 +365,33 @@ class ImportDeduper(
             if (!exchangeIsTarget && !exchangeIsSource) {
                 null
             } else {
-                reconcileCandidates
-                    .firstOrNull { (_, existing) ->
+                val candidates =
+                    reconcileCandidates.filter { (_, existing) ->
                         existing.amount.asset.id == amount.asset.id &&
                             amountWithinTolerance(amount, existing.amount, policy.internalTransferAmountTolerance) &&
-                            (timestamp - existing.timestamp).absoluteValue <= window &&
                             (
                                 (exchangeIsTarget && existing.sourceAccountId == bridge.appAccountId) ||
                                     (exchangeIsSource && existing.targetAccountId == bridge.appAccountId)
                             )
-                    }?.let { (matchId, existingTransfer) ->
-                        val rewritten =
-                            if (exchangeIsTarget) {
-                                transfer.copy(fromAccount = AccountRef.Existing(bridge.appAccountId))
-                            } else {
-                                transfer.copy(toAccount = AccountRef.Existing(bridge.appAccountId))
-                            }
-                        val relationships =
-                            rewritten.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId)
-                        Classified(
-                            transfer = rewritten.copy(relationships = relationships, fee = null),
-                            status = ImportStatus.IMPORTED,
-                            existing = null,
-                            excludeExisting = ExcludeExistingLeg(existingTransfer, exclusionTypeId),
-                        )
                     }
+                selectNearestUnconsumedLeg(candidates, timestamp, window, consumedReconcileIds)?.let { matchId ->
+                    consumedReconcileIds += matchId
+                    val existingTransfer = candidates.first { it.first == matchId }.second
+                    val rewritten =
+                        if (exchangeIsTarget) {
+                            transfer.copy(fromAccount = AccountRef.Existing(bridge.appAccountId))
+                        } else {
+                            transfer.copy(toAccount = AccountRef.Existing(bridge.appAccountId))
+                        }
+                    val relationships =
+                        rewritten.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId)
+                    Classified(
+                        transfer = rewritten.copy(relationships = relationships, fee = null),
+                        status = ImportStatus.IMPORTED,
+                        existing = null,
+                        excludeExisting = ExcludeExistingLeg(existingTransfer, exclusionTypeId),
+                    )
+                }
             }
         }
     }

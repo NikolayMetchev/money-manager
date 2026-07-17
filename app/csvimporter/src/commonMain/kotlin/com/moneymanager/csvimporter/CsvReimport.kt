@@ -38,7 +38,7 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
-import com.moneymanager.importengineapi.selectNearestUnconsumedFundingLeg
+import com.moneymanager.importengineapi.selectNearestUnconsumedLeg
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Duration.Companion.seconds
@@ -661,7 +661,7 @@ suspend fun computeFundingReconcileReruns(
         val bucket = legsByConduitAmount[Triple(candidate.fundingAccount, candidate.conduit, candidate.amount)] ?: return@mapNotNull null
         // Same one-to-one, nearest-timestamp choice the engine's funding reconcile makes, so plan and re-run agree.
         val legId =
-            selectNearestUnconsumedFundingLeg(bucket.map { it.id to it }, candidate.timestamp, window, consumed)
+            selectNearestUnconsumedLeg(bucket.map { it.id to it }, candidate.timestamp, window, consumed)
                 ?: return@mapNotNull null
         consumed += legId
         ReimportFundingReconcile(candidate.rowIndex, candidate.transferId, candidate.description)

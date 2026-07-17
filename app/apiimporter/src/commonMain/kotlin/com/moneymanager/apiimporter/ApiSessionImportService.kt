@@ -46,6 +46,7 @@ import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingApiIdExtractor
 import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
@@ -64,7 +65,6 @@ import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.getOrCreateAttributeType
-import com.moneymanager.importengineapi.insertApiResponseTransactions
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.personalCounterpartyKey
 import com.moneymanager.rest.ApiClient
@@ -1715,10 +1715,22 @@ private suspend fun runImportEngine(
             )
     }
 
-    setup.importEngine.insertApiResponseTransactions(
-        responseRecords
-            .sortedWith(compareBy<ResponseTransactionImportRecord> { it.pageIndex }.thenBy { it.itemIndex })
-            .map { it.toInsert() },
+    // Clear any response-transaction rows from a prior run of this session and insert the fresh set in
+    // the same batch — otherwise a re-import (e.g. after a strategy edit bumps the revision) violates
+    // the (response_id, json_path) unique index, and a cancellation between two separate top-level
+    // import() calls could leave the session's response-transaction provenance deleted but not replaced.
+    setup.importEngine.import(
+        ImportBatch(
+            apiSessionMutations =
+                listOf(
+                    ApiSessionMutation.DeleteResponseTransactionsBySession(setup.sessionId),
+                    ApiSessionMutation.InsertResponseTransactions(
+                        responseRecords
+                            .sortedWith(compareBy<ResponseTransactionImportRecord> { it.pageIndex }.thenBy { it.itemIndex })
+                            .map { it.toInsert() },
+                    ),
+                ),
+        ),
     )
 
     return importResult

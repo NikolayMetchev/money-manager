@@ -49,3 +49,11 @@ internal fun rememberAccountDialogState(
     initialName: String,
     initialCategoryId: Long,
 ): AccountDialogState = remember(initialName, initialCategoryId) { AccountDialogState(initialName, initialCategoryId) }
+
+/**
+ * Whether this exception message looks like the driver's raw text for the `account.name` UNIQUE
+ * constraint, so the dialog can show a friendly message instead — a fallback for callers that don't pass
+ * `existingNames` for proactive validation (or a race where the name was taken after that check ran).
+ */
+internal fun String?.isAccountNameUniqueViolation(): Boolean =
+    this != null && contains("UNIQUE constraint failed", ignoreCase = true) && contains("account.name")

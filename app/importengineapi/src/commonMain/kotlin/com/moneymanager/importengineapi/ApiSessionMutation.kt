@@ -89,6 +89,15 @@ sealed interface ApiSessionMutation {
         val transactions: List<ApiResponseTransactionInsert>,
     ) : ApiSessionMutation
 
+    /**
+     * Clears every `api_response_transaction` row for the session, so a re-import (fresh or
+     * retroactive) can insert a clean set without violating the `(response_id, json_path)` unique
+     * index against records from a prior run.
+     */
+    data class DeleteResponseTransactionsBySession(
+        val sessionId: ApiSessionId,
+    ) : ApiSessionMutation
+
     data class MarkSessionImported(
         val id: ApiSessionId,
         val revisionId: Long,

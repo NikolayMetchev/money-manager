@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import kotlin.jvm.JvmInline
@@ -276,18 +277,25 @@ value class LocalTradeKey(
  * A cross-asset exchange to create: [fromAmount] leaves [fromAccountId] and [toAmount] enters
  * [toAccountId], where the two [Money] legs may be denominated in different assets. The engine
  * allocates a `transaction_id`, inserts the trade, and records provenance; the resulting id is read
- * back from [ImportResult.createdTradeIds] via [key]. (CREATE only for now.)
+ * back from [ImportResult.createdTradeIds] via [key].
+ *
+ * [operation] also supports DELETE (of [existingId]) — used by API re-import to remove a session's
+ * own trades before re-running the import under a changed strategy. UPDATE is not supported: trades
+ * re-create identically on re-run, so re-import always deletes and recreates rather than updating.
  */
 data class ImportTradeIntent(
     val key: LocalTradeKey,
     val source: Source,
-    val timestamp: Instant,
-    val description: String,
-    val fromAccountId: AccountId,
-    val fromAmount: Money,
-    val toAccountId: AccountId,
-    val toAmount: Money,
-)
+    val timestamp: Instant? = null,
+    val description: String? = null,
+    val fromAccountId: AccountId? = null,
+    val fromAmount: Money? = null,
+    val toAccountId: AccountId? = null,
+    val toAmount: Money? = null,
+    override val operation: ImportOperation = ImportOperation.CREATE,
+    /** The trade to DELETE (required for that operation). */
+    val existingId: TradeId? = null,
+) : WriteIntent
 
 /** Builder-chosen placeholder identity for an exchange order upserted in this batch. */
 @JvmInline

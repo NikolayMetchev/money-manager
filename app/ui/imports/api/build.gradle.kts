@@ -7,17 +7,19 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                api(projects.app.apiimporter)
+                api(projects.app.importengineapi)
                 api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
 
+                implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
-                implementation(projects.app.apiimporter)
                 implementation(projects.app.db.read)
-                implementation(projects.app.importengineapi)
                 implementation(projects.app.ui.audit)
+                implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.compose.filePicker)
@@ -47,6 +49,7 @@ kotlin {
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.androidx.compose.ui.unit)
+                implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
@@ -58,6 +61,8 @@ kotlin {
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
+                api(projects.app.apiimporter)
+                api(projects.app.importengineapi)
                 api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
@@ -69,6 +74,7 @@ kotlin {
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.compose.ui.unit.desktop)
+                implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)

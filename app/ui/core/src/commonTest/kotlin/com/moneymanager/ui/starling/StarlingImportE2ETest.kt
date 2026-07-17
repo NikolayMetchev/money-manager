@@ -538,9 +538,11 @@ class StarlingImportE2ETest : DbTest() {
             )
 
             // The incoming ACME transfer originates from the pre-existing account.
-            // The own account shares the bare name "Personal" with the pre-existing fixture, so select
-            // it by excluding the pre-existing account's id.
-            val ownAccount = allAccounts.single { it.name == "Personal" && it.id != existingId }
+            // The own account shares the bare name "Personal" with the pre-existing fixture account, and
+            // account names are unique, so the own account (created second) is disambiguated. This test
+            // doesn't stage the identifiers endpoint, so the own account carries no sort/account-number
+            // attributes; the discriminator falls back to its external id (ACCOUNT_UID) last 6 chars.
+            val ownAccount = allAccounts.single { it.name == "Personal (111111)" }
             val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
             val acmeIncoming = transfers.single { it.amount.hasDisplayValue("500.00") }
             assertEquals(existingId, acmeIncoming.sourceAccountId, "The ACME transfer should link to the pre-existing account")

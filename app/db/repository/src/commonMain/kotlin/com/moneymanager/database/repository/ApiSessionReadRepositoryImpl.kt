@@ -5,6 +5,7 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiCredential
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
@@ -21,6 +22,7 @@ import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionReadRepository
@@ -35,6 +37,7 @@ class ApiSessionReadRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : ApiSessionReadRepository {
     private val selectQueries = database.apiSessionSelectQueries
+    private val entitySourceSelectQueries = database.entitySourceSelectQueries
 
     override suspend fun getAllCredentials(): List<ApiCredential> =
         withContext(Dispatchers.Default) {
@@ -131,6 +134,33 @@ class ApiSessionReadRepositoryImpl(
                 .selectImportedSessionRevisions()
                 .executeAsList()
                 .map { ApiSessionImportRevision(ApiSessionId(it.session_id), it.revision_id) }
+                .toSet()
+        }
+
+    override suspend fun getAccountIdsCreatedBySession(sessionId: ApiSessionId): Set<AccountId> =
+        withContext(Dispatchers.Default) {
+            entitySourceSelectQueries
+                .selectAccountIdsCreatedByApiSession(sessionId.id)
+                .executeAsList()
+                .map { AccountId(it) }
+                .toSet()
+        }
+
+    override suspend fun getTransferIdsCreatedBySession(sessionId: ApiSessionId): Set<TransferId> =
+        withContext(Dispatchers.Default) {
+            entitySourceSelectQueries
+                .selectTransferIdsCreatedByApiSession(sessionId.id)
+                .executeAsList()
+                .map { TransferId(it) }
+                .toSet()
+        }
+
+    override suspend fun getTradeIdsCreatedBySession(sessionId: ApiSessionId): Set<TradeId> =
+        withContext(Dispatchers.Default) {
+            entitySourceSelectQueries
+                .selectTradeIdsCreatedByApiSession(sessionId.id)
+                .executeAsList()
+                .map { TradeId(it) }
                 .toSet()
         }
 

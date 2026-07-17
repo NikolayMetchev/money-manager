@@ -128,6 +128,13 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
     suspend fun insertResponseTransactions(transactions: List<ApiResponseTransactionInsert>)
 
     /**
+     * Deletes every [ApiResponseTransaction] recorded for responses in the given session — used
+     * before a re-import re-inserts a fresh set, so the `(response_id, json_path)` unique index
+     * never sees a stale row from a prior run.
+     */
+    suspend fun deleteResponseTransactionsBySession(sessionId: ApiSessionId)
+
+    /**
      * Marks the given session as imported at the given timestamp.
      * Returns the number of rows updated (0 if the session id doesn't exist).
      */

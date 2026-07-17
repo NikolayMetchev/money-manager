@@ -716,6 +716,9 @@ fun MoneyManagerApp(
                                                 strategyId = screen.strategyId,
                                                 apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                                                 apiSessionRepository = services.imports.apiSessionRepository,
+                                                accountRepository = services.accounts.accountRepository,
+                                                categoryRepository = services.accounts.categoryRepository,
+                                                personRepository = services.people.personRepository,
                                                 onBack = { navigationHistory.navigateBack() },
                                             )
                                         }
