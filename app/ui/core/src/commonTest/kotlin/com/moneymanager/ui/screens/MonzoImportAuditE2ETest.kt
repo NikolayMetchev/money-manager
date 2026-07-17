@@ -3,6 +3,8 @@
 package com.moneymanager.ui.screens
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -113,9 +115,9 @@ private val AUDIT_E2E_TRANSACTIONS_JSON =
  *   1. The imported Monzo account shows "API Import" as the source in its audit history.
  *   2. Clicking "API Import" navigates to the API Traffic screen for that session.
  *
- * Account ordering note: the DB orders accounts by name (SQLite binary collation). Alphabetically
- * among the fixture's accounts — "Alice Example", "Coffee Shop Ltd", "Monzo" (the own account, named
- * via the strategy's staticAccountName), "Void" — the own Monzo account is third, at index 2.
+ * Account ordering note: the DB orders accounts by name (SQLite binary collation), so among the
+ * fixture's accounts — "Alice Example", "Coffee Shop Ltd", "Monzo" (the own account, named via the
+ * strategy's staticAccountName), "Void" — "Alice Example" is always first, which Part 2 relies on.
  */
 private class AuditTestDatabaseManager(
     private val databaseManager: DatabaseManager,
@@ -139,6 +141,7 @@ class MonzoImportAuditE2ETest {
             // Pre-populate: run the full download + import before the UI launches
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
+            var monzoAccountId: Long? = null
 
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
@@ -201,6 +204,8 @@ class MonzoImportAuditE2ETest {
                     strategy = strategy,
                     importEngine = dc.importEngine,
                 )
+
+                monzoAccountId = dc.accountRepository.getAllAccounts().first().single { it.name == "Monzo" }.id.id
             }
 
             val testDatabaseManager =
@@ -222,8 +227,8 @@ class MonzoImportAuditE2ETest {
             waitUntilAtLeastOneExists(hasText(monzoAccountName), timeoutMillis = 20000)
 
             // --- Part 1: Monzo account audit shows API Import ---
-            // Alphabetically third among the four fixture accounts (see class doc) — index 2.
-            onAllNodesWithText("📋")[2].performClick()
+            // Scoped to the Monzo account's own card (by testTag), independent of list ordering.
+            onNode(hasText("📋") and hasAnyAncestor(hasTestTag("account-card-$monzoAccountId"))).performClick()
             waitForIdle()
 
             waitUntilAtLeastOneExists(hasText("API Import"), timeoutMillis = 10000)

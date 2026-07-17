@@ -506,6 +506,9 @@ internal fun StringLongMapEditor(
     Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     rows.forEachIndexed { index, (key, _) ->
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            // A duplicate key silently collapses to one entry (last wins) in emit()'s toMap(); flag it
+            // so the user sees which row won't be saved as its own entry.
+            val isDuplicateKey = key.isNotBlank() && rows.count { it.first == key } > 1
             OutlinedTextField(
                 value = key,
                 onValueChange = { updated ->
@@ -516,6 +519,8 @@ internal fun StringLongMapEditor(
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 enabled = enabled,
+                isError = isDuplicateKey,
+                supportingText = if (isDuplicateKey) { { Text("Duplicate key") } } else null,
             )
             OutlinedTextField(
                 value = valueText[index],
@@ -829,7 +834,7 @@ internal fun EndpointEditor(
     IntFieldRow(
         label = "Relative rate-limit cost (e.g. Kraken's history calls cost 2 vs 1 for others)",
         value = endpoint.requestCostWeight,
-        onValueChange = { onChange(endpoint.copy(requestCostWeight = it)) },
+        onValueChange = { onChange(endpoint.copy(requestCostWeight = it.coerceAtLeast(1))) },
         enabled = enabled,
     )
     QueryParamsEditor(

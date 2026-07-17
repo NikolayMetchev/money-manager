@@ -169,9 +169,10 @@ fun StrategyCatalogScreen(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                if (usingLocalDir && (manualFolderEntrySupported || localDirDisplayName != null)) {
+                val pickedFolderName = localDirDisplayName
+                if (usingLocalDir && !manualFolderEntrySupported && pickedFolderName != null) {
                     Text(
-                        if (manualFolderEntrySupported) localDirPath else localDirDisplayName.orEmpty(),
+                        pickedFolderName,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
