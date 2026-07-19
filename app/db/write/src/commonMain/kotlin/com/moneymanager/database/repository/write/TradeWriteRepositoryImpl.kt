@@ -49,7 +49,7 @@ class TradeWriteRepositoryImpl(
                 // identical trade (0-based, ordered by id); once exhausted, fall through to insert.
                 val existing =
                     selectQueries
-                        .selectMatchingTradeIds(
+                        .selectMatchingTradeId(
                             timestamp = timestamp.toEpochMilliseconds(),
                             description = description,
                             from_account_id = fromAccountId.id,
@@ -58,8 +58,8 @@ class TradeWriteRepositoryImpl(
                             to_account_id = toAccountId.id,
                             to_asset_id = toAmount.asset.id.id,
                             to_amount = toAmount.amount.toString(),
-                        ).executeAsList()
-                        .getOrNull(occurrence)
+                            occurrence = occurrence.toLong(),
+                        ).executeAsOneOrNull()
                 if (existing != null) {
                     return@transactionWithResult TradeCreateResult(TradeId(existing), created = false)
                 }
