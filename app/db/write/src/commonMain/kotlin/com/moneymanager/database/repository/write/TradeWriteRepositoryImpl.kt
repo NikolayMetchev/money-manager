@@ -35,6 +35,7 @@ class TradeWriteRepositoryImpl(
         toAccountId: AccountId,
         toAmount: Money,
         source: Source,
+        occurrence: Int,
     ): TradeCreateResult {
         // A trade is a cross-asset exchange; a same-asset movement is a transfer. The DB CHECK only
         // blocks the same-account+same-asset degenerate case, so enforce the cross-asset rule here.
@@ -43,11 +44,12 @@ class TradeWriteRepositoryImpl(
         }
         return withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
-                // Idempotency: re-importing the same conversion must not double-book. If an identical
-                // trade already exists, return it instead of inserting a duplicate.
+                // Multiset idempotency: re-importing the same conversion must not double-book, but N
+                // genuinely-repeated identical fills must book as N rows. Reuse the occurrence-th existing
+                // identical trade (0-based, ordered by id); once exhausted, fall through to insert.
                 val existing =
                     selectQueries
-                        .selectMatchingTradeId(
+                        .selectMatchingTradeIds(
                             timestamp = timestamp.toEpochMilliseconds(),
                             description = description,
                             from_account_id = fromAccountId.id,
@@ -56,7 +58,8 @@ class TradeWriteRepositoryImpl(
                             to_account_id = toAccountId.id,
                             to_asset_id = toAmount.asset.id.id,
                             to_amount = toAmount.amount.toString(),
-                        ).executeAsOneOrNull()
+                        ).executeAsList()
+                        .getOrNull(occurrence)
                 if (existing != null) {
                     return@transactionWithResult TradeCreateResult(TradeId(existing), created = false)
                 }

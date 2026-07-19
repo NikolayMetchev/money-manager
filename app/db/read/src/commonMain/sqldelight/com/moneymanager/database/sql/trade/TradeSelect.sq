@@ -24,9 +24,12 @@ JOIN asset_details fa ON trade.from_asset_id = fa.id
 JOIN asset_details ta ON trade.to_asset_id = ta.id
 WHERE trade.id = ?;
 
--- Finds an existing trade identical on every field, for re-import dedup (so re-running the same CSV
--- doesn't double-book a conversion). Amounts are the canonical decimal strings.
-selectMatchingTradeId:
+-- Finds every existing trade identical on every field, for re-import dedup (so re-running the same
+-- CSV/API session doesn't double-book a conversion) while still allowing N genuinely-repeated
+-- identical fills (e.g. an exchange order split into several byte-identical fills) to book as N rows.
+-- Ordered by id so callers can consume the k-th occurrence deterministically. Amounts are the
+-- canonical decimal strings.
+selectMatchingTradeIds:
 SELECT id FROM trade
 WHERE timestamp = ?
   AND description = ?
@@ -36,7 +39,7 @@ WHERE timestamp = ?
   AND to_account_id = ?
   AND to_asset_id = ?
   AND to_amount = ?
-LIMIT 1;
+ORDER BY id;
 
 selectByAccount:
 SELECT

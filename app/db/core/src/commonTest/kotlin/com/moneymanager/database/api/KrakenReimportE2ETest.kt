@@ -59,7 +59,7 @@ class KrakenReimportE2ETest : DbTest() {
     private val withdrawalLedgerJson =
         """
         {"error":[],"result":{"ledger":{
-          "LG1":{"refid":"REF1","time":1700000003.5,"asset":"ZGBP","amount":"1998.05","fee":"1.95"}
+          "LG1":{"refid":"REF1","time":1700000003.5,"asset":"ZGBP","amount":"-1998.05","fee":"0.0000"}
         },"count":1}}
         """.trimIndent()
     private val withdrawStatusJson =
