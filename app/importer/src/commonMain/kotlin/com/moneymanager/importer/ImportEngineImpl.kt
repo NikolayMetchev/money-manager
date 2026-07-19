@@ -160,7 +160,34 @@ class ImportEngineImpl(
         }
         val createdTradeIds = mutableMapOf<LocalTradeKey, TradeId>()
         val dedupedTradeKeys = mutableSetOf<LocalTradeKey>()
+
+        // Multiset idempotency (see TradeWriteRepository.createTrade): N intents sharing the exact same
+        // field tuple (e.g. an exchange order split into several byte-identical fills) must book as N
+        // trades, not collapse to one. Count how many identical tuples this pass has already claimed and
+        // pass that count as the occurrence index, so each one reuses a distinct existing row (re-import)
+        // or inserts a distinct new one (first import). The key must group exactly the intents that
+        // createTrade cannot tell apart, so the timestamp is the persisted millisecond value — an Instant
+        // can carry sub-ms precision (e.g. Kraken's float epoch-seconds) that the trade row does not.
+        data class TradeTupleKey(
+            val timestampMs: Long?,
+            val description: String?,
+            val fromAccountId: AccountId?,
+            val fromAmount: Money?,
+            val toAccountId: AccountId?,
+            val toAmount: Money?,
+        )
+        val tradeOccurrences = mutableMapOf<TradeTupleKey, Int>()
         for (intent in batch.trades.creates()) {
+            val tupleKey =
+                TradeTupleKey(
+                    intent.timestamp?.toEpochMilliseconds(),
+                    intent.description,
+                    intent.fromAccountId,
+                    intent.fromAmount,
+                    intent.toAccountId,
+                    intent.toAmount,
+                )
+            val occurrence = tradeOccurrences.getOrDefault(tupleKey, 0)
             val tradeResult =
                 tradeRepository.createTrade(
                     timestamp = requireNotNull(intent.timestamp),
@@ -170,7 +197,9 @@ class ImportEngineImpl(
                     toAccountId = requireNotNull(intent.toAccountId),
                     toAmount = requireNotNull(intent.toAmount),
                     source = intent.source,
+                    occurrence = occurrence,
                 )
+            tradeOccurrences[tupleKey] = occurrence + 1
             createdTradeIds[intent.key] = tradeResult.id
             if (!tradeResult.created) dedupedTradeKeys += intent.key
         }
