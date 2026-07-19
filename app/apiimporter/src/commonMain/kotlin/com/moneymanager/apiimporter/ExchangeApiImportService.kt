@@ -401,6 +401,14 @@ private data class ParsedExchangeTransfer(
     val aliasAccount: String?,
     /** Value looked up against an [ApiDataEndpoint.enrichesTransfers] index (e.g. Kraken Ledgers `refid`). */
     val joinKey: String?,
+    /**
+     * When true, this movement is booked straight to the fee account (exchange -> Fees), never to
+     * the counterparty/funding side. Produced by [ApiTransactionMappings.feeAmountField] on a ledger row
+     * whose main [ApiTransactionMappings.amountField] was skipped as an excluded duplicate (Kraken's
+     * `type=trade` ledger rows carry a same-asset settlement fee TradesHistory never reports, alongside
+     * an `amount` that duplicates the trade TradesHistory already supplied).
+     */
+    val isFeeOnly: Boolean = false,
 )
 
 private data class ParsedOrder(
@@ -430,12 +438,27 @@ private data class ParsedEnrichment(
     val txid: String?,
 )
 
+/**
+ * One leg of a trade-type ledger row excluded from [ParsedExchangeData.transfers] as a duplicate of a
+ * `TradesHistory` trade (see [ApiTransactionMappings.reconcileTradeAmountsField]) — kept so the trade's
+ * booked amount can be reconciled against what the ledger actually settled.
+ */
+private data class ParsedLedgerTradeLeg(
+    val refid: String,
+    val assetCode: String,
+    val signedAmount: BigDecimal,
+    val timestamp: Instant,
+    val requestId: ApiRequestId,
+    val jsonPath: String,
+)
+
 /** Accumulator for parsed items across all of a session's responses. */
 private class ParsedExchangeData {
     val trades = mutableListOf<ParsedTrade>()
     val transfers = mutableListOf<ParsedExchangeTransfer>()
     val orders = mutableListOf<ParsedOrder>()
     val enrichments = mutableListOf<ParsedEnrichment>()
+    val ledgerTradeLegs = mutableListOf<ParsedLedgerTradeLeg>()
 }
 
 /** Parses one response item into [into] according to its endpoint kind. */
@@ -457,12 +480,12 @@ private fun parseExchangeItem(
             dataEndpoint.tradeMappings?.let { parseOrder(obj, it, requestId, jsonPath) }?.let(into.orders::add)
         ApiEndpointKind.DEPOSITS ->
             dataEndpoint.transactionMappings
-                ?.let { parseExchangeTransfer(obj, it, TransferDirection.IN, requestId, jsonPath) }
-                ?.let(into.transfers::add)
+                ?.let { parseExchangeTransfer(obj, it, TransferDirection.IN, requestId, jsonPath, into) }
+                ?.let(into.transfers::addAll)
         ApiEndpointKind.WITHDRAWALS ->
             dataEndpoint.transactionMappings
-                ?.let { parseExchangeTransfer(obj, it, TransferDirection.OUT, requestId, jsonPath) }
-                ?.let(into.transfers::add)
+                ?.let { parseExchangeTransfer(obj, it, TransferDirection.OUT, requestId, jsonPath, into) }
+                ?.let(into.transfers::addAll)
         ApiEndpointKind.BANK_TRANSACTIONS -> Unit
     }
 }
@@ -546,14 +569,7 @@ suspend fun importApiSessionExchange(
             ?: code
 
     fun canonicalAsset(code: String): String = stripAssetSuffix(code).let { aliases[it.uppercase()] ?: it }
-    val trades =
-        parsed.trades.map {
-            it.copy(
-                baseCode = canonicalAsset(it.baseCode),
-                quoteCode = canonicalAsset(it.quoteCode),
-                feeCode = it.feeCode?.let(::canonicalAsset),
-            )
-        }
+    val trades = reconcileTradesAgainstLedger(parsed.trades, parsed.ledgerTradeLegs, ::canonicalAsset)
     // Enrichment endpoints (e.g. Kraken DepositStatus/WithdrawStatus) supply on-chain address/network/
     // txid for transfers built from a different endpoint (Ledgers), matched by joinKey; a transfer's own
     // fields win when present.
@@ -748,16 +764,28 @@ suspend fun importApiSessionExchange(
     for (tx in transfers) {
         val txAsset = asset(tx.currencyCode) ?: continue // single jump — allowed
         val money = Money.fromDisplayValue(tx.amount, txAsset)
-        // Only look up a wallet account for a crypto-denominated transfer — see the minting comment
-        // above. Guarded explicitly (not just relying on accountKeys missing the entry) so a fiat
-        // transfer can never resolve a wallet account that a same-valued crypto address happened to mint.
-        val counterpartyKey =
-            tx.aliasAccount?.let { accountKeys[it] }
-                ?: tx.counterpartyAddress
-                    ?.takeIf { txAsset is CryptoAsset && it.isNotBlank() }
-                    ?.let { accountKeys[it] }
-        val counterparty = counterpartyKey?.let { AccountRef.Local(it) } ?: AccountRef.Existing(fundingId)
-        val (from, to) = if (tx.direction == TransferDirection.IN) counterparty to exchangeRef else exchangeRef to counterparty
+        val (from, to) =
+            if (tx.isFeeOnly) {
+                // A refund (negated ledger fee, e.g. crediting back a failed withdrawal's charge) runs the
+                // opposite way: Fees -> exchange, not exchange -> Fees.
+                if (tx.direction == TransferDirection.IN) {
+                    AccountRef.Existing(feeAccountId) to exchangeRef
+                } else {
+                    exchangeRef to AccountRef.Existing(feeAccountId)
+                }
+            } else {
+                // Only look up a wallet account for a crypto-denominated transfer — see the minting
+                // comment above. Guarded explicitly (not just relying on accountKeys missing the entry)
+                // so a fiat transfer can never resolve a wallet account a same-valued crypto address
+                // happened to mint.
+                val counterpartyKey =
+                    tx.aliasAccount?.let { accountKeys[it] }
+                        ?: tx.counterpartyAddress
+                            ?.takeIf { txAsset is CryptoAsset && it.isNotBlank() }
+                            ?.let { accountKeys[it] }
+                val counterparty = counterpartyKey?.let { AccountRef.Local(it) } ?: AccountRef.Existing(fundingId)
+                if (tx.direction == TransferDirection.IN) counterparty to exchangeRef else exchangeRef to counterparty
+            }
         transferIntents +=
             exchangeTransfer(
                 id = tx.id,
@@ -965,8 +993,18 @@ private fun splitInstrument(
         // EXPLICIT_FIELDS is resolved directly in parseTrade from the base/quote asset fields.
         InstrumentSplitMode.EXPLICIT_FIELDS -> null
         InstrumentSplitMode.QUOTE_SUFFIX -> {
-            val quote = tm.quoteAssets.filter { instrument.endsWith(it) }.maxByOrNull { it.length }
-            quote?.let { instrument.removeSuffix(it) to it }
+            // Kraken marks some crypto/crypto pairs as "synthetic_pair" and reports them
+            // slash-separated (e.g. "SUI/BTC") instead of concatenated like its usual pairs
+            // ("XXBTZGBP") — an explicit separator always wins over suffix matching.
+            val slashIndex = instrument.indexOf('/')
+            if (slashIndex >= 0) {
+                val base = instrument.substring(0, slashIndex)
+                val quote = instrument.substring(slashIndex + 1)
+                if (base.isNotEmpty() && quote.isNotEmpty()) base to quote else null
+            } else {
+                val quote = tm.quoteAssets.filter { instrument.endsWith(it) }.maxByOrNull { it.length }
+                quote?.let { instrument.removeSuffix(it) to it }
+            }
         }
     }
 
@@ -976,29 +1014,175 @@ private fun parseExchangeTransfer(
     direction: TransferDirection,
     requestId: ApiRequestId,
     jsonPath: String,
-): ParsedExchangeTransfer? {
-    val amount = obj.str(tm.amountField)?.let { runCatching { BigDecimal(it).abs() }.getOrNull() } ?: return null
-    val currency = obj.str(tm.currencyField) ?: return null
-    val timestamp = obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat) } ?: return null
-    val id = obj.str(tm.idField) ?: return null
-    val description =
-        obj.str(tm.descriptionField)?.takeIf { it.isNotBlank() }
-            ?: if (direction == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
-    return ParsedExchangeTransfer(
-        id = id,
-        timestamp = timestamp,
-        currencyCode = currency,
-        amount = amount,
-        direction = direction,
-        description = description,
-        requestId = requestId,
-        jsonPath = jsonPath,
-        counterpartyAddress = tm.counterpartyAddressField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
-        network = tm.counterpartyNetworkField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
-        txid = tm.txidField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
-        aliasAccount = tm.counterpartyAliasField?.let { obj.str(it) }?.let { tm.counterpartyAccountAliases[it] },
-        joinKey = tm.joinKeyField?.let { obj.str(it) },
-    )
+    into: ParsedExchangeData,
+): List<ParsedExchangeTransfer> {
+    val currency = obj.str(tm.currencyField) ?: return emptyList()
+    val timestamp = obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat) } ?: return emptyList()
+    val id = obj.str(tm.idField) ?: return emptyList()
+    val excludeField = tm.excludeField
+    val excluded = excludeField != null && obj.str(excludeField) in tm.excludeValues
+    val rawAmount = obj.str(tm.amountField)?.let { runCatching { BigDecimal(it) }.getOrNull() }
+
+    val result = mutableListOf<ParsedExchangeTransfer>()
+    if (excluded) {
+        val refField = tm.reconcileTradeAmountsField
+        val refid = refField?.let { obj.str(it) }
+        if (refid != null && rawAmount != null) {
+            into.ledgerTradeLegs +=
+                ParsedLedgerTradeLeg(
+                    refid = refid,
+                    assetCode = currency,
+                    signedAmount = rawAmount,
+                    timestamp = timestamp,
+                    requestId = requestId,
+                    jsonPath = jsonPath,
+                )
+        }
+    } else if (rawAmount != null) {
+        // Some exchanges (Kraken) book a failed/cancelled deposit or withdrawal as a second ledger
+        // entry sharing the same id with the opposite sign of the original debit/credit, netting to
+        // zero; deriving direction from the sign instead of trusting the endpoint's fixed direction
+        // preserves that net-zero.
+        val resolvedDirection =
+            if (tm.directionFromAmountSign) {
+                if (rawAmount < BigDecimal.ZERO) TransferDirection.OUT else TransferDirection.IN
+            } else {
+                direction
+            }
+        val amount = rawAmount.abs()
+        val description =
+            obj.str(tm.descriptionField)?.takeIf { it.isNotBlank() }
+                ?: if (resolvedDirection == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
+        result +=
+            ParsedExchangeTransfer(
+                id = id,
+                timestamp = timestamp,
+                currencyCode = currency,
+                amount = amount,
+                direction = resolvedDirection,
+                description = description,
+                requestId = requestId,
+                jsonPath = jsonPath,
+                counterpartyAddress = tm.counterpartyAddressField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+                network = tm.counterpartyNetworkField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+                txid = tm.txidField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+                aliasAccount = tm.counterpartyAliasField?.let { obj.str(it) }?.let { tm.counterpartyAccountAliases[it] },
+                joinKey = tm.joinKeyField?.let { obj.str(it) },
+            )
+    }
+
+    // Kraken's ledger charges a same-asset settlement fee on some rows (visible only here, never in
+    // TradesHistory's own quote-currency fee) — extracted unconditionally, even when the row's main
+    // amount was excluded as a trade-type duplicate, since the fee itself is not a duplicate of anything.
+    // A failed/reversed deposit or withdrawal's reversal row carries the *negated* fee (a refund of the
+    // original charge) — abs()-ing it would book the refund as a second charge instead of crediting it
+    // back, so the sign decides direction: negative -> refund (Fees -> exchange), positive -> charge
+    // (exchange -> Fees).
+    val rawFeeAmount = tm.feeAmountField?.let { obj.str(it)?.let { v -> runCatching { BigDecimal(v) }.getOrNull() } }
+    if (rawFeeAmount != null && rawFeeAmount != BigDecimal.ZERO) {
+        val isRefund = rawFeeAmount < BigDecimal.ZERO
+        result +=
+            ParsedExchangeTransfer(
+                id = "$id-fee",
+                timestamp = timestamp,
+                currencyCode = currency,
+                amount = rawFeeAmount.abs(),
+                direction = if (isRefund) TransferDirection.IN else TransferDirection.OUT,
+                description =
+                    tm.feeDescriptionField?.let { obj.str(it) }?.takeIf { it.isNotBlank() }
+                        ?: if (isRefund) "$currency fee refund" else "$currency fee",
+                requestId = requestId,
+                jsonPath = jsonPath,
+                counterpartyAddress = null,
+                network = null,
+                txid = null,
+                aliasAccount = null,
+                joinKey = null,
+                isFeeOnly = true,
+            )
+    }
+    return result
+}
+
+/**
+ * Reconciles parsed trades against their authoritative ledger legs (see
+ * [ApiTransactionMappings.reconcileTradeAmountsField]): a trade's leg amounts are overridden by the
+ * matching ledger group's signed amounts where present, and any ledger group matching no trade at all
+ * is booked as its own trade — Kraken's Ledgers `balance` is ground truth, so no movement it reports
+ * may be silently dropped or left at a TradesHistory amount it disagrees with.
+ */
+private fun reconcileTradesAgainstLedger(
+    rawTrades: List<ParsedTrade>,
+    ledgerLegs: List<ParsedLedgerTradeLeg>,
+    canonicalAsset: (String) -> String,
+): List<ParsedTrade> {
+    val trades =
+        rawTrades.map {
+            it.copy(
+                baseCode = canonicalAsset(it.baseCode),
+                quoteCode = canonicalAsset(it.quoteCode),
+                feeCode = it.feeCode?.let(canonicalAsset),
+            )
+        }
+    val legsByRefid = ledgerLegs.map { it.copy(assetCode = canonicalAsset(it.assetCode)) }.groupBy { it.refid }
+    if (legsByRefid.isEmpty()) return trades
+
+    val consumedRefids = mutableSetOf<String>()
+
+    // A trade's own id equals its ledger refid for an ordinary fill; a Kraken "synthetic_pair"
+    // crypto/crypto trade's id never appears as a ledger refid at all, so fall back to the only other
+    // thing that reliably ties them together: the same second and the same {base, quote} asset pair.
+    fun legsFor(trade: ParsedTrade): List<ParsedLedgerTradeLeg>? {
+        legsByRefid[trade.id]?.let {
+            consumedRefids += trade.id
+            return it
+        }
+        val tradeSecond = trade.timestamp.epochSeconds
+        val assets = setOf(trade.baseCode, trade.quoteCode)
+        val match =
+            legsByRefid.entries.firstOrNull { (refid, legs) ->
+                refid !in consumedRefids &&
+                    legs.any { it.timestamp.epochSeconds == tradeSecond } &&
+                    legs.map { it.assetCode }.toSet() == assets
+            }
+        match?.let { consumedRefids += it.key }
+        return match?.value
+    }
+
+    val reconciled =
+        trades.map { trade ->
+            val legs = legsFor(trade) ?: return@map trade
+            val baseLeg = legs.firstOrNull { it.assetCode == trade.baseCode }
+            val quoteLeg = legs.firstOrNull { it.assetCode == trade.quoteCode }
+            trade.copy(
+                baseQuantity = baseLeg?.signedAmount?.abs() ?: trade.baseQuantity,
+                quoteAmount = quoteLeg?.signedAmount?.abs() ?: trade.quoteAmount,
+            )
+        }
+
+    val orphanTrades =
+        legsByRefid.entries
+            .filterNot { it.key in consumedRefids }
+            .mapNotNull { (refid, legs) ->
+                if (legs.size != 2) return@mapNotNull null
+                val outLeg = legs.firstOrNull { it.signedAmount < BigDecimal.ZERO } ?: return@mapNotNull null
+                val inLeg = legs.firstOrNull { it.signedAmount > BigDecimal.ZERO } ?: return@mapNotNull null
+                ParsedTrade(
+                    id = refid,
+                    timestamp = outLeg.timestamp,
+                    isBuy = false,
+                    baseCode = outLeg.assetCode,
+                    quoteCode = inLeg.assetCode,
+                    baseQuantity = outLeg.signedAmount.abs(),
+                    quoteAmount = inLeg.signedAmount.abs(),
+                    feeAmount = null,
+                    feeCode = null,
+                    orderId = null,
+                    requestId = outLeg.requestId,
+                    jsonPath = outLeg.jsonPath,
+                )
+            }
+    return reconciled + orphanTrades
 }
 
 /** Converts an exchange-reported display value exactly; throws if the asset's scale can't

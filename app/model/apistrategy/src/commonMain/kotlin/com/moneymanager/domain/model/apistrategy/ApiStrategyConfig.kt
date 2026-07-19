@@ -334,6 +334,32 @@ data class ApiTransactionMappings(
      * [counterpartyNetworkField] from the enrichment item. Null disables enrichment for this mapping.
      */
     val joinKeyField: String? = null,
+    /**
+     * When true, the endpoint's fixed direction (IN for DEPOSITS, OUT for WITHDRAWALS) is overridden
+     * by the sign of the raw [amountField] value: negative -> OUT, non-negative -> IN. Some exchanges
+     * (Kraken) report a failed/cancelled deposit or withdrawal as a second ledger entry sharing the
+     * same id with the opposite sign, so the movement nets to zero; treating every ledger row as
+     * unsigned and direction-by-endpoint double-books the reversal as an additional real movement.
+     */
+    val directionFromAmountSign: Boolean = false,
+    /**
+     * Dot-path to a field whose value, if present in [excludeValues], causes the item to be skipped
+     * entirely (no transfer, no enrichment). Used when a single endpoint's response mixes record kinds
+     * that must be dropped — e.g. Kraken's Ledgers `type=all` includes `"trade"` entries that duplicate
+     * the trades already sourced from `TradesHistory`.
+     */
+    val excludeField: String? = null,
+    val excludeValues: Set<String> = emptySet(),
+    /**
+     * Dot-path to a field identifying the trade this row belongs to (e.g. Kraken Ledgers `refid`, which
+     * equals the matching `TradesHistory` trade's own id). When set on a row excluded via
+     * [excludeField]/[excludeValues] (a duplicate trade-type ledger entry), the row's signed amount is
+     * kept as an authoritative leg for reconciling that trade's booked amount — Kraken's TradesHistory
+     * `cost` is a display-rounded price*volume for synthetic crypto/crypto pairs and can disagree with
+     * what the ledger actually settled. A ledger group with no matching trade at all is booked as its
+     * own trade from the two legs, so no movement the ledger reports is ever silently dropped.
+     */
+    val reconcileTradeAmountsField: String? = null,
 )
 
 @Serializable

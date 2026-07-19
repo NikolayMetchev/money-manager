@@ -41,7 +41,6 @@ import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
-import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -620,8 +619,12 @@ object BuiltInApiStrategies {
                 splitMode = InstrumentSplitMode.QUOTE_SUFFIX,
                 // The longest matching suffix always wins (see splitInstrument), so shorter codes that
                 // are also suffixes of longer ones (e.g. "ZUSD" ends with "USD") are listed safely.
-                // "XXBT"/"XETH" cover crypto/crypto pairs quoted in BTC or ETH (e.g. "XETHXXBT" is
-                // ETH/BTC, not a BTC/USD-style fiat pair).
+                // "XXBT"/"XETH" cover crypto/crypto pairs quoted in BTC or ETH using Kraken's legacy long
+                // codes (e.g. "XETHXXBT" is ETH/BTC); "BTC"/"ETH" cover the same case for pairs that use
+                // the short code instead (e.g. "ETHWETH" is ETHW/ETH, "PAXGETH" is PAXG/ETH) — Kraken is
+                // inconsistent about which form a given pair uses. "PYUSD" (and other multi-char
+                // stablecoins) must be listed or a pair like "XBTPYUSD" wrongly matches the shorter "USD"
+                // suffix, splitting as XBTPY/USD instead of XBT/PYUSD.
                 quoteAssets =
                     listOf(
                         "XXBT",
@@ -633,9 +636,17 @@ object BuiltInApiStrategies {
                         "ZJPY",
                         "ZCHF",
                         "ZAUD",
+                        "PYUSD",
                         "USDT",
                         "USDC",
+                        "USDG",
+                        "RLUSD",
+                        "TUSD",
+                        "EURT",
                         "DAI",
+                        "XBT",
+                        "BTC",
+                        "ETH",
                         "USD",
                         "EUR",
                         "GBP",
@@ -644,7 +655,11 @@ object BuiltInApiStrategies {
                 buyValues = setOf("buy"),
                 baseQuantityField = "vol",
                 quoteQuantityField = "cost",
-                feeField = "fee",
+                // No feeField: TradesHistory's own fee is a quote-currency report that can disagree with
+                // (or duplicate) what was actually charged — sometimes in a different asset entirely (a
+                // base-asset settlement fee Kraken bills separately). The Ledgers `type=all` feed already
+                // supplies every fee authoritatively (see ledgerMappings' feeAmountField), so the trade
+                // path books none of its own.
                 timestampField = "time",
                 timestampFormat = TimestampFormat.EPOCH_S_FLOAT,
                 idField = "trade_id",
@@ -663,6 +678,14 @@ object BuiltInApiStrategies {
                 amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                 feeAmountField = "fee",
                 joinKeyField = joinKey,
+                // A failed/cancelled deposit or withdrawal appears as two ledger rows sharing one refid
+                // with opposite-signed amounts (the debit and its reversal), netting to zero. Kraken's
+                // "amount" is signed (negative = out), so trust that sign instead of the endpoint's fixed
+                // direction, or the reversal double-books as a second real movement in the same direction.
+                directionFromAmountSign = true,
+                // Only meaningful on the excluded `type=trade` rows (see excludeField/excludeValues
+                // below) — refid equals the matching TradesHistory trade's own id.
+                reconcileTradeAmountsField = "refid",
             )
 
         // DepositStatus/WithdrawStatus supply no money movement of their own — they only enrich the
@@ -698,60 +721,44 @@ object BuiltInApiStrategies {
             dataEndpoints =
                 listOf(
                     ApiDataEndpoint(
-                        signed("0/private/TradesHistory", "result.trades", responseObjectValues = true),
+                        // Splice the response object's own key (e.g. "STVCTCR-ERSZJ-HBXQB2") over the
+                        // "trade_id" field before mapping: the native `trade_id` is a small per-fill
+                        // sequence number that collides across unrelated trades (observed repeatedly as
+                        // 0), whereas the key is unique and — critically — is the same identifier
+                        // Kraken's Ledgers rows carry as `refid`, letting reconcileTradeAmountsField join
+                        // a trade to its authoritative ledger legs (see ledgerMappings).
+                        signed(
+                            "0/private/TradesHistory",
+                            "result.trades",
+                            responseObjectValues = true,
+                            itemKeyField = "trade_id",
+                        ),
                         ApiEndpointKind.TRADES,
                         tradeMappings = tradeMappings,
                     ),
+                    // Every non-trade ledger movement in one pass. Kraken's Ledgers `type` enum is
+                    // `all, trade, deposit, withdrawal, transfer, margin, adjustment, rollover, credit,
+                    // settled, staking, dividend, sale, nft_rebate` (default "all") — earlier revisions
+                    // of this strategy only requested deposit/withdrawal/reward/staking, so any balance
+                    // movement Kraken books under transfer/margin/adjustment/rollover/credit/settled/
+                    // sale/nft_rebate (Earn subscribe/unsubscribe, internal moves, fee rebates, etc.) was
+                    // invisible to the importer — the account balance would silently drift from the true
+                    // Kraken balance by exactly the missed amount. `type=all` also returns `trade`-type
+                    // entries that duplicate what TradesHistory already supplies, so those are dropped via
+                    // excludeField/excludeValues. Direction comes from the signed `amount` field
+                    // (directionFromAmountSign), not the ledger `type`, so this single endpoint covers
+                    // every type without per-type direction mapping — including the historical "reward"
+                    // vs "staking" naming inconsistency between Kraken account vintages.
                     ApiDataEndpoint(
                         signed(
                             "0/private/Ledgers",
                             "result.ledger",
                             responseObjectValues = true,
                             itemKeyField = "ledger_id",
-                            queryParams = listOf(ApiQueryParam(name = "type", value = "deposit")),
+                            queryParams = listOf(ApiQueryParam(name = "type", value = "all")),
                         ),
                         ApiEndpointKind.DEPOSITS,
-                        fixedDirection = TransferDirection.IN,
-                        transactionMappings = ledgerMappings("refid"),
-                    ),
-                    ApiDataEndpoint(
-                        signed(
-                            "0/private/Ledgers",
-                            "result.ledger",
-                            responseObjectValues = true,
-                            itemKeyField = "ledger_id",
-                            queryParams = listOf(ApiQueryParam(name = "type", value = "withdrawal")),
-                        ),
-                        ApiEndpointKind.WITHDRAWALS,
-                        fixedDirection = TransferDirection.OUT,
-                        transactionMappings = ledgerMappings("refid"),
-                    ),
-                    // Earn/staking reward payouts. Kraken's own docs disagree on the ledger type value
-                    // ("reward" vs "staking") between endpoints — both are requested; whichever the
-                    // account doesn't use simply returns an empty ledger.
-                    ApiDataEndpoint(
-                        signed(
-                            "0/private/Ledgers",
-                            "result.ledger",
-                            responseObjectValues = true,
-                            itemKeyField = "ledger_id",
-                            queryParams = listOf(ApiQueryParam(name = "type", value = "reward")),
-                        ),
-                        ApiEndpointKind.DEPOSITS,
-                        fixedDirection = TransferDirection.IN,
-                        transactionMappings = ledgerMappings("refid"),
-                    ),
-                    ApiDataEndpoint(
-                        signed(
-                            "0/private/Ledgers",
-                            "result.ledger",
-                            responseObjectValues = true,
-                            itemKeyField = "ledger_id",
-                            queryParams = listOf(ApiQueryParam(name = "type", value = "staking")),
-                        ),
-                        ApiEndpointKind.DEPOSITS,
-                        fixedDirection = TransferDirection.IN,
-                        transactionMappings = ledgerMappings("refid"),
+                        transactionMappings = ledgerMappings("refid").copy(excludeField = "type", excludeValues = setOf("trade")),
                     ),
                     // Known limitation: Kraken paginates these funding-status endpoints with an opaque
                     // cursor token (not the offset/date-window shapes the generic engine implements), so

@@ -183,9 +183,22 @@ class ImportDeduper(
     // the reconcile candidates by that triple.
     private val reconcileCandidatesByDirectedAmount: Map<DirectedAmountKey, List<Pair<TransferId, Transfer>>> =
         reconcileCandidates.groupBy { (_, t) -> DirectedAmountKey(t.sourceAccountId, t.targetAccountId, t.amount) }
+
+    // Transfer id -> apiId, for the same non-conflict check applied to in-batch candidates below.
+    private val existingApiIdByTransferId: Map<TransferId, String> =
+        existing.mapNotNull { info -> info.apiId?.let { info.transferId to it } }.toMap()
+
     private val batchApiId = mutableMapOf<String, Int>()
     private val batchUniqueKey = mutableMapOf<Map<String, String>, Int>()
-    private val batchMatchCandidates = mutableListOf<Pair<Int, Transfer>>()
+
+    /** A fuzzy-match candidate from earlier in this batch, keeping its own apiId (see [apiIdConflict]). */
+    private data class BatchCandidate(
+        val index: Int,
+        val transfer: Transfer,
+        val apiId: String?,
+    )
+
+    private val batchMatchCandidates = mutableListOf<BatchCandidate>()
 
     // Existing legs already claimed by an earlier funding-card or internal-transfer reconcile in this
     // batch. Unlike plain cross-source reconcile (which deliberately doesn't consume), both of these rules
@@ -222,7 +235,9 @@ class ImportDeduper(
         val existingId =
             transfer.apiId?.let { existingApiId[it] }
                 ?: transfer.uniqueKey?.takeIf { it.isNotEmpty() }?.let { existingUniqueKeyId[it] }
-                ?: apiMatchCandidatesFor(transfer).firstOrNull { (_, e) -> apiMatches(transfer, e) }?.first
+                ?: apiMatchCandidatesFor(transfer)
+                    .firstOrNull { (id, e) -> apiMatches(transfer, e) && !apiIdConflict(transfer.apiId, existingApiIdByTransferId[id]) }
+                    ?.first
         if (existingId != null) return Classified(transfer, ImportStatus.DUPLICATE, existingId)
 
         // Cross-source reconciliation: the same real movement seen from another provider. Keep this
@@ -242,7 +257,9 @@ class ImportDeduper(
         val batchMatchIndex =
             transfer.apiId?.let { batchApiId[it] }
                 ?: transfer.uniqueKey?.takeIf { it.isNotEmpty() }?.let { batchUniqueKey[it] }
-                ?: batchMatchCandidates.firstOrNull { (_, e) -> apiMatches(transfer, e) }?.first
+                ?: batchMatchCandidates
+                    .firstOrNull { c -> apiMatches(transfer, c.transfer) && !apiIdConflict(transfer.apiId, c.apiId) }
+                    ?.index
         if (batchMatchIndex != null) {
             return Classified(transfer, ImportStatus.DUPLICATE, existing = null, inBatchMatchIndex = batchMatchIndex)
         }
@@ -250,9 +267,21 @@ class ImportDeduper(
         // Accepted: register this transfer so later items in the batch dedupe against it.
         transfer.apiId?.let { batchApiId[it] = index }
         transfer.uniqueKey?.takeIf { it.isNotEmpty() }?.let { batchUniqueKey[it] = index }
-        batchMatchCandidates += index to transfer.toComparableTransfer(TransferId(0))
+        batchMatchCandidates += BatchCandidate(index, transfer.toComparableTransfer(TransferId(0)), transfer.apiId)
         return Classified(transfer, ImportStatus.IMPORTED, null)
     }
+
+    /**
+     * True when both sides carry a provider-native id and they differ — e.g. Kraken's Earn
+     * autoallocation books a spot-debit and Earn-credit leg as two distinct ledger rows, same
+     * timestamp/amount/account-pair but opposite direction; each has its own unique `ledger_id`. Fuzzy
+     * (timestamp+amount+either-direction) matching exists only for legacy/no-apiId records, so it must
+     * never treat two differently-identified real movements as the same one.
+     */
+    private fun apiIdConflict(
+        incoming: String?,
+        existing: String?,
+    ): Boolean = incoming != null && existing != null && incoming != existing
 
     /**
      * Classifies [transfer] as a cross-source reconciliation of an existing transfer when the policy

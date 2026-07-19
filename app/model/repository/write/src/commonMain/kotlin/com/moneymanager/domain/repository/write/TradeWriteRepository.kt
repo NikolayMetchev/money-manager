@@ -23,8 +23,14 @@ interface TradeWriteRepository : TradeReadRepository {
     /**
      * Creates a cross-asset trade: [fromAmount] leaves [fromAccountId], [toAmount] enters
      * [toAccountId] (the two [Money] legs may be denominated in different assets). Allocates a
-     * `transaction_id`, inserts the trade, and records provenance. Idempotent: if an identical
-     * trade already exists it is returned with [TradeCreateResult.created] = false.
+     * `transaction_id`, inserts the trade, and records provenance.
+     *
+     * Idempotent as a **multiset**, not a set: [occurrence] (0-based) is the caller's count of how
+     * many earlier trades in this same create pass already matched this exact field tuple (e.g. an
+     * exchange order split into several byte-identical fills). The occurrence-th existing identical
+     * trade is reused ([TradeCreateResult.created] = false); once existing matches are exhausted, a
+     * new row is inserted. This lets N genuinely-repeated identical fills book as N distinct trades
+     * while re-importing the same N fills still dedupes to the same N rows instead of only one.
      */
     @Suppress("LongParameterList")
     suspend fun createTrade(
@@ -35,6 +41,7 @@ interface TradeWriteRepository : TradeReadRepository {
         toAccountId: AccountId,
         toAmount: Money,
         source: Source,
+        occurrence: Int = 0,
     ): TradeCreateResult
 
     suspend fun deleteTrade(id: TradeId)
