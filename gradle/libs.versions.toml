@@ -169,8 +169,6 @@ kover-gradle-plugin = { module = "org.jetbrains.kotlinx:kover-gradle-plugin", ve
 ktlint-gradle-plugin = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint" }
 ktor-client-auth = { module = "io.ktor:ktor-client-auth", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
-poi = { module = "org.apache.poi:poi", version.ref = "poi" }
-poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
@@ -183,6 +181,8 @@ metro-gradle-plugin = { module = "dev.zacsweers.metro:dev.zacsweers.metro.gradle
 metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
 mokkery-core = { module = "dev.mokkery:mokkery-core", version.ref = "mokkery" }
 mokkery-runtime = { module = "dev.mokkery:mokkery-runtime", version.ref = "mokkery" }
+poi = { module = "org.apache.poi:poi", version.ref = "poi" }
+poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
 schemaspy = { module = "org.schemaspy:schemaspy", version.ref = "schemaspy" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 sort-dependencies-gradle-plugin = { module = "com.squareup.sort-dependencies:com.squareup.sort-dependencies.gradle.plugin", version.ref = "sort-dependencies" }

@@ -59,8 +59,12 @@ object BuiltInCsvStrategies {
      * `Card Acceptor Name` field (e.g. `"Spotify UK               Stockholm      SWE"` ->
      * `"Spotify UK"`, `"CRV*Card verification    London         GBR"` -> `"CRV*Card verification"`),
      * while leaving any leading marker (like "CRV*") untouched for [BuiltInPassThroughs] to detect.
+     * Anchors on the first non-space character (`\s*(\S.*?)`) rather than a bare lazy `(.+?)`: for a
+     * value that's pure padding + a trailing country code (e.g. "                    GBR", no real
+     * merchant name), a bare `(.+?)` backtracks to a single leading space instead of skipping to "GBR",
+     * producing a blank/whitespace-only description.
      */
-    private const val CARD_ACCEPTOR_NAME_TRIM_PATTERN = "^(.+?)(?:\\s{2,}.*)?$"
+    private const val CARD_ACCEPTOR_NAME_TRIM_PATTERN = "^\\s*(\\S.*?)(?:\\s{2,}.*)?$"
 
     /**
      * The Crypto.com Exchange account (also created by the Exchange API strategy). Routing the App's

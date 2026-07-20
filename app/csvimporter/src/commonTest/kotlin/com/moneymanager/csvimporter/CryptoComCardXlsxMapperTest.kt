@@ -204,6 +204,10 @@ class CryptoComCardXlsxMapperTest {
         assertEquals(card.id, r.transfer.targetAccountId)
         assertEquals(Money.fromDisplayValue(BigDecimal("200.0"), gbp), r.transfer.amount)
         assertEquals(emptyList(), r.newAccounts)
+        // Card Acceptor Name here is pure padding + a country code ("                    GBR", no real
+        // merchant): the trim regex must skip past the leading whitespace rather than capturing just a
+        // single leading space, or the description ends up blank/whitespace-only.
+        assertEquals("GBR", r.transfer.description)
     }
 
     @Test
