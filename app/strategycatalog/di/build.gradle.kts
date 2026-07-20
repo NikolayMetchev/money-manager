@@ -15,6 +15,12 @@ kotlin {
             dependencies {
                 api(projects.app.di.scope)
                 api(projects.app.strategycatalog)
+                api(projects.utils.localsettings)
+            }
+        }
+        getByName("androidMain") {
+            dependencies {
+                api(projects.utils.localsettings)
             }
         }
     }
