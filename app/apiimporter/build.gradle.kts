@@ -25,20 +25,20 @@ kotlin {
 
         getByName("jvmMain") {
             dependencies {
-                api(libs.kotlinx.serialization.json)
                 api(projects.app.importengineapi)
                 api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.repository.read)
                 api(projects.utils.rest)
+                api(libs.kotlinx.serialization.json)
 
+                implementation(projects.app.model.csv)
+                implementation(projects.utils.bigdecimal)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.http)
-                implementation(projects.app.model.csv)
-                implementation(projects.utils.bigdecimal)
             }
         }
 
@@ -46,11 +46,11 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.serialization.json)
 
+                implementation(projects.utils.bigdecimal)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.http)
-                implementation(projects.utils.bigdecimal)
             }
         }
 
