@@ -48,6 +48,11 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
+        getByName("jvmTest") {
+            dependencies {
+                implementation(kotlin("reflect"))
+            }
+        }
     }
 }
 

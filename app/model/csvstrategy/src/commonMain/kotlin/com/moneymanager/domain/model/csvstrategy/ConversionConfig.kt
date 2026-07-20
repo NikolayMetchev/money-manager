@@ -48,8 +48,11 @@ data class ConversionConfig(
     val debitPattern: String,
     val creditPattern: String,
     val conversionAccountName: String? = null,
+    // First matching rule wins - order is semantic, keeps default insertion-order serialization.
     val conversionAccountRules: List<ConversionAccountRule> = emptyList(),
     val pairingKeyPattern: String? = null,
+    // Column values are joined in order to form the pairing key - order is semantic, keeps default
+    // insertion-order serialization.
     val pairingKeyColumns: List<String> = emptyList(),
     val pairingWindowSeconds: Long,
     val relationshipTypeName: String,

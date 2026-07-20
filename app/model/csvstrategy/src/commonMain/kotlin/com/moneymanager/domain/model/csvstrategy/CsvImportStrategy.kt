@@ -3,6 +3,7 @@
 package com.moneymanager.domain.model.csvstrategy
 
 import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.serialization.SortedListSerializer
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
@@ -17,7 +18,12 @@ import kotlin.time.Instant
 data class ContentMatchRule(
     val columnName: String,
     val pattern: String,
-)
+) : Comparable<ContentMatchRule> {
+    override fun compareTo(other: ContentMatchRule): Int = compareValuesBy(this, other, { it.columnName }, { it.pattern })
+}
+
+/** Serializes content-match-rule lists sorted by natural order — a file matches if ANY rule hits, so list order carries no meaning. */
+object SortedContentMatchRuleListSerializer : SortedListSerializer<ContentMatchRule>(ContentMatchRule.serializer())
 
 /**
  * Selects an account by matching a CSV [column]'s value against the regex patterns held by a given
