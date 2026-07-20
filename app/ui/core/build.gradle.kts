@@ -7,8 +7,6 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(libs.kotlinx.coroutines.core)
-                api(libs.kotlinx.serialization.json)
                 api(projects.app.apiimporter)
                 api(projects.app.csvimporter)
                 api(projects.app.db.core)
@@ -40,38 +38,42 @@ kotlin {
                 api(projects.app.ui.transactions)
                 api(projects.utils.localsettings)
                 api(projects.utils.rest)
+                api(libs.kotlinx.coroutines.core)
+                api(libs.kotlinx.serialization.json)
 
-                implementation(libs.androidx.navigation3.runtime)
                 implementation(projects.app.db.read)
                 implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.currency)
                 implementation(projects.utils.parsers.qif)
+                implementation(libs.androidx.navigation3.runtime)
             }
         }
         val jvmAndroidMain =
-            create("jvmAndroidMain") {
+                create("jvmAndroidMain") {
                 dependsOn(getByName("commonMain"))
             }
         getByName("commonTest") {
             dependencies {
+                implementation(projects.test.app.db)
+                implementation(projects.test.app.ui)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.ktor.client.mock)
-                implementation(projects.test.app.db)
-                implementation(projects.test.app.ui)
             }
         }
         getByName("androidMain") {
             dependsOn(jvmAndroidMain)
             dependencies {
+                api(projects.app.db.write)
                 api(libs.androidx.compose.foundation)
                 api(libs.androidx.compose.foundation.layout)
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
                 api(libs.androidx.compose.ui.unit)
-                api(projects.app.db.write)
 
+                implementation(projects.app.model.apistrategy)
+                implementation(projects.app.model.repository.write)
                 implementation(libs.androidx.compose.animation)
                 implementation(libs.androidx.compose.material3)
                 implementation(libs.androidx.compose.runtime.annotation)
@@ -82,8 +84,6 @@ kotlin {
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
-                implementation(projects.app.model.apistrategy)
-                implementation(projects.app.model.repository.write)
 
                 runtimeOnly(libs.kotlinx.coroutines.android)
             }
@@ -91,8 +91,6 @@ kotlin {
         getByName("jvmMain") {
             dependsOn(jvmAndroidMain)
             dependencies {
-                api(libs.androidx.compose.runtime.desktop)
-                api(libs.compose.foundation.layout.desktop)
                 api(projects.app.db.core)
                 api(projects.app.db.write)
                 api(projects.app.importengineapi)
@@ -106,7 +104,13 @@ kotlin {
                 api(projects.app.strategycatalog)
                 api(projects.app.ui.foundation)
                 api(projects.utils.localsettings)
+                api(libs.androidx.compose.runtime.desktop)
+                api(libs.compose.foundation.layout.desktop)
 
+                implementation(projects.app.model.apistrategy)
+                implementation(projects.app.model.passthrough)
+                implementation(projects.app.model.repository.write)
+                implementation(projects.app.remotestorage.core)
                 implementation(libs.androidx.compose.runtime.annotation)
                 implementation(libs.androidx.navigation3.runtime.desktop)
                 implementation(libs.androidx.savedstate.desktop)
@@ -121,21 +125,12 @@ kotlin {
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
-                implementation(projects.app.model.apistrategy)
-                implementation(projects.app.model.passthrough)
-                implementation(projects.app.model.repository.write)
-                implementation(projects.app.remotestorage.core)
 
                 runtimeOnly(libs.kotlinx.coroutines.swing)
             }
         }
         getByName("jvmTest") {
             dependencies {
-                implementation(kotlin("test"))
-                // Skiko native libraries for desktop UI tests
-                implementation(compose.desktop.currentOs)
-                implementation(libs.androidx.compose.runtime.desktop)
-                implementation(libs.compose.ui.test.desktop)
                 implementation(projects.app.apiimporter)
                 implementation(projects.app.csvimporter)
                 implementation(projects.app.db.di)
@@ -147,17 +142,17 @@ kotlin {
                 implementation(projects.app.qifimporter)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.rest)
+                implementation(kotlin("test"))
+                // Skiko native libraries for desktop UI tests
+                implementation(compose.desktop.currentOs)
+                implementation(libs.androidx.compose.runtime.desktop)
+                implementation(libs.compose.ui.test.desktop)
             }
         }
         getByName("androidDeviceTest") {
             // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
             // Tests are shared via kotlin.srcDir() below
             dependencies {
-                implementation(kotlin("test"))
-                implementation(libs.androidx.compose.runtime)
-                implementation(libs.androidx.compose.ui.test)
-                implementation(libs.kotlinx.coroutines.test)
-                implementation(libs.ktor.client.mock)
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
                 implementation(projects.app.importer)
@@ -166,16 +161,18 @@ kotlin {
                 implementation(projects.test.app.db)
                 implementation(projects.test.app.ui)
                 implementation(projects.utils.bigdecimal)
-            }
-            kotlin.srcDir("src/commonTest/kotlin")
-            // Include commonTest resources for test database files
-            resources.srcDir("src/commonTest/resources")
-        }
-        getByName("androidHostTest") {
-            dependencies {
+                implementation(kotlin("test"))
                 implementation(libs.androidx.compose.runtime)
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.ktor.client.mock)
+                }
+                kotlin.srcDir("src/commonTest/kotlin")
+                // Include commonTest resources for test database files
+                resources.srcDir("src/commonTest/resources")
+                }
+                getByName("androidHostTest") {
+                dependencies {
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
                 implementation(projects.app.importer)
@@ -183,6 +180,9 @@ kotlin {
                 implementation(projects.app.model.repository.write)
                 implementation(projects.test.app.db)
                 implementation(projects.utils.bigdecimal)
+                implementation(libs.androidx.compose.runtime)
+                implementation(libs.androidx.compose.ui.test)
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
     }

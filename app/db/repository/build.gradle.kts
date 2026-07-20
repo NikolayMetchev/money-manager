@@ -10,7 +10,6 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(libs.kotlinx.coroutines.core)
                 api(projects.app.db.read)
                 api(projects.app.db.schema)
                 api(projects.app.model.accountmapping)
@@ -23,10 +22,11 @@ kotlin {
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
+                api(libs.kotlinx.coroutines.core)
 
+                implementation(projects.utils.bigdecimal)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.sqldelight.coroutines.extensions)
-                implementation(projects.utils.bigdecimal)
             }
         }
         getByName("androidMain") {

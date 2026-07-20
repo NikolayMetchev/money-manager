@@ -30,31 +30,31 @@ kotlin {
                     implementation(libs.kotlinx.serialization.json)
                     implementation(libs.ktor.client.auth)
                     implementation(libs.ktor.client.cio)
+                    }
+                    }
+
+                    jvmMain {
+                    dependsOn(jvmAndroidMain)
+                    dependencies {
+                    api(projects.app.importfilesource.core)
+                    api(projects.app.remotestorage.core)
+                    api(projects.utils.localsettings)
+                    api(libs.kotlinx.serialization.core)
+                    api(libs.ktor.client.core)
+
+                    implementation(libs.ktor.http)
+                    implementation(libs.ktor.utils)
                 }
-            }
-
-        jvmMain {
-            dependsOn(jvmAndroidMain)
-            dependencies {
-                api(libs.kotlinx.serialization.core)
-                api(libs.ktor.client.core)
-                api(projects.app.importfilesource.core)
-                api(projects.app.remotestorage.core)
-                api(projects.utils.localsettings)
-
-                implementation(libs.ktor.http)
-                implementation(libs.ktor.utils)
-            }
         }
 
         androidMain {
             dependsOn(jvmAndroidMain)
             dependencies {
-                api(libs.kotlinx.serialization.core)
-                api(libs.ktor.client.core)
                 api(projects.app.importfilesource.core)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
+                api(libs.kotlinx.serialization.core)
+                api(libs.ktor.client.core)
 
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)

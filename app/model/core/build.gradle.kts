@@ -14,8 +14,8 @@ kotlin {
 
         getByName("jvmMain") {
             dependencies {
-                api(libs.kotlinx.serialization.core)
                 api(projects.utils.bigdecimal)
+                api(libs.kotlinx.serialization.core)
             }
         }
 

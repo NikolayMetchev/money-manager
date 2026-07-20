@@ -21,9 +21,9 @@ kotlin {
 
         getByName("jvmMain") {
             dependencies {
-                api(libs.kotlinx.serialization.core)
                 api(projects.app.model.core)
                 api(projects.app.model.csv)
+                api(libs.kotlinx.serialization.core)
             }
         }
     }

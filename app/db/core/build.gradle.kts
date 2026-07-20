@@ -8,7 +8,6 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(libs.kotlinx.coroutines.core)
                 api(projects.app.db.read)
                 api(projects.app.db.write)
                 api(projects.app.importengineapi)
@@ -24,18 +23,17 @@ kotlin {
                 api(projects.app.model.repository.write)
                 api(projects.app.model.timeline)
                 api(projects.utils.currency)
+                api(libs.kotlinx.coroutines.core)
 
-                implementation(libs.kotlinx.datetime)
-                implementation(libs.kotlinx.serialization.json)
                 implementation(projects.app.importer)
                 implementation(projects.utils.bigdecimal)
+                implementation(libs.kotlinx.datetime)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
 
         getByName("commonTest") {
             dependencies {
-                implementation(kotlin("test"))
-                implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.app.apiimporter)
                 implementation(projects.app.csvimporter)
                 implementation(projects.app.importengineapi)
@@ -53,11 +51,15 @@ kotlin {
                 implementation(projects.app.qifimporter)
                 implementation(projects.app.strategies)
                 implementation(projects.test.app.db)
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
 
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.db.write)
+                api(projects.utils.currency)
                 api(libs.kotlinx.serialization.core)
                 // sqldelight.runtime + read/write are used directly by jvmMain (JvmDatabaseManager uses
                 // the read Schema); declared here per dependency-analysis (the SQLDelight plugin that
@@ -65,8 +67,6 @@ kotlin {
                 // CachingJdbcSqliteDriver extends SQLDelight's JdbcDriver.
                 api(libs.sqldelight.jdbc.driver)
                 api(libs.sqldelight.runtime)
-                api(projects.app.db.write)
-                api(projects.utils.currency)
 
                 implementation(projects.app.db.seed)
 
@@ -78,11 +78,11 @@ kotlin {
 
         getByName("jvmTest") {
             dependencies {
-                implementation(libs.sqldelight.runtime)
                 implementation(projects.app.db.core)
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.read)
                 implementation(projects.app.importfilesource.core)
+                implementation(libs.sqldelight.runtime)
             }
         }
 
@@ -91,17 +91,17 @@ kotlin {
                 api(libs.kotlinx.serialization.core)
                 api(libs.sqldelight.runtime)
 
+                implementation(projects.app.db.seed)
                 implementation(libs.androidx.sqlite)
                 implementation(libs.sqldelight.android.driver)
-                implementation(projects.app.db.seed)
             }
         }
 
         getByName("androidHostTest") {
             dependencies {
-                implementation(libs.sqldelight.runtime)
                 implementation(projects.app.db.di)
                 implementation(projects.app.importfilesource.core)
+                implementation(libs.sqldelight.runtime)
             }
         }
 
@@ -110,19 +110,19 @@ kotlin {
             // Tests are shared via srcDir() below, but we exclude the expect declarations
             // file since androidDeviceTest provides its own implementation
             dependencies {
-                implementation(kotlin("test"))
-                implementation(libs.kotlinx.coroutines.test)
-                implementation(libs.sqldelight.runtime)
                 implementation(projects.app.db.di)
                 implementation(projects.app.strategies)
                 implementation(projects.test.app.db)
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.sqldelight.runtime)
 
                 runtimeOnly(libs.androidx.test.runner)
+                }
+                // Include test packages from commonTest (not the expect declarations file)
+                kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/repository")
+                kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/audit")
             }
-            // Include test packages from commonTest (not the expect declarations file)
-            kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/repository")
-            kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/audit")
-        }
     }
 }
 

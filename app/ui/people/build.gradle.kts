@@ -10,11 +10,11 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
 
-                implementation(libs.kotlinx.coroutines.core)
                 implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
                 implementation(projects.utils.compose.scrollbar)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
         getByName("androidMain") {
@@ -33,10 +33,10 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
-                api(libs.androidx.compose.runtime.desktop)
-                api(libs.compose.foundation.layout.desktop)
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
+                api(libs.androidx.compose.runtime.desktop)
+                api(libs.compose.foundation.layout.desktop)
 
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material.icons.core.desktop)

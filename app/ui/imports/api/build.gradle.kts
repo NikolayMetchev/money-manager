@@ -14,9 +14,6 @@ kotlin {
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
 
-                implementation(libs.kmlogging)
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.serialization.json)
                 implementation(projects.app.db.read)
                 implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
@@ -25,10 +22,13 @@ kotlin {
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.rest)
+                implementation(libs.kmlogging)
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
         val jvmAndroidMain =
-            create("jvmAndroidMain") {
+                create("jvmAndroidMain") {
                 dependsOn(getByName("commonMain"))
             }
         getByName("commonTest") {
@@ -43,6 +43,7 @@ kotlin {
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
 
+                implementation(projects.app.model.passthrough)
                 implementation(libs.androidx.compose.foundation)
                 implementation(libs.androidx.compose.material.icons.core)
                 implementation(libs.androidx.compose.material3)
@@ -53,20 +54,21 @@ kotlin {
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
-                implementation(projects.app.model.passthrough)
             }
         }
         getByName("jvmMain") {
             dependsOn(jvmAndroidMain)
             dependencies {
-                api(libs.androidx.compose.runtime.desktop)
-                api(libs.compose.foundation.layout.desktop)
                 api(projects.app.apiimporter)
                 api(projects.app.importengineapi)
                 api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
+                api(libs.androidx.compose.runtime.desktop)
+                api(libs.compose.foundation.layout.desktop)
 
+                implementation(projects.app.model.passthrough)
+                implementation(projects.app.model.timeline)
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material.icons.core.desktop)
                 implementation(libs.compose.material3.desktop)
@@ -78,8 +80,6 @@ kotlin {
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
-                implementation(projects.app.model.passthrough)
-                implementation(projects.app.model.timeline)
             }
         }
         getByName("jvmTest") {

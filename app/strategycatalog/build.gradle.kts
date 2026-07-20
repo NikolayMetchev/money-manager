@@ -12,11 +12,11 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                api(libs.kotlinx.coroutines.core)
-                api(libs.ktor.client.core)
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.utils.localsettings)
+                api(libs.kotlinx.coroutines.core)
+                api(libs.ktor.client.core)
 
                 implementation(libs.kotlinx.serialization.json)
             }
@@ -29,37 +29,37 @@ kotlin {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(libs.kotlinx.coroutines.core)
+                    }
+                    }
+
+                    // buildHealth (KMP quirk): ABI/impl deps used by commonMain must also be declared on each
+                    // real platform source set. CIO itself is a pure runtime dependency — the engine-less
+                    // HttpClient() in createStrategyCatalogController discovers it from the runtime classpath.
+                    jvmMain {
+                    dependsOn(jvmAndroidMain)
+                    dependencies {
+                    api(projects.app.model.csvstrategy)
+                    api(projects.utils.localsettings)
+                    api(libs.kotlinx.serialization.core)
+
+                    implementation(projects.app.model.core)
+                    implementation(libs.ktor.http)
+                    implementation(libs.ktor.utils)
+
+                    runtimeOnly(libs.ktor.client.cio)
                 }
-            }
-
-        // buildHealth (KMP quirk): ABI/impl deps used by commonMain must also be declared on each
-        // real platform source set. CIO itself is a pure runtime dependency — the engine-less
-        // HttpClient() in createStrategyCatalogController discovers it from the runtime classpath.
-        jvmMain {
-            dependsOn(jvmAndroidMain)
-            dependencies {
-                api(libs.kotlinx.serialization.core)
-                api(projects.app.model.csvstrategy)
-                api(projects.utils.localsettings)
-
-                implementation(libs.ktor.http)
-                implementation(libs.ktor.utils)
-                implementation(projects.app.model.core)
-
-                runtimeOnly(libs.ktor.client.cio)
-            }
         }
 
         androidMain {
             dependsOn(jvmAndroidMain)
             dependencies {
-                api(libs.kotlinx.serialization.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.utils.localsettings)
+                api(libs.kotlinx.serialization.core)
 
+                implementation(projects.app.model.core)
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
-                implementation(projects.app.model.core)
 
                 runtimeOnly(libs.ktor.client.cio)
             }

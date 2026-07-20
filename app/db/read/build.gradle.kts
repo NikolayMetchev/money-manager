@@ -10,7 +10,6 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(libs.mappie.api)
                 // api: read's generated database + select queries + mappers expose schema's row types and
                 // domain models.
                 api(projects.app.db.schema)
@@ -19,19 +18,20 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.passthrough)
+                api(libs.mappie.api)
 
                 implementation(libs.kotlinx.serialization.json)
             }
         }
         getByName("jvmMain") {
             dependencies {
-                api(libs.kotlinx.serialization.core)
                 api(projects.app.db.schema)
                 api(projects.app.model.accountmapping)
                 api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.passthrough)
+                api(libs.kotlinx.serialization.core)
 
                 implementation(projects.utils.bigdecimal)
             }
