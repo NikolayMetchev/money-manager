@@ -118,11 +118,11 @@ kotlin {
                 implementation(libs.sqldelight.runtime)
 
                 runtimeOnly(libs.androidx.test.runner)
-                }
-                // Include test packages from commonTest (not the expect declarations file)
-                kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/repository")
-                kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/audit")
             }
+            // Include test packages from commonTest (not the expect declarations file)
+            kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/repository")
+            kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/audit")
+        }
     }
 }
 

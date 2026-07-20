@@ -28,7 +28,7 @@ kotlin {
             }
         }
         val jvmAndroidMain =
-                create("jvmAndroidMain") {
+            create("jvmAndroidMain") {
                 dependsOn(getByName("commonMain"))
             }
         getByName("commonTest") {

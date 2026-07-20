@@ -50,7 +50,7 @@ kotlin {
             }
         }
         val jvmAndroidMain =
-                create("jvmAndroidMain") {
+            create("jvmAndroidMain") {
                 dependsOn(getByName("commonMain"))
             }
         getByName("commonTest") {
@@ -166,13 +166,13 @@ kotlin {
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.ktor.client.mock)
-                }
-                kotlin.srcDir("src/commonTest/kotlin")
-                // Include commonTest resources for test database files
-                resources.srcDir("src/commonTest/resources")
-                }
-                getByName("androidHostTest") {
-                dependencies {
+            }
+            kotlin.srcDir("src/commonTest/kotlin")
+            // Include commonTest resources for test database files
+            resources.srcDir("src/commonTest/resources")
+        }
+        getByName("androidHostTest") {
+            dependencies {
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
                 implementation(projects.app.importer)
