@@ -71,6 +71,7 @@ kotlin {
             dependencies {
                 implementation(projects.app.model.accountmapping)
                 implementation(projects.app.model.apistrategy)
+                implementation(projects.app.model.csv)
                 implementation(projects.app.model.csvstrategy)
                 implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.passthrough)
@@ -86,6 +87,7 @@ kotlin {
                 implementation(projects.app.importer)
                 implementation(projects.app.model.accountmapping)
                 implementation(projects.app.model.apistrategy)
+                implementation(projects.app.model.csv)
                 implementation(projects.app.model.csvstrategy)
                 implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.passthrough)
@@ -99,6 +101,7 @@ kotlin {
             dependencies {
                 implementation(projects.app.model.accountmapping)
                 implementation(projects.app.model.apistrategy)
+                implementation(projects.app.model.csv)
                 implementation(projects.app.model.csvstrategy)
                 implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.passthrough)

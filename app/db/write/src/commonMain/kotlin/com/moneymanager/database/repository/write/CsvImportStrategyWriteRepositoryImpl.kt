@@ -68,6 +68,15 @@ class CsvImportStrategyWriteRepositoryImpl(
                     updated_at = now.toEpochMilliseconds(),
                     id = strategy.id.id.toString(),
                 )
+                val worksheetName = strategy.worksheetName
+                if (worksheetName != null) {
+                    writeQueries.insertOrReplaceXlsxWorksheet(
+                        csv_import_strategy_id = strategy.id.id.toString(),
+                        worksheet_name = worksheetName,
+                    )
+                } else {
+                    writeQueries.deleteXlsxWorksheet(strategy.id.id.toString())
+                }
                 val persistedRevisionId =
                     selectQueries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
                 writeQueries.insertSource(

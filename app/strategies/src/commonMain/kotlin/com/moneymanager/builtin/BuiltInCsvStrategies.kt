@@ -45,6 +45,7 @@ object BuiltInCsvStrategies {
     val cryptoComFiatStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000008")
     val cryptoComCryptoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
     val curveCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
+    val cryptoComCardXlsxStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -52,6 +53,18 @@ object BuiltInCsvStrategies {
 
     /** Single account that holds every crypto.com crypto balance (one per-asset balance, not per account). */
     private const val CRYPTO_COM_CRYPTO_ACCOUNT = "Crypto.com"
+
+    /**
+     * Trims the trailing city/country padding from the xlsx card export's fixed-width
+     * `Card Acceptor Name` field (e.g. `"Spotify UK               Stockholm      SWE"` ->
+     * `"Spotify UK"`, `"CRV*Card verification    London         GBR"` -> `"CRV*Card verification"`),
+     * while leaving any leading marker (like "CRV*") untouched for [BuiltInPassThroughs] to detect.
+     * Anchors on the first non-space character (`\s*(\S.*?)`) rather than a bare lazy `(.+?)`: for a
+     * value that's pure padding + a trailing country code (e.g. "                    GBR", no real
+     * merchant name), a bare `(.+?)` backtracks to a single leading space instead of skipping to "GBR",
+     * producing a blank/whitespace-only description.
+     */
+    private const val CARD_ACCEPTOR_NAME_TRIM_PATTERN = "^\\s*(\\S.*?)(?:\\s{2,}.*)?$"
 
     /**
      * The Crypto.com Exchange account (also created by the Exchange API strategy). Routing the App's
@@ -127,6 +140,8 @@ object BuiltInCsvStrategies {
 
     private fun curveCsvMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 8, index = index)
 
+    private fun cryptoComCardXlsxMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 9, index = index)
+
     /**
      * All built-in CSV import strategies seeded into a fresh database. [qifCurrencyId] is the fixed
      * currency the QIF strategies carry (the default the QIF import dialog pre-selects); it is resolved
@@ -145,6 +160,7 @@ object BuiltInCsvStrategies {
             buildCryptoComFiatStrategy(now),
             buildCryptoComCryptoStrategy(now),
             buildCurveCsvStrategy(now),
+            buildCryptoComCardXlsxStrategy(now),
         )
 
     /**
@@ -259,6 +275,151 @@ object BuiltInCsvStrategies {
             contentMatchRules = listOf(ContentMatchRule(columnName = "Transaction Kind", pattern = "^$")),
             fileNamePattern = "^card_transactions_record_",
             crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in strategy for crypto.com's older "Card Transaction History" Excel export (an .xlsx
+     * workbook of the same Visa card, before crypto.com switched to the card_transactions_record_*.csv
+     * format above — same source account, entirely different columns and header names). Every row's
+     * `Amount Processed` is already signed (negative = spend, positive = card load/refund), so no
+     * per-row direction logic is needed beyond the standard positive-amount source/target flip.
+     *
+     * v1 limitation: multi-currency FX rows (Service Abbreviation "POS Sig Pur Multi Curr" etc.) are
+     * imported using `Amount Processed`/`Currency ` as-is (the settlement currency), not the original
+     * `Amount Requested` foreign-currency amount — a future refinement could split these into a trade.
+     */
+    fun buildCryptoComCardXlsxStrategy(now: Instant): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                // Fixed-name source so this strategy resolves the same Card account as the CSV
+                // strategy above (both are exports of the same physical card).
+                TransferField.SOURCE_ACCOUNT to
+                    RegexAccountMapping(
+                        id = cryptoComCardXlsxMappingId(1),
+                        fieldType = TransferField.SOURCE_ACCOUNT,
+                        columnName = "Service Abbreviation",
+                        rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CARD_ACCOUNT)),
+                    ),
+                TransferField.TARGET_ACCOUNT to
+                    // Rows with no card acceptor name at all ("Batch Credit Funds Transfer", "Balance
+                    // transfer", …) are account-level credits, not merchant purchases — a raw AccountLookup
+                    // would fail to resolve an empty name and error the row, so route them to Cash first.
+                    ConditionalAccountMapping(
+                        id = cryptoComCardXlsxMappingId(10),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        conditions = listOf(RowCondition("Card Acceptor Name", RowConditionOperator.IS_BLANK)),
+                        whenTrue =
+                            RegexAccountMapping(
+                                id = cryptoComCardXlsxMappingId(11),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Service Abbreviation",
+                                rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CASH_ACCOUNT)),
+                            ),
+                        whenFalse =
+                            ConditionalAccountMapping(
+                                id = cryptoComCardXlsxMappingId(2),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                conditions =
+                                    listOf(
+                                        RowCondition("Service Abbreviation", RowConditionOperator.EQUALS_VALUE, value = "LdExtDbCr"),
+                                    ),
+                                // Card loads ("GBP/200.0-Card Load") come from the Cash account.
+                                whenTrue =
+                                    RegexAccountMapping(
+                                        id = cryptoComCardXlsxMappingId(3),
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Service Abbreviation",
+                                        rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CASH_ACCOUNT)),
+                                    ),
+                                // Everything else looks up/creates a merchant account from the card acceptor
+                                // name, stripped of its trailing city/country padding (the field is
+                                // fixed-width, e.g. "Spotify UK               Stockholm      SWE") via the
+                                // same trim regex as DESCRIPTION below, so "CRV*" pass-through rows still
+                                // resolve to the conduit instead of a raw junk account (pass-through
+                                // detection matches on DESCRIPTION, so both mappings must derive from the
+                                // same trimmed text).
+                                whenFalse =
+                                    RegexAccountMapping(
+                                        id = cryptoComCardXlsxMappingId(4),
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Card Acceptor Name",
+                                        rules =
+                                            listOf(
+                                                RegexRule(
+                                                    pattern = CARD_ACCEPTOR_NAME_TRIM_PATTERN,
+                                                    accountName = "Unknown Merchant",
+                                                    accountNameTemplate = "$1",
+                                                ),
+                                            ),
+                                    ),
+                            ),
+                    ),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        id = cryptoComCardXlsxMappingId(5),
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = "Transaction Date",
+                        dateFormat = "MM/dd/yyyy",
+                        timeColumnName = "Transaction Time",
+                        timeFormat = "HH:mm:ss",
+                    ),
+                // Card Acceptor Name (not the near-constant Description column) carries the real
+                // merchant/CRV* marker; pass-through detection ([PassThroughDetector]) matches against
+                // this field, so it must be the source here, trimmed of trailing city/country padding
+                // but with any "CRV*" prefix left intact for the detector to peel.
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        id = cryptoComCardXlsxMappingId(6),
+                        fieldType = TransferField.DESCRIPTION,
+                        columnName = "Card Acceptor Name",
+                        fallbackColumns = listOf("Description"),
+                        extraction = ColumnExtraction(pattern = CARD_ACCEPTOR_NAME_TRIM_PATTERN, outputTemplate = "$1"),
+                    ),
+                // Already signed: negative = spend, positive (loads/refunds) flows in, so flip.
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        id = cryptoComCardXlsxMappingId(7),
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "Amount Processed",
+                        flipAccountsOnPositive = true,
+                    ),
+                // Column header has a trailing space in the source workbook.
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(
+                        id = cryptoComCardXlsxMappingId(8),
+                        fieldType = TransferField.CURRENCY,
+                        columnName = "Currency ",
+                    ),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(
+                        id = cryptoComCardXlsxMappingId(9),
+                        fieldType = TransferField.TIMEZONE,
+                        timezoneId = "UTC",
+                    ),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(cryptoComCardXlsxStrategyId),
+            name = "Crypto.com Card (Excel)",
+            identificationColumns =
+                setOf(
+                    "Transaction Date",
+                    "Transaction Time",
+                    "Service Abbreviation",
+                    "Card Acceptor Name",
+                    "Description",
+                    "Merchant Category Code",
+                    "Amount Processed",
+                    "Available Balance",
+                    "Currency ",
+                    "Amount Requested",
+                ),
+            fieldMappings = fieldMappings,
+            fileNamePattern = "Card Transaction History",
+            worksheetName = "Sheet1",
             createdAt = now,
             updatedAt = now,
         )

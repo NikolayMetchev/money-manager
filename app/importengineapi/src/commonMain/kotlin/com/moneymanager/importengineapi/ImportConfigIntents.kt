@@ -109,7 +109,40 @@ sealed interface CsvImportMutation {
         val rows: List<List<String>>,
         val fileChecksum: String,
         val fileLastModified: Instant,
-    ) : CsvImportMutation
+        // Non-null only for an Excel import: the raw workbook bytes + the worksheet [headers]/[rows]
+        // were parsed from, stored alongside the staged rows so the sheet can be re-extracted if a
+        // different worksheet is later selected.
+        val xlsxBytes: ByteArray? = null,
+        val xlsxWorksheetName: String? = null,
+    ) : CsvImportMutation {
+        // ByteArray uses reference equality by default; override with structural (contentEquals)
+        // comparison so this mutation compares correctly in tests/state diffing.
+        override fun equals(other: Any?): Boolean =
+            this === other ||
+                (
+                    other is Create &&
+                        key == other.key &&
+                        fileName == other.fileName &&
+                        headers == other.headers &&
+                        rows == other.rows &&
+                        fileChecksum == other.fileChecksum &&
+                        fileLastModified == other.fileLastModified &&
+                        xlsxBytes.contentEquals(other.xlsxBytes) &&
+                        xlsxWorksheetName == other.xlsxWorksheetName
+                )
+
+        override fun hashCode(): Int {
+            var result = key.hashCode()
+            result = 31 * result + fileName.hashCode()
+            result = 31 * result + headers.hashCode()
+            result = 31 * result + rows.hashCode()
+            result = 31 * result + fileChecksum.hashCode()
+            result = 31 * result + fileLastModified.hashCode()
+            result = 31 * result + (xlsxBytes?.contentHashCode() ?: 0)
+            result = 31 * result + (xlsxWorksheetName?.hashCode() ?: 0)
+            return result
+        }
+    }
 
     data class Delete(
         val id: CsvImportId,

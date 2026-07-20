@@ -36,6 +36,8 @@ class CsvImportWriteRepositoryImpl(
         rows: List<List<String>>,
         fileChecksum: String,
         fileLastModified: Instant,
+        xlsxBytes: ByteArray?,
+        xlsxWorksheetName: String?,
     ): CsvImportId =
         withContext(coroutineContext) {
             database.transactionWithResult {
@@ -66,6 +68,14 @@ class CsvImportWriteRepositoryImpl(
                         import_id = importId.id.toString(),
                         column_index = index.toLong(),
                         original_name = header,
+                    )
+                }
+
+                if (xlsxBytes != null && xlsxWorksheetName != null) {
+                    csvImportWriteQueries.insertXlsxBlob(
+                        csv_import_id = importId.id.toString(),
+                        file_bytes = xlsxBytes,
+                        worksheet_name = xlsxWorksheetName,
                     )
                 }
 

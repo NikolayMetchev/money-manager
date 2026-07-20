@@ -31,3 +31,17 @@ expect fun rememberMultipleFilePicker(
 expect class MultipleFilePickerLauncher {
     fun launch()
 }
+
+/**
+ * Creates and remembers a file picker launcher that reads the selection as raw bytes rather than text
+ * (e.g. `.xlsx`, where decoding as UTF-8 like [rememberFilePicker] would corrupt the file).
+ *
+ * @param mimeTypes List of MIME types to filter files
+ * @param onResult Callback invoked with the selected file result, or null if cancelled
+ * @return A launcher that can be used to open the file picker dialog
+ */
+@Composable
+expect fun rememberBinaryFilePicker(
+    mimeTypes: List<String>,
+    onResult: (BinaryFilePickerResult?) -> Unit,
+): BinaryFilePickerLauncher

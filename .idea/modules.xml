@@ -15,6 +15,7 @@
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/ui/imports/money-manager.app.ui.imports.iml" filepath="$PROJECT_DIR$/.idea/modules/app/ui/imports/money-manager.app.ui.imports.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/test/app/money-manager.test.app.iml" filepath="$PROJECT_DIR$/.idea/modules/test/app/money-manager.test.app.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/utils/localsettings/money-manager.utils.localsettings.iml" filepath="$PROJECT_DIR$/.idea/modules/utils/localsettings/money-manager.utils.localsettings.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/utils/parsers/money-manager.utils.parsers.iml" filepath="$PROJECT_DIR$/.idea/modules/utils/parsers/money-manager.utils.parsers.iml" />
     </modules>
   </component>
 </project>

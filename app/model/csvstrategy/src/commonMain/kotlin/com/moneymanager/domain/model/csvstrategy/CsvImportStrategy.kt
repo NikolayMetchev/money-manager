@@ -75,6 +75,11 @@ data class AttributeAccountMatch(
  *                             against an unconsumed funding leg into the row's source account (same
  *                             amount+currency within [crossSourceReconcileWindowSeconds]), ignoring the
  *                             merchant. Null disables funding reconciliation.
+ * @property worksheetName When set, this strategy targets an Excel worksheet by this name rather than a
+ *                          CSV file (like QIF, an XLSX strategy is an ordinary [CsvImportStrategy] that
+ *                          rides the CSV engine — see [isXlsxStrategy]). The named worksheet's first row
+ *                          is treated as headers and the rest as data, exactly like a CSV. Null for CSV
+ *                          and QIF strategies.
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
  */
@@ -91,6 +96,7 @@ data class CsvImportStrategy(
     val crossSourceReconcileWindowSeconds: Long? = null,
     val conversionConfig: ConversionConfig? = null,
     val fundingAttributeMatch: AttributeAccountMatch? = null,
+    val worksheetName: String? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

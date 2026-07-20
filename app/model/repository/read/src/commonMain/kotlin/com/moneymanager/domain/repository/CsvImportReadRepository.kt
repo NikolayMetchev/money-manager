@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.XlsxImportBlob
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.ExperimentalTime
 
@@ -47,4 +48,7 @@ interface CsvImportReadRepository {
      * @return List of matching imports, ordered by timestamp descending
      */
     suspend fun findImportsByChecksum(checksum: String): List<CsvImport>
+
+    /** The raw workbook bytes for an Excel-backed import, or null for a CSV/QIF import. */
+    suspend fun getXlsxBlob(id: CsvImportId): XlsxImportBlob?
 }

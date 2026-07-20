@@ -65,6 +65,28 @@ actual fun rememberMultipleFilePicker(
     }
 }
 
+@Composable
+actual fun rememberBinaryFilePicker(
+    mimeTypes: List<String>,
+    onResult: (BinaryFilePickerResult?) -> Unit,
+): BinaryFilePickerLauncher {
+    val context = LocalContext.current
+
+    val launcher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri: Uri? ->
+            onResult(uri?.let { readBinaryFileContent(context, it) })
+        }
+
+    return remember(launcher, mimeTypes) {
+        BinaryFilePickerLauncher(
+            mimeTypes = mimeTypes.toTypedArray(),
+            launcher = { types -> launcher.launch(types) },
+        )
+    }
+}
+
 private fun readFileContent(
     context: Context,
     uri: Uri,
@@ -75,6 +97,21 @@ private fun readFileContent(
         val inputStream = context.contentResolver.openInputStream(uri) ?: return null
         val content = readStreamAsString(inputStream)
         FilePickerResult(fileName = fileName, content = content, lastModified = lastModified)
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun readBinaryFileContent(
+    context: Context,
+    uri: Uri,
+): BinaryFilePickerResult? {
+    return try {
+        val fileName = getFileName(context, uri) ?: "unknown.xlsx"
+        val lastModified = getLastModified(context, uri)
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val bytes = inputStream.use { it.readBytes() }
+        BinaryFilePickerResult(fileName = fileName, bytes = bytes, lastModified = lastModified)
     } catch (_: Exception) {
         null
     }

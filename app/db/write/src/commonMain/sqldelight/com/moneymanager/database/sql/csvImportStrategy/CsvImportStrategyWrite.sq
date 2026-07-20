@@ -16,3 +16,11 @@ DELETE FROM csv_import_strategy WHERE id = ?;
 insertSource:
 INSERT OR IGNORE INTO csv_import_strategy_source (strategy_id, revision_id, source_type_id, device_id)
 VALUES (?, ?, ?, ?);
+
+-- xlsx_import_strategy queries
+insertOrReplaceXlsxWorksheet:
+INSERT OR REPLACE INTO xlsx_import_strategy (csv_import_strategy_id, worksheet_name)
+VALUES (?, ?);
+
+deleteXlsxWorksheet:
+DELETE FROM xlsx_import_strategy WHERE csv_import_strategy_id = ?;

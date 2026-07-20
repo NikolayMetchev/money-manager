@@ -11,8 +11,10 @@ import kotlin.time.Instant
 
 interface CsvImportWriteRepository : CsvImportReadRepository {
     /**
-     * Creates a new CSV import from parsed data.
-     * Creates the metadata, column definitions, and dynamic table with data.
+     * Creates a new CSV (or Excel) import from parsed data. Creates the metadata, column definitions,
+     * and dynamic table with data. When [xlsxBytes] is non-null, also stores the raw workbook bytes
+     * (and the worksheet they were parsed from) so the sheet can be re-extracted later if a different
+     * worksheet is chosen.
      *
      * @param fileName The original file name
      * @param headers The column headers
@@ -25,6 +27,8 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
         rows: List<List<String>>,
         fileChecksum: String,
         fileLastModified: Instant,
+        xlsxBytes: ByteArray? = null,
+        xlsxWorksheetName: String? = null,
     ): CsvImportId
 
     /**

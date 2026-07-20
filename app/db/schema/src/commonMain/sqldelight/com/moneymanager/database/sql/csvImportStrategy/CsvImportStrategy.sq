@@ -19,6 +19,17 @@ CREATE TABLE csv_import_strategy (
 
 CREATE INDEX idx_csv_import_strategy_name ON csv_import_strategy(name);
 
+-- Marks a csv_import_strategy as targeting an Excel worksheet rather than a CSV file (like QIF, an
+-- XLSX strategy is an ordinary csv_import_strategy row that rides the CSV engine). Split into its own
+-- table rather than a nullable column: unlike the optional per-strategy features above (file name
+-- pattern, conversion config, funding match), worksheet_name is a kind discriminator, not a feature
+-- any strategy may opt into.
+CREATE TABLE xlsx_import_strategy (
+    csv_import_strategy_id TEXT PRIMARY KEY NOT NULL,
+    worksheet_name TEXT NOT NULL,
+    FOREIGN KEY (csv_import_strategy_id) REFERENCES csv_import_strategy(id) ON DELETE CASCADE
+);
+
 -- Source attribution for csv_import_strategy revisions.
 -- Uses TEXT strategy_id because csv_import_strategy.id is a UUID, unlike the INTEGER entity_id
 -- used by the generic entity_source table. Mirrors api_import_strategy_source.

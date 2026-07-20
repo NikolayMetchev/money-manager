@@ -37,6 +37,17 @@ actual class MultipleFilePickerLauncher(
     }
 }
 
+actual class BinaryFilePickerLauncher(
+    private val mimeTypes: List<String>,
+    private val onResult: (BinaryFilePickerResult?) -> Unit,
+) {
+    actual fun launch() {
+        val files = showLoadDialog("Select a file", mimeTypes, multiple = false)
+        files.firstOrNull()?.parent?.let { localSettings.putString(KEY_LAST_DIRECTORY, it) }
+        onResult(files.firstOrNull()?.let { readFileAsBinaryResult(it) })
+    }
+}
+
 /**
  * Shows a native load dialog filtered by [mimeTypes], opened at the last-used directory, and returns
  * the selected files (empty if the user cancelled).
@@ -78,6 +89,7 @@ internal fun mimeTypesToExtensions(mimeTypes: List<String>): List<String> =
                 "application/qif", "application/x-qif" -> listOf(".qif")
                 "text/tab-separated-values" -> listOf(".tsv")
                 "application/vnd.ms-excel" -> listOf(".csv", ".xls")
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> listOf(".xlsx")
                 else -> emptyList()
             }
         }.distinct()
@@ -98,6 +110,18 @@ internal fun readFileAsResult(file: File): FilePickerResult? =
         val content = file.readText(Charsets.UTF_8)
         val lastModified = file.lastModified().takeIf { it > 0 }?.let { Instant.fromEpochMilliseconds(it) }
         FilePickerResult(fileName = file.name, content = content, lastModified = lastModified)
+    } catch (_: Exception) {
+        null
+    }
+
+/**
+ * Reads a file as raw bytes and returns a BinaryFilePickerResult, or null if reading fails.
+ */
+internal fun readFileAsBinaryResult(file: File): BinaryFilePickerResult? =
+    try {
+        val bytes = file.readBytes()
+        val lastModified = file.lastModified().takeIf { it > 0 }?.let { Instant.fromEpochMilliseconds(it) }
+        BinaryFilePickerResult(fileName = file.name, bytes = bytes, lastModified = lastModified)
     } catch (_: Exception) {
         null
     }

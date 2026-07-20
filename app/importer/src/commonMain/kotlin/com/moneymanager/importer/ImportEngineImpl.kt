@@ -1568,7 +1568,15 @@ class ImportEngineImpl(
                 is CsvImportMutation.Create ->
                     csvImportIds.putUnique(
                         m.key,
-                        csvImportRepository.createImport(m.fileName, m.headers, m.rows, m.fileChecksum, m.fileLastModified),
+                        csvImportRepository.createImport(
+                            m.fileName,
+                            m.headers,
+                            m.rows,
+                            m.fileChecksum,
+                            m.fileLastModified,
+                            m.xlsxBytes,
+                            m.xlsxWorksheetName,
+                        ),
                         "CsvImport",
                     )
                 is CsvImportMutation.Delete -> csvImportRepository.deleteImport(m.id)

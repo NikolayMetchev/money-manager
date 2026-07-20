@@ -420,6 +420,7 @@ class CsvStrategyExportService(
                 crossSourceReconcileWindowSeconds = export.crossSourceReconcileWindowSeconds,
                 conversionConfig = export.conversionConfig,
                 fundingAttributeMatch = export.fundingAttributeMatch,
+                worksheetName = export.worksheetName,
                 createdAt = now,
                 updatedAt = now,
             )

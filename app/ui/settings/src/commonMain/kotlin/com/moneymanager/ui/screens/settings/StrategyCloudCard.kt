@@ -423,6 +423,7 @@ private fun StrategyKey.displayLabel(): String =
         StrategyKind.GLOBAL_MAPPINGS -> "Global account mappings"
         StrategyKind.CSV -> "$name (CSV)"
         StrategyKind.QIF -> "$name (QIF)"
+        StrategyKind.XLSX -> "$name (Excel)"
         StrategyKind.API -> "$name (API)"
         StrategyKind.PASS_THROUGH -> "$name (Pass-through)"
     }
