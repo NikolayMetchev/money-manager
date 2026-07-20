@@ -35,7 +35,15 @@ data class CompanionTransactionRule(
     val companionDescription: String,
 ) : Comparable<CompanionTransactionRule> {
     override fun compareTo(other: CompanionTransactionRule): Int =
-        compareValuesBy(this, other, { it.name }, { it.matchAttributeName }, { it.matchValuePattern }, { it.linkAttributeName })
+        compareValuesBy(
+            this,
+            other,
+            { it.name },
+            { it.matchAttributeName },
+            { it.matchValuePattern },
+            { it.linkAttributeName },
+            { it.companionDescription },
+        )
 }
 
 /** Serializes companion-rule lists sorted by natural order — each rule is matched independently, so list order carries no meaning. */
