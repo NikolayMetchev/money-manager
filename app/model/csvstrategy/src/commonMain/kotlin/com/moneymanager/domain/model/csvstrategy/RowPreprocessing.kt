@@ -1,5 +1,6 @@
 package com.moneymanager.domain.model.csvstrategy
 
+import com.moneymanager.domain.model.serialization.SortedListSerializer
 import kotlinx.serialization.Serializable
 
 /**
@@ -37,7 +38,13 @@ data class RowCondition(
     val operator: RowConditionOperator,
     val value: String? = null,
     val otherColumnName: String? = null,
-)
+) : Comparable<RowCondition> {
+    override fun compareTo(other: RowCondition): Int =
+        compareValuesBy(this, other, { it.columnName }, { it.operator.name }, { it.value }, { it.otherColumnName })
+}
+
+/** Serializes condition lists sorted by [RowCondition]'s natural order — all must hold (logical AND), so list order carries no meaning. */
+object SortedRowConditionListSerializer : SortedListSerializer<RowCondition>(RowCondition.serializer())
 
 /**
  * A pair of columns whose values are exchanged when a [RowPreprocessingRule] applies.
@@ -58,7 +65,10 @@ data class ColumnPairSwap(
  */
 @Serializable
 data class RowPreprocessingRule(
+    @Serializable(with = SortedRowConditionListSerializer::class)
     val conditions: List<RowCondition>,
+    // Swaps apply sequentially and can chain (A<->B then B<->C differs from the reverse) - order is
+    // semantic, keeps default insertion-order serialization.
     val columnSwaps: List<ColumnPairSwap> = emptyList(),
     val flipSourceAndTarget: Boolean = false,
 )

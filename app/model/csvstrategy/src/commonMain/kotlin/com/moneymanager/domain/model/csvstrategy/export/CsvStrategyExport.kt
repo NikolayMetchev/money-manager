@@ -14,6 +14,9 @@ import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
+import com.moneymanager.domain.model.csvstrategy.SortedCompanionTransactionRuleListSerializer
+import com.moneymanager.domain.model.csvstrategy.SortedContentMatchRuleListSerializer
+import com.moneymanager.domain.model.csvstrategy.SortedRowConditionListSerializer
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
 import kotlinx.serialization.EncodeDefault
@@ -46,16 +49,20 @@ data class CsvStrategyExport(
     val version: String,
     val name: String,
     // Order-insensitive collections use canonical (sorted) serializers so the same strategy always
-    // serializes to identical bytes on every device; the rule lists below are first-match-wins, so
-    // their order is semantic and they keep default insertion-order serialization.
+    // serializes to identical bytes on every device; a few lists below have semantic order (see their
+    // own comments) and keep default insertion-order serialization instead.
     @Serializable(with = SortedStringSetSerializer::class)
     val identificationColumns: Set<String>,
     @Serializable(with = SortedFieldMappingsSerializer::class)
     val fieldMappings: Map<TransferField, FieldMappingExport>,
     @Serializable(with = SortedAttributeMappingListSerializer::class)
     val attributeMappings: List<AttributeColumnMapping> = emptyList(),
+    // Rules apply sequentially and each can affect what the next rule's conditions see (not
+    // first-match) - order is semantic, keeps default insertion-order serialization.
     val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
+    @Serializable(with = SortedCompanionTransactionRuleListSerializer::class)
     val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
+    @Serializable(with = SortedContentMatchRuleListSerializer::class)
     val contentMatchRules: List<ContentMatchRule> = emptyList(),
     @Serializable(with = SortedAccountMappingListSerializer::class)
     val accountMappings: List<AccountMappingExport> = emptyList(),
@@ -98,6 +105,8 @@ data class HardCodedAccountExport(
 data class AccountLookupExport(
     override val fieldType: TransferField,
     val columnName: String,
+    // Tried in order until one yields a non-blank value - order is semantic, keeps default
+    // insertion-order serialization.
     val fallbackColumns: List<String> = emptyList(),
     val defaultCategoryName: String,
 ) : FieldMappingExport
@@ -111,7 +120,10 @@ data class AccountLookupExport(
 data class RegexAccountExport(
     override val fieldType: TransferField,
     val columnName: String,
+    // First-match-wins - order is semantic, keeps default insertion-order serialization.
     val rules: List<RegexRule>,
+    // Tried in order until one yields a non-blank value - order is semantic, keeps default
+    // insertion-order serialization.
     val fallbackColumns: List<String> = emptyList(),
     val defaultCategoryName: String,
 ) : FieldMappingExport
@@ -148,6 +160,7 @@ data class TemplateAccountExport(
 @Serializable
 data class ConditionalAccountExport(
     override val fieldType: TransferField,
+    @Serializable(with = SortedRowConditionListSerializer::class)
     val conditions: List<RowCondition>,
     val whenTrue: FieldMappingExport,
     val whenFalse: FieldMappingExport,
@@ -176,6 +189,8 @@ data class DateTimeParsingExport(
 data class DirectColumnExport(
     override val fieldType: TransferField,
     val columnName: String,
+    // Tried in order until one yields a non-blank value - order is semantic, keeps default
+    // insertion-order serialization.
     val fallbackColumns: List<String> = emptyList(),
     val extraction: ColumnExtraction? = null,
 ) : FieldMappingExport
@@ -194,6 +209,7 @@ data class AmountParsingExport(
     val negateValues: Boolean = false,
     val flipAccountsOnPositive: Boolean = false,
     val feeColumnName: String? = null,
+    @Serializable(with = SortedRowConditionListSerializer::class)
     val feeConditions: List<RowCondition> = emptyList(),
 ) : FieldMappingExport
 

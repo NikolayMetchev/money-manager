@@ -170,8 +170,38 @@ class ApiStrategyJsonCodecTest {
                 maxRateLimitRetries = 6,
                 assetSuffixesToStrip = setOf(".F", ".S", ".M"),
                 minorUnitDivisorOverrides = mapOf("GBP" to 1000L),
+                // dataEndpoints is decoded in canonical (sorted-by kind/path/responseArrayKey) order -
+                // see SortedDataEndpointListSerializer - so the entries are listed here in that same
+                // order: DEPOSITS "0/private/DepositStatus" < DEPOSITS "0/private/Ledgers" < TRADES.
                 dataEndpoints =
                     listOf(
+                        ApiDataEndpoint(
+                            endpoint = ApiEndpointConfig(path = "0/private/DepositStatus", responseArrayKey = "result"),
+                            kind = ApiEndpointKind.DEPOSITS,
+                            transactionMappings = ApiTransactionMappings(idField = "refid", txidField = "txid"),
+                            enrichesTransfers = true,
+                        ),
+                        ApiDataEndpoint(
+                            endpoint =
+                                ApiEndpointConfig(
+                                    path = "0/private/Ledgers",
+                                    responseArrayKey = "result.ledger",
+                                    method = HttpMethodType.POST,
+                                    errorArrayField = "error",
+                                    responseObjectValues = true,
+                                    itemKeyField = "ledger_id",
+                                    queryParams = listOf(ApiQueryParam(name = "type", value = "deposit")),
+                                ),
+                            kind = ApiEndpointKind.DEPOSITS,
+                            fixedDirection = TransferDirection.IN,
+                            transactionMappings =
+                                ApiTransactionMappings(
+                                    idField = "ledger_id",
+                                    joinKeyField = "refid",
+                                    counterpartyAliasField = "address",
+                                    counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Kraken App"),
+                                ),
+                        ),
                         ApiDataEndpoint(
                             endpoint =
                                 ApiEndpointConfig(
@@ -203,33 +233,6 @@ class ApiStrategyJsonCodecTest {
                                     idField = "trade_id",
                                 ),
                         ),
-                        ApiDataEndpoint(
-                            endpoint =
-                                ApiEndpointConfig(
-                                    path = "0/private/Ledgers",
-                                    responseArrayKey = "result.ledger",
-                                    method = HttpMethodType.POST,
-                                    errorArrayField = "error",
-                                    responseObjectValues = true,
-                                    itemKeyField = "ledger_id",
-                                    queryParams = listOf(ApiQueryParam(name = "type", value = "deposit")),
-                                ),
-                            kind = ApiEndpointKind.DEPOSITS,
-                            fixedDirection = TransferDirection.IN,
-                            transactionMappings =
-                                ApiTransactionMappings(
-                                    idField = "ledger_id",
-                                    joinKeyField = "refid",
-                                    counterpartyAliasField = "address",
-                                    counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Kraken App"),
-                                ),
-                        ),
-                        ApiDataEndpoint(
-                            endpoint = ApiEndpointConfig(path = "0/private/DepositStatus", responseArrayKey = "result"),
-                            kind = ApiEndpointKind.DEPOSITS,
-                            transactionMappings = ApiTransactionMappings(idField = "refid", txidField = "txid"),
-                            enrichesTransfers = true,
-                        ),
                     ),
             )
         val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
@@ -237,20 +240,20 @@ class ApiStrategyJsonCodecTest {
         assertEquals(mapOf("XXBT" to "BTC", "ZUSD" to "USD"), decoded.assetAliases)
         assertEquals(
             WindowBoundFormat.EPOCH_S,
-            decoded.dataEndpoints[0]
+            decoded.dataEndpoints[2]
                 .endpoint.pagination
                 ?.windowBoundFormat,
         )
         assertEquals(
             "ofs",
-            decoded.dataEndpoints[0]
+            decoded.dataEndpoints[2]
                 .endpoint.pagination
                 ?.offsetParam,
         )
-        assertTrue(decoded.dataEndpoints[0].endpoint.responseObjectValues)
+        assertTrue(decoded.dataEndpoints[2].endpoint.responseObjectValues)
         assertEquals("ledger_id", decoded.dataEndpoints[1].endpoint.itemKeyField)
         assertEquals("refid", decoded.dataEndpoints[1].transactionMappings?.joinKeyField)
-        assertTrue(decoded.dataEndpoints[2].enrichesTransfers)
+        assertTrue(decoded.dataEndpoints[0].enrichesTransfers)
     }
 
     @Test

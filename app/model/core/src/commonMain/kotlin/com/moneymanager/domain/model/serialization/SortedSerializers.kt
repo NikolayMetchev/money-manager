@@ -2,6 +2,7 @@ package com.moneymanager.domain.model.serialization
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -32,15 +33,71 @@ open class SortedListSerializer<T : Comparable<T>>(
     override fun deserialize(decoder: Decoder): List<T> = delegate.deserialize(decoder).sorted()
 }
 
-/** A `Set<String>` that serializes (and deserializes) in natural string order. */
-object SortedStringSetSerializer : KSerializer<Set<String>> {
-    private val delegate = SetSerializer(String.serializer())
+/**
+ * Like [SortedListSerializer], but for element types with no natural [Comparable] order (or several
+ * plausible ones) — the caller supplies the canonical [comparator] instead.
+ */
+open class SortedByListSerializer<T>(
+    elementSerializer: KSerializer<T>,
+    private val comparator: Comparator<T>,
+) : KSerializer<List<T>> {
+    private val delegate = ListSerializer(elementSerializer)
     override val descriptor: SerialDescriptor = delegate.descriptor
 
     override fun serialize(
         encoder: Encoder,
-        value: Set<String>,
-    ) = delegate.serialize(encoder, value.sorted().toSet())
+        value: List<T>,
+    ) = delegate.serialize(encoder, value.sortedWith(comparator))
 
-    override fun deserialize(decoder: Decoder): Set<String> = delegate.deserialize(decoder).sorted().toSet()
+    override fun deserialize(decoder: Decoder): List<T> = delegate.deserialize(decoder).sortedWith(comparator)
 }
+
+open class SortedSetSerializer<T : Comparable<T>>(
+    elementSerializer: KSerializer<T>,
+) : KSerializer<Set<T>> {
+    private val delegate = SetSerializer(elementSerializer)
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun serialize(
+        encoder: Encoder,
+        value: Set<T>,
+    ) = delegate.serialize(encoder, value.toSortedSet())
+
+    override fun deserialize(decoder: Decoder): Set<T> = delegate.deserialize(decoder).toSortedSet()
+
+    private fun Set<T>.toSortedSet(): Set<T> = sorted().toSet()
+}
+
+/** A `Set<String>` that serializes (and deserializes) in natural string order. */
+object SortedStringSetSerializer : SortedSetSerializer<String>(String.serializer())
+
+/** A `List<String>` that serializes (and deserializes) in natural string order — only for lists whose element order carries no meaning. */
+object SortedStringListSerializer : SortedListSerializer<String>(String.serializer())
+
+/**
+ * A `Map<K, V>` that serializes (and deserializes) with its entries in ascending key order, so the
+ * same data always produces identical bytes regardless of insertion order (e.g. rows typed into a UI
+ * editor on different devices). Only for maps whose entry order carries no meaning.
+ */
+open class SortedMapSerializer<K : Comparable<K>, V>(
+    keySerializer: KSerializer<K>,
+    valueSerializer: KSerializer<V>,
+) : KSerializer<Map<K, V>> {
+    private val delegate = MapSerializer(keySerializer, valueSerializer)
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun serialize(
+        encoder: Encoder,
+        value: Map<K, V>,
+    ) = delegate.serialize(encoder, value.toSortedMap())
+
+    override fun deserialize(decoder: Decoder): Map<K, V> = delegate.deserialize(decoder).toSortedMap()
+
+    private fun Map<K, V>.toSortedMap(): Map<K, V> = entries.sortedBy { it.key }.associate { it.key to it.value }
+}
+
+/** A `Map<String, String>` that serializes (and deserializes) in ascending key order. */
+object SortedStringToStringMapSerializer : SortedMapSerializer<String, String>(String.serializer(), String.serializer())
+
+/** A `Map<String, Long>` that serializes (and deserializes) in ascending key order. */
+object SortedStringToLongMapSerializer : SortedMapSerializer<String, Long>(String.serializer(), Long.serializer())

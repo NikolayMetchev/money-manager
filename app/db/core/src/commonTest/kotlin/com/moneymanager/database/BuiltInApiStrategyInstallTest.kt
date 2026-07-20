@@ -100,7 +100,9 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                 )
             assertEquals(original.authType, rebuilt.authType)
             assertEquals(original.requestSigning, rebuilt.requestSigning)
-            assertEquals(original.dataEndpoints, rebuilt.dataEndpoints)
+            // dataEndpoints round-trips through a canonical (sorted) order - see
+            // SortedDataEndpointListSerializer - so compare as sets rather than ordered lists.
+            assertEquals(original.dataEndpoints.toSet(), rebuilt.dataEndpoints.toSet())
             assertEquals(original.syntheticAccount, rebuilt.syntheticAccount)
             assertEquals(original.internalTransferReconcile, rebuilt.internalTransferReconcile)
         }

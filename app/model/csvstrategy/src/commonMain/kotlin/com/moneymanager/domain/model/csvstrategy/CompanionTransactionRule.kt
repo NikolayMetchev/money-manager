@@ -1,5 +1,6 @@
 package com.moneymanager.domain.model.csvstrategy
 
+import com.moneymanager.domain.model.serialization.SortedListSerializer
 import kotlinx.serialization.Serializable
 
 /**
@@ -32,4 +33,10 @@ data class CompanionTransactionRule(
     val matchValuePattern: String,
     val linkAttributeName: String,
     val companionDescription: String,
-)
+) : Comparable<CompanionTransactionRule> {
+    override fun compareTo(other: CompanionTransactionRule): Int =
+        compareValuesBy(this, other, { it.name }, { it.matchAttributeName }, { it.matchValuePattern }, { it.linkAttributeName })
+}
+
+/** Serializes companion-rule lists sorted by natural order — each rule is matched independently, so list order carries no meaning. */
+object SortedCompanionTransactionRuleListSerializer : SortedListSerializer<CompanionTransactionRule>(CompanionTransactionRule.serializer())

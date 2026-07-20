@@ -1,5 +1,9 @@
 package com.moneymanager.domain.model.apistrategy
 
+import com.moneymanager.domain.model.serialization.SortedListSerializer
+import com.moneymanager.domain.model.serialization.SortedStringListSerializer
+import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
+import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.Serializable
 
 /**
@@ -61,7 +65,9 @@ data class ApiQueryParam(
     val name: String,
     val value: String? = null,
     val dynamicSource: String? = null,
-)
+) : Comparable<ApiQueryParam> {
+    override fun compareTo(other: ApiQueryParam): Int = compareValuesBy(this, other, { it.name }, { it.value }, { it.dynamicSource })
+}
 
 /** Selects which pagination scheme an endpoint uses. */
 @Serializable
@@ -119,6 +125,7 @@ data class ApiPaginationConfig(
     val endParam: String = "intervalEnd",
     val windowDays: Int = 469,
     val lookbackDays: Int = 365 * 6,
+    @Serializable(with = SortedQueryParamListSerializer::class)
     val extraParams: List<ApiQueryParam> = emptyList(),
     /** Encoding of the [startParam]/[endParam] window bounds; defaults to epoch-millis. */
     val windowBoundFormat: WindowBoundFormat = WindowBoundFormat.EPOCH_MS,
@@ -159,6 +166,7 @@ data class ApiPaginationConfig(
 data class ApiEndpointConfig(
     val path: String,
     val responseArrayKey: String,
+    @Serializable(with = SortedQueryParamListSerializer::class)
     val queryParams: List<ApiQueryParam> = emptyList(),
     val pagination: ApiPaginationConfig? = null,
     val method: HttpMethodType = HttpMethodType.GET,
@@ -204,7 +212,9 @@ data class ApiAccountMappings(
     val sortCodeField: String = "sort_code",
     val accountNumberField: String = "account_number",
     val currencyField: String? = null,
+    @Serializable(with = SortedStringToStringMapSerializer::class)
     val customFields: Map<String, String> = emptyMap(),
+    @Serializable(with = SortedStringSetSerializer::class)
     val uniqueIdentifierFields: Set<String> = emptySet(),
     /**
      * A fixed display name for every account this strategy creates, overriding [descriptionField]
@@ -283,6 +293,7 @@ data class ApiTransactionMappings(
     val amountFormat: ApiAmountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
     val signSource: ApiSignSource = ApiSignSource.EMBEDDED,
     val signField: String? = null,
+    @Serializable(with = SortedStringSetSerializer::class)
     val creditValues: Set<String> = emptySet(),
     val idField: String = "id",
     val merchantNameField: String? = null,
@@ -290,6 +301,7 @@ data class ApiTransactionMappings(
     val counterpartyIdField: String? = null,
     val declineReasonField: String? = null,
     val declineStatusField: String? = null,
+    @Serializable(with = SortedStringSetSerializer::class)
     val declinedStatusValues: Set<String> = emptySet(),
     val localAmountField: String? = null,
     val localCurrencyField: String? = null,
@@ -297,7 +309,9 @@ data class ApiTransactionMappings(
     val feeCurrencyField: String? = null,
     val feeDescriptionField: String? = null,
     val feeIncludedInAmount: Boolean = false,
+    @Serializable(with = SortedStringToStringMapSerializer::class)
     val customFields: Map<String, String> = emptyMap(),
+    @Serializable(with = SortedStringSetSerializer::class)
     val uniqueIdentifierFields: Set<String> = emptySet(),
     /**
      * Dot-path to a blockchain wallet address on a deposit/withdrawal item (e.g. "address" for a
@@ -326,6 +340,7 @@ data class ApiTransactionMappings(
      * directly against that account instead of a wallet/funding account, so the same movement recorded
      * by another strategy (the CSV "Crypto.com" App export) reconciles to it regardless of import order.
      */
+    @Serializable(with = SortedStringToStringMapSerializer::class)
     val counterpartyAccountAliases: Map<String, String> = emptyMap(),
     /**
      * Dot-path to a field on this item whose value is looked up against the id index built from any
@@ -349,6 +364,7 @@ data class ApiTransactionMappings(
      * the trades already sourced from `TradesHistory`.
      */
     val excludeField: String? = null,
+    @Serializable(with = SortedStringSetSerializer::class)
     val excludeValues: Set<String> = emptySet(),
     /**
      * Dot-path to a field identifying the trade this row belongs to (e.g. Kraken Ledgers `refid`, which
@@ -373,6 +389,7 @@ data class ApiPeopleMappings(
     // providers that classify person-like counterparties under several types (e.g. Starling's
     // PAYEE/SENDER). A counterparty is personal when its type matches [personalBeneficiaryAccountTypeValue]
     // or any of these.
+    @Serializable(with = SortedStringSetSerializer::class)
     val personalBeneficiaryAccountTypeValues: Set<String> = emptySet(),
     val counterpartyNameField: String = "name",
     val counterpartyUserIdField: String = "user_id",
@@ -385,6 +402,7 @@ data class ApiPeopleMappings(
     // fragments into one account per transaction (e.g. Monzo issues a fresh "anonuser_…" user id for
     // every bank transfer to the same person). When the id begins with one of these it is discarded
     // and the counterparty is matched by name instead. Empty = treat every id as stable.
+    @Serializable(with = SortedStringSetSerializer::class)
     val ephemeralCounterpartyIdPrefixes: Set<String> = emptySet(),
     // When true, a counterparty's bank sub-entity (sort code + account number) identifies the
     // counterparty account in preference to [ApiTransactionMappings.counterpartyIdField]. Set for
@@ -435,7 +453,12 @@ data class RulePredicate(
     val path: String,
     val op: PredicateOp,
     val value: String? = null,
-)
+) : Comparable<RulePredicate> {
+    override fun compareTo(other: RulePredicate): Int = compareValuesBy(this, other, { it.path }, { it.op.name }, { it.value })
+}
+
+/** Serializes predicate lists sorted by [RulePredicate]'s natural order — all must match (logical AND), so list order carries no meaning. */
+object SortedRulePredicateListSerializer : SortedListSerializer<RulePredicate>(RulePredicate.serializer())
 
 /**
  * A declarative rule that classifies a transaction as a well-known built-in counterparty (e.g.
@@ -451,6 +474,7 @@ data class RulePredicate(
 data class BuiltInCounterpartyRule(
     val name: String,
     val onlyWhenSign: RuleSign = RuleSign.ANY,
+    @Serializable(with = SortedRulePredicateListSerializer::class)
     val predicates: List<RulePredicate> = emptyList(),
 )
 
@@ -473,6 +497,7 @@ data class ApiSigningConfig(
     val challengeHeader: String = "x-2fa-approval",
     val signatureHeader: String = "X-Signature",
     val triggerStatus: Int = 403,
+    @Serializable(with = SortedStringSetSerializer::class)
     val statementCountries: Set<String> = emptySet(),
 )
 
@@ -657,7 +682,10 @@ sealed interface SigPart {
         val format: ParamStringFormat = ParamStringFormat.SORTED_CONCAT,
     ) : SigPart
 
-    /** SHA-256 of the concatenation of [parts], emitted as raw bytes (Kraken's nested hash). */
+    /**
+     * SHA-256 of the concatenation of [parts], emitted as raw bytes (Kraken's nested hash). Order is
+     * semantic (bytes are concatenated in list order) - keeps default insertion-order serialization.
+     */
     @Serializable
     data class Sha256(
         val parts: List<SigPart>,
@@ -682,6 +710,8 @@ data class ApiRequestSigningConfig(
     val algorithm: SigningAlgorithm,
     val secretEncoding: SecretEncoding = SecretEncoding.UTF8,
     val signatureEncoding: SignatureEncoding = SignatureEncoding.HEX,
+    // Order is semantic (bytes are concatenated in list order before signing) - keeps default
+    // insertion-order serialization.
     val message: List<SigPart>,
     val apiKey: FieldPlacement,
     val nonce: NonceSpec,
@@ -792,8 +822,10 @@ data class ApiTradeMappings(
     val instrumentSeparator: String = "_",
     val baseAssetField: String? = null,
     val quoteAssetField: String? = null,
+    @Serializable(with = SortedStringListSerializer::class)
     val quoteAssets: List<String> = emptyList(),
     val sideField: String,
+    @Serializable(with = SortedStringSetSerializer::class)
     val buyValues: Set<String> = setOf("BUY", "buy"),
     val baseQuantityField: String,
     val priceField: String? = null,
@@ -832,7 +864,16 @@ data class ApiSyntheticAccount(
 data class ApiAccountBridge(
     /** Display name of the other owned account (e.g. the CSV "Crypto.com" App account). */
     val otherAccountName: String,
-)
+) : Comparable<ApiAccountBridge> {
+    override fun compareTo(other: ApiAccountBridge): Int = otherAccountName.compareTo(other.otherAccountName)
+}
+
+/**
+ * Serializes bridge lists sorted by [ApiAccountBridge]'s natural order. Each bridge is matched
+ * independently against the existing accounts (no first-match short-circuit), so list order carries
+ * no meaning.
+ */
+object SortedAccountBridgeListSerializer : SortedListSerializer<ApiAccountBridge>(ApiAccountBridge.serializer())
 
 /**
  * Reconciles internal transfers between this strategy's account and another owned account that records
@@ -843,6 +884,7 @@ data class ApiAccountBridge(
  */
 @Serializable
 data class ApiInternalTransferReconcile(
+    @Serializable(with = SortedAccountBridgeListSerializer::class)
     val bridges: List<ApiAccountBridge>,
     val windowSeconds: Long,
     /**
