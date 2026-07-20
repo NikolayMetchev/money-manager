@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.PredicateOp
+import com.moneymanager.domain.model.apistrategy.TransferDirection
 
 /** Tabs of the API strategy editor screen. */
 internal enum class EditorTab(
@@ -83,7 +84,22 @@ internal class ApiStrategyEditorState(
     // edited on the Endpoints tab (synthetic account, data endpoints) and Advanced tab (request
     // signing, internal-transfer reconciliation).
     var requestSigning by mutableStateOf(initial?.requestSigning)
-    var dataEndpoints by mutableStateOf(initial?.dataEndpoints.orEmpty())
+
+    // A directional (deposit/withdrawal) endpoint with a null fixedDirection displays as "IN" in the
+    // Endpoints tab (a rendering fallback), but that fallback is never persisted on its own — so a
+    // strategy saved before this field existed, or otherwise missing it, would show a fully-filled-in
+    // form yet fail isValidForSave and permanently disable Save. Backfill it here, at load time, so the
+    // fix applies without the user ever having to visit the Endpoints tab.
+    var dataEndpoints by
+        mutableStateOf(
+            initial?.dataEndpoints.orEmpty().map { endpoint ->
+                if (endpoint.kind in DIRECTIONAL_KINDS && !endpoint.enrichesTransfers && endpoint.fixedDirection == null) {
+                    endpoint.copy(fixedDirection = TransferDirection.IN)
+                } else {
+                    endpoint
+                }
+            },
+        )
     var syntheticAccount by mutableStateOf(initial?.syntheticAccount)
     var internalTransferReconcile by mutableStateOf(initial?.internalTransferReconcile)
     var assetAliases by mutableStateOf(initial?.assetAliases.orEmpty())
