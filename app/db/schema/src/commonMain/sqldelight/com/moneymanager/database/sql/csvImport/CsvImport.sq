@@ -54,3 +54,13 @@ CREATE TABLE csv_import_error (
 );
 
 CREATE INDEX idx_csv_import_error_import ON csv_import_error(csv_import_id);
+
+-- Raw bytes of an imported Excel workbook, kept alongside its staged rows (in the dynamic
+-- csv_import_<uuid> table referenced by csv_import_metadata) so the worksheet can be re-parsed if the
+-- matched strategy names a different sheet than the one initially staged.
+CREATE TABLE xlsx_import_blob (
+    csv_import_id TEXT PRIMARY KEY NOT NULL,
+    file_bytes BLOB NOT NULL,
+    worksheet_name TEXT NOT NULL,
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE CASCADE
+);

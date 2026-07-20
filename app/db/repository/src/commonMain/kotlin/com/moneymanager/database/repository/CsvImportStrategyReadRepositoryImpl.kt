@@ -58,6 +58,7 @@ class CsvImportStrategyReadRepositoryImpl(
             crossSourceReconcileWindowSeconds = entity.cross_source_reconcile_window_seconds,
             conversionConfig = FieldMappingJsonCodec.decodeConversionConfig(entity.conversion_config_json),
             fundingAttributeMatch = FieldMappingJsonCodec.decodeAttributeAccountMatch(entity.funding_attribute_match_json),
+            worksheetName = entity.worksheet_name,
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
         )

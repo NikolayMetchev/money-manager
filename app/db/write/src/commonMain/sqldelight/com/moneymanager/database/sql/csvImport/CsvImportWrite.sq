@@ -26,3 +26,8 @@ VALUES (?, ?, ?, ?);
 
 deleteError:
 DELETE FROM csv_import_error WHERE csv_import_id = ? AND row_index = ?;
+
+-- xlsx_import_blob queries
+insertXlsxBlob:
+INSERT INTO xlsx_import_blob (csv_import_id, file_bytes, worksheet_name)
+VALUES (?, ?, ?);

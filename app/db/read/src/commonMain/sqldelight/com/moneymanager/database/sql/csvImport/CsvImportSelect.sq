@@ -129,3 +129,7 @@ ORDER BY csv_import_metadata.import_timestamp DESC;
 -- csv_column_metadata queries
 selectColumnsByImportId:
 SELECT * FROM csv_column_metadata WHERE import_id = ? ORDER BY column_index;
+
+-- xlsx_import_blob queries
+selectXlsxBlob:
+SELECT file_bytes, worksheet_name FROM xlsx_import_blob WHERE csv_import_id = ?;

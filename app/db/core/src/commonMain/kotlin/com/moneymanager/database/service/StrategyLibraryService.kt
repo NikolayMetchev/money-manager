@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.isQifStrategy
+import com.moneymanager.domain.model.csvstrategy.isXlsxStrategy
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
@@ -55,7 +56,12 @@ class StrategyLibraryService(
 
         for (strategy in csvStrategyRepository.getAllStrategies().first()) {
             val json = CsvStrategyExportCodec.encode(csvStrategyExportService.toExport(strategy, appVersion))
-            val kind = if (strategy.isQifStrategy()) StrategyKind.QIF else StrategyKind.CSV
+            val kind =
+                when {
+                    strategy.isQifStrategy() -> StrategyKind.QIF
+                    strategy.isXlsxStrategy() -> StrategyKind.XLSX
+                    else -> StrategyKind.CSV
+                }
             entries += entry(StrategyKey(kind, strategy.name), json)
         }
 
@@ -83,7 +89,7 @@ class StrategyLibraryService(
         json: String,
     ): StrategyParseResult =
         when (key.kind) {
-            StrategyKind.CSV, StrategyKind.QIF -> {
+            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX -> {
                 val export = CsvStrategyExportCodec.decode(json)
                 val refs = csvStrategyExportService.parseExport(export).unresolvedReferences.map { it.toDomain() }
                 StrategyParseResult(key, refs)
@@ -106,7 +112,7 @@ class StrategyLibraryService(
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
     ) {
         when (key.kind) {
-            StrategyKind.CSV, StrategyKind.QIF -> applyCsv(key.name, json, resolutions)
+            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX -> applyCsv(key.name, json, resolutions)
             StrategyKind.API -> applyApi(key.name, json)
             StrategyKind.PASS_THROUGH -> applyPassThrough(key.name, json)
             StrategyKind.GLOBAL_MAPPINGS -> applyGlobalMappings(json, resolutions)

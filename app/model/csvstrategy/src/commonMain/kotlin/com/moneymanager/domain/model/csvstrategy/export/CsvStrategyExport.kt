@@ -43,6 +43,8 @@ import kotlinx.serialization.Serializable
  * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.conversionConfig])
  * @property fundingAttributeMatch Attribute-based funding-account match (already portable, no IDs)
  * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fundingAttributeMatch])
+ * @property worksheetName When set, this is an Excel strategy targeting this worksheet
+ * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.worksheetName])
  */
 @Serializable
 data class CsvStrategyExport(
@@ -75,6 +77,10 @@ data class CsvStrategyExport(
     // strategies changed" on catalog/Drive sync. See StrategyArtifactCodec.canonicalHash.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val fundingAttributeMatch: AttributeAccountMatch? = null,
+    // Same NEVER-encode rationale as fundingAttributeMatch above: only strategies that actually set a
+    // worksheet name (XLSX strategies) rehash when this field is added.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val worksheetName: String? = null,
 )
 
 /**

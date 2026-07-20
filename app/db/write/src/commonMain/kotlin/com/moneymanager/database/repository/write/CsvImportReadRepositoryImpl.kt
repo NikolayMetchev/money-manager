@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.XlsxImportBlob
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -106,6 +107,13 @@ class CsvImportReadRepositoryImpl(
         withContext(coroutineContext) {
             csvImportSelectQueries.selectImportsByChecksum(checksum, ::toCsvImportRecord).executeAsList().map { import ->
                 toCsvImport(import)
+            }
+        }
+
+    override suspend fun getXlsxBlob(id: CsvImportId): XlsxImportBlob? =
+        withContext(coroutineContext) {
+            csvImportSelectQueries.selectXlsxBlob(id.id.toString()).executeAsOneOrNull()?.let { blob ->
+                XlsxImportBlob(fileBytes = blob.file_bytes, worksheetName = blob.worksheet_name)
             }
         }
 

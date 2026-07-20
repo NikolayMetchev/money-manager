@@ -147,6 +147,41 @@ suspend fun ImportEngine.createCsvImport(
         ).createdCsvImportIds[fileName],
     )
 
+/**
+ * Stages an Excel worksheet exactly like [createCsvImport], additionally storing the raw workbook
+ * [xlsxBytes] and the [xlsxWorksheetName] [headers]/[rows] were parsed from, so the sheet can be
+ * re-extracted later if a different worksheet is selected. The caller (JVM-side, via the injected
+ * `XlsxParser`) has already parsed the sheet into the same headers/rows shape a CSV file would produce.
+ */
+suspend fun ImportEngine.createXlsxImport(
+    fileName: String,
+    headers: List<String>,
+    rows: List<List<String>>,
+    fileChecksum: String,
+    fileLastModified: Instant,
+    xlsxBytes: ByteArray,
+    xlsxWorksheetName: String,
+): CsvImportId =
+    requireNotNull(
+        import(
+            ImportBatch(
+                csvImportMutations =
+                    listOf(
+                        CsvImportMutation.Create(
+                            fileName,
+                            fileName,
+                            headers,
+                            rows,
+                            fileChecksum,
+                            fileLastModified,
+                            xlsxBytes,
+                            xlsxWorksheetName,
+                        ),
+                    ),
+            ),
+        ).createdCsvImportIds[fileName],
+    )
+
 suspend fun ImportEngine.deleteCsvImport(id: CsvImportId) {
     import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Delete(id))))
 }

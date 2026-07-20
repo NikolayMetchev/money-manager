@@ -109,6 +109,11 @@ sealed interface CsvImportMutation {
         val rows: List<List<String>>,
         val fileChecksum: String,
         val fileLastModified: Instant,
+        // Non-null only for an Excel import: the raw workbook bytes + the worksheet [headers]/[rows]
+        // were parsed from, stored alongside the staged rows so the sheet can be re-extracted if a
+        // different worksheet is later selected.
+        val xlsxBytes: ByteArray? = null,
+        val xlsxWorksheetName: String? = null,
     ) : CsvImportMutation
 
     data class Delete(

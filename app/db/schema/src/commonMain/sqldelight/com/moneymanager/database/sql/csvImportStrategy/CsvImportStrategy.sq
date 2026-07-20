@@ -13,6 +13,7 @@ CREATE TABLE csv_import_strategy (
     cross_source_reconcile_window_seconds INTEGER,
     conversion_config_json TEXT,
     funding_attribute_match_json TEXT,
+    worksheet_name TEXT,
     created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
     updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000)
 );

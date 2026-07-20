@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExportMapper
 import com.moneymanager.domain.model.csvstrategy.isQifStrategy
+import com.moneymanager.domain.model.csvstrategy.isXlsxStrategy
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
 import com.moneymanager.domain.strategy.StrategyFileNaming
@@ -56,7 +57,12 @@ internal fun builtInArtifacts(): Map<StrategyKey, String> {
                 currencyCodeById = { id -> GBP_CURRENCY_CODE.takeIf { id == GBP_CURRENCY_ID } },
                 categoryNameById = { null },
             )
-        val kind = if (strategy.isQifStrategy()) StrategyKind.QIF else StrategyKind.CSV
+        val kind =
+            when {
+                strategy.isQifStrategy() -> StrategyKind.QIF
+                strategy.isXlsxStrategy() -> StrategyKind.XLSX
+                else -> StrategyKind.CSV
+            }
         artifacts[StrategyKey(kind, strategy.name)] = CsvStrategyExportCodec.encode(export)
     }
 

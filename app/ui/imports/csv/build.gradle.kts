@@ -23,6 +23,7 @@ kotlin {
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.parsers.csv)
+                implementation(projects.utils.parsers.xlsx)
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)

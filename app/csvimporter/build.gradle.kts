@@ -39,6 +39,7 @@ kotlin {
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.parsers.csv)
                 implementation(projects.utils.parsers.qif)
+                implementation(projects.utils.parsers.xlsx)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)
             }
@@ -51,6 +52,7 @@ kotlin {
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.parsers.csv)
                 implementation(projects.utils.parsers.qif)
+                implementation(projects.utils.parsers.xlsx)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)
             }

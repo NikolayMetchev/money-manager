@@ -4,14 +4,15 @@ import com.moneymanager.domain.model.AppVersion
 
 /**
  * The kinds of strategy artifact stored in the shared library, one file per artifact on the remote.
- * CSV and QIF are both `csv_import_strategy` rows (QIF rides the CSV engine); they are separated here
- * only so the filename suffix records which kind a file is. [GLOBAL_MAPPINGS] is the single combined
- * file holding all global account mappings. [PASS_THROUGH] is one pass-through (conduit) account
- * definition per file.
+ * CSV, QIF and XLSX are all `csv_import_strategy` rows (QIF and XLSX both ride the CSV engine); they
+ * are separated here only so the filename suffix records which kind a file is. [GLOBAL_MAPPINGS] is
+ * the single combined file holding all global account mappings. [PASS_THROUGH] is one pass-through
+ * (conduit) account definition per file.
  */
 enum class StrategyKind {
     CSV,
     QIF,
+    XLSX,
     API,
     GLOBAL_MAPPINGS,
     PASS_THROUGH,
@@ -51,6 +52,7 @@ object StrategyFileNaming {
     private const val SUFFIX = ".json"
     private const val CSV_INFIX = ".csv"
     private const val QIF_INFIX = ".qif"
+    private const val XLSX_INFIX = ".xlsx"
     private const val API_INFIX = ".api"
     private const val PASS_THROUGH_INFIX = ".passthrough"
 
@@ -58,6 +60,7 @@ object StrategyFileNaming {
         when (key.kind) {
             StrategyKind.CSV -> "${key.name}$CSV_INFIX$SUFFIX"
             StrategyKind.QIF -> "${key.name}$QIF_INFIX$SUFFIX"
+            StrategyKind.XLSX -> "${key.name}$XLSX_INFIX$SUFFIX"
             StrategyKind.API -> "${key.name}$API_INFIX$SUFFIX"
             StrategyKind.GLOBAL_MAPPINGS -> "$GLOBAL_MAPPINGS_NAME$SUFFIX"
             StrategyKind.PASS_THROUGH -> "${key.name}$PASS_THROUGH_INFIX$SUFFIX"
@@ -71,6 +74,7 @@ object StrategyFileNaming {
             return StrategyKey(StrategyKind.GLOBAL_MAPPINGS, GLOBAL_MAPPINGS_NAME)
         }
         return when {
+            stem.endsWith(XLSX_INFIX) -> StrategyKey(StrategyKind.XLSX, stem.removeSuffix(XLSX_INFIX))
             stem.endsWith(CSV_INFIX) -> StrategyKey(StrategyKind.CSV, stem.removeSuffix(CSV_INFIX))
             stem.endsWith(QIF_INFIX) -> StrategyKey(StrategyKind.QIF, stem.removeSuffix(QIF_INFIX))
             stem.endsWith(API_INFIX) -> StrategyKey(StrategyKind.API, stem.removeSuffix(API_INFIX))

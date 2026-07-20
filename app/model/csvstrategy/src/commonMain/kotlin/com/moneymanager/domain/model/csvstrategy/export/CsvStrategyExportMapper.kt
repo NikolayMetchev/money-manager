@@ -51,6 +51,7 @@ object CsvStrategyExportMapper {
             crossSourceReconcileWindowSeconds = strategy.crossSourceReconcileWindowSeconds,
             conversionConfig = strategy.conversionConfig,
             fundingAttributeMatch = strategy.fundingAttributeMatch,
+            worksheetName = strategy.worksheetName,
         )
 
     private fun FieldMapping.toExport(

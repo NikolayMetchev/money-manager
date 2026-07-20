@@ -25,5 +25,6 @@ fun CsvImportStrategyWriteQueries.insertStrategy(strategy: CsvImportStrategy) {
         cross_source_reconcile_window_seconds = strategy.crossSourceReconcileWindowSeconds,
         conversion_config_json = FieldMappingJsonCodec.encodeConversionConfig(strategy.conversionConfig),
         funding_attribute_match_json = FieldMappingJsonCodec.encodeAttributeAccountMatch(strategy.fundingAttributeMatch),
+        worksheet_name = strategy.worksheetName,
     )
 }
