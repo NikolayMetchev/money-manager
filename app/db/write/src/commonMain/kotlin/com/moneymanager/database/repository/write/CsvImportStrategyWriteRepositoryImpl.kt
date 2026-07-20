@@ -65,10 +65,18 @@ class CsvImportStrategyWriteRepositoryImpl(
                     cross_source_reconcile_window_seconds = strategy.crossSourceReconcileWindowSeconds,
                     conversion_config_json = FieldMappingJsonCodec.encodeConversionConfig(strategy.conversionConfig),
                     funding_attribute_match_json = FieldMappingJsonCodec.encodeAttributeAccountMatch(strategy.fundingAttributeMatch),
-                    worksheet_name = strategy.worksheetName,
                     updated_at = now.toEpochMilliseconds(),
                     id = strategy.id.id.toString(),
                 )
+                val worksheetName = strategy.worksheetName
+                if (worksheetName != null) {
+                    writeQueries.insertOrReplaceXlsxWorksheet(
+                        csv_import_strategy_id = strategy.id.id.toString(),
+                        worksheet_name = worksheetName,
+                    )
+                } else {
+                    writeQueries.deleteXlsxWorksheet(strategy.id.id.toString())
+                }
                 val persistedRevisionId =
                     selectQueries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
                 writeQueries.insertSource(

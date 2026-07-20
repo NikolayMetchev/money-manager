@@ -370,6 +370,7 @@ class MoneyManagerDatabaseWrapper(
             "csv_import_metadata",
             "csv_import_strategy",
             "xlsx_import_blob",
+            "xlsx_import_strategy",
             "transaction_id",
             "source_type",
             "entity_source",

@@ -7,7 +7,8 @@ import com.moneymanager.database.sql.csvImportStrategy.CsvImportStrategyWriteQue
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 
 /**
- * Inserts a [CsvImportStrategy] row, serialising its config sections to JSON. Shared by the runtime
+ * Inserts a [CsvImportStrategy] row, serialising its config sections to JSON, plus its
+ * `xlsx_import_strategy` satellite row when it targets an Excel worksheet. Shared by the runtime
  * repository (user-created strategies) and the seeder (built-in strategies) so the column/encoder list
  * lives in one place. created_at/updated_at are filled by the table's DEFAULT (current time).
  */
@@ -25,6 +26,11 @@ fun CsvImportStrategyWriteQueries.insertStrategy(strategy: CsvImportStrategy) {
         cross_source_reconcile_window_seconds = strategy.crossSourceReconcileWindowSeconds,
         conversion_config_json = FieldMappingJsonCodec.encodeConversionConfig(strategy.conversionConfig),
         funding_attribute_match_json = FieldMappingJsonCodec.encodeAttributeAccountMatch(strategy.fundingAttributeMatch),
-        worksheet_name = strategy.worksheetName,
     )
+    strategy.worksheetName?.let { worksheetName ->
+        insertOrReplaceXlsxWorksheet(
+            csv_import_strategy_id = strategy.id.id.toString(),
+            worksheet_name = worksheetName,
+        )
+    }
 }

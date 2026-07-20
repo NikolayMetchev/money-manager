@@ -12,7 +12,6 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -25,41 +24,58 @@ class CsvImportStrategyReadRepositoryImpl(
 
     override fun getAllStrategies(): Flow<List<CsvImportStrategy>> =
         selectQueries
-            .selectAll()
+            .selectAll(::toDomain)
             .asFlow()
             .mapToList(coroutineContext)
-            .map { strategies -> strategies.map(::toDomain) }
 
     override fun getStrategyById(id: CsvImportStrategyId): Flow<CsvImportStrategy?> =
         selectQueries
-            .selectById(id.id.toString())
+            .selectById(id.id.toString(), ::toDomain)
             .asFlow()
             .mapToOneOrNull(coroutineContext)
-            .map { it?.let(::toDomain) }
 
     override fun getStrategyByName(name: String): Flow<CsvImportStrategy?> =
         selectQueries
-            .selectByName(name)
+            .selectByName(name, ::toDomain)
             .asFlow()
             .mapToOneOrNull(coroutineContext)
-            .map { it?.let(::toDomain) }
 
-    private fun toDomain(entity: com.moneymanager.database.sql.csvImportStrategy.Csv_import_strategy): CsvImportStrategy =
+    // revisionId is part of the query's column set (needed to keep this a positional match for the
+    // generated mapper) but isn't part of the domain model.
+    @Suppress("LongParameterList", "UnusedParameter")
+    private fun toDomain(
+        id: String,
+        revisionId: Long,
+        name: String,
+        identificationColumnsJson: String,
+        fieldMappingsJson: String,
+        attributeMappingsJson: String,
+        rowRulesJson: String,
+        companionRulesJson: String,
+        contentMatchRulesJson: String,
+        fileNamePattern: String?,
+        crossSourceReconcileWindowSeconds: Long?,
+        conversionConfigJson: String?,
+        fundingAttributeMatchJson: String?,
+        createdAt: Long,
+        updatedAt: Long,
+        worksheetName: String?,
+    ): CsvImportStrategy =
         CsvImportStrategy(
-            id = CsvImportStrategyId(Uuid.parse(entity.id)),
-            name = entity.name,
-            identificationColumns = FieldMappingJsonCodec.decodeColumns(entity.identification_columns_json),
-            fieldMappings = FieldMappingJsonCodec.decode(entity.field_mappings_json),
-            attributeMappings = FieldMappingJsonCodec.decodeAttributeMappings(entity.attribute_mappings_json),
-            rowPreprocessingRules = FieldMappingJsonCodec.decodeRowRules(entity.row_rules_json),
-            companionTransactionRules = FieldMappingJsonCodec.decodeCompanionRules(entity.companion_rules_json),
-            contentMatchRules = FieldMappingJsonCodec.decodeContentRules(entity.content_match_rules_json),
-            fileNamePattern = entity.file_name_pattern,
-            crossSourceReconcileWindowSeconds = entity.cross_source_reconcile_window_seconds,
-            conversionConfig = FieldMappingJsonCodec.decodeConversionConfig(entity.conversion_config_json),
-            fundingAttributeMatch = FieldMappingJsonCodec.decodeAttributeAccountMatch(entity.funding_attribute_match_json),
-            worksheetName = entity.worksheet_name,
-            createdAt = Instant.fromEpochMilliseconds(entity.created_at),
-            updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
+            id = CsvImportStrategyId(Uuid.parse(id)),
+            name = name,
+            identificationColumns = FieldMappingJsonCodec.decodeColumns(identificationColumnsJson),
+            fieldMappings = FieldMappingJsonCodec.decode(fieldMappingsJson),
+            attributeMappings = FieldMappingJsonCodec.decodeAttributeMappings(attributeMappingsJson),
+            rowPreprocessingRules = FieldMappingJsonCodec.decodeRowRules(rowRulesJson),
+            companionTransactionRules = FieldMappingJsonCodec.decodeCompanionRules(companionRulesJson),
+            contentMatchRules = FieldMappingJsonCodec.decodeContentRules(contentMatchRulesJson),
+            fileNamePattern = fileNamePattern,
+            crossSourceReconcileWindowSeconds = crossSourceReconcileWindowSeconds,
+            conversionConfig = FieldMappingJsonCodec.decodeConversionConfig(conversionConfigJson),
+            fundingAttributeMatch = FieldMappingJsonCodec.decodeAttributeAccountMatch(fundingAttributeMatchJson),
+            worksheetName = worksheetName,
+            createdAt = Instant.fromEpochMilliseconds(createdAt),
+            updatedAt = Instant.fromEpochMilliseconds(updatedAt),
         )
 }
