@@ -45,7 +45,7 @@ import kotlinx.coroutines.launch
 private val TRADE_KINDS = setOf(ApiEndpointKind.TRADES, ApiEndpointKind.ORDERS)
 
 /** Kinds that carry a fixed movement direction + external counterparty account. */
-private val DIRECTIONAL_KINDS = setOf(ApiEndpointKind.DEPOSITS, ApiEndpointKind.WITHDRAWALS)
+internal val DIRECTIONAL_KINDS = setOf(ApiEndpointKind.DEPOSITS, ApiEndpointKind.WITHDRAWALS)
 
 /**
  * Editor for the optional [ApiSyntheticAccount]: an exchange strategy imports into one fixed account
@@ -464,19 +464,26 @@ internal fun InternalTransferReconcileEditor(
                     AccountPicker(
                         selectedAccountId = accounts.firstOrNull { it.name == bridge.otherAccountName }?.id,
                         onAccountSelected = { accountId ->
-                            // Resolve by id directly rather than through the (possibly stale, just after
-                            // an inline creation) `accounts` snapshot: the picker can return the new
-                            // account's id before this composable's collected list re-emits with it.
-                            scope.launch {
-                                val selectedName = accountRepository.getAccountById(accountId).first()?.name ?: return@launch
+                            fun applyName(name: String) =
                                 onChange(
                                     c.copy(
                                         bridges =
                                             c.bridges.mapIndexed { i, b ->
-                                                if (i == index) b.copy(otherAccountName = selectedName) else b
+                                                if (i == index) b.copy(otherAccountName = name) else b
                                             },
                                     ),
                                 )
+                            // Update synchronously from the already-collected snapshot whenever possible, like
+                            // every other field on this tab, so the Save button reacts immediately. Only fall
+                            // back to a DB lookup for a just-created account this snapshot hasn't re-emitted yet.
+                            val cachedName = accounts.firstOrNull { it.id == accountId }?.name
+                            if (cachedName != null) {
+                                applyName(cachedName)
+                            } else {
+                                scope.launch {
+                                    val selectedName = accountRepository.getAccountById(accountId).first()?.name ?: return@launch
+                                    applyName(selectedName)
+                                }
                             }
                         },
                         label = "Other account",
