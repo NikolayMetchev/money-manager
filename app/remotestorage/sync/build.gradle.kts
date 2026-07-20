@@ -20,37 +20,37 @@ kotlin {
         // KMP ABI deps must be re-declared per platform source set for dependency-analysis.
         jvmMain {
             dependencies {
-                // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
-                api(libs.kotlinx.coroutines.core)
                 api(projects.app.db.core)
                 api(projects.app.db.write)
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
+                // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
+                api(libs.kotlinx.coroutines.core)
             }
         }
 
         androidMain {
             dependencies {
-                // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
-                api(libs.kotlinx.coroutines.core)
                 api(projects.app.db.core)
                 api(projects.app.db.write)
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
+                // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
+                api(libs.kotlinx.coroutines.core)
             }
         }
 
         commonTest {
             dependencies {
+                implementation(projects.test.app.db)
+                implementation(projects.utils.archive)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.sqldelight.runtime)
-                implementation(projects.test.app.db)
-                implementation(projects.utils.archive)
             }
         }
 

@@ -35,12 +35,12 @@ kotlin {
                 api(projects.app.model.passthrough)
                 api(projects.app.model.repository.read)
 
-                implementation(libs.diamondedge.logging)
-                implementation(libs.kotlinx.coroutines.core)
                 implementation(projects.app.model.qif)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.parsers.csv)
                 implementation(projects.utils.parsers.qif)
+                implementation(libs.diamondedge.logging)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
@@ -48,19 +48,19 @@ kotlin {
             dependencies {
                 api(projects.app.importfilesource.core)
 
-                implementation(libs.diamondedge.logging)
-                implementation(libs.kotlinx.coroutines.core)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.parsers.csv)
                 implementation(projects.utils.parsers.qif)
+                implementation(libs.diamondedge.logging)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
         getByName("commonTest") {
             dependencies {
+                implementation(projects.app.strategies)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.app.strategies)
             }
         }
 

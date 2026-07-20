@@ -12,11 +12,11 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                api(libs.kotlinx.coroutines.core)
-                api(libs.ktor.client.core)
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.utils.localsettings)
+                api(libs.kotlinx.coroutines.core)
+                api(libs.ktor.client.core)
 
                 implementation(libs.kotlinx.serialization.json)
             }
@@ -38,13 +38,13 @@ kotlin {
         jvmMain {
             dependsOn(jvmAndroidMain)
             dependencies {
-                api(libs.kotlinx.serialization.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.utils.localsettings)
+                api(libs.kotlinx.serialization.core)
 
+                implementation(projects.app.model.core)
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
-                implementation(projects.app.model.core)
 
                 runtimeOnly(libs.ktor.client.cio)
             }
@@ -53,13 +53,13 @@ kotlin {
         androidMain {
             dependsOn(jvmAndroidMain)
             dependencies {
-                api(libs.kotlinx.serialization.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.utils.localsettings)
+                api(libs.kotlinx.serialization.core)
 
+                implementation(projects.app.model.core)
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
-                implementation(projects.app.model.core)
 
                 runtimeOnly(libs.ktor.client.cio)
             }

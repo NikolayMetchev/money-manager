@@ -10,16 +10,16 @@ plugins {
 // ranked names winning, and writes the TSV via the shared renderCryptoDataset. Run manually / on a
 // schedule — NOT part of the app build, so offline builds stay reproducible from the checked-in file.
 dependencies {
+    implementation(projects.app.cryptodata)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.http)
-    implementation(projects.app.cryptodata)
 
-    testImplementation(kotlin("test"))
     testImplementation(projects.app.model.core)
+    testImplementation(kotlin("test"))
 }
 
 tasks.register<JavaExec>("generateCryptoDataset") {

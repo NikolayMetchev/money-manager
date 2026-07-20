@@ -9,8 +9,8 @@ kotlin {
             dependencies {
                 api(projects.app.model.core)
 
-                implementation(libs.kmlogging)
                 implementation(projects.utils.compose.scrollbar)
+                implementation(libs.kmlogging)
             }
         }
         getByName("androidMain") {
@@ -31,9 +31,9 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.model.core)
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
-                api(projects.app.model.core)
 
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material3.desktop)

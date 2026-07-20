@@ -36,8 +36,8 @@ kotlin {
             dependsOn(jvmAndroidMain)
             resources.srcDir("src/commonResources")
             dependencies {
-                api(libs.ktor.client.core)
                 api(projects.app.model.core)
+                api(libs.ktor.client.core)
 
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.http)
@@ -48,8 +48,8 @@ kotlin {
             dependsOn(jvmAndroidMain)
             resources.srcDir("src/commonResources")
             dependencies {
-                api(libs.ktor.client.core)
                 api(projects.app.model.core)
+                api(libs.ktor.client.core)
 
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.http)
@@ -58,8 +58,8 @@ kotlin {
 
         commonTest {
             dependencies {
-                implementation(kotlin("test"))
                 implementation(projects.app.model.core)
+                implementation(kotlin("test"))
             }
         }
     }

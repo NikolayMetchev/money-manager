@@ -15,22 +15,22 @@ kotlin {
                 api(projects.app.strategycatalog)
                 api(projects.app.ui.foundation)
 
-                implementation(libs.compose.charts)
-                implementation(libs.human.readable)
-                implementation(libs.kotlinx.coroutines.core)
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.app.ui.components)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
+                implementation(libs.compose.charts)
+                implementation(libs.human.readable)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
         getByName("androidMain") {
             dependencies {
+                api(projects.app.db.write)
                 api(libs.androidx.compose.foundation.layout)
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
-                api(projects.app.db.write)
 
                 implementation(libs.androidx.compose.animation.core)
                 implementation(libs.androidx.compose.foundation)
@@ -44,8 +44,6 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
-                api(libs.androidx.compose.runtime.desktop)
-                api(libs.compose.foundation.layout.desktop)
                 api(projects.app.db.write)
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
@@ -53,7 +51,10 @@ kotlin {
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.strategycatalog)
+                api(libs.androidx.compose.runtime.desktop)
+                api(libs.compose.foundation.layout.desktop)
 
+                implementation(projects.app.ui.foundation)
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.charts.desktop)
                 implementation(libs.compose.foundation.desktop)
@@ -64,7 +65,6 @@ kotlin {
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.compose.ui.unit.desktop)
-                implementation(projects.app.ui.foundation)
             }
         }
     }

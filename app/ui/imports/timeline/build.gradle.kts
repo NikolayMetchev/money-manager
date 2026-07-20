@@ -7,17 +7,17 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(libs.kotlinx.datetime)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
+                api(libs.kotlinx.datetime)
 
                 implementation(projects.app.ui.foundation)
             }
         }
         getByName("commonTest") {
             dependencies {
-                implementation(kotlin("test"))
                 implementation(projects.test.app.ui)
+                implementation(kotlin("test"))
             }
         }
         getByName("androidMain") {
@@ -37,9 +37,9 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
-                api(libs.androidx.compose.runtime.desktop)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
+                api(libs.androidx.compose.runtime.desktop)
 
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.foundation.layout.desktop)
@@ -63,9 +63,9 @@ kotlin {
         }
         getByName("androidDeviceTest") {
             dependencies {
+                implementation(projects.test.app.ui)
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.coroutines.core)
-                implementation(projects.test.app.ui)
             }
         }
         getByName("androidHostTest") {

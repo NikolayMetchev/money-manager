@@ -8,7 +8,6 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(libs.kotlinx.coroutines.core)
                 api(projects.app.model.accountmapping)
                 api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
@@ -18,6 +17,7 @@ kotlin {
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
                 api(projects.app.model.timeline)
+                api(libs.kotlinx.coroutines.core)
             }
         }
 

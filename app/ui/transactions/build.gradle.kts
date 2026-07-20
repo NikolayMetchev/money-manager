@@ -13,23 +13,23 @@ kotlin {
                 api(projects.app.model.repository.read)
                 api(projects.app.ui.foundation)
 
-                implementation(libs.human.readable)
-                implementation(libs.kmlogging)
-                implementation(libs.kotlinx.coroutines.core)
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.compose.scrollbar)
+                implementation(libs.human.readable)
+                implementation(libs.kmlogging)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
         getByName("commonTest") {
             dependencies {
+                implementation(projects.test.app.db)
+                implementation(projects.test.app.ui)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.mokkery.runtime)
-                implementation(projects.test.app.db)
-                implementation(projects.test.app.ui)
             }
         }
         getByName("androidMain") {
@@ -51,14 +51,15 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.model.core)
+                api(projects.app.model.repository.read)
+                api(projects.app.ui.foundation)
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.desktop)
                 api(libs.compose.foundation.layout.desktop)
                 api(libs.compose.material3.desktop)
-                api(projects.app.model.core)
-                api(projects.app.model.repository.read)
-                api(projects.app.ui.foundation)
 
+                implementation(projects.app.model.csvstrategy)
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.material.icons.core.desktop)
                 implementation(libs.compose.ui.desktop)
@@ -67,20 +68,19 @@ kotlin {
                 implementation(libs.compose.ui.unit.desktop)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.datetime)
-                implementation(projects.app.model.csvstrategy)
             }
         }
         getByName("jvmTest") {
             dependencies {
-                implementation(kotlin("test"))
-                implementation(compose.desktop.currentOs)
-                implementation(libs.compose.ui.test.desktop)
-                implementation(libs.mokkery.core)
                 implementation(projects.app.db.core)
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
                 implementation(projects.app.model.repository.write)
                 implementation(projects.test.app.db)
+                implementation(kotlin("test"))
+                implementation(compose.desktop.currentOs)
+                implementation(libs.compose.ui.test.desktop)
+                implementation(libs.mokkery.core)
             }
         }
         getByName("androidHostTest") {
@@ -93,14 +93,14 @@ kotlin {
         }
         getByName("androidDeviceTest") {
             dependencies {
-                implementation(libs.androidx.compose.ui.test)
-                implementation(libs.mokkery.core)
                 implementation(projects.app.db.core)
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
                 implementation(projects.app.model.repository.write)
                 implementation(projects.test.app.db)
                 implementation(projects.test.app.ui)
+                implementation(libs.androidx.compose.ui.test)
+                implementation(libs.mokkery.core)
             }
         }
     }

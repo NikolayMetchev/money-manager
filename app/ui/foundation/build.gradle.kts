@@ -8,20 +8,20 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(libs.androidx.navigation3.runtime)
-                api(libs.androidx.savedstate)
-                api(libs.kotlinx.coroutines.core)
-                api(libs.kotlinx.datetime)
-                api(libs.kotlinx.serialization.core)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.repository.read)
                 api(projects.utils.bigdecimal)
                 api(projects.utils.localsettings)
+                api(libs.androidx.navigation3.runtime)
+                api(libs.androidx.savedstate)
+                api(libs.kotlinx.coroutines.core)
+                api(libs.kotlinx.datetime)
+                api(libs.kotlinx.serialization.core)
 
-                implementation(libs.kmlogging)
                 implementation(projects.utils.currency)
+                implementation(libs.kmlogging)
             }
         }
         val jvmAndroidMain =
@@ -30,9 +30,9 @@ kotlin {
             }
         getByName("commonTest") {
             dependencies {
+                implementation(projects.test.app.ui)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.serialization.json)
-                implementation(projects.test.app.ui)
             }
         }
         getByName("androidMain") {
@@ -55,16 +55,16 @@ kotlin {
         getByName("jvmMain") {
             dependsOn(jvmAndroidMain)
             dependencies {
-                api(libs.androidx.compose.runtime.desktop)
-                api(libs.androidx.navigation3.runtime.desktop)
-                api(libs.androidx.savedstate.desktop)
-                api(libs.compose.foundation.desktop)
-                api(libs.compose.ui.desktop)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.repository.read)
                 api(projects.utils.bigdecimal)
+                api(libs.androidx.compose.runtime.desktop)
+                api(libs.androidx.navigation3.runtime.desktop)
+                api(libs.androidx.savedstate.desktop)
+                api(libs.compose.foundation.desktop)
+                api(libs.compose.ui.desktop)
 
                 implementation(libs.androidx.compose.runtime.annotation)
                 implementation(libs.compose.foundation.layout.desktop)
@@ -88,10 +88,10 @@ kotlin {
         }
         getByName("androidDeviceTest") {
             dependencies {
+                implementation(projects.test.app.ui)
                 implementation(kotlin("test"))
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.serialization.json)
-                implementation(projects.test.app.ui)
             }
         }
     }

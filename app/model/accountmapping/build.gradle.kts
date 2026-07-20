@@ -20,8 +20,8 @@ kotlin {
 
         getByName("jvmMain") {
             dependencies {
-                api(libs.kotlinx.serialization.core)
                 api(projects.app.model.core)
+                api(libs.kotlinx.serialization.core)
             }
         }
     }

@@ -9,8 +9,6 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
-                api(libs.kotlinx.coroutines.core)
-                api(libs.sqldelight.runtime)
                 // Write repositories use read-side Mappie mappers and JSON codecs, and the wrapper exposes
                 // SqlDriver/QueryResult; the CSV read repository (raw dynamic-table access via the wrapper)
                 // lives here too and uses coroutine Flows.
@@ -29,6 +27,8 @@ kotlin {
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.repository.write)
+                api(libs.kotlinx.coroutines.core)
+                api(libs.sqldelight.runtime)
 
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.sqldelight.coroutines.extensions)
@@ -49,15 +49,15 @@ kotlin {
                 api(projects.app.model.repository.read)
                 api(projects.app.model.repository.write)
 
-                implementation(libs.kotlinx.serialization.core)
                 implementation(projects.app.db.repository)
                 implementation(projects.utils.bigdecimal)
+                implementation(libs.kotlinx.serialization.core)
             }
         }
         getByName("androidMain") {
             dependencies {
-                implementation(libs.kotlinx.serialization.core)
                 implementation(projects.utils.bigdecimal)
+                implementation(libs.kotlinx.serialization.core)
             }
         }
     }

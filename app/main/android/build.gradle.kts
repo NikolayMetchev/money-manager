@@ -39,13 +39,6 @@ tasks.matching { it.name.startsWith("explodeAssetSource") }.configureEach {
 }
 
 dependencies {
-    implementation(kotlin("stdlib"))
-    implementation(libs.androidx.activity)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.compose.runtime)
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.ktor.client.core)
-    implementation(libs.play.services.auth)
     implementation(projects.app.cryptodata)
     implementation(projects.app.db.core)
     implementation(projects.app.db.di)
@@ -64,4 +57,11 @@ dependencies {
     implementation(projects.app.ui.core)
     implementation(projects.app.ui.foundation)
     implementation(projects.utils.localsettings)
+    implementation(kotlin("stdlib"))
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.runtime)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.ktor.client.core)
+    implementation(libs.play.services.auth)
 }
