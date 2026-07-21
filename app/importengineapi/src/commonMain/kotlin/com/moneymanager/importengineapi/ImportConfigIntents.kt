@@ -148,6 +148,18 @@ sealed interface CsvImportMutation {
         val id: CsvImportId,
     ) : CsvImportMutation
 
+    /**
+     * Replaces an already-staged Excel import's rows/columns in place (keeping its id) with a different
+     * worksheet re-parsed from the stored workbook bytes. Used when the matched strategy names a sheet
+     * other than the one initially staged (the first sheet).
+     */
+    data class Restage(
+        val id: CsvImportId,
+        val headers: List<String>,
+        val rows: List<List<String>>,
+        val worksheetName: String,
+    ) : CsvImportMutation
+
     /** Toggles the "ignored" flag; ignored files are hidden from the actionable lists. */
     data class SetIgnored(
         val id: CsvImportId,

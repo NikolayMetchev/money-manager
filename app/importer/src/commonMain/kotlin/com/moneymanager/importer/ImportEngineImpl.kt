@@ -1579,6 +1579,7 @@ class ImportEngineImpl(
                         ),
                         "CsvImport",
                     )
+                is CsvImportMutation.Restage -> csvImportRepository.restageImport(m.id, m.headers, m.rows, m.worksheetName)
                 is CsvImportMutation.Delete -> csvImportRepository.deleteImport(m.id)
                 is CsvImportMutation.SetIgnored -> csvImportRepository.setImportIgnored(m.id, m.ignored)
                 is CsvImportMutation.UpdateRowTransferId -> csvImportRepository.updateRowTransferId(m.id, m.rowIndex, m.transferId)

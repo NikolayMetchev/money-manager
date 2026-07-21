@@ -51,6 +51,8 @@ import com.moneymanager.importengineapi.createAccountMappings
 import com.moneymanager.importengineapi.createAccounts
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
+import com.moneymanager.importengineapi.restageXlsxImport
+import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -330,7 +332,12 @@ suspend fun applyStagedCsv(
     cryptoRepository: CryptoReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
 ): CsvImportResult? {
-    val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
+    // An Excel import is initially staged from the workbook's FIRST worksheet, but the matched strategy
+    // may target a different sheet. Re-extract + re-stage the correct sheet before reading rows so the
+    // staged data (and everything downstream) reflects the sheet the strategy actually imports.
+    val stagedImport = restageXlsxForStrategy(csvImport, strategy, csvImportRepository, importEngine)
+
+    val allRows = csvImportRepository.getImportRows(stagedImport.id, limit = stagedImport.rowCount.coerceAtLeast(1), offset = 0)
     val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
     if (rows.isEmpty()) {
         // A genuinely empty file (a header-only export with no data rows) has nothing to import, but
@@ -338,8 +345,8 @@ suspend fun applyStagedCsv(
         // Record the strategy application once (the lastAppliedAt guard keeps repeated runs a no-op).
         // Scoped to allRows.isEmpty() so it never fires on re-import, which always has rows and whose
         // "nothing new to import" outcome must stay a null result.
-        if (allRows.isEmpty() && csvImport.lastAppliedAt == null) {
-            recordCsvApplication(importEngine, csvImport.id, strategy)
+        if (allRows.isEmpty() && stagedImport.lastAppliedAt == null) {
+            recordCsvApplication(importEngine, stagedImport.id, strategy)
             return CsvImportResult(successCount = 0, failedRows = emptyList())
         }
         return null
@@ -352,7 +359,7 @@ suspend fun applyStagedCsv(
     // On-demand: create a crypto asset for every non-fiat ticker appearing in the strategy's currency
     // column, so rows denominated in crypto resolve to a real crypto asset (upsert = idempotent on
     // re-import). No-op unless a CryptoReadRepository is supplied and the currency column carries crypto.
-    val cryptoAssets = ensureCryptoAssets(strategy, csvImport.columns, rows, currencies, importEngine, cryptoRepository)
+    val cryptoAssets = ensureCryptoAssets(strategy, stagedImport.columns, rows, currencies, importEngine, cryptoRepository)
 
     // Re-fetch accounts so payee accounts created by earlier files in the same scan are seen.
     val accounts = accountRepository.getAllAccounts().first()
@@ -361,7 +368,7 @@ suspend fun applyStagedCsv(
     val basePrep =
         buildCsvMapper(
             strategy,
-            csvImport.columns,
+            stagedImport.columns,
             accounts,
             currencies,
             mappings,
@@ -374,9 +381,9 @@ suspend fun applyStagedCsv(
 
     return runCsvImport(
         cryptoAssets = cryptoAssets,
-        csvImport = csvImport,
+        csvImport = stagedImport,
         rows = rows,
-        columns = csvImport.columns,
+        columns = stagedImport.columns,
         strategy = strategy,
         basePrep = basePrep,
         selectedExistingAccounts = emptyMap(),
@@ -393,6 +400,31 @@ suspend fun applyStagedCsv(
         engineBatchSize = engineBatchSize,
         attributeAccountMatchers = attributeAccountMatchers,
     )
+}
+
+/**
+ * If [strategy] is an Excel strategy naming a worksheet other than the one [csvImport] was staged from,
+ * re-extracts that sheet from the stored workbook bytes and re-stages the import's rows/columns in
+ * place, returning the reloaded import. Otherwise returns [csvImport] unchanged — for CSV/QIF imports,
+ * Excel strategies with no worksheet name, a staged sheet that already matches, or a missing workbook
+ * blob (a CSV file matched by an Excel strategy, or an import staged before Excel support). Excel
+ * parsing is JVM-only, but this stays a no-op on Android because such imports never have a blob, so the
+ * JVM-only [createXlsxParser] is only reached once a blob is present.
+ */
+suspend fun restageXlsxForStrategy(
+    csvImport: CsvImport,
+    strategy: CsvImportStrategy,
+    csvImportRepository: CsvImportReadRepository,
+    importEngine: ImportEngine,
+): CsvImport {
+    val targetSheet = strategy.worksheetName ?: return csvImport
+    val blob = csvImportRepository.getXlsxBlob(csvImport.id) ?: return csvImport
+    if (blob.worksheetName == targetSheet) return csvImport
+
+    val parsed = createXlsxParser().parse(blob.fileBytes, targetSheet)
+    importEngine.restageXlsxImport(csvImport.id, parsed.headers, parsed.rows, targetSheet)
+    logger.info { "Re-staged Excel import ${csvImport.id.id} from sheet '${blob.worksheetName}' to '$targetSheet'" }
+    return csvImportRepository.getImport(csvImport.id).first() ?: csvImport
 }
 
 /**

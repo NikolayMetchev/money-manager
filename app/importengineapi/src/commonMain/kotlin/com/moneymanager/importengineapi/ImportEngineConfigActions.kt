@@ -182,6 +182,20 @@ suspend fun ImportEngine.createXlsxImport(
         ).createdCsvImportIds[fileName],
     )
 
+/**
+ * Re-stages an already-created Excel import [id] in place with a different worksheet's [headers]/[rows],
+ * recording [worksheetName] on the stored workbook blob. The caller (JVM-side) has re-parsed the sheet
+ * from the blob's raw bytes into the same headers/rows shape a CSV file would produce.
+ */
+suspend fun ImportEngine.restageXlsxImport(
+    id: CsvImportId,
+    headers: List<String>,
+    rows: List<List<String>>,
+    worksheetName: String,
+) {
+    import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Restage(id, headers, rows, worksheetName))))
+}
+
 suspend fun ImportEngine.deleteCsvImport(id: CsvImportId) {
     import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Delete(id))))
 }

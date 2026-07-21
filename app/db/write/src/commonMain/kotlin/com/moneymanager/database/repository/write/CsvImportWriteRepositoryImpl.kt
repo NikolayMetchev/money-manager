@@ -83,6 +83,48 @@ class CsvImportWriteRepositoryImpl(
             }
         }
 
+    override suspend fun restageImport(
+        id: CsvImportId,
+        headers: List<String>,
+        rows: List<List<String>>,
+        worksheetName: String,
+    ): Unit =
+        withContext(coroutineContext) {
+            database.transaction {
+                val import =
+                    csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                        ?: return@transaction
+                val columnCount = headers.size
+
+                // Recreate the dynamic table with the new column shape and rows. The row_index sequence
+                // restarts, so any previously written per-row errors are stale — clear them.
+                tableManager.dropCsvTable(import.table_name)
+                tableManager.createCsvTable(import.table_name, columnCount)
+                tableManager.insertRowsBatch(import.table_name, rows, columnCount)
+
+                csvImportWriteQueries.deleteColumnsByImportId(id.id.toString())
+                headers.forEachIndexed { index, header ->
+                    csvImportWriteQueries.insertColumn(
+                        id = Uuid.random().toString(),
+                        import_id = id.id.toString(),
+                        column_index = index.toLong(),
+                        original_name = header,
+                    )
+                }
+
+                csvImportWriteQueries.deleteErrorsByImportId(id.id.toString())
+                csvImportWriteQueries.updateImportCounts(
+                    row_count = rows.size.toLong(),
+                    column_count = columnCount.toLong(),
+                    id = id.id.toString(),
+                )
+                csvImportWriteQueries.updateXlsxBlobWorksheet(
+                    worksheet_name = worksheetName,
+                    csv_import_id = id.id.toString(),
+                )
+            }
+        }
+
     override suspend fun deleteImport(id: CsvImportId): Unit =
         withContext(coroutineContext) {
             val import =
