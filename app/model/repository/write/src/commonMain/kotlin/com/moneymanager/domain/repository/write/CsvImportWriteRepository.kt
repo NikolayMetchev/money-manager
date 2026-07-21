@@ -32,6 +32,22 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     ): CsvImportId
 
     /**
+     * Replaces the staged rows and columns of an existing Excel import in place, keeping its id (and
+     * therefore its directory-file link and history) stable. Used when the matched strategy names a
+     * different worksheet than the one initially staged: the correct sheet is re-parsed from the stored
+     * workbook bytes and re-staged. Recreates the dynamic table, replaces the column metadata, updates
+     * the row/column counts, and records the new [worksheetName] on the workbook blob. Any previously
+     * written per-row statuses/errors are discarded along with the old rows (the old sheet's rows were
+     * never validly imported under this strategy).
+     */
+    suspend fun restageImport(
+        id: CsvImportId,
+        headers: List<String>,
+        rows: List<List<String>>,
+        worksheetName: String,
+    )
+
+    /**
      * Deletes an import, including its metadata, columns, and dynamic table.
      */
     suspend fun deleteImport(id: CsvImportId)

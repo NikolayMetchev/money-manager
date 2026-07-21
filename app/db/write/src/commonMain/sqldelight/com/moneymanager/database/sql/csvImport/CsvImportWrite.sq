@@ -5,6 +5,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 deleteImport:
 DELETE FROM csv_import_metadata WHERE id = ?;
 
+updateImportCounts:
+UPDATE csv_import_metadata SET row_count = ?, column_count = ? WHERE id = ?;
+
 setImportIgnored:
 UPDATE csv_import_metadata SET ignored = ? WHERE id = ?;
 
@@ -27,7 +30,13 @@ VALUES (?, ?, ?, ?);
 deleteError:
 DELETE FROM csv_import_error WHERE csv_import_id = ? AND row_index = ?;
 
+deleteErrorsByImportId:
+DELETE FROM csv_import_error WHERE csv_import_id = ?;
+
 -- xlsx_import_blob queries
 insertXlsxBlob:
 INSERT INTO xlsx_import_blob (csv_import_id, file_bytes, worksheet_name)
 VALUES (?, ?, ?);
+
+updateXlsxBlobWorksheet:
+UPDATE xlsx_import_blob SET worksheet_name = ? WHERE csv_import_id = ?;
