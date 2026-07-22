@@ -2,6 +2,7 @@
 
 package com.moneymanager.domain.model.importdirectory
 
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Auditable
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
@@ -41,6 +42,10 @@ enum class ImportDirectoryProvider(
  *   null for top-level directories.
  * @property excluded When true the user excluded this directory: its download is disabled and
  *   "Download all" skips it.
+ * @property accountId The account files scanned from this folder belong to, used as the source
+ *   account for strategies with no `SOURCE_ACCOUNT` mapping (e.g. two folders of identically-formatted
+ *   Monzo exports, one per account). Null on a discovered subfolder inherits the parent directory's
+ *   account; null with no parent (or no account there either) falls back to the import dialog's pick.
  */
 data class ImportDirectory(
     val id: ImportDirectoryId,
@@ -53,6 +58,7 @@ data class ImportDirectory(
     val topLevel: Boolean = true,
     val parentId: ImportDirectoryId? = null,
     val excluded: Boolean = false,
+    val accountId: AccountId? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
     override val source: Source = Source.Manual,

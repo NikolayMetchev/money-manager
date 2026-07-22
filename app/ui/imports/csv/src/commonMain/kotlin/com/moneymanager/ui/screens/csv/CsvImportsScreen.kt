@@ -25,6 +25,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,8 +38,13 @@ import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
+import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
@@ -48,6 +54,7 @@ import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -59,6 +66,7 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createCsvImport
 import com.moneymanager.importengineapi.createXlsxImport
 import com.moneymanager.importengineapi.setCsvImportIgnored
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.CsvImportAllDialog
@@ -77,6 +85,7 @@ import kotlin.time.Clock
 fun CsvImportsScreen(
     csvImportRepository: CsvImportReadRepository,
     importTimelineRepository: ImportTimelineReadRepository,
+    importDirectoryRepository: ImportDirectoryReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
@@ -101,6 +110,14 @@ fun CsvImportsScreen(
     }
     val dateRanges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
         importTimelineRepository.getCsvImportDateRanges().map { ranges -> ranges.associateBy { it.fileId } }
+    }
+    val strategies by csvImportStrategyRepository.getAllStrategies().collectAsStateWithSchemaErrorHandling(emptyList())
+    val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
+    // The account files scanned from each import directory belong to (see ImportDirectory.accountId),
+    // used below for files whose applied/matched strategy has no hard-coded SOURCE_ACCOUNT of its own.
+    var directoryAccounts by remember { mutableStateOf<Map<CsvImportId, AccountId>>(emptyMap()) }
+    LaunchedEffect(imports) {
+        directoryAccounts = importDirectoryRepository.csvImportSourceAccounts()
     }
     var isImporting by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
@@ -316,6 +333,7 @@ fun CsvImportsScreen(
             if (showImportAll) {
                 CsvImportAllDialog(
                     unimported = unimported,
+                    importDirectoryRepository = importDirectoryRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
@@ -340,10 +358,8 @@ fun CsvImportsScreen(
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
                     accountAttributeRepository = accountAttributeRepository,
-                    categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,
-                    personRepository = personRepository,
                     passThroughAccountRepository = passThroughAccountRepository,
                     csvImportRepository = csvImportRepository,
                     transactionRepository = transactionRepository,
@@ -388,6 +404,7 @@ fun CsvImportsScreen(
                         CsvImportCard(
                             import = import,
                             dateRange = dateRanges[import.id.id.toString()],
+                            sourceAccountName = resolveSourceAccountName(import, strategies, directoryAccounts, accounts),
                             onClick = { onImportClick(import.id) },
                             ignored = ignoredTab,
                             onSetIgnored = { ignore ->
@@ -401,12 +418,33 @@ fun CsvImportsScreen(
     }
 }
 
+/**
+ * The account [import]'s transfers were (or will be) created against, for display in the imports list.
+ * Prefers the strategy's own hard-coded SOURCE_ACCOUNT (e.g. crypto.com's fixed conduit account) — the
+ * true answer whenever one exists — over the file's import-directory account (see
+ * [ImportDirectory.accountId]), which only matters for strategies with no fixed source (e.g. Monzo,
+ * where the same export format serves any account). Null when neither resolves anything yet (the file
+ * has no applied/matched strategy and its directory has none set either).
+ */
+private fun resolveSourceAccountName(
+    import: CsvImport,
+    strategies: List<CsvImportStrategy>,
+    directoryAccounts: Map<CsvImportId, AccountId>,
+    accounts: List<Account>,
+): String? {
+    val appliedStrategy = import.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
+    val hardCodedAccountId = (appliedStrategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT) as? HardCodedAccountMapping)?.accountId
+    val accountId = hardCodedAccountId ?: directoryAccounts[import.id]
+    return accountId?.let { id -> accounts.firstOrNull { it.id == id }?.name }
+}
+
 // The QIF import card mirrors this one by design.
 @Suppress("DuplicatedCode")
 @Composable
 private fun CsvImportCard(
     import: CsvImport,
     dateRange: ImportFileDateRange?,
+    sourceAccountName: String?,
     onClick: () -> Unit,
     ignored: Boolean,
     onSetIgnored: (Boolean) -> Unit,
@@ -479,6 +517,12 @@ private fun CsvImportCard(
                     color = metadataColor,
                 )
             }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Source account: ${sourceAccountName ?: "Not set — choose at import"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = metadataColor,
+            )
             if (import.errorCount > 0) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(

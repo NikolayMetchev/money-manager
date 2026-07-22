@@ -24,6 +24,7 @@ import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -34,6 +35,7 @@ import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.ImportEngine
@@ -55,6 +57,7 @@ import kotlinx.coroutines.launch
 @Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
 fun CsvImportAllDialog(
     unimported: List<CsvImport>,
+    importDirectoryRepository: ImportDirectoryReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
@@ -83,25 +86,47 @@ fun CsvImportAllDialog(
     var progress by remember { mutableStateOf<BulkImportProgress?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
+    // The account each file's own import directory (or that directory's parent) resolves to, when set.
+    // Takes priority over the shared picker below, so two folders of identically-formatted files (e.g.
+    // main vs joint Monzo exports) each land on their own account without user disambiguation.
+    var directoryAccounts by remember { mutableStateOf<Map<CsvImportId, AccountId>>(emptyMap()) }
+    LaunchedEffect(Unit) {
+        directoryAccounts = importDirectoryRepository.csvImportSourceAccounts()
+    }
+
     // Match each file's strategy (filename + content aware), so we can tell how many files will be
     // skipped (no matching strategy) and whether any matched strategy needs a user-chosen source
     // account. getAllImports() doesn't populate columns, so load each file's columns before matching.
-    var matchedStrategies by remember { mutableStateOf<List<CsvImportStrategy?>?>(null) }
+    // Keyed by import id (not position): `unimported` shrinks as files get imported elsewhere, and a
+    // stale positional list would go out of sync with it between this effect's runs.
+    var matchedStrategies by remember { mutableStateOf<Map<CsvImportId, CsvImportStrategy?>?>(null) }
     LaunchedEffect(unimported, strategies) {
         if (strategies.isEmpty()) {
             matchedStrategies = null
             return@LaunchedEffect
         }
         matchedStrategies =
-            unimported.map { listedImport ->
-                val fullImport = csvImportRepository.getImport(listedImport.id).first() ?: return@map null
-                val sampleRows = csvImportRepository.getImportRows(listedImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
-                strategies.selectForCsv(fullImport.originalFileName, fullImport.columns, sampleRows)
+            unimported.associate { listedImport ->
+                val fullImport = csvImportRepository.getImport(listedImport.id).first()
+                val strategy =
+                    fullImport?.let {
+                        val sampleRows =
+                            csvImportRepository.getImportRows(listedImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
+                        strategies.selectForCsv(it.originalFileName, it.columns, sampleRows)
+                    }
+                listedImport.id to strategy
             }
     }
     val matches = matchedStrategies
-    val skippedNoStrategyCount = if (matches == null) 0 else unimported.size - matches.count { it != null }
-    val needsSourceAccount = matches?.any { it != null && it.needsSourceAccountOverride() } ?: false
+    val skippedNoStrategyCount =
+        if (matches == null) 0 else unimported.count { matches[it.id] == null }
+    val needsSourceAccount =
+        matches?.let { m ->
+            unimported.any { listedImport ->
+                val strategy = m[listedImport.id]
+                strategy != null && strategy.needsSourceAccountOverride() && listedImport.id !in directoryAccounts
+            }
+        } ?: false
 
     AlertDialog(
         onDismissRequest = { if (!isImporting) onDismiss() },
@@ -166,6 +191,7 @@ fun CsvImportAllDialog(
                                         passThroughAccounts = passThroughAccounts,
                                         cryptoRepository = cryptoRepository,
                                         attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
+                                        directoryAccounts = directoryAccounts,
                                     )
                                 summary = result.toSummary()
                             } finally {

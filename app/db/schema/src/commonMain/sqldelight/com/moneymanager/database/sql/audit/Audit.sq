@@ -259,6 +259,7 @@ CREATE TABLE import_directory_audit (
     top_level INTEGER NOT NULL,
     parent_id TEXT,
     excluded INTEGER NOT NULL,
+    account_id INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)

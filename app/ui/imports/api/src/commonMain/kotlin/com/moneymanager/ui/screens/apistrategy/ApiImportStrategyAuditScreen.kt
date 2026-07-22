@@ -206,7 +206,7 @@ private fun flattenConfig(config: ApiStrategyConfig): Map<String, String> =
         put("Counterparty sort code field", people.counterpartySortCodeField)
         put("Counterparty account number field", people.counterpartyAccountNumberField)
         put("Counterparty service user number field", people.counterpartyServiceUserNumberField)
-        put("Fallback counterparty account ID suffix", people.fallbackCounterpartyAccountIdSuffix)
+        put("Counterparty account ID field", people.counterpartyAccountIdField)
     }
 
 private fun flattenEndpoint(

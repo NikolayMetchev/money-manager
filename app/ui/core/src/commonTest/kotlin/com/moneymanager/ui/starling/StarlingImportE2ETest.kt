@@ -876,6 +876,15 @@ class StarlingImportE2ETest : DbTest() {
                 sessionId = sessionId,
                 strategy = strategy,
             )
+            // An own account with no transfers referencing it is never created (see
+            // BatchAccountResolver.pruneUnreferencedSourceAccounts), so the feed must be downloaded too.
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
 
             // 1) People FIRST, before any accounts exist — the holder is created but can link to nothing.
             importApiSessionPeople(

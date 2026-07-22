@@ -51,4 +51,13 @@ interface CsvImportReadRepository {
 
     /** The raw workbook bytes for an Excel-backed import, or null for a CSV/QIF import. */
     suspend fun getXlsxBlob(id: CsvImportId): XlsxImportBlob?
+
+    /**
+     * For every CSV import that has one, the single account appearing on either side of every one of
+     * its currently-existing created transfers — i.e. the account the file was actually imported
+     * against last time. Lets re-import auto-resolve a source-account override for strategies with no
+     * SOURCE_ACCOUNT mapping (e.g. Monzo CSV) without asking the user again for a file already
+     * successfully imported once.
+     */
+    suspend fun historicalSourceAccounts(): Map<CsvImportId, AccountId>
 }

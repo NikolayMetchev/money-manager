@@ -1,12 +1,12 @@
 -- Insert a new import directory. created_at/updated_at are filled by their column DEFAULTs.
 insert:
-INSERT INTO import_directory (id, name, provider_type_id, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO import_directory (id, name, provider_type_id, folder_ref, folder_display_path, provider_config, device_id, top_level, parent_id, excluded, account_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Update an existing import directory (bumps revision)
 update:
 UPDATE import_directory
-SET revision_id = revision_id + 1, name = ?, provider_type_id = ?, folder_ref = ?, folder_display_path = ?, provider_config = ?, device_id = ?, top_level = ?, parent_id = ?, excluded = ?, updated_at = ?
+SET revision_id = revision_id + 1, name = ?, provider_type_id = ?, folder_ref = ?, folder_display_path = ?, provider_config = ?, device_id = ?, top_level = ?, parent_id = ?, excluded = ?, account_id = ?, updated_at = ?
 WHERE id = ?;
 
 -- Delete a directory by ID (cascades to import_directory_file)

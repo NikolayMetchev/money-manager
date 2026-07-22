@@ -95,6 +95,18 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
+ * Attribute types that tie an account to a specific real bank account/counterparty identity. An
+ * existing account carrying none of these is "unclaimed" — see [ImportEngineImpl.matchAccount].
+ */
+private val IDENTITY_ATTR_TYPE_IDS =
+    setOf(
+        AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID),
+        AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID),
+        AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID),
+        AttributeTypeId(WellKnownIds.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID),
+    )
+
+/**
  * Database-backed [ImportEngine]. Takes a fully-built [ImportBatch] and performs the whole import:
  * creates (or reuses) accounts, people and ownerships, resolves transfer account references,
  * deduplicates against existing transfers, bulk-creates new transfers, applies updates for changed
@@ -668,7 +680,9 @@ class ImportEngineImpl(
                 .first()
                 .associate { it.name to it.id }
                 .toMutableMap()
-        val byAttr = buildExistingAccountAttrIndex(batch.accountsToCreate)
+        val existingAccountAttrIndex = buildExistingAccountAttrIndex(batch.accountsToCreate)
+        val byAttr = existingAccountAttrIndex.byAttr
+        val claimedAccountIds = existingAccountAttrIndex.claimedAccountIds
         val byPersonalKey = buildExistingPersonalKeyIndex(batch.accountsToCreate)
         // Names of accounts created earlier in THIS batch, so a later same-named intent with no other
         // way to match reuses that account instead of forking a duplicate. Kept separate from [byName]
@@ -679,11 +693,16 @@ class ImportEngineImpl(
         val keyToId = mutableMapOf<LocalAccountKey, AccountId>()
         var created = 0
         for (intent in batch.accountsToCreate) {
-            val match = matchAccount(intent, byName, byAttr, byPersonalKey, batchCreatedByName)
+            val match = matchAccount(intent, byName, byAttr, byPersonalKey, batchCreatedByName, claimedAccountIds)
             if (match != null) {
                 // A bank-identity (adopted) match re-points the existing account onto this intent only for
                 // own/source accounts; counterparties merge in silently keeping the existing account as-is.
-                if (match.adopted && intent.adoptOnBankMatch) adoptAccount(intent, match.id, byName, byAttr)
+                if (match.adopted && intent.adoptOnBankMatch) {
+                    adoptAccount(intent, match.id, byName, byAttr)
+                    // Now carries this intent's identity attributes: a later same-batch intent that would
+                    // otherwise adopt it by the "unclaimed name" fallback must see it as claimed.
+                    claimedAccountIds += match.id
+                }
                 keyToId[intent.key] = match.id
                 continue
             }
@@ -763,6 +782,7 @@ class ImportEngineImpl(
         byAttr: Map<Pair<AttributeTypeId, String>, AccountId>,
         byPersonalKey: Map<String, AccountId>,
         batchCreatedByName: Map<String, AccountId>,
+        claimedAccountIds: Set<AccountId>,
     ): AccountMatch? {
         val primary =
             when (val match = intent.match) {
@@ -780,6 +800,19 @@ class ImportEngineImpl(
         // The matched account is re-pointed (renamed + the intent's own attributes added) so this provider
         // resolves it by id next time, while its bank attributes keep the other provider matching it.
         bankKey?.let { byPersonalKey[it] }?.let { return AccountMatch(it, adopted = true) }
+        // An own/source account intent with no bank-identity match yet may still adopt a pre-existing
+        // account of the exact same name that carries no identity attributes of its own (an "unclaimed"
+        // account — e.g. one created ahead of time by hand, or by the import-directory auto-create-by-name
+        // feature). Without this, the first real import for that account forks a duplicate instead of
+        // filling in the identity/owner attributes the user's placeholder was waiting for. Scoped to
+        // adoptOnBankMatch (own/source) intents only — a COUNTERPARTY must never merge into an unrelated
+        // pre-existing account just because the name coincides.
+        if (intent.adoptOnBankMatch) {
+            intent.name
+                ?.let { byName[it] }
+                ?.takeIf { it !in claimedAccountIds }
+                ?.let { return AccountMatch(it, adopted = true) }
+        }
         // Last resort for an intent with no bank identity — a merchant/conduit counterparty rather than a
         // real bank account: reuse an account of the same name created earlier IN THIS BATCH. A provider
         // routinely mints several external ids for one merchant (Monzo issued two for "Curve"), so without
@@ -874,9 +907,7 @@ class ImportEngineImpl(
      * types actually referenced by attribute-based match keys in this batch — so a name-only batch
      * (CSV/QIF) does not pay to scan every account's attributes.
      */
-    private suspend fun buildExistingAccountAttrIndex(
-        intents: List<ImportAccountIntent>,
-    ): MutableMap<Pair<AttributeTypeId, String>, AccountId> {
+    private suspend fun buildExistingAccountAttrIndex(intents: List<ImportAccountIntent>): ExistingAccountAttrIndex {
         val relevantTypeIds =
             intents
                 .mapNotNull { intent ->
@@ -886,19 +917,41 @@ class ImportEngineImpl(
                         else -> null
                     }
                 }.toSet()
-        if (relevantTypeIds.isEmpty()) return mutableMapOf()
+        // An own/source account intent (adoptOnBankMatch) with no bank-identity match may still adopt a
+        // pre-existing SAME-NAMED account that carries none of these identity attributes (see
+        // [matchAccount]'s "unclaimed" fallback) — so the per-account attribute scan below must also run
+        // whenever such an intent is present, even if this batch's own relevantTypeIds is otherwise empty.
+        if (relevantTypeIds.isEmpty() && intents.none { it.adoptOnBankMatch }) {
+            return ExistingAccountAttrIndex(mutableMapOf(), mutableSetOf())
+        }
 
         val index = mutableMapOf<Pair<AttributeTypeId, String>, AccountId>()
+        val claimed = mutableSetOf<AccountId>()
         for (account in accountRepository.getAllAccounts().first()) {
             val attrs = accountAttributeRepository.getByAccount(account.id).first()
             for (attr in attrs) {
                 if (attr.attributeType.id in relevantTypeIds) {
                     index.getOrPut(attr.attributeType.id to attr.value) { account.id }
                 }
+                if (attr.attributeType.id in IDENTITY_ATTR_TYPE_IDS) {
+                    claimed += account.id
+                }
             }
         }
-        return index
+        return ExistingAccountAttrIndex(index, claimed)
     }
+
+    /**
+     * [byAttr] indexes existing accounts by (relevant attribute type, value) for primary-key matching.
+     * [claimedAccountIds] is every existing account carrying at least one identity attribute
+     * ([IDENTITY_ATTR_TYPE_IDS]) — an account NOT in this set is "unclaimed": it carries no signal tying
+     * it to a specific real bank account/counterparty, so an own/source intent may freely adopt it by
+     * name (see [matchAccount]).
+     */
+    private class ExistingAccountAttrIndex(
+        val byAttr: MutableMap<Pair<AttributeTypeId, String>, AccountId>,
+        val claimedAccountIds: MutableSet<AccountId>,
+    )
 
     /**
      * Builds an index of existing accounts by their sort-code/account-number composite key, so an

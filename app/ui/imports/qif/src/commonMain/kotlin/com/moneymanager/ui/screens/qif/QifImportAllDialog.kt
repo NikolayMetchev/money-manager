@@ -19,12 +19,14 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
@@ -49,6 +51,7 @@ import kotlinx.coroutines.launch
 @Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
 fun QifImportAllDialog(
     unimported: List<QifImport>,
+    importDirectoryRepository: ImportDirectoryReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
@@ -72,6 +75,15 @@ fun QifImportAllDialog(
     var progress by remember { mutableStateOf<BulkImportProgress?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
+    // The account each file's own import directory (or that directory's parent) resolves to, when set.
+    // Takes priority over the shared picker below, so two folders of identically-formatted files each
+    // land on their own account without user disambiguation.
+    var directoryAccounts by remember { mutableStateOf<Map<QifImportId, AccountId>>(emptyMap()) }
+    LaunchedEffect(Unit) {
+        directoryAccounts = importDirectoryRepository.qifImportSourceAccounts()
+    }
+    val needsSourceAccount = unimported.any { it.id !in directoryAccounts }
+
     LaunchedEffect(accounts) {
         if (sourceAccountId == null) {
             val last = settingsRepository.getLastQifAccountId().first()
@@ -88,16 +100,19 @@ fun QifImportAllDialog(
                 if (currentSummary != null) {
                     Text(currentSummary, style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    AccountPicker(
-                        selectedAccountId = sourceAccountId,
-                        onAccountSelected = { sourceAccountId = it },
-                        label = "Source account for all files",
-                        accountRepository = accountRepository,
-                        categoryRepository = categoryRepository,
-                        personRepository = personRepository,
-                        enabled = !isImporting,
-                        isError = sourceAccountId == null,
-                    )
+                    if (needsSourceAccount) {
+                        AccountPicker(
+                            selectedAccountId = sourceAccountId,
+                            onAccountSelected = { sourceAccountId = it },
+                            label = "Source account (for files whose folder has none set)",
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            enabled = !isImporting,
+                            isError = sourceAccountId == null,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
                     progress?.let {
                         Spacer(modifier = Modifier.height(12.dp))
                         BulkImportProgressIndicator(it)
@@ -111,14 +126,14 @@ fun QifImportAllDialog(
             } else {
                 LoadingTextButton(
                     onClick = {
-                        val source = sourceAccountId ?: return@LoadingTextButton
+                        if (needsSourceAccount && sourceAccountId == null) return@LoadingTextButton
                         isImporting = true
                         scope.launch {
                             try {
                                 val result =
                                     bulkApplyQif(
                                         imports = unimported,
-                                        sourceAccountId = source,
+                                        sourceAccountId = sourceAccountId,
                                         strategies = strategies,
                                         currencies = currencies,
                                         accountMappingRepository = accountMappingRepository,
@@ -127,15 +142,16 @@ fun QifImportAllDialog(
                                         maintenance = maintenance,
                                         importEngine = importEngine,
                                         onProgress = { progress = it },
+                                        directoryAccounts = directoryAccounts,
                                     )
-                                importEngine.setLastQifAccount(source)
+                                sourceAccountId?.let { importEngine.setLastQifAccount(it) }
                                 summary = result.toSummary()
                             } finally {
                                 isImporting = false
                             }
                         }
                     },
-                    enabled = !isImporting && sourceAccountId != null,
+                    enabled = !isImporting && (!needsSourceAccount || sourceAccountId != null),
                     loading = isImporting,
                     label = "Import ${unimported.size} files",
                 )

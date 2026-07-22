@@ -45,6 +45,7 @@ class ImportDirectoryWriteRepositoryImpl(
                     top_level = if (directory.topLevel) 1L else 0L,
                     parent_id = directory.parentId?.id?.toString(),
                     excluded = if (directory.excluded) 1L else 0L,
+                    account_id = directory.accountId?.id,
                 )
                 writeQueries.insertSource(
                     directory_id = directory.id.id.toString(),
@@ -74,6 +75,7 @@ class ImportDirectoryWriteRepositoryImpl(
                     top_level = if (directory.topLevel) 1L else 0L,
                     parent_id = directory.parentId?.id?.toString(),
                     excluded = if (directory.excluded) 1L else 0L,
+                    account_id = directory.accountId?.id,
                     updated_at = now.toEpochMilliseconds(),
                     id = directory.id.id.toString(),
                 )

@@ -82,6 +82,11 @@ data class ColumnExtraction(
  * the account name from the matched text — e.g. pattern `CARD PAYMENT TO (?<cp>.+?),` with template
  * `${cp}` extracts the counterparty. [counterpartyIsPerson] marks the resolved counterparty as a
  * person, so the import additionally creates a Person + ownership link rather than just an account.
+ *
+ * @property personNameTemplate When [counterpartyIsPerson] is set and the account name isn't simply the
+ *   person's own name (e.g. it's prefixed, like Monzo's "Monzo ${cp}"), this template derives the
+ *   Person's name separately via the same capture-group substitution. Null falls back to the resolved
+ *   account name (the original behaviour, correct whenever the two coincide, as for Santander's rules).
  */
 @Serializable
 data class RegexRule(
@@ -89,6 +94,7 @@ data class RegexRule(
     val accountName: String,
     val accountNameTemplate: String? = null,
     val counterpartyIsPerson: Boolean = false,
+    val personNameTemplate: String? = null,
 )
 
 /**

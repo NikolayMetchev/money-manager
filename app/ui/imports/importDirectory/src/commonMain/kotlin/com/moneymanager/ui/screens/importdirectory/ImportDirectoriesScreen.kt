@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -34,20 +35,25 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.discoverImportableFolders
 import com.moneymanager.csvimporter.scanImportDirectory
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.domain.model.qif.QifImport
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.importengineapi.createImportDirectory
 import com.moneymanager.importengineapi.deleteImportDirectory
 import com.moneymanager.importengineapi.updateImportDirectory
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
+import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
@@ -68,6 +74,9 @@ fun ImportDirectoriesScreen(
     importDirectoryRepository: ImportDirectoryReadRepository,
     csvImportRepository: CsvImportReadRepository,
     qifImportRepository: QifImportReadRepository,
+    accountRepository: AccountReadRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
     deviceId: DeviceId,
     importFileSourceFactory: ImportFileSourceFactory?,
     driveFolderBrowser: DriveFolderBrowser?,
@@ -285,6 +294,9 @@ fun ImportDirectoriesScreen(
                 ImportDirectoryRow(
                     directory = directory,
                     importDirectoryRepository = importDirectoryRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
                     csvImports = csvImports,
                     qifImports = qifImports,
                     deviceId = deviceId,
@@ -295,6 +307,9 @@ fun ImportDirectoriesScreen(
                     onDownload = { downloadDirectory(directory) },
                     onToggleExclude = {
                         scope.launch { importEngine.updateImportDirectory(directory.copy(excluded = !directory.excluded)) }
+                    },
+                    onAccountChanged = { accountId ->
+                        scope.launch { importEngine.updateImportDirectory(directory.copy(accountId = accountId)) }
                     },
                     onImport = onOpenImports,
                     onAudit = { onOpenAudit(directory) },
@@ -307,8 +322,11 @@ fun ImportDirectoriesScreen(
     if (showAddDialog) {
         AddImportDirectoryDialog(
             driveFolderBrowser = driveFolderBrowser,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
             onDismiss = { showAddDialog = false },
-            onCreate = { name, provider, folderRef, displayPath ->
+            onCreate = { name, provider, folderRef, displayPath, accountId ->
                 showAddDialog = false
                 scope.launch {
                     importEngine.createImportDirectory(
@@ -319,6 +337,7 @@ fun ImportDirectoriesScreen(
                             folderRef = folderRef,
                             displayPath = displayPath,
                             deviceId = if (provider == ImportDirectoryProvider.LOCAL) deviceId else null,
+                            accountId = accountId,
                             createdAt = Clock.System.now(),
                             updatedAt = Clock.System.now(),
                         ),
@@ -335,6 +354,9 @@ fun ImportDirectoriesScreen(
 private fun ImportDirectoryRow(
     directory: ImportDirectory,
     importDirectoryRepository: ImportDirectoryReadRepository,
+    accountRepository: AccountReadRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
     csvImports: List<CsvImport>,
     qifImports: List<QifImport>,
     deviceId: DeviceId,
@@ -344,6 +366,7 @@ private fun ImportDirectoryRow(
     scanProgress: Pair<Int, Int>,
     onDownload: () -> Unit,
     onToggleExclude: () -> Unit,
+    onAccountChanged: (AccountId?) -> Unit,
     onImport: (ImportTab) -> Unit,
     onAudit: () -> Unit,
     onDelete: () -> Unit,
@@ -372,6 +395,46 @@ private fun ImportDirectoryRow(
     // discovered subfolders just download their files.
     val actionLabel = if (directory.topLevel) "Download & find subfolders" else "Download"
 
+    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        accountRepository.getAllAccounts()
+    }
+    val accountName = directory.accountId?.let { id -> accounts.firstOrNull { it.id == id }?.name }
+    var showAccountDialog by remember { mutableStateOf(false) }
+    if (showAccountDialog) {
+        var pendingAccountId by remember { mutableStateOf(directory.accountId) }
+        AlertDialog(
+            onDismissRequest = { showAccountDialog = false },
+            title = { Text("Account for files in this folder") },
+            text = {
+                AccountPicker(
+                    selectedAccountId = pendingAccountId,
+                    onAccountSelected = { pendingAccountId = it },
+                    label = "Account (used for strategies with no source-account mapping)",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onAccountChanged(pendingAccountId)
+                    showAccountDialog = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                Row {
+                    if (pendingAccountId != null) {
+                        TextButton(onClick = {
+                            onAccountChanged(null)
+                            showAccountDialog = false
+                        }) { Text("Clear") }
+                    }
+                    TextButton(onClick = { showAccountDialog = false }) { Text("Cancel") }
+                }
+            },
+        )
+    }
+
     Card(modifier = Modifier.fillMaxWidth().padding(start = indent)) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -390,6 +453,10 @@ private fun ImportDirectoryRow(
                 }
             }
             Text(providerLabel(directory.provider), style = MaterialTheme.typography.bodySmall)
+            Text(
+                accountName?.let { "Account: $it" } ?: "Account: (inherited / picked at import time)",
+                style = MaterialTheme.typography.bodySmall,
+            )
             Text(downloadedSummary, style = MaterialTheme.typography.bodySmall)
             if (onWrongDevice) {
                 Text("Configured on another device — download from that device.", style = MaterialTheme.typography.bodySmall)
@@ -422,6 +489,7 @@ private fun ImportDirectoryRow(
                     onClick = { onImport(ImportTab.QIF) },
                 ) { Text("QIF imports") }
                 TextButton(onClick = onAudit) { Text("History") }
+                TextButton(onClick = { showAccountDialog = true }) { Text("Set account") }
                 TextButton(enabled = !isDownloading, onClick = onDelete) { Text("Delete") }
             }
         }

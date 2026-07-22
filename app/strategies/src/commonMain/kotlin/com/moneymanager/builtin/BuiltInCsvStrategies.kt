@@ -90,6 +90,13 @@ object BuiltInCsvStrategies {
     private const val CRYPTO_COM_RECONCILE_WINDOW_SECONDS = 3600L
 
     /**
+     * Cross-source reconciliation window for the Monzo CSV strategy. A personal<->joint transfer posts
+     * to both account exports within seconds of each other (each side carries its own Transaction ID),
+     * so a short window avoids pairing unrelated same-amount transfers on a busy day.
+     */
+    private const val MONZO_RECONCILE_WINDOW_SECONDS = 120L
+
+    /**
      * Window for pairing a conversion's debit leg to its credit leg. Crypto.com stamps the two legs of
      * one event within ~1s of each other (occasionally straddling a second boundary), while distinct
      * conversion events are minutes-to-days apart, so a few seconds cleanly separates events.
@@ -1349,19 +1356,48 @@ object BuiltInCsvStrategies {
      * Builds the built-in Monzo CSV import strategy for Monzo's transaction export.
      *
      * No SOURCE_ACCOUNT mapping is seeded (account ids are database-specific); the user picks
-     * the Monzo account when applying the strategy. Positive amounts flow INTO the account, so
-     * flipAccountsOnPositive swaps source/target for credits. Transactions are deduplicated by
-     * the Transaction ID column on re-import.
+     * the Monzo account when applying the strategy — an import directory's configured account
+     * disambiguates two folders of otherwise-identical exports (e.g. separate main/joint account
+     * folders). Positive amounts flow INTO the account, so flipAccountsOnPositive swaps source/target
+     * for credits. Transactions are deduplicated by the Transaction ID column on re-import; a transfer
+     * between two Monzo accounts that were each imported from their own CSV export (a different
+     * Transaction ID per side) reconciles instead of double-counting, within
+     * [MONZO_RECONCILE_WINDOW_SECONDS].
      */
     fun buildMonzoCsvStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
+                // A Monzo-to-Monzo transfer's "Name" is another Monzo user, not a merchant — route it to
+                // an account clearly identified as their Monzo account ("Monzo <name>") and mark the
+                // counterparty a person, so the import also creates/links a Person as its owner.
                 TransferField.TARGET_ACCOUNT to
-                    AccountLookupMapping(
-                        id = monzoCsvMappingId(1),
+                    ConditionalAccountMapping(
+                        id = monzoCsvMappingId(7),
                         fieldType = TransferField.TARGET_ACCOUNT,
-                        columnName = "Name",
-                        fallbackColumns = listOf("Type"),
+                        conditions = listOf(RowCondition("Type", RowConditionOperator.EQUALS_VALUE, "Monzo-to-Monzo")),
+                        whenTrue =
+                            RegexAccountMapping(
+                                id = monzoCsvMappingId(8),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Name",
+                                rules =
+                                    listOf(
+                                        RegexRule(
+                                            pattern = ".+",
+                                            accountName = "",
+                                            accountNameTemplate = "Monzo $0",
+                                            counterpartyIsPerson = true,
+                                            personNameTemplate = "$0",
+                                        ),
+                                    ),
+                            ),
+                        whenFalse =
+                            AccountLookupMapping(
+                                id = monzoCsvMappingId(9),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Name",
+                                fallbackColumns = listOf("Type"),
+                            ),
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
@@ -1394,10 +1430,16 @@ object BuiltInCsvStrategies {
                         columnName = "Currency",
                     ),
                 TransferField.TIMEZONE to
+                    // Monzo's CSV Date/Time columns are already plain UTC, not British local time —
+                    // confirmed against the API's own timestamps, which agree with the raw CSV digits
+                    // exactly year-round. "Europe/London" looked right in winter (GMT = UTC) but during
+                    // BST wrongly shifted every CSV row an hour early, pushing Monzo-to-Monzo transfers
+                    // outside the cross-source reconcile window and creating duplicates instead of
+                    // reconciled pairs.
                     HardCodedTimezoneMapping(
                         id = monzoCsvMappingId(6),
                         fieldType = TransferField.TIMEZONE,
-                        timezoneId = "Europe/London",
+                        timezoneId = "UTC",
                     ),
             )
         val attributeMappings =
@@ -1437,6 +1479,7 @@ object BuiltInCsvStrategies {
             identificationColumns = identificationColumns,
             fieldMappings = fieldMappings,
             attributeMappings = attributeMappings,
+            crossSourceReconcileWindowSeconds = MONZO_RECONCILE_WINDOW_SECONDS,
             createdAt = now,
             updatedAt = now,
         )

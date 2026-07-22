@@ -3,6 +3,7 @@
 package com.moneymanager.database.mapper
 
 import com.moneymanager.database.sql.audit.SelectAuditHistoryForImportDirectory
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
@@ -59,6 +60,7 @@ object ImportDirectoryAuditEntryMapper {
             topLevel = from.top_level != 0L,
             parentId = from.parent_id?.let { ImportDirectoryId(Uuid.parse(it)) },
             excluded = from.excluded != 0L,
+            accountId = from.account_id?.let(::AccountId),
             createdAt = Instant.fromEpochMilliseconds(from.created_at),
             updatedAt = Instant.fromEpochMilliseconds(from.updated_at),
             source = source,

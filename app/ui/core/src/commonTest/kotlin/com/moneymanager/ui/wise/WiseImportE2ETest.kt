@@ -179,7 +179,7 @@ class WiseImportE2ETest : DbTest() {
         }
 
     @Test
-    fun `importing an accounts-only session creates accounts without any transactions`() =
+    fun `importing an accounts-only session creates no accounts`() =
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
@@ -237,9 +237,10 @@ class WiseImportE2ETest : DbTest() {
 
             assertEquals(0, importResult.transactionCount, "No transactions are downloaded for an accounts-only session")
             val accounts = repositories.accountRepository.getAllAccounts().first()
-            assertNotNull(
-                accounts.singleOrNull { it.name == "GBP" },
-                "The Wise balance must be created as an account even with no owners and no transactions",
+            assertEquals(
+                emptyList(),
+                accounts,
+                "A downloaded balance with no statement lines referencing it must not be created as an account",
             )
         }
 
@@ -259,6 +260,7 @@ class WiseImportE2ETest : DbTest() {
                     val url = request.url.toString()
                     val json =
                         when {
+                            url.contains("statement.json") -> STATEMENT_JSON
                             url.contains("/balances") -> BALANCES_JSON
                             url.contains("/v1/profiles") -> PROFILES_JSON
                             else -> error("Unexpected request: $url")
@@ -276,10 +278,19 @@ class WiseImportE2ETest : DbTest() {
                     engine = engine(),
                 )
 
-            // 1. Download + import accounts so the GBP balance exists as an account.
+            // 1. Download + import accounts AND their statement, so the GBP balance exists as an account —
+            // an account with no transfers referencing it is never created (see BatchAccountResolver
+            // .pruneUnreferencedSourceAccounts), so a real statement line is what makes it exist here.
             val accountsSessionId =
                 repositories.apiSessionRepository.createSession("test-wise-token", deviceId, now, null)
             downloadApiSessionAccounts(
+                token = "test-wise-token",
+                apiClient = clientFor(accountsSessionId),
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = accountsSessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
                 token = "test-wise-token",
                 apiClient = clientFor(accountsSessionId),
                 apiSessionRepository = repositories.apiSessionRepository,

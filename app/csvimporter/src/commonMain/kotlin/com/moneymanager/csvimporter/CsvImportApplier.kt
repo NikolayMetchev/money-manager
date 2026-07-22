@@ -37,13 +37,17 @@ import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportFee
+import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPassThrough
+import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PassThroughDetector
+import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createAccountMapping
@@ -51,6 +55,7 @@ import com.moneymanager.importengineapi.createAccountMappings
 import com.moneymanager.importengineapi.createAccounts
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
+import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.restageXlsxImport
 import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.flow.first
@@ -223,9 +228,11 @@ data class CsvBulkResult(
  * Applies the matching strategy to every [imports] file. Each file's strategy is auto-matched from its
  * column headers, so files from different banks each get the right strategy; files with no match are
  * skipped and counted. Payee/counterparty accounts auto-create with their detected names (no per-file
- * confirmation). The shared [sourceAccountOverride] is used only for files whose strategy needs a
- * user-chosen source (no SOURCE_ACCOUNT mapping); hard-coded and per-row strategies resolve their own.
- * Refreshes materialized views once at the end. Reports row-weighted run-wide progress via [onProgress].
+ * confirmation). For files whose strategy needs a user-chosen source (no SOURCE_ACCOUNT mapping), the
+ * source account is [directoryAccounts]'s entry for that file if present (the import directory it was
+ * scanned from, or that directory's parent), else the shared [sourceAccountOverride]; hard-coded and
+ * per-row strategies resolve their own regardless. Refreshes
+ * materialized views once at the end. Reports row-weighted run-wide progress via [onProgress].
  */
 @Suppress("LongParameterList")
 suspend fun bulkApplyCsv(
@@ -242,6 +249,7 @@ suspend fun bulkApplyCsv(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
+    directoryAccounts: Map<CsvImportId, AccountId> = emptyMap(),
 ): CsvBulkResult {
     var filesImported = 0
     var transfers = 0
@@ -272,7 +280,7 @@ suspend fun bulkApplyCsv(
                 applyStagedCsv(
                     csvImport = csvImport,
                     strategy = matched,
-                    sourceAccountOverride = sourceAccountOverride,
+                    sourceAccountOverride = directoryAccounts[csvImport.id] ?: sourceAccountOverride,
                     currencies = currencies,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
@@ -921,9 +929,54 @@ suspend fun runCsvImport(
             )
         }
 
+    // Personal counterparties (resolved via person-flagged strategy rules, e.g. a RegexRule with
+    // counterpartyIsPerson) become People with an ownership link to their counterparty account, in
+    // addition to the account itself. The engine dedups people by name key and ownerships by
+    // (person, account), so repeats across rows/files and re-imports collapse. Mirrors the QIF importer,
+    // which reuses this same CsvTransferMapper-computed signal.
+    //
+    // The counterparty account id is read from the resolved transfer (the side that isn't the source
+    // account) rather than by name lookup, so a counterparty that resolved to an existing account with
+    // different casing/name still gets its Person + ownership. The value is paired with the first CSV
+    // row that referenced the person, so the person's audit source links back to that exact row.
+    val personLinks = LinkedHashMap<String, Pair<AccountId, Long>>()
+    finalPrep.validTransfers.forEach { row ->
+        val name = row.personalCounterpartyName?.trim()?.takeIf { it.isNotEmpty() } ?: return@forEach
+        val counterpartyAccountId =
+            when (selectedSourceAccountId) {
+                row.transfer.sourceAccountId -> row.transfer.targetAccountId
+                row.transfer.targetAccountId -> row.transfer.sourceAccountId
+                else -> accountsByName[name]?.id
+            } ?: return@forEach
+        val previous = personLinks[name]
+        personLinks[name] =
+            (previous?.first ?: counterpartyAccountId) to minOf(previous?.second ?: row.rowIndex, row.rowIndex)
+    }
+    val peopleToCreate =
+        personLinks.map { (name, link) ->
+            val parts = name.split(Regex("\\s+"))
+            ImportPersonIntent(
+                key = LocalPersonKey(name),
+                match = PersonMatchKey.ByNameKey(normalizeNameKey(name)),
+                firstName = parts.first(),
+                lastName = parts.drop(1).joinToString(" ").ifBlank { null },
+                source = Source.Csv(csvImport.id, link.second),
+            )
+        }
+    val personOwnerships =
+        personLinks.map { (name, link) ->
+            ImportOwnershipIntent(
+                personKey = LocalPersonKey(name),
+                account = AccountRef.Existing(link.first),
+                source = Source.Csv(csvImport.id, link.second),
+            )
+        }
+
     val batch =
         ImportBatch(
             transfers = importTransfers + tradeFeeTransfers,
+            peopleToCreate = peopleToCreate,
+            ownerships = personOwnerships,
             trades = importTrades,
             dedupePolicy =
                 if (uniqueIdTypeNames.isEmpty()) {
@@ -939,7 +992,17 @@ suspend fun runCsvImport(
                             reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
                     )
                 } else {
-                    DedupePolicy.UniqueIdentifier
+                    // Cross-source reconciliation for unique-id strategies whose sources issue a
+                    // different id per side of the same movement (e.g. Monzo's own- and joint-account
+                    // exports each carry their own Transaction ID for one transfer).
+                    val reconcileWindow = strategy.crossSourceReconcileWindowSeconds?.seconds
+                    DedupePolicy.UniqueIdentifier(
+                        reconcileWindow = reconcileWindow,
+                        reconciledExclusionAttributeTypeId =
+                            reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
+                        reconciledRelationshipTypeId =
+                            reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
+                    )
                 },
             uniqueKeyExtractor =
                 if (uniqueIdTypeNames.isEmpty()) {

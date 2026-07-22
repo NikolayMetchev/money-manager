@@ -1298,6 +1298,11 @@ data class CsvBulkReimportResult(
  * import-created accounts removed). Files with no resolvable strategy are skipped and counted.
  * Refreshes materialized views once at the end. Mirrors [bulkApplyCsv]; reports row-weighted
  * run-wide progress via [onProgress].
+ *
+ * For a strategy with no SOURCE_ACCOUNT mapping, each file's own entry in
+ * [CsvImportReadRepository.historicalSourceAccounts] — the account it actually imported against last
+ * time — takes priority over the shared [sourceAccountOverride], so a file that already imported
+ * successfully once never needs the user to pick a source account again.
  */
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 suspend fun bulkReimportCsv(
@@ -1337,6 +1342,7 @@ suspend fun bulkReimportCsv(
     tracker.started(detail = "Preparing")
     val cryptoAssets =
         ensureCryptoAssetsForImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository)
+    val historicalSourceAccounts = csvImportRepository.historicalSourceAccounts()
 
     imports.forEachIndexed { index, listedImport ->
         tracker.fileStarted(index, listedImport.originalFileName)
@@ -1352,12 +1358,13 @@ suspend fun bulkReimportCsv(
             skippedNoStrategy++
             return@forEachIndexed
         }
+        val effectiveOverride = historicalSourceAccounts[csvImport.id] ?: sourceAccountOverride
         try {
             val plan =
                 planCsvReimport(
                     csvImport = csvImport,
                     strategy = matched,
-                    sourceAccountOverride = sourceAccountOverride,
+                    sourceAccountOverride = effectiveOverride,
                     currencies = currencies,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
@@ -1375,7 +1382,7 @@ suspend fun bulkReimportCsv(
                     plan = plan,
                     csvImport = csvImport,
                     strategy = matched,
-                    sourceAccountOverride = sourceAccountOverride,
+                    sourceAccountOverride = effectiveOverride,
                     currencies = currencies,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,

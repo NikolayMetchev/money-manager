@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
@@ -103,16 +104,19 @@ fun List<CsvImportStrategy>.selectForQifContent(
 }
 
 /**
- * Applies the matching QIF strategy to every [imports] file using a single [sourceAccountId]. The
- * currency comes from each file's auto-detected strategy (QIF data has none, so the strategy's
- * configured currency is authoritative), so there is no per-import currency prompt. Payee/counterparty
- * accounts are auto-created with their detected names (no per-file confirmation). Refreshes
- * materialized views once at the end. Reports row-weighted run-wide progress via [onProgress].
+ * Applies the matching QIF strategy to every [imports] file, using [directoryAccounts]'s entry for a
+ * file if present (the import directory it was scanned from, or that directory's parent), else the
+ * shared [sourceAccountId]. A file resolving to no source account either way is skipped and counted
+ * alongside the no-matching-strategy files. The currency comes from each file's auto-detected strategy
+ * (QIF data has none, so the strategy's configured currency is authoritative), so there is no
+ * per-import currency prompt. Payee/counterparty accounts are auto-created with their detected names
+ * (no per-file confirmation). Refreshes materialized views once at the end. Reports row-weighted
+ * run-wide progress via [onProgress].
  */
 @Suppress("LongParameterList")
 suspend fun bulkApplyQif(
     imports: List<QifImport>,
-    sourceAccountId: AccountId,
+    sourceAccountId: AccountId?,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
     accountMappingRepository: AccountMappingReadRepository,
@@ -121,6 +125,7 @@ suspend fun bulkApplyQif(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onProgress: suspend (BulkImportProgress) -> Unit,
+    directoryAccounts: Map<QifImportId, AccountId> = emptyMap(),
 ): QifBulkResult {
     val qifStrategies = strategies.qifCompatible()
     var filesImported = 0
@@ -149,12 +154,24 @@ suspend fun bulkApplyQif(
 
             // The strategy's own (configured) currency is used — no per-import override.
             val strategy = matched
+            val effectiveSourceAccountId = directoryAccounts[qifImport.id] ?: sourceAccountId
+            if (effectiveSourceAccountId == null && strategy.fieldMappings[TransferField.SOURCE_ACCOUNT] == null) {
+                skippedNoStrategy++
+                return@forEachIndexed
+            }
             // Re-fetch accounts so payee accounts created by earlier files are seen.
             val accounts = accountRepository.getAllAccounts().first()
             val mappings = accountMappingRepository.getAllMappings().first()
             val historicalAccountNames = accountRepository.getPreviousAccountNames()
             val basePrep =
-                buildMapper(strategy, accounts, currencies, mappings, sourceAccountId, historicalAccountNames).prepareImport(rows)
+                buildMapper(
+                    strategy,
+                    accounts,
+                    currencies,
+                    mappings,
+                    effectiveSourceAccountId,
+                    historicalAccountNames,
+                ).prepareImport(rows)
 
             val result =
                 runImport(
@@ -164,7 +181,7 @@ suspend fun bulkApplyQif(
                     basePrep = basePrep,
                     selectedExistingAccounts = emptyMap(),
                     selectedNewAccountNames = emptyMap(),
-                    selectedSourceAccountId = sourceAccountId,
+                    selectedSourceAccountId = effectiveSourceAccountId,
                     currencies = currencies,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,

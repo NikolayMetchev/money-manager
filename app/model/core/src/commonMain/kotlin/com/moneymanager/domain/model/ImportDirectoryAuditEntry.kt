@@ -23,6 +23,7 @@ data class ImportDirectoryAuditEntry(
     val topLevel: Boolean,
     val parentId: ImportDirectoryId?,
     val excluded: Boolean,
+    val accountId: AccountId?,
     val createdAt: Instant,
     val updatedAt: Instant,
     val source: SourceRecord? = null,

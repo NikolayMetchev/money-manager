@@ -5,6 +5,8 @@ import com.moneymanager.apiimporter.discoverApiCounterpartiesToCreate
 import com.moneymanager.apiimporter.downloadApiSessionAccounts
 import com.moneymanager.apiimporter.downloadApiSessionTransactions
 import com.moneymanager.apiimporter.importApiSessionTransactions
+import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
@@ -14,6 +16,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createPerson
 import com.moneymanager.test.database.hasDisplayValue
 import com.moneymanager.test.database.updateAccount
@@ -57,6 +60,8 @@ private val ACCOUNTS_JSON =
 }
     """.trimIndent()
 
+private const val SHARED_OWNER_SECOND_ACCOUNT_ID = "acc_00009TEST000000000099"
+
 private val ACCOUNTS_WITH_SHARED_OWNER_ID_JSON =
     """
 {
@@ -73,7 +78,7 @@ private val ACCOUNTS_WITH_SHARED_OWNER_ID_JSON =
       ]
     },
     {
-      "id": "acc_00009TEST000000000099",
+      "id": "$SHARED_OWNER_SECOND_ACCOUNT_ID",
       "closed": false,
       "created": "2022-01-02T00:00:00.000Z",
       "description": "joint_00009TEST000000001",
@@ -82,6 +87,43 @@ private val ACCOUNTS_WITH_SHARED_OWNER_ID_JSON =
       "owners": [
         { "user_id": "user_shared_001", "preferred_name": "Alice Smith" }
       ]
+    }
+  ]
+}
+    """.trimIndent()
+
+/** One ordinary transaction per shared-owner account, so neither is pruned for lack of activity. */
+private val SHARED_OWNER_FIRST_ACCOUNT_ACTIVITY_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST_SHAREDOWNER1",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-03T09:15:00.000Z",
+      "amount": -1250,
+      "currency": "GBP",
+      "description": "COFFEE SHOP LTD LONDON GBR",
+      "merchant": { "name": "Coffee Shop Ltd" },
+      "counterparty": {}
+    }
+  ]
+}
+    """.trimIndent()
+
+private val SHARED_OWNER_SECOND_ACCOUNT_ACTIVITY_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST_SHAREDOWNER2",
+      "account_id": "$SHARED_OWNER_SECOND_ACCOUNT_ID",
+      "created": "2024-06-04T09:15:00.000Z",
+      "amount": -2500,
+      "currency": "GBP",
+      "description": "SOME OTHER SHOP LONDON GBR",
+      "merchant": { "name": "Some Other Shop" },
+      "counterparty": {}
     }
   ]
 }
@@ -575,6 +617,125 @@ private val TRANSACTIONS_WITH_LOCAL_CURRENCY_JSON =
 }
     """.trimIndent()
 
+/**
+ * Mirrors the real three-account shape a Monzo user with a rewards opt-in and a joint account sees:
+ * a personal `uk_retail` account with bank details, a bank-detail-less `uk_rewards` pseudo-account
+ * (cashback opt-in), and a `uk_retail_joint` account with two owners. Used to verify that an account
+ * with no activity is never created, and that the rewards account is named "Monzo Rewards" rather than
+ * colliding with the personal account's plain "Monzo" name.
+ */
+private const val PERSONAL_ACCOUNT_ID = "acc_00009TEST_PERSONAL01"
+private const val PERSONAL_OWN_USER_ID = "user_00009TEST_PERSONALown"
+private const val REWARDS_ACCOUNT_ID = "acc_00009TEST_REWARDS001"
+private const val JOINT_ACCOUNT_ID = "acc_00009TEST_JOINT00001"
+
+private val THREE_ACCOUNTS_JSON =
+    """
+{
+  "accounts": [
+    {
+      "id": "$PERSONAL_ACCOUNT_ID",
+      "closed": false,
+      "created": "2022-01-01T00:00:00.000Z",
+      "description": "$PERSONAL_OWN_USER_ID",
+      "type": "uk_retail",
+      "currency": "GBP",
+      "account_number": "74006361",
+      "sort_code": "040004"
+    },
+    {
+      "id": "$REWARDS_ACCOUNT_ID",
+      "closed": false,
+      "created": "2023-01-01T00:00:00.000Z",
+      "description": "rewardsoptin_00009TESTrewards",
+      "type": "uk_rewards",
+      "currency": "GBP"
+    },
+    {
+      "id": "$JOINT_ACCOUNT_ID",
+      "closed": false,
+      "created": "2024-01-01T00:00:00.000Z",
+      "description": "Joint account between user_a and user_b",
+      "type": "uk_retail_joint",
+      "currency": "GBP",
+      "account_number": "90841534",
+      "sort_code": "040003",
+      "owners": [
+        { "user_id": "$PERSONAL_OWN_USER_ID", "preferred_name": "Nikolay Metchev" },
+        { "user_id": "user_00009TEST_PARTNERown", "preferred_name": "Olga Zakharenko" }
+      ]
+    }
+  ]
+}
+    """.trimIndent()
+
+/**
+ * A self-transfer to the joint account, in the exact shape Monzo's real API returns: `counterparty`
+ * carries `account_id` (the joint account's own external id) and `user_id` (the account holder's OWN
+ * Monzo user id — not `anonuser_`-prefixed), but no `id`. Used to verify the counterparty resolves onto
+ * the joint own-account intent rather than minting a new "user:<id>" counterparty account.
+ */
+private val SELF_TRANSFER_TO_JOINT_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST_SELFXFER01",
+      "account_id": "$PERSONAL_ACCOUNT_ID",
+      "created": "2024-06-05T09:15:00.000Z",
+      "amount": -100000,
+      "currency": "GBP",
+      "description": "Nikolay Metchev & Olga Zakharenko",
+      "merchant": null,
+      "counterparty": {
+        "account_id": "$JOINT_ACCOUNT_ID",
+        "name": "Nikolay Metchev & Olga Zakharenko",
+        "preferred_name": "Nikolay Metchev & Olga Zakharenko",
+        "user_id": "$PERSONAL_OWN_USER_ID"
+      }
+    }
+  ]
+}
+    """.trimIndent()
+
+/** A single ordinary transaction on the personal account, unrelated to the joint/rewards accounts. */
+private val PERSONAL_ACCOUNT_ACTIVITY_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST_PERSONAL001",
+      "account_id": "$PERSONAL_ACCOUNT_ID",
+      "created": "2024-06-05T09:15:00.000Z",
+      "amount": -1250,
+      "currency": "GBP",
+      "description": "COFFEE SHOP LTD LONDON GBR",
+      "merchant": { "name": "Coffee Shop Ltd" },
+      "counterparty": {}
+    }
+  ]
+}
+    """.trimIndent()
+
+/** A single transaction on the rewards pseudo-account, so it must actually be created (and named). */
+private val REWARDS_ACTIVITY_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST_REWARDS001",
+      "account_id": "$REWARDS_ACCOUNT_ID",
+      "created": "2024-06-05T09:15:00.000Z",
+      "amount": 150,
+      "currency": "GBP",
+      "description": "Cashback reward",
+      "merchant": null,
+      "counterparty": {}
+    }
+  ]
+}
+    """.trimIndent()
+
 class MonzoImportE2ETest : DbTest() {
     override val installBuiltInStrategies: Boolean = true
 
@@ -960,6 +1121,10 @@ class MonzoImportE2ETest : DbTest() {
                     val json =
                         when {
                             url.contains("/accounts") -> ACCOUNTS_WITH_SHARED_OWNER_ID_JSON
+                            url.contains("/transactions") && url.contains(ACCOUNT_ID) && !url.contains("before=") ->
+                                SHARED_OWNER_FIRST_ACCOUNT_ACTIVITY_JSON
+                            url.contains("/transactions") && url.contains(SHARED_OWNER_SECOND_ACCOUNT_ID) && !url.contains("before=") ->
+                                SHARED_OWNER_SECOND_ACCOUNT_ACTIVITY_JSON
                             url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
                             else -> error("Unexpected request: $url")
                         }
@@ -2009,5 +2174,374 @@ class MonzoImportE2ETest : DbTest() {
                     .first()
                     .filter { it.attributeType.name == "counterparty-name-key" }
             assertEquals("olga zakharenko", nameKeyAttrs.single().value, "Account should carry one normalised name key")
+        }
+
+    @Test
+    fun `own accounts with no activity are never created and the personal account gets no id suffix`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> THREE_ACCOUNTS_JSON
+                            url.contains("/transactions") && url.contains(PERSONAL_ACCOUNT_ID) && !url.contains("before=") ->
+                                PERSONAL_ACCOUNT_ACTIVITY_JSON
+                            url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Monzo" }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                    importEngine = repositories.importEngine,
+                )
+
+            assertEquals(1, importResult.transactionCount, "Only the personal account's transaction is downloaded")
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            assertEquals(
+                setOf("Monzo", "Coffee Shop Ltd"),
+                allAccounts.map { it.name }.toSet(),
+                "Only the personal own account and its spend counterparty should be created, the personal " +
+                    "account named exactly \"Monzo\" — no id-suffix collision with a pruned rewards/joint account",
+            )
+        }
+
+    @Test
+    fun `a self-transfer to the joint account resolves onto the joint own account not a new counterparty`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> THREE_ACCOUNTS_JSON
+                            url.contains("/transactions") && url.contains(PERSONAL_ACCOUNT_ID) && !url.contains("before=") ->
+                                SELF_TRANSFER_TO_JOINT_JSON
+                            url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Monzo" }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                    importEngine = repositories.importEngine,
+                )
+
+            assertEquals(1, importResult.transactionCount, "The self-transfer should be imported")
+            assertEquals(0, importResult.errorCount)
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            assertEquals(
+                setOf("Monzo", "Monzo Joint"),
+                allAccounts.map { it.name }.toSet(),
+                "Rewards must stay pruned (no activity); the self-transfer's counterparty must reuse the " +
+                    "joint own account instead of minting a third account",
+            )
+
+            val monzoAccount = allAccounts.single { it.name == "Monzo" }
+            val jointAccount = allAccounts.single { it.name == "Monzo Joint" }
+            val transfer =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(monzoAccount.id)
+                    .first()
+                    .single()
+            assertEquals(monzoAccount.id, transfer.sourceAccountId, "Money should leave the personal account")
+            assertEquals(
+                jointAccount.id,
+                transfer.targetAccountId,
+                "Money should land on the existing joint own account, not a new counterparty account",
+            )
+            assertTrue(transfer.amount.hasDisplayValue("1000.00"))
+
+            // Neither account may have been keyed on the account holder's own Monzo user id — that was
+            // the bug: the counterparty resolver fell through to "user:<id>" because counterparty.id was
+            // absent, and a self-transfer's user_id is the holder's own id (not an ephemeral anonuser_…).
+            val allExternalIds =
+                allAccounts.flatMap { account ->
+                    repositories.accountAttributeRepository
+                        .getByAccount(account.id)
+                        .first()
+                        .filter { it.attributeType.name == "account-external-id" }
+                        .map { it.value }
+                }
+            assertTrue(
+                allExternalIds.none { it == "user:$PERSONAL_OWN_USER_ID" },
+                "No account should be keyed on the account holder's own user id: $allExternalIds",
+            )
+        }
+
+    @Test
+    fun `a pre-existing bare account of the same name is adopted instead of duplicated`() =
+        runTest {
+            // Mirrors a CSV import (or a manually created account) getting to "Monzo Joint" first, with
+            // no bank identity of its own — exactly what the import-directory auto-create-by-name feature
+            // produces. The API import must fill in this account's identity/owner attributes rather than
+            // forking a second "Monzo Joint".
+            val preExisting =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Monzo Joint", openingDate = Instant.fromEpochMilliseconds(1_700_000_000_000L)),
+                )
+
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> THREE_ACCOUNTS_JSON
+                            url.contains("/transactions") && url.contains(PERSONAL_ACCOUNT_ID) && !url.contains("before=") ->
+                                SELF_TRANSFER_TO_JOINT_JSON
+                            url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Monzo" }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                currencyRepository = repositories.currencyRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+                importEngine = repositories.importEngine,
+            )
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            assertEquals(
+                setOf("Monzo", "Monzo Joint"),
+                allAccounts.map { it.name }.toSet(),
+                "The API import must not fork a second account for the same name",
+            )
+            val jointAccount = allAccounts.single { it.name == "Monzo Joint" }
+            assertEquals(preExisting, jointAccount.id, "The pre-existing bare account must be adopted, not replaced")
+
+            val jointAttrs = repositories.accountAttributeRepository.getByAccount(jointAccount.id).first()
+            assertEquals(
+                JOINT_ACCOUNT_ID,
+                jointAttrs.single { it.attributeType.name == "account-external-id" }.value,
+                "The adopted account must gain Monzo's external id, so future imports match it directly",
+            )
+            assertTrue(
+                jointAttrs.any { it.attributeType.name == "account-sort-code" },
+                "The adopted account must gain the joint account's bank details",
+            )
+
+            // "including owner": both joint-account owners must be linked to THIS account, the one that
+            // pre-existed, not to some other id.
+            val allPeople = repositories.personRepository.getAllPeople().first()
+            val ownerNames = allPeople.map { it.firstName }.toSet()
+            assertTrue(
+                ownerNames.containsAll(setOf("Nikolay", "Olga")),
+                "Both joint-account owners should be created: $ownerNames",
+            )
+            val jointOwnerPersonIds =
+                allPeople.filter { person ->
+                    repositories.personAccountOwnershipRepository
+                        .getOwnershipsByPerson(person.id)
+                        .first()
+                        .any { it.accountId == jointAccount.id }
+                }
+            assertEquals(2, jointOwnerPersonIds.size, "Both owners must be linked to the pre-existing (adopted) account")
+        }
+
+    @Test
+    fun `the rewards account is created and named Monzo Rewards when it does carry activity`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> THREE_ACCOUNTS_JSON
+                            url.contains("/transactions") && url.contains(REWARDS_ACCOUNT_ID) && !url.contains("before=") ->
+                                REWARDS_ACTIVITY_JSON
+                            url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.importEngine),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Monzo" }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                    importEngine = repositories.importEngine,
+                )
+
+            assertEquals(1, importResult.transactionCount, "The rewards transaction should be imported")
+
+            val accountNames =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .map { it.name }
+            assertTrue(
+                "Monzo Rewards" in accountNames,
+                "The rewards account should be created (it has activity) and named distinctly from " +
+                    "\"Monzo\", not pruned and not carrying an id suffix: $accountNames",
+            )
+            assertTrue(
+                accountNames.none { it.startsWith("Monzo Joint") },
+                "The joint account has no activity in this scenario and must stay pruned: $accountNames",
+            )
         }
 }

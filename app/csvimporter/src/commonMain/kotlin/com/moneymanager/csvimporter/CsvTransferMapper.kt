@@ -38,6 +38,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
+import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
@@ -1104,6 +1105,8 @@ class CsvTransferMapper(
         val sourceColumnValue: String,
         val matchedPattern: String?,
         val counterpartyIsPerson: Boolean = false,
+        /** The counterparty's own name, when it differs from [accountName] (e.g. Monzo's "Monzo <name>" account). */
+        val personName: String? = null,
     )
 
     /**
@@ -1135,6 +1138,7 @@ class CsvTransferMapper(
                         sourceColumnValue = primaryValue,
                         matchedPattern = rule.pattern,
                         counterpartyIsPerson = rule.counterpartyIsPerson,
+                        personName = personNameFor(rule, accountName, match),
                     )
                 }
             }
@@ -1161,6 +1165,24 @@ class CsvTransferMapper(
             sourceColumnValue = "",
             matchedPattern = null,
         )
+    }
+
+    /**
+     * The person's own name for a matched [rule], when it differs from the (possibly prefixed)
+     * [accountName] — falls back to [accountName], correct whenever the two coincide (e.g. Santander's
+     * rules, which never rename the counterparty's account). Null when [rule] doesn't flag its
+     * counterparty as a person.
+     */
+    private fun personNameFor(
+        rule: RegexRule,
+        accountName: String,
+        match: MatchResult,
+    ): String? {
+        if (!rule.counterpartyIsPerson) return null
+        return rule.personNameTemplate
+            ?.let { substituteTemplate(it, match).replace(WHITESPACE_RUN_REGEX, " ").trim() }
+            ?.takeIf { it.isNotBlank() }
+            ?: accountName
     }
 
     private fun parseTimestamp(
@@ -1261,11 +1283,11 @@ class CsvTransferMapper(
             is RegexAccountMapping -> {
                 val result = getAccountNameFromRegexWithPattern(mapping, values)
                 when {
-                    !result.counterpartyIsPerson || result.accountName.isBlank() -> null
+                    !result.counterpartyIsPerson || result.personName.isNullOrBlank() -> null
                     // A persisted account mapping intentionally remaps this counterparty (e.g. onto an
                     // existing account), so don't auto-create a Person/ownership from the regex name.
                     findPersistedMapping(result.sourceColumnValue) != null -> null
-                    else -> result.accountName
+                    else -> result.personName
                 }
             }
             is ConditionalAccountMapping -> resolvePersonalCounterparty(resolveConditional(mapping, values), values)

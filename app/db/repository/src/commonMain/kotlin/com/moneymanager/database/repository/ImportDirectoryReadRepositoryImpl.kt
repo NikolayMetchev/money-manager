@@ -7,6 +7,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.sql.importDirectory.Import_directory
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
@@ -87,6 +88,43 @@ class ImportDirectoryReadRepositoryImpl(
                 }
         }
 
+    override suspend fun csvImportSourceAccounts(): Map<CsvImportId, AccountId> =
+        withContext(coroutineContext) {
+            selectQueries
+                .selectStagedImportAccounts()
+                .executeAsList()
+                .mapNotNull { row ->
+                    val csvImportId = row.csv_import_id ?: return@mapNotNull null
+                    val accountId = row.account_id ?: return@mapNotNull null
+                    CsvImportId(Uuid.parse(csvImportId)) to AccountId(accountId)
+                }.toUnambiguousMap()
+        }
+
+    override suspend fun qifImportSourceAccounts(): Map<QifImportId, AccountId> =
+        withContext(coroutineContext) {
+            selectQueries
+                .selectStagedImportAccounts()
+                .executeAsList()
+                .mapNotNull { row ->
+                    val qifImportId = row.qif_import_id ?: return@mapNotNull null
+                    val accountId = row.account_id ?: return@mapNotNull null
+                    QifImportId(Uuid.parse(qifImportId)) to AccountId(accountId)
+                }.toUnambiguousMap()
+        }
+
+    /**
+     * A staged import can be reused (by content checksum) across more than one directory, so the same
+     * import id can appear here paired with a DIFFERENT directory's account. Collapsing that with a
+     * plain `toMap()` would pick an arbitrary, order-dependent account. Instead, keep an id only when
+     * every row for it agrees on the account; an id with conflicting accounts is dropped rather than
+     * resolved to a possibly-wrong one, so its caller falls back to its own default (a shared override,
+     * or prompting).
+     */
+    private fun <K> List<Pair<K, AccountId>>.toUnambiguousMap(): Map<K, AccountId> =
+        groupBy({ it.first }, { it.second })
+            .mapNotNull { (id, accountIds) -> accountIds.toSet().singleOrNull()?.let { id to it } }
+            .toMap()
+
     private fun toDomain(entity: Import_directory): ImportDirectory =
         ImportDirectory(
             id = ImportDirectoryId(Uuid.parse(entity.id)),
@@ -99,6 +137,7 @@ class ImportDirectoryReadRepositoryImpl(
             topLevel = entity.top_level != 0L,
             parentId = entity.parent_id?.let { ImportDirectoryId(Uuid.parse(it)) },
             excluded = entity.excluded != 0L,
+            accountId = entity.account_id?.let(::AccountId),
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
         )
