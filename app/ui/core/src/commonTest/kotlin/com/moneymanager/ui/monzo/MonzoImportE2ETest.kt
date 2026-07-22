@@ -2251,7 +2251,7 @@ class MonzoImportE2ETest : DbTest() {
         }
 
     @Test
-    fun `a self-transfer to the joint account resolves onto the joint own account, not a new counterparty`() =
+    fun `a self-transfer to the joint account resolves onto the joint own account not a new counterparty`() =
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId =
