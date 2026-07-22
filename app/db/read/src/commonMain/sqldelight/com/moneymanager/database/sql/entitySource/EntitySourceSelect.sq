@@ -50,37 +50,45 @@ WHERE api_entity_source.api_session_id = ?
   AND entity_source.entity_type_id = 11
   AND entity_source.revision_id = 1;
 
--- For every CSV import, the single account appearing on either side of EVERY one of its
--- currently-existing created transfers (entity_type_id = 7). Monzo's flipAccountsOnPositive means the
--- "own" account alternates between source and target depending on the transaction's sign, so both
--- sides are checked. Used by re-import to auto-derive the source-account override for strategies with
--- no SOURCE_ACCOUNT mapping, so a file that already imported successfully once never re-prompts. The
--- join against `transfer` excludes transfers a prior re-import already deleted (entity_source rows are
--- never cascade-cleaned), and the HAVING count matches every currently-existing transfer from that
--- import, not just the ones landing on this particular account.
+-- For every CSV import that has exactly one, the single account appearing on either side of EVERY one
+-- of its currently-existing created transfers (entity_type_id = 7). Monzo's flipAccountsOnPositive
+-- means the "own" account alternates between source and target depending on the transaction's sign, so
+-- both sides are checked. Used by re-import to auto-derive the source-account override for strategies
+-- with no SOURCE_ACCOUNT mapping, so a file that already imported successfully once never re-prompts.
+-- The join against `transfer` excludes transfers a prior re-import already deleted (entity_source rows
+-- are never cascade-cleaned), and the inner HAVING count matches every currently-existing transfer from
+-- that import, not just the ones landing on this particular account. A single-transfer import (or one
+-- whose rows are all between the same two accounts) makes BOTH endpoints qualify — the outer
+-- GROUP BY/HAVING keeps only imports where exactly one account qualifies, so an ambiguous import
+-- resolves to nothing rather than an arbitrarily-picked (and possibly wrong) account.
 selectHistoricalSourceAccounts:
-SELECT candidate.csv_import_id, candidate.account_id
+SELECT csv_import_id, MIN(account_id) AS account_id
 FROM (
-    SELECT csv_entity_source.csv_import_id, transfer.source_account_id AS account_id, transfer.id AS transfer_id
-    FROM entity_source
-    JOIN csv_entity_source ON csv_entity_source.id = entity_source.id
-    JOIN transfer ON transfer.id = entity_source.entity_id
-    WHERE entity_source.entity_type_id = 7
-    UNION ALL
-    SELECT csv_entity_source.csv_import_id, transfer.target_account_id AS account_id, transfer.id AS transfer_id
-    FROM entity_source
-    JOIN csv_entity_source ON csv_entity_source.id = entity_source.id
-    JOIN transfer ON transfer.id = entity_source.entity_id
-    WHERE entity_source.entity_type_id = 7
-) AS candidate
-GROUP BY candidate.csv_import_id, candidate.account_id
-HAVING COUNT(DISTINCT candidate.transfer_id) = (
-    SELECT COUNT(DISTINCT t2.id)
-    FROM entity_source es2
-    JOIN csv_entity_source ces2 ON ces2.id = es2.id
-    JOIN transfer t2 ON t2.id = es2.entity_id
-    WHERE es2.entity_type_id = 7 AND ces2.csv_import_id = candidate.csv_import_id
-);
+    SELECT candidate.csv_import_id, candidate.account_id
+    FROM (
+        SELECT csv_entity_source.csv_import_id, transfer.source_account_id AS account_id, transfer.id AS transfer_id
+        FROM entity_source
+        JOIN csv_entity_source ON csv_entity_source.id = entity_source.id
+        JOIN transfer ON transfer.id = entity_source.entity_id
+        WHERE entity_source.entity_type_id = 7
+        UNION ALL
+        SELECT csv_entity_source.csv_import_id, transfer.target_account_id AS account_id, transfer.id AS transfer_id
+        FROM entity_source
+        JOIN csv_entity_source ON csv_entity_source.id = entity_source.id
+        JOIN transfer ON transfer.id = entity_source.entity_id
+        WHERE entity_source.entity_type_id = 7
+    ) AS candidate
+    GROUP BY candidate.csv_import_id, candidate.account_id
+    HAVING COUNT(DISTINCT candidate.transfer_id) = (
+        SELECT COUNT(DISTINCT t2.id)
+        FROM entity_source es2
+        JOIN csv_entity_source ces2 ON ces2.id = es2.id
+        JOIN transfer t2 ON t2.id = es2.entity_id
+        WHERE es2.entity_type_id = 7 AND ces2.csv_import_id = candidate.csv_import_id
+    )
+) AS matches
+GROUP BY csv_import_id
+HAVING COUNT(*) = 1;
 
 selectEntitySourceForRevision:
 SELECT id, source_type_id

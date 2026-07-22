@@ -108,7 +108,7 @@ class CsvImportReadRepositoryImpl(
             entitySourceSelectQueries
                 .selectHistoricalSourceAccounts()
                 .executeAsList()
-                .associate { CsvImportId(Uuid.parse(it.csv_import_id)) to AccountId(it.account_id) }
+                .associate { CsvImportId(Uuid.parse(it.csv_import_id)) to AccountId(requireNotNull(it.account_id)) }
         }
 
     override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =

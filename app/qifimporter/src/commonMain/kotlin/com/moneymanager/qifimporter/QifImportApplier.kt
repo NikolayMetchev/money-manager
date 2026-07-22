@@ -155,7 +155,7 @@ suspend fun bulkApplyQif(
             // The strategy's own (configured) currency is used — no per-import override.
             val strategy = matched
             val effectiveSourceAccountId = directoryAccounts[qifImport.id] ?: sourceAccountId
-            if (effectiveSourceAccountId == null) {
+            if (effectiveSourceAccountId == null && strategy.fieldMappings[TransferField.SOURCE_ACCOUNT] == null) {
                 skippedNoStrategy++
                 return@forEachIndexed
             }

@@ -489,6 +489,12 @@ class ImportDeduper(
                     if (transfersAreIdentical(transfer, existing)) ImportStatus.DUPLICATE else ImportStatus.UPDATED
                 return Classified(transfer, status, existing.transferId)
             }
+            // Not in the database; an earlier transfer in this same batch may have already claimed this
+            // key. Must run BEFORE reconciliation: a literal duplicate row that also happens to match a
+            // reconcile candidate must still be flagged DUPLICATE, not re-imported as a second "reconciled" copy.
+            if (!seenInBatch.add(key)) {
+                return Classified(transfer, ImportStatus.DUPLICATE, null)
+            }
         }
 
         // Cross-source reconciliation: the same real movement seen from another provider/export under a
@@ -500,12 +506,6 @@ class ImportDeduper(
             policy.reconciledRelationshipTypeId,
         )?.let { return it }
 
-        if (key.isNullOrEmpty()) return Classified(transfer, ImportStatus.IMPORTED, null)
-
-        // Not in the database; check whether an earlier transfer in this same batch already claimed it.
-        if (!seenInBatch.add(key)) {
-            return Classified(transfer, ImportStatus.DUPLICATE, null)
-        }
         return Classified(transfer, ImportStatus.IMPORTED, null)
     }
 

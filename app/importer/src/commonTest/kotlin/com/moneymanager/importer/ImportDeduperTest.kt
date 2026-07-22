@@ -196,6 +196,24 @@ class ImportDeduperTest {
     }
 
     @Test
+    fun uniqueId_inBatchDuplicateStaysDuplicateEvenWhenItAlsoMatchesAReconcileCandidate() {
+        // A literal repeat of the same unique key within one batch must stay a plain in-batch DUPLICATE,
+        // never get imported twice as separate "reconciled" copies just because it also happens to match
+        // a cross-source reconcile candidate.
+        val key = mapOf("txid" to "dup")
+        val deduper = ImportDeduper(reconcilingUniqueIdPolicy, existing = listOf(existing(9, uniqueKey = mapOf("txid" to "personal-side"))))
+        val result =
+            deduper.classify(
+                listOf(
+                    importTransfer(0, uniqueKey = key, timestamp = baseTime + 1.minutes),
+                    importTransfer(1, uniqueKey = key, timestamp = baseTime + 1.minutes),
+                ),
+            )
+        assertEquals(ImportStatus.IMPORTED, result[0].status)
+        assertEquals(ImportStatus.DUPLICATE, result[1].status)
+    }
+
+    @Test
     fun fuzzy_exactMatchIsDuplicate() {
         val deduper = ImportDeduper(DedupePolicy.FuzzyAllFields(), existing = listOf(existing(3)))
         val result = deduper.classify(listOf(importTransfer(0))).single()
