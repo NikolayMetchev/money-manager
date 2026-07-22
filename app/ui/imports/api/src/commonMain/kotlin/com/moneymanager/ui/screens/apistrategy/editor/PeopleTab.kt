@@ -60,12 +60,9 @@ internal fun PeopleTab(
         path("Counterparty service-user-number field", p.counterpartyServiceUserNumberField) {
             state.peopleMappings = p.copy(counterpartyServiceUserNumberField = it)
         }
-        TextFieldRow(
-            label = "Fallback account-id suffix",
-            value = p.fallbackCounterpartyAccountIdSuffix,
-            onValueChange = { state.peopleMappings = p.copy(fallbackCounterpartyAccountIdSuffix = it) },
-            enabled = enabled,
-        )
+        path("Counterparty account-id field", p.counterpartyAccountIdField) {
+            state.peopleMappings = p.copy(counterpartyAccountIdField = it)
+        }
         ToggleRow(
             label = "Prefer bank identity (sort code + account number over counterparty id)",
             checked = p.preferBankIdentity,

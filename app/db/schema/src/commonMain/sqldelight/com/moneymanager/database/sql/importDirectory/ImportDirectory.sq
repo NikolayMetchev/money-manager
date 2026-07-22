@@ -32,11 +32,16 @@ CREATE TABLE import_directory (
     parent_id TEXT,
     -- 1 = the user excluded this directory: its download is disabled and "Download all" skips it.
     excluded INTEGER NOT NULL DEFAULT 0,
+    -- The account files scanned from this folder belong to, used as the source account for strategies
+    -- with no SOURCE_ACCOUNT mapping (e.g. two folders of identically-formatted Monzo exports, one per
+    -- account). NULL -> inherit the parent directory's account, else fall back to the import dialog's pick.
+    account_id INTEGER,
     created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
     updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
     FOREIGN KEY (provider_type_id) REFERENCES import_directory_provider(id),
     FOREIGN KEY (device_id) REFERENCES device(id),
-    FOREIGN KEY (parent_id) REFERENCES import_directory(id) ON DELETE CASCADE
+    FOREIGN KEY (parent_id) REFERENCES import_directory(id) ON DELETE CASCADE,
+    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_import_directory_name ON import_directory(name);

@@ -691,10 +691,14 @@ suspend fun importApiSessionTransactions(
 }
 
 /**
- * Allocates an [ImportAccountIntent] for every downloaded account up front, so an account is created
- * even when it has no owners and no transactions (e.g. Wise balances). Its own bank details (e.g. from
- * Starling's identifiers endpoint) are recorded as sort-code/account-number attributes so counterparties
- * another provider creates for this same real account match and merge into it. Idempotent.
+ * Allocates an [ImportAccountIntent] for every downloaded account up front, so a counterparty match
+ * (e.g. a self-transfer to another of the user's own Monzo accounts) can resolve onto it even though it
+ * has no transaction feed of its own — and so it merges with any counterparty another provider already
+ * created for the same real account via a shared bank identity. Its own bank details (e.g. from
+ * Starling's identifiers endpoint) are recorded as sort-code/account-number attributes for that match.
+ * Idempotent. An account nothing ends up referencing by the end of the import (own feed empty, and no
+ * other account's feed mentions it either — e.g. Monzo's read-only `uk_rewards` pseudo-account) is
+ * dropped by [BatchAccountResolver.pruneUnreferencedSourceAccounts] before the batch is built.
  */
 private suspend fun ensureSourceAccounts(setup: ImportSetup) {
     for (account in setup.accountsById.values) {
@@ -1523,6 +1527,21 @@ private data class PreparedApiTransaction(
     val passThrough: ImportPassThrough? = null,
 )
 
+/** Every [LocalAccountKey] this prepared transaction moves money through (main legs, fee, pass-through). */
+private fun PreparedApiTransaction.referencedLocalAccountKeys(): Set<LocalAccountKey> =
+    buildSet {
+        (source as? AccountRef.Local)?.let { add(it.key) }
+        (target as? AccountRef.Local)?.let { add(it.key) }
+        fee?.let { fee ->
+            (fee.source as? AccountRef.Local)?.let { add(it.key) }
+            (fee.target as? AccountRef.Local)?.let { add(it.key) }
+        }
+        passThrough?.let { passThrough ->
+            passThrough.conduits.forEach { conduit -> (conduit as? AccountRef.Local)?.let { add(it.key) } }
+            (passThrough.merchantTarget as? AccountRef.Local)?.let { add(it.key) }
+        }
+    }
+
 /** The prepared transfers plus the count of items that failed to parse/prepare (recorded as errors). */
 private data class PreparedTransfers(
     val orderedPrepared: List<PreparedApiTransaction>,
@@ -1650,6 +1669,16 @@ private suspend fun runImportEngine(
             )
         }
 
+    // An own account the accounts endpoint returned but that ended up on no prepared transfer leg (e.g.
+    // Monzo's read-only `uk_rewards` pseudo-account, whose feed is always empty) is never created.
+    // Counterparty accounts are never candidates: only keys ensureSourceAccounts allocated can be pruned.
+    val referencedAccountKeys = orderedPrepared.flatMapTo(mutableSetOf()) { it.referencedLocalAccountKeys() }
+    val prunedAccountKeys = setup.accountResolver.pruneUnreferencedSourceAccounts(referencedAccountKeys)
+    val ownershipIntents =
+        setup.peopleResolver.ownershipIntents().filterNot { ownership ->
+            (ownership.account as? AccountRef.Local)?.key in prunedAccountKeys
+        }
+
     val uniqueIdTxFields = setup.uniqueIdTxFields
     val batch =
         ImportBatch(
@@ -1662,7 +1691,7 @@ private suspend fun runImportEngine(
                 ),
             accountsToCreate = setup.accountResolver.intents(),
             peopleToCreate = setup.peopleResolver.intents(),
-            ownerships = setup.peopleResolver.ownershipIntents(),
+            ownerships = ownershipIntents,
             apiIdExtractor =
                 ExistingApiIdExtractor { transfer ->
                     transactionIdAttributeName?.let { name ->
@@ -2530,6 +2559,11 @@ private class BatchAccountResolver {
     // name so unrelated orgs never collide.
     private val byNameKey = mutableMapOf<String, LocalAccountKey>()
 
+    // Keys allocated by [resolveSourceAccount], tracked so [pruneUnreferencedSourceAccounts] can drop
+    // ones no prepared transfer ever referenced (e.g. Monzo's read-only `uk_rewards` pseudo-account,
+    // whose feed is always empty). Counterparty-only keys are never in here, so pruning can't touch them.
+    private val sourceAccountKeys = mutableSetOf<LocalAccountKey>()
+
     /** The accumulated intents, in allocation order, for [ImportBatch.accountsToCreate]. */
     suspend fun intents(): List<ImportAccountIntent> = mutex.withLock { intents.values.toList() }
 
@@ -2593,6 +2627,7 @@ private class BatchAccountResolver {
                     mergeAttributes(key, listOf(externalIdAttr(externalId)) + bankAttrs(sortCode!!, accountNumber!!))
                     byPersonalKey.getOrPut(bankKey) { key }
                 }
+                sourceAccountKeys += key
                 return@withLock key
             }
             // In-batch adoption: a counterparty already created for this same real bank account becomes the
@@ -2602,6 +2637,7 @@ private class BatchAccountResolver {
                 byPersonalKey[bankKey]?.let { key ->
                     byExternalId[externalId] = key
                     mergeAttributes(key, listOf(externalIdAttr(externalId)) + bankAttrs(sortCode!!, accountNumber!!))
+                    sourceAccountKeys += key
                     return@withLock key
                 }
             }
@@ -2625,7 +2661,30 @@ private class BatchAccountResolver {
                 )
             byExternalId[externalId] = key
             if (bankKey != null) byPersonalKey.getOrPut(bankKey) { key }
+            sourceAccountKeys += key
             key
+        }
+
+    /**
+     * Removes source-account intents that ended up referenced by no prepared transfer leg (e.g. Monzo's
+     * read-only `uk_rewards` pseudo-account, whose transaction feed is always empty) from [referenced].
+     * Counterparty intents are never candidates — only keys [resolveSourceAccount] allocated are tracked
+     * in [sourceAccountKeys] — so this can't prune an account real money moved through. Cleans every
+     * dedupe index too, so a pruned key can't be resurrected by a later lookup. Returns the pruned keys
+     * so callers can drop ownerships/attributes that referenced them.
+     */
+    suspend fun pruneUnreferencedSourceAccounts(referenced: Set<LocalAccountKey>): Set<LocalAccountKey> =
+        mutex.withLock {
+            val toPrune = sourceAccountKeys - referenced
+            if (toPrune.isEmpty()) return@withLock emptySet()
+            intents.keys.removeAll(toPrune)
+            byExternalId.values.removeAll(toPrune)
+            byPersonalKey.values.removeAll(toPrune)
+            byBuiltInType.values.removeAll(toPrune)
+            byName.values.removeAll(toPrune)
+            byNameKey.values.removeAll(toPrune)
+            sourceAccountKeys -= toPrune
+            toPrune
         }
 
     /** Merges a custom account-field attribute onto a source account already allocated by external id. */
@@ -2906,7 +2965,22 @@ private class CurrencyCache(
         }
 }
 
-private fun ApiImportAccount.staticDisplayName(staticName: String): String = if (owners.size > 1) "$staticName Joint" else staticName
+/**
+ * Resolves [ApiAccountMappings.staticAccountName] plus a distinguishing suffix: the first matching
+ * [ApiAccountMappings.accountNameRules] entry (evaluated against the account's raw JSON), else the
+ * existing "more than one owner" -> "Joint" rule, else the bare static name.
+ */
+private fun ApiImportAccount.staticDisplayName(
+    staticName: String,
+    mappings: ApiAccountMappings,
+): String {
+    val ruleSuffix =
+        rawJson
+            ?.let { json -> mappings.accountNameRules.firstOrNull { rule -> rule.predicates.all { json.evaluatePredicate(it) } } }
+            ?.suffix
+    val suffix = ruleSuffix ?: "Joint".takeIf { owners.size > 1 }
+    return if (suffix != null) "$staticName $suffix" else staticName
+}
 
 /**
  * Display name for a downloaded own account. When [ApiAccountMappings.staticAccountName] is set, two
@@ -2919,8 +2993,8 @@ private fun ApiImportAccount.displayName(
     siblingAccounts: Collection<ApiImportAccount>,
 ): String {
     val staticName = mappings.staticAccountName ?: return description.ifBlank { id }
-    val name = staticDisplayName(staticName)
-    val collides = siblingAccounts.any { it.id != id && it.staticDisplayName(staticName) == name }
+    val name = staticDisplayName(staticName, mappings)
+    val collides = siblingAccounts.any { it.id != id && it.staticDisplayName(staticName, mappings) == name }
     return if (collides) "$name (${id.takeLast(6)})" else name
 }
 
@@ -3066,16 +3140,13 @@ private fun JsonObject.resolveCounterpartyIdentity(
 
     resolveJsonPath(counterpartyIdField)?.takeIf { it.isNotBlank() }?.let { return it }
 
-    if (counterpartyIdField.endsWith(".id")) {
-        val counterpartyIdSuffix = "." + peopleMappings.counterpartyUserIdField.substringAfterLast(".")
-        val accountIdField =
-            if (counterpartyIdField.endsWith(counterpartyIdSuffix)) {
-                counterpartyIdField.removeSuffix(counterpartyIdSuffix) + peopleMappings.fallbackCounterpartyAccountIdSuffix
-            } else {
-                counterpartyIdField + peopleMappings.fallbackCounterpartyAccountIdSuffix
-            }
-        resolveJsonPath(accountIdField)?.takeIf { it.isNotBlank() }?.let { return it }
-    }
+    // counterpartyIdField (e.g. Monzo's "counterparty.id") is often absent while the counterparty's own
+    // account id is always present — check it before falling through to the user-id fallback below,
+    // which is not stable across a self-transfer (Monzo reports the account holder's own user id there).
+    resolveJsonObjectPath(peopleMappings.counterpartyObjectField)
+        ?.stringOrNull(peopleMappings.counterpartyAccountIdField)
+        ?.takeIf { it.isNotBlank() }
+        ?.let { return it }
 
     bankIdentity(peopleMappings)?.let { return it }
 

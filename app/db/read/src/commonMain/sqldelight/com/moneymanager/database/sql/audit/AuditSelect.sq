@@ -524,6 +524,7 @@ SELECT
     import_directory_audit.top_level,
     import_directory_audit.parent_id,
     import_directory_audit.excluded,
+    import_directory_audit.account_id,
     import_directory_audit.created_at,
     import_directory_audit.updated_at,
     -- Source information

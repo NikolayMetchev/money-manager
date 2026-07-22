@@ -7,6 +7,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.sql.importDirectory.Import_directory
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
@@ -87,6 +88,30 @@ class ImportDirectoryReadRepositoryImpl(
                 }
         }
 
+    override suspend fun csvImportSourceAccounts(): Map<CsvImportId, AccountId> =
+        withContext(coroutineContext) {
+            selectQueries
+                .selectStagedImportAccounts()
+                .executeAsList()
+                .mapNotNull { row ->
+                    val csvImportId = row.csv_import_id ?: return@mapNotNull null
+                    val accountId = row.account_id ?: return@mapNotNull null
+                    CsvImportId(Uuid.parse(csvImportId)) to AccountId(accountId)
+                }.toMap()
+        }
+
+    override suspend fun qifImportSourceAccounts(): Map<QifImportId, AccountId> =
+        withContext(coroutineContext) {
+            selectQueries
+                .selectStagedImportAccounts()
+                .executeAsList()
+                .mapNotNull { row ->
+                    val qifImportId = row.qif_import_id ?: return@mapNotNull null
+                    val accountId = row.account_id ?: return@mapNotNull null
+                    QifImportId(Uuid.parse(qifImportId)) to AccountId(accountId)
+                }.toMap()
+        }
+
     private fun toDomain(entity: Import_directory): ImportDirectory =
         ImportDirectory(
             id = ImportDirectoryId(Uuid.parse(entity.id)),
@@ -99,6 +124,7 @@ class ImportDirectoryReadRepositoryImpl(
             topLevel = entity.top_level != 0L,
             parentId = entity.parent_id?.let { ImportDirectoryId(Uuid.parse(it)) },
             excluded = entity.excluded != 0L,
+            accountId = entity.account_id?.let(::AccountId),
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
         )

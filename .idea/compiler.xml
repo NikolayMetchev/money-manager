@@ -247,6 +247,9 @@
       <module name="money-manager.utils.parsers.qif" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.parsers.qif.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.parsers.qif.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.parsers.xlsx" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.parsers.xlsx.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.parsers.xlsx.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.rest" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.rest.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.rest.jvmTest" options="-Xlint:all -Werror" />

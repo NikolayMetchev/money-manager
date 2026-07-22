@@ -5,6 +5,7 @@ package com.moneymanager.builtin
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
+import com.moneymanager.domain.model.apistrategy.ApiAccountNameRule
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
@@ -86,6 +87,15 @@ object BuiltInApiStrategies {
                     // display name — Monzo's API has no field meant for this, so use a fixed name
                     // ("Monzo Joint" for a joint account, detected by having more than one owner).
                     staticAccountName = "Monzo",
+                    // Monzo's cashback/rewards opt-in is a pseudo-account with no bank details and (for
+                    // most users) no activity — it would otherwise collide with the main "Monzo" name.
+                    accountNameRules =
+                        listOf(
+                            ApiAccountNameRule(
+                                suffix = "Rewards",
+                                predicates = listOf(RulePredicate(path = "type", op = PredicateOp.EQUALS, value = "uk_rewards")),
+                            ),
+                        ),
                 ),
             transactionMappings =
                 ApiTransactionMappings(

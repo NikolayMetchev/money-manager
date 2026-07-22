@@ -99,7 +99,7 @@ class ImportDeduperTest {
         val key = mapOf("txid" to "abc")
         val deduper =
             ImportDeduper(
-                DedupePolicy.UniqueIdentifier,
+                DedupePolicy.UniqueIdentifier(),
                 existing = listOf(existing(7, uniqueKey = key)),
             )
         val result = deduper.classify(listOf(importTransfer(0, uniqueKey = key))).single()
@@ -112,7 +112,7 @@ class ImportDeduperTest {
         val key = mapOf("txid" to "abc")
         val deduper =
             ImportDeduper(
-                DedupePolicy.UniqueIdentifier,
+                DedupePolicy.UniqueIdentifier(),
                 existing = listOf(existing(7, description = "Old", uniqueKey = key)),
             )
         val result = deduper.classify(listOf(importTransfer(0, description = "New", uniqueKey = key))).single()
@@ -124,7 +124,7 @@ class ImportDeduperTest {
     fun uniqueId_newKeyIsImported() {
         val deduper =
             ImportDeduper(
-                DedupePolicy.UniqueIdentifier,
+                DedupePolicy.UniqueIdentifier(),
                 existing = listOf(existing(7, uniqueKey = mapOf("txid" to "abc"))),
             )
         val result = deduper.classify(listOf(importTransfer(0, uniqueKey = mapOf("txid" to "zzz")))).single()
@@ -134,7 +134,7 @@ class ImportDeduperTest {
     @Test
     fun uniqueId_dedupesWithinBatch() {
         val key = mapOf("txid" to "dup")
-        val deduper = ImportDeduper(DedupePolicy.UniqueIdentifier, existing = emptyList())
+        val deduper = ImportDeduper(DedupePolicy.UniqueIdentifier(), existing = emptyList())
         val result =
             deduper.classify(
                 listOf(
@@ -144,6 +144,55 @@ class ImportDeduperTest {
             )
         assertEquals(ImportStatus.IMPORTED, result[0].status)
         assertEquals(ImportStatus.DUPLICATE, result[1].status)
+    }
+
+    private val reconcilingUniqueIdPolicy =
+        DedupePolicy.UniqueIdentifier(
+            reconcileWindow = 5.minutes,
+            reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+            reconciledRelationshipTypeId = RelationshipTypeId(1),
+        )
+
+    @Test
+    fun uniqueId_reconcilesCrossSourceMirrorWithinWindow() {
+        // The Monzo case: a personal->joint transfer imported from the joint account's own CSV export
+        // carries a different Transaction ID than the mirror leg already imported from the personal
+        // account's export, but same accounts+amount within the window: keep it, tagged excluded+linked.
+        val deduper = ImportDeduper(reconcilingUniqueIdPolicy, existing = listOf(existing(9, uniqueKey = mapOf("txid" to "personal-side"))))
+        val result =
+            deduper
+                .classify(listOf(importTransfer(0, uniqueKey = mapOf("txid" to "joint-side"), timestamp = baseTime + 1.minutes)))
+                .single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertEquals(
+            NewAttribute(AttributeTypeId(-1), "reconciled"),
+            result.transfer.attributes.single { it.typeId == AttributeTypeId(-1) },
+        )
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(9), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
+        )
+    }
+
+    @Test
+    fun uniqueId_sameKeyStillWinsOverReconciliation() {
+        // A genuine re-import (same unique key) must stay a plain DUPLICATE, never an excluded+linked copy.
+        val key = mapOf("txid" to "abc")
+        val deduper = ImportDeduper(reconcilingUniqueIdPolicy, existing = listOf(existing(7, uniqueKey = key)))
+        val result = deduper.classify(listOf(importTransfer(0, uniqueKey = key))).single()
+        assertEquals(ImportStatus.DUPLICATE, result.status)
+        assertEquals(TransferId(7), result.existing)
+    }
+
+    @Test
+    fun uniqueId_doesNotReconcileOutsideWindow() {
+        val deduper = ImportDeduper(reconcilingUniqueIdPolicy, existing = listOf(existing(9, uniqueKey = mapOf("txid" to "personal-side"))))
+        val result =
+            deduper
+                .classify(listOf(importTransfer(0, uniqueKey = mapOf("txid" to "joint-side"), timestamp = baseTime + 10.minutes)))
+                .single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
     }
 
     @Test

@@ -221,7 +221,7 @@ class ImportDeduper(
     ): Classified =
         when (policy) {
             is DedupePolicy.None -> Classified(transfer, ImportStatus.IMPORTED, null)
-            is DedupePolicy.UniqueIdentifier -> classifyByUniqueId(transfer)
+            is DedupePolicy.UniqueIdentifier -> classifyByUniqueId(transfer, policy)
             is DedupePolicy.FuzzyAllFields -> classifyByAllFields(transfer, policy)
             is DedupePolicy.ApiMultiKey -> classifyByApiMultiKey(index, transfer, policy)
         }
@@ -477,16 +477,30 @@ class ImportDeduper(
             amount = requireNotNull(amount),
         )
 
-    private fun classifyByUniqueId(transfer: ImportTransfer): Classified {
+    private fun classifyByUniqueId(
+        transfer: ImportTransfer,
+        policy: DedupePolicy.UniqueIdentifier,
+    ): Classified {
         val key = transfer.uniqueKey
-        if (key.isNullOrEmpty()) return Classified(transfer, ImportStatus.IMPORTED, null)
-
-        val existing = existingByUniqueKey[key]
-        if (existing != null) {
-            val status =
-                if (transfersAreIdentical(transfer, existing)) ImportStatus.DUPLICATE else ImportStatus.UPDATED
-            return Classified(transfer, status, existing.transferId)
+        if (!key.isNullOrEmpty()) {
+            val existing = existingByUniqueKey[key]
+            if (existing != null) {
+                val status =
+                    if (transfersAreIdentical(transfer, existing)) ImportStatus.DUPLICATE else ImportStatus.UPDATED
+                return Classified(transfer, status, existing.transferId)
+            }
         }
+
+        // Cross-source reconciliation: the same real movement seen from another provider/export under a
+        // different unique id (e.g. Monzo issues a separate Transaction ID per account side of a transfer).
+        classifyAsReconciled(
+            transfer,
+            policy.reconcileWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
+
+        if (key.isNullOrEmpty()) return Classified(transfer, ImportStatus.IMPORTED, null)
 
         // Not in the database; check whether an earlier transfer in this same batch already claimed it.
         if (!seenInBatch.add(key)) {

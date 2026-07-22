@@ -1,6 +1,7 @@
 package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingsExport
+import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport
@@ -42,6 +43,7 @@ class StrategyExportUnsortedCollectionGuardTest {
             // Positional ("ancestor[N]." expressions) / first-match-wins / sequential-mutation semantics.
             ApiStrategyExport::class to "ancestorEndpoints",
             ApiStrategyExport::class to "builtInCounterpartyRules",
+            ApiAccountMappings::class to "accountNameRules",
             ApiStrategyExport::class to "connectInstructions",
             ApiRequestSigningConfig::class to "message",
             SigPart.Sha256::class to "parts",

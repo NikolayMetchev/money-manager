@@ -4,17 +4,22 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
+import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.QifImportId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createCsvImport
 import com.moneymanager.importengineapi.createQifImport
 import com.moneymanager.importengineapi.createXlsxImport
 import com.moneymanager.importengineapi.recordDirectoryFileImported
+import com.moneymanager.importengineapi.updateImportDirectory
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.qif.QifParser
@@ -50,6 +55,11 @@ internal fun isSupportedImportFile(fileName: String): Boolean = supportedKind(fi
  * Change detection: a matching server-provided content hash (e.g. Drive md5Checksum) skips the download
  * entirely; otherwise the file is downloaded and sha256-confirmed. A changed file produces a fresh
  * staging row; a bad file is recorded as a failure and does not abort the scan.
+ *
+ * A top-level [directory] with no [ImportDirectory.accountId] set gets one resolved automatically
+ * before scanning: an existing account named exactly [ImportDirectory.name] if one exists, else a
+ * newly created one (see [ensureDirectoryAccount]) — the user can still override it via "Set account".
+ * Discovered subfolders (`topLevel == false`) are left alone; they inherit their parent's account.
  */
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 suspend fun scanImportDirectory(
@@ -61,6 +71,9 @@ suspend fun scanImportDirectory(
     importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): ScanResult {
+    if (directory.topLevel && directory.accountId == null) {
+        ensureDirectoryAccount(directory, importEngine)
+    }
     val entries = fileSource.list()
     var downloaded = 0
     var csvDownloaded = 0
@@ -249,3 +262,21 @@ private suspend fun stageQif(
 }
 
 private fun ImportFileEntry.lastModifiedInstant(): Instant = lastModifiedEpochMs?.let(Instant::fromEpochMilliseconds) ?: Clock.System.now()
+
+/**
+ * Resolves [directory]'s account by name — an existing account named exactly [ImportDirectory.name],
+ * or a newly created one — and persists it onto the directory. [ImportEngine.createAccount] already
+ * matches by name before creating (idempotent), so this never creates a second account for a name
+ * that already exists; it only needs to decide whether the directory should point at it.
+ */
+private suspend fun ensureDirectoryAccount(
+    directory: ImportDirectory,
+    importEngine: ImportEngine,
+) {
+    val accountId =
+        importEngine.createAccount(
+            Account(id = AccountId(0), name = directory.name, openingDate = Clock.System.now()),
+            Source.System,
+        )
+    importEngine.updateImportDirectory(directory.copy(accountId = accountId), Source.System)
+}

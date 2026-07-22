@@ -135,6 +135,9 @@ fun ImportsScreen(
                     importDirectoryRepository = importDirectoryRepository,
                     csvImportRepository = csvImportRepository,
                     qifImportRepository = qifImportRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
                     deviceId = deviceId,
                     importFileSourceFactory = importFileSourceFactory,
                     driveFolderBrowser = driveFolderBrowser,
@@ -145,6 +148,7 @@ fun ImportsScreen(
                 CsvImportsScreen(
                     csvImportRepository = csvImportRepository,
                     importTimelineRepository = importTimelineRepository,
+                    importDirectoryRepository = importDirectoryRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
@@ -167,6 +171,7 @@ fun ImportsScreen(
                 QifImportsScreen(
                     qifImportRepository = qifImportRepository,
                     importTimelineRepository = importTimelineRepository,
+                    importDirectoryRepository = importDirectoryRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,

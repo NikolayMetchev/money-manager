@@ -106,6 +106,7 @@
             <option value="$PROJECT_DIR$/utils/parsers" />
             <option value="$PROJECT_DIR$/utils/parsers/csv" />
             <option value="$PROJECT_DIR$/utils/parsers/qif" />
+            <option value="$PROJECT_DIR$/utils/parsers/xlsx" />
             <option value="$PROJECT_DIR$/utils/rest" />
           </set>
         </option>

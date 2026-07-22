@@ -155,6 +155,7 @@ private fun ImportDirectory.flatten(): Map<String, String> =
         put("Top-level", topLevel.toString())
         put("Excluded", excluded.toString())
         parentId?.let { put("Parent", it.id.toString()) }
+        accountId?.let { put("Account", it.id.toString()) }
     }
 
 private fun ImportDirectoryAuditEntry.flatten(): Map<String, String> =
@@ -165,6 +166,7 @@ private fun ImportDirectoryAuditEntry.flatten(): Map<String, String> =
         put("Top-level", topLevel.toString())
         put("Excluded", excluded.toString())
         parentId?.let { put("Parent", it.id.toString()) }
+        accountId?.let { put("Account", it.id.toString()) }
     }
 
 // ─── Diff card ────────────────────────────────────────────────────────────────

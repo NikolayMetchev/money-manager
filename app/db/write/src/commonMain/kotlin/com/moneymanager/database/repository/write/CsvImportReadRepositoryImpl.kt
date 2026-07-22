@@ -103,6 +103,14 @@ class CsvImportReadRepositoryImpl(
                 .toSet()
         }
 
+    override suspend fun historicalSourceAccounts(): Map<CsvImportId, AccountId> =
+        withContext(coroutineContext) {
+            entitySourceSelectQueries
+                .selectHistoricalSourceAccounts()
+                .executeAsList()
+                .associate { CsvImportId(Uuid.parse(it.csv_import_id)) to AccountId(it.account_id) }
+        }
+
     override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =
         withContext(coroutineContext) {
             csvImportSelectQueries.selectImportsByChecksum(checksum, ::toCsvImportRecord).executeAsList().map { import ->

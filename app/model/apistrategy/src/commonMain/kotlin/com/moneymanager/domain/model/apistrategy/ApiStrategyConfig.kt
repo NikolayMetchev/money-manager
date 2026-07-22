@@ -223,6 +223,12 @@ data class ApiAccountMappings(
      * gets " Joint" appended so it's distinguishable from the holder's individual account.
      */
     val staticAccountName: String? = null,
+    /**
+     * Rules appending a distinguishing suffix to [staticAccountName] for accounts of a recognisable
+     * sub-kind (e.g. Monzo's `type == "uk_rewards"` -> "Monzo Rewards"), evaluated in order with the
+     * first match winning. Only used when [staticAccountName] is set.
+     */
+    val accountNameRules: List<ApiAccountNameRule> = emptyList(),
 )
 
 /** How a transaction amount value is encoded in the API response. */
@@ -396,7 +402,12 @@ data class ApiPeopleMappings(
     val counterpartySortCodeField: String = "sort_code",
     val counterpartyAccountNumberField: String = "account_number",
     val counterpartyServiceUserNumberField: String = "service_user_number",
-    val fallbackCounterpartyAccountIdSuffix: String = ".account_id",
+    // Field (relative to [counterpartyObjectField]) holding the counterparty's own account id, used as
+    // a fallback identity when [ApiTransactionMappings.counterpartyIdField] has no value on this
+    // transaction (e.g. Monzo's `counterparty.id` is absent, but `counterparty.account_id` is always
+    // present). Checked before falling back to a person's [counterpartyUserIdField], since that fallback
+    // is not stable across a self-transfer (Monzo reports the account holder's own user id there).
+    val counterpartyAccountIdField: String = "account_id",
     // Prefixes marking a resolved counterparty id as ephemeral — a throwaway id that changes per
     // transaction and so must NOT identify the counterparty account, or the same real counterparty
     // fragments into one account per transaction (e.g. Monzo issues a fresh "anonuser_…" user id for
@@ -474,6 +485,23 @@ object SortedRulePredicateListSerializer : SortedListSerializer<RulePredicate>(R
 data class BuiltInCounterpartyRule(
     val name: String,
     val onlyWhenSign: RuleSign = RuleSign.ANY,
+    @Serializable(with = SortedRulePredicateListSerializer::class)
+    val predicates: List<RulePredicate> = emptyList(),
+)
+
+/**
+ * A declarative rule appending [suffix] to a downloaded own account's [ApiAccountMappings.staticAccountName]
+ * when all [predicates] match its raw account JSON (e.g. Monzo's `type == "uk_rewards"` -> "Rewards", so
+ * that account is named "Monzo Rewards" instead of colliding with the main "Monzo" account). Evaluated
+ * in list order; the first matching rule wins, so list order is meaningful (unlike [predicates] within
+ * a single rule, which are all required). Only used when [ApiAccountMappings.staticAccountName] is set.
+ *
+ * @property suffix Appended (space-separated) to the static name when this rule matches.
+ * @property predicates Conditions that must all hold (logical AND) for this rule to match.
+ */
+@Serializable
+data class ApiAccountNameRule(
+    val suffix: String,
     @Serializable(with = SortedRulePredicateListSerializer::class)
     val predicates: List<RulePredicate> = emptyList(),
 )

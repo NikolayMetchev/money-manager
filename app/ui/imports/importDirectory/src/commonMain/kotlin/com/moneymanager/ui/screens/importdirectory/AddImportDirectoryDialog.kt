@@ -22,20 +22,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.manualFolderEntrySupported
 import com.moneymanager.compose.filepicker.rememberFolderPicker
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
+import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importfilesource.DriveFolderBrowser
+import com.moneymanager.ui.components.AccountPicker
 
 /**
- * Dialog to add an import directory: name, provider (Local folder / Google Drive), and the folder
- * (picked for local; browsed from the user's Drive hierarchy via a popup for Google Drive). The
- * directory only downloads files into the Imports section — the user runs "Import All" there.
+ * Dialog to add an import directory: name, provider (Local folder / Google Drive), the folder (picked
+ * for local; browsed from the user's Drive hierarchy via a popup for Google Drive), and an optional
+ * account. The account is the source account used for scanned files whose strategy has no
+ * SOURCE_ACCOUNT mapping — set it to disambiguate two folders of identically-formatted files (e.g.
+ * separate Monzo main/joint account exports). Left blank, the first download resolves it automatically:
+ * an existing account named exactly this directory's name, or a newly created one (see
+ * `ensureDirectoryAccount` in `ImportDirectoryScanner.kt`). The directory only downloads files into the
+ * Imports section — the user runs "Import All" there.
  */
 @Composable
-@Suppress("LongMethod", "CyclomaticComplexMethod")
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 fun AddImportDirectoryDialog(
     driveFolderBrowser: DriveFolderBrowser?,
+    accountRepository: AccountReadRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
     onDismiss: () -> Unit,
-    onCreate: (name: String, provider: ImportDirectoryProvider, folderRef: String, displayPath: String?) -> Unit,
+    onCreate: (
+        name: String,
+        provider: ImportDirectoryProvider,
+        folderRef: String,
+        displayPath: String?,
+        accountId: AccountId?,
+    ) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var provider by remember { mutableStateOf(ImportDirectoryProvider.LOCAL) }
@@ -43,6 +62,7 @@ fun AddImportDirectoryDialog(
     var localFolderName by remember { mutableStateOf<String?>(null) }
     var driveFolderName by remember { mutableStateOf<String?>(null) }
     var showDrivePicker by remember { mutableStateOf(false) }
+    var accountId by remember { mutableStateOf<AccountId?>(null) }
 
     val folderPicker =
         rememberFolderPicker { picked ->
@@ -140,6 +160,18 @@ fun AddImportDirectoryDialog(
                     ) { Text(if (driveFolderName == null) "Browse Google Drive…" else "Change folder") }
                     driveFolderName?.let { Text("Selected: $it", style = MaterialTheme.typography.bodyMedium) }
                 }
+
+                AccountPicker(
+                    selectedAccountId = accountId,
+                    onAccountSelected = { accountId = it },
+                    label = "Account for files in this folder (optional — auto-resolved by name if left blank)",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
+                )
+                if (accountId != null) {
+                    TextButton(onClick = { accountId = null }) { Text("Clear account") }
+                }
             }
         },
         confirmButton = {
@@ -154,7 +186,7 @@ fun AddImportDirectoryDialog(
                             ImportDirectoryProvider.GDRIVE -> driveFolderName
                             ImportDirectoryProvider.LOCAL -> localFolderName?.takeIf { it != folderRef }
                         }
-                    onCreate(name.trim(), provider, folderRef.trim(), displayPath)
+                    onCreate(name.trim(), provider, folderRef.trim(), displayPath, accountId)
                 },
             ) { Text("Add") }
         },

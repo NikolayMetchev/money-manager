@@ -31,8 +31,21 @@ sealed interface DedupePolicy {
      * transfer with the same key but differing fields -> UPDATED. Also dedupes within the same batch
      * (a later transfer with a key already seen in this batch is treated as a duplicate). Used by the
      * API importer and by CSV strategies that declare unique-identifier columns.
+     *
+     * Cross-source reconciliation: when [reconcileWindow], [reconciledExclusionAttributeTypeId] and
+     * [reconciledRelationshipTypeId] are all set, an incoming transfer whose unique key does not match
+     * any existing transfer, but which does match an existing transfer on the same source+target+amount
+     * with a timestamp within [reconcileWindow], is still IMPORTED — tagged with the exclusion
+     * attribute and linked via a `reconciled` relationship, so a movement two sources both record under
+     * different ids (e.g. a Monzo transfer's own- and joint-account exports, each with their own
+     * `Transaction ID`) is counted once. Defaults are null: reconciliation is opt-in per strategy and
+     * off for all pre-existing behavior.
      */
-    data object UniqueIdentifier : DedupePolicy
+    data class UniqueIdentifier(
+        val reconcileWindow: Duration? = null,
+        val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
+        val reconciledRelationshipTypeId: RelationshipTypeId? = null,
+    ) : DedupePolicy
 
     /**
      * Match against existing transfers by all fields: first an exact core-field + attribute match,
