@@ -183,10 +183,20 @@ exclude:
       - "*/build"
       - "*/*/build"
       - "*/*/*/build"
-      # 4- and 5-deep modules (app/model/repository/read, app/ui/imports/csv, …) — without these
-      # their generated build/ sources leak into the scan (3k+ naming findings on SQLDelight codegen).
+      # The wildcard globs above don't actually match (only literal paths are honoured — the
+      # pre-existing literal app/db/core/build entry is why that module never leaked), so every
+      # module whose codegen produces findings needs a literal entry. Without these the generated
+      # SQLDelight/Mappie sources leak 3k+ naming findings into the scan.
       - "*/*/*/*/build"
       - "*/*/*/*/*/build"
+      - app/db/read/build
+      - app/db/write/build
+      - app/db/schema/build
+      - app/db/seed/build
+      - app/db/repository/build
+      - app/db/di/build
+      - app/model/repository/read/build
+      - app/model/repository/write/build
       - gradle/build-logic/build
       - app/db/core/build
       - app/ui/core/build
@@ -392,6 +402,10 @@ exclude:
       - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/CsvImportStrategyReadRepositoryImpl.kt
       - app/model/csvstrategy/src/commonMain/kotlin/com/moneymanager/domain/model/csvstrategy/FieldMapping.kt
       - utils/parsers/xlsx/src/jvmTest/kotlin/com/moneymanager/xlsx/XlsxParserTest.kt
+      # Interface-mandated parameters of intentional no-op overrides (same files as the
+      # EmptyMethod entries above).
+      - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
+      - utils/compose/scrollbar/src/androidMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
   - name: UnusedSymbol
     paths:
       - app/db/di/src
