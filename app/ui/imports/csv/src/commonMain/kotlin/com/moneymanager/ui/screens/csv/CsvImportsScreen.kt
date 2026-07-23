@@ -440,7 +440,6 @@ fun CsvImportsScreen(
                             import = import,
                             dateRange = dateRanges[import.id.id.toString()],
                             sourceAccountName = resolveSourceAccountName(import, strategies, directoryAccounts, accounts),
-                            matchedStrategyName = null,
                             onClick = { onImportClick(import.id) },
                             ignored = true,
                             onSetIgnored = { ignore ->
