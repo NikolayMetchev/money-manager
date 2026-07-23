@@ -95,7 +95,7 @@ class CategoriesScreenTest {
     // region Display Tests
 
     @Test
-    fun categoriesScreen_displaysEmptyState_whenNoCategories() =
+    fun categoriesScreen_displaysEmptyState_whenNoCategories() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createCategoryRepository(emptyList())
@@ -116,9 +116,10 @@ class CategoriesScreenTest {
             onNodeWithText("Your Categories").assertIsDisplayed()
             onNodeWithText("No categories yet. Add your first category!").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun categoriesScreen_displaysCategories_whenCategoriesExist() =
+    fun categoriesScreen_displaysCategories_whenCategoriesExist() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -144,9 +145,10 @@ class CategoriesScreenTest {
             onNodeWithText("Food").assertIsDisplayed()
             onNodeWithText("Transport").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun categoriesScreen_displaysAddCategoryButton() =
+    fun categoriesScreen_displaysAddCategoryButton() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createCategoryRepository(emptyList())
@@ -166,9 +168,10 @@ class CategoriesScreenTest {
             // Then
             onNodeWithText("Add Category").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun categoriesScreen_displaysUncategorizedCategory() =
+    fun categoriesScreen_displaysUncategorizedCategory() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -194,9 +197,10 @@ class CategoriesScreenTest {
             onNodeWithText("Uncategorized").assertIsDisplayed()
             onNodeWithText("Food").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun categoriesScreen_displaysChildCount_whenCategoryHasChildren() =
+    fun categoriesScreen_displaysChildCount_whenCategoryHasChildren() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -222,9 +226,10 @@ class CategoriesScreenTest {
             // Then - child count is shown in brackets after category name
             onNodeWithText("Food (2)").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun categoriesScreen_expandsCategory_whenArrowClicked() =
+    fun categoriesScreen_expandsCategory_whenArrowClicked() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -255,13 +260,14 @@ class CategoriesScreenTest {
             // Then
             onNodeWithText("Groceries").assertIsDisplayed()
         }
+    }
 
     // endregion
 
     // region Create Category Dialog Tests
 
     @Test
-    fun categoriesScreen_opensCreateDialog_whenAddCategoryClicked() =
+    fun categoriesScreen_opensCreateDialog_whenAddCategoryClicked() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createCategoryRepository(emptyList())
@@ -285,9 +291,10 @@ class CategoriesScreenTest {
             onNodeWithText("Category Name").assertIsDisplayed()
             onNodeWithText("Parent Category").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun createCategoryDialog_validatesRequiredFields() =
+    fun createCategoryDialog_validatesRequiredFields() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createCategoryRepository(emptyList())
@@ -313,9 +320,10 @@ class CategoriesScreenTest {
             // Then
             onNodeWithText("Category name is required").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun createCategoryDialog_canBeDismissed() =
+    fun createCategoryDialog_canBeDismissed() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createCategoryRepository(emptyList())
@@ -342,9 +350,10 @@ class CategoriesScreenTest {
             // Then - dialog should be dismissed
             onNodeWithText("Create New Category").assertDoesNotExist()
         }
+    }
 
     @Test
-    fun createCategoryDialog_createsCategory_whenValidInput() =
+    fun createCategoryDialog_createsCategory_whenValidInput() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createCategoryRepository(emptyList())
@@ -375,9 +384,10 @@ class CategoriesScreenTest {
             onNodeWithText("Create New Category").assertDoesNotExist()
             verifySuspend { repository.createCategory(matches { it.name == "Entertainment" }, any()) }
         }
+    }
 
     @Test
-    fun createCategoryDialog_showsParentDropdown_withAvailableCategories() =
+    fun createCategoryDialog_showsParentDropdown_withAvailableCategories() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -411,13 +421,14 @@ class CategoriesScreenTest {
             onAllNodesWithText("Food").fetchSemanticsNodes().isNotEmpty()
             onAllNodesWithText("Transport").fetchSemanticsNodes().isNotEmpty()
         }
+    }
 
     // endregion
 
     // region Edit Category Dialog Tests
 
     @Test
-    fun categoriesScreen_opensEditDialog_whenEditButtonClicked() =
+    fun categoriesScreen_opensEditDialog_whenEditButtonClicked() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -444,9 +455,10 @@ class CategoriesScreenTest {
             // Then
             onNodeWithText("Edit Category").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun editCategoryDialog_canRenameCategory() =
+    fun editCategoryDialog_canRenameCategory() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -481,9 +493,10 @@ class CategoriesScreenTest {
             onNodeWithText("Edit Category").assertDoesNotExist()
             verifySuspend { repository.updateCategory(matches { it.name == "Food" }, any()) }
         }
+    }
 
     @Test
-    fun editCategoryDialog_validatesRequiredFields() =
+    fun editCategoryDialog_validatesRequiredFields() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -515,9 +528,10 @@ class CategoriesScreenTest {
             // Just verify the dialog shows the expected content - can't easily clear text fields
             // in Compose tests when the text is shown as value not as placeholder
         }
+    }
 
     @Test
-    fun editCategoryDialog_canBeDismissed() =
+    fun editCategoryDialog_canBeDismissed() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -548,9 +562,10 @@ class CategoriesScreenTest {
             // Then - dialog should be dismissed
             onNodeWithText("Edit Category").assertDoesNotExist()
         }
+    }
 
     @Test
-    fun editCategoryDialog_showsDeleteButton() =
+    fun editCategoryDialog_showsDeleteButton() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -577,9 +592,10 @@ class CategoriesScreenTest {
             // Then
             onNodeWithText("Delete Category").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun editCategoryDialog_opensDeleteConfirmation_whenDeleteClicked() =
+    fun editCategoryDialog_opensDeleteConfirmation_whenDeleteClicked() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -610,9 +626,10 @@ class CategoriesScreenTest {
             onNodeWithText("Delete Category?").assertIsDisplayed()
             onNodeWithText("Are you sure you want to delete \"Food\"?").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun deleteConfirmationDialog_deletesCategory_whenConfirmed() =
+    fun deleteConfirmationDialog_deletesCategory_whenConfirmed() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -646,9 +663,10 @@ class CategoriesScreenTest {
             // Then
             verifySuspend { repository.deleteCategory(1L) }
         }
+    }
 
     @Test
-    fun deleteConfirmationDialog_canBeCancelled() =
+    fun deleteConfirmationDialog_canBeCancelled() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -685,13 +703,14 @@ class CategoriesScreenTest {
             // Verify no deletion occurred
             verifySuspend(VerifyMode.not) { repository.deleteCategory(any()) }
         }
+    }
 
     // endregion
 
     // region Uncategorized Protection Tests
 
     @Test
-    fun categoriesScreen_doesNotShowEditButton_forUncategorizedCategory() =
+    fun categoriesScreen_doesNotShowEditButton_forUncategorizedCategory() {
         runMoneyManagerComposeUiTest {
             // Given - only Uncategorized category
             val categories =
@@ -716,9 +735,10 @@ class CategoriesScreenTest {
             onNodeWithText("Uncategorized").assertIsDisplayed()
             onNodeWithContentDescription("Edit").assertDoesNotExist()
         }
+    }
 
     @Test
-    fun categoriesScreen_showsEditButton_forNonUncategorizedCategory() =
+    fun categoriesScreen_showsEditButton_forNonUncategorizedCategory() {
         runMoneyManagerComposeUiTest {
             // Given - Uncategorized and another category
             val categories =
@@ -746,13 +766,14 @@ class CategoriesScreenTest {
             // There should be exactly one edit button
             onAllNodesWithContentDescription("Edit")[0].assertIsDisplayed()
         }
+    }
 
     // endregion
 
     // region Parent Category Selection Tests
 
     @Test
-    fun editCategoryDialog_excludesSelfFromParentOptions() =
+    fun editCategoryDialog_excludesSelfFromParentOptions() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -784,9 +805,10 @@ class CategoriesScreenTest {
             // (Food shouldn't be in dropdown as it can't be its own parent)
             onAllNodesWithText("Transport")[0].assertIsDisplayed()
         }
+    }
 
     @Test
-    fun editCategoryDialog_excludesDescendantsFromParentOptions() =
+    fun editCategoryDialog_excludesDescendantsFromParentOptions() {
         runMoneyManagerComposeUiTest {
             // Given - Food has child Groceries, which has child Organic
             val categories =
@@ -819,9 +841,10 @@ class CategoriesScreenTest {
             // Then - Transport should be available (not a descendant of Food)
             onAllNodesWithText("Transport")[0].assertIsDisplayed()
         }
+    }
 
     @Test
-    fun editCategoryDialog_canChangeParentCategory() =
+    fun editCategoryDialog_canChangeParentCategory() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -860,13 +883,14 @@ class CategoriesScreenTest {
             // Then
             verifySuspend { repository.updateCategory(matches { it.parentId == 1L }, any()) }
         }
+    }
 
     // endregion
 
     // region Searchable Dropdown Tests
 
     @Test
-    fun createCategoryDialog_filtersParentCategories_whenSearching() =
+    fun createCategoryDialog_filtersParentCategories_whenSearching() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -901,13 +925,14 @@ class CategoriesScreenTest {
             // Then - only Food should be visible in dropdown
             onAllNodesWithText("Food")[0].assertIsDisplayed()
         }
+    }
 
     // endregion
 
     // region Multiple Categories Tests
 
     @Test
-    fun categoriesScreen_displaysMultipleTopLevelCategories() =
+    fun categoriesScreen_displaysMultipleTopLevelCategories() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -937,9 +962,10 @@ class CategoriesScreenTest {
             onNodeWithText("Entertainment").assertIsDisplayed()
             onNodeWithText("Utilities").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun categoriesScreen_displaysNestedHierarchy() =
+    fun categoriesScreen_displaysNestedHierarchy() {
         runMoneyManagerComposeUiTest {
             // Given
             val categories =
@@ -976,6 +1002,7 @@ class CategoriesScreenTest {
             onAllNodesWithContentDescription("Expand")[0].performClick()
             onNodeWithText("Organic").assertIsDisplayed()
         }
+    }
 
     // endregion
 

@@ -117,7 +117,7 @@ class ImportTimelineScreenTest {
         )
 
     @Test
-    fun timelineScreen_displaysEmptyState_whenNoRanges() =
+    fun timelineScreen_displaysEmptyState_whenNoRanges() {
         runMoneyManagerComposeUiTest {
             setContent {
                 ProvideSchemaAwareScope {
@@ -132,9 +132,10 @@ class ImportTimelineScreenTest {
 
             onNodeWithText("No imported transactions yet").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun timelineScreen_displaysStrategyRowsAndManualRow() =
+    fun timelineScreen_displaysStrategyRowsAndManualRow() {
         runMoneyManagerComposeUiTest {
             val ranges =
                 listOf(
@@ -164,4 +165,5 @@ class ImportTimelineScreenTest {
             // Every row's data stops before today, so the gaps table lists them.
             onNodeWithText("Gaps").assertIsDisplayed()
         }
+    }
 }

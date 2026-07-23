@@ -45,7 +45,7 @@ class CreateAccountWithNewCategoryE2ETest {
     }
 
     @Test
-    fun createAccount_withNewlyCreatedCategory_shouldSucceed() =
+    fun createAccount_withNewlyCreatedCategory_shouldSucceed() {
         runMoneyManagerComposeUiTest {
             // Given: Create a fresh test database
             testDbLocation = createTestDatabaseLocation()
@@ -118,6 +118,7 @@ class CreateAccountWithNewCategoryE2ETest {
             // Step 8: Verify the account was created and appears in the list
             onNodeWithText("Test Checking Account", useUnmergedTree = true).assertIsDisplayed()
         }
+    }
 }
 
 /**

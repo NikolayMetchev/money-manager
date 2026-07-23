@@ -100,11 +100,11 @@ class ImportTimelineRepositoryImplTest : DbTest() {
             fileLastModified = fileLastModified,
         )
 
-    private suspend fun createStrategy(name: String): CsvImportStrategy {
+    private suspend fun createStrategy(): CsvImportStrategy {
         val strategy =
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
-                name = name,
+                name = "Monzo",
                 identificationColumns = headers.toSet(),
                 fieldMappings = emptyMap(),
                 createdAt = Clock.System.now(),
@@ -119,7 +119,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
         runTest {
             setupAccountsAndCurrency()
             val importId = createCsvImport("statement.csv")
-            val strategy = createStrategy("Monzo")
+            val strategy = createStrategy()
             repositories.csvImportRepository.recordImportApplication(importId, strategy.id, strategy.name, appliedAt)
             attachCsvProvenance(createTransferAt(earliestTimestamp), importId, rowIndex = 0)
             attachCsvProvenance(createTransferAt(latestTimestamp), importId, rowIndex = 1)
@@ -204,7 +204,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
                     fileChecksum = "qif-checksum",
                     fileLastModified = fileLastModified,
                 )
-            val strategy = createStrategy("Monzo")
+            val strategy = createStrategy()
             repositories.qifImportRepository.recordImportApplication(qifImportId, strategy.id, strategy.name, appliedAt)
             val transfer = createTransferAt(earliestTimestamp)
             val source =

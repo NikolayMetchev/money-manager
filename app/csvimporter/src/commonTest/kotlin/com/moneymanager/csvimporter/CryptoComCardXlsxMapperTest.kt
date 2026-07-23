@@ -84,7 +84,6 @@ class CryptoComCardXlsxMapperTest {
         cardAcceptorName: String,
         description: String,
         amountProcessed: String,
-        currency: String,
     ): CsvRow =
         CsvRow(
             rowIndex = 1,
@@ -98,7 +97,7 @@ class CryptoComCardXlsxMapperTest {
                     "5411.0",
                     amountProcessed,
                     "0.0",
-                    currency,
+                    "GBP",
                     amountProcessed,
                 ),
         )
@@ -125,7 +124,6 @@ class CryptoComCardXlsxMapperTest {
                     cardAcceptorName = "Spotify UK               Stockholm      SWE",
                     description = "POS Signature Purchase",
                     amountProcessed = "-4.5",
-                    currency = "GBP",
                 ),
             )
 
@@ -148,7 +146,6 @@ class CryptoComCardXlsxMapperTest {
                     cardAcceptorName = "CRV*Card verification    London         GBR",
                     description = "POS Signature Purchase",
                     amountProcessed = "-1.5",
-                    currency = "GBP",
                 ),
             )
 
@@ -172,7 +169,6 @@ class CryptoComCardXlsxMapperTest {
                     cardAcceptorName = "",
                     description = "Batch Credit Funds Transfer",
                     amountProcessed = "245.86",
-                    currency = "GBP",
                 ),
             )
 
@@ -193,7 +189,6 @@ class CryptoComCardXlsxMapperTest {
                     cardAcceptorName = "                                        GBR",
                     description = "GBP/200.0-Card Load",
                     amountProcessed = "200.0",
-                    currency = "GBP",
                 ),
             )
 
@@ -219,7 +214,6 @@ class CryptoComCardXlsxMapperTest {
                     cardAcceptorName = "CRV*Card verification    London         GBR",
                     description = "Account Verification Transaction",
                     amountProcessed = "0.0",
-                    currency = "GBP",
                 ),
             )
 

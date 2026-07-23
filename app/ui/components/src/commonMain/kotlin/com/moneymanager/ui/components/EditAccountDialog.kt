@@ -36,7 +36,6 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.getOrCreateAttributeType
-import com.moneymanager.ui.components.CreateCategoryDialog
 import com.moneymanager.ui.components.transactions.EditableAttributesSection
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope

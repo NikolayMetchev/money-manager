@@ -18,7 +18,7 @@ import kotlin.uuid.Uuid
 
 class CsvPreviewTableTest {
     @Test
-    fun viewLink_clickInvokesTransferCallback() =
+    fun viewLink_clickInvokesTransferCallback() {
         runMoneyManagerComposeUiTest {
             var clickedTransferId: TransferId? = null
             var clickedIsPositiveAmount: Boolean? = null
@@ -58,9 +58,10 @@ class CsvPreviewTableTest {
             assertEquals(TransferId(42), clickedTransferId)
             assertEquals(true, clickedIsPositiveAmount)
         }
+    }
 
     @Test
-    fun duplicateLink_clickInvokesDuplicateSourceCallbackWithAmountSign() =
+    fun duplicateLink_clickInvokesDuplicateSourceCallbackWithAmountSign() {
         runMoneyManagerComposeUiTest {
             var clickedTransferId: TransferId? = null
             var clickedIsPositiveAmount: Boolean? = null
@@ -100,9 +101,10 @@ class CsvPreviewTableTest {
             assertEquals(TransferId(42), clickedTransferId)
             assertEquals(false, clickedIsPositiveAmount)
         }
+    }
 
     @Test
-    fun duplicateLink_withoutDuplicateSourceCallbackIsNotClickable() =
+    fun duplicateLink_withoutDuplicateSourceCallbackIsNotClickable() {
         runMoneyManagerComposeUiTest {
             setContent {
                 MaterialTheme {
@@ -132,4 +134,5 @@ class CsvPreviewTableTest {
 
             onNodeWithText("View ->").assertHasNoClickAction()
         }
+    }
 }

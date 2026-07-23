@@ -1,6 +1,11 @@
 <component name="InspectionProjectProfileManager">
   <profile version="1.0">
     <option name="myName" value="Money Manager"/>
+    <!-- Style preferences this project rejects: positional destructuring is fragile against
+         data-class property reordering, and the println calls in CLI tools/build scripts ARE the
+         program output (a debugger logpoint is not a substitute). -->
+    <inspection_tool class="DestructuringDeclaration" enabled="false" level="WARNING" enabled_by_default="false"/>
+    <inspection_tool class="KotlinPrintToLogpoint" enabled="false" level="INFORMATION" enabled_by_default="false"/>
     <inspection_tool class="UnnecessaryModuleDependencyInspection" enabled="false" level="WARNING" enabled_by_default="false"/>
     <inspection_tool class="UnstableApiUsage" enabled="false" level="WARNING" enabled_by_default="false"/>
     <inspection_tool class="ConstantConditionIf" enabled="true" level="ERROR" enabled_by_default="true"/>

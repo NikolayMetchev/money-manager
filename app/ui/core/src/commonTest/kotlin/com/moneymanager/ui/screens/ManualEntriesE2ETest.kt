@@ -53,7 +53,7 @@ class ManualEntriesE2ETest {
     }
 
     @Test
-    fun manualEntries_createsCompanionInterestTransferForAssetsFee() =
+    fun manualEntries_createsCompanionInterestTransferForAssetsFee() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -164,6 +164,7 @@ class ManualEntriesE2ETest {
                 )
             }
         }
+    }
 }
 
 /**

@@ -49,7 +49,7 @@ class TransactionAttributeAuditE2ETest {
     }
 
     @Test
-    fun createTransaction_withAttribute_shouldShowAttributeInAuditRevision1() =
+    fun createTransaction_withAttribute_shouldShowAttributeInAuditRevision1() {
         runMoneyManagerComposeUiTest {
             // Given: Create a fresh test database
             testDbLocation = createTestDatabaseLocation()
@@ -275,6 +275,7 @@ class TransactionAttributeAuditE2ETest {
                     "Attribute should be part of revision 1, not create a new revision."
             }
         }
+    }
 }
 
 /**

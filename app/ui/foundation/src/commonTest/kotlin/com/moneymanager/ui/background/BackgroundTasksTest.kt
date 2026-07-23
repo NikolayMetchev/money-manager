@@ -25,7 +25,7 @@ class BackgroundTasksTest {
     }
 
     @Test
-    fun backgroundTaskPanel_showsElapsedTimeForRunningTask() =
+    fun backgroundTaskPanel_showsElapsedTimeForRunningTask() {
         runMoneyManagerComposeUiTest {
             val manager = BackgroundTaskManager(CoroutineScope(Dispatchers.Main))
             manager.tasks.add(
@@ -42,9 +42,10 @@ class BackgroundTasksTest {
 
             onNodeWithText("Elapsed", substring = true).assertIsDisplayed()
         }
+    }
 
     @Test
-    fun backgroundTaskPanel_doesNotShowElapsedForCompletedTask() =
+    fun backgroundTaskPanel_doesNotShowElapsedForCompletedTask() {
         runMoneyManagerComposeUiTest {
             val manager = BackgroundTaskManager(CoroutineScope(Dispatchers.Main))
             manager.tasks.add(
@@ -71,6 +72,7 @@ class BackgroundTasksTest {
             onNodeWithText("Elapsed", substring = true).assertIsDisplayed()
             onAllNodesWithText("Elapsed", substring = true).assertCountEquals(1)
         }
+    }
 
     @Test
     fun startTask_setsStartedAtMillisWhenTaskStarts() {

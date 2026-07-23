@@ -1,7 +1,5 @@
 package com.moneymanager.ui.audit
 
-import com.moneymanager.ui.audit.FieldChange
-
 private data class ResolvedValue<T>(
     val value: T,
 )
