@@ -255,12 +255,9 @@ jobs:
     needs: [changes, lint-format]
     # Unlike the other heavy jobs this one also runs on workflow_dispatch, so it has no
     # event-name condition.
-    # Runs the 2026.2-eap linter (qodana.yaml): EAP linters need no Qodana Cloud license,
-    # which works around the expired open-source license (and retests QD-14665). No QODANA_TOKEN
-    # is passed: when one is present the linter validates it even on EAP and dies with "token was
-    # declined by Qodana Cloud server" before producing a SARIF (verified: actions run
-    # 30006530973). Re-add the token env once the license is renewed to restore cloud upload.
-    # SARIF goes to GitHub Code Scanning and the run artifact either way.
+    # Runs the community 2026.2-eap linter (qodana.yaml). QODANA_TOKEN is a Qodana Cloud
+    # community-tier project token, so results upload to Qodana Cloud; the SARIF also goes to
+    # GitHub Code Scanning and the run artifact.
     if: >-
       !cancelled() &&
       needs.changes.outputs.code == 'true' &&
@@ -293,6 +290,9 @@ jobs:
           restore-keys: qodana-2026.2-eap-
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.1
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+          QODANA_ENDPOINT: 'https://qodana.cloud'
         with:
           upload-result: true
           # On PRs analyse only the changed files and fail solely on problems they introduce. The
