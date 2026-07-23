@@ -3,7 +3,7 @@
 # and IntelliJ Android Tests run configuration aligned. API 37 is beta.
 android-compileSdk = "36"
 develocity = "4.4.2"
-android-gradle-plugin = "9.3.0"
+android-gradle-plugin = "9.3.1"
 android-minSdk = "30"
 android-targetSdk = "36"
 play-services-auth = "21.6.0"
