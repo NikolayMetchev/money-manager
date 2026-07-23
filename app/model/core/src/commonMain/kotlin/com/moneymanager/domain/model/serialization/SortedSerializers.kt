@@ -28,7 +28,9 @@ open class SortedListSerializer<T : Comparable<T>>(
     override fun serialize(
         encoder: Encoder,
         value: List<T>,
-    ) = delegate.serialize(encoder, value.sorted())
+    ) {
+        delegate.serialize(encoder, value.sorted())
+    }
 
     override fun deserialize(decoder: Decoder): List<T> = delegate.deserialize(decoder).sorted()
 }
@@ -47,7 +49,9 @@ open class SortedByListSerializer<T>(
     override fun serialize(
         encoder: Encoder,
         value: List<T>,
-    ) = delegate.serialize(encoder, value.sortedWith(comparator))
+    ) {
+        delegate.serialize(encoder, value.sortedWith(comparator))
+    }
 
     override fun deserialize(decoder: Decoder): List<T> = delegate.deserialize(decoder).sortedWith(comparator)
 }
@@ -61,7 +65,9 @@ open class SortedSetSerializer<T : Comparable<T>>(
     override fun serialize(
         encoder: Encoder,
         value: Set<T>,
-    ) = delegate.serialize(encoder, value.toSortedSet())
+    ) {
+        delegate.serialize(encoder, value.toSortedSet())
+    }
 
     override fun deserialize(decoder: Decoder): Set<T> = delegate.deserialize(decoder).toSortedSet()
 
@@ -89,7 +95,9 @@ open class SortedMapSerializer<K : Comparable<K>, V>(
     override fun serialize(
         encoder: Encoder,
         value: Map<K, V>,
-    ) = delegate.serialize(encoder, value.toSortedMap())
+    ) {
+        delegate.serialize(encoder, value.toSortedMap())
+    }
 
     override fun deserialize(decoder: Decoder): Map<K, V> = delegate.deserialize(decoder).toSortedMap()
 

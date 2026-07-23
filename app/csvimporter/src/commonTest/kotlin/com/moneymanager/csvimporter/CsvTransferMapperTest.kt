@@ -1615,10 +1615,7 @@ class CsvTransferMapperTest {
         )
     }
 
-    private fun cardLast4Matchers(
-        accountId: AccountId,
-        value: String,
-    ): Map<String, AttributeAccountMatcher> =
+    private fun cardLast4Matchers(accountId: AccountId): Map<String, AttributeAccountMatcher> =
         mapOf(
             "card-last4" to
                 AttributeAccountMatcher.from(
@@ -1627,7 +1624,7 @@ class CsvTransferMapperTest {
                             id = 1,
                             accountId = accountId,
                             attributeType = AttributeType(id = AttributeTypeId(-8), name = "card-last4"),
-                            value = value,
+                            value = "9999",
                         ),
                     ),
                 ),
@@ -1642,7 +1639,7 @@ class CsvTransferMapperTest {
                 existingAccounts = mapOf("PayPal" to testTargetAccount.copy(name = "PayPal")),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
                 existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
-                attributeAccountMatchers = cardLast4Matchers(testTargetAccountId, "9999"),
+                attributeAccountMatchers = cardLast4Matchers(testTargetAccountId),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Some payment", "-50.00", "9999"))
@@ -1662,7 +1659,7 @@ class CsvTransferMapperTest {
                 existingAccounts = emptyMap(),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
                 existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
-                attributeAccountMatchers = cardLast4Matchers(testTargetAccountId, "9999"),
+                attributeAccountMatchers = cardLast4Matchers(testTargetAccountId),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Some payment", "-50.00", "Netflix"))

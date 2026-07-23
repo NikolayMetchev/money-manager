@@ -37,7 +37,7 @@ class DatabaseSchemaErrorDialogE2ETest {
     }
 
     @Test
-    fun moneyManagerApp_showsSchemaErrorDialog_whenDatabaseHasSchemaError() =
+    fun moneyManagerApp_showsSchemaErrorDialog_whenDatabaseHasSchemaError() {
         runMoneyManagerComposeUiTest {
             // Given: Copy the problematic test database to a test location
             testDbLocation = copyDatabaseFromResources("/money_manager.db")
@@ -75,9 +75,10 @@ class DatabaseSchemaErrorDialogE2ETest {
             // Error message should mention the specific issue
             onNodeWithText(text = "Error details:", substring = false).assertIsDisplayed()
         }
+    }
 
     @Test
-    fun databaseSchemaErrorDialog_allowsBackupAndCreateNew() =
+    fun databaseSchemaErrorDialog_allowsBackupAndCreateNew() {
         runMoneyManagerComposeUiTest {
             // Given: Copy the problematic test database to a test location
             testDbLocation = copyDatabaseFromResources("/money_manager.db")
@@ -113,9 +114,10 @@ class DatabaseSchemaErrorDialogE2ETest {
             // Then: Dialog should be gone
             onNodeWithText("Database Schema Error").assertDoesNotExist()
         }
+    }
 
     @Test
-    fun databaseSchemaErrorDialog_allowsDeleteAndCreateNew() =
+    fun databaseSchemaErrorDialog_allowsDeleteAndCreateNew() {
         runMoneyManagerComposeUiTest {
             // Given: Copy the problematic test database to a test location
             testDbLocation = copyDatabaseFromResources("/money_manager.db")
@@ -151,6 +153,7 @@ class DatabaseSchemaErrorDialogE2ETest {
             // Then: Dialog should be gone
             onNodeWithText("Database Schema Error").assertDoesNotExist()
         }
+    }
 }
 
 /**

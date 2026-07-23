@@ -62,7 +62,7 @@ class ImportMonzoCsvE2ETest {
     }
 
     @Test
-    fun navigateToCsvImports_shouldShowCsvImportsScreen() =
+    fun navigateToCsvImports_shouldShowCsvImportsScreen() {
         runMoneyManagerComposeUiTest {
             // Given: Create fresh database (old databases don't have Device/Platform tables)
             testDbLocation = createTestDatabaseLocation()
@@ -96,9 +96,10 @@ class ImportMonzoCsvE2ETest {
             // Wait for navigation to complete - should show empty state
             waitUntilExactlyOneExists(hasText("No CSV files imported yet", substring = true), timeoutMillis = 15000)
         }
+    }
 
     @Test
-    fun importMonzoCsv_andCreateStrategy_shouldAutoDetectColumnMappings() =
+    fun importMonzoCsv_andCreateStrategy_shouldAutoDetectColumnMappings() {
         runMoneyManagerComposeUiTest {
             // Given: Create database and populate with CSV data BEFORE starting the app
             testDbLocation = createTestDatabaseLocation()
@@ -248,9 +249,10 @@ class ImportMonzoCsvE2ETest {
             // its rows on navigation, so wait for the row count to reappear.
             waitUntilAtLeastOneExists(hasText("20 rows"), timeoutMillis = 15000)
         }
+    }
 
     @Test
-    fun applyStrategy_shouldAllowCreatingSourceAccount() =
+    fun applyStrategy_shouldAllowCreatingSourceAccount() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -328,9 +330,10 @@ class ImportMonzoCsvE2ETest {
 
             waitUntilExactlyOneExists(hasText("Monzo Current Account"), timeoutMillis = 10000)
         }
+    }
 
     @Test
-    fun csvImports_shouldShowImportedAndUnimportedStates() =
+    fun csvImports_shouldShowImportedAndUnimportedStates() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -407,6 +410,7 @@ class ImportMonzoCsvE2ETest {
             waitUntilExactlyOneExists(hasText("already_imported.csv"), timeoutMillis = 15000)
             waitUntilExactlyOneExists(hasText("via Monzo", substring = true), timeoutMillis = 10000)
         }
+    }
 
     /**
      * "Import all" auto-matches each file's strategy by its columns (the built-in "Monzo CSV" strategy
@@ -414,7 +418,7 @@ class ImportMonzoCsvE2ETest {
      * getAllImports() returned imports without their columns, so column-based matching skipped every file.
      */
     @Test
-    fun importAll_matchesFilesByColumnsAndImportsThemAll() =
+    fun importAll_matchesFilesByColumnsAndImportsThemAll() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -493,6 +497,7 @@ class ImportMonzoCsvE2ETest {
             waitUntilExactlyOneExists(hasText("second.csv"), timeoutMillis = 15000)
             onNodeWithText("Unimported (0)").assertExists()
         }
+    }
 
     /**
      * Loads the test CSV content from resources.

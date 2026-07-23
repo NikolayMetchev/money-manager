@@ -51,7 +51,7 @@ class ImportWiseCsvE2ETest {
     }
 
     @Test
-    fun importWiseCsv_appliesSeededStrategyWithoutSourceAccountSelection() =
+    fun importWiseCsv_appliesSeededStrategyWithoutSourceAccountSelection() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -140,6 +140,7 @@ class ImportWiseCsvE2ETest {
                 timeoutMillis = 15000,
             )
         }
+    }
 
     /**
      * Regression test for importing on a fresh database with no accounts at all: the dialog
@@ -149,7 +150,7 @@ class ImportWiseCsvE2ETest {
      * "Import 0 Transfers" with no way to proceed.
      */
     @Test
-    fun importWiseCsv_onFreshDatabaseCreatesWiseAccounts() =
+    fun importWiseCsv_onFreshDatabaseCreatesWiseAccounts() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -228,6 +229,7 @@ class ImportWiseCsvE2ETest {
                 assertNotNull(accounts.singleOrNull { it.name == "Wise: GBP" }, "Wise: GBP account is created")
             }
         }
+    }
 
     /**
      * A trimmed Wise transaction-history export covering the interesting row shapes:

@@ -13,21 +13,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class JsonPrimitivesTest {
-    private fun path(
-        json: String,
-        p: String,
-    ): String? = (Json.parseToJsonElement(json).resolveJsonPathElement(p) as? JsonPrimitive)?.contentOrNull
+    private val json = """{ "result": { "data": [ {"price": "100"}, {"price": "200"} ] }, "code": 0 }"""
+
+    private fun path(p: String): String? = (Json.parseToJsonElement(json).resolveJsonPathElement(p) as? JsonPrimitive)?.contentOrNull
 
     @Test
     fun `resolves nested object and array paths`() {
-        val json = """{ "result": { "data": [ {"price": "100"}, {"price": "200"} ] }, "code": 0 }"""
-        assertEquals("100", path(json, "result.data[0].price"))
-        assertEquals("200", path(json, "result.data[1].price"))
-        assertEquals("0", path(json, "code"))
-        assertNull(path(json, "result.data[2].price"))
-        assertNull(path(json, "result.missing"))
+        assertEquals("100", path("result.data[0].price"))
+        assertEquals("200", path("result.data[1].price"))
+        assertEquals("0", path("code"))
+        assertNull(path("result.data[2].price"))
+        assertNull(path("result.missing"))
         // Malformed segment with trailing text after the brackets resolves to null, not data[0].
-        assertNull(path(json, "result.data[0]foo"))
+        assertNull(path("result.data[0]foo"))
     }
 
     @Test

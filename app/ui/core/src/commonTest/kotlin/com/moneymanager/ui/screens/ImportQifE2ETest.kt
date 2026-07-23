@@ -133,7 +133,7 @@ class ImportQifE2ETest {
     }
 
     @Test
-    fun applyQifStrategy_usesDefaultCurrencyAndImportsTransfers() =
+    fun applyQifStrategy_usesDefaultCurrencyAndImportsTransfers() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -200,9 +200,10 @@ class ImportQifE2ETest {
             // Everything is imported, so the Apply Strategy button is no longer enabled.
             onNodeWithText("Apply Strategy").assertIsNotEnabled()
         }
+    }
 
     @Test
-    fun builtInQifStrategy_alwaysMatchesOutOfTheBox() =
+    fun builtInQifStrategy_alwaysMatchesOutOfTheBox() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -246,9 +247,10 @@ class ImportQifE2ETest {
             waitForIdle()
             onNodeWithText("No QIF strategy matches this file yet", substring = true).assertDoesNotExist()
         }
+    }
 
     @Test
-    fun fileWithAllDuplicateTransactions_stillShowsAsImported() =
+    fun fileWithAllDuplicateTransactions_stillShowsAsImported() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -314,9 +316,10 @@ class ImportQifE2ETest {
             waitUntilExactlyOneExists(hasText("second.qif"), timeoutMillis = 15000)
             onNodeWithText("Unimported (0)").assertExists()
         }
+    }
 
     @Test
-    fun importAll_appliesStrategyToEveryUnimportedFileAtOnce() =
+    fun importAll_appliesStrategyToEveryUnimportedFileAtOnce() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -377,6 +380,7 @@ class ImportQifE2ETest {
             waitUntilExactlyOneExists(hasText("second.qif"), timeoutMillis = 15000)
             onNodeWithText("Unimported (0)").assertExists()
         }
+    }
 }
 
 /** DatabaseManager wrapper that points the app at the pre-populated test database. */

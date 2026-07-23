@@ -91,7 +91,7 @@ class OrdersScreenTest {
         }
 
     @Test
-    fun ordersList_rendersOrderRows_andClickReportsOrderId() =
+    fun ordersList_rendersOrderRows_andClickReportsOrderId() {
         runMoneyManagerComposeUiTest {
             var clicked: ExchangeOrderId? = null
             setContent {
@@ -113,9 +113,10 @@ class OrdersScreenTest {
             waitForIdle()
             assertEquals(orderId, clicked)
         }
+    }
 
     @Test
-    fun ordersList_showsEmptyState_whenAccountHasNoOrders() =
+    fun ordersList_showsEmptyState_whenAccountHasNoOrders() {
         runMoneyManagerComposeUiTest {
             setContent {
                 ProvideSchemaAwareScope {
@@ -128,9 +129,10 @@ class OrdersScreenTest {
             waitUntilExactlyOneExists(hasText("No orders"))
             waitForIdle()
         }
+    }
 
     @Test
-    fun orderDetail_rendersFieldsAndFills_andClickReportsFillTrade() =
+    fun orderDetail_rendersFieldsAndFills_andClickReportsFillTrade() {
         runMoneyManagerComposeUiTest {
             var clickedFill: Trade? = null
             setContent {
@@ -153,9 +155,10 @@ class OrdersScreenTest {
             waitForIdle()
             assertEquals(fillTrade, clickedFill)
         }
+    }
 
     @Test
-    fun orderDetail_backButtonStaysReachable_whenTheOrderDoesNotResolve() =
+    fun orderDetail_backButtonStaysReachable_whenTheOrderDoesNotResolve() {
         runMoneyManagerComposeUiTest {
             // A stale/deleted order id never emits an order; the user must still be able to navigate away.
             var backClicks = 0
@@ -175,9 +178,10 @@ class OrdersScreenTest {
             waitForIdle()
             assertEquals(1, backClicks)
         }
+    }
 
     @Test
-    fun orderDetail_fillTrade_hasOwnAuditButton_reportingTheFill() =
+    fun orderDetail_fillTrade_hasOwnAuditButton_reportingTheFill() {
         runMoneyManagerComposeUiTest {
             var auditedFill: Trade? = null
             setContent {
@@ -196,9 +200,10 @@ class OrdersScreenTest {
             waitForIdle()
             assertEquals(fillTrade, auditedFill)
         }
+    }
 
     @Test
-    fun ordersList_backButton_reportsBack() =
+    fun ordersList_backButton_reportsBack() {
         runMoneyManagerComposeUiTest {
             var backClicks = 0
             setContent {
@@ -217,9 +222,10 @@ class OrdersScreenTest {
             waitForIdle()
             assertEquals(1, backClicks)
         }
+    }
 
     @Test
-    fun orderDetail_auditButton_reportsOrderId() =
+    fun orderDetail_auditButton_reportsOrderId() {
         runMoneyManagerComposeUiTest {
             var auditOrder: ExchangeOrderId? = null
             setContent {
@@ -238,9 +244,10 @@ class OrdersScreenTest {
             waitForIdle()
             assertEquals(orderId, auditOrder)
         }
+    }
 
     @Test
-    fun orderAudit_rendersEntry_andApiSourceLinksToImportingRequest() =
+    fun orderAudit_rendersEntry_andApiSourceLinksToImportingRequest() {
         runMoneyManagerComposeUiTest {
             val sessionId = ApiSessionId(5L)
             val requestId = ApiRequestId(9L)
@@ -300,4 +307,5 @@ class OrdersScreenTest {
             waitForIdle()
             assertEquals(Triple(sessionId, requestId, jsonPath), linked)
         }
+    }
 }

@@ -59,9 +59,6 @@ import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.testSource
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.foundation.LocalImportEngine
-import com.moneymanager.ui.screens.transactions.AccountTransactionCard
-import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
-import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import com.moneymanager.ui.util.ScreenSizeClass
 import dev.mokkery.MockMode
@@ -88,7 +85,7 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
     @Test
-    fun accountMatrix_rendersWhenTotalColumnWidthExceedsComposeConstraintsLimit() =
+    fun accountMatrix_rendersWhenTotalColumnWidthExceedsComposeConstraintsLimit() {
         runMoneyManagerComposeUiTest {
             // Given: enough accounts that the matrix's total scrollable width (~120dp per column)
             // exceeds the ~262k px a Compose Constraints value can represent. The virtualization
@@ -127,9 +124,10 @@ class AccountTransactionsScreenTest {
             // Then: the screen measures without throwing and the selected account's column is composed
             waitUntilExactlyOneExists(hasText("Account 1"))
         }
+    }
 
     @Test
-    fun accountTransactionCard_flipsAccountDisplay_whenPerspectiveChanges() =
+    fun accountTransactionCard_flipsAccountDisplay_whenPerspectiveChanges() {
         runMoneyManagerComposeUiTest {
             // Given: Two accounts and a transfer between them
             val now = Clock.System.now()
@@ -221,9 +219,10 @@ class AccountTransactionsScreenTest {
             onAllNodesWithText("Savings").assertCountEquals(1) // Matrix header only (NOT in transaction row anymore!)
             onAllNodesWithText("Checking").assertCountEquals(2) // Matrix header + transaction row
         }
+    }
 
     @Test
-    fun clickingAccountInTransaction_switchesPerspective() =
+    fun clickingAccountInTransaction_switchesPerspective() {
         runMoneyManagerComposeUiTest {
             // Given: Two accounts with a transfer between them
             val now = Clock.System.now()
@@ -309,9 +308,10 @@ class AccountTransactionsScreenTest {
             // [1] = Transaction row (the "other" account from Savings' view)
             onAllNodesWithText("Checking").assertCountEquals(2)
         }
+    }
 
     @Test
-    fun clickingAccountInTransaction_passesTransferIdSoTheOtherAccountScrollsToIt() =
+    fun clickingAccountInTransaction_passesTransferIdSoTheOtherAccountScrollsToIt() {
         runMoneyManagerComposeUiTest {
             // Given: two accounts with a transfer between them
             val now = Clock.System.now()
@@ -368,9 +368,10 @@ class AccountTransactionsScreenTest {
             assertEquals(savings.id, clickedAccountId)
             assertEquals(transfer.id, clickedTransferId)
         }
+    }
 
     @Test
-    fun scrollingUpAfterNavigatingToTransfer_loadsNewerPage_withoutYankingBackToAnchor() =
+    fun scrollingUpAfterNavigatingToTransfer_loadsNewerPage_withoutYankingBackToAnchor() {
         runMoneyManagerComposeUiTest {
             // Given: a long history where navigation lands on an old transfer, so the screen loads
             // a window centred on it with newer pages available above (hasPrevious = true).
@@ -484,9 +485,10 @@ class AccountTransactionsScreenTest {
             onNodeWithText("Tx 150").assertIsDisplayed()
             onNodeWithText("Tx 190").assertDoesNotExist()
         }
+    }
 
     @Test
-    fun feeBadges_distinguishMainAndFee_andEachLinksToTheOther() =
+    fun feeBadges_distinguishMainAndFee_andEachLinksToTheOther() {
         runMoneyManagerComposeUiTest {
             val now = Clock.System.now()
             val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
@@ -556,9 +558,10 @@ class AccountTransactionsScreenTest {
             waitForIdle()
             assertEquals(mainId, linkClicked)
         }
+    }
 
     @Test
-    fun orderBadge_showsOnLinkedTradeRow_andReportsItsOrderId() =
+    fun orderBadge_showsOnLinkedTradeRow_andReportsItsOrderId() {
         runMoneyManagerComposeUiTest {
             // A trade row filling an exchange order carries the order id from the AccountRow join and
             // renders a clickable "Order" badge; a trade with no order shows none.
@@ -612,9 +615,10 @@ class AccountTransactionsScreenTest {
             waitForIdle()
             assertEquals(orderId, clicked)
         }
+    }
 
     @Test
-    fun sameAccountTrade_rendersBothAssetLegs_withoutDuplicateListKeys() =
+    fun sameAccountTrade_rendersBothAssetLegs_withoutDuplicateListKeys() {
         runMoneyManagerComposeUiTest {
             // A trade inside one account (e.g. BTC→USD on an exchange) produces two running-balance
             // rows with the same transaction AND account ids, differing only in asset. The list key
@@ -687,9 +691,10 @@ class AccountTransactionsScreenTest {
             // Both legs carry the trade type icon in the type column.
             onAllNodesWithContentDescription("Trade").assertCountEquals(2)
         }
+    }
 
     @Test
-    fun passThroughBadges_distinguishFundingAndSpend_andEachLinksToTheOther() =
+    fun passThroughBadges_distinguishFundingAndSpend_andEachLinksToTheOther() {
         runMoneyManagerComposeUiTest {
             val now = Clock.System.now()
             val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
@@ -760,9 +765,10 @@ class AccountTransactionsScreenTest {
             waitForIdle()
             assertEquals(fundingId, linkClicked)
         }
+    }
 
     @Test
-    fun clickingFeeBadge_whenLinkedTransferAlreadyInList_doesNotNavigate() =
+    fun clickingFeeBadge_whenLinkedTransferAlreadyInList_doesNotNavigate() {
         runMoneyManagerComposeUiTest {
             // Given: an account showing both a transaction and its linked fee (both fit on screen).
             val now = Clock.System.now()
@@ -824,6 +830,7 @@ class AccountTransactionsScreenTest {
             // Then: it's handled in place (highlight) — no navigation to another screen.
             assertEquals(false, navigated)
         }
+    }
 
     @Test
     fun editTransaction_addNewAttribute_savesAttributeSuccessfully() {

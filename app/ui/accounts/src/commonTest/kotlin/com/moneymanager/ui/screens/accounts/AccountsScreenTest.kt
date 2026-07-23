@@ -41,7 +41,7 @@ import kotlin.time.Duration
 
 class AccountsScreenTest {
     @Test
-    fun accountsScreen_displaysEmptyState_whenNoAccounts() =
+    fun accountsScreen_displaysEmptyState_whenNoAccounts() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createAccountRepository(emptyList())
@@ -68,9 +68,10 @@ class AccountsScreenTest {
             onNodeWithText("Your Accounts").assertIsDisplayed()
             onNodeWithText("No accounts yet. Add your first account!").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun accountsScreen_displaysAccounts_whenAccountsExist() =
+    fun accountsScreen_displaysAccounts_whenAccountsExist() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -111,9 +112,10 @@ class AccountsScreenTest {
             onNodeWithText("Checking Account").assertIsDisplayed()
             onNodeWithText("Savings Account").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun accountsScreen_displaysAddAccountButton() =
+    fun accountsScreen_displaysAddAccountButton() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createAccountRepository(emptyList())
@@ -139,9 +141,10 @@ class AccountsScreenTest {
             // Then
             onNodeWithText("+ Add Account").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun accountsScreen_opensCreateDialog_whenAddAccountClicked() =
+    fun accountsScreen_opensCreateDialog_whenAddAccountClicked() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createAccountRepository(emptyList())
@@ -170,9 +173,10 @@ class AccountsScreenTest {
             onNodeWithText("Create New Account").assertIsDisplayed()
             onNodeWithText("Account Name").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun createAccountDialog_addsOwnersFromDropdown() =
+    fun createAccountDialog_addsOwnersFromDropdown() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createAccountRepository(emptyList())
@@ -208,9 +212,10 @@ class AccountsScreenTest {
             // Then
             onNodeWithText("Remove").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun accountCard_displaysAccountInformation() =
+    fun accountCard_displaysAccountInformation() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -243,9 +248,10 @@ class AccountsScreenTest {
             // Then
             onNodeWithText("My Checking").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun accountCard_opensDeleteDialog_whenDeleteButtonClicked() =
+    fun accountCard_opensDeleteDialog_whenDeleteButtonClicked() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -282,9 +288,10 @@ class AccountsScreenTest {
             onNodeWithText("Delete Account?").assertIsDisplayed()
             onNodeWithText("Are you sure you want to delete \"Test Account\"?").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun createAccountDialog_validatesRequiredFields() =
+    fun createAccountDialog_validatesRequiredFields() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createAccountRepository(emptyList())
@@ -316,9 +323,10 @@ class AccountsScreenTest {
             // Then
             onNodeWithText("Account name is required").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun createAccountDialog_canBeDismissed() =
+    fun createAccountDialog_canBeDismissed() {
         runMoneyManagerComposeUiTest {
             // Given
             val repository = createAccountRepository(emptyList())
@@ -351,9 +359,10 @@ class AccountsScreenTest {
             // Then - dialog should be dismissed
             onNodeWithText("Create New Account").assertDoesNotExist()
         }
+    }
 
     @Test
-    fun deleteAccountDialog_canBeDismissed() =
+    fun deleteAccountDialog_canBeDismissed() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -393,9 +402,10 @@ class AccountsScreenTest {
             // Then - dialog should be dismissed
             onNodeWithText("Delete Account?").assertDoesNotExist()
         }
+    }
 
     @Test
-    fun accountsScreen_displaysMultipleAccounts() =
+    fun accountsScreen_displaysMultipleAccounts() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -442,9 +452,10 @@ class AccountsScreenTest {
             onNodeWithText("Account 2").assertIsDisplayed()
             onNodeWithText("Account 3").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun accountsScreen_displaysNameSearchField_whenAccountsExist() =
+    fun accountsScreen_displaysNameSearchField_whenAccountsExist() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -475,9 +486,10 @@ class AccountsScreenTest {
             // Then - the name search field should be present
             onNodeWithText("Search accounts").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun accountsScreen_nameFilter_hidesNonMatchingAccounts() =
+    fun accountsScreen_nameFilter_hidesNonMatchingAccounts() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -515,9 +527,10 @@ class AccountsScreenTest {
             onNodeWithText("Savings Account").assertIsDisplayed()
             onNodeWithText("Crypto Wallet").assertDoesNotExist()
         }
+    }
 
     @Test
-    fun accountsScreen_nameFilter_isCaseInsensitive() =
+    fun accountsScreen_nameFilter_isCaseInsensitive() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -553,9 +566,10 @@ class AccountsScreenTest {
             onNodeWithText("My Checking").assertIsDisplayed()
             onNodeWithText("My Savings").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun accountsScreen_nameFilter_showsEmptyMessage_whenNoMatch() =
+    fun accountsScreen_nameFilter_showsEmptyMessage_whenNoMatch() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -588,9 +602,10 @@ class AccountsScreenTest {
             // Then - empty-filter message is shown
             onNodeWithText("No accounts match the current filters.").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun accountsScreen_assetFilter_isDisplayed_whenAccountsHaveBalances() =
+    fun accountsScreen_assetFilter_isDisplayed_whenAccountsHaveBalances() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -620,9 +635,10 @@ class AccountsScreenTest {
             // Then - the asset filter dropdown should be visible
             onNodeWithText("Filter by asset").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun accountsScreen_assetFilter_hidesAccountsWithoutSelectedAsset() =
+    fun accountsScreen_assetFilter_hidesAccountsWithoutSelectedAsset() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -663,9 +679,10 @@ class AccountsScreenTest {
             onNodeWithText("GBP Checking").assertIsDisplayed()
             onNodeWithText("USD Savings").assertDoesNotExist()
         }
+    }
 
     @Test
-    fun accountsScreen_assetFilter_search_filtersByCodeCaseInsensitive() =
+    fun accountsScreen_assetFilter_search_filtersByCodeCaseInsensitive() {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
@@ -709,6 +726,7 @@ class AccountsScreenTest {
             onNodeWithText("GBP — British Pound").assertIsDisplayed()
             onNodeWithText("USD — US Dollar").assertDoesNotExist()
         }
+    }
 
     private fun createAccountRepository(accounts: List<Account>): AccountWriteRepository =
         mock(MockMode.autoUnit) {

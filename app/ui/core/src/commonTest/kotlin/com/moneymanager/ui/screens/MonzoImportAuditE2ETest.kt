@@ -134,7 +134,7 @@ class MonzoImportAuditE2ETest {
     }
 
     @Test
-    fun `imported account audit history shows API Import source and navigates to API traffic`() =
+    fun `imported account audit history shows API Import source and navigates to API traffic`() {
         runMoneyManagerComposeUiTest {
             // Pre-populate: run the full download + import before the UI launches
             testDbLocation = createTestDatabaseLocation()
@@ -259,4 +259,5 @@ class MonzoImportAuditE2ETest {
             waitUntilAtLeastOneExists(hasText("API Import"), timeoutMillis = 10000)
             waitUntilDoesNotExist(hasText("Source data missing"), timeoutMillis = 3000)
         }
+    }
 }

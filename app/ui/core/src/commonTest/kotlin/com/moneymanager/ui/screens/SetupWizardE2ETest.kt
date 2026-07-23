@@ -40,7 +40,7 @@ class SetupWizardE2ETest {
     }
 
     @Test
-    fun setupWizard_runsOnAFreshDatabase_andFinishingRecordsItAndOpensTheApp() =
+    fun setupWizard_runsOnAFreshDatabase_andFinishingRecordsItAndOpensTheApp() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -69,9 +69,10 @@ class SetupWizardE2ETest {
 
             assertTrue(readSetupWizardCompleted(databaseManager, testDbLocation!!))
         }
+    }
 
     @Test
-    fun setupWizard_canBeSkippedEntirely() =
+    fun setupWizard_canBeSkippedEntirely() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -96,6 +97,7 @@ class SetupWizardE2ETest {
             // Skipping is remembered too: the wizard must not ambush the user on every launch.
             assertTrue(readSetupWizardCompleted(databaseManager, testDbLocation!!))
         }
+    }
 
     private fun readSetupWizardCompleted(
         databaseManager: DatabaseManager,

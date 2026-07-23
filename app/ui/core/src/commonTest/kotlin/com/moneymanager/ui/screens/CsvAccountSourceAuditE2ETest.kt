@@ -69,7 +69,7 @@ class CsvAccountSourceAuditE2ETest {
     }
 
     @Test
-    fun `csv imported account audit shows clickable CSV source linking to its row`() =
+    fun `csv imported account audit shows clickable CSV source linking to its row`() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -188,6 +188,7 @@ class CsvAccountSourceAuditE2ETest {
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("1 rows", substring = true), timeoutMillis = 10000)
         }
+    }
 
     private fun createStrategy(
         sourceAccountId: AccountId,

@@ -200,104 +200,120 @@ internal fun TransactionMappingsFields(
     onChange: (ApiTransactionMappings) -> Unit,
     enabled: Boolean,
 ) {
-    val m = mappings
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextFieldRow("Amount field", m.amountField, { onChange(m.copy(amountField = it)) }, enabled, isError = m.amountField.isBlank())
+        TextFieldRow(
+            "Amount field",
+            mappings.amountField,
+            { onChange(mappings.copy(amountField = it)) },
+            enabled,
+            isError = mappings.amountField.isBlank(),
+        )
         TextFieldRow(
             "Timestamp field",
-            m.timestampField,
-            { onChange(m.copy(timestampField = it)) },
+            mappings.timestampField,
+            { onChange(mappings.copy(timestampField = it)) },
             enabled,
-            isError = m.timestampField.isBlank(),
+            isError = mappings.timestampField.isBlank(),
         )
         TextFieldRow(
             "Currency field",
-            m.currencyField,
-            { onChange(m.copy(currencyField = it)) },
+            mappings.currencyField,
+            { onChange(mappings.copy(currencyField = it)) },
             enabled,
-            isError = m.currencyField.isBlank(),
+            isError = mappings.currencyField.isBlank(),
         )
-        TextFieldRow("Description field", m.descriptionField, {
-            onChange(m.copy(descriptionField = it))
-        }, enabled, isError = m.descriptionField.isBlank())
-        TextFieldRow("Transaction ID field", m.idField, { onChange(m.copy(idField = it)) }, enabled, isError = m.idField.isBlank())
+        TextFieldRow("Description field", mappings.descriptionField, {
+            onChange(mappings.copy(descriptionField = it))
+        }, enabled, isError = mappings.descriptionField.isBlank())
+        TextFieldRow(
+            "Transaction ID field",
+            mappings.idField,
+            { onChange(mappings.copy(idField = it)) },
+            enabled,
+            isError = mappings.idField.isBlank(),
+        )
         EnumDropdown(
             label = "Amount format",
             options = ApiAmountFormat.entries,
-            selected = m.amountFormat,
-            onSelect = { onChange(m.copy(amountFormat = it)) },
+            selected = mappings.amountFormat,
+            onSelect = { onChange(mappings.copy(amountFormat = it)) },
             optionLabel = { it.name },
             enabled = enabled,
         )
         EnumDropdown(
             label = "Timestamp format",
             options = TimestampFormat.entries,
-            selected = m.timestampFormat,
-            onSelect = { onChange(m.copy(timestampFormat = it)) },
+            selected = mappings.timestampFormat,
+            onSelect = { onChange(mappings.copy(timestampFormat = it)) },
             optionLabel = { it.name },
             enabled = enabled,
         )
         EnumDropdown(
             label = "Sign source",
             options = ApiSignSource.entries,
-            selected = m.signSource,
-            onSelect = { onChange(m.copy(signSource = it)) },
+            selected = mappings.signSource,
+            onSelect = { onChange(mappings.copy(signSource = it)) },
             optionLabel = { it.name },
             enabled = enabled,
         )
-        if (m.signSource == ApiSignSource.FIELD) {
-            TextFieldRow("Sign field", m.signField.orEmpty(), { onChange(m.copy(signField = it.ifBlank { null })) }, enabled)
+        if (mappings.signSource == ApiSignSource.FIELD) {
+            TextFieldRow("Sign field", mappings.signField.orEmpty(), { onChange(mappings.copy(signField = it.ifBlank { null })) }, enabled)
             StringSetEditor(
                 label = "Credit values (mean incoming/positive)",
-                values = m.creditValues,
-                onChange = { onChange(m.copy(creditValues = it)) },
+                values = mappings.creditValues,
+                onChange = { onChange(mappings.copy(creditValues = it)) },
                 enabled = enabled,
             )
         }
         TextFieldRow(
             "Fee amount field (optional)",
-            m.feeAmountField.orEmpty(),
-            { onChange(m.copy(feeAmountField = it.ifBlank { null })) },
+            mappings.feeAmountField.orEmpty(),
+            { onChange(mappings.copy(feeAmountField = it.ifBlank { null })) },
             enabled,
         )
-        TextFieldRow("Fee currency field (optional)", m.feeCurrencyField.orEmpty(), {
-            onChange(m.copy(feeCurrencyField = it.ifBlank { null }))
+        TextFieldRow("Fee currency field (optional)", mappings.feeCurrencyField.orEmpty(), {
+            onChange(mappings.copy(feeCurrencyField = it.ifBlank { null }))
         }, enabled)
         TextFieldRow(
             "Counterparty name field (optional)",
-            m.counterpartyNameField.orEmpty(),
-            { onChange(m.copy(counterpartyNameField = it.ifBlank { null })) },
+            mappings.counterpartyNameField.orEmpty(),
+            { onChange(mappings.copy(counterpartyNameField = it.ifBlank { null })) },
             enabled,
         )
-        TextFieldRow("Txid field (optional)", m.txidField.orEmpty(), { onChange(m.copy(txidField = it.ifBlank { null })) }, enabled)
+        TextFieldRow(
+            "Txid field (optional)",
+            mappings.txidField.orEmpty(),
+            { onChange(mappings.copy(txidField = it.ifBlank { null })) },
+            enabled,
+        )
         TextFieldRow(
             "Counterparty address field (optional)",
-            m.counterpartyAddressField.orEmpty(),
-            { onChange(m.copy(counterpartyAddressField = it.ifBlank { null })) },
+            mappings.counterpartyAddressField.orEmpty(),
+            { onChange(mappings.copy(counterpartyAddressField = it.ifBlank { null })) },
             enabled,
         )
         TextFieldRow(
             "Counterparty network field (optional)",
-            m.counterpartyNetworkField.orEmpty(),
-            { onChange(m.copy(counterpartyNetworkField = it.ifBlank { null })) },
+            mappings.counterpartyNetworkField.orEmpty(),
+            { onChange(mappings.copy(counterpartyNetworkField = it.ifBlank { null })) },
             enabled,
         )
         TextFieldRow(
             "Join key field (optional, matches an enrichesTransfers endpoint's id)",
-            m.joinKeyField.orEmpty(),
-            { onChange(m.copy(joinKeyField = it.ifBlank { null })) },
+            mappings.joinKeyField.orEmpty(),
+            { onChange(mappings.copy(joinKeyField = it.ifBlank { null })) },
             enabled,
         )
         TextFieldRow(
             "Counterparty alias field (optional, e.g. address)",
-            m.counterpartyAliasField.orEmpty(),
-            { onChange(m.copy(counterpartyAliasField = it.ifBlank { null })) },
+            mappings.counterpartyAliasField.orEmpty(),
+            { onChange(mappings.copy(counterpartyAliasField = it.ifBlank { null })) },
             enabled,
         )
         StringMapEditor(
             label = "Counterparty account aliases (alias value -> owned account name)",
-            entries = m.counterpartyAccountAliases,
-            onChange = { onChange(m.copy(counterpartyAccountAliases = it)) },
+            entries = mappings.counterpartyAccountAliases,
+            onChange = { onChange(mappings.copy(counterpartyAccountAliases = it)) },
             keyLabel = "Alias value",
             valueLabel = "Account name",
             enabled = enabled,
@@ -312,110 +328,136 @@ internal fun TradeMappingsEditor(
     onChange: (ApiTradeMappings) -> Unit,
     enabled: Boolean,
 ) {
-    val m = mappings
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextFieldRow("Instrument field", m.instrumentField, {
-            onChange(m.copy(instrumentField = it))
-        }, enabled, isError = m.instrumentField.isBlank())
+        TextFieldRow("Instrument field", mappings.instrumentField, {
+            onChange(mappings.copy(instrumentField = it))
+        }, enabled, isError = mappings.instrumentField.isBlank())
         EnumDropdown(
             label = "Instrument split mode",
             options = InstrumentSplitMode.entries,
-            selected = m.splitMode,
-            onSelect = { onChange(m.copy(splitMode = it)) },
+            selected = mappings.splitMode,
+            onSelect = { onChange(mappings.copy(splitMode = it)) },
             optionLabel = { it.name },
             enabled = enabled,
         )
-        when (m.splitMode) {
+        when (mappings.splitMode) {
             InstrumentSplitMode.SEPARATOR ->
-                TextFieldRow("Instrument separator", m.instrumentSeparator, { onChange(m.copy(instrumentSeparator = it)) }, enabled)
+                TextFieldRow(
+                    "Instrument separator",
+                    mappings.instrumentSeparator,
+                    { onChange(mappings.copy(instrumentSeparator = it)) },
+                    enabled,
+                )
             InstrumentSplitMode.EXPLICIT_FIELDS -> {
                 TextFieldRow(
                     "Base asset field",
-                    m.baseAssetField.orEmpty(),
-                    { onChange(m.copy(baseAssetField = it.ifBlank { null })) },
+                    mappings.baseAssetField.orEmpty(),
+                    { onChange(mappings.copy(baseAssetField = it.ifBlank { null })) },
                     enabled,
                 )
                 TextFieldRow(
                     "Quote asset field",
-                    m.quoteAssetField.orEmpty(),
-                    { onChange(m.copy(quoteAssetField = it.ifBlank { null })) },
+                    mappings.quoteAssetField.orEmpty(),
+                    { onChange(mappings.copy(quoteAssetField = it.ifBlank { null })) },
                     enabled,
                 )
             }
             InstrumentSplitMode.QUOTE_SUFFIX ->
                 StringSetEditor(
                     label = "Known quote assets (longest match wins)",
-                    values = m.quoteAssets.toSet(),
-                    onChange = { onChange(m.copy(quoteAssets = it.toList())) },
+                    values = mappings.quoteAssets.toSet(),
+                    onChange = { onChange(mappings.copy(quoteAssets = it.toList())) },
                     enabled = enabled,
                 )
         }
-        TextFieldRow("Side field", m.sideField, { onChange(m.copy(sideField = it)) }, enabled, isError = m.sideField.isBlank())
+        TextFieldRow(
+            "Side field",
+            mappings.sideField,
+            { onChange(mappings.copy(sideField = it)) },
+            enabled,
+            isError = mappings.sideField.isBlank(),
+        )
         StringSetEditor(
             label = "Buy values (mean BUY side)",
-            values = m.buyValues,
-            onChange = { onChange(m.copy(buyValues = it)) },
+            values = mappings.buyValues,
+            onChange = { onChange(mappings.copy(buyValues = it)) },
             enabled = enabled,
         )
-        TextFieldRow("Base quantity field", m.baseQuantityField, {
-            onChange(m.copy(baseQuantityField = it))
-        }, enabled, isError = m.baseQuantityField.isBlank())
-        TextFieldRow("Price field (optional)", m.priceField.orEmpty(), { onChange(m.copy(priceField = it.ifBlank { null })) }, enabled)
-        TextFieldRow("Quote quantity field (optional)", m.quoteQuantityField.orEmpty(), {
-            onChange(m.copy(quoteQuantityField = it.ifBlank { null }))
+        TextFieldRow("Base quantity field", mappings.baseQuantityField, {
+            onChange(mappings.copy(baseQuantityField = it))
+        }, enabled, isError = mappings.baseQuantityField.isBlank())
+        TextFieldRow(
+            "Price field (optional)",
+            mappings.priceField.orEmpty(),
+            { onChange(mappings.copy(priceField = it.ifBlank { null })) },
+            enabled,
+        )
+        TextFieldRow("Quote quantity field (optional)", mappings.quoteQuantityField.orEmpty(), {
+            onChange(mappings.copy(quoteQuantityField = it.ifBlank { null }))
         }, enabled)
-        TextFieldRow("Fee field (optional)", m.feeField.orEmpty(), { onChange(m.copy(feeField = it.ifBlank { null })) }, enabled)
-        TextFieldRow("Fee currency field (optional)", m.feeCurrencyField.orEmpty(), {
-            onChange(m.copy(feeCurrencyField = it.ifBlank { null }))
+        TextFieldRow(
+            "Fee field (optional)",
+            mappings.feeField.orEmpty(),
+            { onChange(mappings.copy(feeField = it.ifBlank { null })) },
+            enabled,
+        )
+        TextFieldRow("Fee currency field (optional)", mappings.feeCurrencyField.orEmpty(), {
+            onChange(mappings.copy(feeCurrencyField = it.ifBlank { null }))
         }, enabled)
         TextFieldRow(
             "Timestamp field",
-            m.timestampField,
-            { onChange(m.copy(timestampField = it)) },
+            mappings.timestampField,
+            { onChange(mappings.copy(timestampField = it)) },
             enabled,
-            isError = m.timestampField.isBlank(),
+            isError = mappings.timestampField.isBlank(),
         )
         EnumDropdown(
             label = "Timestamp format",
             options = TimestampFormat.entries,
-            selected = m.timestampFormat,
-            onSelect = { onChange(m.copy(timestampFormat = it)) },
+            selected = mappings.timestampFormat,
+            onSelect = { onChange(mappings.copy(timestampFormat = it)) },
             optionLabel = { it.name },
             enabled = enabled,
         )
-        TextFieldRow("Trade ID field", m.idField, { onChange(m.copy(idField = it)) }, enabled, isError = m.idField.isBlank())
+        TextFieldRow(
+            "Trade ID field",
+            mappings.idField,
+            { onChange(mappings.copy(idField = it)) },
+            enabled,
+            isError = mappings.idField.isBlank(),
+        )
         TextFieldRow(
             "Order ID field (optional)",
-            m.orderIdField.orEmpty(),
-            { onChange(m.copy(orderIdField = it.ifBlank { null })) },
+            mappings.orderIdField.orEmpty(),
+            { onChange(mappings.copy(orderIdField = it.ifBlank { null })) },
             enabled,
         )
-        TextFieldRow("Description field (optional)", m.descriptionField.orEmpty(), {
-            onChange(m.copy(descriptionField = it.ifBlank { null }))
+        TextFieldRow("Description field (optional)", mappings.descriptionField.orEmpty(), {
+            onChange(mappings.copy(descriptionField = it.ifBlank { null }))
         }, enabled)
         TextFieldRow(
             "Order type field (optional)",
-            m.orderTypeField.orEmpty(),
-            { onChange(m.copy(orderTypeField = it.ifBlank { null })) },
+            mappings.orderTypeField.orEmpty(),
+            { onChange(mappings.copy(orderTypeField = it.ifBlank { null })) },
             enabled,
         )
-        TextFieldRow("Order status field (optional)", m.orderStatusField.orEmpty(), {
-            onChange(m.copy(orderStatusField = it.ifBlank { null }))
+        TextFieldRow("Order status field (optional)", mappings.orderStatusField.orEmpty(), {
+            onChange(mappings.copy(orderStatusField = it.ifBlank { null }))
         }, enabled)
-        TextFieldRow("Limit price field (optional)", m.limitPriceField.orEmpty(), {
-            onChange(m.copy(limitPriceField = it.ifBlank { null }))
+        TextFieldRow("Limit price field (optional)", mappings.limitPriceField.orEmpty(), {
+            onChange(mappings.copy(limitPriceField = it.ifBlank { null }))
         }, enabled)
-        TextFieldRow("Average price field (optional)", m.avgPriceField.orEmpty(), {
-            onChange(m.copy(avgPriceField = it.ifBlank { null }))
+        TextFieldRow("Average price field (optional)", mappings.avgPriceField.orEmpty(), {
+            onChange(mappings.copy(avgPriceField = it.ifBlank { null }))
         }, enabled)
-        TextFieldRow("Update timestamp field (optional)", m.updateTimestampField.orEmpty(), {
-            onChange(m.copy(updateTimestampField = it.ifBlank { null }))
+        TextFieldRow("Update timestamp field (optional)", mappings.updateTimestampField.orEmpty(), {
+            onChange(mappings.copy(updateTimestampField = it.ifBlank { null }))
         }, enabled)
-        TextFieldRow("Client order id field (optional)", m.clientOidField.orEmpty(), {
-            onChange(m.copy(clientOidField = it.ifBlank { null }))
+        TextFieldRow("Client order id field (optional)", mappings.clientOidField.orEmpty(), {
+            onChange(mappings.copy(clientOidField = it.ifBlank { null }))
         }, enabled)
-        TextFieldRow("Time-in-force field (optional)", m.timeInForceField.orEmpty(), {
-            onChange(m.copy(timeInForceField = it.ifBlank { null }))
+        TextFieldRow("Time-in-force field (optional)", mappings.timeInForceField.orEmpty(), {
+            onChange(mappings.copy(timeInForceField = it.ifBlank { null }))
         }, enabled)
     }
 }

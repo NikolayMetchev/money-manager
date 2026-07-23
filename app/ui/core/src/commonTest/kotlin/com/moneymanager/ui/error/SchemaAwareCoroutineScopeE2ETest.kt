@@ -42,7 +42,7 @@ class SchemaAwareCoroutineScopeE2ETest {
     }
 
     @Test
-    fun schemaAwareScope_showsSchemaErrorDialog_whenCsvTableHasOldSchema() =
+    fun schemaAwareScope_showsSchemaErrorDialog_whenCsvTableHasOldSchema() {
         runMoneyManagerComposeUiTest {
             // Given: Copy the test database with old CSV schema to a test location
             // Note: Old databases are missing Device/Platform tables, so schema error
@@ -70,9 +70,10 @@ class SchemaAwareCoroutineScopeE2ETest {
             // The error message should mention a missing table
             onNodeWithText(text = "no such table", substring = true).assertIsDisplayed()
         }
+    }
 
     @Test
-    fun schemaAwareScope_allowsRecovery_whenCsvTableHasOldSchema() =
+    fun schemaAwareScope_allowsRecovery_whenCsvTableHasOldSchema() {
         runMoneyManagerComposeUiTest {
             // Given: Copy the test database with old schema to a test location
             // Note: Old databases are missing Device/Platform tables, so schema error
@@ -111,6 +112,7 @@ class SchemaAwareCoroutineScopeE2ETest {
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
             waitForIdle()
         }
+    }
 }
 
 /**

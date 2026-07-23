@@ -9,7 +9,7 @@ import kotlin.test.Test
 
 class ErrorScreenTest {
     @Test
-    fun errorScreen_displaysErrorMessage() =
+    fun errorScreen_displaysErrorMessage() {
         runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = "Database connection failed"
@@ -27,9 +27,10 @@ class ErrorScreenTest {
             onNodeWithText("The application failed to initialize:").assertIsDisplayed()
             onNodeWithText(errorMessage).assertIsDisplayed()
         }
+    }
 
     @Test
-    fun errorScreen_displaysFullException_whenProvided() =
+    fun errorScreen_displaysFullException_whenProvided() {
         runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = "Database connection failed"
@@ -47,9 +48,10 @@ class ErrorScreenTest {
             onNodeWithText("Exception Details:").assertIsDisplayed()
             onNodeWithText(fullException, substring = true).assertIsDisplayed()
         }
+    }
 
     @Test
-    fun errorScreen_doesNotDisplayExceptionDetails_whenNotProvided() =
+    fun errorScreen_doesNotDisplayExceptionDetails_whenNotProvided() {
         runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = "Database connection failed"
@@ -65,9 +67,10 @@ class ErrorScreenTest {
             // Then
             onNodeWithText("Exception Details:").assertDoesNotExist()
         }
+    }
 
     @Test
-    fun errorScreen_truncatesLongExceptions() =
+    fun errorScreen_truncatesLongExceptions() {
         runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = "Database connection failed"
@@ -87,9 +90,10 @@ class ErrorScreenTest {
             val expectedTruncated = longException.take(500) + "..."
             onNodeWithText(expectedTruncated).assertIsDisplayed()
         }
+    }
 
     @Test
-    fun errorScreen_displaysMultilineErrorMessage() =
+    fun errorScreen_displaysMultilineErrorMessage() {
         runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = "Database connection failed\nPlease check your connection settings"
@@ -105,9 +109,10 @@ class ErrorScreenTest {
             // Then
             onNodeWithText(errorMessage).assertIsDisplayed()
         }
+    }
 
     @Test
-    fun errorScreen_handlesEmptyErrorMessage() =
+    fun errorScreen_handlesEmptyErrorMessage() {
         runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = ""
@@ -124,4 +129,5 @@ class ErrorScreenTest {
             onNodeWithText("Application Error").assertIsDisplayed()
             onNodeWithText("The application failed to initialize:").assertIsDisplayed()
         }
+    }
 }

@@ -29,7 +29,7 @@ class CurrenciesScreenTest {
         }
 
     @Test
-    fun currenciesScreen_displaysEmptyState_whenNoCurrencies() =
+    fun currenciesScreen_displaysEmptyState_whenNoCurrencies() {
         runMoneyManagerComposeUiTest {
             val repository = createCurrencyRepository(emptyList())
 
@@ -43,9 +43,10 @@ class CurrenciesScreenTest {
 
             onNodeWithText("No currencies yet. Add your first currency!").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun currenciesScreen_displaysCurrencies_whenCurrenciesExist() =
+    fun currenciesScreen_displaysCurrencies_whenCurrenciesExist() {
         runMoneyManagerComposeUiTest {
             val testCurrency =
                 Currency(
@@ -66,9 +67,10 @@ class CurrenciesScreenTest {
             onNodeWithText("USD").assertIsDisplayed()
             onNodeWithText("US Dollar").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun currenciesScreen_displaysMultipleCurrencies() =
+    fun currenciesScreen_displaysMultipleCurrencies() {
         runMoneyManagerComposeUiTest {
             val currencies =
                 listOf(
@@ -93,9 +95,10 @@ class CurrenciesScreenTest {
             onNodeWithText("GBP").assertIsDisplayed()
             onNodeWithText("British Pound").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun currenciesScreen_opensCreateDialog_whenFabClicked() =
+    fun currenciesScreen_opensCreateDialog_whenFabClicked() {
         runMoneyManagerComposeUiTest {
             val repository = createCurrencyRepository(emptyList())
 
@@ -111,9 +114,10 @@ class CurrenciesScreenTest {
 
             onNodeWithText("Create New Currency").assertIsDisplayed()
         }
+    }
 
     @Test
-    fun createCurrencyDialog_showsValidationError_whenCodeIsEmpty() =
+    fun createCurrencyDialog_showsValidationError_whenCodeIsEmpty() {
         runMoneyManagerComposeUiTest {
             val repository = createCurrencyRepository(emptyList())
 
@@ -130,4 +134,5 @@ class CurrenciesScreenTest {
 
             onNodeWithText("Currency code is required").assertIsDisplayed()
         }
+    }
 }
