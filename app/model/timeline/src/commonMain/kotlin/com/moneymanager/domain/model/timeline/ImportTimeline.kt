@@ -2,6 +2,7 @@
 
 package com.moneymanager.domain.model.timeline
 
+import com.moneymanager.domain.model.AccountId
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -28,4 +29,6 @@ data class ImportFileDateRange(
     val earliest: Instant,
     val latest: Instant,
     val transactionCount: Long,
+    /** Set only for account-grouped ranges: one of the two accounts a transfer leg touched. */
+    val accountId: AccountId? = null,
 )

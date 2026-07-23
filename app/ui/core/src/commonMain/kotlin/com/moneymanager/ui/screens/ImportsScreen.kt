@@ -34,6 +34,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
@@ -82,6 +83,7 @@ fun ImportsScreen(
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     personRepository: PersonReadRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     importEngine: ImportEngine,
     deviceId: DeviceId,
     onCsvImportClick: (CsvImportId) -> Unit,
@@ -225,6 +227,9 @@ fun ImportsScreen(
             ImportTab.TIMELINE ->
                 ImportTimelineScreen(
                     importTimelineRepository = importTimelineRepository,
+                    accountRepository = accountRepository,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                     onOpenFile = onTimelineFileClick,
                 )
         }

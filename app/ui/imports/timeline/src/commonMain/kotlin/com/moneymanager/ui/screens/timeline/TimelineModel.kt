@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens.timeline
 
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import kotlinx.datetime.LocalDate
@@ -9,6 +10,38 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
+
+/** Which dimension timeline rows are grouped by. */
+enum class TimelineGroupMode {
+    STRATEGY,
+    ACCOUNT,
+}
+
+/**
+ * Narrows account-grouped ranges (see [TimelineGroupMode.ACCOUNT]) to those whose account matches
+ * both [nameFilter] (case-insensitive substring of the account name) and [selectedOwnerIds] (a
+ * range's account must have at least one of the selected owners; an empty selection matches
+ * everything) — the same two filters as the Accounts screen. A range whose account is unknown
+ * (missing from [accountNameById]) never matches a non-blank [nameFilter] or a non-empty owner
+ * selection.
+ */
+fun filterAccountRanges(
+    ranges: List<ImportFileDateRange>,
+    accountNameById: Map<AccountId, String>,
+    nameFilter: String,
+    selectedOwnerIds: Set<Long>,
+    ownerIdsByAccount: Map<AccountId, Set<Long>>,
+): List<ImportFileDateRange> =
+    ranges.filter { range ->
+        val accountId = range.accountId
+        val matchesName =
+            nameFilter.isBlank() ||
+                (accountId != null && accountNameById[accountId]?.contains(nameFilter, ignoreCase = true) == true)
+        val matchesOwner =
+            selectedOwnerIds.isEmpty() ||
+                (accountId != null && ownerIdsByAccount[accountId].orEmpty().any { it in selectedOwnerIds })
+        matchesName && matchesOwner
+    }
 
 /** One file/session bar inside a timeline row, in local epoch days (inclusive on both ends). */
 data class TimelineFile(
@@ -47,14 +80,24 @@ data class TimelineMatrix(
 
 private const val MANUAL_ROW_LABEL = "Manual entries"
 private const val UNKNOWN_STRATEGY_LABEL = "Unknown strategy"
+private const val UNKNOWN_ACCOUNT_LABEL = "Unknown account"
 
 /**
- * Groups per-file date ranges into timeline rows keyed by strategy name. CSV and QIF files that
- * share a strategy land in the same row (QIF reuses CSV strategies — one strategy is one logical
- * source, and a CSV+QIF export of the same period should show up as overlap, not as two rows).
- * Strategy names are per-application snapshots, so files imported before and after a strategy
- * rename split into separate rows. API sessions group by API strategy name, falling back to the
- * session type for legacy strategy-less sessions. The manual aggregate gets its own last row.
+ * Groups per-file date ranges into timeline rows keyed by strategy name ([TimelineGroupMode.STRATEGY])
+ * or by account name ([TimelineGroupMode.ACCOUNT]).
+ *
+ * In [TimelineGroupMode.STRATEGY]: CSV and QIF files that share a strategy land in the same row
+ * (QIF reuses CSV strategies — one strategy is one logical source, and a CSV+QIF export of the
+ * same period should show up as overlap, not as two rows). Strategy names are per-application
+ * snapshots, so files imported before and after a strategy rename split into separate rows. API
+ * sessions group by API strategy name, falling back to the session type for legacy strategy-less
+ * sessions. The manual aggregate gets its own last row.
+ *
+ * In [TimelineGroupMode.ACCOUNT]: every transfer touches two accounts, so [ranges] is expected to
+ * already be the account-unpivoted form (one entry per file/session/manual *and* touched account —
+ * see `ImportTimelineReadRepository.getAllAccountRanges`), and rows are keyed by [accountNameById]
+ * looked up from `range.accountId`. A file whose transfers touch several accounts naturally lands
+ * in several rows, one per account.
  *
  * The axis spans the earliest transaction anywhere up to [todayDay]. A row whose coverage starts
  * later than the axis gets a leading gap, and one whose coverage stops before today gets a
@@ -64,6 +107,8 @@ fun buildTimelineMatrix(
     ranges: List<ImportFileDateRange>,
     timeZone: TimeZone,
     todayDay: Long,
+    groupMode: TimelineGroupMode = TimelineGroupMode.STRATEGY,
+    accountNameById: Map<AccountId, String> = emptyMap(),
 ): TimelineMatrix? {
     if (ranges.isEmpty()) return null
     val files =
@@ -80,7 +125,7 @@ fun buildTimelineMatrix(
     val maxDay = maxOf(files.maxOf { it.endDay }, todayDay)
     val rows =
         files
-            .groupBy { rowLabel(it.range) }
+            .groupBy { rowLabel(it.range, groupMode, accountNameById) }
             .map { (label, rowFiles) ->
                 val segments = mergeIntervals(rowFiles)
                 TimelineRow(
@@ -90,7 +135,10 @@ fun buildTimelineMatrix(
                     gaps = leadingGap(segments, minDay) + gapsBetween(segments) + trailingGap(segments, maxDay),
                 )
             }.sortedWith(
-                compareBy({ it.files.first().kind == TimelineSourceKind.MANUAL }, { it.label.lowercase() }),
+                compareBy(
+                    { groupMode == TimelineGroupMode.STRATEGY && it.files.first().kind == TimelineSourceKind.MANUAL },
+                    { it.label.lowercase() },
+                ),
             )
     return TimelineMatrix(
         minDay = minDay,
@@ -125,11 +173,19 @@ private fun trailingGap(
     }
 }
 
-private fun rowLabel(range: ImportFileDateRange): String =
-    when (range.kind) {
-        TimelineSourceKind.MANUAL -> MANUAL_ROW_LABEL
-        TimelineSourceKind.API -> range.strategyName ?: UNKNOWN_STRATEGY_LABEL
-        TimelineSourceKind.CSV, TimelineSourceKind.QIF -> range.strategyName ?: UNKNOWN_STRATEGY_LABEL
+private fun rowLabel(
+    range: ImportFileDateRange,
+    groupMode: TimelineGroupMode,
+    accountNameById: Map<AccountId, String>,
+): String =
+    when (groupMode) {
+        TimelineGroupMode.ACCOUNT -> accountNameById[range.accountId] ?: UNKNOWN_ACCOUNT_LABEL
+        TimelineGroupMode.STRATEGY ->
+            when (range.kind) {
+                TimelineSourceKind.MANUAL -> MANUAL_ROW_LABEL
+                TimelineSourceKind.API -> range.strategyName ?: UNKNOWN_STRATEGY_LABEL
+                TimelineSourceKind.CSV, TimelineSourceKind.QIF -> range.strategyName ?: UNKNOWN_STRATEGY_LABEL
+            }
     }
 
 private fun fileLabel(

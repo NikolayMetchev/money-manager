@@ -22,4 +22,19 @@ interface ImportTimelineReadRepository {
 
     /** All of the above combined — the timeline screen's single input. */
     fun getAllDateRanges(): Flow<List<ImportFileDateRange>>
+
+    /** One entry per (CSV import, touched account) pair — a file touching several accounts repeats. */
+    fun getCsvImportAccountRanges(): Flow<List<ImportFileDateRange>>
+
+    /** One entry per (QIF import, touched account) pair. */
+    fun getQifImportAccountRanges(): Flow<List<ImportFileDateRange>>
+
+    /** One entry per (API session, touched account) pair. */
+    fun getApiSessionAccountRanges(): Flow<List<ImportFileDateRange>>
+
+    /** One entry per account touched by manually created transactions. */
+    fun getManualAccountRanges(): Flow<List<ImportFileDateRange>>
+
+    /** All of the above combined — the timeline screen's input for the account-grouped view. */
+    fun getAllAccountRanges(): Flow<List<ImportFileDateRange>>
 }

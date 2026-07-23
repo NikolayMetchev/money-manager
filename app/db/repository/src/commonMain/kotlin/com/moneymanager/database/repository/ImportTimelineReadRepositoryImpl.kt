@@ -6,6 +6,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOne
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
@@ -111,6 +112,98 @@ class ImportTimelineReadRepositoryImpl(
             csv + qif + api + listOfNotNull(manual)
         }
 
+    override fun getCsvImportAccountRanges(): Flow<List<ImportFileDateRange>> =
+        queries
+            .selectCsvImportAccountRanges()
+            .asFlow()
+            .mapToList(coroutineContext)
+            .map { rows ->
+                rows.map { row ->
+                    fileRange(
+                        kind = TimelineSourceKind.CSV,
+                        fileId = row.import_id,
+                        fileName = row.file_name,
+                        ignored = row.ignored,
+                        strategyName = null,
+                        earliestMs = row.earliest_ms,
+                        latestMs = row.latest_ms,
+                        transactionCount = row.transaction_count,
+                        accountId = AccountId(row.account_id),
+                    )
+                }
+            }
+
+    override fun getQifImportAccountRanges(): Flow<List<ImportFileDateRange>> =
+        queries
+            .selectQifImportAccountRanges()
+            .asFlow()
+            .mapToList(coroutineContext)
+            .map { rows ->
+                rows.map { row ->
+                    fileRange(
+                        kind = TimelineSourceKind.QIF,
+                        fileId = row.import_id,
+                        fileName = row.file_name,
+                        ignored = row.ignored,
+                        strategyName = null,
+                        earliestMs = row.earliest_ms,
+                        latestMs = row.latest_ms,
+                        transactionCount = row.transaction_count,
+                        accountId = AccountId(row.account_id),
+                    )
+                }
+            }
+
+    override fun getApiSessionAccountRanges(): Flow<List<ImportFileDateRange>> =
+        queries
+            .selectApiSessionAccountRanges()
+            .asFlow()
+            .mapToList(coroutineContext)
+            .map { rows ->
+                rows.map { row ->
+                    ImportFileDateRange(
+                        kind = TimelineSourceKind.API,
+                        fileId = row.session_id.toString(),
+                        fileName = "Session ${row.session_id}",
+                        strategyName = null,
+                        earliest = Instant.fromEpochMilliseconds(requireNotNull(row.earliest_ms)),
+                        latest = Instant.fromEpochMilliseconds(requireNotNull(row.latest_ms)),
+                        transactionCount = row.transaction_count,
+                        accountId = AccountId(row.account_id),
+                    )
+                }
+            }
+
+    override fun getManualAccountRanges(): Flow<List<ImportFileDateRange>> =
+        queries
+            .selectManualAccountRanges()
+            .asFlow()
+            .mapToList(coroutineContext)
+            .map { rows ->
+                rows.map { row ->
+                    ImportFileDateRange(
+                        kind = TimelineSourceKind.MANUAL,
+                        fileId = "",
+                        fileName = "Manual entries",
+                        strategyName = null,
+                        earliest = Instant.fromEpochMilliseconds(requireNotNull(row.earliest_ms)),
+                        latest = Instant.fromEpochMilliseconds(requireNotNull(row.latest_ms)),
+                        transactionCount = row.transaction_count,
+                        accountId = AccountId(row.account_id),
+                    )
+                }
+            }
+
+    override fun getAllAccountRanges(): Flow<List<ImportFileDateRange>> =
+        combine(
+            getCsvImportAccountRanges(),
+            getQifImportAccountRanges(),
+            getApiSessionAccountRanges(),
+            getManualAccountRanges(),
+        ) { csv, qif, api, manual ->
+            csv + qif + api + manual
+        }
+
     @Suppress("LongParameterList")
     private fun fileRange(
         kind: TimelineSourceKind,
@@ -121,6 +214,7 @@ class ImportTimelineReadRepositoryImpl(
         earliestMs: Long?,
         latestMs: Long?,
         transactionCount: Long,
+        accountId: AccountId? = null,
     ): ImportFileDateRange =
         ImportFileDateRange(
             kind = kind,
@@ -131,5 +225,6 @@ class ImportTimelineReadRepositoryImpl(
             earliest = Instant.fromEpochMilliseconds(requireNotNull(earliestMs)),
             latest = Instant.fromEpochMilliseconds(requireNotNull(latestMs)),
             transactionCount = transactionCount,
+            accountId = accountId,
         )
 }
