@@ -255,9 +255,10 @@ jobs:
     needs: [changes, lint-format]
     # Unlike the other heavy jobs this one also runs on workflow_dispatch, so it has no
     # event-name condition.
-    # Runs the 2026.2-eap linter (qodana.yaml): EAP linters need no Qodana Cloud license/token,
-    # which works around the expired open-source license (and retests QD-14665). The cloud
-    # upload is disabled below; SARIF still goes to GitHub Code Scanning and the run artifact.
+    # Runs the 2026.2-eap linter (qodana.yaml): EAP linters need no Qodana Cloud license,
+    # which works around the expired open-source license (and retests QD-14665). The token is
+    # still passed so results upload to Qodana Cloud; SARIF also goes to GitHub Code Scanning
+    # and the run artifact.
     if: >-
       !cancelled() &&
       needs.changes.outputs.code == 'true' &&
@@ -298,6 +299,9 @@ jobs:
           # the baseline.
           pr-mode: ${{ github.event_name == 'pull_request' }}
           use-caches: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/') }}
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1874207222 }}
+          QODANA_ENDPOINT: 'https://qodana.cloud'
       - name: Upload SARIF as artifact
         if: always()
         uses: actions/upload-artifact@v7
