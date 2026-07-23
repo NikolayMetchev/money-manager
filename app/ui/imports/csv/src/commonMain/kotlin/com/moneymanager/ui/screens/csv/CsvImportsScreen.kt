@@ -130,10 +130,21 @@ fun CsvImportsScreen(
     // (content/filename-aware, needs each file's columns + sampled rows — not in getAllImports()), to
     // group the Unimported tab by strategy and flag files with no match. Keyed by import id (not
     // position) since `imports` can change under this effect between runs.
+    //
+    // `strategies` starts as emptyList() before its flow's first emission (the collectAsState initial
+    // value), which is indistinguishable from a genuinely empty strategy list — so `strategies.isEmpty()`
+    // alone can't tell "still loading" from "user has zero strategies configured". A dedicated
+    // one-shot subscription tracks the real load instead: once it flips, an empty `strategies` correctly
+    // routes every unimported file to "No strategy" rather than getting stuck in "Matching strategies…".
+    var strategiesLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        csvImportStrategyRepository.getAllStrategies().first()
+        strategiesLoaded = true
+    }
     val unimportedForMatching = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt == null } }
     var matchedStrategies by remember { mutableStateOf<Map<CsvImportId, CsvImportStrategy?>?>(null) }
-    LaunchedEffect(unimportedForMatching, strategies) {
-        if (strategies.isEmpty()) {
+    LaunchedEffect(unimportedForMatching, strategies, strategiesLoaded) {
+        if (!strategiesLoaded) {
             matchedStrategies = null
             return@LaunchedEffect
         }
