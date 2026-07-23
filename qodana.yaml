@@ -133,6 +133,13 @@ exclude:
       - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/csvstrategy/editor/ConversionEditors.kt
       - app/ui/imports/importDirectory/src/commonMain/kotlin/com/moneymanager/ui/screens/importdirectory/ImportDirectoryAuditScreen.kt
 
+  # "Initializer is redundant" fires on `val x = remember { ... }` / `LocalX.current` — a val
+  # with its only initializer cannot have a redundant one. EAP false positive AND
+  # nondeterministic: three consecutive identical scans flagged zero, then two, then two
+  # different files (the linter's own sanity check reports the Kotlin inspections as suspect),
+  # so it must be excluded wholesale — path entries just chase it around the codebase.
+  - name: VariableInitializerIsRedundant
+
   # CryptographyProvider.get is not an operator fun, so the suggested indexing syntax doesn't
   # compile.
   - name: ReplaceGetOrSet
@@ -148,6 +155,10 @@ exclude:
   # expect-fun parameter, both reported as "unused parameter".
   - name: unused
     paths:
+      # revisionId in toDomain is unused by design (positional match for the generated mapper —
+      # see the comment there); the in-code @Suppress can't carry the IDE's "unused" id because
+      # RedundantSuppression then flags the detekt-only ids sharing the annotation.
+      - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/CsvImportStrategyReadRepositoryImpl.kt
       - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
       - app/db/di/src/androidMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.android.kt
       - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DatabaseComponent.kt

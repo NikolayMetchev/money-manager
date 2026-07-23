@@ -40,7 +40,7 @@ class CsvImportStrategyReadRepositoryImpl(
 
     // revisionId is part of the query's column set (needed to keep this a positional match for the
     // generated mapper) but isn't part of the domain model.
-    @Suppress("LongParameterList", "UnusedParameter", "unused")
+    @Suppress("LongParameterList", "UnusedParameter")
     private fun toDomain(
         id: String,
         revisionId: Long,
