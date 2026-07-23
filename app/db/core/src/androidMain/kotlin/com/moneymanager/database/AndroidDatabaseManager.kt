@@ -104,7 +104,7 @@ class AndroidDatabaseManager(
         return context.getDatabasePath(location.name).exists()
     }
 
-    override fun getDefaultLocation() = DEFAULT_DB_LOCATION
+    override fun getDefaultLocation(): DbLocation = DEFAULT_DB_LOCATION
 
     override suspend fun backupDatabase(location: DbLocation): DbLocation =
         withContext(Dispatchers.IO) {

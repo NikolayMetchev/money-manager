@@ -1,9 +1,8 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 
 package com.moneymanager.ui.screens.categories
 
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -56,7 +55,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlin.test.Test
 
-@OptIn(ExperimentalTestApi::class)
 class CategoriesScreenTest {
     // A real engine wrapping the test's category repository: edits route through it (as in production),
     // and because it delegates to [categoryRepository], the existing verifySuspend assertions still hold.

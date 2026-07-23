@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
@@ -58,6 +56,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.DurationUnit
 import kotlin.time.Instant
 import kotlin.time.toDuration
@@ -220,7 +219,7 @@ suspend fun downloadApiSessionExchange(
                         if (error == null) {
                             responseCount += 1
                             pageBody = response.body
-                            if (effectiveDelayMillis > 0) delay(effectiveDelayMillis)
+                            if (effectiveDelayMillis > 0) delay(effectiveDelayMillis.milliseconds)
                             keepRetrying = false
                         } else {
                             // A rate-limit-shaped error (per the strategy's own config) is transient:
@@ -241,7 +240,7 @@ suspend fun downloadApiSessionExchange(
                                 "Rate-limited on '${endpoint.path}' " +
                                     "(attempt $rateLimitRetries/${strategy.maxRateLimitRetries}); retrying in ${backoffMillis}ms"
                             }
-                            delay(backoffMillis)
+                            delay(backoffMillis.milliseconds)
                         }
                     }
                 }
@@ -849,13 +848,13 @@ suspend fun importApiSessionExchange(
                         // A configured reconcile window also enables plain cross-source reconciliation, so
                         // an aliased internal transfer (booked directly against the App account) links to
                         // the identical leg the CSV export produces, regardless of which imports first.
-                        reconcileWindow = reconcile?.windowSeconds?.let { it.toDuration(DurationUnit.SECONDS) },
+                        reconcileWindow = reconcile?.windowSeconds?.toDuration(DurationUnit.SECONDS),
                         reconciledExclusionAttributeTypeId =
                             if (reconcile == null) null else AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
                         reconciledRelationshipTypeId =
                             if (reconcile == null) null else RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
                         internalTransferBridges = bridges,
-                        internalTransferWindow = reconcile?.windowSeconds?.let { it.toDuration(DurationUnit.SECONDS) },
+                        internalTransferWindow = reconcile?.windowSeconds?.toDuration(DurationUnit.SECONDS),
                         internalTransferAmountTolerance =
                             reconcile?.amountTolerancePercent?.let { runCatching { BigDecimal(it) }.getOrNull() } ?: BigDecimal.ZERO,
                     ),
@@ -1202,7 +1201,7 @@ private fun moneyExact(
     }
 
 private fun JsonObject.str(path: String): String? =
-    (resolveJsonPathElement(path) as? kotlinx.serialization.json.JsonPrimitive)?.let { it.contentOrNullCompat() }
+    (resolveJsonPathElement(path) as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNullCompat()
 
 private fun kotlinx.serialization.json.JsonPrimitive.contentOrNullCompat(): String? =
     if (this is kotlinx.serialization.json.JsonNull) null else content

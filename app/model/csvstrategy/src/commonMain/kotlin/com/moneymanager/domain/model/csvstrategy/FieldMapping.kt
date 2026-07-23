@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.domain.model.csvstrategy
 
 import com.moneymanager.domain.model.AccountId
@@ -133,7 +131,7 @@ data class RegexAccountMapping(
  * [RegexAccountMapping] does). Unlike [RegexAccountMapping] the patterns live on the accounts, so the
  * same strategy routes to whatever accounts the user has tagged without editing the strategy.
  *
- * Persisted [CsvAccountMapping] overrides on the raw column value are applied first, so renamed
+ * Persisted `CsvAccountMapping` overrides on the raw column value are applied first, so renamed
  * accounts keep matching.
  */
 @Serializable
@@ -151,7 +149,7 @@ data class AttributeMatchAccountMapping(
  * Useful when one logical account exists per currency and the CSV only carries
  * the currency code.
  *
- * Persisted [CsvAccountMapping] overrides on the raw column value are applied first,
+ * Persisted `CsvAccountMapping` overrides on the raw column value are applied first,
  * so renamed accounts keep matching.
  */
 @Serializable

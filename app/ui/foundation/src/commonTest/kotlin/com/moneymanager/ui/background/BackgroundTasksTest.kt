@@ -1,6 +1,7 @@
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+
 package com.moneymanager.ui.background
 
-import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
@@ -15,7 +16,6 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-@OptIn(ExperimentalTestApi::class)
 class BackgroundTasksTest {
     @Test
     fun formatElapsedTime_formatsExpectedRanges() {

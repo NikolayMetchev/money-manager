@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package com.moneymanager.qifimporter
 
 import com.moneymanager.domain.model.csv.CsvColumn
@@ -7,7 +5,6 @@ import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.domain.model.qif.QifImportRecord
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**

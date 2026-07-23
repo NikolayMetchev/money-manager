@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.ui.monzo
 import com.moneymanager.apiimporter.discoverApiCounterpartiesToCreate
 import com.moneymanager.apiimporter.downloadApiSessionAccounts

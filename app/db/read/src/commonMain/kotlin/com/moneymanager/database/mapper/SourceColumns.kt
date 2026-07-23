@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.mapper
 
 import com.moneymanager.domain.model.ApiRequestId
@@ -60,7 +58,7 @@ data class SourceDetailColumns(
 
 /**
  * Reconstructs the unified [SourceRecord] from the flat source columns, or null when no source row
- * exists for this revision. The [Source] sealed value mirrors [Source.toSourceType]'s inverse, with
+ * exists for this revision. The [Source] sealed value mirrors `Source.toSourceType`'s inverse, with
  * import ids/indexes/session/request/jsonPath read from the detail columns (when present), while
  * [SourceRecord] carries the row id, device info, join-derived import file name and timestamp.
  */
@@ -95,7 +93,7 @@ fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
 
 /**
  * Reconstructs the [Source] for [sourceType] from this row's detail columns, paired with the
- * join-derived import file name (CSV/QIF only; null otherwise). Mirrors [Source.toSourceType].
+ * join-derived import file name (CSV/QIF only; null otherwise). Mirrors `Source.toSourceType`.
  */
 private fun SourceDetailColumns.reconstructSource(sourceType: SourceType): Pair<Source, String?> =
     when (sourceType) {
@@ -123,7 +121,7 @@ private fun SourceDetailColumns.reconstructSource(sourceType: SourceType): Pair<
     }
 
 /**
- * Reuses [DeviceRepositoryImpl.createDeviceInfo]'s logic but tolerates unknown/absent platform by
+ * Reuses `DeviceRepositoryImpl.createDeviceInfo`'s logic but tolerates unknown/absent platform by
  * returning null (audit rows may lack device metadata), rather than throwing.
  */
 private fun auditDeviceInfo(

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.repository.write
 
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper

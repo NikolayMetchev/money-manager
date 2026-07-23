@@ -255,8 +255,9 @@ jobs:
     needs: [changes, lint-format]
     # Unlike the other heavy jobs this one also runs on workflow_dispatch, so it has no
     # event-name condition.
-    # Temporarily re-enabled on this branch to test the 2026.2-eap linter for QD-14665.
-    # EAP linters need no Qodana Cloud license/token, so the cloud upload is disabled below.
+    # Runs the 2026.2-eap linter (qodana.yaml): EAP linters need no Qodana Cloud license/token,
+    # which works around the expired open-source license (and retests QD-14665). The cloud
+    # upload is disabled below; SARIF still goes to GitHub Code Scanning and the run artifact.
     if: >-
       !cancelled() &&
       needs.changes.outputs.code == 'true' &&
@@ -304,8 +305,11 @@ jobs:
           name: qodana-sarif
           path: ${{ runner.temp }}/qodana/results/qodana.sarif.json
           retention-days: 7
-      # Code Scanning upload intentionally omitted on this test branch: a full unbaselined
-      # EAP scan would flood the repo's alerts.
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
 
   lint-format:
     name: Auto-format PR

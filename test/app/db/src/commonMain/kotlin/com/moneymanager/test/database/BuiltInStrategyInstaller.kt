@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.test.database
 
 import com.moneymanager.builtin.BuiltInApiStrategies

@@ -1,6 +1,6 @@
 /**
  * Applied to the pure import modules (importengineapi + the engine impl + the csv/qif/api importers).
- * These modules must only ever build the import model and talk to the [ImportEngine] interface — they
+ * These modules must only ever build the import model and talk to the `ImportEngine` interface — they
  * must NEVER gain a (transitive) dependency on the database, DI, or UI layers. The only seam that
  * binds the interface to the database-backed implementation is the DI module.
  *

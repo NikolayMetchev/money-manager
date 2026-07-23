@@ -104,7 +104,7 @@ class GoogleOAuth(
         const val AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
         const val TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
         const val STATE_BYTES = 16
-        val json = Json { ignoreUnknownKeys = true }
+        val json: Json = Json { ignoreUnknownKeys = true }
     }
 }
 

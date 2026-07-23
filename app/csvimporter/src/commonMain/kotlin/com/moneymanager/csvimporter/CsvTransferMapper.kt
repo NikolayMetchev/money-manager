@@ -1,6 +1,4 @@
 @file:OptIn(
-    kotlin.time.ExperimentalTime::class,
-    kotlin.uuid.ExperimentalUuidApi::class,
     kotlinx.datetime.format.FormatStringsInDatetimeFormats::class,
 )
 
@@ -97,7 +95,7 @@ sealed interface MappingResult {
          * Null for ordinary rows.
          */
         val passThrough: CsvPassThrough? = null,
-        /** Set when the row is one leg of an asset conversion (see [ConversionConfig]); null otherwise. */
+        /** Set when the row is one leg of an asset conversion (see `ConversionConfig`); null otherwise. */
         val conversionLeg: ConversionLegInfo? = null,
         /** Raw funding value from [CsvImportStrategy.fundingAttributeMatch]'s column; null when unset/blank. */
         val fundingMatchValue: String? = null,
@@ -157,11 +155,11 @@ data class CsvPassThrough(
     val conduitName: String get() = conduitNames.first()
 }
 
-/** Which side of an asset conversion a row represents (see [ConversionConfig]). */
+/** Which side of an asset conversion a row represents (see `ConversionConfig`). */
 enum class ConversionSide { DEBIT, CREDIT }
 
 /**
- * Marks a mapped row as one leg of an asset conversion (see [ConversionConfig]). The applier pairs
+ * Marks a mapped row as one leg of an asset conversion (see `ConversionConfig`). The applier pairs
  * each [ConversionSide.DEBIT] leg to a [ConversionSide.CREDIT] leg with the same [pairingKey] within
  * the config's time window and links them with the conversion relationship.
  *
@@ -199,7 +197,7 @@ data class CsvTransferWithAttributes(
     val personalCounterpartyName: String? = null,
     /** Pass-through (conduit) routing for the row (e.g. Curve); null for ordinary rows. */
     val passThrough: CsvPassThrough? = null,
-    /** Set when the row is one leg of an asset conversion (see [ConversionConfig]); null otherwise. */
+    /** Set when the row is one leg of an asset conversion (see `ConversionConfig`); null otherwise. */
     val conversionLeg: ConversionLegInfo? = null,
     /**
      * Raw value of the strategy's [CsvImportStrategy.fundingAttributeMatch] column for this row (e.g. a
@@ -274,7 +272,7 @@ class CsvTransferMapper(
     /**
      * Former account names (from audit history), keyed by lowercased name → the account that most
      * recently bore it. Consulted as a fallback after current-name lookup so a renamed account still
-     * resolves when a row carries its old name. See [AccountReadRepository.getPreviousAccountNames].
+     * resolves when a row carries its old name. See `AccountReadRepository.getPreviousAccountNames`.
      */
     private val historicalAccountNames: Map<String, AccountId> = emptyMap(),
     /** When set, overrides the strategy's SOURCE_ACCOUNT mapping for every row. */
@@ -1484,8 +1482,8 @@ class CsvTransferMapper(
         if (!sharesAccount) return false
         val withinDateTolerance =
             (transfer.timestamp - existing.timestamp).absoluteValue <= DUPLICATE_DATE_TOLERANCE
-        if (!withinDateTolerance) return false
-        return StringSimilarity.similarity(transfer.description, existing.description) >=
+        return withinDateTolerance &&
+            StringSimilarity.similarity(transfer.description, existing.description) >=
             DESCRIPTION_SIMILARITY_THRESHOLD
     }
 

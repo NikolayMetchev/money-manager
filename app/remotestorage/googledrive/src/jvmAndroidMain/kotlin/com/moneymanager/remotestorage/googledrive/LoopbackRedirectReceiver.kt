@@ -16,7 +16,7 @@ import kotlin.time.Duration.Companion.minutes
  * Google "Desktop app" OAuth client permits, and a raw [ServerSocket] works on both JVM and Android
  * (no Jetty), so this is the one redirect path shared by both platforms.
  *
- * Usage: [start] to bind and learn the redirect URI, open the browser, then [awaitCode]. Always
+ * Usage: `start` to bind and learn the redirect URI, open the browser, then [awaitCode]. Always
  * [close] (a `use {}` block) so the socket is released.
  */
 class LoopbackRedirectReceiver : AutoCloseable {
@@ -28,7 +28,7 @@ class LoopbackRedirectReceiver : AutoCloseable {
     /**
      * Waits (up to [timeout]) for the browser to hit the loopback redirect, then returns the `code`
      * query parameter after checking the callback's `state` equals [expectedState]. Throws
-     * [RemoteAuthException] on an OAuth `error`, a timeout, a state mismatch, or a malformed request.
+     * `RemoteAuthException` on an OAuth `error`, a timeout, a state mismatch, or a malformed request.
      */
     suspend fun awaitCode(
         expectedState: String,

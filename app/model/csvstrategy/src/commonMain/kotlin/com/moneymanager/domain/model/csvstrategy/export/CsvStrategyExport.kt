@@ -1,5 +1,3 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-
 package com.moneymanager.domain.model.csvstrategy.export
 
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport

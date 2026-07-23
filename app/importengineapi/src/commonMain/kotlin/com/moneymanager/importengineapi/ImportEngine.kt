@@ -8,7 +8,7 @@ package com.moneymanager.importengineapi
  * the app can block all writes at one place when they would be unsafe (e.g. a cloud-backed database whose
  * remote copy is ahead).
  *
- * The database-backed implementation ([com.moneymanager.importer.ImportEngineImpl]) owns the import logic
+ * The database-backed implementation (`com.moneymanager.importer.ImportEngineImpl`) owns the import logic
  * and source/provenance recording; CSV/QIF/API importers depend only on this interface and build an
  * [ImportBatch]. The binding to the implementation happens where services are assembled.
  */

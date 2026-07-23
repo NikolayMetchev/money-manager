@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.ui.screens.csv
 
 import androidx.compose.foundation.background
@@ -422,7 +420,7 @@ fun CsvImportsScreen(
  * The account [import]'s transfers were (or will be) created against, for display in the imports list.
  * Prefers the strategy's own hard-coded SOURCE_ACCOUNT (e.g. crypto.com's fixed conduit account) — the
  * true answer whenever one exists — over the file's import-directory account (see
- * [ImportDirectory.accountId]), which only matters for strategies with no fixed source (e.g. Monzo,
+ * `ImportDirectory.accountId`), which only matters for strategies with no fixed source (e.g. Monzo,
  * where the same export format serves any account). Null when neither resolves anything yet (the file
  * has no applied/matched strategy and its directory has none set either).
  */

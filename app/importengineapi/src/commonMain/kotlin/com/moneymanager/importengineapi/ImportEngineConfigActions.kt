@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.AccountId
@@ -7,7 +5,6 @@ import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
-import com.moneymanager.domain.model.ApiResponseTransactionInsert
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -355,14 +352,6 @@ suspend fun ImportEngine.insertApiResponse(
         import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.InsertResponse(key, requestId, sessionId, json))))
             .apiResponseIds[key],
     )
-}
-
-suspend fun ImportEngine.insertApiResponseTransactions(transactions: List<ApiResponseTransactionInsert>) {
-    import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.InsertResponseTransactions(transactions))))
-}
-
-suspend fun ImportEngine.deleteApiResponseTransactionsBySession(sessionId: ApiSessionId) {
-    import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.DeleteResponseTransactionsBySession(sessionId))))
 }
 
 suspend fun ImportEngine.markApiSessionImported(

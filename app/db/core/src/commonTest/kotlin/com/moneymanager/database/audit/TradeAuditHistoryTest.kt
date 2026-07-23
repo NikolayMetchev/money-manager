@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.database.audit
 
 import com.moneymanager.domain.model.Account
@@ -17,7 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 /**
  * Trades write their audit trail through DB triggers like transfers do; the audit history read

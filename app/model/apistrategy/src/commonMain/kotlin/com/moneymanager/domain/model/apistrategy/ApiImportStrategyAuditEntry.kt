@@ -1,11 +1,8 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.domain.model.apistrategy
 
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.SourceRecord
-import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import kotlin.time.Instant
 
 data class ApiImportStrategyAuditEntry(

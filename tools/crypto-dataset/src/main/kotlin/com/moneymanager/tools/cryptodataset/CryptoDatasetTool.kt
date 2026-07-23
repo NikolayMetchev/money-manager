@@ -13,6 +13,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val LIST_URL = "https://api.coingecko.com/api/v3/coins/list"
 private const val MARKETS_URL = "https://api.coingecko.com/api/v3/coins/markets"
@@ -49,7 +50,7 @@ fun main(args: Array<String>) {
                                 parameter("page", page)
                             }.bodyAsText()
                     json.decodeFromString<List<Coin>>(body).forEach { ranked += CryptoDatasetEntry(it.symbol, it.name) }
-                    delay(RATE_LIMIT_DELAY_MS)
+                    delay(RATE_LIMIT_DELAY_MS.milliseconds)
                 }
                 val all =
                     json

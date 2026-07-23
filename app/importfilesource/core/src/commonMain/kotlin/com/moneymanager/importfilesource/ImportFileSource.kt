@@ -39,7 +39,7 @@ interface ImportFileSource {
     suspend fun download(fileRef: String): ByteArray
 }
 
-/** Resolves an [ImportFileSource] for a configured [ImportDirectory] (local folder or Drive folder). */
+/** Resolves an [ImportFileSource] for a configured `ImportDirectory` (local folder or Drive folder). */
 interface ImportFileSourceFactory {
     /**
      * Whether this platform can read directories backed by [provider]. Lets the UI hide/disable
@@ -59,7 +59,7 @@ data class ImportFolder(
 
 /**
  * Browses the user's Google Drive folder hierarchy for the add-directory folder picker, one level at a
- * time. Signs in (requesting the read-only Drive scope) if needed. [providerConfig] is the OAuth client
+ * time. Signs in (requesting the read-only Drive scope) if needed. `providerConfig` is the OAuth client
  * config, or null to use the app's shipped default credentials.
  */
 interface DriveFolderBrowser {

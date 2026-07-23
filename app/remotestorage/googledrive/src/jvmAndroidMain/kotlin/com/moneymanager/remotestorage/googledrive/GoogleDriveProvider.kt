@@ -28,7 +28,7 @@ import kotlin.time.Instant
 import kotlinx.serialization.json.Json as JsonFormat
 
 /**
- * A [RemoteStorageProvider] backed by Google Drive, spoken directly over the Drive REST API v3 with a
+ * A `RemoteStorageProvider` backed by Google Drive, spoken directly over the Drive REST API v3 with a
  * shared Ktor client so the REST surface runs identically on JVM and Android (the Google Java SDK's
  * OAuth is JVM-only).
  *
@@ -237,7 +237,7 @@ class GoogleDriveProvider(
         const val FILE_FIELDS = "id,name,size,modifiedTime,headRevisionId,md5Checksum"
         const val HTTP_NOT_FOUND = 404
         val APP_PROPERTIES = mapOf(APP_PROPERTY_KEY to "true")
-        val json = JsonFormat { ignoreUnknownKeys = true }
+        val json: JsonFormat = JsonFormat { ignoreUnknownKeys = true }
 
         fun HttpRequestBuilder.multipartBody(
             boundary: String,

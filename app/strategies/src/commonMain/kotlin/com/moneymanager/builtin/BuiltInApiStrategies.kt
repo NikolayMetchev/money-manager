@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class, kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.builtin
 
 import com.moneymanager.domain.model.ApiImportStrategyId
@@ -392,7 +390,6 @@ object BuiltInApiStrategies {
                 startParam = "start_ts",
                 endParam = "end_ts",
                 windowDays = 90,
-                lookbackDays = 365 * 6,
             )
         // get-trades / get-order-history only serve the last 6 months (older trades come from the CSV
         // import) and cap the window at 7 days; unlike the deposit/withdrawal endpoints they take
@@ -420,7 +417,6 @@ object BuiltInApiStrategies {
         val tradeMappings =
             ApiTradeMappings(
                 instrumentField = "instrument_name",
-                instrumentSeparator = "_",
                 sideField = "side",
                 buyValues = setOf("BUY", "buy"),
                 baseQuantityField = "traded_quantity",
@@ -453,11 +449,8 @@ object BuiltInApiStrategies {
 
         fun transferMappings(addressField: String) =
             ApiTransactionMappings(
-                amountField = "amount",
-                currencyField = "currency",
                 timestampField = "create_time",
                 timestampFormat = TimestampFormat.EPOCH_MS,
-                idField = "id",
                 amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                 // Model the blockchain wallet as a per-address account; key the movement by its on-chain
                 // txid so it reconciles with the same transaction seen from another source. A deposit's
@@ -567,7 +560,6 @@ object BuiltInApiStrategies {
                 endParam = "end",
                 windowBoundFormat = WindowBoundFormat.EPOCH_S,
                 windowDays = 90,
-                lookbackDays = 365 * 6,
                 offsetParam = "ofs",
                 limitValue = 50,
                 totalCountField = "result.count",
@@ -678,7 +670,6 @@ object BuiltInApiStrategies {
 
         fun ledgerMappings(joinKey: String) =
             ApiTransactionMappings(
-                amountField = "amount",
                 currencyField = "asset",
                 timestampField = "time",
                 timestampFormat = TimestampFormat.EPOCH_S_FLOAT,
@@ -802,7 +793,6 @@ object BuiltInApiStrategies {
             // paced as conservatively as the most expensive ones.
             rateLimitMillis = 3_100L,
             rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Too many requests", "Throttled"),
-            rateLimitBackoffMillis = 5_000L,
             maxRateLimitRetries = 6,
             tokenPageUrl = "https://pro.kraken.com/app/settings/api",
             connectInstructions =

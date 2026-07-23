@@ -8,7 +8,7 @@ import com.moneymanager.importengineapi.ImportResult
 
 /**
  * The [ImportEngine] for the active database, provided once at the app root
- * ([com.moneymanager.ui.MoneyManagerApp]). It is the single entry point for every edit (described
+ * (`com.moneymanager.ui.MoneyManagerApp`). It is the single entry point for every edit (described
  * declaratively as an [ImportBatch]), so writes can be blocked centrally when editing is locked (e.g. a
  * cloud-backed database whose remote copy is ahead).
  *

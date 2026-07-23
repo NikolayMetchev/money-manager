@@ -1,8 +1,7 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 
 package com.moneymanager.ui.screens.currencies
 
-import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -20,7 +19,6 @@ import dev.mokkery.mock
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 
-@OptIn(ExperimentalTestApi::class)
 class CurrenciesScreenTest {
     private fun createCurrencyRepository(currencies: List<Currency>): CurrencyWriteRepository =
         mock(MockMode.autoUnit) {

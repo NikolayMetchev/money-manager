@@ -1,8 +1,4 @@
-@file:OptIn(
-    androidx.compose.material3.ExperimentalMaterial3Api::class,
-    androidx.compose.foundation.ExperimentalFoundationApi::class,
-    kotlin.uuid.ExperimentalUuidApi::class,
-)
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package com.moneymanager.ui.screens.categories
 

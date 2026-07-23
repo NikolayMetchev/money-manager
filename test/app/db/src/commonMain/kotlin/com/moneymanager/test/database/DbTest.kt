@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.test.database
 
 import com.moneymanager.database.di.DatabaseComponent

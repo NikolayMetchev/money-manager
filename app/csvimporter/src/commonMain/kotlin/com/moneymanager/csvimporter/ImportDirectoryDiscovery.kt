@@ -5,7 +5,7 @@ import com.moneymanager.importfilesource.ImportFileSource
 /**
  * Traverses the folder tree rooted at [rootFolderRef] all the way down and returns every folder that
  * DIRECTLY contains an importable file (.csv/.qif), so the caller can create one import directory per
- * such folder. [openFolder] resolves an [ImportFileSource] for a folder ref; [displayPath] strings are
+ * such folder. [openFolder] resolves an `ImportFileSource` for a folder ref; `displayPath` strings are
  * built from [rootDisplayPath] plus subfolder names for the UI. Cycles/symlinks are guarded by a
  * visited set and [maxDepth].
  */

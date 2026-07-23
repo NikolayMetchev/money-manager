@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.ui.util
 
 import com.moneymanager.bigdecimal.BigInteger
@@ -48,7 +46,6 @@ import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 // Transfers are written one chunk per database transaction so the engine reports fine-grained progress
@@ -726,16 +723,13 @@ private fun buildTradesAndOrders(
                 source = source,
                 accountId = exchangeAccountIds.random(random),
                 orderRef = "SAMPLE-ORDER-$orderIndex",
-                clientOid = null,
                 side = if (index % 2 == 0) "BUY" else "SELL",
                 orderType = "LIMIT",
                 timeInForce = "FILL_OR_KILL",
                 status = if (index % 2 == 0) "ACTIVE" else "CANCELED",
                 limitPrice = randomPrice(random),
                 quantity = randomPrice(random),
-                avgPrice = null,
                 createdAt = createdAt,
-                updatedAt = null,
             ),
         )
         orderIndex++

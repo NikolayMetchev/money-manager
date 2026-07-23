@@ -1,12 +1,12 @@
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+
 package com.moneymanager.ui
 
-import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.Test
 
-@OptIn(ExperimentalTestApi::class)
 class ErrorScreenTest {
     @Test
     fun errorScreen_displaysErrorMessage() =

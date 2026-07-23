@@ -277,7 +277,6 @@ class MoneyTest {
             id = CryptoId(11L),
             code = "ETH",
             name = "Ethereum",
-            scaleFactor = 1_000_000_000_000_000_000L, // 18 decimals
         )
 
     @Test

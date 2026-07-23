@@ -35,8 +35,8 @@ object WellKnownIds {
      * "card-last4" account attribute: one or more whitespace/comma-separated regex tokens (typically the
      * last-4 digits) identifying the cards funded from this account. It is the default attribute type for
      * the generic attribute-account matcher: a CSV strategy with a
-     * [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fundingAttributeMatch] (or an
-     * [com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping] field) matches a column
+     * `com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fundingAttributeMatch` (or an
+     * `com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping` field) matches a column
      * value against these tokens to route a conduit (e.g. Curve) spend to the funding account. Nothing in
      * code special-cases this id — it is just the built-in Curve strategy's chosen attribute type.
      */
@@ -54,7 +54,7 @@ object WellKnownIds {
     /**
      * "pass-through" relationship type: id1 is the funding leg (card → conduit), id2 the spend leg
      * (conduit → merchant) of a charge routed through a conduit account (e.g. Curve). See
-     * [com.moneymanager.domain.model.passthrough.PassThroughAccount].
+     * `com.moneymanager.domain.model.passthrough.PassThroughAccount`.
      */
     const val PASS_THROUGH_RELATIONSHIP_TYPE_ID: Long = 3
 

@@ -4,7 +4,7 @@ import io.ktor.client.HttpClient
 
 /**
  * Supplies the OAuth access token for Google Drive REST calls, abstracting the platform sign-in
- * mechanism so [GoogleDriveProvider] stays platform-agnostic:
+ * mechanism so `GoogleDriveProvider` stays platform-agnostic:
  * - **JVM/desktop**: the installed-app loopback flow + a refresh token persisted in `LocalSettings`.
  * - **Android**: Google Identity `AuthorizationClient` (a native consent sheet, short-lived tokens
  *   re-issued silently once the `drive.file` scope is granted — no refresh token, no backend).

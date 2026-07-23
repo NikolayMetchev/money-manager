@@ -1,12 +1,9 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.domain.repository.write
 
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.CsvImportReadRepository
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 interface CsvImportWriteRepository : CsvImportReadRepository {

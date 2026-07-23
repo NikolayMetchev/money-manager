@@ -55,10 +55,10 @@ enum class TimestampFormat {
  *                         - "account.id" — the current account's external API id
  *                         - "account.<field>" — a dot-path field on the current account's raw JSON
  *                           (e.g. "account.currency")
- *                         - "ancestor[N].<field>" — a field on the N-th ancestor resource item
+ *                         - "ancestor`N`.<field>" — a field on the N-th ancestor resource item
  *                           (e.g. "ancestor[0].id"); "parent.id" aliases the last ancestor's id
  *                         - "window.start" / "window.end" — the ISO-8601 bounds of the current
- *                           date window (see [ApiPaginationConfig.DateWindow])
+ *                           date window (see `ApiPaginationConfig.DateWindow`)
  */
 @Serializable
 data class ApiQueryParam(

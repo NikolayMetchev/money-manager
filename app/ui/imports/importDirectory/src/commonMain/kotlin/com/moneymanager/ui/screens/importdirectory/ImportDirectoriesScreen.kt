@@ -1,6 +1,4 @@
 @file:OptIn(
-    kotlin.time.ExperimentalTime::class,
-    kotlin.uuid.ExperimentalUuidApi::class,
     androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
 )
 

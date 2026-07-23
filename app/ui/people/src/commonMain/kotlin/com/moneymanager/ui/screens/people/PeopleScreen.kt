@@ -1,8 +1,3 @@
-@file:OptIn(
-    kotlin.time.ExperimentalTime::class,
-    androidx.compose.material3.ExperimentalMaterial3Api::class,
-)
-
 package com.moneymanager.ui.screens.people
 
 import androidx.compose.foundation.clickable

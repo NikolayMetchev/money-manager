@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.ui.screens
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasText

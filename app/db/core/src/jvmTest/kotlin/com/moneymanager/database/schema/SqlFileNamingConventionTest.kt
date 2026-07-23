@@ -90,8 +90,7 @@ class SqlFileNamingConventionTest {
             body
                 .lineSequence()
                 .map { it.trim() }
-                .filter { it.isNotEmpty() && !it.startsWith("--") }
-                .firstOrNull()
+                .firstOrNull { it.isNotEmpty() && !it.startsWith("--") }
                 ?.takeWhile { it.isLetter() }
                 ?.uppercase()
                 .orEmpty()

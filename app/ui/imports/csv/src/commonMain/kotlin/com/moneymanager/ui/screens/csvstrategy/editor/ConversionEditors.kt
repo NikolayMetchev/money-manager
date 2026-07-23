@@ -294,7 +294,7 @@ private fun ConversionAccountRulesEditor(
 }
 
 /**
- * A numeric [OutlinedTextField] bound to a [Long]. Keeps its own text buffer so intermediate
+ * A numeric `OutlinedTextField` bound to a [Long]. Keeps its own text buffer so intermediate
  * empty/invalid input is shown without corrupting the model; commits only parseable values.
  */
 @Composable

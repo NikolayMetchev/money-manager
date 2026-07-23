@@ -16,7 +16,7 @@ class NavigationHistory(
     /** The navigation back stack; the last element is the current screen. Never empty. */
     val backStack: MutableList<NavKey>,
 ) {
-    constructor(initialScreen: Screen) : this(mutableStateListOf<NavKey>(initialScreen))
+    constructor(initialScreen: Screen) : this(mutableStateListOf(initialScreen))
 
     init {
         require(backStack.isNotEmpty()) { "backStack must contain the initial screen" }

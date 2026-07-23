@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class, kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.builtin
 
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -772,7 +770,7 @@ object BuiltInCsvStrategies {
      * Every row is mapped to a spend leg [CURVE_CONDUIT_ACCOUNT] -> merchant, matching the spend leg the
      * pass-through detector already synthesises from the underlying card's "CRV*<merchant>" row (see
      * [com.moneymanager.builtin.BuiltInPassThroughs.curve]). Cross-source reconciliation
-     * ([com.moneymanager.importer.ImportDeduper.reconcileMatches]) then links the two whenever they
+     * (`com.moneymanager.importer.ImportDeduper.reconcileMatches`) then links the two whenever they
      * resolve to the same merchant account, same amount and same currency within
      * [CURVE_RECONCILE_WINDOW_SECONDS] — so the merchant spend is counted once. The funding leg
      * (card -> Curve) is contributed by the underlying-card import, not this file.

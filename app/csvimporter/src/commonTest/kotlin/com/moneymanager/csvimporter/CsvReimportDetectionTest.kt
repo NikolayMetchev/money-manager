@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.model.Account
@@ -657,7 +655,7 @@ class CsvReimportDetectionTest {
             val rows =
                 listOf(
                     // DUPLICATE: its transfer belongs to another row.
-                    tradeRow(index = 1, importStatus = ImportStatus.DUPLICATE),
+                    tradeRow(importStatus = ImportStatus.DUPLICATE),
                     // Already converted: trades write no transfer id back.
                     tradeRow(index = 2, transferId = null),
                     // Never imported: applyStagedCsv picks it up anyway.
@@ -679,7 +677,7 @@ class CsvReimportDetectionTest {
     @Test
     fun `rows already planned as rewrites or with dangling transfers are skipped`() =
         runTest {
-            val rows = listOf(tradeRow(index = 1), tradeRow(index = 2))
+            val rows = listOf(tradeRow(), tradeRow(index = 2))
             val mappedPrep = tradePrep(rows)
 
             // Row 1 is owned by a pass-through rewrite; row 2's transfer id no longer resolves.

@@ -1,9 +1,3 @@
-@file:OptIn(
-    kotlin.time.ExperimentalTime::class,
-    kotlin.uuid.ExperimentalUuidApi::class,
-    androidx.compose.material3.ExperimentalMaterial3Api::class,
-)
-
 package com.moneymanager.ui.screens.csvstrategy.editor
 
 import androidx.compose.foundation.layout.Arrangement

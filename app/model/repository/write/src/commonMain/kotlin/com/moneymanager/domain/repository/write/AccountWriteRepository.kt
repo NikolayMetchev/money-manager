@@ -46,7 +46,7 @@ interface AccountWriteRepository : AccountReadRepository {
     /**
      * Merges [deletedAccount] into [survivingAccount]: reassigns all of the deleted account's
      * transactions to the surviving account, then deletes the merged-away account. Records a
-     * reversible [AccountMerge] so the operation can later be undone via [unmergeAccount].
+     * reversible `AccountMerge` so the operation can later be undone via [unmergeAccount].
      *
      * Throws if any transfers exist directly between the two accounts (they would become invalid
      * self-transfers); callers should surface this to the user before invoking.

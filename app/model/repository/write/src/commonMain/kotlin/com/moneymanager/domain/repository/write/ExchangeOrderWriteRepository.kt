@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.domain.repository.write
 
 import com.moneymanager.domain.model.AccountId

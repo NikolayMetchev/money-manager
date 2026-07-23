@@ -29,7 +29,7 @@ internal enum class EditorTab(
     ADVANCED("Advanced"),
 }
 
-/** Whether [op] requires a [com.moneymanager.domain.model.apistrategy.RulePredicate.value] operand. */
+/** Whether `op` requires a [com.moneymanager.domain.model.apistrategy.RulePredicate.value] operand. */
 internal fun PredicateOp.requiresValue(): Boolean =
     when (this) {
         PredicateOp.EQUALS, PredicateOp.EQUALS_IGNORE_CASE, PredicateOp.STARTS_WITH, PredicateOp.ARRAY_ANY_STARTS_WITH -> true

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.ui.starling
 import com.moneymanager.apiimporter.downloadApiSessionAccountIdentifiers
 import com.moneymanager.apiimporter.downloadApiSessionAccounts

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.audit
 
 import com.moneymanager.domain.model.Account
@@ -26,8 +24,8 @@ import kotlin.uuid.Uuid
 
 /**
  * Regression tests proving the non-import UPDATE paths record provenance: every revision an update
- * produces must have a source row, mirroring the create paths. Before [Auditable] wiring these
- * updates bumped the revision without recording a [Source], leaving audit rows with a null source.
+ * produces must have a source row, mirroring the create paths. Before `Auditable` wiring these
+ * updates bumped the revision without recording a `Source`, leaving audit rows with a null source.
  */
 class UpdateProvenanceTest : DbTest() {
     @Test

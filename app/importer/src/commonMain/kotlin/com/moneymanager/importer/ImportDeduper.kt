@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.importer
 
 import com.moneymanager.bigdecimal.BigDecimal
@@ -590,8 +588,8 @@ class ImportDeduper(
         if (!sharesAccount) return false
         val withinDateTolerance =
             (requireNotNull(transfer.timestamp) - existing.timestamp).absoluteValue <= policy.dateTolerance
-        if (!withinDateTolerance) return false
-        return StringSimilarity.similarity(transfer.description, existing.description) >= policy.similarityThreshold
+        return withinDateTolerance &&
+            StringSimilarity.similarity(transfer.description, existing.description) >= policy.similarityThreshold
     }
 
     // Dedupe runs on resolved CREATE transfers, whose fields are present; null indicates a builder error.

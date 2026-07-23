@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.audit
 import app.cash.sqldelight.db.QueryResult
 import com.moneymanager.builtin.BuiltInApiStrategies
@@ -38,7 +36,7 @@ import kotlin.uuid.Uuid
  * Contract test: every entity-level audit entry must have source attribution.
  *
  * [allEntityAuditEntriesHaveSource] creates one instance of each known entity type, records its
- * source, then asserts that every audit entry returned by [AuditReadRepository] has a non-null
+ * source, then asserts that every audit entry returned by `AuditReadRepository` has a non-null
  * `source`. It also verifies the built-in seeded entities (currencies, Uncategorized category,
  * Monzo strategy).
  *
@@ -49,7 +47,7 @@ import kotlin.uuid.Uuid
  *
  * To add coverage for a new entity type:
  * 1. Create one instance via the repository, record its source.
- * 2. Fetch its audit history via [AuditReadRepository] and call [assertAllHaveSource].
+ * 2. Fetch its audit history via `AuditReadRepository` and call [assertAllHaveSource].
  * 3. Add its audit table name to `coveredTables`.
  */
 class AuditSourceCoverageTest : DbTest() {

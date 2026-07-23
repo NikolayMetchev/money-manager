@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalEncodingApi::class)
-
 package com.moneymanager.rest
 
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
@@ -17,7 +15,6 @@ import dev.whyoleg.cryptography.algorithms.HMAC
 import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.algorithms.SHA512
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * A fully assembled, signed HTTP request ready to send: the final [url] (with any query params),

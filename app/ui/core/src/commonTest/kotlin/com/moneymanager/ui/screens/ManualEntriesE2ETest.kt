@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
-
 package com.moneymanager.ui.screens
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasText
@@ -36,9 +34,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 
 /**
  * End-to-end test for the Manual Entries tab: a Wise assets fee (matched by the seeded

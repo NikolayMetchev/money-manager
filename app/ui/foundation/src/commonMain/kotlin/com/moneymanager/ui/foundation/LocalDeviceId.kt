@@ -4,7 +4,7 @@ import androidx.compose.runtime.compositionLocalOf
 import com.moneymanager.domain.model.DeviceId
 
 /**
- * The current device id, provided once at the app root ([com.moneymanager.ui.MoneyManagerApp]).
+ * The current device id, provided once at the app root (`com.moneymanager.ui.MoneyManagerApp`).
  *
  * The default ([DeviceId] 1 — the seeded SYSTEM device) only applies to isolated previews/tests that
  * render a screen outside the app root; production always provides the real device. Entities created

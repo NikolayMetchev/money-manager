@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.qifimporter
 
 import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE

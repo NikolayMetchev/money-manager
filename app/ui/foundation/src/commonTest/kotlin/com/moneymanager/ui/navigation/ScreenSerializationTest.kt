@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.ui.navigation
 
 import androidx.navigation3.runtime.NavKey

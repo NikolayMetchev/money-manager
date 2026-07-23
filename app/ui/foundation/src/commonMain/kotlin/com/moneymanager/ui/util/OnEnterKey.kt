@@ -12,7 +12,7 @@ import androidx.compose.ui.input.key.type
  *
  * This is the cross-platform path for "press Enter to confirm a dialog": it fires on desktop and on
  * hardware keyboards on both platforms. Soft-keyboard "Done" parity (Android) is handled separately via
- * [androidx.compose.foundation.text.KeyboardActions]. The caller is responsible for gating [onEnter] on
+ * `androidx.compose.foundation.text.KeyboardActions`. The caller is responsible for gating [onEnter] on
  * the same validity the confirm button uses, so Enter never submits a disabled form.
  */
 fun Modifier.onEnterKeyDown(onEnter: () -> Unit): Modifier =

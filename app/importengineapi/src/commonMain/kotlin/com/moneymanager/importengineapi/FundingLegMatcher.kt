@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.Transfer

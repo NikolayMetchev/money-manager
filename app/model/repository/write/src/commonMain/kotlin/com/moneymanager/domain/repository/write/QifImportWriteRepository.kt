@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.domain.repository.write
 
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -7,7 +5,6 @@ import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.repository.QifImportReadRepository
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 interface QifImportWriteRepository : QifImportReadRepository {

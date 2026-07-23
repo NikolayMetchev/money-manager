@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.Maintenance
@@ -42,7 +40,6 @@ import com.moneymanager.importengineapi.selectNearestUnconsumedLeg
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 private val logger = logging()

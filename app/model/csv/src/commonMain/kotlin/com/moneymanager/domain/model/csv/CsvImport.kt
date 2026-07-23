@@ -1,11 +1,8 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.domain.model.csv
 
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.DeviceInfo
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 data class CsvImport(
