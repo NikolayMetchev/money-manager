@@ -255,11 +255,9 @@ jobs:
     needs: [changes, lint-format]
     # Unlike the other heavy jobs this one also runs on workflow_dispatch, so it has no
     # event-name condition.
-    # Disabled: the Qodana Cloud open-source license expired on 2026-07-06, so every run
-    # fails before producing a SARIF. Re-enable (drop the leading `false &&`) once a new
-    # license is granted.
+    # Temporarily re-enabled on this branch to test the 2026.2-eap linter for QD-14665.
+    # EAP linters need no Qodana Cloud license/token, so the cloud upload is disabled below.
     if: >-
-      false &&
       !cancelled() &&
       needs.changes.outputs.code == 'true' &&
       (needs.lint-format.result == 'success' || needs.lint-format.result == 'skipped')
@@ -287,21 +285,18 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/qodana/caches
-          key: qodana-2026.1-refs/heads/main
-          restore-keys: qodana-2026.1-
+          key: qodana-2026.2-eap-refs/heads/main
+          restore-keys: qodana-2026.2-eap-
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.1
         with:
-          upload-result: true
+          upload-result: false
           # On PRs analyse only the changed files and fail solely on problems they introduce. The
           # whole-project + cloud-baseline approach didn't subtract main's pre-existing problems on PR
           # runs (they were all reported as "new"); push-to-main runs still do a full scan and refresh
           # the baseline.
           pr-mode: ${{ github.event_name == 'pull_request' }}
           use-caches: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/') }}
-        env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1874207222 }}
-          QODANA_ENDPOINT: 'https://qodana.cloud'
       - name: Upload SARIF as artifact
         if: always()
         uses: actions/upload-artifact@v7
@@ -309,11 +304,8 @@ jobs:
           name: qodana-sarif
           path: ${{ runner.temp }}/qodana/results/qodana.sarif.json
           retention-days: 7
-      - name: Upload SARIF to GitHub Code Scanning
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
+      # Code Scanning upload intentionally omitted on this test branch: a full unbaselined
+      # EAP scan would flood the repo's alerts.
 
   lint-format:
     name: Auto-format PR
