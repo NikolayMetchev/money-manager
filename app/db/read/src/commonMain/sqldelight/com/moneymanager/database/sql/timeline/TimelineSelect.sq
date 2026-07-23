@@ -88,3 +88,147 @@ WHERE entity_source.entity_type_id = 7
       FROM entity_source creation
       WHERE creation.entity_type_id = 7 AND creation.entity_id = entity_source.entity_id
   );
+
+-- Account-grouped counterparts below: every transfer touches two accounts (source_account_id and
+-- target_account_id, both NOT NULL FKs to account), so each import/session/manual transfer is
+-- unpivoted into two rows (one per leg) before grouping. A file/session whose transfers touch
+-- several accounts therefore contributes a bar to each of those accounts' rows, exactly mirroring
+-- how the same transfer already appears on both accounts' ledgers.
+selectCsvImportAccountRanges:
+SELECT
+    import_id,
+    file_name,
+    ignored,
+    account_id,
+    MIN(timestamp) AS earliest_ms,
+    MAX(timestamp) AS latest_ms,
+    COUNT(DISTINCT transfer_id) AS transaction_count
+FROM (
+    SELECT
+        csv_import_metadata.id AS import_id,
+        csv_import_metadata.original_file_name AS file_name,
+        csv_import_metadata.ignored AS ignored,
+        transfer.id AS transfer_id,
+        transfer.source_account_id AS account_id,
+        transfer.timestamp AS timestamp
+    FROM csv_import_metadata
+    JOIN csv_entity_source ON csv_entity_source.csv_import_id = csv_import_metadata.id
+    JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7
+    JOIN transfer ON transfer.id = entity_source.entity_id
+    UNION ALL
+    SELECT
+        csv_import_metadata.id,
+        csv_import_metadata.original_file_name,
+        csv_import_metadata.ignored,
+        transfer.id,
+        transfer.target_account_id,
+        transfer.timestamp
+    FROM csv_import_metadata
+    JOIN csv_entity_source ON csv_entity_source.csv_import_id = csv_import_metadata.id
+    JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7
+    JOIN transfer ON transfer.id = entity_source.entity_id
+)
+GROUP BY import_id, account_id;
+
+selectQifImportAccountRanges:
+SELECT
+    import_id,
+    file_name,
+    ignored,
+    account_id,
+    MIN(timestamp) AS earliest_ms,
+    MAX(timestamp) AS latest_ms,
+    COUNT(DISTINCT transfer_id) AS transaction_count
+FROM (
+    SELECT
+        qif_import_metadata.id AS import_id,
+        qif_import_metadata.original_file_name AS file_name,
+        qif_import_metadata.ignored AS ignored,
+        transfer.id AS transfer_id,
+        transfer.source_account_id AS account_id,
+        transfer.timestamp AS timestamp
+    FROM qif_import_metadata
+    JOIN qif_entity_source ON qif_entity_source.qif_import_id = qif_import_metadata.id
+    JOIN entity_source ON entity_source.id = qif_entity_source.id AND entity_source.entity_type_id = 7
+    JOIN transfer ON transfer.id = entity_source.entity_id
+    UNION ALL
+    SELECT
+        qif_import_metadata.id,
+        qif_import_metadata.original_file_name,
+        qif_import_metadata.ignored,
+        transfer.id,
+        transfer.target_account_id,
+        transfer.timestamp
+    FROM qif_import_metadata
+    JOIN qif_entity_source ON qif_entity_source.qif_import_id = qif_import_metadata.id
+    JOIN entity_source ON entity_source.id = qif_entity_source.id AND entity_source.entity_type_id = 7
+    JOIN transfer ON transfer.id = entity_source.entity_id
+)
+GROUP BY import_id, account_id;
+
+selectApiSessionAccountRanges:
+SELECT
+    session_id,
+    account_id,
+    MIN(timestamp) AS earliest_ms,
+    MAX(timestamp) AS latest_ms,
+    COUNT(DISTINCT transfer_id) AS transaction_count
+FROM (
+    SELECT
+        api_session.id AS session_id,
+        transfer.id AS transfer_id,
+        transfer.source_account_id AS account_id,
+        transfer.timestamp AS timestamp
+    FROM api_session
+    JOIN api_entity_source ON api_entity_source.api_session_id = api_session.id
+    JOIN entity_source ON entity_source.id = api_entity_source.id AND entity_source.entity_type_id = 7
+    JOIN transfer ON transfer.id = entity_source.entity_id
+    UNION ALL
+    SELECT
+        api_session.id,
+        transfer.id,
+        transfer.target_account_id,
+        transfer.timestamp
+    FROM api_session
+    JOIN api_entity_source ON api_entity_source.api_session_id = api_session.id
+    JOIN entity_source ON entity_source.id = api_entity_source.id AND entity_source.entity_type_id = 7
+    JOIN transfer ON transfer.id = entity_source.entity_id
+)
+GROUP BY session_id, account_id;
+
+selectManualAccountRanges:
+SELECT
+    account_id,
+    MIN(timestamp) AS earliest_ms,
+    MAX(timestamp) AS latest_ms,
+    COUNT(DISTINCT transfer_id) AS transaction_count
+FROM (
+    SELECT
+        transfer.id AS transfer_id,
+        transfer.source_account_id AS account_id,
+        transfer.timestamp AS timestamp
+    FROM entity_source
+    JOIN transfer ON transfer.id = entity_source.entity_id
+    WHERE entity_source.entity_type_id = 7
+      AND entity_source.source_type_id = 1
+      AND entity_source.revision_id = (
+          SELECT MIN(creation.revision_id)
+          FROM entity_source creation
+          WHERE creation.entity_type_id = 7 AND creation.entity_id = entity_source.entity_id
+      )
+    UNION ALL
+    SELECT
+        transfer.id,
+        transfer.target_account_id,
+        transfer.timestamp
+    FROM entity_source
+    JOIN transfer ON transfer.id = entity_source.entity_id
+    WHERE entity_source.entity_type_id = 7
+      AND entity_source.source_type_id = 1
+      AND entity_source.revision_id = (
+          SELECT MIN(creation.revision_id)
+          FROM entity_source creation
+          WHERE creation.entity_type_id = 7 AND creation.entity_id = entity_source.entity_id
+      )
+)
+GROUP BY account_id;

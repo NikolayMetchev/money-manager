@@ -22,6 +22,7 @@ kotlin {
         }
         getByName("androidMain") {
             dependencies {
+                api(projects.app.model.core)
                 api(libs.androidx.compose.foundation.layout)
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
@@ -37,6 +38,7 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.model.core)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
                 api(libs.androidx.compose.runtime.desktop)
@@ -54,6 +56,7 @@ kotlin {
         }
         getByName("jvmTest") {
             dependencies {
+                implementation(projects.app.model.core)
                 implementation(kotlin("test"))
                 implementation(libs.compose.ui.test.desktop)
                 implementation(libs.kotlinx.coroutines.core)
@@ -63,6 +66,7 @@ kotlin {
         }
         getByName("androidDeviceTest") {
             dependencies {
+                implementation(projects.app.model.core)
                 implementation(projects.test.app.ui)
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.coroutines.core)
@@ -70,6 +74,7 @@ kotlin {
         }
         getByName("androidHostTest") {
             dependencies {
+                implementation(projects.app.model.core)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }

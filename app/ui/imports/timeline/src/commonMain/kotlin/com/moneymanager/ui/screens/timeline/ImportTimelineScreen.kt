@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.moneymanager.ui.screens.timeline
 
@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -19,10 +20,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,9 +53,13 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
+import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
+import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.displayDate
 import kotlinx.datetime.LocalDate
@@ -61,76 +73,156 @@ private val ROW_BAR_HEIGHT = 24.dp
 private val TOOLTIP_OFFSET = 12.dp
 
 /**
- * Matrix of import coverage: one row per import strategy (plus manual entries), a shared time
- * axis spanning the earliest to the latest imported transaction. Gaps in a row are periods no
- * file covers; darker stretches are covered by more than one file. Hovering a row (desktop) or
- * tapping it (touch) lists the files covering that day; clicking a covered spot opens the file
- * (with a chooser when several files overlap). A table of every gap sits under the timeline.
+ * Matrix of import coverage: one row per import strategy or per account (toggled by the tabs at
+ * the top), sharing a time axis spanning the earliest to the latest imported transaction. Gaps in
+ * a row are periods no file covers; darker stretches are covered by more than one file. Hovering a
+ * row (desktop) or tapping it (touch) lists the files covering that day; clicking a covered spot
+ * opens the file (with a chooser when several files overlap). A table of every gap sits under the
+ * timeline.
  */
 @Composable
 fun ImportTimelineScreen(
     importTimelineRepository: ImportTimelineReadRepository,
+    accountRepository: AccountReadRepository,
+    personRepository: PersonReadRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     onOpenFile: (ImportFileDateRange) -> Unit = {},
 ) {
-    val ranges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+    var groupMode by remember { mutableStateOf(TimelineGroupMode.STRATEGY) }
+    var accountNameFilter by remember { mutableStateOf("") }
+    var selectedOwnerIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+
+    val strategyRanges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         importTimelineRepository.getAllDateRanges()
     }
+    val accountRanges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        importTimelineRepository.getAllAccountRanges()
+    }
+    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        accountRepository.getAllAccounts()
+    }
+    val people by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        personRepository.getAllPeople()
+    }
+    val ownerships by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        personAccountOwnershipRepository.getAllOwnerships()
+    }
+    val accountNameById = remember(accounts) { accounts.associate { it.id to it.name } }
+    val ownerIdsByAccount =
+        remember(ownerships) {
+            ownerships.groupBy({ it.accountId }, { it.personId.id }).mapValues { it.value.toSet() }
+        }
+
     val timeZone = remember { TimeZone.currentSystemDefault() }
     val matrix =
-        remember(ranges) {
+        remember(groupMode, strategyRanges, accountRanges, accountNameById, accountNameFilter, selectedOwnerIds, ownerIdsByAccount) {
             val todayDay =
                 Clock.System
                     .now()
                     .toLocalDateTime(timeZone)
                     .date
                     .toEpochDays()
-            buildTimelineMatrix(ranges, timeZone, todayDay)
+            when (groupMode) {
+                TimelineGroupMode.STRATEGY -> buildTimelineMatrix(strategyRanges, timeZone, todayDay, groupMode)
+                TimelineGroupMode.ACCOUNT -> {
+                    val filtered =
+                        filterAccountRanges(
+                            accountRanges,
+                            accountNameById,
+                            accountNameFilter,
+                            selectedOwnerIds,
+                            ownerIdsByAccount,
+                        )
+                    buildTimelineMatrix(filtered, timeZone, todayDay, groupMode, accountNameById)
+                }
+            }
         }
 
-    if (matrix == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = "No imported transactions yet",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Column(modifier = Modifier.fillMaxSize()) {
+        SecondaryTabRow(selectedTabIndex = groupMode.ordinal) {
+            Tab(
+                selected = groupMode == TimelineGroupMode.STRATEGY,
+                onClick = { groupMode = TimelineGroupMode.STRATEGY },
+                text = { Text("By strategy") },
+            )
+            Tab(
+                selected = groupMode == TimelineGroupMode.ACCOUNT,
+                onClick = { groupMode = TimelineGroupMode.ACCOUNT },
+                text = { Text("By account") },
             )
         }
-        return
-    }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-    ) {
-        TimelineLegend()
-        Spacer(modifier = Modifier.height(12.dp))
-        matrix.rows.forEach { row ->
-            TimelineRowItem(row = row, minDay = matrix.minDay, maxDay = matrix.maxDay, onOpenFile = onOpenFile)
-            Spacer(modifier = Modifier.height(8.dp))
+        if (groupMode == TimelineGroupMode.ACCOUNT) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                OutlinedTextField(
+                    value = accountNameFilter,
+                    onValueChange = { accountNameFilter = it },
+                    label = { Text("Search accounts") },
+                    placeholder = { Text("Type to search...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                if (people.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OwnerFilterDropdown(
+                        people = people,
+                        selectedOwnerIds = selectedOwnerIds,
+                        onSelectionChange = { selectedOwnerIds = it },
+                    )
+                }
+            }
         }
-        TimelineAxis(minDay = matrix.minDay, maxDay = matrix.maxDay)
-        Spacer(modifier = Modifier.height(24.dp))
-        GapsTable(matrix)
+
+        if (matrix == null) {
+            val filtersActive = groupMode == TimelineGroupMode.ACCOUNT && (accountNameFilter.isNotBlank() || selectedOwnerIds.isNotEmpty())
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = if (filtersActive) "No accounts match the current filters." else "No imported transactions yet",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            return@Column
+        }
+
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+        ) {
+            TimelineLegend()
+            Spacer(modifier = Modifier.height(12.dp))
+            matrix.rows.forEach { row ->
+                TimelineRowItem(row = row, minDay = matrix.minDay, maxDay = matrix.maxDay, onOpenFile = onOpenFile)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            TimelineAxis(minDay = matrix.minDay, maxDay = matrix.maxDay)
+            Spacer(modifier = Modifier.height(24.dp))
+            GapsTable(matrix, groupMode)
+        }
     }
 }
 
 @Composable
-private fun GapsTable(matrix: TimelineMatrix) {
+private fun GapsTable(
+    matrix: TimelineMatrix,
+    groupMode: TimelineGroupMode,
+) {
     val gaps = matrix.rows.flatMap { row -> row.gaps.map { gap -> row.label to gap } }
+    val columnLabel = if (groupMode == TimelineGroupMode.ACCOUNT) "Account" else "Strategy"
     Text(text = "Gaps", style = MaterialTheme.typography.titleSmall)
     Spacer(modifier = Modifier.height(4.dp))
     if (gaps.isEmpty()) {
         Text(
-            text = "No gaps — every strategy is fully covered up to today.",
+            text = "No gaps — every ${columnLabel.lowercase()} is fully covered up to today.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         return
     }
-    GapsTableRow(strategy = "Strategy", from = "From", to = "To", days = "Days", header = true)
+    GapsTableRow(strategy = columnLabel, from = "From", to = "To", days = "Days", header = true)
     gaps.forEach { (label, gap) ->
         GapsTableRow(
             strategy = label,
@@ -428,6 +520,79 @@ private fun TimelineAxis(
                         maxLines = 1,
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Multi-select owner filter, matching the one on the Accounts screen. */
+@Composable
+private fun OwnerFilterDropdown(
+    people: List<Person>,
+    selectedOwnerIds: Set<Long>,
+    onSelectionChange: (Set<Long>) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val selectionLabel =
+        when (selectedOwnerIds.size) {
+            0 -> "All owners"
+            1 -> people.find { it.id.id in selectedOwnerIds }?.fullName ?: "1 owner"
+            else -> "${selectedOwnerIds.size} owners"
+        }
+
+    val filteredPeople =
+        remember(people, searchQuery) {
+            if (searchQuery.isBlank()) people else people.filter { it.fullName.contains(searchQuery, ignoreCase = true) }
+        }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            value = if (expanded) searchQuery else selectionLabel,
+            onValueChange = { searchQuery = it },
+            label = { Text("Filter by owner") },
+            placeholder = { Text("Type to search...") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            singleLine = true,
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = {
+                expanded = false
+                searchQuery = ""
+            },
+        ) {
+            DropdownMenuItem(
+                text = { Text("All owners") },
+                onClick = { onSelectionChange(emptySet()) },
+            )
+            filteredPeople.forEach { person ->
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = selectedOwnerIds.contains(person.id.id),
+                                onCheckedChange = null,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(person.fullName)
+                        }
+                    },
+                    onClick = {
+                        onSelectionChange(
+                            if (selectedOwnerIds.contains(person.id.id)) {
+                                selectedOwnerIds - person.id.id
+                            } else {
+                                selectedOwnerIds + person.id.id
+                            },
+                        )
+                    },
+                )
             }
         }
     }

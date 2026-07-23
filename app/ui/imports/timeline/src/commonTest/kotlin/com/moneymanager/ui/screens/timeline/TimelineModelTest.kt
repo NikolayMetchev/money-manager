@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens.timeline
 
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import kotlinx.datetime.LocalDate
@@ -29,6 +30,7 @@ class TimelineModelTest {
         strategyName: String? = "Strategy A",
         ignored: Boolean = false,
         count: Long = 10,
+        accountId: AccountId? = null,
     ): ImportFileDateRange =
         ImportFileDateRange(
             kind = kind,
@@ -39,6 +41,7 @@ class TimelineModelTest {
             earliest = instant(start),
             latest = instant(end),
             transactionCount = count,
+            accountId = accountId,
         )
 
     private fun file(
@@ -172,6 +175,97 @@ class TimelineModelTest {
                 todayDay = day("2024-01-31"),
             )!!
         assertEquals(listOf("Zebra Bank", "Manual entries"), matrix.rows.map { it.label })
+    }
+
+    @Test
+    fun filterAccountRangesMatchesByNameCaseInsensitively() {
+        val checking = AccountId(1)
+        val savings = AccountId(2)
+        val ranges = listOf(range("2024-01-01", "2024-01-31", accountId = checking), range("2024-01-01", "2024-01-31", accountId = savings))
+        val filtered =
+            filterAccountRanges(
+                ranges,
+                accountNameById = mapOf(checking to "Checking", savings to "Savings"),
+                nameFilter = "check",
+                selectedOwnerIds = emptySet(),
+                ownerIdsByAccount = emptyMap(),
+            )
+        assertEquals(listOf(checking), filtered.map { it.accountId })
+    }
+
+    @Test
+    fun filterAccountRangesMatchesByOwner() {
+        val checking = AccountId(1)
+        val savings = AccountId(2)
+        val ranges = listOf(range("2024-01-01", "2024-01-31", accountId = checking), range("2024-01-01", "2024-01-31", accountId = savings))
+        val filtered =
+            filterAccountRanges(
+                ranges,
+                accountNameById = mapOf(checking to "Checking", savings to "Savings"),
+                nameFilter = "",
+                selectedOwnerIds = setOf(42L),
+                ownerIdsByAccount = mapOf(savings to setOf(42L)),
+            )
+        assertEquals(listOf(savings), filtered.map { it.accountId })
+    }
+
+    @Test
+    fun filterAccountRangesWithBlankFilterAndNoOwnersSelectedKeepsEverything() {
+        val checking = AccountId(1)
+        val ranges = listOf(range("2024-01-01", "2024-01-31", accountId = checking))
+        val filtered =
+            filterAccountRanges(
+                ranges,
+                accountNameById = mapOf(checking to "Checking"),
+                nameFilter = "",
+                selectedOwnerIds = emptySet(),
+                ownerIdsByAccount = emptyMap(),
+            )
+        assertEquals(ranges, filtered)
+    }
+
+    @Test
+    fun accountModeGroupsByAccountNameAndAFileTouchingTwoAccountsAppearsInBoth() {
+        val checking = AccountId(1)
+        val savings = AccountId(2)
+        val matrix =
+            buildTimelineMatrix(
+                listOf(
+                    range("2024-01-01", "2024-01-31", fileId = "csv-1", accountId = checking),
+                    range("2024-01-01", "2024-01-31", fileId = "csv-1", accountId = savings),
+                    range("2024-02-01", "2024-02-28", fileId = "csv-2", accountId = checking),
+                ),
+                timeZone,
+                todayDay = day("2024-02-28"),
+                groupMode = TimelineGroupMode.ACCOUNT,
+                accountNameById = mapOf(checking to "Checking", savings to "Savings"),
+            )!!
+        assertEquals(listOf("Checking", "Savings"), matrix.rows.map { it.label })
+        assertEquals(
+            2,
+            matrix.rows
+                .single { it.label == "Checking" }
+                .files.size,
+        )
+        assertEquals(
+            1,
+            matrix.rows
+                .single { it.label == "Savings" }
+                .files.size,
+        )
+    }
+
+    @Test
+    fun accountModeFallsBackToUnknownAccountLabel() {
+        val matrix =
+            buildTimelineMatrix(
+                listOf(range("2024-01-01", "2024-01-31", accountId = AccountId(99))),
+                timeZone,
+                todayDay = day("2024-01-31"),
+                groupMode = TimelineGroupMode.ACCOUNT,
+                accountNameById = emptyMap(),
+            )!!
+        assertEquals(listOf("Unknown account"), matrix.rows.map { it.label })
     }
 
     @Test
