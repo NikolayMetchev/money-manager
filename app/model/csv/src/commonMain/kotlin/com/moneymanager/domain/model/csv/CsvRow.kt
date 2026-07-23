@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.domain.model.csv
 
 import com.moneymanager.domain.model.TransferId

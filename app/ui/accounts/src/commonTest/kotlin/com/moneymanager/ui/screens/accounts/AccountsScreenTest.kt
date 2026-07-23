@@ -1,8 +1,7 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 
 package com.moneymanager.ui.screens.accounts
 
-import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -40,7 +39,6 @@ import kotlin.test.Test
 import kotlin.time.Clock
 import kotlin.time.Duration
 
-@OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
     @Test
     fun accountsScreen_displaysEmptyState_whenNoAccounts() =

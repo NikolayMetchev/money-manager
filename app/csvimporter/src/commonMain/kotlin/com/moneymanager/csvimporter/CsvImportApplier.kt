@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.Maintenance
@@ -417,7 +415,7 @@ suspend fun applyStagedCsv(
  * Excel strategies with no worksheet name, a staged sheet that already matches, or a missing workbook
  * blob (a CSV file matched by an Excel strategy, or an import staged before Excel support). Excel
  * parsing is JVM-only, but this stays a no-op on Android because such imports never have a blob, so the
- * JVM-only [createXlsxParser] is only reached once a blob is present.
+ * JVM-only `createXlsxParser` is only reached once a blob is present.
  */
 suspend fun restageXlsxForStrategy(
     csvImport: CsvImport,
@@ -477,7 +475,7 @@ fun effectiveSourceFor(
         else -> null
     }
 
-/** True when [strategy] needs a user-chosen source account (no SOURCE_ACCOUNT mapping of its own). */
+/** True when `strategy` needs a user-chosen source account (no SOURCE_ACCOUNT mapping of its own). */
 fun CsvImportStrategy.needsSourceAccountOverride(): Boolean = fieldMappings[TransferField.SOURCE_ACCOUNT] == null
 
 fun buildCsvMapper(

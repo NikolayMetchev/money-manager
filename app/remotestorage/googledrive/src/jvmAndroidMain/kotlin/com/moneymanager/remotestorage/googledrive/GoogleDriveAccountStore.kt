@@ -9,7 +9,7 @@ data class StoredAccessToken(
 )
 
 /**
- * Persists Google OAuth tokens, keyed by the user's OAuth client id, in [LocalSettings] (outside any
+ * Persists Google OAuth tokens, keyed by the user's OAuth client id, in `LocalSettings` (outside any
  * money-manager database, which is itself ephemeral when cloud-backed). Two things are stored:
  *
  * - the long-lived **refresh token** — written once at interactive sign-in and reused indefinitely;

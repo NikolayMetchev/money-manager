@@ -52,7 +52,7 @@ import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
-/** Requests the JSON-path picker dialog over [paths], routing the chosen path to [setter]. */
+/** Requests the JSON-path picker dialog over `paths`, routing the chosen path to `setter`. */
 internal typealias PathPicker = (paths: List<JsonPathEntry>, setter: (String) -> Unit) -> Unit
 
 /** Holds the editable state for a single custom field mapping row. */

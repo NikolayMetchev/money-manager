@@ -103,12 +103,12 @@ data class Money(
     /**
      * Checks if this Money amount is positive.
      */
-    fun isPositive(): Boolean = amount.compareTo(BigInteger.ZERO) > 0
+    fun isPositive(): Boolean = amount > BigInteger.ZERO
 
     /**
      * Checks if this Money amount is negative.
      */
-    fun isNegative(): Boolean = amount.compareTo(BigInteger.ZERO) < 0
+    fun isNegative(): Boolean = amount < BigInteger.ZERO
 
     /**
      * Returns the absolute value of this Money amount.

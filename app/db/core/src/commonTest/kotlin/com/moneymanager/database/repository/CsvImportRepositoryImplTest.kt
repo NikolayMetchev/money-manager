@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
-
 package com.moneymanager.database.repository
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
@@ -22,9 +20,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class CsvImportRepositoryImplTest : DbTest() {

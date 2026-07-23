@@ -73,7 +73,7 @@ class AttributeAccountMatcherTest {
         val registry =
             AttributeAccountMatcher.registry(
                 listOf(
-                    attribute(accountId = 60, value = "7721", typeName = "card-last4"),
+                    attribute(accountId = 60, value = "7721"),
                     attribute(accountId = 61, value = "acme", typeName = "merchant-key"),
                 ),
             )

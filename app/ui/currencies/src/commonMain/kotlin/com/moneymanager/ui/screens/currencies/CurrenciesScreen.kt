@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.ui.screens.currencies
 
 import androidx.compose.foundation.layout.*

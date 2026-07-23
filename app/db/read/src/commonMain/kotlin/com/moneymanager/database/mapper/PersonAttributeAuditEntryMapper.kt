@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.mapper
 
 import com.moneymanager.database.sql.audit.SelectAttributeAuditByPerson

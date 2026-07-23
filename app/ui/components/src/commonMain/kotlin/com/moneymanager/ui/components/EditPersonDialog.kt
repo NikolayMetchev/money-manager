@@ -1,5 +1,3 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-
 package com.moneymanager.ui.components
 
 import androidx.compose.foundation.layout.Arrangement

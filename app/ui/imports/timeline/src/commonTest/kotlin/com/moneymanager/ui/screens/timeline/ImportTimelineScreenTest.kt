@@ -1,8 +1,7 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 
 package com.moneymanager.ui.screens.timeline
 
-import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -30,7 +29,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.time.Instant
 
-@OptIn(ExperimentalTestApi::class)
 class ImportTimelineScreenTest {
     private fun createRepository(ranges: List<ImportFileDateRange>): ImportTimelineReadRepository =
         object : ImportTimelineReadRepository {

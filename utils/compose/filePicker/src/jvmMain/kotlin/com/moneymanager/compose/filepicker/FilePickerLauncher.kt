@@ -1,5 +1,4 @@
 @file:Suppress("UnusedPrivateProperty") // False positive: mimeTypes and onResult are used
-@file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.compose.filepicker
 

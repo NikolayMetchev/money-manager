@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.moneymanager.ui.screens.apistrategy
 
@@ -759,7 +759,6 @@ fun ApiSessionsScreen(
                             ApiSessionImportResult(
                                 accountCount = 0,
                                 transactionCount = result.transactionsImported + result.tradesImported,
-                                duplicateCount = 0,
                             )
                     )
                 refresh()

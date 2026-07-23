@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.ui.screens.transactions
 
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -246,7 +244,7 @@ class OrdersScreenTest {
         runMoneyManagerComposeUiTest {
             val sessionId = ApiSessionId(5L)
             val requestId = ApiRequestId(9L)
-            val jsonPath = "\$.result.data[0]"
+            val jsonPath = "$.result.data[0]"
             val entry =
                 ExchangeOrderAuditEntry(
                     id = 1L,

@@ -1,11 +1,8 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.domain.model.qif
 
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.QifImportId
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**

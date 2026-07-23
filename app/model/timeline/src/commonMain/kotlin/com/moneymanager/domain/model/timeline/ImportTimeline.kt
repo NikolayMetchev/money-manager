@@ -1,9 +1,6 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.domain.model.timeline
 
 import com.moneymanager.domain.model.AccountId
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 enum class TimelineSourceKind {

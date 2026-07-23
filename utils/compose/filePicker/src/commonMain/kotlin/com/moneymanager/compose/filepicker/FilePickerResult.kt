@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.compose.filepicker
 
 import kotlin.time.Instant
@@ -39,5 +37,5 @@ data class BinaryFilePickerResult(
                     lastModified == other.lastModified
             )
 
-    override fun hashCode(): Int = 31 * (31 * fileName.hashCode() + bytes.contentHashCode()) + (lastModified?.hashCode() ?: 0)
+    override fun hashCode(): Int = 31 * (31 * fileName.hashCode() + bytes.contentHashCode()) + lastModified.hashCode()
 }

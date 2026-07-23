@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountId
@@ -8,7 +6,6 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.XlsxImportBlob
 import kotlinx.coroutines.flow.Flow
-import kotlin.time.ExperimentalTime
 
 interface CsvImportReadRepository {
     /**

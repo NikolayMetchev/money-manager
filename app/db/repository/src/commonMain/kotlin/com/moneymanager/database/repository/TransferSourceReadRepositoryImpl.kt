@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.repository
 
 import com.moneymanager.database.mapper.SourceColumns

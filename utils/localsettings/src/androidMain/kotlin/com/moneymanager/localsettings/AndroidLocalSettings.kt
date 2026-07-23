@@ -3,7 +3,7 @@ package com.moneymanager.localsettings
 import android.content.Context
 
 /**
- * Android [LocalSettings] backed by [android.content.SharedPreferences], so values survive
+ * Android [LocalSettings] backed by `android.content.SharedPreferences`, so values survive
  * application restarts. Construct with the application context (e.g. from DI).
  */
 class AndroidLocalSettings(

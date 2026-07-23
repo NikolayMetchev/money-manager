@@ -73,7 +73,7 @@ class StrategyArtifactCodecTest {
 
     @Test
     fun `csv hash ignores the version stamp`() {
-        assertEquals(hash(csvExport(version = "1.0.0")), hash(csvExport(version = "9.9.9")))
+        assertEquals(hash(csvExport()), hash(csvExport(version = "9.9.9")))
     }
 
     @Test

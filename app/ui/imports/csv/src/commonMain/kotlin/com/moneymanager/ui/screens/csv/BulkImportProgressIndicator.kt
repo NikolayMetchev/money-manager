@@ -14,7 +14,7 @@ import com.moneymanager.csvimporter.BulkImportProgress
 
 /**
  * One determinate bar for a whole bulk import run: a file counter + current file/phase label over a
- * [LinearProgressIndicator] driven by the row-weighted [BulkImportProgress.overallFraction], so the bar
+ * `LinearProgressIndicator` driven by the row-weighted [BulkImportProgress.overallFraction], so the bar
  * advances within large files instead of jumping once per file. Shared by the CSV and QIF
  * "Import all"/"Re-import all" dialogs (the QIF module already reuses this package's composables).
  */

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.domain.model
 
 import kotlin.time.Instant
@@ -21,7 +19,7 @@ data class AccountRow(
     val feeParentTransferId: TransferId? = null,
     /**
      * When this row is the funding leg of a pass-through (conduit) charge (card → conduit), the id of its
-     * linked spend leg (conduit → merchant). See [com.moneymanager.domain.model.passthrough.PassThroughAccount].
+     * linked spend leg (conduit → merchant). See `com.moneymanager.domain.model.passthrough.PassThroughAccount`.
      */
     val passThroughSpendId: TransferId? = null,
     /** When this row IS the spend leg of a pass-through charge, the id of its funding leg. */

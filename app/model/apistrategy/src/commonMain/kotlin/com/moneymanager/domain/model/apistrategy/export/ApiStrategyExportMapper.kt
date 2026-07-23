@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.domain.model.apistrategy.export
 
 import com.moneymanager.domain.model.ApiImportStrategyId

@@ -255,11 +255,13 @@ jobs:
     needs: [changes, lint-format]
     # Unlike the other heavy jobs this one also runs on workflow_dispatch, so it has no
     # event-name condition.
-    # Disabled: the Qodana Cloud open-source license expired on 2026-07-06, so every run
-    # fails before producing a SARIF. Re-enable (drop the leading `false &&`) once a new
-    # license is granted.
+    # Runs the 2026.2-eap linter (qodana.yaml): EAP linters need no Qodana Cloud license,
+    # which works around the expired open-source license (and retests QD-14665). No QODANA_TOKEN
+    # is passed: when one is present the linter validates it even on EAP and dies with "token was
+    # declined by Qodana Cloud server" before producing a SARIF (verified: actions run
+    # 30006530973). Re-add the token env once the license is renewed to restore cloud upload.
+    # SARIF goes to GitHub Code Scanning and the run artifact either way.
     if: >-
-      false &&
       !cancelled() &&
       needs.changes.outputs.code == 'true' &&
       (needs.lint-format.result == 'success' || needs.lint-format.result == 'skipped')
@@ -287,8 +289,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/qodana/caches
-          key: qodana-2026.1-refs/heads/main
-          restore-keys: qodana-2026.1-
+          key: qodana-2026.2-eap-refs/heads/main
+          restore-keys: qodana-2026.2-eap-
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.1
         with:
@@ -299,9 +301,6 @@ jobs:
           # the baseline.
           pr-mode: ${{ github.event_name == 'pull_request' }}
           use-caches: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/') }}
-        env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1874207222 }}
-          QODANA_ENDPOINT: 'https://qodana.cloud'
       - name: Upload SARIF as artifact
         if: always()
         uses: actions/upload-artifact@v7

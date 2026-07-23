@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.ui.screens.csvstrategy
 
 import com.moneymanager.domain.model.csv.CsvColumn

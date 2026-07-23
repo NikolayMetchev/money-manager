@@ -1,8 +1,3 @@
-@file:OptIn(
-    kotlin.uuid.ExperimentalUuidApi::class,
-    androidx.compose.material3.ExperimentalMaterial3Api::class,
-)
-
 package com.moneymanager.ui.screens.apistrategy.editor
 
 import androidx.compose.foundation.layout.Arrangement

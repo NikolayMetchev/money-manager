@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.domain.repository.write
 
 import com.moneymanager.domain.model.ApiCredentialId
@@ -128,7 +126,7 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
     suspend fun insertResponseTransactions(transactions: List<ApiResponseTransactionInsert>)
 
     /**
-     * Deletes every [ApiResponseTransaction] recorded for responses in the given session — used
+     * Deletes every `ApiResponseTransaction` recorded for responses in the given session — used
      * before a re-import re-inserts a fresh set, so the `(response_id, json_path)` unique index
      * never sees a stale row from a prior run.
      */

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.domain.model.importdirectory
 
 import com.moneymanager.domain.model.CsvImportId

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountAttributeAuditEntry

@@ -3,9 +3,6 @@ insert:
 INSERT INTO currency(id, code, name, scale_factor)
 VALUES (?, ?, ?, ?);
 
-lastInsertedId:
-SELECT last_insert_rowid();
-
 update:
 UPDATE currency
 SET revision_id = revision_id + 1,

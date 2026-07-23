@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.apiimporter
 
 import com.moneymanager.domain.Maintenance
@@ -35,9 +33,8 @@ import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.markApiSessionImported
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
-/** Value an internal-transfer reconcile's exclusion attribute always carries (see [ImportDeduper]). */
+/** Value an internal-transfer reconcile's exclusion attribute always carries (see `ImportDeduper`). */
 private const val EXCLUDED_ATTR_VALUE = "reconciled"
 
 /**

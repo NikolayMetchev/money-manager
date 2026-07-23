@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class, kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.ui.screens.apistrategy
 
 import com.moneymanager.domain.model.ApiImportStrategyId
@@ -12,7 +10,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**

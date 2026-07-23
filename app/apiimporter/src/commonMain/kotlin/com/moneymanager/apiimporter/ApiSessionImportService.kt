@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
@@ -484,7 +482,7 @@ private fun validatePeopleOwnershipConfig(config: ApiPersonImportConfig) {
 }
 
 /**
- * Imports people from a people-download session: creates a [Person] for each profile holder and, when
+ * Imports people from a people-download session: creates a `Person` for each profile holder and, when
  * [accountsSessionId] is provided, links each person as an owner of the accounts fetched under their
  * profile (via [ApiPersonImportConfig.accountOwnerAncestorExpr]).
  */
@@ -1017,7 +1015,7 @@ private suspend fun buildGlobalHolderOwnerships(
  * disambiguate it, the import engine's own-account matching falls back to reusing an existing
  * same-named account from this batch (a heuristic meant for merchant/counterparty dedup, e.g. one
  * provider minting two external ids for one merchant) — which would wrongly merge two genuinely
- * distinct own accounts that share the static name. [siblingAccounts] lets [displayName] detect that
+ * distinct own accounts that share the static name. `siblingAccounts` lets [displayName] detect that
  * and append a short disambiguator only when it's actually needed.
  */
 private suspend fun resolveOwnAccountKey(
@@ -2199,7 +2197,7 @@ private fun parseFeeAmount(
  * Resolves the transaction sign (-1/0/1) from either the amount magnitude or a dedicated field.
  * Returns null when [ApiSignSource.FIELD] is configured but the sign field is absent: a missing
  * direction indicator is unexpected data, so the caller skips the item rather than silently
- * defaulting it to a debit. A present value that is simply not in [creditValues] is a debit.
+ * defaulting it to a debit. A present value that is simply not in `creditValues` is a debit.
  */
 private fun resolveSign(
     obj: JsonObject,
@@ -3076,7 +3074,7 @@ private fun JsonObject.stringOrNull(key: String): String? = this[key]?.jsonPrimi
 private fun JsonObject.resolveJsonPath(dotPath: String): String? = (resolveJsonPathElement(dotPath) as? JsonPrimitive)?.contentOrNull
 
 /**
- * Resolves a dot-notation path to a [JsonElement], supporting array indexing so exchange responses
+ * Resolves a dot-notation path to a `JsonElement`, supporting array indexing so exchange responses
  * whose items live inside nested arrays are addressable — e.g. "result.data", "data[0].price",
  * "legs[1].amount". Each segment is an optional object key followed by zero or more `[n]` indices.
  */
@@ -3257,7 +3255,7 @@ private fun JsonObject.evaluatePredicate(predicate: RulePredicate): Boolean {
     }
 }
 
-/** Resolves a dot-notation path to its [JsonElement] (object, array, or primitive), or null. */
+/** Resolves a dot-notation path to its `JsonElement` (object, array, or primitive), or null. */
 private fun JsonObject.resolveJsonElementPath(dotPath: String): JsonElement? {
     var current: JsonElement = this
     for (part in dotPath.split(".")) {

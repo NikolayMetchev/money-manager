@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
-
 package com.moneymanager.ui.screens
 
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -31,9 +29,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 
 /**
  * End-to-end test for importing a Wise transaction-history CSV with the built-in

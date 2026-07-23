@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package com.moneymanager.ui.screens.apistrategy
 
 import com.moneymanager.domain.model.ApiCredential
@@ -22,7 +20,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class ApiSessionsScreenLogicTest {

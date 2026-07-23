@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.moneymanager.ui.screens.transactions
 
@@ -149,10 +149,9 @@ private fun visibleColumnRange(
     count: Int,
 ): IntRange {
     if (count == 0) return IntRange.EMPTY
-    val viewStart = scrollPx
     val viewEnd = scrollPx + viewportPx
     var first = 0
-    while (first < count && columns.starts[first] + columns.widths[first] < viewStart) {
+    while (first < count && columns.starts[first] + columns.widths[first] < scrollPx) {
         first++
     }
     var last = first

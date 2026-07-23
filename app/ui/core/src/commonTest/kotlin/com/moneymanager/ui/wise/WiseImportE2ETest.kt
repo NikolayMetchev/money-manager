@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.ui.wise
 import com.moneymanager.apiimporter.downloadApiSessionAccounts
 import com.moneymanager.apiimporter.downloadApiSessionPeople

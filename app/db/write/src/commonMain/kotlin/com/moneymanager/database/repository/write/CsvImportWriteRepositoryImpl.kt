@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
-
 package com.moneymanager.database.repository.write
 
 import com.moneymanager.database.csv.CsvTableManager
@@ -14,9 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class CsvImportWriteRepositoryImpl(

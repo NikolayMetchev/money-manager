@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.csv
 
 import app.cash.sqldelight.db.QueryResult

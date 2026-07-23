@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountId
@@ -7,7 +5,6 @@ import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportRecord
 import kotlinx.coroutines.flow.Flow
-import kotlin.time.ExperimentalTime
 
 /**
  * Read access for QIF imports. QIF imports reuse the CSV import-strategy engine

@@ -1,11 +1,7 @@
-@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
-
 package com.moneymanager.domain.model
 
 import kotlinx.serialization.Serializable
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 
 data class ApiCredential(
     val id: ApiCredentialId,

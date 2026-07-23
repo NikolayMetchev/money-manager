@@ -5,7 +5,7 @@ actual data class DbLocation(
 ) {
     /**
      * On Android, checking file existence requires Context.
-     * Use [com.moneymanager.database.DatabaseManager.databaseExists] for actual file existence checks.
+     * Use `com.moneymanager.database.DatabaseManager.databaseExists` for actual file existence checks.
      * This returns true (assumed to exist or will be created).
      */
     actual fun exists() = true

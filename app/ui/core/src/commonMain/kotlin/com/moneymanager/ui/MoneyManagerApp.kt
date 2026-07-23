@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -157,7 +155,7 @@ fun MoneyManagerApp(
 
         // Null until the flag has been read: showing the wizard on a `false` we haven't loaded yet would
         // flash it over an already-configured database on every launch.
-        val setupWizardCompleted by rememberFlowAsStateWithSchemaErrorHandling<Boolean?>(initial = null) {
+        val setupWizardCompleted by rememberFlowAsStateWithSchemaErrorHandling(initial = null) {
             services.settings.settingsRepository.isSetupWizardCompleted()
         }
         var setupWizardRequested by remember { mutableStateOf(false) }

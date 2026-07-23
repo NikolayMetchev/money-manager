@@ -157,6 +157,7 @@ kotlin {
                 implementation(projects.app.db.write)
                 implementation(projects.app.importer)
                 implementation(projects.app.model.apistrategy)
+                implementation(projects.app.model.qif)
                 implementation(projects.app.model.repository.write)
                 implementation(projects.test.app.db)
                 implementation(projects.test.app.ui)

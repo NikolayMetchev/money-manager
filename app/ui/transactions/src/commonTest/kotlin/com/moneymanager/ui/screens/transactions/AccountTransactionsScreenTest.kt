@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.ui.screens.transactions
 
 import androidx.compose.foundation.layout.Column
@@ -83,6 +81,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
@@ -428,7 +427,7 @@ class AccountTransactionsScreenTest {
                             // Suspend like a real DB query: setting isLoadingPreviousPage recomposes
                             // before this returns, so if the trigger effect keys on that flag it
                             // restarts and cancels this very call — the load then never completes.
-                            delay(50)
+                            delay(50.milliseconds)
                             val rows = allRows.filterByCurrency(currencyId)
                             val idx =
                                 rows.indexOfFirst {

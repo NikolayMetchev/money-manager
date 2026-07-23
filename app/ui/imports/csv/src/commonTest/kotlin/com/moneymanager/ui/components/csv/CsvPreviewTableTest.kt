@@ -1,9 +1,8 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 
 package com.moneymanager.ui.components.csv
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -17,7 +16,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalTestApi::class)
 class CsvPreviewTableTest {
     @Test
     fun viewLink_clickInvokesTransferCallback() =

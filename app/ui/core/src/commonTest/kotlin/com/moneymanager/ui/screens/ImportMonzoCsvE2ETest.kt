@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
-
 package com.moneymanager.ui.screens
 
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -38,9 +36,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**

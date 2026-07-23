@@ -5,8 +5,8 @@ import kotlinx.serialization.Serializable
 /**
  * Declares how a CSV source expresses an **asset conversion** that arrives as two (or more) separate
  * rows — a *debit* leg (an asset leaving the owner account) plus a *credit* leg (the asset received) —
- * rather than as a single cross-asset row. Such conversions cannot be modelled as one [transfer] (a
- * transfer is single-asset) nor reliably as a [trade] (the source often reports only the aggregate
+ * rather than as a single cross-asset row. Such conversions cannot be modelled as one `transfer` (a
+ * transfer is single-asset) nor reliably as a `trade` (the source often reports only the aggregate
  * credited amount for a many-assets-in / one-asset-out event, e.g. crypto.com "Convert Dust").
  *
  * When set on a [CsvImportStrategy], the importer:

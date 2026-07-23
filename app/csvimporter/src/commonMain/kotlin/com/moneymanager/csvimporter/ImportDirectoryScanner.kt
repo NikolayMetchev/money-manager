@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.csvimporter
 
 import com.moneymanager.csv.CsvParseOptions
@@ -23,7 +21,6 @@ import com.moneymanager.importengineapi.updateImportDirectory
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.qif.QifParser
-import com.moneymanager.xlsx.XlsxUnsupportedPlatformException
 import com.moneymanager.xlsx.createXlsxParser
 import org.lighthousegames.logging.logging
 import kotlin.coroutines.cancellation.CancellationException
@@ -220,7 +217,7 @@ private suspend fun stageCsv(
 /**
  * Stages an Excel workbook's first worksheet exactly like [stageCsv] (header row + data rows), plus the
  * raw workbook bytes so a strategy naming a different worksheet can re-extract it later. Throws
- * [XlsxUnsupportedPlatformException] on Android (Apache POI is JVM-only); the caller's generic
+ * `XlsxUnsupportedPlatformException` on Android (Apache POI is JVM-only); the caller's generic
  * exception handler records that as a per-file scan failure.
  */
 private suspend fun stageXlsx(

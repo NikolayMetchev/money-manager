@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.audit
 
 import com.moneymanager.domain.model.Account
@@ -18,7 +16,7 @@ import kotlin.time.Clock
 /**
  * Regression test for the audit trail failing on QIF-imported accounts.
  *
- * An account created from a QIF import gets a [Source.Qif] with a known import id but **no**
+ * An account created from a QIF import gets a `Source.Qif` with a known import id but **no**
  * `recordIndex` (the account is derived from the import as a whole, not a single record). The
  * import-detail table previously forced the record index NOT NULL, so the recorder skipped the
  * detail row entirely and the import id was lost; reconstructing the source for the audit trail

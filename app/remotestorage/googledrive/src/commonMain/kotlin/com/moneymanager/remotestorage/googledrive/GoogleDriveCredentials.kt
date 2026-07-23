@@ -16,7 +16,7 @@ private val lenientJson = Json { ignoreUnknownKeys = true }
  * the app's shipped default credentials (build-time injected via `GoogleOAuthDefaults`); the value can
  * also be carried in a database binding's `providerConfig` for provider reconstruction on later
  * launches. The long-lived refresh token is NOT stored here — the provider keeps it in
- * [GoogleDriveAccountStore].
+ * `GoogleDriveAccountStore`.
  */
 @Serializable
 data class GoogleDriveCredentials(

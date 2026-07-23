@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.write
 
 import com.moneymanager.database.json.FieldMappingJsonCodec

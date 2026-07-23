@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
-
 package com.moneymanager.database.repository.write
 
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
@@ -15,9 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class QifImportWriteRepositoryImpl(

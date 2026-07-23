@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package com.moneymanager.database.repository
 
 import app.cash.sqldelight.coroutines.asFlow
@@ -15,7 +13,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlin.coroutines.CoroutineContext
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 class ImportTimelineReadRepositoryImpl(

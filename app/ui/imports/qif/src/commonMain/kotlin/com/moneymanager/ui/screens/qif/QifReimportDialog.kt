@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.ui.screens.qif
 
 import androidx.compose.foundation.layout.Column

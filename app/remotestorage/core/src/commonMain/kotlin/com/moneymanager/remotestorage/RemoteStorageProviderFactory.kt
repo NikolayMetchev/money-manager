@@ -8,7 +8,7 @@ data class RemoteStorageType(
 
 /**
  * Builds [RemoteStorageProvider] instances. Lets the UI enumerate available backends and lets startup
- * reconstruct the bound provider from a persisted id + provider-specific [config], without the common
+ * reconstruct the bound provider from a persisted id + provider-specific `config`, without the common
  * code depending on platform-specific provider implementations.
  */
 interface RemoteStorageProviderFactory {

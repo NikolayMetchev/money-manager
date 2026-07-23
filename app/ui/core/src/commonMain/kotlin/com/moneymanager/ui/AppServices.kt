@@ -39,7 +39,7 @@ import com.moneymanager.importengineapi.ImportEngine
  * The UI's view of the database. Every repository here is a **read** interface — the UI never mutates
  * the database through a repository. All writes go through [TransactionsDomain.importEngine] (the single
  * write seam, which carries the session's edit gate). The engine is built in di/core
- * ([com.moneymanager.database.di.createImportEngine]) so the write repositories never reach this layer.
+ * (`com.moneymanager.database.di.createImportEngine`) so the write repositories never reach this layer.
  */
 data class AppServices(
     val accounts: AccountsDomain,

@@ -1,12 +1,10 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.domain.model
 
 import kotlin.time.Instant
 
 /**
- * A single revision of an [com.moneymanager.domain.model.importdirectory.ImportDirectory] as captured
- * in the audit trail, with its provenance [source]. Mirrors [CsvImportStrategyAuditEntry].
+ * A single revision of an `com.moneymanager.domain.model.importdirectory.ImportDirectory` as captured
+ * in the audit trail, with its provenance [source]. Mirrors `CsvImportStrategyAuditEntry`.
  */
 data class ImportDirectoryAuditEntry(
     val id: Long,

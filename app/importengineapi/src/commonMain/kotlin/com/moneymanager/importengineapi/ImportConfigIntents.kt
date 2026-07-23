@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.AccountId
@@ -139,7 +137,7 @@ sealed interface CsvImportMutation {
             result = 31 * result + fileChecksum.hashCode()
             result = 31 * result + fileLastModified.hashCode()
             result = 31 * result + (xlsxBytes?.contentHashCode() ?: 0)
-            result = 31 * result + (xlsxWorksheetName?.hashCode() ?: 0)
+            result = 31 * result + xlsxWorksheetName.hashCode()
             return result
         }
     }

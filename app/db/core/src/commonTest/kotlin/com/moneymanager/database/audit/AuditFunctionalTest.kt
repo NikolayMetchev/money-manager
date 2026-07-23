@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.audit
 import app.cash.sqldelight.db.QueryResult
 import com.moneymanager.domain.model.Account

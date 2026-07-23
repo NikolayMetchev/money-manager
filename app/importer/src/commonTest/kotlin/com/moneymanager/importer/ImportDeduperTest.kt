@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.importer
 
 import com.moneymanager.bigdecimal.BigDecimal
@@ -634,7 +632,7 @@ class ImportDeduperTest {
 
     @Test
     fun fundingReconcile_amountMismatchDoesNotMatch() {
-        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(fundingLeg(9, amount = 5)))
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(fundingLeg(9)))
         val result = deduper.classify(listOf(curveRow(0, amount = 6))).single()
         assertEquals(ImportStatus.IMPORTED, result.status)
         assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })

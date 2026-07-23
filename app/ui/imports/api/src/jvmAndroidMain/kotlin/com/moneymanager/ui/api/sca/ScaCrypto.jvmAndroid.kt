@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
-
 package com.moneymanager.ui.api.sca
 
 import java.security.KeyFactory

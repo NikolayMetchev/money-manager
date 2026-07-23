@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class, kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.service
 
 import com.moneymanager.domain.model.ApiImportStrategyId

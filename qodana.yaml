@@ -3,7 +3,7 @@
 ####################################################################################################################
 
 version: "1.0"
-linter: jetbrains/qodana-jvm-community:2026.1
+linter: jetbrains/qodana-jvm-community:2026.2-eap
 plugins:
   - id: com.squareup.sqldelight
 profile:
@@ -34,52 +34,31 @@ exclude:
     paths:
       # Metro DI modules/providers and the DB-free catalog factory are consumed by the Metro
       # compiler plugin / DI wiring, which qodana can't see.
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/strategycatalog/StrategyCatalogModule.kt
       - app/strategycatalog/src/commonMain/kotlin/com/moneymanager/strategycatalog/StrategyCatalogFactory.kt
       # Fake StrategyLibrary: interface-mandated override parameters its stub bodies don't read.
       - app/strategycatalog/src/commonTest/kotlin/com/moneymanager/strategycatalog/StrategyCatalogControllerTest.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/RepositoryModule.kt
-      - app/ui/core/src/jvmMain/kotlin/com/moneymanager/ui/navigation/PlatformBackHandler.jvm.kt
-      - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/csvstrategy/FieldMapping.kt
-      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/database/CreateDatabaseManager.jvm.kt
   - name: UnusedSymbol
     paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/strategycatalog/StrategyCatalogModule.kt
       - app/strategycatalog/src/commonMain/kotlin/com/moneymanager/strategycatalog/StrategyCatalogFactory.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/RepositoryModule.kt
   - name: UnusedDeclaration
     paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/strategycatalog/StrategyCatalogModule.kt
       - app/strategycatalog/src/commonMain/kotlin/com/moneymanager/strategycatalog/StrategyCatalogFactory.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/RepositoryModule.kt
   - name: UnusedSymbolLocal
     paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/strategycatalog/StrategyCatalogModule.kt
       - app/strategycatalog/src/commonMain/kotlin/com/moneymanager/strategycatalog/StrategyCatalogFactory.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/RepositoryModule.kt
   - name: UnusedSymbol
     paths:
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppComponent.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseComponent.kt
       - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/DbTest.kt
       # Provenance test helpers: used cross-module (app/db/core tests), which Qodana misses here.
       - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/TestProvenance.kt
       - utils/compose/scrollbar/src/jvmMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
       # Platform-specific implementations referenced only via DI / expect-actual, which Qodana misses here.
       - utils/localsettings/src/androidMain/kotlin/com/moneymanager/localsettings/AndroidLocalSettings.kt
-      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/DatabaseLocationPickerLauncher.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/MinimalErrorScreen.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/SimpleFallbackErrorScreen.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/ErrorDialog.kt
@@ -89,67 +68,24 @@ exclude:
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/IdConversions.kt
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/SourceTypeConversions.kt
-      # getAuditableTables/getTableColumns are used only by app/db/core tests (cross-module), which
-      # Qodana misses here — same situation as TestProvenance above.
-      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/MoneyManagerDatabaseWrapper.kt
-  # Android no-op actual for the Linux-only horizontal-scroll-wheel modifier: the scrollState
-  # parameter is required by the expect signature but unused on Android (no mouse wheel).
   - name: unused
     paths:
-      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.android.kt
-  - name: UnusedSymbol
-    paths:
-      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.android.kt
-  - name: UnusedDeclaration
-    paths:
-      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.android.kt
-  - name: UnusedSymbolLocal
-    paths:
-      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.android.kt
-  # Metro DI module + platform factories contributed via @ContributesTo/@Provides and expect-actual:
-  # Qodana sees no direct usage (mirrors DatabaseManagerModule / CreateDatabaseManager.jvm.kt).
-  - name: unused
-    paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/LocalSettingsModule.kt
-      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/CreateLocalSettings.jvm.kt
       - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/DbLocation.kt
-  - name: UnusedSymbol
-    paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/LocalSettingsModule.kt
-  - name: UnusedDeclaration
-    paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/LocalSettingsModule.kt
-  - name: UnusedSymbolLocal
-    paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/LocalSettingsModule.kt
   # Remote-storage DI factories/modules contributed via Metro @ContributesTo/@Provides and expect-actual,
   # plus platform impls referenced only via DI: Qodana sees no direct usage (mirrors LocalSettingsModule).
   # GoogleDriveProviderFactory.kt's googleDriveProvider(tokenSource)/buildBearerDriveClient are likewise
   # called only from the Android app/DI modules, which Qodana's KMP import doesn't resolve.
   - name: unused
     paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.kt
-      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.jvm.kt
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.android.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/RemoteStorageModule.kt
       - app/remotestorage/googledrive/src/jvmAndroidMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
   - name: UnusedSymbol
     paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.kt
-      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.jvm.kt
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.android.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/RemoteStorageModule.kt
       - app/remotestorage/googledrive/src/jvmAndroidMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
   - name: UnusedDeclaration
     paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.kt
-      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.jvm.kt
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.android.kt
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/RemoteStorageModule.kt
       - app/remotestorage/googledrive/src/jvmAndroidMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
   - name: UnusedSymbolLocal
     paths:
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/RemoteStorageModule.kt
       - app/remotestorage/googledrive/src/jvmAndroidMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
   # Interface default intentionally returns null for non-token backends (Google Drive overrides it);
   # the test-only no-op GoogleAccessTokenSource fake likewise returns constants from its stubs.
@@ -165,36 +101,32 @@ exclude:
   - name: ReplaceGetOrSet
     paths:
       - utils/archive/src/commonMain/kotlin/com/moneymanager/archive/ArchiveCodec.kt
-  # Compose setup dialogs intentionally repeat small field/label fragments across create/open branches.
-  - name: DuplicatedCode
-    paths:
-      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/screens/CloudStorageCard.kt
-      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/screens/GoogleDriveSetupDialog.kt
-  # Each audit/source query maps a distinct SQLDelight-generated row type to SourceRecord. Those row
-  # types share no supertype, so reading the identically-named source_* columns into SourceColumns /
-  # SourceDetailColumns is necessarily repeated per mapper — unavoidable codegen boilerplate, not real
-  # duplication that could be extracted.
-  - name: DuplicatedCode
-    paths:
-      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper
   - name: All
     paths:
       - build
       - "*/build"
       - "*/*/build"
       - "*/*/*/build"
+      # The wildcard globs above don't actually match (only literal paths are honoured — the
+      # pre-existing literal app/db/core/build entry is why that module never leaked), so every
+      # module whose codegen produces findings needs a literal entry. Without these the generated
+      # SQLDelight/Mappie sources leak 3k+ naming findings into the scan.
+      - "*/*/*/*/build"
+      - "*/*/*/*/*/build"
+      - app/db/read/build
+      - app/db/write/build
+      - app/db/schema/build
+      - app/db/seed/build
+      - app/db/repository/build
+      - app/db/di/build
+      - app/model/repository/read/build
+      - app/model/repository/write/build
       - gradle/build-logic/build
       - app/db/core/build
       - app/ui/core/build
   # False positives in a PR-touched test: `setValue` is used via 17 `by` delegations, and the mockery
   # `calls { (code) -> ... it.code == code }` lambda isn't a constant condition. (PR runs analyse changed
   # files, so these surface even though the lines are unchanged.)
-  - name: KotlinUnusedImport
-    paths:
-      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/AccountTransactionsScreenTest.kt
-  - name: KotlinConstantConditions
-    paths:
-      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/AccountTransactionsScreenTest.kt
   # Static unused-symbol/parameter analysis is unreliable for test code: helpers, fixtures and
   # repository factories are referenced only by `@Test` methods, which the PR-diff analysis doesn't
   # treat as roots (verified false positives, e.g. helpers used 11-15x). Don't fail PRs on it in tests.
@@ -268,38 +200,133 @@ exclude:
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/QifStagingConversion.kt
   # Per-platform capability methods intentionally return a constant: both platforms now support every
   # import-directory provider, so supportsProvider() is always true. Not a simplifiable code smell.
-  - name: SameReturnValue
-    paths:
-      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource/CreateImportFileSourceFactory.jvm.kt
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource/CreateImportFileSourceFactory.android.kt
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource/CreateDriveFolderBrowser.android.kt
   - name: unused
     paths:
       - app/importfilesource/core/src/commonMain/kotlin/com/moneymanager/importfilesource/ImportFileSource.kt
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/importfilesource
-      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource
-  - name: UnusedSymbol
-    paths:
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/importfilesource
-      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource
-  - name: UnusedDeclaration
-    paths:
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/importfilesource
-      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource
-  - name: UnusedSymbolLocal
-    paths:
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/importfilesource
-      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/importfilesource
-      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/importfilesource
   # Mappie generates near-identical audit-entry mappers from the same template; the duplicated fragment
   # is codegen-shaped boilerplate, not hand-written duplication.
   - name: DuplicatedCode
     paths:
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/OwnershipAuditHistoryForAccountMapper.kt
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/TransferAuditEntryMapper.kt
+  # ── 2026.2-eap migration (QD-14665 retest) ────────────────────────────────────────
+  # Stylistic inspections newly surfaced by the EAP profile that this project doesn't want:
+  # DestructuringDeclaration is a pure style preference; KotlinPrintToLogpoint suggests IDE
+  # logpoints for println in CLI tools/build scripts where println IS the output.
+  - name: DestructuringDeclaration
+  - name: KotlinPrintToLogpoint
+  # SameParameterValue can't see cross-module callers (KMP per-module import), so parameters
+  # that exist for API generality are reported as constant. Mirrors the app/ui entry above.
+  - name: SameParameterValue
+  # EAP false positives (QD-14665 family and friends), verified against real code:
+  #   * KotlinUnreachableCode — flags the entire body after `?: throw` inside a lambda/`use {}`
+  #     block that demonstrably runs in production (SafFolderImportFileSource.queryChildren).
+  #   * UnnecessaryOptInAnnotation — the UI modules use ExposedDropdownMenuBox/menuAnchor and
+  #     friends, which still require ExperimentalMaterial3Api under the project's compiler;
+  #     removing those opt-ins as suggested breaks the build (verified: ~20 files).
+  #   * KotlinUnusedImport — `import kotlin.time.Instant` reported unused in files whose
+  #     declarations use Instant; removing it breaks the build.
+  #   * HasPlatformType — commonMain code cannot have platform types (SortedSerializers).
+  #   * UnusedReceiverParameter — Cursor.getLongOrNullAt calls isNull/getLong on its receiver.
+  #   * KotlinMisorderedAssertEqualsArguments — assertEquals(emptyList(), actual) already has
+  #     the expected value first.
+  - name: KotlinUnreachableCode
+    paths:
+      - app/importfilesource/localfolder/src/androidMain/kotlin/com/moneymanager/importfilesource/localfolder/SafFolderImportFileSource.kt
+      - app/apiimporter/src/commonMain/kotlin/com/moneymanager/apiimporter/ApiSessionImportService.kt
+  - name: UnnecessaryOptInAnnotation
+    paths:
+      - app/ui
+  - name: KotlinUnusedImport
+    paths:
+      - app/model/apistrategy/src/commonMain/kotlin/com/moneymanager/domain/model/apistrategy/ApiImportStrategyAuditEntry.kt
+      - app/model/csvstrategy/src/commonMain/kotlin/com/moneymanager/domain/model/csvstrategy/CsvImportStrategyAuditEntry.kt
+  - name: HasPlatformType
+    paths:
+      - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/serialization/SortedSerializers.kt
+  - name: UnusedReceiverParameter
+    paths:
+      - app/importfilesource/localfolder/src/androidMain/kotlin/com/moneymanager/importfilesource/localfolder/SafFolderImportFileSource.kt
+  - name: KotlinMisorderedAssertEqualsArguments
+    paths:
+      - app/db/read/src/commonTest/kotlin/com/moneymanager/database/json/FieldMappingJsonCodecTest.kt
+  # Intentional patterns:
+  #   * EmptyMethod — deliberate no-op overrides (Android onCreate-for-existing-DB branch and
+  #     the Android no-op scrollbar actuals).
+  #   * SameReturnValue — platform capability methods and test stubs intentionally constant.
+  #   * UnnecessaryVariable — `val m = mappings` is a deliberate short alias keeping the many
+  #     TextFieldRow lines readable.
+  #   * DuplicatedCode — near-identical import/reimport orchestration blocks that share no
+  #     extractable abstraction (mirrors the app/db/core mapper entry above).
+  - name: EmptyMethod
+    paths:
+      - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
+      - utils/compose/scrollbar/src/androidMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
+  - name: SameReturnValue
+    paths:
+      - app/importfilesource/di/src/androidMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.android.kt
+      - app/importfilesource/di/src/jvmMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.jvm.kt
+      - app/model/core/src/androidMain/kotlin/com/moneymanager/domain/model/DbLocation.kt
+      - app/ui/imports/timeline/src/commonTest/kotlin/com/moneymanager/ui/screens/timeline/ImportTimelineScreenTest.kt
+  - name: UnnecessaryVariable
+    paths:
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/editor/ExchangeDataEditors.kt
+  - name: DuplicatedCode
+    paths:
+      - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/CsvImportApplier.kt
+      - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/CsvReimport.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/ImportDeduper.kt
+  # ReplaceGetOrSet: CryptographyProvider.get is not an operator fun (same as the ArchiveCodec
+  # entry above), so the suggested indexing syntax doesn't compile.
+  - name: ReplaceGetOrSet
+    paths:
+      - utils/rest/src/commonMain/kotlin/com/moneymanager/rest/ApiRequestSigner.kt
+  # Metro DI annotations (@Provides/@ContributesTo/@DependencyGraph) are marked as entry points
+  # in .idea/misc.xml, which the 2026.2-eap linter respects (QD-14665) — so the broad DI-module
+  # excludes that used to live here are gone. What remains is only what a full-scan run on the
+  # EAP (actions run 30005309699) still flags, all verified false positives:
+  #   * RepositoryModule/DeviceIdModule — the entry point suppresses every provide*ReadRepository
+  #     but no provide*WriteRepository (identically annotated, same file; reported on QD-14665).
+  #   * DatabaseComponent — the @DependencyGraph.Factory interface and repository properties used
+  #     only by other modules' tests.
+  #   * expect/actual platform factories (create*) and Android-only impls wired from app/main —
+  #     not annotation-based, so entry points can't cover them; Qodana's per-module KMP import
+  #     can't see their callers.
+  - name: unused
+    paths:
+      - app/db/di/src/jvmMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.jvm.kt
+      - app/importfilesource/di/src/androidMain
+      - app/importfilesource/di/src/jvmMain
+      - app/remotestorage/di/src/androidMain
+      - app/remotestorage/di/src/jvmMain
+      - utils/localsettings/di/src/jvmMain
+      - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/CsvImportStrategyReadRepositoryImpl.kt
+      - app/model/csvstrategy/src/commonMain/kotlin/com/moneymanager/domain/model/csvstrategy/FieldMapping.kt
+      - utils/parsers/xlsx/src/jvmTest/kotlin/com/moneymanager/xlsx/XlsxParserTest.kt
+      # Interface-mandated parameters of intentional no-op overrides (same files as the
+      # EmptyMethod entries above).
+      - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
+      - utils/compose/scrollbar/src/androidMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
+  - name: UnusedSymbol
+    paths:
+      - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/RepositoryModule.kt
+      - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DeviceIdModule.kt
+      - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DatabaseComponent.kt
+      - app/db/di/src/androidMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.android.kt
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/VersionReader.android.kt
+      - app/importfilesource/di/src/androidMain
+      - app/remotestorage/di/src/androidMain
+      - app/strategycatalog/src/androidMain/kotlin/com/moneymanager/strategycatalog/StrategyCatalogFactory.android.kt
+      - utils/localsettings/di/src/androidMain
+      # Platform impls referenced only via DI/expect-actual, plus cross-module test helpers
+      # (TestMoneyAssertions/TestDatabaseHelper) and the write-wrapper audit helpers used only
+      # by app/db/core tests.
+      - app/importfilesource/localfolder/src/androidMain/kotlin/com/moneymanager/importfilesource/localfolder/SafFolderImportFileSource.kt
+      - utils/compose/scrollbar/src/androidMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
+      - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
+      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/MoneyManagerDatabaseWrapper.kt
+      - test/app/db/src
+
 include:
   - name: CheckDependencyLicenses
 failureConditions:

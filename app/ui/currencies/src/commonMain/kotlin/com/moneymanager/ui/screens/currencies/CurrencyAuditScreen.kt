@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.ui.screens.currencies
 
 import androidx.compose.material3.MaterialTheme
