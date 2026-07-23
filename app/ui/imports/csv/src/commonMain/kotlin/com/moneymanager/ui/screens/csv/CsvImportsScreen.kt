@@ -11,12 +11,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
@@ -25,6 +30,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,10 +41,13 @@ import com.moneymanager.compose.filepicker.rememberBinaryFilePicker
 import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
+import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
+import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
@@ -71,6 +80,7 @@ import com.moneymanager.ui.util.displayDate
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.sha256Hex
 import com.moneymanager.xlsx.createXlsxParser
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -115,6 +125,31 @@ fun CsvImportsScreen(
     LaunchedEffect(imports) {
         directoryAccounts = importDirectoryRepository.csvImportSourceAccounts()
     }
+
+    // Unimported files carry no stored strategy, so match one per file the same way "Import all" does
+    // (content/filename-aware, needs each file's columns + sampled rows — not in getAllImports()), to
+    // group the Unimported tab by strategy and flag files with no match. Keyed by import id (not
+    // position) since `imports` can change under this effect between runs.
+    val unimportedForMatching = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt == null } }
+    var matchedStrategies by remember { mutableStateOf<Map<CsvImportId, CsvImportStrategy?>?>(null) }
+    LaunchedEffect(unimportedForMatching, strategies) {
+        if (strategies.isEmpty()) {
+            matchedStrategies = null
+            return@LaunchedEffect
+        }
+        matchedStrategies =
+            unimportedForMatching.associate { listedImport ->
+                val fullImport = csvImportRepository.getImport(listedImport.id).first()
+                val strategy =
+                    fullImport?.let {
+                        val sampleRows =
+                            csvImportRepository.getImportRows(listedImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
+                        strategies.selectForCsv(it.originalFileName, it.columns, sampleRows)
+                    }
+                listedImport.id to strategy
+            }
+    }
+
     var isImporting by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
     var importMessageIsError by remember { mutableStateOf(false) }
@@ -304,10 +339,15 @@ fun CsvImportsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            var showImportAll by remember { mutableStateOf(false) }
+            // The list to run "Import all" against (a strategy group's files, or every unimported file
+            // when launched from the top-level button); null hides the dialog.
+            var importAllScope by remember { mutableStateOf<List<CsvImport>?>(null) }
+            // Same idea for "Re-import all".
+            var reimportAllScope by remember { mutableStateOf<List<CsvImport>?>(null) }
+
             if (selectedTab == 0 && unimported.isNotEmpty()) {
                 Button(
-                    onClick = { showImportAll = true },
+                    onClick = { importAllScope = unimported },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Import all (${unimported.size})")
@@ -315,10 +355,9 @@ fun CsvImportsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            var showReimportAll by remember { mutableStateOf(false) }
             if (selectedTab == 1 && importedList.isNotEmpty()) {
                 Button(
-                    onClick = { showReimportAll = true },
+                    onClick = { reimportAllScope = importedList },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Re-import all (${importedList.size})")
@@ -326,9 +365,9 @@ fun CsvImportsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            if (showImportAll) {
+            importAllScope?.let { scopedUnimported ->
                 CsvImportAllDialog(
-                    unimported = unimported,
+                    unimported = scopedUnimported,
                     importDirectoryRepository = importDirectoryRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountMappingRepository = accountMappingRepository,
@@ -342,14 +381,14 @@ fun CsvImportsScreen(
                     csvImportRepository = csvImportRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
-                    onDismiss = { showImportAll = false },
-                    onComplete = { showImportAll = false },
+                    onDismiss = { importAllScope = null },
+                    onComplete = { importAllScope = null },
                 )
             }
 
-            if (showReimportAll) {
+            reimportAllScope?.let { scopedImported ->
                 CsvReimportAllDialog(
-                    imported = importedList,
+                    imported = scopedImported,
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
@@ -364,8 +403,8 @@ fun CsvImportsScreen(
                     tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
-                    onDismiss = { showReimportAll = false },
-                    onComplete = { showReimportAll = false },
+                    onDismiss = { reimportAllScope = null },
+                    onComplete = { reimportAllScope = null },
                 )
             }
 
@@ -391,8 +430,8 @@ fun CsvImportsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            } else {
-                val ignoredTab = selectedTab == 2
+            } else if (selectedTab == 2) {
+                // Ignored files span every strategy and need no scoped bulk action, so this tab stays flat.
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -401,15 +440,178 @@ fun CsvImportsScreen(
                             import = import,
                             dateRange = dateRanges[import.id.id.toString()],
                             sourceAccountName = resolveSourceAccountName(import, strategies, directoryAccounts, accounts),
+                            matchedStrategyName = null,
                             onClick = { onImportClick(import.id) },
-                            ignored = ignoredTab,
+                            ignored = true,
                             onSetIgnored = { ignore ->
                                 scope.launch { importEngine.setCsvImportIgnored(import.id, ignore) }
                             },
                         )
                     }
                 }
+            } else {
+                val groups =
+                    remember(unimported, importedList, matchedStrategies, selectedTab) {
+                        if (selectedTab == 0) {
+                            buildUnimportedStrategyGroups(unimported, matchedStrategies)
+                        } else {
+                            buildImportedStrategyGroups(importedList)
+                        }
+                    }
+                val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    groups.forEach { group ->
+                        val sectionKey = "$selectedTab:${group.key?.toString() ?: "none"}"
+                        val expanded = expandedSections[sectionKey] ?: true
+                        item(key = "header-$sectionKey") {
+                            val isNoStrategyGroup = selectedTab == 0 && group.key == null && group.actionable
+                            StrategySectionHeader(
+                                title = group.label,
+                                count = group.imports.size,
+                                expanded = expanded,
+                                onToggleExpanded = { expandedSections[sectionKey] = !expanded },
+                                actionLabel =
+                                    when {
+                                        !group.actionable -> null
+                                        isNoStrategyGroup -> "Ignore all"
+                                        selectedTab == 0 -> "Import all"
+                                        else -> "Re-import all"
+                                    },
+                                onAction = {
+                                    when {
+                                        isNoStrategyGroup ->
+                                            scope.launch {
+                                                group.imports.forEach { importEngine.setCsvImportIgnored(it.id, true) }
+                                            }
+                                        selectedTab == 0 -> importAllScope = group.imports
+                                        else -> reimportAllScope = group.imports
+                                    }
+                                },
+                                isWarning = group.isWarning,
+                            )
+                        }
+                        if (expanded) {
+                            items(group.imports, key = { it.id.toString() }) { import ->
+                                CsvImportCard(
+                                    import = import,
+                                    dateRange = dateRanges[import.id.id.toString()],
+                                    sourceAccountName = resolveSourceAccountName(import, strategies, directoryAccounts, accounts),
+                                    matchedStrategyName =
+                                        if (selectedTab == 0 && group.actionable && !group.isWarning) group.label else null,
+                                    noMatchingStrategy = selectedTab == 0 && group.isWarning,
+                                    onClick = { onImportClick(import.id) },
+                                    ignored = false,
+                                    onSetIgnored = { ignore ->
+                                        scope.launch { importEngine.setCsvImportIgnored(import.id, ignore) }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
             }
+        }
+    }
+}
+
+/**
+ * One strategy's files within a tab; [key] is null for the "no strategy"/"unknown strategy" bucket.
+ * [actionable] is false only for the transient "still matching" bucket, which has no scoped action yet.
+ */
+private data class CsvStrategyGroup(
+    val key: CsvImportStrategyId?,
+    val label: String,
+    val imports: List<CsvImport>,
+    val isWarning: Boolean = false,
+    val actionable: Boolean = true,
+)
+
+/**
+ * Groups already-imported files by the strategy they were last applied with — a field every
+ * [CsvImport] already carries, so no extra queries are needed. "No strategy" first, this stays sorted
+ * by label with a fallback "Unknown strategy" bucket kept last (below) for imports whose applied
+ * strategy has since been deleted or otherwise lost its name.
+ */
+private fun buildImportedStrategyGroups(importedList: List<CsvImport>): List<CsvStrategyGroup> =
+    importedList
+        .groupBy { it.lastAppliedStrategyId }
+        .map { (id, files) ->
+            val label = files.firstOrNull { !it.lastAppliedStrategyName.isNullOrBlank() }?.lastAppliedStrategyName
+            CsvStrategyGroup(key = id, label = label ?: "Unknown strategy", imports = files)
+        }.sortedBy { it.label.lowercase() }
+
+/**
+ * Groups unimported files by their auto-matched strategy ([matches], built by content/filename-aware
+ * [selectForCsv] since these files have no stored strategy yet). Files with no match ([matches] value
+ * null) form a "No strategy" group surfaced first with warning styling, so they're never lost among
+ * matched files. While [matches] hasn't finished resolving, every file is shown under one "Matching
+ * strategies…" bucket with no scoped action, rather than leaving the tab blank.
+ */
+private fun buildUnimportedStrategyGroups(
+    unimported: List<CsvImport>,
+    matches: Map<CsvImportId, CsvImportStrategy?>?,
+): List<CsvStrategyGroup> {
+    if (matches == null) {
+        return listOf(
+            CsvStrategyGroup(key = null, label = "Matching strategies…", imports = unimported, actionable = false),
+        )
+    }
+    val byStrategyId = unimported.groupBy { matches[it.id]?.id }
+    val noStrategy = byStrategyId[null].orEmpty()
+    val strategyById = matches.values.filterNotNull().associateBy { it.id }
+    val withStrategy =
+        byStrategyId.entries
+            .filter { it.key != null }
+            .map { (id, files) -> CsvStrategyGroup(key = id, label = strategyById[id]?.name ?: "Unknown strategy", imports = files) }
+            .sortedBy { it.label.lowercase() }
+    return buildList {
+        if (noStrategy.isNotEmpty()) {
+            add(CsvStrategyGroup(key = null, label = "No strategy", imports = noStrategy, isWarning = true))
+        }
+        addAll(withStrategy)
+    }
+}
+
+@Composable
+private fun StrategySectionHeader(
+    title: String,
+    count: Int,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    actionLabel: String?,
+    onAction: () -> Unit,
+    isWarning: Boolean,
+) {
+    val titleColor = if (isWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleExpanded)
+                .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = titleColor,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (isWarning) "⚠ $title ($count)" else "$title ($count)",
+                style = MaterialTheme.typography.titleSmall,
+                color = titleColor,
+            )
+        }
+        if (actionLabel != null) {
+            TextButton(onClick = onAction) { Text(actionLabel) }
         }
     }
 }
@@ -444,6 +646,10 @@ private fun CsvImportCard(
     onClick: () -> Unit,
     ignored: Boolean,
     onSetIgnored: (Boolean) -> Unit,
+    // Auto-matched strategy name for an unimported file (null elsewhere, and null when unmatched — see
+    // [noMatchingStrategy]). Already-imported cards show their strategy via `lastAppliedStrategyName` below.
+    matchedStrategyName: String? = null,
+    noMatchingStrategy: Boolean = false,
 ) {
     val isImported = import.lastAppliedAt != null
     val containerColor =
@@ -519,6 +725,21 @@ private fun CsvImportCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = metadataColor,
             )
+            if (matchedStrategyName != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Strategy: $matchedStrategyName",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = metadataColor,
+                )
+            } else if (noMatchingStrategy) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "⚠ No matching strategy",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             if (import.errorCount > 0) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
