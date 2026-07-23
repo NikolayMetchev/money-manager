@@ -283,11 +283,23 @@ exclude:
       - utils/rest/src/commonMain/kotlin/com/moneymanager/rest/ApiRequestSigner.kt
   # Metro DI annotations (@Provides/@ContributesTo/@DependencyGraph) are marked as entry points
   # in .idea/misc.xml, which the 2026.2-eap linter respects (QD-14665) — so the broad DI-module
-  # excludes that used to live here are gone. What remains is only what entry points cannot
-  # express: expect/actual platform factories and impls referenced from other modules' DI wiring,
-  # plus cross-module test helpers — all invisible to Qodana's per-module KMP import.
+  # excludes that used to live here are gone. What remains is only what a full-scan run on the
+  # EAP (actions run 30005309699) still flags, all verified false positives:
+  #   * RepositoryModule/DeviceIdModule — the entry point suppresses every provide*ReadRepository
+  #     but no provide*WriteRepository (identically annotated, same file; reported on QD-14665).
+  #   * DatabaseComponent — the @DependencyGraph.Factory interface and repository properties used
+  #     only by other modules' tests.
+  #   * expect/actual platform factories (create*) and Android-only impls wired from app/main —
+  #     not annotation-based, so entry points can't cover them; Qodana's per-module KMP import
+  #     can't see their callers.
   - name: unused
     paths:
+      - app/db/di/src/jvmMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.jvm.kt
+      - app/importfilesource/di/src/androidMain
+      - app/importfilesource/di/src/jvmMain
+      - app/remotestorage/di/src/androidMain
+      - app/remotestorage/di/src/jvmMain
+      - utils/localsettings/di/src/jvmMain
       - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/CsvImportStrategyReadRepositoryImpl.kt
       - app/model/csvstrategy/src/commonMain/kotlin/com/moneymanager/domain/model/csvstrategy/FieldMapping.kt
       - utils/parsers/xlsx/src/jvmTest/kotlin/com/moneymanager/xlsx/XlsxParserTest.kt
@@ -297,6 +309,15 @@ exclude:
       - utils/compose/scrollbar/src/androidMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
   - name: UnusedSymbol
     paths:
+      - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/RepositoryModule.kt
+      - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DeviceIdModule.kt
+      - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DatabaseComponent.kt
+      - app/db/di/src/androidMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.android.kt
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/VersionReader.android.kt
+      - app/importfilesource/di/src/androidMain
+      - app/remotestorage/di/src/androidMain
+      - app/strategycatalog/src/androidMain/kotlin/com/moneymanager/strategycatalog/StrategyCatalogFactory.android.kt
+      - utils/localsettings/di/src/androidMain
       # Platform impls referenced only via DI/expect-actual, plus cross-module test helpers
       # (TestMoneyAssertions/TestDatabaseHelper) and the write-wrapper audit helpers used only
       # by app/db/core tests.
