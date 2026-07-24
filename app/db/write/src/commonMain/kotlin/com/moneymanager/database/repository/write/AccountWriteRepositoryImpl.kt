@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.write.AccountWriteRepository
 import kotlinx.coroutines.Dispatchers
@@ -382,12 +383,13 @@ class AccountWriteRepositoryImpl(
     }
 
     /**
-     * Carries one whole identity group. Skipped when the survivor already holds the same key AND the same
-     * contents, so a merge is idempotent. A same-key-different-contents clash is re-keyed rather than
-     * dropped or overwritten — rare by construction, since writers seed the key from the identity's own
-     * values, so it only arises once a key has gone stale (a hand edit, or an earlier merge's rename).
-     * Safe because matching derives the bank key from the values and never from group_key, so the next
-     * import still resolves the re-keyed group by content.
+     * Carries one whole identity group onto the survivor, unless the survivor already holds that identity.
+     *
+     * Because stored group keys are opaque UUIDs, two accounts describing the same real bank account carry
+     * that identity under DIFFERENT keys, so the match must be by the identity's derived value (sort code +
+     * account number), not by the key string — otherwise every same-identity merge would duplicate it.
+     * A group with no derivable bank identity (an arbitrary user group) falls back to key-string matching,
+     * which for UUIDs effectively never collides, so it is carried across verbatim.
      */
     private fun carryGroup(
         groupKey: String,
@@ -396,16 +398,34 @@ class AccountWriteRepositoryImpl(
         survivingAccount: AccountId,
         mergeId: Long,
     ) {
+        // Same identity already on the survivor (under whatever key) -> nothing to carry.
+        bankKeyOf(group)?.let { if (survivor.hasBankKey(it)) return }
+
         val existing = survivor.group(groupKey)
         if (existing != null && existing == group.associate { it.attribute_type_id to it.attribute_value }) return
+        // A key-string collision with unrelated contents (a stale/hand-edited key) is re-keyed rather than
+        // dropped or overwritten; safe because import resolves the group by derived value, not by key.
         val target = if (existing == null) groupKey else "$groupKey#m$mergeId"
         group.forEach { attr ->
             insertCarriedAttribute(survivingAccount, attr.attribute_type_id, attr.attribute_value, target, mergeId)
         }
     }
 
+    /**
+     * The bank identity a group encodes — `"<sortCode>|<accountNumber>"` — when it holds exactly one sort
+     * code and one account number, else null. Derived from the values (never the key), mirroring the import
+     * engine's `bankKeysFrom`, so two accounts holding the same identity under different UUID keys still
+     * reconcile on merge.
+     */
+    private fun bankKeyOf(group: List<SelectByAccount>): String? {
+        val sortCode = group.singleOrNull { it.attribute_type_id == WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID }?.attribute_value
+        val accountNumber =
+            group.singleOrNull { it.attribute_type_id == WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID }?.attribute_value
+        return if (!sortCode.isNullOrBlank() && !accountNumber.isNullOrBlank()) "$sortCode|$accountNumber" else null
+    }
+
     /** The surviving account's attributes, indexed for the lookups [carryAttributeGroups] needs. */
-    private class SurvivorAttributes(
+    private inner class SurvivorAttributes(
         attrs: List<SelectByAccount>,
     ) {
         private val groups =
@@ -416,9 +436,18 @@ class AccountWriteRepositoryImpl(
         private val ungroupedTypes = attrs.filter { it.group_key.isEmpty() }.map { it.attribute_type_id }.toSet()
         private val typeValues = attrs.map { it.attribute_type_id to it.attribute_value }.toSet()
 
+        // Bank identities the survivor already holds, one per group (grouped or, tolerating legacy data,
+        // the ungrouped slot). Lets a same-identity loser group be recognised despite a different key.
+        private val bankKeys =
+            (attrs.filter { it.group_key.isNotEmpty() }.groupBy { it.group_key }.values + listOf(attrs.filter { it.group_key.isEmpty() }))
+                .mapNotNull { bankKeyOf(it) }
+                .toSet()
+
         fun group(key: String): Map<Long, String>? = groups[key]
 
         fun occupiesUngrouped(typeId: Long): Boolean = typeId in ungroupedTypes
+
+        fun hasBankKey(key: String): Boolean = key in bankKeys
 
         fun holds(
             typeId: Long,

@@ -52,6 +52,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class ImportEngineDbTest : DbTest() {
     private val baseTime = Instant.fromEpochMilliseconds(1_700_000_000_000)
@@ -335,6 +336,48 @@ class ImportEngineDbTest : DbTest() {
             )
             // Both identities remain distinct groups rather than collapsing into one.
             assertEquals(2, afterSecond.count { it.groupKey.isNotEmpty() } / 2)
+            // Stored group keys are opaque UUIDs (minted by the engine), not the natural key seeded by the
+            // intent — and stable across the re-import, which is what keeps it idempotent.
+            afterSecond.filter { it.groupKey.isNotEmpty() }.forEach { Uuid.parse(it.groupKey) }
+        }
+
+    /**
+     * The invariant the API import relies on: a sort code and account number always land in ONE non-empty
+     * group, so the two halves of an identity can never be paired with another identity's.
+     */
+    @Test
+    fun importedBankIdentity_storesSortCodeAndAccountNumberInOneUuidGroup() =
+        runTest {
+            val result =
+                engine().import(
+                    ImportBatch(
+                        accountsToCreate =
+                            listOf(
+                                counterpartyByExternalId(
+                                    LocalAccountKey("cp"),
+                                    "NIKOLAY IVANOV METCHEV",
+                                    "bank:040736:01311504",
+                                    sortCode = "040736",
+                                    accountNumber = "01311504",
+                                ),
+                            ),
+                    ),
+                )
+            val id = result.createdAccountIds.getValue(LocalAccountKey("cp"))
+            val bankAttrs =
+                repositories.accountAttributeRepository
+                    .getByAccount(id)
+                    .first()
+                    .filter {
+                        it.attributeType.id.id == WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID ||
+                            it.attributeType.id.id == WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID
+                    }
+            assertEquals(2, bankAttrs.size)
+            val groupKeys = bankAttrs.map { it.groupKey }.toSet()
+            assertEquals(1, groupKeys.size)
+            val groupKey = groupKeys.single()
+            assertTrue(groupKey.isNotEmpty())
+            Uuid.parse(groupKey)
         }
 
     /**

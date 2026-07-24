@@ -93,6 +93,7 @@ import com.moneymanager.importengineapi.normalizeNameKey
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Attribute types that tie an account to a specific real bank account/counterparty identity. An
@@ -846,62 +847,72 @@ class ImportEngineImpl(
             byName[resolvedName] = id
         }
         val currentAttrs = accountAttributeRepository.getByAccount(id).first()
+        val storedGroupKey = storedGroupKeyResolver(intent.attributes, currentAttrs)
         for (attr in intent.attributes) {
             val present = currentAttrs.any { it.attributeType.id == attr.typeId && it.value == attr.value }
             if (!present) {
                 // Upsert rather than insert-and-swallow: the (type, group) slot may already hold a
                 // different value, and dropping the write there would silently lose this provider's
                 // identity for the account.
-                accountAttributeRepository.upsertInCreationMode(
-                    id,
-                    attr.typeId,
-                    attr.value,
-                    resolveGroupKey(attr, intent.attributes, currentAttrs),
-                )
+                accountAttributeRepository.upsertInCreationMode(id, attr.typeId, attr.value, storedGroupKey(attr))
                 byAttr.getOrPut(attr.typeId to attr.value) { id }
             }
         }
     }
 
     /**
-     * The group this incoming attribute should be written into on an existing account.
+     * Builds the function that maps each of an intent's attributes to the `group_key` it is stored under.
      *
-     * For a grouped attribute, the incoming group's derived bank key is matched against the account's
-     * existing groups and the matching group's ACTUAL key is reused. That is what makes a re-import
-     * idempotent even when the stored key has drifted from the natural key (a hand edit, or an earlier
-     * merge's re-key) — matching by content rather than by key means the drifted group is updated in
-     * place instead of a near-duplicate being minted beside it.
+     * Stored group keys are opaque UUIDs. The intent carries a transient grouping tag (the natural
+     * `personalCounterpartyKey`) that only binds an identity's attributes together within the batch; this
+     * translates that tag to a persisted UUID, minting one for a new group and reusing an existing group's
+     * UUID when the incoming identity matches an existing one BY DERIVED VALUE. Matching by value (not by
+     * key string) is what keeps a re-import idempotent and lets two independently-created accounts be
+     * merged without duplicating a shared identity.
      *
-     * An ungrouped identity attribute whose slot already holds a different value is moved into a group of
-     * its own rather than overwriting: two providers can each know the account by a different external id,
-     * and clobbering one would stop that provider matching the account at all.
+     * Ungrouped identity attributes (e.g. a provider external id) are resolved per attribute: one whose
+     * ungrouped slot already holds a DIFFERENT value is moved into a group of its own rather than
+     * overwriting, so two providers that each know the account by a different external id both survive.
      */
-    private fun resolveGroupKey(
-        attr: NewAttribute,
+    private fun storedGroupKeyResolver(
         intentAttributes: List<NewAttribute>,
-        currentAttrs: List<AccountAttribute>,
-    ): String {
-        if (attr.groupKey.isEmpty()) {
-            val occupied =
-                currentAttrs.any {
-                    it.groupKey.isEmpty() && it.attributeType.id == attr.typeId && it.value != attr.value
-                }
-            val isIdentity = attr.typeId.id in IDENTITY_ATTR_TYPE_IDS.map { it.id }
-            return if (occupied && isIdentity) "adopted:${attr.typeId.id}:${attr.value}" else ""
-        }
-        val incomingKey =
-            bankKeysFrom(
-                intentAttributes.filter { it.groupKey == attr.groupKey }.map { AttributeSlot(it.typeId.id, it.value, it.groupKey) },
-            ).firstOrNull() ?: return attr.groupKey
-        val existingGroup =
-            currentAttrs
+        existingAttrs: List<AccountAttribute>,
+    ): (NewAttribute) -> String {
+        val existingGroups = existingAttrs.filter { it.groupKey.isNotEmpty() }.groupBy { it.groupKey }
+        val tagToStored =
+            intentAttributes
                 .filter { it.groupKey.isNotEmpty() }
                 .groupBy { it.groupKey }
-                .entries
-                .firstOrNull { (key, rows) ->
-                    bankKeysFrom(rows.map { AttributeSlot(it.attributeType.id.id, it.value, key) }).firstOrNull() == incomingKey
-                }?.key
-        return existingGroup ?: attr.groupKey
+                .keys
+                .associateWith { tag ->
+                    val incomingKey =
+                        bankKeysFrom(
+                            intentAttributes
+                                .filter { it.groupKey == tag }
+                                .map { AttributeSlot(it.typeId.id, it.value, it.groupKey) },
+                        ).firstOrNull()
+                    val reuse =
+                        incomingKey?.let {
+                            existingGroups.entries
+                                .firstOrNull { (key, rows) ->
+                                    bankKeysFrom(rows.map { AttributeSlot(it.attributeType.id.id, it.value, key) })
+                                        .firstOrNull() == incomingKey
+                                }?.key
+                        }
+                    reuse ?: Uuid.random().toString()
+                }
+        val identityTypeIds = IDENTITY_ATTR_TYPE_IDS.map { it.id }
+        return { attr ->
+            if (attr.groupKey.isNotEmpty()) {
+                tagToStored.getValue(attr.groupKey)
+            } else {
+                val occupied =
+                    existingAttrs.any {
+                        it.groupKey.isEmpty() && it.attributeType.id == attr.typeId && it.value != attr.value
+                    }
+                if (occupied && attr.typeId.id in identityTypeIds) Uuid.random().toString() else ""
+            }
+        }
     }
 
     /**
@@ -926,8 +937,9 @@ class ImportEngineImpl(
                 ),
                 intent.source,
             )
+        val storedGroupKey = storedGroupKeyResolver(intent.attributes, existingAttrs = emptyList())
         intent.attributes.forEach { attr ->
-            accountAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value, attr.groupKey)
+            accountAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value, storedGroupKey(attr))
         }
         return newId
     }

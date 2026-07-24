@@ -281,10 +281,11 @@ fun EditAccountDialog(
                     existingAttributeTypes = existingAttributeTypes,
                     isSaving = accountState.isSaving,
                     onAttributesChange = { editableAttributes = it },
-                    onAddAttribute = {
-                        editableAttributes = editableAttributes + (nextTempId to EditableAttribute("", ""))
+                    onAddAttribute = { groupKey ->
+                        editableAttributes = editableAttributes + (nextTempId to EditableAttribute("", "", groupKey))
                         nextTempId--
                     },
+                    grouping = true,
                 )
 
                 accountState.errorMessage?.let { error -> ErrorMessageText(error) }

@@ -582,7 +582,7 @@ fun TransactionEditDialog(
                     isSaving = isSaving,
                     onAttributesChange = { editableAttributes = it },
                     onAddAttribute = {
-                        editableAttributes = editableAttributes + (nextTempId to EditableAttribute("", ""))
+                        editableAttributes = editableAttributes + (nextTempId to EditableAttribute("", "", it))
                         nextTempId--
                     },
                 )

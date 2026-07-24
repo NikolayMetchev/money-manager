@@ -16,14 +16,12 @@ fun normalizeNameKey(fullName: String): String = fullName.trim().replace(Regex("
  * the same string the engine uses to index existing accounts by their sort-code/account-number
  * attributes, keeping cross-provider bank reconciliation order-independent.
  *
- * This doubles as the **seed** for an attribute's `group_key`, which is what lets one account own several
- * bank identities (Crypto.com moved its fiat destination to a new sort code, so payments to one account
- * arrive under two). Seeding the group with the identity's own natural key makes a re-import upsert the
- * same group instead of minting a duplicate.
- *
- * The group key is only ever a seed: readers must re-derive the key from the attribute **values** in a
- * group and never parse `group_key` itself. A key can legitimately go stale — a user edits a sort code,
- * or a merge re-keys a collision — and matching has to keep working when it does.
+ * This is also the **transient grouping tag** an importer stamps on a bank identity's attributes within a
+ * batch, so the engine knows which sort code and account number belong together (Crypto.com moved its
+ * fiat destination to a new sort code, so one account owns two identities). It is never persisted: the
+ * engine translates each tag to an opaque UUID `group_key` on write. Readers always re-derive the identity
+ * from the attribute **values** in a group and never parse `group_key` itself — so a stored key going stale
+ * (a UI edit, a merge re-key) is harmless.
  */
 fun personalCounterpartyKey(
     sortCode: String,

@@ -8,11 +8,12 @@ CREATE TABLE account_attribute (
     -- identity, and Crypto.com moving its fiat destination to a new sort code means one account legitimately
     -- holds two. '' means ungrouped -- the default, and the value for every scalar attribute.
     --
-    -- READERS MUST NEVER PARSE group_key. Derive meaning from the VALUES inside a group; writers merely SEED
-    -- it with a natural key (personalCounterpartyKey: "<sortCode>|<accountNumber>") so a re-import upserts
-    -- the same group instead of minting a duplicate. Parsing it would break that guarantee, because a group
-    -- key can legitimately go stale -- a user edits a sort code in the UI, or a merge renames a colliding
-    -- key. Both must stay harmless, and they only are while the key is treated as an arbitrary token.
+    -- The stored value is an opaque UUID (minted by the import engine when a group is first persisted, or
+    -- by the editor when a user forms a group). READERS MUST NEVER PARSE group_key: identity is derived
+    -- from the VALUES inside a group (e.g. sort code + account number), never from the key. That is what
+    -- lets a re-import reconcile to an existing group by content, and two accounts holding the same
+    -- identity under different UUIDs be merged without duplicating it. A UUID also means a user-formed
+    -- group can never accidentally collide with an importer's key or another group's.
     --
     -- NOT NULL is load-bearing, not stylistic: SQLite treats every NULL as distinct in a UNIQUE index, so a
     -- nullable group_key would make the constraint below enforce nothing for ungrouped rows and stop

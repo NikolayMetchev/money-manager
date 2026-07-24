@@ -2587,13 +2587,17 @@ private class BatchAccountResolver {
     private fun externalIdAttr(value: String) = NewAttribute(typeId = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, value = value)
 
     /**
-     * The sort-code + account-number pair for one bank identity, tagged with a shared group key so the two
-     * halves stay bound together. An account can legitimately own several identities (Crypto.com moved its
-     * fiat destination to a new sort code), and without the group the engine would be free to pair one
-     * identity's sort code with another's account number.
+     * The sort-code + account-number pair for one bank identity, always emitted TOGETHER under one shared
+     * grouping tag. This is the sole point that produces bank details, so the invariant "an API import
+     * never stores a sort code and account number separately" holds here: both halves carry the same tag,
+     * and the engine maps stored `group_key`s by tag, so both land under the same UUID — even if bank-key
+     * derivation ever returned null, because the grouping follows the tag, not the derived value. An account
+     * can legitimately own several identities (Crypto.com moved its fiat destination to a new sort code);
+     * the tag keeps each identity's two halves bound so the engine never pairs one identity's sort code
+     * with another's account number.
      *
-     * The group is SEEDED with the identity's own natural key so a re-import upserts the same group instead
-     * of minting a duplicate; nothing ever reads it back to recover the sort code.
+     * The tag is the identity's natural key. It is transient — it only groups the attributes within this
+     * batch and is never persisted; the engine translates it to an opaque UUID on write.
      */
     private fun bankAttrs(
         sortCode: String,

@@ -476,6 +476,36 @@ class AccountRepositoryImplTest : DbTest() {
         }
 
     @Test
+    fun `mergeAccounts dedups the same identity held under different group keys`() =
+        runTest {
+            val now = Clock.System.now()
+            val keep =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Keep", openingDate = now),
+                )
+            val drop =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Drop", openingDate = now),
+                )
+            val sortCode = repositories.attributeTypeRepository.getOrCreate("account-sort-code")
+            val accountNumber = repositories.attributeTypeRepository.getOrCreate("account-account-number")
+
+            // Same real bank account, but each was created independently so the identity sits under a
+            // DIFFERENT opaque UUID on each account (as real imports now produce). The merge must recognise
+            // them as one identity by derived value, not be fooled by the mismatched keys, and not duplicate.
+            repositories.accountAttributeRepository.insert(keep, sortCode, "040541", "11111111-1111-1111-1111-111111111111")
+            repositories.accountAttributeRepository.insert(keep, accountNumber, "00002490", "11111111-1111-1111-1111-111111111111")
+            repositories.accountAttributeRepository.insert(drop, sortCode, "040541", "22222222-2222-2222-2222-222222222222")
+            repositories.accountAttributeRepository.insert(drop, accountNumber, "00002490", "22222222-2222-2222-2222-222222222222")
+
+            repositories.accountRepository.mergeAccounts(deletedAccount = drop, survivingAccount = keep)
+
+            val attrs = repositories.accountAttributeRepository.getByAccount(keep).first()
+            assertEquals(2, attrs.size)
+            assertEquals(setOf("11111111-1111-1111-1111-111111111111"), attrs.map { it.groupKey }.toSet())
+        }
+
+    @Test
     fun `mergeAccounts keeps both values when a group key collides with differing contents`() =
         runTest {
             val now = Clock.System.now()
