@@ -45,6 +45,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ApiSessionMutation
+import com.moneymanager.importengineapi.AttributeSlot
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingApiIdExtractor
 import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
@@ -62,6 +63,7 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.bankKeysFrom
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.personalCounterpartyKey
@@ -708,13 +710,26 @@ private suspend fun ensureSourceAccounts(setup: ImportSetup) {
  * The own account's bank details (sort code, account number), taken from the account itself (filled
  * directly from the accounts response or from the account-identifiers endpoint) or, failing that, from
  * its owners. Either element is null when absent.
+ *
+ * The pair is preferred from a SINGLE source — the account's own fields, else the first owner supplying
+ * both — before falling back to mixing an account-level sort code with an owner-level account number.
+ * A mixed pair is a bank identity that belongs to no real account, and now that the pair also seeds an
+ * attribute group key, a bogus one would persist as a group and be upserted on every later import
+ * rather than merely mis-keying a single match.
  */
 private fun ApiImportAccount.bankDetails(): Pair<String?, String?> {
-    val sortCode =
-        sortCode?.takeIf { it.isNotBlank() } ?: owners.firstOrNull { !it.sortCode.isNullOrBlank() }?.sortCode
-    val accountNumber =
-        accountNumber?.takeIf { it.isNotBlank() } ?: owners.firstOrNull { !it.accountNumber.isNullOrBlank() }?.accountNumber
-    return sortCode to accountNumber
+    val ownSortCode = sortCode?.takeIf { it.isNotBlank() }
+    val ownAccountNumber = accountNumber?.takeIf { it.isNotBlank() }
+    if (ownSortCode != null && ownAccountNumber != null) return ownSortCode to ownAccountNumber
+
+    val completeOwner =
+        owners.firstOrNull { !it.sortCode.isNullOrBlank() && !it.accountNumber.isNullOrBlank() }
+    if (completeOwner != null) return completeOwner.sortCode to completeOwner.accountNumber
+
+    // Last resort: neither the account nor any single owner has a complete pair, so fill each half
+    // independently and accept that they may come from different objects.
+    return (ownSortCode ?: owners.firstOrNull { !it.sortCode.isNullOrBlank() }?.sortCode) to
+        (ownAccountNumber ?: owners.firstOrNull { !it.accountNumber.isNullOrBlank() }?.accountNumber)
 }
 
 /** Mutable progress counters shared between the setup, parallel import, and progress callback. */
@@ -1260,8 +1275,10 @@ private data class PersonalCounterpartyIdentity(
     val sortCode: String,
     val accountNumber: String,
 ) {
+    // Built with the shared helper so this dedupe key, the engine's match key and the attribute group key
+    // seeded by [bankAttrs] are the same string by construction rather than by coincidence.
     val dedupeKey: String
-        get() = "$sortCode|$accountNumber"
+        get() = personalCounterpartyKey(sortCode, accountNumber)
 }
 
 private fun ApiImportAccountOwner.personalCounterpartyIdentity(): PersonalCounterpartyIdentity? {
@@ -2569,16 +2586,27 @@ private class BatchAccountResolver {
 
     private fun externalIdAttr(value: String) = NewAttribute(typeId = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, value = value)
 
+    /**
+     * The sort-code + account-number pair for one bank identity, tagged with a shared group key so the two
+     * halves stay bound together. An account can legitimately own several identities (Crypto.com moved its
+     * fiat destination to a new sort code), and without the group the engine would be free to pair one
+     * identity's sort code with another's account number.
+     *
+     * The group is SEEDED with the identity's own natural key so a re-import upserts the same group instead
+     * of minting a duplicate; nothing ever reads it back to recover the sort code.
+     */
     private fun bankAttrs(
         sortCode: String,
         accountNumber: String,
-    ): List<NewAttribute> =
-        listOf(
-            NewAttribute(typeId = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, value = sortCode),
-            NewAttribute(typeId = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, value = accountNumber),
+    ): List<NewAttribute> {
+        val group = personalCounterpartyKey(sortCode, accountNumber)
+        return listOf(
+            NewAttribute(typeId = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, value = sortCode, groupKey = group),
+            NewAttribute(typeId = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, value = accountNumber, groupKey = group),
         )
+    }
 
-    /** Adds attributes (deduped by type+value) onto an already-allocated intent. */
+    /** Adds attributes (deduped by type+value+group) onto an already-allocated intent. */
     private fun mergeAttributes(
         key: LocalAccountKey,
         newAttrs: List<NewAttribute>,
@@ -2588,15 +2616,17 @@ private class BatchAccountResolver {
         val existing = intent.attributes
         val merged =
             existing +
-                newAttrs.filter { attr -> existing.none { it.typeId == attr.typeId && it.value == attr.value } }
+                newAttrs.filter { attr ->
+                    existing.none { it.typeId == attr.typeId && it.value == attr.value && it.groupKey == attr.groupKey }
+                }
         if (merged.size != existing.size) intents[key] = intent.copy(attributes = merged)
-        // Register any bank attributes on the personal-key index so a later personal-counterparty
-        // match (or a source account with the same bank key) collapses onto this same intent.
-        val sortCode = merged.firstOrNull { it.typeId == ACCOUNT_SORT_CODE_ATTR_TYPE_ID }?.value
-        val accountNumber = merged.firstOrNull { it.typeId == ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID }?.value
-        if (!sortCode.isNullOrBlank() && !accountNumber.isNullOrBlank()) {
-            byPersonalKey.getOrPut(personalCounterpartyKey(sortCode, accountNumber)) { key }
-        }
+        // Register EVERY bank identity on the personal-key index so a later personal-counterparty match (or
+        // a source account with any of these bank keys) collapses onto this same intent. This is where one
+        // intent accumulates a second identity, so scanning per group matters twice over: keying off the
+        // first sort code alone would leave the second identity unregistered, and pairing across groups
+        // would invent a key belonging to no real account.
+        bankKeysFrom(merged.map { AttributeSlot(it.typeId.id, it.value, it.groupKey) })
+            .forEach { bankKey -> byPersonalKey.getOrPut(bankKey) { key } }
     }
 
     /**
@@ -3188,7 +3218,11 @@ private fun JsonObject.bankIdentity(peopleMappings: ApiPeopleMappings): String? 
 private fun bankDedupeKeyFromCounterpartyId(counterpartyId: String?): String? {
     if (counterpartyId == null || !counterpartyId.startsWith("bank:")) return null
     val (sortCode, accountNumber) = counterpartyId.removePrefix("bank:").split(":").takeIf { it.size == 2 } ?: return null
-    return if (sortCode.isNotBlank() && accountNumber.isNotBlank()) "$sortCode|$accountNumber" else null
+    return if (sortCode.isNotBlank() && accountNumber.isNotBlank()) {
+        personalCounterpartyKey(sortCode, accountNumber)
+    } else {
+        null
+    }
 }
 
 /**

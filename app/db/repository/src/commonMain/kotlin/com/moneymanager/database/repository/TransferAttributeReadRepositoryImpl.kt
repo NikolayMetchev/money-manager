@@ -33,6 +33,7 @@ class TransferAttributeReadRepositoryImpl(
                                 name = row.attribute_type_name,
                             ),
                         value = row.attribute_value,
+                        groupKey = row.group_key,
                     )
                 }
             }

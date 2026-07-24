@@ -39,6 +39,7 @@ import com.moneymanager.importengineapi.createAccounts
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.importengineapi.getOrCreateAttributeType
+import com.moneymanager.importengineapi.personalCounterpartyKey
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
@@ -147,8 +148,7 @@ class ImportEngineDbTest : DbTest() {
         val externalIdType = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
         val attributes = mutableListOf(NewAttribute(externalIdType, externalId))
         if (sortCode != null && accountNumber != null) {
-            attributes += NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), sortCode)
-            attributes += NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), accountNumber)
+            attributes += bankIdentityAttrs(sortCode, accountNumber)
         }
         return ImportAccountIntent(
             key = key,
@@ -157,6 +157,18 @@ class ImportEngineDbTest : DbTest() {
             openingDate = baseTime,
             source = Source.SampleGenerator,
             attributes = attributes,
+        )
+    }
+
+    /** A bank identity as the API importer writes it: both halves sharing the natural-key group. */
+    private fun bankIdentityAttrs(
+        sortCode: String,
+        accountNumber: String,
+    ): List<NewAttribute> {
+        val group = personalCounterpartyKey(sortCode, accountNumber)
+        return listOf(
+            NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), sortCode, group),
+            NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), accountNumber, group),
         )
     }
 
@@ -219,6 +231,204 @@ class ImportEngineDbTest : DbTest() {
             assertEquals(2, result.accountsCreated)
             assertEquals(1, accountsNamed("Nikolay Metchev"))
             assertEquals(1, accountsNamed("Nikolay Metchev (6361)"))
+        }
+
+    /**
+     * An account can own several bank identities: Crypto.com moved its fiat destination from one sort
+     * code to another, so payments to the same account arrive under two. Both must resolve to it, or the
+     * second one forks a duplicate account that money flows into and never out of.
+     */
+    @Test
+    fun accountWithTwoBankIdentities_matchesOnEither() =
+        runTest {
+            val key = LocalAccountKey("cash")
+            val externalIdType = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
+            val created =
+                engine().import(
+                    ImportBatch(
+                        accountsToCreate =
+                            listOf(
+                                ImportAccountIntent(
+                                    key = key,
+                                    match = AccountMatchKey.ByExternalId(externalIdType, "crypto-com-cash"),
+                                    name = "Crypto.com Cash",
+                                    openingDate = baseTime,
+                                    source = Source.SampleGenerator,
+                                    attributes =
+                                        listOf(NewAttribute(externalIdType, "crypto-com-cash")) +
+                                            bankIdentityAttrs("040541", "00002490") +
+                                            bankIdentityAttrs("040736", "01311504"),
+                                ),
+                            ),
+                    ),
+                )
+            val cashId = created.createdAccountIds.getValue(key)
+
+            // A later import knows the account only by its bank details — once by the old identity, once by
+            // the new one. Neither may create an account.
+            val second =
+                engine().import(
+                    ImportBatch(
+                        accountsToCreate =
+                            listOf(
+                                counterpartyByExternalId(
+                                    LocalAccountKey("old"),
+                                    "FORIS MT LIMITED",
+                                    "bank:040541:00002490",
+                                    sortCode = "040541",
+                                    accountNumber = "00002490",
+                                ),
+                                counterpartyByExternalId(
+                                    LocalAccountKey("new"),
+                                    "NIKOLAY IVANOV METCHEV",
+                                    "bank:040736:01311504",
+                                    sortCode = "040736",
+                                    accountNumber = "01311504",
+                                ),
+                            ),
+                    ),
+                )
+
+            assertEquals(0, second.accountsCreated)
+            assertEquals(cashId, second.createdAccountIds.getValue(LocalAccountKey("old")))
+            assertEquals(cashId, second.createdAccountIds.getValue(LocalAccountKey("new")))
+        }
+
+    /**
+     * Re-importing an account that already holds both identities must upsert the same two groups rather
+     * than duplicate them — the group key is seeded from the identity's own values precisely so this is a
+     * no-op.
+     */
+    @Test
+    fun reimportOfBothBankIdentities_isIdempotent() =
+        runTest {
+            val externalIdType = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
+
+            fun batch() =
+                ImportBatch(
+                    accountsToCreate =
+                        listOf(
+                            ImportAccountIntent(
+                                key = LocalAccountKey("cash"),
+                                match = AccountMatchKey.ByExternalId(externalIdType, "crypto-com-cash"),
+                                name = "Crypto.com Cash",
+                                openingDate = baseTime,
+                                source = Source.SampleGenerator,
+                                adoptOnBankMatch = true,
+                                attributes =
+                                    listOf(NewAttribute(externalIdType, "crypto-com-cash")) +
+                                        bankIdentityAttrs("040541", "00002490") +
+                                        bankIdentityAttrs("040736", "01311504"),
+                            ),
+                        ),
+                )
+
+            val cashId = engine().import(batch()).createdAccountIds.getValue(LocalAccountKey("cash"))
+            val afterFirst = repositories.accountAttributeRepository.getByAccount(cashId).first()
+            engine().import(batch())
+            val afterSecond = repositories.accountAttributeRepository.getByAccount(cashId).first()
+
+            assertEquals(5, afterFirst.size)
+            assertEquals(
+                afterFirst.map { Triple(it.attributeType.id, it.value, it.groupKey) }.toSet(),
+                afterSecond.map { Triple(it.attributeType.id, it.value, it.groupKey) }.toSet(),
+            )
+            // Both identities remain distinct groups rather than collapsing into one.
+            assertEquals(2, afterSecond.count { it.groupKey.isNotEmpty() } / 2)
+        }
+
+    /**
+     * The headline regression. Merging the duplicate account away must CARRY its bank identity onto the
+     * survivor; otherwise the cascade delete drops the identity and the next import sees an unknown sort
+     * code / account number pair and re-creates the very account just merged away.
+     */
+    @Test
+    fun mergedAwayBankIdentity_doesNotResurrectTheAccountOnReimport() =
+        runTest {
+            fun incoming() =
+                ImportBatch(
+                    accountsToCreate =
+                        listOf(
+                            counterpartyByExternalId(
+                                LocalAccountKey("old"),
+                                "Crypto.com Cash",
+                                "bank:040541:00002490",
+                                sortCode = "040541",
+                                accountNumber = "00002490",
+                            ),
+                            counterpartyByExternalId(
+                                LocalAccountKey("new"),
+                                "NIKOLAY IVANOV METCHEV",
+                                "bank:040736:01311504",
+                                sortCode = "040736",
+                                accountNumber = "01311504",
+                            ),
+                        ),
+                )
+
+            val created = engine().import(incoming())
+            assertEquals(2, created.accountsCreated)
+            val keepId = created.createdAccountIds.getValue(LocalAccountKey("old"))
+            val dropId = created.createdAccountIds.getValue(LocalAccountKey("new"))
+
+            engine().import(
+                ImportBatch.manualEdits(accountMerges = listOf(AccountMergeRequest(deletedId = dropId, survivingId = keepId))),
+            )
+            assertNull(repositories.accountRepository.getAccountById(dropId).first())
+
+            // The survivor now owns both identities, so re-importing the same data creates nothing.
+            val second = engine().import(incoming())
+            assertEquals(0, second.accountsCreated)
+            assertEquals(0, accountsNamed("NIKOLAY IVANOV METCHEV"))
+            assertEquals(keepId, second.createdAccountIds.getValue(LocalAccountKey("new")))
+        }
+
+    /** Unmerging must hand the carried identity back, leaving neither account holding both. */
+    @Test
+    fun unmergingReturnsTheCarriedBankIdentityToTheRestoredAccount() =
+        runTest {
+            val created =
+                engine().import(
+                    ImportBatch(
+                        accountsToCreate =
+                            listOf(
+                                counterpartyByExternalId(
+                                    LocalAccountKey("keep"),
+                                    "Crypto.com Cash",
+                                    "bank:040541:00002490",
+                                    sortCode = "040541",
+                                    accountNumber = "00002490",
+                                ),
+                                counterpartyByExternalId(
+                                    LocalAccountKey("drop"),
+                                    "NIKOLAY IVANOV METCHEV",
+                                    "bank:040736:01311504",
+                                    sortCode = "040736",
+                                    accountNumber = "01311504",
+                                ),
+                            ),
+                    ),
+                )
+            val keepId = created.createdAccountIds.getValue(LocalAccountKey("keep"))
+            val dropId = created.createdAccountIds.getValue(LocalAccountKey("drop"))
+            val keepBefore = repositories.accountAttributeRepository.getByAccount(keepId).first()
+            val dropBefore = repositories.accountAttributeRepository.getByAccount(dropId).first()
+
+            engine().import(
+                ImportBatch.manualEdits(accountMerges = listOf(AccountMergeRequest(deletedId = dropId, survivingId = keepId))),
+            )
+            val merge =
+                repositories.accountRepository
+                    .getReversibleMerges()
+                    .first()
+                    .first()
+            engine().import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
+
+            fun signature(attrs: List<com.moneymanager.domain.model.AccountAttribute>) =
+                attrs.map { Triple(it.attributeType.id, it.value, it.groupKey) }.toSet()
+
+            assertEquals(signature(keepBefore), signature(repositories.accountAttributeRepository.getByAccount(keepId).first()))
+            assertEquals(signature(dropBefore), signature(repositories.accountAttributeRepository.getByAccount(dropId).first()))
         }
 
     @Test

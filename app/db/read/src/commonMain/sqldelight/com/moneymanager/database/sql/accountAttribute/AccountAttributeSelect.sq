@@ -4,6 +4,7 @@ SELECT
     account_attribute.account_id,
     account_attribute.attribute_type_id,
     account_attribute.attribute_value,
+    account_attribute.group_key,
     attribute_type.name AS attribute_type_name
 FROM account_attribute
 JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id
@@ -16,6 +17,7 @@ SELECT
     account_attribute.account_id,
     account_attribute.attribute_type_id,
     account_attribute.attribute_value,
+    account_attribute.group_key,
     attribute_type.name AS attribute_type_name
 FROM account_attribute
 JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id
@@ -27,6 +29,7 @@ SELECT
     account_attribute.account_id,
     account_attribute.attribute_type_id,
     account_attribute.attribute_value,
+    account_attribute.group_key,
     attribute_type.name AS attribute_type_name
 FROM account_attribute
 JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id
@@ -39,6 +42,7 @@ SELECT
     account_attribute.account_id,
     account_attribute.attribute_type_id,
     account_attribute.attribute_value,
+    account_attribute.group_key,
     attribute_type.name AS attribute_type_name
 FROM account_attribute
 JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id

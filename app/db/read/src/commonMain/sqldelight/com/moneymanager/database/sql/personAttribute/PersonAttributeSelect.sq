@@ -4,6 +4,7 @@ SELECT
     person_attribute.person_id,
     person_attribute.attribute_type_id,
     person_attribute.attribute_value,
+    person_attribute.group_key,
     attribute_type.name AS attribute_type_name
 FROM person_attribute
 JOIN attribute_type ON person_attribute.attribute_type_id = attribute_type.id
@@ -16,6 +17,7 @@ SELECT
     person_attribute.person_id,
     person_attribute.attribute_type_id,
     person_attribute.attribute_value,
+    person_attribute.group_key,
     attribute_type.name AS attribute_type_name
 FROM person_attribute
 JOIN attribute_type ON person_attribute.attribute_type_id = attribute_type.id

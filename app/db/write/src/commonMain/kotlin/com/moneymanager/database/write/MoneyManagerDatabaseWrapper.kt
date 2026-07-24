@@ -401,6 +401,7 @@ class MoneyManagerDatabaseWrapper(
             // Account-merge reversal records; they are the audit/undo data, not audited entities.
             "account_merge",
             "account_merge_transfer",
+            "account_merge_attribute",
             "settings",
             "api_credential",
             "api_session",

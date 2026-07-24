@@ -12,5 +12,11 @@ insertMergeTransfer:
 INSERT INTO account_merge_transfer(merge_id, transfer_id, moved_source, moved_target)
 VALUES (?, ?, ?, ?);
 
+insertMergeAttribute:
+-- Record an attribute row this merge grafted onto the SURVIVOR, so unmerge can remove exactly the rows
+-- the merge added and leave the survivor's own attributes alone.
+INSERT INTO account_merge_attribute(merge_id, attribute_id)
+VALUES (?, ?);
+
 markReversed:
 UPDATE account_merge SET reversed = 1 WHERE id = ?;

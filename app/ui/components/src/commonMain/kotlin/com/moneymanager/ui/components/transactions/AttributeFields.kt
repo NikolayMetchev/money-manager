@@ -28,10 +28,10 @@ import com.moneymanager.domain.model.AttributeType
 
 @Composable
 fun EditableAttributesSection(
-    editableAttributes: Map<Long, Pair<String, String>>,
+    editableAttributes: Map<Long, EditableAttribute>,
     existingAttributeTypes: List<AttributeType>,
     isSaving: Boolean,
-    onAttributesChange: (Map<Long, Pair<String, String>>) -> Unit,
+    onAttributesChange: (Map<Long, EditableAttribute>) -> Unit,
     onAddAttribute: () -> Unit,
 ) {
     Column(
@@ -44,8 +44,8 @@ fun EditableAttributesSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        editableAttributes.forEach { (id, pair) ->
-            val (typeName, value) = pair
+        editableAttributes.forEach { (id, attribute) ->
+            val (typeName, value) = attribute
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -54,7 +54,7 @@ fun EditableAttributesSection(
                 AttributeTypeField(
                     value = typeName,
                     onValueChange = { newTypeName ->
-                        onAttributesChange(editableAttributes + (id to Pair(newTypeName, value)))
+                        onAttributesChange(editableAttributes + (id to attribute.copy(typeName = newTypeName)))
                     },
                     existingTypes = existingAttributeTypes,
                     enabled = !isSaving,
@@ -63,7 +63,7 @@ fun EditableAttributesSection(
                 OutlinedTextField(
                     value = value,
                     onValueChange = { newValue ->
-                        onAttributesChange(editableAttributes + (id to Pair(typeName, newValue)))
+                        onAttributesChange(editableAttributes + (id to attribute.copy(value = newValue)))
                     },
                     label = { Text("Value") },
                     modifier = Modifier.weight(0.5f),
