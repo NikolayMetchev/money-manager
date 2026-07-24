@@ -413,7 +413,7 @@ class AccountRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `mergeAccounts carries the deleted account's identity groups onto the survivor`() =
+    fun `mergeAccounts carries the deleted accounts identity groups onto the survivor`() =
         runTest {
             val now = Clock.System.now()
             val keep =
