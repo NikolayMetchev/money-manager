@@ -4,16 +4,6 @@ insert:
 INSERT INTO transfer_attribute (transaction_id, attribute_type_id, attribute_value, group_key, revision_id)
 VALUES (:transaction_id, :attribute_type_id, :attribute_value, :group_key, (SELECT revision_id FROM transfer WHERE id = :transaction_id));
 
-upsert:
--- Idempotent write of one attribute into one (type, group) slot: inserts when the slot is free,
--- updates when it holds a different value, and does nothing when the value already matches. Lets a
--- re-import of an already-known identity be a true no-op instead of a swallowed UNIQUE violation.
-INSERT INTO transfer_attribute (transaction_id, attribute_type_id, attribute_value, group_key, revision_id)
-VALUES (:transaction_id, :attribute_type_id, :attribute_value, :group_key, (SELECT revision_id FROM transfer WHERE id = :transaction_id))
-ON CONFLICT (transaction_id, attribute_type_id, group_key)
-DO UPDATE SET attribute_value = excluded.attribute_value
-WHERE attribute_value != excluded.attribute_value;
-
 selectLastInsertedId:
 SELECT last_insert_rowid();
 

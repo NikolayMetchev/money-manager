@@ -1054,9 +1054,9 @@ suspend fun discoverApiCounterpartiesToCreate(
     // Reported as sub-steps so the (potentially slow) preparation phase shows what it is doing rather than
     // a single opaque "Preparing import…". Left indeterminate (no fraction) so the bar does not fill and
     // then reset when the engine phases take over with their own 0–100% progress.
-    onProgress(ApiSessionImportProgress(detail = "Scanning existing accounts...", progress = null))
+    onProgress(ApiSessionImportProgress(detail = "Scanning existing accounts..."))
     val existingCounterpartyIds = loadCounterpartyIdIndex(accountAttributeRepository).keys
-    onProgress(ApiSessionImportProgress(detail = "Reading downloaded transactions...", progress = null))
+    onProgress(ApiSessionImportProgress(detail = "Reading downloaded transactions..."))
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val transactionResponses =
         apiSessionRepository
@@ -1069,7 +1069,7 @@ suspend fun discoverApiCounterpartiesToCreate(
         counterpartyIdField = counterpartyIdField,
         nameMappings = CounterpartyNameMappings.from(strategy),
         onResponseProcessed = { done, total ->
-            onProgress(ApiSessionImportProgress(detail = "Finding new counterparties ($done/$total)...", progress = null))
+            onProgress(ApiSessionImportProgress(detail = "Finding new counterparties ($done/$total)..."))
         },
     ).filterKeys { it !in existingCounterpartyIds }
         .map { (counterpartyId, names) ->
