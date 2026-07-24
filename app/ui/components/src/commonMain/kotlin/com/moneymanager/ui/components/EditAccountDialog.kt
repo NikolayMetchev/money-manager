@@ -159,7 +159,8 @@ fun EditAccountDialog(
                         if (original != null) {
                             val typeChanged = original.attributeType.name != typeName
                             val valueChanged = original.value != value
-                            if (typeChanged || valueChanged) {
+                            val groupChanged = original.groupKey != groupKey
+                            if (typeChanged || valueChanged || groupChanged) {
                                 val typeId = importEngine.getOrCreateAttributeType(typeName.trim())
                                 // Carry the row's original group through: editing a sort code must keep the
                                 // attribute bound to its own bank identity, not move it into the ungrouped slot.
