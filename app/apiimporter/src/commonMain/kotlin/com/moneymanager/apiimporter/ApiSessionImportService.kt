@@ -39,7 +39,6 @@ import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.AccountMatchKey
@@ -490,7 +489,6 @@ private fun validatePeopleOwnershipConfig(config: ApiPersonImportConfig) {
  */
 suspend fun importApiSessionPeople(
     apiSessionRepository: ApiSessionReadRepository,
-    accountRepository: AccountReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
     importEngine: ImportEngine,
     sessionId: ApiSessionId,
@@ -509,12 +507,12 @@ suspend fun importApiSessionPeople(
     // The own accounts these people own already exist in the DB; resolve their ids by external id (a
     // read, not a write) so they can be referenced via AccountRef.Existing.
     val ownedAccountsByProfile =
-        buildProfileAccountMap(apiSessionRepository, accountRepository, accountAttributeRepository, accountsSessionId, strategy, config)
+        buildProfileAccountMap(apiSessionRepository, accountAttributeRepository, accountsSessionId, strategy, config)
     // Flat providers with a single global account holder (no ancestor hierarchy) link that holder to
     // every account imported in the session.
     val allSessionAccountIds =
         if (config.ownsAllAccounts) {
-            loadSessionAccountIds(apiSessionRepository, accountRepository, accountAttributeRepository, accountsSessionId, strategy)
+            loadSessionAccountIds(apiSessionRepository, accountAttributeRepository, accountsSessionId, strategy)
         } else {
             emptyList()
         }
@@ -566,7 +564,6 @@ suspend fun importApiSessionPeople(
 /** Builds a map of profile external id → the [AccountId]s fetched under that profile. */
 private suspend fun buildProfileAccountMap(
     apiSessionRepository: ApiSessionReadRepository,
-    accountRepository: AccountReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
     accountsSessionId: ApiSessionId?,
     strategy: ApiImportStrategy,
@@ -574,7 +571,7 @@ private suspend fun buildProfileAccountMap(
 ): Map<String, List<AccountId>> {
     val ancestorExpr = config.accountOwnerAncestorExpr ?: return emptyMap()
     if (accountsSessionId == null) return emptyMap()
-    val accountIdByExternalId = loadAccountExternalIdIndex(accountRepository, accountAttributeRepository)
+    val accountIdByExternalId = loadAccountExternalIdIndex(accountAttributeRepository)
     val requestsById = apiSessionRepository.getRequestsBySession(accountsSessionId).associateBy { it.id }
     val result = mutableMapOf<String, MutableList<AccountId>>()
     for (response in apiSessionRepository.getResponsesBySession(accountsSessionId)) {
@@ -595,13 +592,12 @@ private suspend fun buildProfileAccountMap(
 /** Returns every [AccountId] imported under [accountsSessionId] (used for [ApiPersonImportConfig.ownsAllAccounts]). */
 private suspend fun loadSessionAccountIds(
     apiSessionRepository: ApiSessionReadRepository,
-    accountRepository: AccountReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
     accountsSessionId: ApiSessionId?,
     strategy: ApiImportStrategy,
 ): List<AccountId> {
     if (accountsSessionId == null) return emptyList()
-    val accountIdByExternalId = loadAccountExternalIdIndex(accountRepository, accountAttributeRepository)
+    val accountIdByExternalId = loadAccountExternalIdIndex(accountAttributeRepository)
     val requestsById = apiSessionRepository.getRequestsBySession(accountsSessionId).associateBy { it.id }
     val result = mutableListOf<AccountId>()
     for (response in apiSessionRepository.getResponsesBySession(accountsSessionId)) {
@@ -677,7 +673,7 @@ suspend fun importApiSessionTransactions(
     onProgress(ApiSessionImportProgress(detail = "Transactions prepared. Processing people...", progress = 0.6f))
     addCustomAccountFieldAttributes(setup)
     buildPeopleAndOwnershipIntents(setup)
-    onProgress(ApiSessionImportProgress(detail = "Importing...", progress = 0.7f))
+    onProgress(ApiSessionImportProgress(detail = "Saving to database...", progress = 0.7f))
     val importResult = runImportEngine(setup, preparedTransfers)
     onProgress(ApiSessionImportProgress(detail = "Import finalized.", progress = 0.98f))
     return ApiSessionImportResult(
@@ -1049,17 +1045,18 @@ private suspend fun resolveOwnAccountKey(
 
 suspend fun discoverApiCounterpartiesToCreate(
     apiSessionRepository: ApiSessionReadRepository,
-    accountRepository: AccountReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
+    onProgress: (ApiSessionImportProgress) -> Unit = {},
 ): List<ApiCounterpartySuggestion> {
     val counterpartyIdField = strategy.transactionMappings.counterpartyIdField ?: return emptyList()
-    val existingCounterpartyIds =
-        loadCounterpartyIdIndex(
-            accountRepository = accountRepository,
-            accountAttributeRepository = accountAttributeRepository,
-        ).keys
+    // Reported as sub-steps so the (potentially slow) preparation phase shows what it is doing rather than
+    // a single opaque "Preparing import…". Left indeterminate (no fraction) so the bar does not fill and
+    // then reset when the engine phases take over with their own 0–100% progress.
+    onProgress(ApiSessionImportProgress(detail = "Scanning existing accounts...", progress = null))
+    val existingCounterpartyIds = loadCounterpartyIdIndex(accountAttributeRepository).keys
+    onProgress(ApiSessionImportProgress(detail = "Reading downloaded transactions...", progress = null))
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val transactionResponses =
         apiSessionRepository
@@ -1071,6 +1068,9 @@ suspend fun discoverApiCounterpartiesToCreate(
         strategy = strategy,
         counterpartyIdField = counterpartyIdField,
         nameMappings = CounterpartyNameMappings.from(strategy),
+        onResponseProcessed = { done, total ->
+            onProgress(ApiSessionImportProgress(detail = "Finding new counterparties ($done/$total)...", progress = null))
+        },
     ).filterKeys { it !in existingCounterpartyIds }
         .map { (counterpartyId, names) ->
             ApiCounterpartySuggestion(
@@ -1149,9 +1149,11 @@ private fun collectCounterpartiesFromResponses(
     strategy: ApiImportStrategy,
     counterpartyIdField: String,
     nameMappings: CounterpartyNameMappings,
+    onResponseProcessed: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): Map<String, List<String>> =
     responses
-        .flatMap { response ->
+        .flatMapIndexed { index, response ->
+            onResponseProcessed(index + 1, responses.size)
             parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
                 // Skip transactions handled by built-in type logic — their counterpartyId is
                 // irrelevant because they all route to a single built-in account.
@@ -1172,22 +1174,17 @@ private fun collectCounterpartiesFromResponses(
             valueTransform = { it.second },
         ).mapValues { (_, names) -> names.filterNotNull() }
 
-private suspend fun loadCounterpartyIdIndex(
-    accountRepository: AccountReadRepository,
-    accountAttributeRepository: AccountAttributeReadRepository,
-): Map<String, AccountId> = loadAccountExternalIdIndex(accountRepository, accountAttributeRepository)
+private suspend fun loadCounterpartyIdIndex(accountAttributeRepository: AccountAttributeReadRepository): Map<String, AccountId> =
+    loadAccountExternalIdIndex(accountAttributeRepository)
 
-private suspend fun loadAccountExternalIdIndex(
-    accountRepository: AccountReadRepository,
-    accountAttributeRepository: AccountAttributeReadRepository,
-): Map<String, AccountId> {
+private suspend fun loadAccountExternalIdIndex(accountAttributeRepository: AccountAttributeReadRepository): Map<String, AccountId> {
+    // One query for every account's attributes rather than a per-account read: this used to be an N+1
+    // over the whole account table, which dominated the "Preparing import…" phase on a large database.
     val index = mutableMapOf<String, AccountId>()
-    for (account in accountRepository.getAllAccounts().first()) {
-        accountAttributeRepository
-            .getByAccount(account.id)
-            .first()
-            .firstOrNull { it.attributeType.id == ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID }
-            ?.let { index[it.value] = account.id }
+    for (attr in accountAttributeRepository.getAll().first()) {
+        if (attr.attributeType.id == ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID) {
+            index[attr.value] = attr.accountId
+        }
     }
     return index
 }

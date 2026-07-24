@@ -37,4 +37,25 @@ class PersonAttributeReadRepositoryImpl(
                     )
                 }
             }
+
+    override fun getAll(): Flow<List<PersonAttribute>> =
+        selectQueries
+            .selectAll()
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list ->
+                list.map { row ->
+                    PersonAttribute(
+                        id = row.id,
+                        personId = PersonId(row.person_id),
+                        attributeType =
+                            AttributeType(
+                                id = AttributeTypeId(row.attribute_type_id),
+                                name = row.attribute_type_name,
+                            ),
+                        value = row.attribute_value,
+                        groupKey = row.group_key,
+                    )
+                }
+            }
 }

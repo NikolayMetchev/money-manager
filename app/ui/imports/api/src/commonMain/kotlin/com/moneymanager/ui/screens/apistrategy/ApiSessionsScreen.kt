@@ -341,7 +341,6 @@ fun ApiSessionsScreen(
                 if (strategy.peopleDownload != null) {
                     importApiSessionPeople(
                         apiSessionRepository = apiSessionRepository,
-                        accountRepository = accountRepository,
                         accountAttributeRepository = accountAttributeRepository,
                         importEngine = importEngine,
                         sessionId = session.id,
@@ -667,6 +666,10 @@ fun ApiSessionsScreen(
                                     // indicator appears immediately, before the discovery scan below runs.
                                     preparingImportSessions = preparingImportSessions + session.id
                                     scope.launch {
+                                        // Cleared in the finally UNLESS we hand off to startImport, which then
+                                        // owns the progress state — clearing it there would race the engine's
+                                        // first progress callback.
+                                        var handedOffToImport = false
                                         try {
                                             val strategy =
                                                 resolveStrategy(credential) ?: run {
@@ -675,18 +678,22 @@ fun ApiSessionsScreen(
                                                     return@launch
                                                 }
                                             // Safe for all providers: returns empty when the strategy has no
-                                            // counterparty field, skipping the confirmation dialog.
+                                            // counterparty field, skipping the confirmation dialog. Its
+                                            // sub-step progress surfaces on the same bar as the import phases.
                                             val suggestions =
                                                 discoverApiCounterpartiesToCreate(
                                                     apiSessionRepository = apiSessionRepository,
-                                                    accountRepository = accountRepository,
                                                     accountAttributeRepository = accountAttributeRepository,
                                                     sessionId = session.id,
                                                     strategy = strategy,
+                                                    onProgress = { progress ->
+                                                        importProgressBySession = importProgressBySession + (session.id to progress)
+                                                    },
                                                 )
                                             if (suggestions.isEmpty()) {
                                                 // startImport registers the background task synchronously, so
                                                 // isImportingSession stays true across the handoff below.
+                                                handedOffToImport = true
                                                 startImport(session, strategy, emptyMap())
                                             } else {
                                                 pendingImport =
@@ -698,6 +705,9 @@ fun ApiSessionsScreen(
                                             }
                                         } finally {
                                             preparingImportSessions = preparingImportSessions - session.id
+                                            if (!handedOffToImport) {
+                                                importProgressBySession = importProgressBySession - session.id
+                                            }
                                         }
                                     }
                                 },
@@ -1102,22 +1112,20 @@ private fun SessionRow(
         }
 
         if (isImporting) {
-            Text(text = "Importing...", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-            // Indeterminate until the first progress fraction arrives, so the bar is visible during the
-            // discovery scan and the engine's initial index build; determinate thereafter.
             val fraction = importProgress?.progress
+            // Before the first engine progress arrives, the import is still in the UI-side preparation
+            // phase (resolving the strategy, scanning for counterparties, loading the session) — so label
+            // it accurately as "Preparing import…" rather than the misleading "Importing…". Once progress
+            // flows, each phase reports its own detail ("Counterparties prepared.", "Resolving accounts",
+            // "Importing transactions", "Import finalized.", …), which we surface as the label.
+            val percent = fraction?.let { " (${(it * 100).toInt().coerceIn(0, 100)}%)" }.orEmpty()
+            val label = importProgress?.let { it.detail + percent } ?: "Preparing import…"
+            Text(text = label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            // Indeterminate during preparation (no fraction yet), determinate once a phase reports one.
             if (fraction == null) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             } else {
                 LinearProgressIndicator(progress = { fraction.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-            }
-            importProgress?.let {
-                val percent = it.progress?.let { p -> " (${(p * 100).toInt().coerceIn(0, 100)}%)" }.orEmpty()
-                Text(
-                    text = it.detail + percent,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
             }
         }
 

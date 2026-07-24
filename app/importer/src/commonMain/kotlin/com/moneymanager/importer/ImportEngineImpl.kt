@@ -988,15 +988,16 @@ class ImportEngineImpl(
 
         val index = mutableMapOf<Pair<AttributeTypeId, String>, AccountId>()
         val claimed = mutableSetOf<AccountId>()
-        for (account in accountRepository.getAllAccounts().first()) {
-            val attrs = accountAttributeRepository.getByAccount(account.id).first()
-            for (attr in attrs) {
-                if (attr.attributeType.id in relevantTypeIds) {
-                    index.getOrPut(attr.attributeType.id to attr.value) { account.id }
-                }
-                if (attr.attributeType.id in IDENTITY_ATTR_TYPE_IDS) {
-                    claimed += account.id
-                }
+        // One query over all account attributes rather than a per-account read: this used to be an N+1
+        // over the whole account table, which dominated the "Resolving accounts" phase on a large database.
+        // getAll() is ordered by (type, account_id), so getOrPut still keeps the lowest-id account for a
+        // given (type, value) — the same winner the per-account scan produced.
+        for (attr in accountAttributeRepository.getAll().first()) {
+            if (attr.attributeType.id in relevantTypeIds) {
+                index.getOrPut(attr.attributeType.id to attr.value) { attr.accountId }
+            }
+            if (attr.attributeType.id in IDENTITY_ATTR_TYPE_IDS) {
+                claimed += attr.accountId
             }
         }
         return ExistingAccountAttrIndex(index, claimed)
@@ -1076,7 +1077,7 @@ class ImportEngineImpl(
 
         val existingPeople = personRepository.getAllPeople().first()
         val byNameKey = existingPeople.associate { normalizeNameKey(it.fullName) to it.id }.toMutableMap()
-        val byAttr = buildExistingPersonAttrIndex(batch, existingPeople)
+        val byAttr = buildExistingPersonAttrIndex(batch)
 
         val keyToId = mutableMapOf<LocalPersonKey, PersonId>()
         var created = 0
@@ -1135,10 +1136,7 @@ class ImportEngineImpl(
         return PersonResolution(keyToId, created)
     }
 
-    private suspend fun buildExistingPersonAttrIndex(
-        batch: ImportBatch,
-        existingPeople: List<Person>,
-    ): MutableMap<Pair<AttributeTypeId, String>, PersonId> {
+    private suspend fun buildExistingPersonAttrIndex(batch: ImportBatch): MutableMap<Pair<AttributeTypeId, String>, PersonId> {
         val relevantTypeIds =
             batch.peopleToCreate
                 .mapNotNull { (it.match as? PersonMatchKey.ByExternalId)?.typeId }
@@ -1146,12 +1144,11 @@ class ImportEngineImpl(
         if (relevantTypeIds.isEmpty()) return mutableMapOf()
 
         val index = mutableMapOf<Pair<AttributeTypeId, String>, PersonId>()
-        for (person in existingPeople) {
-            val attrs = personAttributeRepository.getByPerson(person.id).first()
-            for (attr in attrs) {
-                if (attr.attributeType.id in relevantTypeIds) {
-                    index.getOrPut(attr.attributeType.id to attr.value) { person.id }
-                }
+        // One query over all person attributes rather than a per-person read: this used to be an N+1
+        // over the whole person table during the "Resolving people" phase.
+        for (attr in personAttributeRepository.getAll().first()) {
+            if (attr.attributeType.id in relevantTypeIds) {
+                index.getOrPut(attr.attributeType.id to attr.value) { attr.personId }
             }
         }
         return index

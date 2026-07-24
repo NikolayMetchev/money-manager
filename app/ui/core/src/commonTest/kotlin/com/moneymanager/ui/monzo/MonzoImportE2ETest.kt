@@ -1569,7 +1569,6 @@ class MonzoImportE2ETest : DbTest() {
             val suggestions =
                 discoverApiCounterpartiesToCreate(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     accountAttributeRepository = repositories.accountAttributeRepository,
                     sessionId = sessionId,
                     strategy = strategy,
