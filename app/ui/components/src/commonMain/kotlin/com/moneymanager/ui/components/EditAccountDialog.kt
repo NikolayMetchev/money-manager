@@ -36,6 +36,7 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.getOrCreateAttributeType
+import com.moneymanager.ui.components.transactions.EditableAttribute
 import com.moneymanager.ui.components.transactions.EditableAttributesSection
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -82,7 +83,7 @@ fun EditAccountDialog(
 
     // Attribute state
     var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
-    var editableAttributes by remember { mutableStateOf<Map<Long, Pair<String, String>>>(emptyMap()) }
+    var editableAttributes by remember { mutableStateOf<Map<Long, EditableAttribute>>(emptyMap()) }
     var originalAttributeList by remember { mutableStateOf<List<com.moneymanager.domain.model.AccountAttribute>>(emptyList()) }
     var nextTempId by remember { mutableStateOf(-1L) }
     var attributesLoaded by remember { mutableStateOf(false) }
@@ -101,7 +102,7 @@ fun EditAccountDialog(
                 originalAttributeList = attrs
                 editableAttributes =
                     attrs.associate { attr ->
-                        attr.id to Pair(attr.attributeType.name, attr.value)
+                        attr.id to EditableAttribute(attr.attributeType.name, attr.value, attr.groupKey)
                     }
                 attributesLoaded = true
             }
@@ -152,25 +153,27 @@ fun EditAccountDialog(
                     val deletedAttributeIds = originalIds - editableIds
 
                     val updatedAttributes = mutableMapOf<Long, NewAttribute>()
-                    editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
-                        val (typeName, value) = pair
+                    editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, attribute) ->
+                        val (typeName, value, groupKey) = attribute
                         val original = originalAttributeList.find { it.id == id }
                         if (original != null) {
                             val typeChanged = original.attributeType.name != typeName
                             val valueChanged = original.value != value
                             if (typeChanged || valueChanged) {
                                 val typeId = importEngine.getOrCreateAttributeType(typeName.trim())
-                                updatedAttributes[id] = NewAttribute(typeId, value.trim())
+                                // Carry the row's original group through: editing a sort code must keep the
+                                // attribute bound to its own bank identity, not move it into the ungrouped slot.
+                                updatedAttributes[id] = NewAttribute(typeId, value.trim(), groupKey)
                             }
                         }
                     }
 
                     val newAttributes = mutableListOf<NewAttribute>()
-                    editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
-                        val (typeName, value) = pair
+                    editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, attribute) ->
+                        val (typeName, value, groupKey) = attribute
                         if (typeName.isNotBlank() && value.isNotBlank()) {
                             val typeId = importEngine.getOrCreateAttributeType(typeName.trim())
-                            newAttributes.add(NewAttribute(typeId, value.trim()))
+                            newAttributes.add(NewAttribute(typeId, value.trim(), groupKey))
                         }
                     }
 
@@ -278,10 +281,11 @@ fun EditAccountDialog(
                     existingAttributeTypes = existingAttributeTypes,
                     isSaving = accountState.isSaving,
                     onAttributesChange = { editableAttributes = it },
-                    onAddAttribute = {
-                        editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                    onAddAttribute = { groupKey ->
+                        editableAttributes = editableAttributes + (nextTempId to EditableAttribute("", "", groupKey))
                         nextTempId--
                     },
+                    grouping = true,
                 )
 
                 accountState.errorMessage?.let { error -> ErrorMessageText(error) }

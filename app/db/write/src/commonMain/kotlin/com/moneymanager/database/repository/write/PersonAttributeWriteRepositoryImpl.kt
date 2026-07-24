@@ -19,10 +19,11 @@ class PersonAttributeWriteRepositoryImpl(
         personId: PersonId,
         attributeTypeId: AttributeTypeId,
         value: String,
+        groupKey: String,
     ): Long =
         withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
-                writeQueries.insert(personId.id, attributeTypeId.id, value)
+                writeQueries.insert(personId.id, attributeTypeId.id, value, groupKey)
                 writeQueries.selectLastInsertedId().executeAsOne()
             }
         }
@@ -31,12 +32,13 @@ class PersonAttributeWriteRepositoryImpl(
         personId: PersonId,
         attributeTypeId: AttributeTypeId,
         value: String,
+        groupKey: String,
     ): Long =
         withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
                 database.beginCreationMode()
                 try {
-                    writeQueries.insert(personId.id, attributeTypeId.id, value)
+                    writeQueries.insert(personId.id, attributeTypeId.id, value, groupKey)
                     writeQueries.selectLastInsertedId().executeAsOne()
                 } finally {
                     database.endCreationMode()

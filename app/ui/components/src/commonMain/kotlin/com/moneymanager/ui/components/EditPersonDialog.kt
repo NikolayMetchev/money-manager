@@ -36,6 +36,7 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.getOrCreateAttributeType
+import com.moneymanager.ui.components.transactions.EditableAttribute
 import com.moneymanager.ui.components.transactions.EditableAttributesSection
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
@@ -62,7 +63,7 @@ fun EditPersonDialog(
     // Attribute editing (e.g. provider external ids) is available when both repositories are provided.
     val attributesEditable = personAttributeRepository != null && attributeTypeRepository != null
     var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
-    var editableAttributes by remember { mutableStateOf<Map<Long, Pair<String, String>>>(emptyMap()) }
+    var editableAttributes by remember { mutableStateOf<Map<Long, EditableAttribute>>(emptyMap()) }
     var originalAttributeList by remember { mutableStateOf<List<PersonAttribute>>(emptyList()) }
     var nextTempId by remember { mutableStateOf(-1L) }
     var attributesLoaded by remember { mutableStateOf(false) }
@@ -78,7 +79,7 @@ fun EditPersonDialog(
         if (personAttributeRepository != null && personToEdit != null && !attributesLoaded) {
             val attrs = personAttributeRepository.getByPerson(personToEdit.id).first()
             originalAttributeList = attrs
-            editableAttributes = attrs.associate { it.id to Pair(it.attributeType.name, it.value) }
+            editableAttributes = attrs.associate { it.id to EditableAttribute(it.attributeType.name, it.value, it.groupKey) }
             attributesLoaded = true
         }
     }
@@ -113,21 +114,32 @@ fun EditPersonDialog(
                             .toSet()
                             .minus(keptIds)
                             .forEach { deletedAttributeIds.add(it) }
-                        editableAttributes.filterKeys { it > 0 }.forEach { (id, pair) ->
-                            val typeName = pair.first.trim()
-                            val value = pair.second.trim()
+                        editableAttributes.filterKeys { it > 0 }.forEach { (id, attribute) ->
+                            val typeName = attribute.typeName.trim()
+                            val value = attribute.value.trim()
                             val original = originalAttributeList.find { it.id == id } ?: return@forEach
                             when {
                                 typeName.isBlank() || value.isBlank() -> deletedAttributeIds.add(id)
                                 original.attributeType.name != typeName || original.value != value ->
-                                    updatedAttributes[id] = NewAttribute(importEngine.getOrCreateAttributeType(typeName), value)
+                                    updatedAttributes[id] =
+                                        NewAttribute(
+                                            importEngine.getOrCreateAttributeType(typeName),
+                                            value,
+                                            attribute.groupKey,
+                                        )
                             }
                         }
-                        editableAttributes.filterKeys { it < 0 }.forEach { (_, pair) ->
-                            val typeName = pair.first.trim()
-                            val value = pair.second.trim()
+                        editableAttributes.filterKeys { it < 0 }.forEach { (_, attribute) ->
+                            val typeName = attribute.typeName.trim()
+                            val value = attribute.value.trim()
                             if (typeName.isNotEmpty() && value.isNotEmpty()) {
-                                newAttributes.add(NewAttribute(importEngine.getOrCreateAttributeType(typeName), value))
+                                newAttributes.add(
+                                    NewAttribute(
+                                        importEngine.getOrCreateAttributeType(typeName),
+                                        value,
+                                        attribute.groupKey,
+                                    ),
+                                )
                             }
                         }
                     }
@@ -248,7 +260,7 @@ fun EditPersonDialog(
                         isSaving = saveState.isSaving,
                         onAttributesChange = { editableAttributes = it },
                         onAddAttribute = {
-                            editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                            editableAttributes = editableAttributes + (nextTempId to EditableAttribute("", "", it))
                             nextTempId--
                         },
                     )

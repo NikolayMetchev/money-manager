@@ -1,6 +1,7 @@
 package com.moneymanager.importer
 
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountAttribute
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
@@ -58,6 +59,7 @@ import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.ApiStrategyMutation
+import com.moneymanager.importengineapi.AttributeSlot
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.DedupePolicy
@@ -85,12 +87,13 @@ import com.moneymanager.importengineapi.QifImportMutation
 import com.moneymanager.importengineapi.RowOutcome
 import com.moneymanager.importengineapi.WriteIntent
 import com.moneymanager.importengineapi.bankKeyFromExternalId
+import com.moneymanager.importengineapi.bankKeysFrom
 import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
-import com.moneymanager.importengineapi.personalCounterpartyKey
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Attribute types that tie an account to a specific real bank account/counterparty identity. An
@@ -758,11 +761,12 @@ class ImportEngineImpl(
      * enough to disambiguate without making the name unreadably long).
      */
     private fun discriminatorFor(intent: ImportAccountIntent): String? {
-        val accountNumberTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
+        // Take the account number from the first group that yields a COMPLETE bank key, so an account with
+        // several identities gets a stable discriminator instead of one that depends on attribute order.
         val accountNumberDiscriminator =
-            intent.attributes
-                .firstOrNull { it.typeId == accountNumberTypeId }
-                ?.value
+            intentBankKeys(intent)
+                .firstOrNull()
+                ?.substringAfter('|')
                 ?.takeLast(4)
         if (accountNumberDiscriminator != null) return accountNumberDiscriminator
         return (intent.match as? AccountMatchKey.ByExternalId)?.value?.takeLast(6)
@@ -791,13 +795,13 @@ class ImportEngineImpl(
                 is AccountMatchKey.AlwaysCreate -> null
             }
         if (primary != null) return AccountMatch(primary, adopted = false)
-        val bankKey = intentBankKey(intent)
+        val bankKeys = intentBankKeys(intent)
         // Fallback: an intent that carries bank details (sort code + account number attributes) but didn't
         // match by its primary key adopts a pre-existing account for the same real bank account — e.g. a
         // source account adopting a counterparty another provider created, keeping imports order-independent.
         // The matched account is re-pointed (renamed + the intent's own attributes added) so this provider
         // resolves it by id next time, while its bank attributes keep the other provider matching it.
-        bankKey?.let { byPersonalKey[it] }?.let { return AccountMatch(it, adopted = true) }
+        bankKeys.firstNotNullOfOrNull { byPersonalKey[it] }?.let { return AccountMatch(it, adopted = true) }
         // An own/source account intent with no bank-identity match yet may still adopt a pre-existing
         // account of the exact same name that carries no identity attributes of its own (an "unclaimed"
         // account — e.g. one created ahead of time by hand, or by the import-directory auto-create-by-name
@@ -818,7 +822,7 @@ class ImportEngineImpl(
         // pre-existing account — so an own/source account can't merge into an unrelated account that
         // merely shares its name. Accounts that carry bank details are excluded too: two people can share
         // a name while owning different accounts.
-        if (bankKey == null && intent.match !is AccountMatchKey.AlwaysCreate) {
+        if (bankKeys.isEmpty() && intent.match !is AccountMatchKey.AlwaysCreate) {
             intent.name?.let { batchCreatedByName[it] }?.let { return AccountMatch(it, adopted = false) }
         }
         return null
@@ -843,23 +847,81 @@ class ImportEngineImpl(
             byName[resolvedName] = id
         }
         val currentAttrs = accountAttributeRepository.getByAccount(id).first()
+        val storedGroupKey = storedGroupKeyResolver(intent.attributes, currentAttrs)
         for (attr in intent.attributes) {
             val present = currentAttrs.any { it.attributeType.id == attr.typeId && it.value == attr.value }
             if (!present) {
-                runCatching { accountAttributeRepository.insertInCreationMode(id, attr.typeId, attr.value) }
+                // Upsert rather than insert-and-swallow: the (type, group) slot may already hold a
+                // different value, and dropping the write there would silently lose this provider's
+                // identity for the account.
+                accountAttributeRepository.upsertInCreationMode(id, attr.typeId, attr.value, storedGroupKey(attr))
                 byAttr.getOrPut(attr.typeId to attr.value) { id }
             }
         }
     }
 
-    /** The personal-counterparty bank key from an intent's sort-code + account-number attributes, if both present. */
-    private fun intentBankKey(intent: ImportAccountIntent): String? {
-        val sortCodeTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
-        val accountNumberTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
-        val sortCode = intent.attributes.firstOrNull { it.typeId == sortCodeTypeId }?.value
-        val accountNumber = intent.attributes.firstOrNull { it.typeId == accountNumberTypeId }?.value
-        return if (sortCode != null && accountNumber != null) personalCounterpartyKey(sortCode, accountNumber) else null
+    /**
+     * Builds the function that maps each of an intent's attributes to the `group_key` it is stored under.
+     *
+     * Stored group keys are opaque UUIDs. The intent carries a transient grouping tag (the natural
+     * `personalCounterpartyKey`) that only binds an identity's attributes together within the batch; this
+     * translates that tag to a persisted UUID, minting one for a new group and reusing an existing group's
+     * UUID when the incoming identity matches an existing one BY DERIVED VALUE. Matching by value (not by
+     * key string) is what keeps a re-import idempotent and lets two independently-created accounts be
+     * merged without duplicating a shared identity.
+     *
+     * Ungrouped identity attributes (e.g. a provider external id) are resolved per attribute: one whose
+     * ungrouped slot already holds a DIFFERENT value is moved into a group of its own rather than
+     * overwriting, so two providers that each know the account by a different external id both survive.
+     */
+    private fun storedGroupKeyResolver(
+        intentAttributes: List<NewAttribute>,
+        existingAttrs: List<AccountAttribute>,
+    ): (NewAttribute) -> String {
+        val existingGroups = existingAttrs.filter { it.groupKey.isNotEmpty() }.groupBy { it.groupKey }
+        val tagToStored =
+            intentAttributes
+                .filter { it.groupKey.isNotEmpty() }
+                .groupBy { it.groupKey }
+                .keys
+                .associateWith { tag ->
+                    val incomingKey =
+                        bankKeysFrom(
+                            intentAttributes
+                                .filter { it.groupKey == tag }
+                                .map { AttributeSlot(it.typeId.id, it.value, it.groupKey) },
+                        ).firstOrNull()
+                    val reuse =
+                        incomingKey?.let {
+                            existingGroups.entries
+                                .firstOrNull { (key, rows) ->
+                                    bankKeysFrom(rows.map { AttributeSlot(it.attributeType.id.id, it.value, key) })
+                                        .firstOrNull() == incomingKey
+                                }?.key
+                        }
+                    reuse ?: Uuid.random().toString()
+                }
+        val identityTypeIds = IDENTITY_ATTR_TYPE_IDS.map { it.id }
+        return { attr ->
+            if (attr.groupKey.isNotEmpty()) {
+                tagToStored.getValue(attr.groupKey)
+            } else {
+                val occupied =
+                    existingAttrs.any {
+                        it.groupKey.isEmpty() && it.attributeType.id == attr.typeId && it.value != attr.value
+                    }
+                if (occupied && attr.typeId.id in identityTypeIds) Uuid.random().toString() else ""
+            }
+        }
     }
+
+    /**
+     * Every personal-counterparty bank key this intent carries — one per attribute group holding both a
+     * sort code and an account number, so an intent describing an account with two bank identities yields
+     * both. Derived from the attribute values, never from the group key, so a stale group key is harmless.
+     */
+    private fun intentBankKeys(intent: ImportAccountIntent): List<String> =
+        bankKeysFrom(intent.attributes.map { AttributeSlot(it.typeId.id, it.value, it.groupKey) })
 
     private suspend fun createAccount(
         intent: ImportAccountIntent,
@@ -875,8 +937,9 @@ class ImportEngineImpl(
                 ),
                 intent.source,
             )
+        val storedGroupKey = storedGroupKeyResolver(intent.attributes, existingAttrs = emptyList())
         intent.attributes.forEach { attr ->
-            accountAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
+            accountAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value, storedGroupKey(attr))
         }
         return newId
     }
@@ -895,9 +958,9 @@ class ImportEngineImpl(
             is AccountMatchKey.ByPersonalCounterparty -> byPersonalKey.getOrPut(match.key) { id }
             else -> Unit
         }
-        // Register the new account's bank identity (from its sort/account attributes) so a later intent in
-        // this batch sharing those details merges into it instead of creating a duplicate.
-        intentBankKey(intent)?.let { byPersonalKey.getOrPut(it) { id } }
+        // Register every bank identity the new account carries (from its sort/account attribute groups) so
+        // a later intent in this batch sharing any of them merges into it instead of creating a duplicate.
+        intentBankKeys(intent).forEach { key -> byPersonalKey.getOrPut(key) { id } }
     }
 
     /**
@@ -925,15 +988,16 @@ class ImportEngineImpl(
 
         val index = mutableMapOf<Pair<AttributeTypeId, String>, AccountId>()
         val claimed = mutableSetOf<AccountId>()
-        for (account in accountRepository.getAllAccounts().first()) {
-            val attrs = accountAttributeRepository.getByAccount(account.id).first()
-            for (attr in attrs) {
-                if (attr.attributeType.id in relevantTypeIds) {
-                    index.getOrPut(attr.attributeType.id to attr.value) { account.id }
-                }
-                if (attr.attributeType.id in IDENTITY_ATTR_TYPE_IDS) {
-                    claimed += account.id
-                }
+        // One query over all account attributes rather than a per-account read: this used to be an N+1
+        // over the whole account table, which dominated the "Resolving accounts" phase on a large database.
+        // getAll() is ordered by (type, account_id), so getOrPut still keeps the lowest-id account for a
+        // given (type, value) — the same winner the per-account scan produced.
+        for (attr in accountAttributeRepository.getAll().first()) {
+            if (attr.attributeType.id in relevantTypeIds) {
+                index.getOrPut(attr.attributeType.id to attr.value) { attr.accountId }
+            }
+            if (attr.attributeType.id in IDENTITY_ATTR_TYPE_IDS) {
+                claimed += attr.accountId
             }
         }
         return ExistingAccountAttrIndex(index, claimed)
@@ -963,29 +1027,38 @@ class ImportEngineImpl(
         // existing account for the same real bank account.
         val hasPersonalKeys =
             intents.any { it.match is AccountMatchKey.ByPersonalCounterparty } ||
-                intents.any { intentBankKey(it) != null }
+                intents.any { intentBankKeys(it).isNotEmpty() }
         if (!hasPersonalKeys) return mutableMapOf()
 
-        val sortCodeTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
-        val accountNumberTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
-        val externalIdTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
-
         val index = mutableMapOf<String, AccountId>()
-        for (account in accountRepository.getAllAccounts().first()) {
-            val attrs = accountAttributeRepository.getByAccount(account.id).first()
-            val sortCode = attrs.firstOrNull { it.attributeType.id == sortCodeTypeId }?.value
-            val accountNumber = attrs.firstOrNull { it.attributeType.id == accountNumberTypeId }?.value
-            if (sortCode != null && accountNumber != null) {
-                index.getOrPut(personalCounterpartyKey(sortCode, accountNumber)) { account.id }
-            } else {
-                // Fallback: an account whose only bank identity is a synthetic "bank:<sort>:<account>"
-                // external-id (created before its sort/account were persisted as attributes). Don't
-                // overwrite an attribute-backed entry — those are authoritative.
-                val externalId = attrs.firstOrNull { it.attributeType.id == externalIdTypeId }?.value
-                bankKeyFromExternalId(externalId)?.let { index.getOrPut(it) { account.id } }
-            }
+        // One query for every account's attributes rather than a per-account flow read: this used to be an
+        // N+1 over the whole account table on every import carrying a bank identity.
+        for ((accountId, attrs) in accountAttributeRepository.getAll().first().groupBy { it.accountId }) {
+            // Index EVERY identity: an account that owns two bank identities must be reachable by both, or
+            // the second one silently forks a duplicate account on the next import.
+            existingBankKeys(attrs).forEach { key -> index.getOrPut(key) { accountId } }
         }
         return index
+    }
+
+    /** Every bank key an existing account's stored [attrs] resolve to, best source first. */
+    private fun existingBankKeys(attrs: List<AccountAttribute>): List<String> {
+        val slots = attrs.map { AttributeSlot(it.attributeType.id.id, it.value, it.groupKey) }
+        val grouped = bankKeysFrom(slots)
+        if (grouped.isNotEmpty()) return grouped
+        // Loose pairing: an account whose sort code and account number ended up in different groups (a
+        // half-finished hand edit) would otherwise index nothing. Only when there is exactly one of each
+        // across the whole account, so this can never invent a pair.
+        bankKeysFrom(slots.map { it.copy(groupKey = "") }).singleOrNull()?.let { return listOf(it) }
+        // Fallback: an account whose only bank identity is a synthetic "bank:<sort>:<account>" external-id
+        // (created before its sort/account were persisted as attributes).
+        val externalIdTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
+        return attrs
+            .firstOrNull { it.attributeType.id == externalIdTypeId }
+            ?.value
+            ?.let(::bankKeyFromExternalId)
+            ?.let { listOf(it) }
+            .orEmpty()
     }
 
     // endregion
@@ -1004,7 +1077,7 @@ class ImportEngineImpl(
 
         val existingPeople = personRepository.getAllPeople().first()
         val byNameKey = existingPeople.associate { normalizeNameKey(it.fullName) to it.id }.toMutableMap()
-        val byAttr = buildExistingPersonAttrIndex(batch, existingPeople)
+        val byAttr = buildExistingPersonAttrIndex(batch)
 
         val keyToId = mutableMapOf<LocalPersonKey, PersonId>()
         var created = 0
@@ -1063,10 +1136,7 @@ class ImportEngineImpl(
         return PersonResolution(keyToId, created)
     }
 
-    private suspend fun buildExistingPersonAttrIndex(
-        batch: ImportBatch,
-        existingPeople: List<Person>,
-    ): MutableMap<Pair<AttributeTypeId, String>, PersonId> {
+    private suspend fun buildExistingPersonAttrIndex(batch: ImportBatch): MutableMap<Pair<AttributeTypeId, String>, PersonId> {
         val relevantTypeIds =
             batch.peopleToCreate
                 .mapNotNull { (it.match as? PersonMatchKey.ByExternalId)?.typeId }
@@ -1074,12 +1144,11 @@ class ImportEngineImpl(
         if (relevantTypeIds.isEmpty()) return mutableMapOf()
 
         val index = mutableMapOf<Pair<AttributeTypeId, String>, PersonId>()
-        for (person in existingPeople) {
-            val attrs = personAttributeRepository.getByPerson(person.id).first()
-            for (attr in attrs) {
-                if (attr.attributeType.id in relevantTypeIds) {
-                    index.getOrPut(attr.attributeType.id to attr.value) { person.id }
-                }
+        // One query over all person attributes rather than a per-person read: this used to be an N+1
+        // over the whole person table during the "Resolving people" phase.
+        for (attr in personAttributeRepository.getAll().first()) {
+            if (attr.attributeType.id in relevantTypeIds) {
+                index.getOrPut(attr.attributeType.id to attr.value) { attr.personId }
             }
         }
         return index

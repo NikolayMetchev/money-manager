@@ -1,6 +1,7 @@
 package com.moneymanager.database.repository.write
 
 import com.moneymanager.database.mapper.TransferMapper
+import com.moneymanager.database.sql.accountAttribute.SelectByAccount
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.Account
@@ -10,6 +11,7 @@ import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.write.AccountWriteRepository
 import kotlinx.coroutines.Dispatchers
@@ -117,8 +119,10 @@ class AccountWriteRepositoryImpl(
                         },
                         bumpRevisionOnly = { writeQueries.bumpRevisionOnly(effectiveAccountId.id) },
                         selectRevision = { selectQueries.selectRevisionById(effectiveAccountId.id).executeAsOne() },
-                        selectCurrentTypeId = { id ->
-                            attributeSelectQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
+                        selectCurrentSlot = { id ->
+                            attributeSelectQueries.selectById(id).executeAsOneOrNull()?.let {
+                                it.attribute_type_id to it.group_key
+                            }
                         },
                         deleteById = { id -> attributeWriteQueries.deleteById(id) },
                         insertAttribute = { attr ->
@@ -126,6 +130,7 @@ class AccountWriteRepositoryImpl(
                                 account_id = effectiveAccountId.id,
                                 attribute_type_id = attr.typeId.id,
                                 attribute_value = attr.value,
+                                group_key = attr.groupKey,
                             )
                         },
                         updateValue = { value, id -> attributeWriteQueries.updateValue(value, id) },
@@ -215,6 +220,12 @@ class AccountWriteRepositoryImpl(
                     recordTransferMergeSource(transferId, Source.Merge)
                 }
 
+                // Carry the deleted account's attribute groups onto the survivor BEFORE the cascade delete
+                // takes them away. Without this the merge destroys the loser's bank identity, so the next
+                // import sees an unknown sort code / account number pair and re-creates the very account
+                // just merged away ("merge loses identity, account resurrects").
+                carryAttributeGroups(deletedAccount, survivingAccount, mergeId)
+
                 writeQueries.delete(deletedAccount.id)
                 // Source the deleted account's DELETE audit entry (recorded at revision_id + 1 by the
                 // custom account delete trigger) as a merge, so the trail shows where it went rather than
@@ -272,7 +283,9 @@ class AccountWriteRepositoryImpl(
 
                 // Restore attributes from the audit trail (no bump): the merge's cascade delete recorded
                 // each attribute as a DELETE in account_attribute_audit, and the latest such batch for
-                // this account is exactly the set removed by this merge.
+                // this account is exactly the set removed by this merge. group_key is restored with the
+                // value — an account that owned two bank identities would otherwise come back with both
+                // pairs collapsed into the ungrouped slot, violating the UNIQUE constraint.
                 database.beginCreationMode()
                 try {
                     auditQueries.selectDeletedAttributesForAccount(merge.deleted_account_id).executeAsList().forEach {
@@ -280,7 +293,14 @@ class AccountWriteRepositoryImpl(
                             account_id = merge.deleted_account_id,
                             attribute_type_id = it.attribute_type_id,
                             attribute_value = it.attribute_value,
+                            group_key = it.group_key,
                         )
+                    }
+                    // Remove the attributes the merge grafted onto the SURVIVOR. Leaving them would have
+                    // both accounts claiming the same bank identity, making the next import's lookup
+                    // non-deterministic (whichever account id the index happens to see first wins).
+                    mergeSelectQueries.selectAttributeIdsForMerge(mergeId.id).executeAsList().forEach { attributeId ->
+                        attributeWriteQueries.deleteById(attributeId)
                     }
                 } finally {
                     database.endCreationMode()
@@ -307,6 +327,151 @@ class AccountWriteRepositoryImpl(
                 mergeWriteQueries.markReversed(mergeId.id)
             }
         }
+
+    /**
+     * Moves [deletedAccount]'s attributes onto [survivingAccount], recording each row actually inserted in
+     * `account_merge_attribute` so [unmergeAccount] can remove exactly what was added and leave the
+     * survivor's own attributes alone.
+     *
+     * Runs in creation mode: each acquired attribute is recorded in `account_attribute_audit` at the
+     * survivor's current revision without minting one unsourced revision per attribute (the same choice
+     * unmerge already makes when restoring).
+     *
+     * Nothing is ever overwritten. A conflicting value is inserted under a fresh group instead, so merging
+     * two accounts that each carry a different `account-external-id` keeps both and the survivor stays
+     * matchable by either provider.
+     */
+    private fun carryAttributeGroups(
+        deletedAccount: AccountId,
+        survivingAccount: AccountId,
+        mergeId: Long,
+    ) {
+        val loserAttrs = attributeSelectQueries.selectByAccount(deletedAccount.id).executeAsList()
+        if (loserAttrs.isEmpty()) return
+        val survivor = SurvivorAttributes(attributeSelectQueries.selectByAccount(survivingAccount.id).executeAsList())
+
+        database.beginCreationMode()
+        try {
+            for ((groupKey, group) in loserAttrs.groupBy { it.group_key }) {
+                if (groupKey.isEmpty()) {
+                    carryUngrouped(group, survivor, survivingAccount, mergeId)
+                } else {
+                    carryGroup(groupKey, group, survivor, survivingAccount, mergeId)
+                }
+            }
+        } finally {
+            database.endCreationMode()
+        }
+    }
+
+    /**
+     * Ungrouped attributes carry one at a time: they are independent scalars, not a tuple. A conflicting
+     * value goes into a group of its own rather than overwriting, so merging two provider-created accounts
+     * keeps both external ids and the survivor stays matchable by either.
+     */
+    private fun carryUngrouped(
+        group: List<SelectByAccount>,
+        survivor: SurvivorAttributes,
+        survivingAccount: AccountId,
+        mergeId: Long,
+    ) {
+        group.forEach { attr ->
+            if (survivor.holds(attr.attribute_type_id, attr.attribute_value)) return@forEach
+            val target = if (survivor.occupiesUngrouped(attr.attribute_type_id)) "m$mergeId:${attr.id}" else ""
+            insertCarriedAttribute(survivingAccount, attr.attribute_type_id, attr.attribute_value, target, mergeId)
+        }
+    }
+
+    /**
+     * Carries one whole identity group onto the survivor, unless the survivor already holds that identity.
+     *
+     * Because stored group keys are opaque UUIDs, two accounts describing the same real bank account carry
+     * that identity under DIFFERENT keys, so the match must be by the identity's derived value (sort code +
+     * account number), not by the key string — otherwise every same-identity merge would duplicate it.
+     * A group with no derivable bank identity (an arbitrary user group) falls back to key-string matching,
+     * which for UUIDs effectively never collides, so it is carried across verbatim.
+     */
+    private fun carryGroup(
+        groupKey: String,
+        group: List<SelectByAccount>,
+        survivor: SurvivorAttributes,
+        survivingAccount: AccountId,
+        mergeId: Long,
+    ) {
+        // Same identity already on the survivor (under whatever key) -> nothing to carry.
+        bankKeyOf(group)?.let { if (survivor.hasBankKey(it)) return }
+
+        val existing = survivor.group(groupKey)
+        if (existing != null && existing == group.associate { it.attribute_type_id to it.attribute_value }) return
+        // A key-string collision with unrelated contents (a stale/hand-edited key) is re-keyed rather than
+        // dropped or overwritten; safe because import resolves the group by derived value, not by key.
+        val target = if (existing == null) groupKey else "$groupKey#m$mergeId"
+        group.forEach { attr ->
+            insertCarriedAttribute(survivingAccount, attr.attribute_type_id, attr.attribute_value, target, mergeId)
+        }
+    }
+
+    /**
+     * The bank identity a group encodes — `"<sortCode>|<accountNumber>"` — when it holds exactly one sort
+     * code and one account number, else null. Derived from the values (never the key), mirroring the import
+     * engine's `bankKeysFrom`, so two accounts holding the same identity under different UUID keys still
+     * reconcile on merge.
+     */
+    private fun bankKeyOf(group: List<SelectByAccount>): String? {
+        val sortCode = group.singleOrNull { it.attribute_type_id == WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID }?.attribute_value
+        val accountNumber =
+            group.singleOrNull { it.attribute_type_id == WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID }?.attribute_value
+        return if (!sortCode.isNullOrBlank() && !accountNumber.isNullOrBlank()) "$sortCode|$accountNumber" else null
+    }
+
+    /** The surviving account's attributes, indexed for the lookups [carryAttributeGroups] needs. */
+    private inner class SurvivorAttributes(
+        attrs: List<SelectByAccount>,
+    ) {
+        private val groups =
+            attrs
+                .filter { it.group_key.isNotEmpty() }
+                .groupBy { it.group_key }
+                .mapValues { (_, rows) -> rows.associate { it.attribute_type_id to it.attribute_value } }
+        private val ungroupedTypes = attrs.filter { it.group_key.isEmpty() }.map { it.attribute_type_id }.toSet()
+        private val typeValues = attrs.map { it.attribute_type_id to it.attribute_value }.toSet()
+
+        // Bank identities the survivor already holds, one per group (grouped or, tolerating legacy data,
+        // the ungrouped slot). Lets a same-identity loser group be recognised despite a different key.
+        private val bankKeys =
+            (attrs.filter { it.group_key.isNotEmpty() }.groupBy { it.group_key }.values + listOf(attrs.filter { it.group_key.isEmpty() }))
+                .mapNotNull { bankKeyOf(it) }
+                .toSet()
+
+        fun group(key: String): Map<Long, String>? = groups[key]
+
+        fun occupiesUngrouped(typeId: Long): Boolean = typeId in ungroupedTypes
+
+        fun hasBankKey(key: String): Boolean = key in bankKeys
+
+        fun holds(
+            typeId: Long,
+            value: String,
+        ): Boolean = (typeId to value) in typeValues
+    }
+
+    /** Inserts one carried attribute onto the survivor and records it against [mergeId] for unmerge. */
+    private fun insertCarriedAttribute(
+        survivingAccount: AccountId,
+        attributeTypeId: Long,
+        value: String,
+        groupKey: String,
+        mergeId: Long,
+    ) {
+        attributeWriteQueries.insert(
+            account_id = survivingAccount.id,
+            attribute_type_id = attributeTypeId,
+            attribute_value = value,
+            group_key = groupKey,
+        )
+        val attributeId = attributeWriteQueries.selectLastInsertedId().executeAsOne()
+        mergeWriteQueries.insertMergeAttribute(merge_id = mergeId, attribute_id = attributeId)
+    }
 
     /** [desired] if free, else [desired] with an incrementing counter suffix until one is (always terminates). */
     private fun uniqueRestoreName(

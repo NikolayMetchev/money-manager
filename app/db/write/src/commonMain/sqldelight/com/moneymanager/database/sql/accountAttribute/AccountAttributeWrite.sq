@@ -1,11 +1,22 @@
 insert:
 -- Seed revision_id from the parent account's current revision so it is correct even on the import path
 -- (where triggers are skipped); the insert trigger refreshes it to the post-bump revision otherwise.
-INSERT INTO account_attribute (account_id, attribute_type_id, attribute_value, revision_id)
-VALUES (:account_id, :attribute_type_id, :attribute_value, (SELECT revision_id FROM account WHERE id = :account_id));
+INSERT INTO account_attribute (account_id, attribute_type_id, attribute_value, group_key, revision_id)
+VALUES (:account_id, :attribute_type_id, :attribute_value, :group_key, (SELECT revision_id FROM account WHERE id = :account_id));
+
+upsert:
+-- Idempotent write of one attribute into one (type, group) slot: inserts when the slot is free,
+-- updates when it holds a different value, and does nothing when the value already matches. Lets a
+-- re-import of an already-known identity be a true no-op instead of a swallowed UNIQUE violation.
+INSERT INTO account_attribute (account_id, attribute_type_id, attribute_value, group_key, revision_id)
+VALUES (:account_id, :attribute_type_id, :attribute_value, :group_key, (SELECT revision_id FROM account WHERE id = :account_id))
+ON CONFLICT (account_id, attribute_type_id, group_key)
+DO UPDATE SET attribute_value = excluded.attribute_value
+WHERE attribute_value != excluded.attribute_value;
 
 selectLastInsertedId:
 SELECT last_insert_rowid();
+
 
 updateValue:
 UPDATE account_attribute

@@ -8,7 +8,7 @@ internal fun applyAttributeChangesInCreationMode(
     deletedAttributeIds: Set<Long>,
     updatedAttributes: Map<Long, NewAttribute>,
     newAttributes: List<NewAttribute>,
-    selectCurrentTypeId: (Long) -> Long?,
+    selectCurrentSlot: (Long) -> Pair<Long, String>?,
     deleteById: (Long) -> Unit,
     insertAttribute: (NewAttribute) -> Unit,
     insertAttributeForUpdatedType: (NewAttribute) -> Unit,
@@ -21,8 +21,12 @@ internal fun applyAttributeChangesInCreationMode(
         }
 
         updatedAttributes.forEach { (id, attr) ->
-            val currentTypeId = selectCurrentTypeId(id)
-            if (currentTypeId != null && currentTypeId != attr.typeId.id) {
+            val currentSlot = selectCurrentSlot(id)
+            // The (type, group) pair is the row's UNIQUE slot. Changing either moves the row to a
+            // different slot, which an in-place UPDATE cannot express — it would keep the old group
+            // (silently un-grouping or mis-grouping the attribute) and could collide with the row
+            // already sitting in the target slot. Re-create instead.
+            if (currentSlot != null && currentSlot != (attr.typeId.id to attr.groupKey)) {
                 deleteById(id)
                 insertAttributeForUpdatedType(attr)
             } else {
@@ -47,7 +51,7 @@ internal fun updateEntityWithAttributes(
     updateEntity: () -> Unit,
     bumpRevisionOnly: () -> Unit,
     selectRevision: () -> Long,
-    selectCurrentTypeId: (Long) -> Long?,
+    selectCurrentSlot: (Long) -> Pair<Long, String>?,
     deleteById: (Long) -> Unit,
     insertAttribute: (NewAttribute) -> Unit,
     updateValue: (value: String, id: Long) -> Unit,
@@ -69,7 +73,7 @@ internal fun updateEntityWithAttributes(
             deletedAttributeIds = deletedAttributeIds,
             updatedAttributes = updatedAttributes,
             newAttributes = newAttributes,
-            selectCurrentTypeId = selectCurrentTypeId,
+            selectCurrentSlot = selectCurrentSlot,
             deleteById = deleteById,
             insertAttribute = insertAttribute,
             insertAttributeForUpdatedType = insertAttribute,

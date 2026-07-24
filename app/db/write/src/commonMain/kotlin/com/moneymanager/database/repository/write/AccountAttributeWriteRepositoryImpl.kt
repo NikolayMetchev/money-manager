@@ -20,6 +20,7 @@ class AccountAttributeWriteRepositoryImpl(
         accountId: AccountId,
         attributeTypeId: AttributeTypeId,
         value: String,
+        groupKey: String,
     ): Long =
         withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
@@ -27,6 +28,7 @@ class AccountAttributeWriteRepositoryImpl(
                     accountId.id,
                     attributeTypeId.id,
                     value,
+                    groupKey,
                 )
                 writeQueries.selectLastInsertedId().executeAsOne()
             }
@@ -36,6 +38,7 @@ class AccountAttributeWriteRepositoryImpl(
         accountId: AccountId,
         attributeTypeId: AttributeTypeId,
         value: String,
+        groupKey: String,
     ): Long =
         withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
@@ -45,8 +48,31 @@ class AccountAttributeWriteRepositoryImpl(
                         accountId.id,
                         attributeTypeId.id,
                         value,
+                        groupKey,
                     )
                     writeQueries.selectLastInsertedId().executeAsOne()
+                } finally {
+                    database.endCreationMode()
+                }
+            }
+        }
+
+    override suspend fun upsertInCreationMode(
+        accountId: AccountId,
+        attributeTypeId: AttributeTypeId,
+        value: String,
+        groupKey: String,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.transaction {
+                database.beginCreationMode()
+                try {
+                    writeQueries.upsert(
+                        accountId.id,
+                        attributeTypeId.id,
+                        value,
+                        groupKey,
+                    )
                 } finally {
                     database.endCreationMode()
                 }
@@ -64,6 +90,7 @@ class AccountAttributeWriteRepositoryImpl(
                             input.accountId.id,
                             input.attributeTypeId.id,
                             input.value,
+                            input.groupKey,
                         )
                     }
                 } finally {

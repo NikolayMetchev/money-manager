@@ -126,6 +126,8 @@ CREATE TABLE transfer_attribute_audit (
     revision_id INTEGER NOT NULL,
     attribute_type_id INTEGER NOT NULL,
     attribute_value TEXT NOT NULL,
+    -- Opaque grouping tag carried from the attribute row; see account_attribute.group_key.
+    group_key TEXT NOT NULL DEFAULT '',
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
     FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
 );
@@ -142,6 +144,8 @@ CREATE TABLE account_attribute_audit (
     revision_id INTEGER NOT NULL,
     attribute_type_id INTEGER NOT NULL,
     attribute_value TEXT NOT NULL,
+    -- Opaque grouping tag carried from the attribute row; see account_attribute.group_key.
+    group_key TEXT NOT NULL DEFAULT '',
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
     FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
 );
@@ -158,6 +162,8 @@ CREATE TABLE person_attribute_audit (
     revision_id INTEGER NOT NULL,
     attribute_type_id INTEGER NOT NULL,
     attribute_value TEXT NOT NULL,
+    -- Opaque grouping tag carried from the attribute row; see account_attribute.group_key.
+    group_key TEXT NOT NULL DEFAULT '',
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
     FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
 );

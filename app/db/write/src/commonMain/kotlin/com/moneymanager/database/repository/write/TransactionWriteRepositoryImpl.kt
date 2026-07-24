@@ -116,13 +116,16 @@ class TransactionWriteRepositoryImpl(
                         updatedAttributes.forEach { (id, attr) ->
                             // Check if type changed (requires delete + insert)
                             val current = transferAttributeSelectQueries.selectById(id).executeAsOneOrNull()
-                            if (current != null && current.attribute_type_id != attr.typeId.id) {
-                                // Type changed: delete and recreate
+                            val slot = current?.let { it.attribute_type_id to it.group_key }
+                            if (slot != null && slot != (attr.typeId.id to attr.groupKey)) {
+                                // Type or group changed: the row belongs in a different UNIQUE slot, so
+                                // delete and recreate rather than UPDATE it where it sits.
                                 transferAttributeWriteQueries.deleteById(id)
                                 transferAttributeWriteQueries.insert(
                                     transaction_id = effectiveTransactionId.id,
                                     attribute_type_id = attr.typeId.id,
                                     attribute_value = attr.value,
+                                    group_key = attr.groupKey,
                                 )
                             } else {
                                 // Only value changed
@@ -136,6 +139,7 @@ class TransactionWriteRepositoryImpl(
                                 transaction_id = effectiveTransactionId.id,
                                 attribute_type_id = attr.typeId.id,
                                 attribute_value = attr.value,
+                                group_key = attr.groupKey,
                             )
                         }
                     } finally {
@@ -195,30 +199,36 @@ class TransactionWriteRepositoryImpl(
                     if (update.newAttributes.isNotEmpty()) {
                         // The existing transfer may already carry some of these attribute types (e.g. a
                         // cross-source reconciliation added one, so a re-import of an otherwise-unchanged
-                        // row is classified UPDATED). Upsert by (transaction_id, attribute_type_id) —
-                        // update a changed value, insert a genuinely new type — instead of blindly
-                        // inserting, which would violate the UNIQUE(transaction_id, attribute_type_id)
-                        // constraint on the types already present.
-                        val existingByType =
+                        // row is classified UPDATED). Upsert by (transaction_id, attribute_type_id,
+                        // group_key) — update a changed value, insert a genuinely new slot — instead of
+                        // blindly inserting, which would violate the
+                        // UNIQUE(transaction_id, attribute_type_id, group_key) constraint on the slots
+                        // already present. The group is part of the key: two attributes of the same type in
+                        // different groups are distinct rows, so keying on the type alone would make the
+                        // second one invisible here and silently drop it.
+                        val existingBySlot =
                             transferAttributeSelectQueries
-                                .selectByTransaction(updatedTransfer.id.id) { rowId, _, typeId, value, _, _ ->
-                                    typeId to (rowId to value)
+                                .selectByTransaction(updatedTransfer.id.id) { rowId, _, typeId, value, groupKey, _, _ ->
+                                    (typeId to groupKey) to (rowId to value)
                                 }.executeAsList()
                                 .toMap()
                         database.beginCreationMode()
                         try {
-                            // Deduplicate by type first: a transfer holds one value per attribute type, and
-                            // [existingByType] is a snapshot, so two incoming attributes of the same type would
-                            // both take the insert path and hit the UNIQUE(transaction_id, attribute_type_id)
-                            // constraint. Last value wins, matching how the attribute would be stored.
-                            update.newAttributes.associateBy { it.typeId.id }.forEach { (typeId, attr) ->
-                                val existing = existingByType[typeId]
+                            // Deduplicate by slot first: a transfer holds one value per (type, group), and
+                            // [existingBySlot] is a snapshot, so two incoming attributes in the same slot would
+                            // both take the insert path and hit the
+                            // UNIQUE(transaction_id, attribute_type_id, group_key) constraint. Last value wins,
+                            // matching how the attribute would be stored.
+                            update.newAttributes.associateBy { it.typeId.id to it.groupKey }.forEach { (slot, attr) ->
+                                val (typeId, groupKey) = slot
+                                val existing = existingBySlot[slot]
                                 when {
                                     existing == null ->
                                         transferAttributeWriteQueries.insert(
                                             transaction_id = updatedTransfer.id.id,
                                             attribute_type_id = typeId,
                                             attribute_value = attr.value,
+                                            group_key = groupKey,
                                         )
                                     existing.second != attr.value ->
                                         transferAttributeWriteQueries.updateValue(attr.value, existing.first)
@@ -279,6 +289,7 @@ class TransactionWriteRepositoryImpl(
                     transaction_id = generatedId,
                     attribute_type_id = attr.typeId.id,
                     attribute_value = attr.value,
+                    group_key = attr.groupKey,
                 )
             }
             database.recordSource(deviceId, EntityType.TRANSFER, realId.id, transfer.revisionId, sources[index])

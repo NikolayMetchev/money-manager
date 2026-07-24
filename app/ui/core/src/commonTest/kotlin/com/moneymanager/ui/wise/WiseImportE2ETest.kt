@@ -319,7 +319,6 @@ class WiseImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionPeople(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     accountAttributeRepository = repositories.accountAttributeRepository,
                     importEngine = repositories.importEngine,
                     sessionId = peopleSessionId,
@@ -379,7 +378,6 @@ class WiseImportE2ETest : DbTest() {
             downloadApiSessionPeople("test-wise-token", client, repositories.apiSessionRepository, peopleSessionId, strategy)
             importApiSessionPeople(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 importEngine = repositories.importEngine,
                 sessionId = peopleSessionId,

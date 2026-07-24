@@ -31,6 +31,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -178,6 +179,11 @@ fun ApiSessionsScreen(
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
     var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportProgress>>(emptyMap()) }
+    // Sessions whose import was clicked but whose background task has not yet registered — the gap covers
+    // the counterparty-discovery scan and the engine's initial index build, both of which can run for
+    // seconds on a large database with no progress callback. Tracking it here lets the button grey out and
+    // a progress indicator appear the instant Import is pressed, rather than only once real progress arrives.
+    var preparingImportSessions by remember { mutableStateOf<Set<ApiSessionId>>(emptySet()) }
 
     // Per-credential download result state (cleared when a new download starts)
     var downloadResultByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiSessionDownloadResult>>(emptyMap()) }
@@ -335,7 +341,6 @@ fun ApiSessionsScreen(
                 if (strategy.peopleDownload != null) {
                     importApiSessionPeople(
                         apiSessionRepository = apiSessionRepository,
-                        accountRepository = accountRepository,
                         accountAttributeRepository = accountAttributeRepository,
                         importEngine = importEngine,
                         sessionId = session.id,
@@ -498,7 +503,9 @@ fun ApiSessionsScreen(
                                 importProgressBySession = importProgressBySession,
                                 importedSessionRevisions = importedSessionRevisions,
                                 selectedStrategyRevision = currentStrategyRevisionByCredential[credential.id],
-                                isImportingSession = { sessionId -> backgroundTasks.isRunning(apiImportTaskKey(sessionId)) },
+                                isImportingSession = { sessionId ->
+                                    backgroundTasks.isRunning(apiImportTaskKey(sessionId)) || sessionId in preparingImportSessions
+                                },
                                 hasEverBeenImported = { sessionId -> importedSessionRevisions.any { it.sessionId == sessionId } },
                                 importedSessionCount =
                                     sessionsByCredential[credential.id].orEmpty().count { session ->
@@ -506,7 +513,7 @@ fun ApiSessionsScreen(
                                     },
                                 isAnySessionImporting =
                                     sessionsByCredential[credential.id].orEmpty().any {
-                                        backgroundTasks.isRunning(apiImportTaskKey(it.id))
+                                        backgroundTasks.isRunning(apiImportTaskKey(it.id)) || it.id in preparingImportSessions
                                     },
                                 onDownload = {
                                     downloadResultByCredential = downloadResultByCredential - credential.id
@@ -655,32 +662,52 @@ fun ApiSessionsScreen(
                                 onImport = { session ->
                                     importResultBySession = importResultBySession - session.id
                                     importErrorBySession = importErrorBySession - session.id
+                                    // Mark it importing synchronously so the button greys and a progress
+                                    // indicator appears immediately, before the discovery scan below runs.
+                                    preparingImportSessions = preparingImportSessions + session.id
                                     scope.launch {
-                                        val strategy =
-                                            resolveStrategy(credential) ?: run {
-                                                importErrorBySession =
-                                                    importErrorBySession + (session.id to "No import strategy configured")
-                                                return@launch
-                                            }
-                                        // Safe for all providers: returns empty when the strategy has no
-                                        // counterparty field, skipping the confirmation dialog.
-                                        val suggestions =
-                                            discoverApiCounterpartiesToCreate(
-                                                apiSessionRepository = apiSessionRepository,
-                                                accountRepository = accountRepository,
-                                                accountAttributeRepository = accountAttributeRepository,
-                                                sessionId = session.id,
-                                                strategy = strategy,
-                                            )
-                                        if (suggestions.isEmpty()) {
-                                            startImport(session, strategy, emptyMap())
-                                        } else {
-                                            pendingImport =
-                                                PendingApiImport(
-                                                    session = session,
+                                        // Cleared in the finally UNLESS we hand off to startImport, which then
+                                        // owns the progress state — clearing it there would race the engine's
+                                        // first progress callback.
+                                        var handedOffToImport = false
+                                        try {
+                                            val strategy =
+                                                resolveStrategy(credential) ?: run {
+                                                    importErrorBySession =
+                                                        importErrorBySession + (session.id to "No import strategy configured")
+                                                    return@launch
+                                                }
+                                            // Safe for all providers: returns empty when the strategy has no
+                                            // counterparty field, skipping the confirmation dialog. Its
+                                            // sub-step progress surfaces on the same bar as the import phases.
+                                            val suggestions =
+                                                discoverApiCounterpartiesToCreate(
+                                                    apiSessionRepository = apiSessionRepository,
+                                                    accountAttributeRepository = accountAttributeRepository,
+                                                    sessionId = session.id,
                                                     strategy = strategy,
-                                                    counterparties = suggestions,
+                                                    onProgress = { progress ->
+                                                        importProgressBySession = importProgressBySession + (session.id to progress)
+                                                    },
                                                 )
+                                            if (suggestions.isEmpty()) {
+                                                // startImport registers the background task synchronously, so
+                                                // isImportingSession stays true across the handoff below.
+                                                handedOffToImport = true
+                                                startImport(session, strategy, emptyMap())
+                                            } else {
+                                                pendingImport =
+                                                    PendingApiImport(
+                                                        session = session,
+                                                        strategy = strategy,
+                                                        counterparties = suggestions,
+                                                    )
+                                            }
+                                        } finally {
+                                            preparingImportSessions = preparingImportSessions - session.id
+                                            if (!handedOffToImport) {
+                                                importProgressBySession = importProgressBySession - session.id
+                                            }
                                         }
                                     }
                                 },
@@ -1085,14 +1112,20 @@ private fun SessionRow(
         }
 
         if (isImporting) {
-            Text(text = "Importing...", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-            importProgress?.let {
-                val percent = it.progress?.let { p -> " (${(p * 100).toInt().coerceIn(0, 100)}%)" }.orEmpty()
-                Text(
-                    text = it.detail + percent,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            val fraction = importProgress?.progress
+            // Before the first engine progress arrives, the import is still in the UI-side preparation
+            // phase (resolving the strategy, scanning for counterparties, loading the session) — so label
+            // it accurately as "Preparing import…" rather than the misleading "Importing…". Once progress
+            // flows, each phase reports its own detail ("Counterparties prepared.", "Resolving accounts",
+            // "Importing transactions", "Import finalized.", …), which we surface as the label.
+            val percent = fraction?.let { " (${(it * 100).toInt().coerceIn(0, 100)}%)" }.orEmpty()
+            val label = importProgress?.let { it.detail + percent } ?: "Preparing import…"
+            Text(text = label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            // Indeterminate during preparation (no fraction yet), determinate once a phase reports one.
+            if (fraction == null) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else {
+                LinearProgressIndicator(progress = { fraction.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
             }
         }
 

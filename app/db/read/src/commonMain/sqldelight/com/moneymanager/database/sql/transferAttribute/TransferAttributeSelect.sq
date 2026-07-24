@@ -4,6 +4,7 @@ SELECT
     transfer_attribute.transaction_id,
     transfer_attribute.attribute_type_id,
     transfer_attribute.attribute_value,
+    transfer_attribute.group_key,
     attribute_type.id AS attribute_type_id,
     attribute_type.name AS attribute_type_name
 FROM transfer_attribute
@@ -17,6 +18,7 @@ SELECT
     transfer_attribute.transaction_id,
     transfer_attribute.attribute_type_id,
     transfer_attribute.attribute_value,
+    transfer_attribute.group_key,
     attribute_type.id AS attribute_type_id,
     attribute_type.name AS attribute_type_name
 FROM transfer_attribute
@@ -29,6 +31,7 @@ SELECT
     transfer_attribute.transaction_id,
     transfer_attribute.attribute_type_id,
     transfer_attribute.attribute_value,
+    transfer_attribute.group_key,
     attribute_type.id AS attribute_type_id,
     attribute_type.name AS attribute_type_name
 FROM transfer_attribute
