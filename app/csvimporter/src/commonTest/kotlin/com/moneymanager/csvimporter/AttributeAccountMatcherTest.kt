@@ -69,6 +69,14 @@ class AttributeAccountMatcherTest {
     }
 
     @Test
+    fun `a token that is not valid regex syntax matches literally instead of throwing`() {
+        val matcher = AttributeAccountMatcher.from(listOf(attribute(accountId = 55, value = "crv*revolut**4647*")))
+
+        assertEquals(AccountId(55), matcher.match("CRV*REVOLUT**4647* LONDON"))
+        assertNull(matcher.match("crv revolut 4647"))
+    }
+
+    @Test
     fun `registry groups matchers by attribute type name`() {
         val registry =
             AttributeAccountMatcher.registry(
