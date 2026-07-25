@@ -14,6 +14,10 @@ import com.moneymanager.domain.model.AccountId
  *
  * A last-4 like "7721" is just a trivial regex, so existing `card-last4` attributes keep working; use
  * `\s` for a literal space in a pattern, since spaces separate tokens.
+ *
+ * Attribute values are free text a user or an importer may have written without regex intent (a raw
+ * card descriptor like `crv*revolut**4647*`), so a token that isn't a valid regex is matched
+ * literally rather than failing the whole import.
  */
 class AttributeAccountMatcher private constructor(
     private val patterns: List<Pair<Regex, AccountId>>,
@@ -35,9 +39,14 @@ class AttributeAccountMatcher private constructor(
                         .split(TOKEN_DELIMITER)
                         .map { it.trim() }
                         .filter { it.isNotEmpty() }
-                        .map { Regex(it, RegexOption.IGNORE_CASE) to attribute.accountId }
+                        .map { compileToken(it) to attribute.accountId }
                 },
             )
+
+        /** Compiles a token as a regex, falling back to a literal match when it isn't valid regex syntax. */
+        private fun compileToken(token: String): Regex =
+            runCatching { Regex(token, RegexOption.IGNORE_CASE) }
+                .getOrElse { Regex(Regex.escape(token), RegexOption.IGNORE_CASE) }
 
         /** Builds a registry keyed by attribute-type name from a mixed list of account attributes. */
         fun registry(attributes: List<AccountAttribute>): Map<String, AttributeAccountMatcher> =
