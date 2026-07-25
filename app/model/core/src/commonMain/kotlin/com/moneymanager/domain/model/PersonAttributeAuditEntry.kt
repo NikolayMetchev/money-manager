@@ -10,4 +10,5 @@ data class PersonAttributeAuditEntry(
     val attributeType: AttributeType,
     val auditType: AuditType,
     val value: String,
+    val groupKey: String = "",
 )

@@ -3,14 +3,19 @@ CREATE TABLE person_attribute (
     person_id INTEGER NOT NULL,
     attribute_type_id INTEGER NOT NULL,
     attribute_value TEXT NOT NULL,
+    -- Opaque grouping tag; '' means ungrouped. See account_attribute.group_key for the full contract --
+    -- readers never parse it, writers only seed it. Persons carry no grouped attributes today; the column
+    -- exists so AttributeUpdateApplier stays generic over account/person/transfer instead of branching.
+    group_key TEXT NOT NULL DEFAULT '',
     -- The person revision at which this attribute's current value became effective. Maintained by the
     -- attribute insert/update triggers; lets the DELETE audit trigger record the correct revision even
     -- on a cascade delete, when the parent person row is already gone.
     revision_id INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE CASCADE,
     FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT,
-    UNIQUE (person_id, attribute_type_id)
+    UNIQUE (person_id, attribute_type_id, group_key)
 );
 
 CREATE INDEX idx_person_attribute_person ON person_attribute(person_id);
 CREATE INDEX idx_person_attribute_type ON person_attribute(attribute_type_id);
+CREATE INDEX idx_person_attribute_group ON person_attribute(person_id, group_key);

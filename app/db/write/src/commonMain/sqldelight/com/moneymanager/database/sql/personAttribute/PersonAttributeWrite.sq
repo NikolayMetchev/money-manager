@@ -1,11 +1,12 @@
 insert:
 -- Seed revision_id from the parent person's current revision; the insert trigger refreshes it to the
 -- post-bump revision for non-import paths.
-INSERT INTO person_attribute (person_id, attribute_type_id, attribute_value, revision_id)
-VALUES (:person_id, :attribute_type_id, :attribute_value, (SELECT revision_id FROM person WHERE id = :person_id));
+INSERT INTO person_attribute (person_id, attribute_type_id, attribute_value, group_key, revision_id)
+VALUES (:person_id, :attribute_type_id, :attribute_value, :group_key, (SELECT revision_id FROM person WHERE id = :person_id));
 
 selectLastInsertedId:
 SELECT last_insert_rowid();
+
 
 updateValue:
 UPDATE person_attribute

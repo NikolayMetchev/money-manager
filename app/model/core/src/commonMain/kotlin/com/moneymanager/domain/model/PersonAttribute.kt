@@ -5,4 +5,5 @@ data class PersonAttribute(
     val personId: PersonId,
     val attributeType: AttributeType,
     val value: String,
+    val groupKey: String = "",
 )

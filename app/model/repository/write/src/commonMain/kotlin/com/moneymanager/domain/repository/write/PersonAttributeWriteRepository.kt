@@ -9,12 +9,14 @@ interface PersonAttributeWriteRepository : PersonAttributeReadRepository {
         personId: PersonId,
         attributeTypeId: AttributeTypeId,
         value: String,
+        groupKey: String = "",
     ): Long
 
     suspend fun insertInCreationMode(
         personId: PersonId,
         attributeTypeId: AttributeTypeId,
         value: String,
+        groupKey: String = "",
     ): Long
 
     suspend fun updateValue(

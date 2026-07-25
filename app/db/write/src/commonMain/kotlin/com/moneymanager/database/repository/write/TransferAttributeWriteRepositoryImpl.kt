@@ -19,6 +19,7 @@ class TransferAttributeWriteRepositoryImpl(
         transactionId: TransferId,
         attributeTypeId: AttributeTypeId,
         value: String,
+        groupKey: String,
     ): Long =
         withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
@@ -26,6 +27,7 @@ class TransferAttributeWriteRepositoryImpl(
                     transactionId.id,
                     attributeTypeId.id,
                     value,
+                    groupKey,
                 )
                 // Get the inserted ID using last_insert_rowid()
                 writeQueries.selectLastInsertedId().executeAsOne()

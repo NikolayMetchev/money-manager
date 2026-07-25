@@ -34,9 +34,26 @@ CREATE TABLE account_merge_transfer (
 
 CREATE INDEX idx_account_merge_transfer_merge ON account_merge_transfer(merge_id);
 
--- Note: neither attributes nor ownerships are snapshotted here. The merge's cascade delete records
--- each one as a DELETE in account_attribute_audit / person_account_ownership_audit (the attribute
--- delete trigger uses the attribute's own stamped revision_id, so it fires even after the parent
+-- The attribute rows the merge GRAFTED onto the surviving account -- the deleted account's identity
+-- groups, carried across so the merge does not destroy them. Without the carry, merging away an account
+-- that held a bank identity drops that identity, and the next import sees an unknown sort code /account
+-- number pair and re-creates the very account just merged away ("merge loses identity, account
+-- resurrects"). Recorded because the survivor's own audit trail cannot distinguish "added by the merge"
+-- from "added by the user", and unmerge must remove exactly what the merge added -- no more. Rows the
+-- merge skipped (the survivor already held that identity) are deliberately not recorded.
+CREATE TABLE account_merge_attribute (
+    merge_id INTEGER NOT NULL,
+    attribute_id INTEGER NOT NULL,
+    FOREIGN KEY (merge_id) REFERENCES account_merge(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_merge_attribute_merge ON account_merge_attribute(merge_id);
+
+-- Note: the deleted account's attributes and ownerships are not snapshotted here. The merge's cascade
+-- delete records each one as a DELETE in account_attribute_audit / person_account_ownership_audit (the
+-- attribute delete trigger uses the attribute's own stamped revision_id, so it fires even after the parent
 -- account is gone), so unmerge reconstructs both from the audit trail (Audit.sq
 -- selectDeletedAttributesForAccount / selectDeletedOwnershipPersonIds). Only the deleted account's own
 -- core fields are snapshotted above, since the cascade delete leaves no recoverable trace of them.
+-- account_merge_attribute is the mirror image: it tracks what the merge added to the SURVIVOR, which the
+-- cascade delete knows nothing about.

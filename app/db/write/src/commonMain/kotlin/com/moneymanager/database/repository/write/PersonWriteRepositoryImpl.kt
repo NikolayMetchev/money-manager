@@ -90,8 +90,10 @@ class PersonWriteRepositoryImpl(
                         },
                         bumpRevisionOnly = { personWriteQueries.bumpRevisionOnly(effectivePersonId.id) },
                         selectRevision = { personSelectQueries.selectRevisionById(effectivePersonId.id).executeAsOne() },
-                        selectCurrentTypeId = { id ->
-                            attributeSelectQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
+                        selectCurrentSlot = { id ->
+                            attributeSelectQueries.selectById(id).executeAsOneOrNull()?.let {
+                                it.attribute_type_id to it.group_key
+                            }
                         },
                         deleteById = { id -> attributeWriteQueries.deleteById(id) },
                         insertAttribute = { attr ->
@@ -99,6 +101,7 @@ class PersonWriteRepositoryImpl(
                                 person_id = effectivePersonId.id,
                                 attribute_type_id = attr.typeId.id,
                                 attribute_value = attr.value,
+                                group_key = attr.groupKey,
                             )
                         },
                         updateValue = { value, id -> attributeWriteQueries.updateValue(value, id) },

@@ -213,7 +213,6 @@ suspend fun executeApiReimport(
                 if (strategy.peopleDownload != null) {
                     importApiSessionPeople(
                         apiSessionRepository = apiSessionRepository,
-                        accountRepository = accountRepository,
                         accountAttributeRepository = accountAttributeRepository,
                         importEngine = importEngine,
                         sessionId = session.id,

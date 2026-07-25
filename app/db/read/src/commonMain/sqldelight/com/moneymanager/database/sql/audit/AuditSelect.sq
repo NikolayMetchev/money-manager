@@ -63,6 +63,7 @@ SELECT
     transfer_attribute_audit.revision_id,
     transfer_attribute_audit.attribute_type_id,
     transfer_attribute_audit.attribute_value,
+    transfer_attribute_audit.group_key,
     attribute_type.name AS attribute_type_name
 FROM transfer_attribute_audit
 JOIN audit_type ON transfer_attribute_audit.audit_type_id = audit_type.id
@@ -80,6 +81,7 @@ SELECT
     account_attribute_audit.revision_id,
     account_attribute_audit.attribute_type_id,
     account_attribute_audit.attribute_value,
+    account_attribute_audit.group_key,
     attribute_type.name AS attribute_type_name
 FROM account_attribute_audit
 JOIN audit_type ON account_attribute_audit.audit_type_id = audit_type.id
@@ -97,6 +99,7 @@ SELECT
     person_attribute_audit.revision_id,
     person_attribute_audit.attribute_type_id,
     person_attribute_audit.attribute_value,
+    person_attribute_audit.group_key,
     attribute_type.name AS attribute_type_name
 FROM person_attribute_audit
 JOIN audit_type ON person_attribute_audit.audit_type_id = audit_type.id
@@ -178,8 +181,11 @@ WHERE account_id = :accountId
 -- here using the attribute's own stamped revision_id, so it fires even after the parent account row
 -- is gone. Anchored to the account's own delete timestamp (see selectDeletedOwnershipPersonIds) so a
 -- most-recent delete with no attributes doesn't fall back to an older, unrelated delete's attributes.
+-- group_key is part of the restored tuple, not decoration: an account that owned two bank identities
+-- restored without it would collapse both pairs into the ungrouped slot and violate
+-- UNIQUE (account_id, attribute_type_id, group_key).
 selectDeletedAttributesForAccount:
-SELECT attribute_type_id, attribute_value
+SELECT attribute_type_id, attribute_value, group_key
 FROM account_attribute_audit
 WHERE account_id = :accountId
   AND audit_type_id = 3

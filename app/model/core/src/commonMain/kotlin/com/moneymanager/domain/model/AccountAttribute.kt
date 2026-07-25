@@ -5,4 +5,5 @@ data class AccountAttribute(
     val accountId: AccountId,
     val attributeType: AttributeType,
     val value: String,
+    val groupKey: String = "",
 )

@@ -20,11 +20,11 @@ BEGIN
     -- revision_id (kept current by the insert/update triggers) when the parent revision is no
     -- longer readable. This makes merged-away attributes reconstructable from the audit (see
     -- unmergeAccount).
-    INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
+    INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value, group_key)
     VALUES (
         CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.account_id,
         COALESCE((SELECT revision_id FROM account WHERE id = old.account_id), old.revision_id),
-        old.attribute_type_id, old.attribute_value);
+        old.attribute_type_id, old.attribute_value, old.group_key);
 END;
 
 -- trigger_account_attribute_insert_audit
@@ -40,13 +40,13 @@ BEGIN
       AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
     -- Always record the addition in audit table at current revision
-    INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
-    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.account_id, revision_id, new.attribute_type_id, new.attribute_value
+    INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value, group_key)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.account_id, revision_id, new.attribute_type_id, new.attribute_value, new.group_key
     FROM account WHERE id = new.account_id;
 
     -- Stamp the attribute with the (post-bump) account revision so a later cascade delete can
     -- record the exact revision. Re-fires this table's UPDATE trigger but its WHEN guard skips
-    -- it (attribute_value is unchanged), so there is no recursion or double audit.
+    -- it (neither attribute_value nor group_key changes), so there is no recursion or double audit.
     UPDATE account_attribute
     SET revision_id = (SELECT revision_id FROM account WHERE id = new.account_id)
     WHERE id = new.id;
@@ -57,7 +57,7 @@ CREATE TRIGGER trigger_account_attribute_update_audit
 AFTER UPDATE ON account_attribute
 FOR EACH ROW
 WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
-  AND old.attribute_value != new.attribute_value
+  AND (old.attribute_value != new.attribute_value OR old.group_key != new.group_key)
 BEGIN
     -- Only bump revision if NOT in creation mode
     UPDATE account
@@ -66,8 +66,8 @@ BEGIN
       AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
     -- Always record the change in audit table (OLD value - what it was before)
-    INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
-    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.account_id, revision_id, new.attribute_type_id, old.attribute_value
+    INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value, group_key)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.account_id, revision_id, new.attribute_type_id, old.attribute_value, old.group_key
     FROM account WHERE id = new.account_id;
 
     -- Advance the attribute's stamped revision to the new value's revision (guarded re-fire).
@@ -155,11 +155,11 @@ BEGIN
     -- gone, so a join would record nothing. The revision falls back to the attribute's own
     -- stamped revision_id (kept current by the insert/update triggers) when the parent
     -- revision is no longer readable.
-    INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
+    INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value, group_key)
     VALUES (
         CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.transaction_id,
         COALESCE((SELECT revision_id FROM transfer WHERE id = old.transaction_id), old.revision_id),
-        old.attribute_type_id, old.attribute_value);
+        old.attribute_type_id, old.attribute_value, old.group_key);
 END;
 
 -- trigger_attribute_insert_audit
@@ -175,13 +175,13 @@ BEGIN
       AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
     -- Always record the addition in audit table at current revision
-    INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
-    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.transaction_id, revision_id, new.attribute_type_id, new.attribute_value
+    INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value, group_key)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.transaction_id, revision_id, new.attribute_type_id, new.attribute_value, new.group_key
     FROM transfer WHERE id = new.transaction_id;
 
     -- Stamp the attribute with the (post-bump) transfer revision so a later cascade delete can
     -- record the exact revision. Re-fires this table's UPDATE trigger but its WHEN guard skips
-    -- it (attribute_value is unchanged), so there is no recursion or double audit.
+    -- it (neither attribute_value nor group_key changes), so there is no recursion or double audit.
     UPDATE transfer_attribute
     SET revision_id = (SELECT revision_id FROM transfer WHERE id = new.transaction_id)
     WHERE id = new.id;
@@ -192,7 +192,7 @@ CREATE TRIGGER trigger_attribute_update_audit
 AFTER UPDATE ON transfer_attribute
 FOR EACH ROW
 WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
-  AND old.attribute_value != new.attribute_value
+  AND (old.attribute_value != new.attribute_value OR old.group_key != new.group_key)
 BEGIN
     -- Only bump revision if NOT in creation mode
     UPDATE transfer
@@ -201,8 +201,8 @@ BEGIN
       AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
     -- Always record the change in audit table (OLD value - what it was before)
-    INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
-    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.transaction_id, revision_id, new.attribute_type_id, old.attribute_value
+    INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value, group_key)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.transaction_id, revision_id, new.attribute_type_id, old.attribute_value, old.group_key
     FROM transfer WHERE id = new.transaction_id;
 
     -- Advance the attribute's stamped revision to the new value's revision (guarded re-fire).
@@ -438,11 +438,11 @@ BEGIN
     -- so a join would record nothing. The revision falls back to the attribute's own stamped
     -- revision_id (kept current by the insert/update triggers) when the parent revision is no
     -- longer readable.
-    INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+    INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value, group_key)
     VALUES (
         CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.person_id,
         COALESCE((SELECT revision_id FROM person WHERE id = old.person_id), old.revision_id),
-        old.attribute_type_id, old.attribute_value);
+        old.attribute_type_id, old.attribute_value, old.group_key);
 END;
 
 -- trigger_person_attribute_insert_audit
@@ -455,13 +455,13 @@ BEGIN
     WHERE id = new.person_id
       AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-    INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
-    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.person_id, revision_id, new.attribute_type_id, new.attribute_value
+    INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value, group_key)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.person_id, revision_id, new.attribute_type_id, new.attribute_value, new.group_key
     FROM person WHERE id = new.person_id;
 
     -- Stamp the attribute with the (post-bump) person revision so a later cascade delete can
     -- record the exact revision. Re-fires this table's UPDATE trigger but its WHEN guard skips
-    -- it (attribute_value is unchanged), so there is no recursion or double audit.
+    -- it (neither attribute_value nor group_key changes), so there is no recursion or double audit.
     UPDATE person_attribute
     SET revision_id = (SELECT revision_id FROM person WHERE id = new.person_id)
     WHERE id = new.id;
@@ -471,15 +471,15 @@ END;
 CREATE TRIGGER trigger_person_attribute_update_audit
 AFTER UPDATE ON person_attribute
 FOR EACH ROW
-WHEN old.attribute_value != new.attribute_value
+WHEN (old.attribute_value != new.attribute_value OR old.group_key != new.group_key)
 BEGIN
     UPDATE person
     SET revision_id = revision_id + 1
     WHERE id = new.person_id
       AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-    INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
-    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.person_id, revision_id, new.attribute_type_id, old.attribute_value
+    INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value, group_key)
+    SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.person_id, revision_id, new.attribute_type_id, old.attribute_value, old.group_key
     FROM person WHERE id = new.person_id;
 
     -- Advance the attribute's stamped revision to the new value's revision (guarded re-fire).

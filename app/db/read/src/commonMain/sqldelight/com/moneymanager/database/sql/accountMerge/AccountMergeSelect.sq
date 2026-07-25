@@ -45,3 +45,7 @@ WHERE account_merge.deleted_account_id = ?;
 
 selectTransfersForMerge:
 SELECT transfer_id, moved_source, moved_target FROM account_merge_transfer WHERE merge_id = ?;
+
+-- The attribute rows this merge grafted onto the surviving account; unmerge deletes exactly these.
+selectAttributeIdsForMerge:
+SELECT attribute_id FROM account_merge_attribute WHERE merge_id = ?;

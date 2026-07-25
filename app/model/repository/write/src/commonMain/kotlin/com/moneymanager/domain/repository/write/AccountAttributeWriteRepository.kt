@@ -13,6 +13,7 @@ interface AccountAttributeWriteRepository : AccountAttributeReadRepository {
         accountId: AccountId,
         attributeTypeId: AttributeTypeId,
         value: String,
+        groupKey: String = "",
     ): Long
 
     /**
@@ -24,7 +25,21 @@ interface AccountAttributeWriteRepository : AccountAttributeReadRepository {
         accountId: AccountId,
         attributeTypeId: AttributeTypeId,
         value: String,
+        groupKey: String = "",
     ): Long
+
+    /**
+     * Writes one attribute into one (type, group) slot, inserting or updating as needed and doing nothing
+     * when the value already matches. Unlike [insertInCreationMode] this never throws on a slot that is
+     * already occupied, so a re-import of an already-known bank identity is a true no-op rather than a
+     * swallowed UNIQUE violation.
+     */
+    suspend fun upsertInCreationMode(
+        accountId: AccountId,
+        attributeTypeId: AttributeTypeId,
+        value: String,
+        groupKey: String = "",
+    )
 
     /**
      * Inserts many attributes in creation mode.
@@ -36,6 +51,7 @@ interface AccountAttributeWriteRepository : AccountAttributeReadRepository {
                 accountId = input.accountId,
                 attributeTypeId = input.attributeTypeId,
                 value = input.value,
+                groupKey = input.groupKey,
             )
         }
     }
@@ -60,4 +76,5 @@ data class AccountAttributeCreateInput(
     val accountId: AccountId,
     val attributeTypeId: AttributeTypeId,
     val value: String,
+    val groupKey: String = "",
 )

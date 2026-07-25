@@ -60,6 +60,7 @@ import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.transactions.EditableAttribute
 import com.moneymanager.ui.components.transactions.EditableAttributesSection
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
@@ -142,11 +143,10 @@ fun TransactionEditDialog(
 
     // EditableAttribute represents the current state of each attribute in the UI
     // key: a stable identifier (original attribute id or a negative temp id for new ones)
-    // value: Pair(attributeTypeName, value)
     var editableAttributes by remember {
         mutableStateOf(
             originalAttributes.associate { attr ->
-                attr.id to Pair(attr.attributeType.name, attr.value)
+                attr.id to EditableAttribute(attr.attributeType.name, attr.value, attr.groupKey)
             },
         )
     }
@@ -161,15 +161,16 @@ fun TransactionEditDialog(
 
     // Helper to check if attributes have changed
     fun hasAttributeChanges(): Boolean {
-        val originalMap = originalAttributes.associate { it.id to Pair(it.attributeType.name, it.value) }
+        val originalMap =
+            originalAttributes.associate { it.id to EditableAttribute(it.attributeType.name, it.value, it.groupKey) }
         // Check if any new attributes were added (negative IDs)
         if (editableAttributes.keys.any { it < 0 }) return true
         // Check if any original attributes were removed
         if (originalMap.keys.any { it !in editableAttributes.keys }) return true
         // Check if any attribute values changed
-        return editableAttributes.any { (id, pair) ->
+        return editableAttributes.any { (id, attribute) ->
             val original = originalMap[id]
-            original == null || original != pair
+            original == null || original != attribute
         }
     }
 
@@ -315,26 +316,26 @@ fun TransactionEditDialog(
 
                             // Build updated attributes map (id -> NewAttribute)
                             val updatedAttributes = mutableMapOf<Long, NewAttribute>()
-                            editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
-                                val (typeName, value) = pair
+                            editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, attribute) ->
+                                val (typeName, value, groupKey) = attribute
                                 val original = originalAttributes.find { it.id == id }
                                 if (original != null) {
                                     val typeChanged = original.attributeType.name != typeName
                                     val valueChanged = original.value != value
                                     if (typeChanged || valueChanged) {
                                         val typeId = importEngine.getOrCreateAttributeType(typeName)
-                                        updatedAttributes[id] = NewAttribute(typeId, value)
+                                        updatedAttributes[id] = NewAttribute(typeId, value, groupKey)
                                     }
                                 }
                             }
 
                             // Build new attributes list
                             val newAttributes = mutableListOf<NewAttribute>()
-                            editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
-                                val (typeName, value) = pair
+                            editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, attribute) ->
+                                val (typeName, value, groupKey) = attribute
                                 if (typeName.isNotBlank() && value.isNotBlank()) {
                                     val typeId = importEngine.getOrCreateAttributeType(typeName)
-                                    newAttributes.add(NewAttribute(typeId, value))
+                                    newAttributes.add(NewAttribute(typeId, value, groupKey))
                                 }
                             }
 
@@ -380,10 +381,10 @@ fun TransactionEditDialog(
                             // CREATE MODE: build attributes to save (only non-blank ones).
                             val attributesToSave =
                                 editableAttributes
-                                    .filter { (_, pair) -> pair.first.isNotBlank() && pair.second.isNotBlank() }
-                                    .map { (_, pair) ->
-                                        val typeId = importEngine.getOrCreateAttributeType(pair.first.trim())
-                                        NewAttribute(typeId, pair.second.trim())
+                                    .filter { (_, attr) -> attr.typeName.isNotBlank() && attr.value.isNotBlank() }
+                                    .map { (_, attr) ->
+                                        val typeId = importEngine.getOrCreateAttributeType(attr.typeName.trim())
+                                        NewAttribute(typeId, attr.value.trim(), attr.groupKey)
                                     }.toMutableList()
 
                             if (isExcluded) {
@@ -581,7 +582,7 @@ fun TransactionEditDialog(
                     isSaving = isSaving,
                     onAttributesChange = { editableAttributes = it },
                     onAddAttribute = {
-                        editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                        editableAttributes = editableAttributes + (nextTempId to EditableAttribute("", "", it))
                         nextTempId--
                     },
                 )

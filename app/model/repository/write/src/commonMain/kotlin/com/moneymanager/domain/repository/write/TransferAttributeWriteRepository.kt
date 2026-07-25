@@ -13,6 +13,7 @@ interface TransferAttributeWriteRepository : TransferAttributeReadRepository {
         transactionId: TransferId,
         attributeTypeId: AttributeTypeId,
         value: String,
+        groupKey: String = "",
     ): Long
 
     /**

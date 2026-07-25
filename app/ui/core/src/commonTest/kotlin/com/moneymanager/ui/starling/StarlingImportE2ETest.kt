@@ -820,7 +820,6 @@ class StarlingImportE2ETest : DbTest() {
             )
             importApiSessionPeople(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 importEngine = repositories.importEngine,
                 sessionId = sessionId,
@@ -887,7 +886,6 @@ class StarlingImportE2ETest : DbTest() {
             // 1) People FIRST, before any accounts exist — the holder is created but can link to nothing.
             importApiSessionPeople(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 importEngine = repositories.importEngine,
                 sessionId = sessionId,
@@ -948,7 +946,6 @@ class StarlingImportE2ETest : DbTest() {
             )
             importApiSessionPeople(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 importEngine = repositories.importEngine,
                 sessionId = peopleSessionId,

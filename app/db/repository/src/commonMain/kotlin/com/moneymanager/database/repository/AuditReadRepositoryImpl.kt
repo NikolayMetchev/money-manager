@@ -200,6 +200,7 @@ class AuditReadRepositoryImpl(
                         ),
                     auditType = mapAuditType(row.audit_type),
                     value = row.attribute_value,
+                    groupKey = row.group_key,
                 )
             }
 
@@ -256,6 +257,7 @@ class AuditReadRepositoryImpl(
                             ),
                         auditType = mapAuditType(row.audit_type),
                         value = row.attribute_value,
+                        groupKey = row.group_key,
                     )
                 }
 

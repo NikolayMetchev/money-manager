@@ -45,11 +45,17 @@ class AccountRepositoryImplTest : DbTest() {
         runTest {
             val now = Clock.System.now()
             // Account A held "Shared" then was renamed away (audit row: name="Shared", account_id=A).
-            val a = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Shared", openingDate = now))
+            val a =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Shared", openingDate = now),
+                )
             repositories.accountRepository.updateAccount(Account(id = a, name = "A Renamed", openingDate = now))
 
             // Account B later also held "Shared" (a MORE RECENT audit row) then was deleted.
-            val b = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Shared", openingDate = now))
+            val b =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Shared", openingDate = now),
+                )
             repositories.accountRepository.updateAccount(Account(id = b, name = "B Renamed", openingDate = now))
             repositories.accountRepository.deleteAccount(b)
 
@@ -66,7 +72,9 @@ class AccountRepositoryImplTest : DbTest() {
                     Person(id = PersonId(0), firstName = "Owner", middleName = null, lastName = "One"),
                 )
             val accountId =
-                repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Acct", openingDate = now))
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Acct", openingDate = now),
+                )
             val manual = Source.Manual
 
             // Adding an owner is a change to the account: it must become a new revision.
@@ -95,7 +103,9 @@ class AccountRepositoryImplTest : DbTest() {
                     Person(id = PersonId(0), firstName = "Owner", middleName = null, lastName = "One"),
                 )
             val accountId =
-                repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Acct", openingDate = now))
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Acct", openingDate = now),
+                )
 
             // Default test provenance is SampleGenerator (a bulk/non-manual source): no revision bump.
             repositories.personAccountOwnershipRepository.createOwnership(person, accountId)
@@ -400,6 +410,130 @@ class AccountRepositoryImplTest : DbTest() {
                     .first()
                     .size,
             )
+        }
+
+    @Test
+    fun `mergeAccounts carries the deleted accounts identity groups onto the survivor`() =
+        runTest {
+            val now = Clock.System.now()
+            val keep =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Crypto.com Cash", openingDate = now),
+                )
+            val drop =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "NIKOLAY IVANOV METCHEV", openingDate = now),
+                )
+            val sortCode = repositories.attributeTypeRepository.getOrCreate("account-sort-code")
+            val accountNumber = repositories.attributeTypeRepository.getOrCreate("account-account-number")
+
+            repositories.accountAttributeRepository.insert(keep, sortCode, "040541", "040541|00002490")
+            repositories.accountAttributeRepository.insert(keep, accountNumber, "00002490", "040541|00002490")
+            repositories.accountAttributeRepository.insert(drop, sortCode, "040736", "040736|01311504")
+            repositories.accountAttributeRepository.insert(drop, accountNumber, "01311504", "040736|01311504")
+
+            repositories.accountRepository.mergeAccounts(deletedAccount = drop, survivingAccount = keep)
+
+            // The survivor owns BOTH identities, each still a distinct group. Without the carry, the
+            // cascade delete would have dropped the second one and the next import would re-create it.
+            val attrs = repositories.accountAttributeRepository.getByAccount(keep).first()
+            assertEquals(
+                setOf("040541|00002490", "040736|01311504"),
+                attrs.map { it.groupKey }.toSet(),
+            )
+            assertEquals(
+                setOf("040541", "00002490", "040736", "01311504"),
+                attrs.map { it.value }.toSet(),
+            )
+        }
+
+    @Test
+    fun `mergeAccounts skips an identity the survivor already holds`() =
+        runTest {
+            val now = Clock.System.now()
+            val keep =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Keep", openingDate = now),
+                )
+            val drop =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Drop", openingDate = now),
+                )
+            val sortCode = repositories.attributeTypeRepository.getOrCreate("account-sort-code")
+            val accountNumber = repositories.attributeTypeRepository.getOrCreate("account-account-number")
+
+            // Both accounts describe the SAME real bank account, so both groups carry the same key and the
+            // same contents — the merge must not duplicate them onto the survivor.
+            listOf(keep, drop).forEach { account ->
+                repositories.accountAttributeRepository.insert(account, sortCode, "040541", "040541|00002490")
+                repositories.accountAttributeRepository.insert(account, accountNumber, "00002490", "040541|00002490")
+            }
+
+            repositories.accountRepository.mergeAccounts(deletedAccount = drop, survivingAccount = keep)
+
+            val attrs = repositories.accountAttributeRepository.getByAccount(keep).first()
+            assertEquals(2, attrs.size)
+        }
+
+    @Test
+    fun `mergeAccounts dedups the same identity held under different group keys`() =
+        runTest {
+            val now = Clock.System.now()
+            val keep =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Keep", openingDate = now),
+                )
+            val drop =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Drop", openingDate = now),
+                )
+            val sortCode = repositories.attributeTypeRepository.getOrCreate("account-sort-code")
+            val accountNumber = repositories.attributeTypeRepository.getOrCreate("account-account-number")
+
+            // Same real bank account, but each was created independently so the identity sits under a
+            // DIFFERENT opaque UUID on each account (as real imports now produce). The merge must recognise
+            // them as one identity by derived value, not be fooled by the mismatched keys, and not duplicate.
+            repositories.accountAttributeRepository.insert(keep, sortCode, "040541", "11111111-1111-1111-1111-111111111111")
+            repositories.accountAttributeRepository.insert(keep, accountNumber, "00002490", "11111111-1111-1111-1111-111111111111")
+            repositories.accountAttributeRepository.insert(drop, sortCode, "040541", "22222222-2222-2222-2222-222222222222")
+            repositories.accountAttributeRepository.insert(drop, accountNumber, "00002490", "22222222-2222-2222-2222-222222222222")
+
+            repositories.accountRepository.mergeAccounts(deletedAccount = drop, survivingAccount = keep)
+
+            val attrs = repositories.accountAttributeRepository.getByAccount(keep).first()
+            assertEquals(2, attrs.size)
+            assertEquals(setOf("11111111-1111-1111-1111-111111111111"), attrs.map { it.groupKey }.toSet())
+        }
+
+    @Test
+    fun `mergeAccounts keeps both values when a group key collides with differing contents`() =
+        runTest {
+            val now = Clock.System.now()
+            val keep =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Keep", openingDate = now),
+                )
+            val drop =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Drop", openingDate = now),
+                )
+            val sortCode = repositories.attributeTypeRepository.getOrCreate("account-sort-code")
+            val accountNumber = repositories.attributeTypeRepository.getOrCreate("account-account-number")
+
+            // A stale group key: both accounts use the key "legacy" for different real identities (someone
+            // hand-edited a sort code, so the key no longer matches its contents). Neither may be lost.
+            repositories.accountAttributeRepository.insert(keep, sortCode, "040541", "legacy")
+            repositories.accountAttributeRepository.insert(keep, accountNumber, "00002490", "legacy")
+            repositories.accountAttributeRepository.insert(drop, sortCode, "040736", "legacy")
+            repositories.accountAttributeRepository.insert(drop, accountNumber, "01311504", "legacy")
+
+            repositories.accountRepository.mergeAccounts(deletedAccount = drop, survivingAccount = keep)
+
+            val attrs = repositories.accountAttributeRepository.getByAccount(keep).first()
+            assertEquals(4, attrs.size)
+            assertEquals(setOf("040541", "00002490", "040736", "01311504"), attrs.map { it.value }.toSet())
+            // The clashing group was re-keyed rather than overwritten, so the two identities stay separable.
+            assertEquals(2, attrs.map { it.groupKey }.toSet().size)
         }
 
     @Test

@@ -1,11 +1,12 @@
 insert:
 -- Seed revision_id from the parent transfer's current revision; the insert trigger refreshes it to the
 -- post-bump revision for non-import paths.
-INSERT INTO transfer_attribute (transaction_id, attribute_type_id, attribute_value, revision_id)
-VALUES (:transaction_id, :attribute_type_id, :attribute_value, (SELECT revision_id FROM transfer WHERE id = :transaction_id));
+INSERT INTO transfer_attribute (transaction_id, attribute_type_id, attribute_value, group_key, revision_id)
+VALUES (:transaction_id, :attribute_type_id, :attribute_value, :group_key, (SELECT revision_id FROM transfer WHERE id = :transaction_id));
 
 selectLastInsertedId:
 SELECT last_insert_rowid();
+
 
 updateValue:
 UPDATE transfer_attribute
