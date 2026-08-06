@@ -49,7 +49,6 @@ class TradeWriteRepositoryImpl(
                     selectQueries
                         .selectMatchingTradeId(
                             timestamp = timestamp.toEpochMilliseconds(),
-                            description = description,
                             from_account_id = fromAccountId.id,
                             from_asset_id = fromAmount.asset.id.id,
                             from_amount = fromAmount.amount.toString(),

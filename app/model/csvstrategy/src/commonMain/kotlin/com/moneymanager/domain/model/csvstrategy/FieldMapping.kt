@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
@@ -85,6 +86,13 @@ data class ColumnExtraction(
  *   person's own name (e.g. it's prefixed, like Monzo's "Monzo ${cp}"), this template derives the
  *   Person's name separately via the same capture-group substitution. Null falls back to the resolved
  *   account name (the original behaviour, correct whenever the two coincide, as for Santander's rules).
+ * @property counterpartyIsUnidentified Set when the rule gives the counterparty a *name* but not an
+ *   identity: the export says money arrived or left, not whose account it was (e.g. crypto.com's card
+ *   statement records a top-up only as "GBP Deposit"). The named account is then a placeholder, and the
+ *   import engine reconciles the row against a real record of the same movement if one exists — see
+ *   `ImportTransfer.unidentifiedCounterpartyAccountId`. Rows that fall through every rule are
+ *   unidentified anyway (their account is the raw column value); this flag extends that to rules that
+ *   exist purely to name the placeholder well.
  */
 @Serializable
 data class RegexRule(
@@ -93,6 +101,12 @@ data class RegexRule(
     val accountNameTemplate: String? = null,
     val counterpartyIsPerson: Boolean = false,
     val personNameTemplate: String? = null,
+    // Omitted from JSON when false (the strategy codecs encode defaults) so ADDING this field does not
+    // change the canonical hash of every strategy that has regex rules — only a rule that actually sets
+    // it rehashes, avoiding a spurious "all strategies changed" on catalog/Drive sync. Same rationale as
+    // CsvStrategyExport.fundingAttributeMatch.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val counterpartyIsUnidentified: Boolean = false,
 )
 
 /**

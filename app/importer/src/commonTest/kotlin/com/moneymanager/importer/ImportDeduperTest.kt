@@ -482,6 +482,38 @@ class ImportDeduperTest {
     }
 
     @Test
+    fun fuzzy_doesNotCollapseTwoRealMovementsOntoOneExistingLeg() {
+        // A wallet export gives every deposit the same wording, so two genuine £5 deposits hours apart
+        // differ only in their timestamp — which the fuzzy pass tolerates. One existing leg can only ever
+        // be one of them; the other is a movement in its own right.
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(existing(9, description = "GBP Deposit (via FPS)")))
+        val result =
+            deduper.classify(
+                listOf(
+                    importTransfer(0, description = "GBP Deposit (via FPS)"),
+                    importTransfer(1, description = "GBP Deposit (via FPS)", timestamp = baseTime + 8.hours),
+                ),
+            )
+        assertEquals(ImportStatus.DUPLICATE, result[0].status)
+        assertEquals(ImportStatus.IMPORTED, result[1].status, "the second deposit is not the first one again")
+    }
+
+    @Test
+    fun fuzzy_doesNotReconcileAgainstAnAlreadyExcludedLeg() {
+        // A third export of the same movement must not chain-exclude: reconciling onto an already-excluded
+        // leg would leave the movement counted zero times.
+        val alreadyExcluded =
+            existing(9, description = "GBP Deposit").copy(attributes = mapOf(AttributeTypeId(-1) to "reconciled"))
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(alreadyExcluded))
+        val result =
+            deduper
+                .classify(listOf(importTransfer(0, description = "Top Up Card", timestamp = baseTime + 1.minutes)))
+                .single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
     fun fuzzy_exactMatchWinsOverReconciliation() {
         // Re-importing the same file must stay a plain DUPLICATE, never an excluded+linked copy.
         val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(existing(3)))
@@ -529,6 +561,202 @@ class ImportDeduperTest {
         assertEquals(ImportStatus.IMPORTED, result.status)
         assertTrue(result.transfer.attributes.isEmpty())
         assertTrue(result.transfer.relationships.isEmpty())
+    }
+
+    // Unidentified-counterparty reconcile: the crypto.com/Monzo case. The wallet's own export records a
+    // deposit as "GBP Deposit (via FPS)" against a placeholder account, while the bank's feed names both
+    // ends (it resolves the wallet by sort code + account number). Only the owned account, the direction
+    // and the amount are common to the two records.
+    private val wallet = AccountId(30)
+    private val placeholder = AccountId(31)
+    private val bank = AccountId(32)
+
+    private val unidentifiedPolicy =
+        DedupePolicy.FuzzyAllFields(
+            reconcileWindow = 60.minutes,
+            reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+            reconciledRelationshipTypeId = RelationshipTypeId(1),
+            unidentifiedCounterpartyAttributeTypeId = AttributeTypeId(-9),
+        )
+
+    /** The wallet export's own row: placeholder -> wallet, counterparty unknown. */
+    private fun placeholderDeposit(
+        rowIndex: Long,
+        amount: Long = 5,
+        timestamp: Instant = baseTime,
+    ) = importTransfer(
+        rowIndex,
+        description = "GBP Deposit (via FPS)",
+        amount = amount,
+        timestamp = timestamp,
+        src = placeholder,
+        tgt = wallet,
+        attributes = listOf(NewAttribute(AttributeTypeId(-9), "true")),
+    ).copy(unidentifiedCounterpartyAccountId = placeholder)
+
+    /** The bank feed's own record of the same movement: bank -> wallet. */
+    private fun bankCredit(
+        id: Long,
+        amount: Long = 5,
+        timestamp: Instant = baseTime,
+        src: AccountId = bank,
+        tgt: AccountId = wallet,
+    ) = existing(id, description = "BI6055443", amount = amount, timestamp = timestamp, src = src, tgt = tgt)
+
+    @Test
+    fun unidentifiedCounterparty_reconcilesAgainstIdentifiedLeg() {
+        val deduper = ImportDeduper(unidentifiedPolicy, existing = listOf(bankCredit(40, timestamp = baseTime + 20.hours)))
+        val result = deduper.classify(listOf(placeholderDeposit(0))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertEquals(
+            NewAttribute(AttributeTypeId(-1), "reconciled"),
+            result.transfer.attributes.single { it.typeId == AttributeTypeId(-1) },
+        )
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(40), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
+        )
+    }
+
+    @Test
+    fun unidentifiedCounterparty_doesNotReconcileOppositeDirection() {
+        // A withdrawal out of the wallet is not the deposit into it, however well amount and date match.
+        val deduper =
+            ImportDeduper(
+                unidentifiedPolicy,
+                existing = listOf(bankCredit(40, src = wallet, tgt = bank, timestamp = baseTime + 1.hours)),
+            )
+        val result = deduper.classify(listOf(placeholderDeposit(0))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun unidentifiedCounterparty_doesNotReconcileOutsideWindow() {
+        // The window is the fuzzy date tolerance (3 days), not the exact-account reconcile window.
+        val deduper = ImportDeduper(unidentifiedPolicy, existing = listOf(bankCredit(40, timestamp = baseTime + 4.days)))
+        val result = deduper.classify(listOf(placeholderDeposit(0))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun unidentifiedCounterparty_consumesEachLegOnce() {
+        // Two same-amount deposits a day apart but only one bank credit: the nearest row reconciles, the
+        // other stays a plain import rather than both collapsing onto the single bank record.
+        val deduper = ImportDeduper(unidentifiedPolicy, existing = listOf(bankCredit(40, timestamp = baseTime + 1.hours)))
+        val result = deduper.classify(listOf(placeholderDeposit(0), placeholderDeposit(1, timestamp = baseTime + 1.days)))
+        assertTrue(result[0].transfer.attributes.any { it.typeId == AttributeTypeId(-1) }, "first reconciles")
+        assertTrue(result[1].transfer.attributes.none { it.typeId == AttributeTypeId(-1) }, "second is a plain import")
+    }
+
+    @Test
+    fun unidentifiedCounterparty_ignoresOtherPlaceholderLegs() {
+        // Another placeholder record is not evidence of the movement's real other end, so the two are left
+        // to the exact-account reconcile pass instead of one silently swallowing the other.
+        val otherPlaceholderLeg =
+            existing(40, description = "Faster Payment In", src = AccountId(33), tgt = wallet, timestamp = baseTime + 1.hours)
+                .copy(attributes = mapOf(AttributeTypeId(-9) to "true"))
+        val deduper = ImportDeduper(unidentifiedPolicy, existing = listOf(otherPlaceholderLeg))
+        val result = deduper.classify(listOf(placeholderDeposit(0))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun unidentifiedCounterparty_ignoresAlreadyExcludedLegs() {
+        // An excluded leg represents no counted movement, so reconciling onto it would count the movement
+        // zero times. Amount+direction alone is a loose match: a £5 withdrawal and an excluded £5 card
+        // top-up both move £5 out of the same wallet a day apart.
+        val excludedLeg =
+            existing(43, description = "Top Up Card", src = wallet, tgt = AccountId(35), timestamp = baseTime + 1.hours)
+                .copy(attributes = mapOf(AttributeTypeId(-1) to "reconciled"))
+        val withdrawal =
+            importTransfer(0, description = "GBP Withdrawal (via FPS)", src = wallet, tgt = placeholder)
+                .copy(unidentifiedCounterpartyAccountId = placeholder)
+        val deduper = ImportDeduper(unidentifiedPolicy, existing = listOf(excludedLeg))
+        val result = deduper.classify(listOf(withdrawal)).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun unidentifiedCounterparty_ignoresLegsAnotherRecordAlreadyClaimed() {
+        // Consumption must survive across imports: a bank credit an earlier (now excluded) placeholder row
+        // already reconciled against must not excuse a second row, or that row's real deposit disappears.
+        val deduper =
+            ImportDeduper(
+                unidentifiedPolicy,
+                existing = listOf(bankCredit(40, timestamp = baseTime + 1.hours)),
+                claimedReconcileTargets = setOf(TransferId(40)),
+            )
+        val result = deduper.classify(listOf(placeholderDeposit(0))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun unidentifiedCounterparty_ignoresMovementsTheSameExportBooksItself() {
+        // A wallet statement lists both a £5 bank withdrawal and a £5 top-up of the card it also books.
+        // Same account, same direction, same amount, days apart — but two real movements, not one seen twice.
+        val card = AccountId(36)
+        val topUp = existing(44, description = "Top Up Card", src = wallet, tgt = card, timestamp = baseTime + 2.days)
+        val withdrawal =
+            importTransfer(0, description = "GBP Withdrawal (via FPS)", src = wallet, tgt = placeholder)
+                .copy(unidentifiedCounterpartyAccountId = placeholder)
+        val toCard = importTransfer(1, description = "Top Up Card", src = wallet, tgt = card, timestamp = baseTime + 2.days)
+        val deduper =
+            ImportDeduper(
+                unidentifiedPolicy,
+                existing = listOf(topUp),
+                ownBatchAccounts = setOf(wallet, placeholder, card),
+            )
+        val result = deduper.classify(listOf(withdrawal, toCard))
+        assertTrue(result[0].transfer.attributes.none { it.typeId == AttributeTypeId(-1) }, "the withdrawal stands on its own")
+    }
+
+    @Test
+    fun unidentifiedCounterparty_withoutConfigNeverReconciles() {
+        val deduper = ImportDeduper(reconcilingFuzzyPolicy, existing = listOf(bankCredit(40, timestamp = baseTime + 1.hours)))
+        val result = deduper.classify(listOf(placeholderDeposit(0))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun identifiedRow_supersedesExistingPlaceholderLeg() {
+        // The opposite import order: the placeholder record already exists and the bank feed's row, which
+        // names both ends, arrives now. The incoming row is kept and the placeholder leg is excluded.
+        val existingPlaceholder =
+            existing(41, description = "GBP Deposit (via FPS)", src = placeholder, tgt = wallet, timestamp = baseTime)
+                .copy(attributes = mapOf(AttributeTypeId(-9) to "true"))
+        val deduper = ImportDeduper(unidentifiedPolicy, existing = listOf(existingPlaceholder))
+        val result =
+            deduper
+                .classify(
+                    listOf(importTransfer(0, description = "BI6055443", timestamp = baseTime + 20.hours, src = bank, tgt = wallet)),
+                ).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) }, "the better record stays counted")
+        assertEquals(TransferId(41), result.excludeExisting?.transfer?.id)
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(41), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
+        )
+    }
+
+    @Test
+    fun identifiedRow_ignoresIdentifiedExistingLegs() {
+        // Without the placeholder marker there is nothing to supersede: a genuine second movement of the
+        // same amount through the same account must not be excluded.
+        val deduper = ImportDeduper(unidentifiedPolicy, existing = listOf(bankCredit(42, src = AccountId(34))))
+        val result =
+            deduper
+                .classify(
+                    listOf(importTransfer(0, description = "BI9999999", timestamp = baseTime + 1.hours, src = bank, tgt = wallet)),
+                ).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertEquals(null, result.excludeExisting)
     }
 
     // Funding-card reconcile: a conduit (e.g. Curve) spend, `conduit -> merchant`, reconciles against

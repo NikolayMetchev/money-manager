@@ -465,6 +465,16 @@ data class ImportTransfer(
      * unconsumed funding leg of the same amount+currency within the window, ignoring the merchant.
      */
     val reconcileFundingAccountId: AccountId? = null,
+    /**
+     * When set, this leg's counterparty is a placeholder account named after the row's own description:
+     * the strategy resolved neither a rule, a persisted mapping nor a bank identity for it, so the real
+     * other end is unknown. Enables the unidentified-counterparty reconcile pass (see
+     * [DedupePolicy.FuzzyAllFields]): the row reconciles against an unconsumed leg of the same
+     * amount+currency moving the same way through the *owned* account, whatever its counterparty — the
+     * one thing this row cannot state. The account id is the placeholder itself (either side of this
+     * transfer; the owned account is the other one).
+     */
+    val unidentifiedCounterpartyAccountId: AccountId? = null,
     /** [ImportOperation.CREATE] (default), or UPDATE/DELETE of [existingId]. */
     override val operation: ImportOperation = ImportOperation.CREATE,
     /** The transfer to UPDATE/DELETE (required for those operations). */

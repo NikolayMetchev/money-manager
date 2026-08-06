@@ -486,6 +486,12 @@ fun CsvImportDetailScreen(
                         if (result.convertedRows.isNotEmpty()) {
                             append(", ${result.convertedRows.size} transfer(s) converted to trades")
                         }
+                        if (result.duplicateTradeRows.isNotEmpty()) {
+                            append(", ${result.duplicateTradeRows.size} duplicate conversion(s) removed")
+                        }
+                        if (result.counterpartyReconciledRows.isNotEmpty()) {
+                            append(", ${result.counterpartyReconciledRows.size} row(s) rebooked onto their real counterparty")
+                        }
                         result.importResult?.let { append(", ${it.successCount} row(s) imported") }
                         if (result.deletedEmptyAccounts.isNotEmpty()) {
                             append(", ${result.deletedEmptyAccounts.size} empty account(s) deleted")

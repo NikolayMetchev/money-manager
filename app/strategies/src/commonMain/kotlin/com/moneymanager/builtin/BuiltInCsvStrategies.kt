@@ -81,6 +81,16 @@ object BuiltInCsvStrategies {
     private const val CRYPTO_COM_CONVERSIONS_ACCOUNT = "Crypto.com Conversions"
 
     /**
+     * Placeholder counterparty for a card top-up seen only from the card's side. The card statement
+     * records that money arrived ("GBP Deposit", "Card Load") but never where from — it may be the fiat
+     * Cash wallet or, as in crypto.com's pre-mid-2022 TGBP era, a crypto wallet. Booking it against Cash
+     * would debit an account that never paid; the row lands here instead and reconciles away against the
+     * funding side's own record of the movement when one is imported (see
+     * `RegexRule.counterpartyIsUnidentified`).
+     */
+    private const val CRYPTO_COM_CARD_TOP_UP_ACCOUNT = "Crypto.com Card Top Up"
+
+    /**
      * Cross-source reconciliation window for the crypto.com strategies. The same top-up appears in
      * both the card export ("GBP Deposit") and the fiat export (viban_card_top_up) with near-identical
      * timestamps, but statement exports are less precise than API feeds, so allow up to an hour.
@@ -218,13 +228,23 @@ object BuiltInCsvStrategies {
                         columnName = "Transaction Description",
                         rules =
                             listOf(
-                                // Top-ups ("GBP Deposit", "EUR Deposit", …) come from the Cash account.
-                                RegexRule(pattern = "^[A-Z]{3,5} Deposit$", accountName = CRYPTO_COM_CASH_ACCOUNT),
+                                // Top-ups ("GBP Deposit", "EUR Deposit", …). The statement does not say
+                                // which wallet funded them, so they land on the top-up placeholder and
+                                // reconcile against the funding side's own record when it is imported.
+                                RegexRule(
+                                    pattern = "^[A-Z]{3,5} Deposit$",
+                                    accountName = CRYPTO_COM_CARD_TOP_UP_ACCOUNT,
+                                    counterpartyIsUnidentified = true,
+                                ),
                                 // Pre-mid-2022 exports describe the same top-up as "GBP -> GBP" (same
                                 // currency on both sides). Cross-currency arrows (e.g. "TGBP -> GBP") are
                                 // conversion-funded and deliberately NOT matched — the crypto export
                                 // records that movement separately.
-                                RegexRule(pattern = "^([A-Z]{3,5}) -> \\1$", accountName = CRYPTO_COM_CASH_ACCOUNT),
+                                RegexRule(
+                                    pattern = "^([A-Z]{3,5}) -> \\1$",
+                                    accountName = CRYPTO_COM_CARD_TOP_UP_ACCOUNT,
+                                    counterpartyIsUnidentified = true,
+                                ),
                             ),
                         // Everything else looks up/creates a merchant account from the raw description.
                     ),
@@ -321,7 +341,14 @@ object BuiltInCsvStrategies {
                                 id = cryptoComCardXlsxMappingId(11),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Service Abbreviation",
-                                rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CASH_ACCOUNT)),
+                                rules =
+                                    listOf(
+                                        RegexRule(
+                                            pattern = "^",
+                                            accountName = CRYPTO_COM_CARD_TOP_UP_ACCOUNT,
+                                            counterpartyIsUnidentified = true,
+                                        ),
+                                    ),
                             ),
                         whenFalse =
                             ConditionalAccountMapping(
@@ -331,13 +358,21 @@ object BuiltInCsvStrategies {
                                     listOf(
                                         RowCondition("Service Abbreviation", RowConditionOperator.EQUALS_VALUE, value = "LdExtDbCr"),
                                     ),
-                                // Card loads ("GBP/200.0-Card Load") come from the Cash account.
+                                // Card loads ("GBP/200.0-Card Load"): funding wallet unknown, same as the
+                                // CSV export's "GBP Deposit" rows.
                                 whenTrue =
                                     RegexAccountMapping(
                                         id = cryptoComCardXlsxMappingId(3),
                                         fieldType = TransferField.TARGET_ACCOUNT,
                                         columnName = "Service Abbreviation",
-                                        rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CASH_ACCOUNT)),
+                                        rules =
+                                            listOf(
+                                                RegexRule(
+                                                    pattern = "^",
+                                                    accountName = CRYPTO_COM_CARD_TOP_UP_ACCOUNT,
+                                                    counterpartyIsUnidentified = true,
+                                                ),
+                                            ),
                                     ),
                                 // Everything else looks up/creates a merchant account from the card acceptor
                                 // name, stripped of its trailing city/country padding (the field is
@@ -425,6 +460,8 @@ object BuiltInCsvStrategies {
             fieldMappings = fieldMappings,
             fileNamePattern = "Card Transaction History",
             worksheetName = "Sheet1",
+            // Same physical card as the CSV export above, so the two overlap wherever their date ranges do.
+            crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
             createdAt = now,
             updatedAt = now,
         )
@@ -485,8 +522,20 @@ object BuiltInCsvStrategies {
                                         // Card top-ups route to the Card account (the card export's
                                         // "GBP Deposit" side of the same movement).
                                         RegexRule(pattern = "^Top Up Card$", accountName = CRYPTO_COM_CARD_ACCOUNT),
+                                        // Bank deposits/withdrawals ("GBP Deposit (via FPS)"): the export
+                                        // names the movement, never the bank behind it. Keep the
+                                        // description as the placeholder account's name (so nothing is
+                                        // renamed) but mark it unidentified, so a bank export that DOES
+                                        // name both ends — resolving this wallet by sort code + account
+                                        // number — reconciles instead of double-counting the deposit.
+                                        RegexRule(
+                                            pattern = "^[A-Z]{3,5} (?:Deposit|Withdrawal) \\(via [A-Za-z ]+\\)$",
+                                            accountName = "Bank Transfer",
+                                            accountNameTemplate = "$0",
+                                            counterpartyIsUnidentified = true,
+                                        ),
                                     ),
-                                // Deposits/withdrawals create a counterparty account from the description.
+                                // Anything else creates a counterparty account from the description.
                             ),
                     ),
                 TransferField.TIMESTAMP to

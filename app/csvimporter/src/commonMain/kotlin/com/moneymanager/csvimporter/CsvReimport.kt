@@ -8,6 +8,8 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Trade
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
@@ -34,8 +36,10 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportProgress
+import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.selectNearestUnconsumedLeg
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
@@ -75,6 +79,15 @@ enum class ReimportSkipReason {
 
     /** Deleting a row's old transfer for a transfer→trade conversion failed; the row was left as-is. */
     TRADE_CONVERSION_FAILED,
+
+    /** Deleting a row's old transfer for an unidentified-counterparty re-run failed; row left as-is. */
+    COUNTERPARTY_RECONCILE_FAILED,
+
+    /** Deleting a row's duplicate trade failed; the duplicate was left in place. */
+    DUPLICATE_TRADE_FAILED,
+
+    /** Resetting a row wrongly marked a duplicate failed; the row stays unimported. */
+    STALE_DUPLICATE_FAILED,
 
     /** Deleting a row's old transfer for a funding-card reconcile failed; the row was left as-is. */
     FUNDING_RECONCILE_FAILED,
@@ -131,6 +144,47 @@ data class ReimportFundingReconcile(
     val transferId: TransferId,
     /** The row's statement description, for the preview. */
     val description: String,
+)
+
+/**
+ * One row marked DUPLICATE against a transaction that no longer exists, so the match stands for nothing:
+ * the row is reset and re-run, matching a leg of its own or importing as the movement it always was.
+ */
+data class ReimportStaleDuplicate(
+    val rowIndex: Long,
+    /** The row's statement description, for the preview. */
+    val description: String,
+)
+
+/**
+ * One already-imported trade row whose trade duplicates an earlier one: two exports recorded the same
+ * conversion (same instant, accounts, assets and amounts) under different wording, which the trade
+ * identity check used to treat as distinct. This row's redundant trade is deleted and the row reset, so
+ * the re-run reuses [keptTradeId] and the conversion is booked once.
+ */
+data class ReimportDuplicateTrade(
+    val rowIndex: Long,
+    val tradeId: TradeId,
+    /** The row's statement description, for the preview. */
+    val description: String,
+    /** The earlier trade the row will reuse. */
+    val keptTradeId: TradeId,
+)
+
+/**
+ * One already-imported row whose counterparty the current strategy treats as unidentified (a
+ * placeholder named after the row's description) and whose persisted transfer no longer reflects that —
+ * either it was booked against a different account, or a real record of the same movement has since been
+ * imported and the engine would now reconcile the row against it. The transfer is deleted and the row
+ * reset so the re-run re-imports it: onto the placeholder, reconciled away, or both.
+ */
+data class ReimportCounterpartyReconcile(
+    val rowIndex: Long,
+    val transferId: TransferId,
+    /** The row's statement description, for the preview. */
+    val description: String,
+    /** Why the row is being re-run, for the preview (account change vs. now-reconcilable). */
+    val detail: String,
 )
 
 /**
@@ -197,6 +251,12 @@ data class ReimportPlan(
     val reversals: List<ReimportReversal> = emptyList(),
     /** Already-imported single-asset transfers the current strategy now maps to cross-asset trades. */
     val tradeConversions: List<ReimportTradeConversion> = emptyList(),
+    /** Already-imported rows whose unidentified counterparty is now booked wrongly or reconcilable. */
+    val counterpartyReconciles: List<ReimportCounterpartyReconcile> = emptyList(),
+    /** Already-imported trade rows whose trade duplicates an earlier export's record of it. */
+    val duplicateTrades: List<ReimportDuplicateTrade> = emptyList(),
+    /** Rows marked DUPLICATE against a transaction that is gone or already claimed by another row. */
+    val staleDuplicates: List<ReimportStaleDuplicate> = emptyList(),
     /** Already-imported conduit spends that will reconcile against a funding leg once re-run. */
     val fundingReconciles: List<ReimportFundingReconcile> = emptyList(),
 ) {
@@ -208,6 +268,9 @@ data class ReimportPlan(
                 valueUpdates.isEmpty() &&
                 reversals.isEmpty() &&
                 tradeConversions.isEmpty() &&
+                counterpartyReconciles.isEmpty() &&
+                duplicateTrades.isEmpty() &&
+                staleDuplicates.isEmpty() &&
                 fundingReconciles.isEmpty()
 }
 
@@ -229,6 +292,12 @@ data class CsvReimportResult(
     val convertedRows: List<ReimportTradeConversion> = emptyList(),
     /** Conduit-spend rows deleted and re-imported so they reconcile against a funding leg. */
     val reconciledRows: List<ReimportFundingReconcile> = emptyList(),
+    /** Rows deleted and re-imported so their unidentified counterparty is booked/reconciled correctly. */
+    val counterpartyReconciledRows: List<ReimportCounterpartyReconcile> = emptyList(),
+    /** Trade rows whose duplicate trade was deleted so the conversion is booked once. */
+    val duplicateTradeRows: List<ReimportDuplicateTrade> = emptyList(),
+    /** Rows released from a duplicate match that no longer holds, and re-imported. */
+    val staleDuplicateRows: List<ReimportStaleDuplicate> = emptyList(),
 )
 
 /** Raw merge detection output: duplicate → single target, plus duplicates with competing targets. */
@@ -373,6 +442,8 @@ suspend fun planCsvReimport(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoAssets: List<CryptoAsset> = emptyList(),
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
+    /** Needed to spot trade rows duplicating another export's record of the same conversion. */
+    tradeRepository: TradeReadRepository? = null,
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): ReimportPlan {
     onProgress?.invoke(ImportProgress("Loading rows"))
@@ -445,17 +516,58 @@ suspend fun planCsvReimport(
             onProgress = onProgress,
         ) { transferId -> existingTransfers[transferId] }
     val reversalRowIndexes = reversals.flatMapTo(mutableSetOf()) { it.rowIndexes }
+    val loadTransfersTouchingAccount: suspend (AccountId, Instant, Instant) -> List<Transfer> =
+        { accountId, startDate, endDate ->
+            transactionRepository.getTransactionsByAccountAndDateRange(accountId, startDate, endDate).first()
+        }
+    val duplicateTrades =
+        if (tradeRepository == null) {
+            emptyList()
+        } else {
+            computeDuplicateTradeReruns(
+                allRows = allRows,
+                mappedPrep = mappedPrep,
+                excludedRowIndexes = rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes + tradeConversions.map { it.rowIndex },
+                tradesTouchingAccount = { accountId -> tradeRepository.getTradesByAccount(accountId).first() },
+                onProgress = onProgress,
+            )
+        }
+    val staleDuplicates =
+        computeStaleDuplicateReruns(
+            allRows = allRows,
+            mappedPrep = mappedPrep,
+            existingTransfers = existingTransfers,
+            excludedRowIndexes = rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes + tradeConversions.map { it.rowIndex },
+        )
+    val counterpartyReconciles =
+        computeUnidentifiedCounterpartyReruns(
+            allRows = allRows,
+            mappedPrep = mappedPrep,
+            strategy = strategy,
+            excludedRowIndexes =
+                rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes + tradeConversions.map { it.rowIndex } +
+                    duplicateTrades.map { it.rowIndex },
+            existingTransfers = existingTransfers,
+            loadTransfersTouchingAccount = loadTransfersTouchingAccount,
+            claimedReconcileTargets = { ids ->
+                relationshipRepository
+                    .getByTransfers(ids)
+                    .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
+                    .mapTo(mutableSetOf()) { it.id2 }
+            },
+            onProgress = onProgress,
+        )
     val fundingReconciles =
         computeFundingReconcileReruns(
             allRows = allRows,
             mappedPrep = mappedPrep,
             strategy = strategy,
             attributeAccountMatchers = attributeAccountMatchers,
-            excludedRowIndexes = rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes + tradeConversions.map { it.rowIndex },
+            excludedRowIndexes =
+                rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes + tradeConversions.map { it.rowIndex } +
+                    counterpartyReconciles.map { it.rowIndex },
             existingTransfers = existingTransfers,
-            loadTransfersTouchingAccount = { accountId, startDate, endDate ->
-                transactionRepository.getTransactionsByAccountAndDateRange(accountId, startDate, endDate).first()
-            },
+            loadTransfersTouchingAccount = loadTransfersTouchingAccount,
             onProgress = onProgress,
         )
     // Rows whose transfers a reversal moves back are excluded from value updates: the reversal owns that
@@ -469,6 +581,8 @@ suspend fun planCsvReimport(
                 rewrites.map { it.rowIndex }.toSet() +
                     reversalRowIndexes +
                     tradeConversions.map { it.rowIndex } +
+                    counterpartyReconciles.map { it.rowIndex } +
+                    duplicateTrades.map { it.rowIndex } +
                     fundingReconciles.map { it.rowIndex },
             existingTransferLookup = { transferId -> existingTransfers[transferId] },
             onProgress = onProgress,
@@ -517,6 +631,9 @@ suspend fun planCsvReimport(
         valueUpdates = valueUpdates,
         reversals = reversals,
         tradeConversions = tradeConversions,
+        counterpartyReconciles = counterpartyReconciles,
+        duplicateTrades = duplicateTrades,
+        staleDuplicates = staleDuplicates,
         fundingReconciles = fundingReconciles,
     )
 }
@@ -582,6 +699,250 @@ private suspend fun valueUpdateFor(
         sourceAccountId = existing.sourceAccountId,
         targetAccountId = existing.targetAccountId,
     )
+}
+
+/**
+ * Finds rows marked DUPLICATE against a transaction that no longer exists — the row records a match that
+ * has since been deleted (by a rewrite, a re-run, or a repair), so it stands for nothing. Resetting them
+ * lets the re-run classify them afresh: they either match a leg of their own or import as the movement
+ * they always were. This is what brings back deposits an over-eager fuzzy match once swallowed.
+ */
+fun computeStaleDuplicateReruns(
+    allRows: List<CsvRow>,
+    mappedPrep: ImportPreparation,
+    existingTransfers: Map<TransferId, Transfer>,
+    excludedRowIndexes: Set<Long>,
+): List<ReimportStaleDuplicate> {
+    val mappedByRow = mappedPrep.validTransfers.associateBy { it.rowIndex }
+
+    // Rows the pass-through machinery owns are re-run by the rewrite path, which rebuilds their whole
+    // conduit chain; releasing them here as well would fight that.
+    fun eligible(row: CsvRow) =
+        row.importStatus == ImportStatus.DUPLICATE &&
+            row.rowIndex !in excludedRowIndexes &&
+            mappedByRow[row.rowIndex]?.passThrough == null
+
+    // A row with no recorded match is not evidence of a broken one (in-batch duplicates never recorded
+    // which transaction they matched); treating those as stale would re-import them every time.
+    val claimants = mutableMapOf<TransferId, MutableList<CsvRow>>()
+    for (row in allRows.sortedBy { it.rowIndex }) {
+        row.transferId?.takeIf { row.importStatus != null }?.let { claimants.getOrPut(it) { mutableListOf() } += row }
+    }
+
+    // Stale either because the match is gone, or because it is one movement several rows claim while
+    // recording different instants — an export lists each movement once, so those are distinct movements
+    // an over-eager fuzzy match collapsed. Rows recording the SAME instant may genuinely be one movement
+    // listed twice, so they are left alone.
+    fun isStale(row: CsvRow): Boolean {
+        val transferId = row.transferId ?: return false
+        val existing = existingTransfers[transferId] ?: return true
+        val claimingRows = claimants[transferId].orEmpty()
+        val instants = claimingRows.mapNotNull { mappedByRow[it.rowIndex]?.transfer?.timestamp }.distinct()
+        return claimingRows.size > 1 &&
+            instants.size > 1 &&
+            mappedByRow[row.rowIndex]?.transfer?.timestamp != existing.timestamp
+    }
+
+    return allRows
+        .sortedBy { it.rowIndex }
+        .filter { eligible(it) && isStale(it) }
+        .map { ReimportStaleDuplicate(it.rowIndex, it.values.firstOrNull().orEmpty()) }
+}
+
+/**
+ * Finds already-imported trade rows whose trade duplicates an earlier one — same instant, accounts,
+ * assets and amounts, differing only in wording, because two crypto.com exports describe one conversion
+ * as e.g. "GBP -> MELANIA" and "Bought MELANIA". The identity check now ignores the description, so
+ * re-running such a row reuses the earlier trade; this deletes the redundant one first.
+ *
+ * The row keeping its trade is always the one holding the lowest trade id, so plan and re-run agree and
+ * a repeated re-import is a no-op. [tradesTouchingAccount] loads an account's trades.
+ */
+suspend fun computeDuplicateTradeReruns(
+    allRows: List<CsvRow>,
+    mappedPrep: ImportPreparation,
+    excludedRowIndexes: Set<Long>,
+    tradesTouchingAccount: suspend (AccountId) -> List<Trade>,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+): List<ReimportDuplicateTrade> {
+    val rowsByIndex = allRows.associateBy { it.rowIndex }
+    val tradeRows =
+        mappedPrep.validTransfers.mapNotNull { mapped ->
+            if (mapped.rowIndex in excludedRowIndexes || mapped.tradeTo == null) return@mapNotNull null
+            val row = rowsByIndex[mapped.rowIndex] ?: return@mapNotNull null
+            if (row.importStatus != ImportStatus.IMPORTED) return@mapNotNull null
+            mapped to row.transferId?.let { TradeId(it.id) }
+        }
+    if (tradeRows.isEmpty()) return emptyList()
+
+    onProgress?.invoke(ImportProgress("Checking duplicate conversions"))
+    val tradesByAccount = mutableMapOf<AccountId, List<Trade>>()
+    val planned = mutableSetOf<TradeId>()
+    val duplicates = mutableListOf<ReimportDuplicateTrade>()
+    for ((mapped, ownId) in tradeRows) {
+        val account = mapped.transfer.sourceAccountId
+        val trades = tradesByAccount.getOrPut(account) { tradesTouchingAccount(account) }
+        // Rows imported before trade ids were recorded have no link, so fall back to the tuple this row
+        // maps to: the trades it could have produced are exactly the ones sharing that tuple.
+        val own = ownId?.let { id -> trades.firstOrNull { it.id == id } }
+        val group =
+            when {
+                ownId != null && own == null -> emptyList()
+                own != null -> trades.filter { it.sameConversionAs(own) }
+                else -> trades.filter { it.timestamp == mapped.transfer.timestamp && it.from == mapped.transfer.amount }
+            }
+        // Keep the earliest record of the conversion; this row gives up the later one and re-links to it.
+        val kept = group.minByOrNull { it.id.id }
+        val redundant = own ?: group.maxByOrNull { it.id.id }
+        if (group.size > 1 && kept != null && redundant != null && redundant.id != kept.id && planned.add(redundant.id)) {
+            duplicates += ReimportDuplicateTrade(mapped.rowIndex, redundant.id, redundant.description, kept.id)
+        }
+    }
+    return duplicates
+}
+
+/** Whether two trades record one conversion: same instant, accounts, assets and amounts (wording aside). */
+private fun Trade.sameConversionAs(other: Trade): Boolean =
+    timestamp == other.timestamp &&
+        fromAccountId == other.fromAccountId &&
+        toAccountId == other.toAccountId &&
+        from == other.from &&
+        to == other.to
+
+/**
+ * Finds already-imported rows whose counterparty the current strategy treats as unidentified (see
+ * [com.moneymanager.domain.model.csvstrategy.RegexRule.counterpartyIsUnidentified]) and whose persisted
+ * transfer no longer matches what importing them now would produce, either because
+ *  - the strategy books that counterparty on a different account than the persisted transfer uses (the
+ *    rule changed — e.g. card top-ups moved off the Cash wallet onto a top-up placeholder), or
+ *  - a real record of the same movement has since been imported, so the engine's
+ *    unidentified-counterparty reconcile would now exclude the row instead of double-counting it.
+ *
+ * Such rows are re-run (transfer deleted, row status reset), not updated in place: the re-run is what
+ * creates the placeholder account and applies the reconcile. Rows that would neither move nor reconcile
+ * are left alone, so a re-import doesn't churn.
+ *
+ * [loadTransfersTouchingAccount] loads a bounded window of an account's transfers, mirroring the
+ * engine's own candidate load.
+ */
+suspend fun computeUnidentifiedCounterpartyReruns(
+    allRows: List<CsvRow>,
+    mappedPrep: ImportPreparation,
+    strategy: CsvImportStrategy,
+    excludedRowIndexes: Set<Long>,
+    existingTransfers: Map<TransferId, Transfer>,
+    loadTransfersTouchingAccount: suspend (AccountId, Instant, Instant) -> List<Transfer>,
+    /** Legs already claimed by a `reconciled` link, mirroring the engine's own rule. */
+    claimedReconcileTargets: suspend (Collection<TransferId>) -> Set<TransferId>,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+): List<ReimportCounterpartyReconcile> {
+    // Reconciliation is opt-in per strategy (the same switch the engine reads), and the window is the
+    // engine's own fuzzy date tolerance, so plan and re-run agree on what will reconcile.
+    if (strategy.crossSourceReconcileWindowSeconds == null) return emptyList()
+    val window = DedupePolicy.FuzzyAllFields().dateTolerance
+    val rowsByIndex = allRows.associateBy { it.rowIndex }
+
+    /** An already-imported row the current mapping treats as having an unidentified counterparty. */
+    data class Candidate(
+        val rowIndex: Long,
+        val transferId: TransferId,
+        val placeholder: AccountId,
+        /** The account this row's money moves through, and whether it moves in. */
+        val owned: AccountId,
+        val inflow: Boolean,
+        val amount: Money,
+        val timestamp: Instant,
+        val description: String,
+        /** Set when the persisted transfer books the counterparty on another account. */
+        val movedFrom: AccountId?,
+    )
+    val candidates =
+        mappedPrep.validTransfers.mapNotNull { mapped ->
+            if (mapped.rowIndex in excludedRowIndexes) return@mapNotNull null
+            val row = rowsByIndex[mapped.rowIndex] ?: return@mapNotNull null
+            if (row.importStatus != ImportStatus.IMPORTED) return@mapNotNull null
+            val transferId = row.transferId ?: return@mapNotNull null
+            val placeholder = mapped.unidentifiedCounterpartyAccountId ?: return@mapNotNull null
+            val existing = existingTransfers[transferId] ?: return@mapNotNull null
+            if (existing.attributes.any { it.attributeType.id.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }) return@mapNotNull null
+            val inflow = mapped.transfer.sourceAccountId == placeholder
+            val owned = if (inflow) mapped.transfer.targetAccountId else mapped.transfer.sourceAccountId
+            val persistedCounterparty = if (inflow) existing.sourceAccountId else existing.targetAccountId
+            Candidate(
+                rowIndex = mapped.rowIndex,
+                transferId = transferId,
+                placeholder = placeholder,
+                owned = owned,
+                inflow = inflow,
+                amount = existing.amount,
+                timestamp = existing.timestamp,
+                description = existing.description,
+                movedFrom = persistedCounterparty.takeIf { it != placeholder },
+            )
+        }
+    if (candidates.isEmpty()) return emptyList()
+
+    onProgress?.invoke(ImportProgress("Checking unidentified counterparties"))
+    // Legs through each owned account, bucketed by direction + amount — the whole of what an
+    // unidentified-counterparty row can match on. Bounded to the candidates' span ± the window.
+    val minTs = candidates.minOf { it.timestamp } - window
+    val maxTs = candidates.maxOf { it.timestamp } + window
+    val candidateTransferIds = candidates.mapTo(mutableSetOf()) { it.transferId }
+    val legs = mutableMapOf<Triple<AccountId, Boolean, Money>, MutableList<Transfer>>()
+    for (owned in candidates.map { it.owned }.toSet()) {
+        // A candidate's own persisted leg is not evidence of a second record of the movement, and
+        // neither is another placeholder leg — the engine only reconciles onto identified records.
+        val identifiedLegs =
+            loadTransfersTouchingAccount(owned, minTs, maxTs).filter { leg ->
+                leg.id !in candidateTransferIds &&
+                    // Mirrors the engine: neither another placeholder record nor an already-excluded leg
+                    // is evidence of where the money really came from or went.
+                    leg.attributes.none {
+                        it.attributeType.name == WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME ||
+                            it.attributeType.id.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID
+                    } &&
+                    (leg.targetAccountId == owned || leg.sourceAccountId == owned)
+            }
+        for (leg in identifiedLegs) {
+            legs.getOrPut(Triple(owned, leg.targetAccountId == owned, leg.amount)) { mutableListOf() } += leg
+        }
+    }
+    // A leg another record already reconciled against stands for a movement that is already counted
+    // once; claiming it again would silently drop this row's own movement.
+    val claimed =
+        claimedReconcileTargets(
+            legs.values
+                .flatten()
+                .map { it.id }
+                .distinct(),
+        )
+    // Mirrors the engine: a leg whose counterparty is an account this import books itself is another of
+    // this export's own movements (a wallet statement lists both bank withdrawals and card top-ups).
+    val ownAccounts =
+        mappedPrep.validTransfers.flatMapTo(mutableSetOf()) {
+            listOf(it.transfer.sourceAccountId, it.transfer.targetAccountId)
+        }
+    val consumed = mutableSetOf<TransferId>()
+    return candidates.mapNotNull { candidate ->
+        val bucket =
+            legs[Triple(candidate.owned, candidate.inflow, candidate.amount)]
+                ?.filterNot { it.id in claimed }
+                ?.filter { leg ->
+                    val counterparty = if (candidate.inflow) leg.sourceAccountId else leg.targetAccountId
+                    counterparty != candidate.placeholder && counterparty !in ownAccounts
+                }.orEmpty()
+        // Same one-to-one, nearest-timestamp choice the engine makes, so plan and re-run agree.
+        val legId = selectNearestUnconsumedLeg(bucket.map { it.id to it }, candidate.timestamp, window, consumed)
+        if (legId != null) consumed += legId
+        val detail =
+            when {
+                legId != null && candidate.movedFrom != null -> "counterparty rebooked and reconciled against an existing record"
+                legId != null -> "reconciled against an existing record of the same movement"
+                candidate.movedFrom != null -> "counterparty rebooked onto the placeholder account"
+                else -> return@mapNotNull null
+            }
+        ReimportCounterpartyReconcile(candidate.rowIndex, candidate.transferId, candidate.description, detail)
+    }
 }
 
 /**
@@ -1012,6 +1373,115 @@ suspend fun executeCsvReimport(
         }
     }
 
+    // Releasing a row from a match that no longer holds only resets its status — there is nothing to
+    // delete — so one batch covers them all.
+    val releasedDuplicates = mutableListOf<ReimportStaleDuplicate>()
+    if (plan.staleDuplicates.isNotEmpty()) {
+        onProgress?.invoke(ImportProgress("Releasing rows wrongly matched as duplicates"))
+        try {
+            importEngine.import(
+                ImportBatch(
+                    dedupePolicy = DedupePolicy.None,
+                    csvImportMutations =
+                        listOf(CsvImportMutation.ResetRowStatuses(csvImport.id, plan.staleDuplicates.map { it.rowIndex })),
+                ),
+            )
+            releasedDuplicates += plan.staleDuplicates
+        } catch (expected: Exception) {
+            logger.warn(expected) { "Re-import release of ${plan.staleDuplicates.size} stale duplicate row(s) failed" }
+            skipped +=
+                ReimportSkippedAccount(
+                    accountId = null,
+                    accountName = "${plan.staleDuplicates.size} row(s) matched as duplicates",
+                    reason = ReimportSkipReason.STALE_DUPLICATE_FAILED,
+                    detail = expected.message ?: "Reset failed",
+                )
+        }
+    }
+
+    // One batch per row: the redundant trade is deleted and the row status reset together, so the re-run
+    // reuses the earlier export's trade (the identity check ignores the description) instead of leaving
+    // the conversion booked twice.
+    val deduplicatedTrades = mutableListOf<ReimportDuplicateTrade>()
+    for ((index, duplicate) in plan.duplicateTrades.withIndex()) {
+        onProgress?.invoke(
+            ImportProgress(
+                "Removing duplicate conversions",
+                fraction = index.toFloat() / plan.duplicateTrades.size,
+                processed = index,
+                total = plan.duplicateTrades.size,
+            ),
+        )
+        try {
+            importEngine.import(
+                ImportBatch(
+                    trades =
+                        listOf(
+                            ImportTradeIntent(
+                                key = LocalTradeKey("reimport-duplicate-${duplicate.tradeId.id}"),
+                                source = Source.Csv(csvImport.id),
+                                operation = ImportOperation.DELETE,
+                                existingId = duplicate.tradeId,
+                            ),
+                        ),
+                    dedupePolicy = DedupePolicy.None,
+                    csvImportMutations = listOf(CsvImportMutation.ResetRowStatuses(csvImport.id, listOf(duplicate.rowIndex))),
+                ),
+            )
+            deduplicatedTrades += duplicate
+        } catch (expected: Exception) {
+            logger.warn(expected) { "Re-import duplicate-trade removal of row ${duplicate.rowIndex} failed" }
+            skipped +=
+                ReimportSkippedAccount(
+                    accountId = null,
+                    accountName = duplicate.description,
+                    reason = ReimportSkipReason.DUPLICATE_TRADE_FAILED,
+                    detail = expected.message ?: "Duplicate conversion removal failed",
+                )
+        }
+    }
+
+    // One batch per row, mirroring the loops above: the stale transfer is deleted and the row status
+    // reset together, so the re-run re-imports the row onto its placeholder counterparty and lets the
+    // engine's unidentified-counterparty reconcile exclude it against any real record of the movement.
+    val counterpartyReconciled = mutableListOf<ReimportCounterpartyReconcile>()
+    for ((index, reconcile) in plan.counterpartyReconciles.withIndex()) {
+        onProgress?.invoke(
+            ImportProgress(
+                "Rebooking unidentified counterparties",
+                fraction = index.toFloat() / plan.counterpartyReconciles.size,
+                processed = index,
+                total = plan.counterpartyReconciles.size,
+            ),
+        )
+        try {
+            importEngine.import(
+                ImportBatch(
+                    transfers =
+                        listOf(
+                            ImportTransfer(
+                                source = Source.Csv(csvImport.id),
+                                operation = ImportOperation.DELETE,
+                                existingId = reconcile.transferId,
+                            ),
+                        ),
+                    dedupePolicy = DedupePolicy.None,
+                    csvImportMutations = listOf(CsvImportMutation.ResetRowStatuses(csvImport.id, listOf(reconcile.rowIndex))),
+                ),
+            )
+            counterpartyReconciled += reconcile
+        } catch (expected: Exception) {
+            logger.warn(expected) { "Re-import counterparty re-run of row ${reconcile.rowIndex} ('${reconcile.description}') failed" }
+            skipped +=
+                ReimportSkippedAccount(
+                    accountId = null,
+                    accountName = reconcile.description,
+                    reason = ReimportSkipReason.COUNTERPARTY_RECONCILE_FAILED,
+                    detail = expected.message ?: "Counterparty re-run failed",
+                )
+        }
+    }
+
     // One batch per reconcile: the plain conduit-spend transfer is deleted and its row status reset in
     // the same batch, so the re-run below re-imports it through the engine's funding-card reconcile
     // (which links it to the funding leg + excludes it instead of double-counting).
@@ -1091,6 +1561,9 @@ suspend fun executeCsvReimport(
         reversedMerges = reversedMerges,
         convertedRows = converted,
         reconciledRows = reconciled,
+        counterpartyReconciledRows = counterpartyReconciled,
+        duplicateTradeRows = deduplicatedTrades,
+        staleDuplicateRows = releasedDuplicates,
     )
 }
 
@@ -1268,6 +1741,10 @@ data class CsvBulkReimportResult(
     val reversals: List<ReimportReversal>,
     val valueUpdates: Int,
     val tradeConversions: Int,
+    /** Rows re-run so their unidentified counterparty is rebooked and/or reconciled away. */
+    val counterpartyReconciles: Int,
+    /** Trade rows whose duplicate conversion (another export's wording of it) was removed. */
+    val duplicateTrades: Int,
     val emptyAccountsDeleted: Int,
     val skipped: List<ReimportSkippedAccount>,
 ) : BulkImportResult {
@@ -1277,6 +1754,8 @@ data class CsvBulkReimportResult(
             append(" · $transfersCreated new")
             if (valueUpdates > 0) append(" · $valueUpdates updated")
             if (tradeConversions > 0) append(" · $tradeConversions converted to trades")
+            if (counterpartyReconciles > 0) append(" · $counterpartyReconciles rebooked")
+            if (duplicateTrades > 0) append(" · $duplicateTrades duplicate conversions removed")
             if (merges.isNotEmpty()) append(" · ${merges.size} account${if (merges.size == 1) "" else "s"} merged")
             if (reversals.isNotEmpty()) append(" · ${reversals.size} merge${if (reversals.size == 1) "" else "s"} reversed")
             if (emptyAccountsDeleted > 0) append(" · $emptyAccountsDeleted empty removed")
@@ -1330,6 +1809,8 @@ suspend fun bulkReimportCsv(
     val reversals = mutableListOf<ReimportReversal>()
     var valueUpdates = 0
     var tradeConversions = 0
+    var counterpartyReconciles = 0
+    var duplicateTrades = 0
     var emptyAccountsDeleted = 0
     val skipped = mutableListOf<ReimportSkippedAccount>()
     // Create every crypto asset the batch needs up front, sized to the batch-wide max precision per
@@ -1373,6 +1854,7 @@ suspend fun bulkReimportCsv(
                     onProgress = { tracker.phase(index, csvImport.originalFileName, it) },
                     cryptoAssets = cryptoAssets,
                     attributeAccountMatchers = attributeAccountMatchers,
+                    tradeRepository = tradeRepository,
                 )
             val result =
                 executeCsvReimport(
@@ -1400,6 +1882,8 @@ suspend fun bulkReimportCsv(
             reversals += result.reversedMerges
             valueUpdates += result.updatedRows.size
             tradeConversions += result.convertedRows.size
+            counterpartyReconciles += result.counterpartyReconciledRows.size
+            duplicateTrades += result.duplicateTradeRows.size
             emptyAccountsDeleted += result.deletedEmptyAccounts.size
             skipped += result.skipped
         } catch (expected: Exception) {
@@ -1421,6 +1905,8 @@ suspend fun bulkReimportCsv(
         reversals = reversals,
         valueUpdates = valueUpdates,
         tradeConversions = tradeConversions,
+        counterpartyReconciles = counterpartyReconciles,
+        duplicateTrades = duplicateTrades,
         emptyAccountsDeleted = emptyAccountsDeleted,
         skipped = skipped,
     )

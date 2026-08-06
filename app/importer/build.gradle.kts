@@ -12,6 +12,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.csv)
                 api(projects.app.model.passthrough)
+                api(projects.app.model.repository.read)
                 api(projects.app.model.repository.write)
 
                 implementation(libs.kotlinx.coroutines.core)
@@ -33,6 +34,7 @@ kotlin {
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.app.model.csv)
+                api(projects.app.model.repository.read)
                 api(projects.app.model.repository.write)
 
                 implementation(projects.app.model.accountmapping)

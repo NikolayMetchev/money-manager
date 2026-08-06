@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -193,26 +194,27 @@ class CryptoComCsvMapperTest {
     }
 
     @Test
-    fun `card top-up row is Cash to Card, matching the fiat viban_card_top_up direction`() {
+    fun `card top-up row credits the card from the unidentified top-up placeholder`() {
         val r = map(cardStrategy, row("GBP Deposit", "GBP", "400.0", "", "", "400.0", ""))
-        // Same account pair and direction as the fiat file's viban_card_top_up rows, which is what
-        // lets cross-source reconciliation link the two records of the same movement.
-        assertEquals(cash.id, r.transfer.sourceAccountId)
+        // The card statement says money arrived, never from which wallet, so the row must not debit Cash
+        // on a guess: it lands on the top-up placeholder, flagged unidentified so the engine reconciles
+        // it against the fiat file's viban_card_top_up record of the same movement.
+        assertEquals("Crypto.com Card Top Up", r.newAccountName())
         assertEquals(card.id, r.transfer.targetAccountId)
-        assertTrue(r.newAccounts.isEmpty())
+        assertNotNull(r.unidentifiedCounterpartyAccountId)
     }
 
     @Test
-    fun `old-format card top-up described as GBP - GBP is Cash to Card`() {
+    fun `old-format card top-up described as GBP - GBP also uses the top-up placeholder`() {
         // Pre-mid-2022 card exports describe top-ups as "GBP -> GBP" (with the To columns populated)
-        // instead of "GBP Deposit"; they must resolve the same Cash -> Card pair so cross-source
-        // reconciliation still links them to the fiat file's viban_card_top_up rows.
+        // instead of "GBP Deposit"; both forms must land on the same placeholder so they reconcile with
+        // whichever wallet's export records the funding side.
         val r = map(cardStrategy, row("GBP -> GBP", "GBP", "1500.0", "GBP", "1500.0", "1500.0", ""))
-        assertEquals(cash.id, r.transfer.sourceAccountId)
+        assertEquals("Crypto.com Card Top Up", r.newAccountName())
         assertEquals(card.id, r.transfer.targetAccountId)
         assertEquals(Money.fromDisplayValue(BigDecimal("1500.0"), gbp), r.transfer.amount)
         assertNull(r.tradeTo)
-        assertTrue(r.newAccounts.isEmpty(), "old-format top-ups must not create a 'GBP -> GBP' account")
+        assertNotNull(r.unidentifiedCounterpartyAccountId)
     }
 
     @Test
