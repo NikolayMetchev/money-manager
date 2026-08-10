@@ -31,7 +31,7 @@ runs:
         distribution: 'corretto'  # Corretto includes jmod files required by ProGuard (Temurin removed them in JDK 24+ per JEP 493)
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v6.2.0
+      uses: gradle/actions/setup-gradle@v6.3.0
       with:
         # No gradle-version pin: ./gradlew uses the wrapper's version anyway, so a pin here only
         # downloads a second, unused distribution.
