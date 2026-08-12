@@ -277,6 +277,7 @@ class CryptoComCsvE2ETest : DbTest() {
                 transactionRepository = repositories.transactionRepository,
                 relationshipRepository = repositories.transferRelationshipRepository,
                 transferSourceRepository = repositories.transferSourceRepository,
+                tradeRepository = repositories.tradeRepository,
             )
         return executeCsvReimport(
             plan = plan,
@@ -307,7 +308,9 @@ class CryptoComCsvE2ETest : DbTest() {
             val reworded =
                 listOf(row("2023-11-20 09:00:00", "Bought TGBP", "GBP", "5000.0", "TGBP", "5000.0", "5000.0", "viban_purchase"))
             val second = stage("cash_transactions_record_20260707_184457.csv", reworded)
-            applyAll(listOf(second))
+            val secondResult = applyAll(listOf(second))
+            assertEquals(1, secondResult.filesImported, "the reworded export must match a strategy")
+            assertEquals(0, secondResult.filesSkippedNoStrategy)
             repositories.maintenanceService.refreshMaterializedViews()
 
             val accounts = repositories.accountRepository.getAllAccounts().first()

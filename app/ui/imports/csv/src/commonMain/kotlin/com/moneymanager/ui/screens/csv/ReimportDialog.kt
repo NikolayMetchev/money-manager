@@ -487,6 +487,34 @@ private fun ReimportPlanPreview(
             )
         }
 
+        if (plan.staleDuplicates.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Rows sharing or missing a transaction (${plan.staleDuplicates.size}):",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            plan.staleDuplicates.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { stale ->
+                Text(text = "\u2022 ${stale.description}", style = MaterialTheme.typography.bodySmall)
+            }
+            if (plan.staleDuplicates.size > VALUE_UPDATE_PREVIEW_LIMIT) {
+                Text(
+                    text = "\u2026and ${plan.staleDuplicates.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text =
+                    "These rows were collapsed onto a transaction another row also claims, or onto one that " +
+                        "no longer exists, so the movement they record is missing from balances. They are " +
+                        "released and re-imported so each gets its own transaction.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         if (plan.counterpartyReconciles.isNotEmpty()) {
             Spacer(modifier = Modifier.height(12.dp))
             Text(

@@ -439,11 +439,11 @@ suspend fun planCsvReimport(
     transactionRepository: TransactionReadRepository,
     relationshipRepository: TransferRelationshipReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
+    /** Needed to spot trade rows duplicating another export's record of the same conversion. */
+    tradeRepository: TradeReadRepository,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoAssets: List<CryptoAsset> = emptyList(),
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
-    /** Needed to spot trade rows duplicating another export's record of the same conversion. */
-    tradeRepository: TradeReadRepository? = null,
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): ReimportPlan {
     onProgress?.invoke(ImportProgress("Loading rows"))
@@ -521,17 +521,13 @@ suspend fun planCsvReimport(
             transactionRepository.getTransactionsByAccountAndDateRange(accountId, startDate, endDate).first()
         }
     val duplicateTrades =
-        if (tradeRepository == null) {
-            emptyList()
-        } else {
-            computeDuplicateTradeReruns(
-                allRows = allRows,
-                mappedPrep = mappedPrep,
-                excludedRowIndexes = rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes + tradeConversions.map { it.rowIndex },
-                tradesTouchingAccount = { accountId -> tradeRepository.getTradesByAccount(accountId).first() },
-                onProgress = onProgress,
-            )
-        }
+        computeDuplicateTradeReruns(
+            allRows = allRows,
+            mappedPrep = mappedPrep,
+            excludedRowIndexes = rewrites.map { it.rowIndex }.toSet() + reversalRowIndexes + tradeConversions.map { it.rowIndex },
+            tradesTouchingAccount = { accountId -> tradeRepository.getTradesByAccount(accountId).first() },
+            onProgress = onProgress,
+        )
     val staleDuplicates =
         computeStaleDuplicateReruns(
             allRows = allRows,
@@ -776,6 +772,10 @@ suspend fun computeDuplicateTradeReruns(
     if (tradeRows.isEmpty()) return emptyList()
 
     onProgress?.invoke(ImportProgress("Checking duplicate conversions"))
+    // A row that never recorded its trade id must not give up a trade another row in this file owns:
+    // deleting it would leave that row IMPORTED but pointing at nothing, and the `own == null` branch
+    // below then refuses to repair it forever.
+    val claimedByOtherRows = tradeRows.mapNotNullTo(mutableSetOf()) { (_, ownId) -> ownId }
     val tradesByAccount = mutableMapOf<AccountId, List<Trade>>()
     val planned = mutableSetOf<TradeId>()
     val duplicates = mutableListOf<ReimportDuplicateTrade>()
@@ -793,7 +793,7 @@ suspend fun computeDuplicateTradeReruns(
             }
         // Keep the earliest record of the conversion; this row gives up the later one and re-links to it.
         val kept = group.minByOrNull { it.id.id }
-        val redundant = own ?: group.maxByOrNull { it.id.id }
+        val redundant = own ?: group.filter { it.id !in claimedByOtherRows }.maxByOrNull { it.id.id }
         if (group.size > 1 && kept != null && redundant != null && redundant.id != kept.id && planned.add(redundant.id)) {
             duplicates += ReimportDuplicateTrade(mapped.rowIndex, redundant.id, redundant.description, kept.id)
         }
@@ -1745,6 +1745,8 @@ data class CsvBulkReimportResult(
     val counterpartyReconciles: Int,
     /** Trade rows whose duplicate conversion (another export's wording of it) was removed. */
     val duplicateTrades: Int,
+    /** Rows released for re-import because the transfer they claimed is stale or shared. */
+    val staleDuplicates: Int,
     val emptyAccountsDeleted: Int,
     val skipped: List<ReimportSkippedAccount>,
 ) : BulkImportResult {
@@ -1755,7 +1757,12 @@ data class CsvBulkReimportResult(
             if (valueUpdates > 0) append(" · $valueUpdates updated")
             if (tradeConversions > 0) append(" · $tradeConversions converted to trades")
             if (counterpartyReconciles > 0) append(" · $counterpartyReconciles rebooked")
-            if (duplicateTrades > 0) append(" · $duplicateTrades duplicate conversions removed")
+            if (duplicateTrades > 0) {
+                append(" · $duplicateTrades duplicate conversion${if (duplicateTrades == 1) "" else "s"} removed")
+            }
+            if (staleDuplicates > 0) {
+                append(" · $staleDuplicates row${if (staleDuplicates == 1) "" else "s"} released")
+            }
             if (merges.isNotEmpty()) append(" · ${merges.size} account${if (merges.size == 1) "" else "s"} merged")
             if (reversals.isNotEmpty()) append(" · ${reversals.size} merge${if (reversals.size == 1) "" else "s"} reversed")
             if (emptyAccountsDeleted > 0) append(" · $emptyAccountsDeleted empty removed")
@@ -1792,12 +1799,13 @@ suspend fun bulkReimportCsv(
     transactionRepository: TransactionReadRepository,
     relationshipRepository: TransferRelationshipReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
+    /** Needed to spot trade rows duplicating another export's record of the same conversion. */
+    tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onProgress: suspend (BulkImportProgress) -> Unit,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
-    tradeRepository: TradeReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
 ): CsvBulkReimportResult {
     var filesImported = 0
@@ -1811,6 +1819,7 @@ suspend fun bulkReimportCsv(
     var tradeConversions = 0
     var counterpartyReconciles = 0
     var duplicateTrades = 0
+    var staleDuplicates = 0
     var emptyAccountsDeleted = 0
     val skipped = mutableListOf<ReimportSkippedAccount>()
     // Create every crypto asset the batch needs up front, sized to the batch-wide max precision per
@@ -1884,6 +1893,7 @@ suspend fun bulkReimportCsv(
             tradeConversions += result.convertedRows.size
             counterpartyReconciles += result.counterpartyReconciledRows.size
             duplicateTrades += result.duplicateTradeRows.size
+            staleDuplicates += result.staleDuplicateRows.size
             emptyAccountsDeleted += result.deletedEmptyAccounts.size
             skipped += result.skipped
         } catch (expected: Exception) {
@@ -1907,6 +1917,7 @@ suspend fun bulkReimportCsv(
         tradeConversions = tradeConversions,
         counterpartyReconciles = counterpartyReconciles,
         duplicateTrades = duplicateTrades,
+        staleDuplicates = staleDuplicates,
         emptyAccountsDeleted = emptyAccountsDeleted,
         skipped = skipped,
     )

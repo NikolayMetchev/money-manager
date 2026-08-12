@@ -642,8 +642,9 @@ class ImportDeduperTest {
 
     @Test
     fun unidentifiedCounterparty_consumesEachLegOnce() {
-        // Two same-amount deposits a day apart but only one bank credit: the nearest row reconciles, the
-        // other stays a plain import rather than both collapsing onto the single bank record.
+        // Two same-amount deposits a day apart but only one bank credit: the first row in list order
+        // claims the leg (nearest-leg selection runs per row, not across rows), and the other stays a
+        // plain import rather than both collapsing onto the single bank record.
         val deduper = ImportDeduper(unidentifiedPolicy, existing = listOf(bankCredit(40, timestamp = baseTime + 1.hours)))
         val result = deduper.classify(listOf(placeholderDeposit(0), placeholderDeposit(1, timestamp = baseTime + 1.days)))
         assertTrue(result[0].transfer.attributes.any { it.typeId == AttributeTypeId(-1) }, "first reconciles")
