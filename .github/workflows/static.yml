@@ -58,7 +58,7 @@ jobs:
         # for this single reporting task. It writes webpage/modules-graph.md.
         uses: ./.github/actions/gradle-run
         with:
-          command: 'createModuleGraph -Dorg.gradle.unsafe.isolated-projects=false --no-configuration-cache --stacktrace'
+          command: 'createModuleGraph -Dorg.gradle.isolated-projects=false --no-configuration-cache --stacktrace'
           cache-read-only: true
       - name: Generate strategy catalog
         # Renders the Kotlin built-in strategy definitions (app/strategies) into

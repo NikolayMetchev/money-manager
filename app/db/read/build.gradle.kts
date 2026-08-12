@@ -65,7 +65,7 @@ sqldelight {
             packageName.set("com.moneymanager.database.sql.read")
             verifyMigrations.set(false)
             dialect(libs.sqldelight.dialect.sqlite)
-            dependency(project(":app:db:schema"))
+            dependency(projects.app.db.schema)
         }
     }
 }
