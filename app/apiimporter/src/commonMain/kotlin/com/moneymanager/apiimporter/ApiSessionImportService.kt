@@ -91,6 +91,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.lighthousegames.logging.logging
 import kotlin.math.absoluteValue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
@@ -107,6 +108,14 @@ private val ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID = AttributeTypeId(WellKno
 // Reconciliation is additionally restricted to cross-source matches, so this window does not collapse
 // genuine repeat transfers from the same provider.
 private val RECONCILE_WINDOW = 5.minutes
+
+/**
+ * Window for superseding a placeholder leg another source left for a movement this feed identifies at
+ * both ends (see `DedupePolicy.ApiMultiKey.unidentifiedCounterpartyWindow`). Matches the CSV side's
+ * fuzzy date tolerance: a bank feed and the receiving account's own export stamp one transfer hours or
+ * a day apart, and all a placeholder match has is the account, direction and amount.
+ */
+private val UNIDENTIFIED_COUNTERPARTY_WINDOW = 3.days
 
 data class ApiSessionImportResult(
     val accountCount: Int,
@@ -1700,6 +1709,9 @@ private suspend fun runImportEngine(
                     reconcileWindow = RECONCILE_WINDOW,
                     reconciledExclusionAttributeTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
                     reconciledRelationshipTypeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
+                    unidentifiedCounterpartyAttributeTypeId =
+                        setup.attributeTypeCache.getOrCreate(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME),
+                    unidentifiedCounterpartyWindow = UNIDENTIFIED_COUNTERPARTY_WINDOW,
                 ),
             accountsToCreate = setup.accountResolver.intents(),
             peopleToCreate = setup.peopleResolver.intents(),

@@ -747,13 +747,16 @@ suspend fun runCsvImport(
         },
     )
 
-    // Pre-resolve attribute types
+    // Pre-resolve attribute types. The unidentified-counterparty marker is engine-facing rather than a
+    // mapped column, and is resolved for every import: even a file that identifies both ends of every row
+    // needs it, to recognise (and supersede) the placeholder legs an earlier export left behind.
     val allAttributeTypeNames =
         finalPrep.validTransfers
             .flatMap { it.attributes }
             .map { it.first }
-            .toSet()
+            .toSet() + WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME
     val attributeTypeIdByName = importEngine.getOrCreateAttributeTypes(allAttributeTypeNames.toList())
+    val unidentifiedCounterpartyTypeId = attributeTypeIdByName[WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME]
 
     logger.info { "Starting to import $validCount transfers" }
 
@@ -918,12 +921,21 @@ suspend fun runCsvImport(
                 timestamp = row.transfer.timestamp,
                 description = row.transfer.description,
                 amount = row.transfer.amount,
-                attributes = attributesFor(row.attributes),
+                attributes =
+                    attributesFor(row.attributes) +
+                        listOfNotNull(
+                            // Marks the persisted leg as the placeholder record, so a later import that
+                            // does name both ends knows which of the two to exclude.
+                            unidentifiedCounterpartyTypeId
+                                ?.takeIf { row.unidentifiedCounterpartyAccountId != null }
+                                ?.let { NewAttribute(it, "true") },
+                        ),
                 uniqueKey = uniqueKey,
                 fee = fee,
                 passThrough = passThrough,
                 batchRelationships = listOfNotNull(conversionLinkByRow[row.rowIndex]),
                 reconcileFundingAccountId = fundingAccountId,
+                unidentifiedCounterpartyAccountId = row.unidentifiedCounterpartyAccountId,
             )
         }
 
@@ -988,6 +1000,8 @@ suspend fun runCsvImport(
                             reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
                         reconciledRelationshipTypeId =
                             reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
+                        unidentifiedCounterpartyAttributeTypeId =
+                            reconcileWindow?.let { unidentifiedCounterpartyTypeId },
                     )
                 } else {
                     // Cross-source reconciliation for unique-id strategies whose sources issue a
@@ -1040,12 +1054,16 @@ suspend fun runCsvImport(
     fun LocalTradeKey.rowIndexOrNull(): Long? =
         if (value.startsWith(tradeKeyPrefix)) value.removePrefix(tradeKeyPrefix).toLongOrNull() else null
 
+    // The row records the trade's transaction id, exactly as a transfer row records its transfer's:
+    // it is what links the row to what it produced, and what lets a re-import find the trade again.
     val tradeRowsByStatus =
-        importResult.createdTradeIds.keys
-            .mapNotNull { key -> key.rowIndexOrNull()?.let { key to it } }
+        importResult.createdTradeIds.entries
+            .mapNotNull { (key, tradeId) -> key.rowIndexOrNull()?.let { Triple(key, it, tradeId) } }
             .groupBy(
-                keySelector = { (key, _) -> if (key in importResult.dedupedTradeKeys) ImportStatus.DUPLICATE else ImportStatus.IMPORTED },
-                valueTransform = { (_, rowIndex) -> rowIndex },
+                keySelector = { (key, _, _) ->
+                    if (key in importResult.dedupedTradeKeys) ImportStatus.DUPLICATE else ImportStatus.IMPORTED
+                },
+                valueTransform = { (_, rowIndex, tradeId) -> rowIndex to TransferId(tradeId.id) },
             )
 
     val statusMutations = mutableListOf<CsvImportMutation>()
@@ -1053,14 +1071,9 @@ suspend fun runCsvImport(
         statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.IMPORTED.name, importedStatuses)
         statusMutations += CsvImportMutation.ClearErrors(csvImport.id, importedStatuses.keys.toList())
     }
-    for ((status, rowIndices) in tradeRowsByStatus) {
-        statusMutations +=
-            CsvImportMutation.UpdateRowStatuses(
-                csvImport.id,
-                status.name,
-                rowIndices.associateWith { null },
-            )
-        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, rowIndices)
+    for ((status, rows) in tradeRowsByStatus) {
+        statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, status.name, rows.toMap())
+        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, rows.map { it.first })
     }
     if (duplicateStatuses.isNotEmpty()) {
         statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.DUPLICATE.name, duplicateStatuses)

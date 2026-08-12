@@ -30,6 +30,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.write.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.write.AccountMappingWriteRepository
 import com.moneymanager.domain.repository.write.AccountWriteRepository
@@ -139,6 +140,12 @@ class ImportEngineImpl(
     private val settingsRepository: SettingsWriteRepository,
     private val importDirectoryRepository: ImportDirectoryWriteRepository,
     private val passThroughAccountRepository: PassThroughAccountWriteRepository,
+    /**
+     * Read-only view of transfer relationships, used to see which existing legs a `reconciled` link
+     * already claims (see [ImportDeduper.claimedReconcileTargets]). Optional so the hand-built engines in
+     * tests need not wire it; the DI-built engine always supplies it.
+     */
+    private val transferRelationshipRepository: TransferRelationshipReadRepository? = null,
     private val editGate: EditGate = EditGate.AlwaysWritable,
 ) : ImportEngine {
     override suspend fun import(
@@ -181,9 +188,11 @@ class ImportEngineImpl(
         // or inserts a distinct new one (first import). The key must group exactly the intents that
         // createTrade cannot tell apart, so the timestamp is the persisted millisecond value — an Instant
         // can carry sub-ms precision (e.g. Kraken's float epoch-seconds) that the trade row does not.
+        // The description is deliberately absent: it plays no part in identifying a conversion (see
+        // TradeSelect.sq's selectMatchingTradeId), so two rows describing one movement differently share
+        // an occurrence counter and the second reuses the first's trade instead of double-booking.
         data class TradeTupleKey(
             val timestampMs: Long?,
-            val description: String?,
             val fromAccountId: AccountId?,
             val fromAmount: Money?,
             val toAccountId: AccountId?,
@@ -194,7 +203,6 @@ class ImportEngineImpl(
             val tupleKey =
                 TradeTupleKey(
                     intent.timestamp?.toEpochMilliseconds(),
-                    intent.description,
                     intent.fromAccountId,
                     intent.fromAmount,
                     intent.toAccountId,
@@ -499,7 +507,13 @@ class ImportEngineImpl(
 
         onProgress?.invoke(ImportProgress("Detecting duplicates"))
         val existing = loadExisting(resolvedTransfers, batch)
-        val classified = ImportDeduper(batch.dedupePolicy, existing).classify(resolvedTransfers)
+        val classified =
+            ImportDeduper(
+                batch.dedupePolicy,
+                existing,
+                claimedReconcileTargets(existing),
+                ownBatchAccounts = resolvedTransfers.flatMapTo(mutableSetOf()) { listOf(it.fromAccount, it.toAccount).map(::requireId) },
+            ).classify(resolvedTransfers)
 
         val toImport = resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })
         val toUpdate = classified.filter { it.status == ImportStatus.UPDATED } + internalReconcileExclusions(classified)
@@ -1193,6 +1207,20 @@ class ImportEngineImpl(
     // endregion
 
     // region Transfers
+
+    /**
+     * The subset of [existing] some other record already reconciled against — the `id2` of a `reconciled`
+     * relationship. A leg only ever stands for one movement, so a second row must not be excused against
+     * it (that would drop a genuine movement from the balances).
+     */
+    private suspend fun claimedReconcileTargets(existing: List<ExistingTransferInfo>): Set<TransferId> {
+        val repository = transferRelationshipRepository ?: return emptySet()
+        if (existing.isEmpty()) return emptySet()
+        return repository
+            .getByTransfers(existing.map { it.transferId })
+            .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
+            .mapTo(mutableSetOf()) { it.id2 }
+    }
 
     private suspend fun loadExisting(
         transfers: List<ImportTransfer>,

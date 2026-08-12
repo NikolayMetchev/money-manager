@@ -30,10 +30,13 @@ WHERE trade.id = ?;
 -- fills) to book as N rows. Ordered by id so callers consume the k-th occurrence deterministically
 -- via :occurrence, without materializing every matching row. Amounts are the canonical decimal
 -- strings.
+-- Deliberately does NOT compare the description: a trade's timestamp, both accounts, both assets and
+-- both amounts already pin one conversion to the millisecond, so two sources wording it differently
+-- ("GBP -> MELANIA" in one crypto.com export, "Bought MELANIA" in another) are the same movement.
+-- Genuinely repeated identical fills are still kept apart by :occurrence.
 selectMatchingTradeId:
 SELECT id FROM trade
 WHERE timestamp = ?
-  AND description = ?
   AND from_account_id = ?
   AND from_asset_id = ?
   AND from_amount = ?

@@ -533,6 +533,7 @@ interface RepositoryModule {
         settingsRepository: SettingsWriteRepository,
         importDirectoryRepository: ImportDirectoryWriteRepository,
         passThroughAccountRepository: PassThroughAccountWriteRepository,
+        transferRelationshipRepository: TransferRelationshipReadRepository,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,
@@ -557,5 +558,6 @@ interface RepositoryModule {
             settingsRepository = settingsRepository,
             importDirectoryRepository = importDirectoryRepository,
             passThroughAccountRepository = passThroughAccountRepository,
+            transferRelationshipRepository = transferRelationshipRepository,
         )
 }
