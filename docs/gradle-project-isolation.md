@@ -4,7 +4,9 @@ Date tested: 2026-06-06 (previous attempt: 2026-05-24)
 
 ## Result
 
-Project isolation (`org.gradle.unsafe.isolated-projects=true`) is **enabled** in `gradle.properties`.
+Project isolation (`org.gradle.isolated-projects=true`) is **enabled** in `gradle.properties`. Gradle
+9.7 promoted the feature to *incubating* and stabilised the property name — the old
+`org.gradle.unsafe.isolated-projects` spelling is a deprecated alias.
 
 `./gradlew build` (tests, kover, buildHealth, detekt, ktlint, Android lint) passes with the flag
 on, and the configuration cache entry is stored without isolation violations.
