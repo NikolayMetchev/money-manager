@@ -24,7 +24,7 @@ version = projectVersion
 
 // gradle-doctor configures tasks/plugins across subprojects from the root project,
 // which violates project isolation — keep it off while isolation is enabled.
-if (providers.gradleProperty("org.gradle.unsafe.isolated-projects").orNull != "true") {
+if (providers.gradleProperty("org.gradle.isolated-projects").orNull != "true") {
     pluginManager.apply("com.osacky.doctor")
 }
 
