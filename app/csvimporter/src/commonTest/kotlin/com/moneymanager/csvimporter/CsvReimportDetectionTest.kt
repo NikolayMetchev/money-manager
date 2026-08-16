@@ -159,7 +159,58 @@ class CsvReimportDetectionTest {
         payee: String,
         description: String = "Payment",
         amount: String = "-50.00",
-    ) = CsvRow(rowIndex = index, values = listOf("15/12/2024", description, amount, payee))
+        date: String = "15/12/2024",
+    ) = CsvRow(rowIndex = index, values = listOf(date, description, amount, payee))
+
+    @Test
+    fun `rows sharing one transaction at different instants are released, identical ones are not`() {
+        // A wallet export words every deposit the same, so two deposits hours apart differ only in their
+        // timestamp — which the fuzzy pass tolerated, collapsing the second onto the first's transfer.
+        // A row genuinely listed twice (same instant) stays a duplicate.
+        val payee = account(10, "Acme")
+        val accounts = listOf(payee)
+        val rows =
+            listOf(
+                row(1, "Acme", description = "GBP Deposit").copy(importStatus = ImportStatus.IMPORTED, transferId = TransferId(7)),
+                row(2, "Acme", description = "GBP Deposit").copy(importStatus = ImportStatus.DUPLICATE, transferId = TransferId(7)),
+                row(3, "Acme", description = "GBP Deposit").copy(importStatus = ImportStatus.DUPLICATE, transferId = TransferId(9)),
+            )
+        val mapped = prep(rows, accounts, emptyList())
+        // Every row here carries the same CSV date column, so all three map to one instant.
+        val transferOfRow1 = mapped.validTransfers.first { it.rowIndex == 1L }.transfer
+        val existing =
+            mapOf(
+                TransferId(7) to transferOfRow1.copy(id = TransferId(7)),
+                TransferId(9) to transferOfRow1.copy(id = TransferId(9)),
+            )
+
+        val stale = computeStaleDuplicateReruns(rows, mapped, existing, excludedRowIndexes = emptySet())
+
+        // Rows 1-3 all map to the same instant here (one CSV date column), so nothing is released...
+        assertEquals(emptyList(), stale.map { it.rowIndex })
+
+        // ...but a row whose transaction has since been deleted is always released.
+        val staleAfterDelete = computeStaleDuplicateReruns(rows, mapped, existing - TransferId(9), excludedRowIndexes = emptySet())
+        assertEquals(listOf(3L), staleAfterDelete.map { it.rowIndex })
+
+        // Two rows claiming one transaction while mapping to different days are two movements the fuzzy
+        // pass collapsed: the one whose instant the transaction does not record is released.
+        val datedRows =
+            listOf(
+                row(1, "Acme", description = "GBP Deposit").copy(importStatus = ImportStatus.IMPORTED, transferId = TransferId(7)),
+                row(2, "Acme", description = "GBP Deposit", date = "16/12/2024")
+                    .copy(importStatus = ImportStatus.DUPLICATE, transferId = TransferId(7)),
+            )
+        val datedMapped = prep(datedRows, accounts, emptyList())
+        val keptTransfer =
+            datedMapped.validTransfers
+                .first { it.rowIndex == 1L }
+                .transfer
+                .copy(id = TransferId(7))
+        val staleAcrossDays =
+            computeStaleDuplicateReruns(datedRows, datedMapped, mapOf(TransferId(7) to keptTransfer), excludedRowIndexes = emptySet())
+        assertEquals(listOf(2L), staleAcrossDays.map { it.rowIndex })
+    }
 
     @Test
     fun `new global mapping consolidating an import-created account yields a merge candidate`() {

@@ -5,12 +5,23 @@ package com.moneymanager.database.csv
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.CsvBulkResult
+import com.moneymanager.csvimporter.CsvReimportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
+import com.moneymanager.csvimporter.executeCsvReimport
+import com.moneymanager.csvimporter.planCsvReimport
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -150,6 +161,9 @@ class CryptoComCsvE2ETest : DbTest() {
                 setOf(
                     "Crypto.com Card",
                     "Crypto.com Cash",
+                    // The card export says a top-up arrived but not from which wallet, so it books the
+                    // movement against this placeholder rather than guessing the Cash wallet.
+                    "Crypto.com Card Top Up",
                     "GBP Deposit (via FPS)",
                     "GBP Withdrawal (via FPS)",
                     "Spotify P3 C6 Ef4945",
@@ -211,24 +225,218 @@ class CryptoComCsvE2ETest : DbTest() {
                 "viban_withdrawal: Cash -> external",
             )
 
-            // The shared top-up: both records exist as Cash -> Card...
+            // The shared top-up: the fiat export names both ends (Cash -> Card), the card export only
+            // that £400 arrived (placeholder -> Card). Both records are kept...
+            val topUpPlaceholderId = accounts.first { it.name == "Crypto.com Card Top Up" }.id
             val topUps =
-                cashTransfers.filter {
-                    it.sourceAccountId == cashId &&
-                        it.targetAccountId == cardId &&
-                        it.amount.toDisplayValue().compareTo(BigDecimal("400.00")) == 0
-                }
+                repositories.transactionRepository
+                    .getTransactionsByAccount(cardId)
+                    .first()
+                    .filter { it.targetAccountId == cardId && it.amount.toDisplayValue().compareTo(BigDecimal("400.00")) == 0 }
             assertEquals(2, topUps.size, "both files' top-up records are kept")
+            val fiatRecord = topUps.single { it.sourceAccountId == cashId }
+            val cardRecord = topUps.single { it.sourceAccountId == topUpPlaceholderId }
 
-            // ...but exactly one carries the excluded attribute and a reconciled link to the other,
-            // so the movement counts once.
-            val excluded = topUps.filter { t -> t.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" } }
-            assertEquals(1, excluded.size, "exactly one top-up record is excluded as reconciled")
-            val original = topUps.single { it.id != excluded.single().id }
-            val relationships = repositories.transferRelationshipRepository.getByTransfer(excluded.single().id).first()
+            // ...but the placeholder one — the record that cannot say where the money came from — is the
+            // excluded one, linked to the fiat record, so the movement counts once and off the real wallet.
+            assertTrue(
+                cardRecord.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
+                "the placeholder record is excluded as reconciled",
+            )
+            assertTrue(
+                fiatRecord.attributes.none { it.attributeType.name == "excluded" },
+                "the record naming both ends stays counted",
+            )
+            val relationships = repositories.transferRelationshipRepository.getByTransfer(fiatRecord.id).first()
             val reconciledLink = relationships.single { it.relationshipType.name == "reconciled" }
-            assertEquals(excluded.single().id, reconciledLink.id1)
-            assertEquals(original.id, reconciledLink.id2)
+            assertEquals(fiatRecord.id, reconciledLink.id1)
+            assertEquals(cardRecord.id, reconciledLink.id2)
+        }
+
+    /** Re-imports an already-imported file (plan + execute) with its built-in strategy. */
+    private suspend fun reimport(
+        importId: CsvImportId,
+        strategyName: String,
+    ): CsvReimportResult {
+        val current = repositories.csvImportRepository.getImport(importId).first()!!
+        val strategy =
+            repositories.csvImportStrategyRepository
+                .getAllStrategies()
+                .first()
+                .first { it.name == strategyName }
+        val currencies = repositories.currencyRepository.getAllCurrencies().first()
+        val plan =
+            planCsvReimport(
+                csvImport = current,
+                strategy = strategy,
+                sourceAccountOverride = null,
+                currencies = currencies,
+                accountMappingRepository = repositories.accountMappingRepository,
+                accountRepository = repositories.accountRepository,
+                csvImportRepository = repositories.csvImportRepository,
+                transactionRepository = repositories.transactionRepository,
+                relationshipRepository = repositories.transferRelationshipRepository,
+                transferSourceRepository = repositories.transferSourceRepository,
+                tradeRepository = repositories.tradeRepository,
+            )
+        return executeCsvReimport(
+            plan = plan,
+            csvImport = current,
+            strategy = strategy,
+            sourceAccountOverride = null,
+            currencies = currencies,
+            accountMappingRepository = repositories.accountMappingRepository,
+            accountRepository = repositories.accountRepository,
+            csvImportRepository = repositories.csvImportRepository,
+            maintenance = maintenance,
+            importEngine = repositories.importEngine,
+            cryptoRepository = repositories.cryptoRepository,
+            tradeRepository = repositories.tradeRepository,
+        )
+    }
+
+    @Test
+    fun sameConversionWordedDifferentlyByTwoExports_isBookedOnce() =
+        runTest {
+            // crypto.com's crypto export calls a purchase "GBP -> TGBP" while its newer cash export calls
+            // the same conversion "Bought TGBP". A trade's instant, accounts, assets and amounts pin one
+            // conversion, so the wording must not make it two.
+            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+            val first = stage("fiat_transactions_record_20231120_085814.csv", fiatRows)
+            assertEquals(1, applyAll(listOf(first)).filesImported)
+
+            val reworded =
+                listOf(row("2023-11-20 09:00:00", "Bought TGBP", "GBP", "5000.0", "TGBP", "5000.0", "5000.0", "viban_purchase"))
+            val second = stage("cash_transactions_record_20260707_184457.csv", reworded)
+            val secondResult = applyAll(listOf(second))
+            assertEquals(1, secondResult.filesImported, "the reworded export must match a strategy")
+            assertEquals(0, secondResult.filesSkippedNoStrategy)
+            repositories.maintenanceService.refreshMaterializedViews()
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val cashId = accounts.first { it.name == "Crypto.com Cash" }.id
+            val buys =
+                repositories.tradeRepository
+                    .getTradesByAccount(cashId)
+                    .first()
+                    .filter { it.fromAccountId == cashId && it.from.toDisplayValue().compareTo(BigDecimal("5000.00")) == 0 }
+            assertEquals(1, buys.size, "the conversion is booked once, whichever export words it how")
+        }
+
+    @Test
+    fun bankLegImportedLater_isReconciledRetroactivelyOnReimport() =
+        runTest {
+            // The order the real world produces: the wallet's own export is imported first, so its deposit
+            // record is the only one and counts. The bank feed arrives later, and re-importing the wallet
+            // export must then reconcile the now-redundant placeholder record instead of leaving the
+            // deposit counted twice.
+            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+            val fiat = stage("fiat_transactions_record_20231120_085814.csv", fiatRows)
+            assertEquals(1, applyAll(listOf(fiat)).filesImported)
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val cashId = accounts.first { it.name == "Crypto.com Cash" }.id
+            val gbp = repositories.currencyRepository.getCurrencyByCode("GBP").first()!!
+            val bankId =
+                repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Monzo", openingDate = now), Source.Manual)
+            createTransfer(
+                Transfer(
+                    id = TransferId(0),
+                    timestamp = Instant.parse("2023-11-17T02:18:14Z"),
+                    description = "BI6055443",
+                    sourceAccountId = bankId,
+                    targetAccountId = cashId,
+                    amount = Money.fromDisplayValue(BigDecimal("2000.00"), gbp),
+                ),
+            )
+
+            val result = reimport(fiat.id, "Crypto.com Fiat")
+            assertEquals(1, result.counterpartyReconciledRows.size, "the deposit row is re-run")
+            repositories.maintenanceService.refreshMaterializedViews()
+
+            val deposits =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(cashId)
+                    .first()
+                    .filter { it.targetAccountId == cashId && it.amount.toDisplayValue().compareTo(BigDecimal("2000.00")) == 0 }
+            assertEquals(2, deposits.size, "both records are kept")
+            assertTrue(
+                deposits.single { it.sourceAccountId != bankId }.attributes.any {
+                    it.attributeType.name == "excluded" && it.value == "reconciled"
+                },
+                "the wallet's placeholder record is now excluded",
+            )
+            val cashBalance =
+                repositories.transactionRepository
+                    .getAccountBalances()
+                    .first()
+                    .single { it.accountId == cashId && it.balance.asset.code == "GBP" }
+            assertEquals("-3446.03", cashBalance.balance.toDisplayValue().toString(), "the deposit counts once")
+        }
+
+    @Test
+    fun bankLegAlreadyImported_reconcilesTheWalletsOwnDepositRecord() =
+        runTest {
+            // The bank knows both ends of an FPS deposit (its feed resolves the wallet by sort code +
+            // account number), while crypto.com's own export says only "GBP Deposit (via FPS)" and books a
+            // placeholder counterparty. Nothing links the two records but the wallet account, the
+            // direction and the amount — so without the unidentified-counterparty reconcile the deposit
+            // lands in the wallet twice.
+            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+            val gbp = repositories.currencyRepository.getCurrencyByCode("GBP").first()!!
+            val bankId =
+                repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Monzo", openingDate = now), Source.Manual)
+            val cashId =
+                repositories.importEngine.createAccount(
+                    Account(id = AccountId(0), name = "Crypto.com Cash", openingDate = now),
+                    Source.Manual,
+                )
+            // The bank's own record, stamped nine hours before crypto.com's (statement exports and bank
+            // feeds rarely agree to the minute).
+            createTransfer(
+                Transfer(
+                    id = TransferId(0),
+                    timestamp = Instant.parse("2023-11-17T02:18:14Z"),
+                    description = "BI6055443",
+                    sourceAccountId = bankId,
+                    targetAccountId = cashId,
+                    amount = Money.fromDisplayValue(BigDecimal("2000.00"), gbp),
+                ),
+            )
+
+            val fiat = stage("fiat_transactions_record_20231120_085814.csv", fiatRows)
+            assertEquals(1, applyAll(listOf(fiat)).filesImported)
+            repositories.maintenanceService.refreshMaterializedViews()
+
+            val deposits =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(cashId)
+                    .first()
+                    .filter { it.targetAccountId == cashId && it.amount.toDisplayValue().compareTo(BigDecimal("2000.00")) == 0 }
+            assertEquals(2, deposits.size, "both records are kept")
+            val walletRecord = deposits.single { it.sourceAccountId != bankId }
+            val bankRecord = deposits.single { it.sourceAccountId == bankId }
+            assertTrue(
+                walletRecord.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
+                "the wallet's placeholder record is excluded, so the deposit is counted once",
+            )
+            assertTrue(bankRecord.attributes.none { it.attributeType.name == "excluded" }, "the bank's record stays counted")
+            val reconciledLink =
+                repositories.transferRelationshipRepository
+                    .getByTransfer(walletRecord.id)
+                    .first()
+                    .single { it.relationshipType.name == "reconciled" }
+            assertEquals(walletRecord.id, reconciledLink.id1)
+            assertEquals(bankRecord.id, reconciledLink.id2)
+
+            // The wallet balance reflects one deposit: +2000 in, -400 to the card, -5055.89 withdrawn,
+            // -5000 converted to TGBP and +5009.86 converted back.
+            val cashBalance =
+                repositories.transactionRepository
+                    .getAccountBalances()
+                    .first()
+                    .single { it.accountId == cashId && it.balance.asset.code == "GBP" }
+            assertEquals("-3446.03", cashBalance.balance.toDisplayValue().toString())
         }
 
     @Test

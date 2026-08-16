@@ -18,6 +18,7 @@ import com.moneymanager.importengineapi.PassThroughDetector
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -159,7 +160,7 @@ class CryptoComCardXlsxMapperTest {
     }
 
     @Test
-    fun `a blank card acceptor name routes to Cash instead of failing to resolve an empty account`() {
+    fun `a blank card acceptor name routes to the top-up placeholder, not a blank account`() {
         val r =
             map(
                 row(
@@ -172,14 +173,16 @@ class CryptoComCardXlsxMapperTest {
                 ),
             )
 
-        // Positive amount flips: Cash (this branch's mapped account) becomes the source, Card the target.
-        assertEquals(cash.id, r.transfer.sourceAccountId)
+        // Positive amount flips: the top-up placeholder (this branch's mapped account) becomes the
+        // source, Card the target. The statement never says which wallet funded it, so the counterparty
+        // is unidentified and the engine can reconcile the row against the funding side's own record.
+        assertEquals(listOf(NewAccount("Crypto.com Card Top Up", Category.UNCATEGORIZED_ID)), r.newAccounts)
         assertEquals(card.id, r.transfer.targetAccountId)
-        assertEquals(emptyList(), r.newAccounts)
+        assertNotNull(r.unidentifiedCounterpartyAccountId)
     }
 
     @Test
-    fun `a positive card load credits the card from Cash, not a merchant lookup`() {
+    fun `a positive card load credits the card from the top-up placeholder, not a merchant lookup`() {
         val r =
             map(
                 row(
@@ -192,11 +195,13 @@ class CryptoComCardXlsxMapperTest {
                 ),
             )
 
-        // Positive amount flips source/target: Cash (this branch's mapped account) becomes the source.
-        assertEquals(cash.id, r.transfer.sourceAccountId)
+        // Positive amount flips source/target: the top-up placeholder becomes the source. Which wallet
+        // paid is not in this export (the pre-mid-2022 card was funded from TGBP, later from Cash), so
+        // the row must not debit Cash on a guess.
+        assertEquals(listOf(NewAccount("Crypto.com Card Top Up", Category.UNCATEGORIZED_ID)), r.newAccounts)
         assertEquals(card.id, r.transfer.targetAccountId)
         assertEquals(Money.fromDisplayValue(BigDecimal("200.0"), gbp), r.transfer.amount)
-        assertEquals(emptyList(), r.newAccounts)
+        assertNotNull(r.unidentifiedCounterpartyAccountId)
         // Card Acceptor Name here is pure padding + a country code ("                    GBR", no real
         // merchant): the trim regex must skip past the leading whitespace rather than capturing just a
         // single leading space, or the description ends up blank/whitespace-only.

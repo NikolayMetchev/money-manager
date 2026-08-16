@@ -69,6 +69,21 @@ sealed interface DedupePolicy {
         val reconcileWindow: Duration? = null,
         val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
         val reconciledRelationshipTypeId: RelationshipTypeId? = null,
+        /**
+         * Unidentified-counterparty reconciliation. When set (together with the exclusion + relationship
+         * type ids), a leg whose counterparty is only a description-derived placeholder
+         * ([ImportTransfer.unidentifiedCounterpartyAccountId]) reconciles against an existing leg moving
+         * the same amount the same way through the *owned* account, **whatever that leg's counterparty
+         * is** — the one field the placeholder row cannot state. The placeholder leg is the one excluded:
+         * incoming when it is the unidentified one, otherwise the existing leg carrying this attribute
+         * (so the two import orders agree). Each existing leg is claimed at most once, nearest timestamp
+         * first, within [dateTolerance].
+         *
+         * This is what stops a bank export and an account's own export double-counting the same deposit:
+         * the bank names the account by sort code + account number, while the account's own export says
+         * only "GBP Deposit (via FPS)" and so cannot name the bank.
+         */
+        val unidentifiedCounterpartyAttributeTypeId: AttributeTypeId? = null,
     ) : DedupePolicy
 
     /**
@@ -105,6 +120,20 @@ sealed interface DedupePolicy {
         val internalTransferWindow: Duration? = null,
         /** Allowed amount difference as a percentage (BigDecimal for precise monetary comparison). */
         val internalTransferAmountTolerance: BigDecimal = BigDecimal.ZERO,
+        /**
+         * Unidentified-counterparty reconciliation, as on [FuzzyAllFields] — here it is the *existing*
+         * leg that carries the attribute: an API import that names both owned ends of a movement (a bank
+         * resolving the far account by sort code + account number) excludes the placeholder leg an
+         * earlier export left behind.
+         */
+        val unidentifiedCounterpartyAttributeTypeId: AttributeTypeId? = null,
+        /**
+         * Window for [unidentifiedCounterpartyAttributeTypeId]. Deliberately wider than
+         * [reconcileWindow]: that one matches an exact account pair, which pins a movement to the minute,
+         * while a placeholder match has only the account, direction and amount to go on — and a statement
+         * export stamps the movement hours (sometimes a day) away from the bank feed's own timestamp.
+         */
+        val unidentifiedCounterpartyWindow: Duration? = null,
     ) : DedupePolicy
 
     /** No deduplication — every transfer is imported. */

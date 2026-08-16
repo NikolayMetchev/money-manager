@@ -45,6 +45,16 @@ object WellKnownIds {
     /** Name of the [ACCOUNT_CARD_LAST4_ATTR_TYPE_ID] attribute type. */
     const val ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME: String = "card-last4"
 
+    /**
+     * "unidentified-counterparty" transfer attribute: this leg's counterparty account is only the raw
+     * description the export carried (no strategy rule, persisted mapping or bank identity resolved it),
+     * so the account is a placeholder standing in for whoever the real other end was. Marks the leg as
+     * the one to drop when another source records the same movement against a real account — see
+     * `DedupePolicy.FuzzyAllFields.unidentifiedCounterpartyAttributeTypeId`. Resolved by name
+     * (get-or-create), so databases seeded before the type existed self-heal on first use.
+     */
+    const val UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME: String = "unidentified-counterparty"
+
     /** "reconciled" relationship type: id1 mirrors id2 seen from another source. */
     const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = 1
 

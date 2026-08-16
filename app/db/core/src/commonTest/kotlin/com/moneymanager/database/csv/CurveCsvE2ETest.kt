@@ -179,6 +179,7 @@ class CurveCsvE2ETest : DbTest() {
                 transactionRepository = repositories.transactionRepository,
                 relationshipRepository = repositories.transferRelationshipRepository,
                 transferSourceRepository = repositories.transferSourceRepository,
+                tradeRepository = repositories.tradeRepository,
                 passThroughAccounts = passThroughAccounts,
                 attributeAccountMatchers = attributeMatchers,
             )

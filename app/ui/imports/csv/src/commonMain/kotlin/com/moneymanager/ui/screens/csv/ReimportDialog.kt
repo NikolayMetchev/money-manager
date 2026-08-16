@@ -155,6 +155,7 @@ fun ReimportDialog(
                     // transfer→trade conversion scans, so pass the full asset set.
                     cryptoAssets = cryptoRepository.getAllCryptoAssets().first(),
                     attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
+                    tradeRepository = tradeRepository,
                     onProgress = { planProgress = it },
                 )
             errorMessage = null
@@ -453,6 +454,91 @@ private fun ReimportPlanPreview(
                     "These rows exchange one asset for another: each row's old single-asset transaction(s) " +
                         "are deleted — including any manual edits made to them — and the row is re-imported " +
                         "as a trade.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (plan.duplicateTrades.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Conversions another export already recorded (${plan.duplicateTrades.size}):",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            plan.duplicateTrades.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { duplicate ->
+                Text(text = "• ${duplicate.description}", style = MaterialTheme.typography.bodySmall)
+            }
+            if (plan.duplicateTrades.size > VALUE_UPDATE_PREVIEW_LIMIT) {
+                Text(
+                    text = "…and ${plan.duplicateTrades.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text =
+                    "These rows describe a conversion another export already imported under different " +
+                        "wording (same instant, accounts, assets and amounts), so it was booked twice. The " +
+                        "duplicate is deleted and the row re-linked to the surviving one.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (plan.staleDuplicates.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Rows sharing or missing a transaction (${plan.staleDuplicates.size}):",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            plan.staleDuplicates.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { stale ->
+                Text(text = "\u2022 ${stale.description}", style = MaterialTheme.typography.bodySmall)
+            }
+            if (plan.staleDuplicates.size > VALUE_UPDATE_PREVIEW_LIMIT) {
+                Text(
+                    text = "\u2026and ${plan.staleDuplicates.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text =
+                    "These rows were collapsed onto a transaction another row also claims, or onto one that " +
+                        "no longer exists, so the movement they record is missing from balances. They are " +
+                        "released and re-imported so each gets its own transaction.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (plan.counterpartyReconciles.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Rows whose counterparty is unknown to this export (${plan.counterpartyReconciles.size}):",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            plan.counterpartyReconciles.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { reconcile ->
+                Text(text = "• ${reconcile.description} — ${reconcile.detail}", style = MaterialTheme.typography.bodySmall)
+            }
+            if (plan.counterpartyReconciles.size > VALUE_UPDATE_PREVIEW_LIMIT) {
+                Text(
+                    text = "…and ${plan.counterpartyReconciles.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text =
+                    "This export records that money moved but not whose account it came from or went to. " +
+                        "Each row's transaction is deleted and re-imported against a placeholder counterparty, " +
+                        "and where another source already recorded the same movement against a real account the " +
+                        "row is linked to it and excluded from balances (counted once).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

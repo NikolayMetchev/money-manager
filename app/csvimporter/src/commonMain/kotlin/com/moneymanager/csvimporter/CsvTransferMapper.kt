@@ -99,6 +99,12 @@ sealed interface MappingResult {
         val conversionLeg: ConversionLegInfo? = null,
         /** Raw funding value from [CsvImportStrategy.fundingAttributeMatch]'s column; null when unset/blank. */
         val fundingMatchValue: String? = null,
+        /**
+         * The counterparty account when the strategy could not identify it and simply named it after the
+         * row's description (see `ImportTransfer.unidentifiedCounterpartyAccountId`); null otherwise.
+         * [UNRESOLVED_ACCOUNT_ID] until the account exists — the re-map after account creation resolves it.
+         */
+        val unidentifiedCounterpartyAccountId: AccountId? = null,
     ) : MappingResult {
         /** Convenience for flows where only the target side can discover a new account. */
         val newAccountName: String? get() = newAccounts.firstOrNull()?.name
@@ -205,6 +211,12 @@ data class CsvTransferWithAttributes(
      * The applier matches it against the funding attribute type to resolve the funding account.
      */
     val fundingMatchValue: String? = null,
+    /**
+     * Counterparty account the strategy could not identify (see
+     * `ImportTransfer.unidentifiedCounterpartyAccountId`); null when it resolved a rule, a persisted
+     * mapping or an identity for it.
+     */
+    val unidentifiedCounterpartyAccountId: AccountId? = null,
 )
 
 /**
@@ -385,6 +397,7 @@ class CsvTransferMapper(
                             passThrough = result.passThrough,
                             conversionLeg = result.conversionLeg,
                             fundingMatchValue = result.fundingMatchValue,
+                            unidentifiedCounterpartyAccountId = result.unidentifiedCounterpartyAccountId,
                         ),
                     )
                     // Count by status
@@ -523,6 +536,10 @@ class CsvTransferMapper(
                 }
             }
 
+            // The counterparty is the account the TARGET_ACCOUNT mapping resolved, on whichever side the
+            // flip below puts it.
+            val counterpartyAccountId = targetAccountId
+
             if (flipAccounts) {
                 val temp = sourceAccountId
                 sourceAccountId = targetAccountId
@@ -614,6 +631,19 @@ class CsvTransferMapper(
                     resolvePersonalCounterparty(targetMapping, values)
                 }
 
+            // A counterparty the strategy could not identify — no rule matched, no persisted mapping, so
+            // the account is just this row's description standing in for whoever the real other end was
+            // (e.g. crypto.com's "GBP Deposit (via FPS)"). Recorded so the engine can reconcile the row
+            // against a real record of the same movement instead of double-counting it. Pass-through
+            // merchants, conversion legs and trades have counterparties of their own shape, so they are
+            // out of scope.
+            val unidentifiedCounterpartyAccountId =
+                if (passThroughMatch != null || conversionDetection != null || tradeTo != null) {
+                    null
+                } else {
+                    counterpartyAccountId.takeIf { isUnidentifiedCounterparty(targetMapping, values) }
+                }
+
             // Create Money with absolute value (direction is indicated by source/target)
             val amount = Money.fromDisplayValue(rawAmount.abs(), currency)
 
@@ -703,6 +733,7 @@ class CsvTransferMapper(
                     strategy.fundingAttributeMatch?.let {
                         getColumnValueOrNull(it.column, originalValues)?.trim()?.takeIf { v -> v.isNotBlank() }
                     },
+                unidentifiedCounterpartyAccountId = unidentifiedCounterpartyAccountId,
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
@@ -989,6 +1020,29 @@ class CsvTransferMapper(
     }
 
     /**
+     * True when the rule that resolved [mapping] for this row declares the counterparty unidentified (see
+     * [RegexRule.counterpartyIsUnidentified]) and no persisted mapping claimed the value — the user
+     * mapping the value to a real account is exactly what makes the counterparty known. The account is
+     * then a placeholder for an unknown other end; see `ImportTransfer.unidentifiedCounterpartyAccountId`.
+     */
+    private fun isUnidentifiedCounterparty(
+        mapping: FieldMapping,
+        values: List<String>,
+    ): Boolean =
+        when (mapping) {
+            is ConditionalAccountMapping -> isUnidentifiedCounterparty(resolveConditional(mapping, values), values)
+            is RegexAccountMapping -> {
+                val result = getAccountNameFromRegexWithPattern(mapping, values)
+                result.counterpartyIsUnidentified &&
+                    result.accountName.isNotBlank() &&
+                    findPersistedMapping(result.sourceColumnValue) == null
+            }
+            // Every other account mapping either names an account explicitly (a lookup/template) or
+            // resolves an identity (an attribute match), so its counterparty is not a placeholder.
+            else -> false
+        }
+
+    /**
      * Finds a persisted account mapping whose pattern matches the given account source value
      * (the value the strategy's account field-mapping resolved for this row). First matching
      * mapping wins: strategy-scoped mappings are tried before global ones, then id order — so
@@ -1103,6 +1157,8 @@ class CsvTransferMapper(
         val sourceColumnValue: String,
         val matchedPattern: String?,
         val counterpartyIsPerson: Boolean = false,
+        /** See [RegexRule.counterpartyIsUnidentified]. */
+        val counterpartyIsUnidentified: Boolean = false,
         /** The counterparty's own name, when it differs from [accountName] (e.g. Monzo's "Monzo <name>" account). */
         val personName: String? = null,
     )
@@ -1136,6 +1192,7 @@ class CsvTransferMapper(
                         sourceColumnValue = primaryValue,
                         matchedPattern = rule.pattern,
                         counterpartyIsPerson = rule.counterpartyIsPerson,
+                        counterpartyIsUnidentified = rule.counterpartyIsUnidentified,
                         personName = personNameFor(rule, accountName, match),
                     )
                 }

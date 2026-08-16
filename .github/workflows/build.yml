@@ -340,7 +340,7 @@ jobs:
           distribution: 'corretto'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6.2.0
+        uses: gradle/actions/setup-gradle@v6.3.0
         # No gradle-version pin: ./gradlew uses the wrapper's version, so a pin here only
         # downloads a second, unused distribution.
 
