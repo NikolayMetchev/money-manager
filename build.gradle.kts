@@ -22,9 +22,13 @@ val projectVersion = System.getProperty("version")
 
 version = projectVersion
 
-// gradle-doctor configures tasks/plugins across subprojects from the root project,
-// which violates project isolation — keep it off while isolation is enabled.
-if (providers.gradleProperty("org.gradle.isolated-projects").orNull != "true") {
+// gradle-doctor configures tasks/plugins across subprojects from the root project and reads
+// `Project.properties`, both of which are illegal under project isolation — which this build enables.
+// The guard is an explicit opt-in rather than a check of `org.gradle.isolated-projects`: that property
+// has already been renamed once, and isolation can also be switched on by the IDE (Android Studio
+// enables it for sync) or a `-D`/`--isolated-projects` flag, none of which a gradle-property read sees.
+// Run `./gradlew <task> -PenableGradleDoctor=true -Dorg.gradle.isolated-projects=false` to use it.
+if (providers.gradleProperty("enableGradleDoctor").orNull == "true") {
     pluginManager.apply("com.osacky.doctor")
 }
 
