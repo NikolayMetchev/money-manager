@@ -38,9 +38,13 @@ cleanly; `build` was also executed to completion:
 ## Remaining incompatibilities
 
 1. **gradle-doctor** (`com.osacky.doctor` 0.12.1) — still incompatible. It accesses
-   `Project.tasks` and `Project.plugins` across subprojects from the root project (50 violations).
-   It stays conditionally disabled in the root `build.gradle.kts` while isolation is on.
-   Re-test when upgrading the plugin.
+   `Project.tasks` and `Project.plugins` across subprojects from the root project (50 violations),
+   plus `Project.properties` in `RemoteCacheEstimation`, which fails plugin application outright.
+   It is therefore **off unless explicitly opted in** in the root `build.gradle.kts`:
+   `-PenableGradleDoctor=true` (with isolation off). The guard deliberately does not test
+   `org.gradle.isolated-projects` — isolation can be enabled by the IDE (Android Studio turns it on
+   for sync) or a `-D`/CLI flag, which a Gradle-property read cannot observe, and the property name
+   itself has already changed once. Re-test when upgrading the plugin.
 
 ## Notes / follow-ups
 
