@@ -398,7 +398,7 @@ suspend fun downloadApiSessionTransactions(
 /**
  * Downloads the per-account identifiers endpoint (the account's own sort code + account number) into
  * [sessionId], one request per account. Only applies to strategies that configure
- * [com.moneymanager.domain.model.apistrategy.ApiImportStrategy.accountIdentifiersEndpoint] (e.g.
+ * [com.moneymanager.domain.model.apistrategy.ApiStrategyConfig.accountIdentifiersEndpoint] (e.g.
  * Starling, whose `/accounts` response omits bank details); a no-op otherwise. Incremental: an account
  * whose identifiers URL is already stored is skipped.
  *
@@ -1382,7 +1382,8 @@ private fun accountsItemJsonPath(
 
 /**
  * Returns [accounts] with each account's bank details (sort code + account number) filled from the
- * matching account-identifiers response, when [ApiImportStrategy.accountIdentifiersEndpoint] is set.
+ * matching account-identifiers response, when the strategy config's
+ * [com.moneymanager.domain.model.apistrategy.ApiStrategyConfig.accountIdentifiersEndpoint] is set.
  * Each identifiers response is matched to its account via the `account.id` captured from the request
  * path, and the sort code / account number are read using the strategy's account field mappings.
  * A no-op for strategies without the endpoint, or when no identifiers responses are present.
