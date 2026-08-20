@@ -1,6 +1,5 @@
 package com.moneymanager.database.repository.write
 
-import com.moneymanager.database.json.ApiStrategyConfigJson
 import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.ApiImportStrategyId
@@ -35,7 +34,7 @@ class ApiImportStrategyWriteRepositoryImpl(
             writeQueries.insert(
                 id = strategy.id.id.toString(),
                 name = strategy.name,
-                config_json = ApiStrategyJsonCodec.encode(strategy.toConfigJson()),
+                config_json = ApiStrategyJsonCodec.encode(strategy.config),
             )
             writeQueries.insertSource(
                 strategy_id = strategy.id.id.toString(),
@@ -58,7 +57,7 @@ class ApiImportStrategyWriteRepositoryImpl(
             database.transaction {
                 writeQueries.update(
                     name = strategy.name,
-                    config_json = ApiStrategyJsonCodec.encode(strategy.toConfigJson()),
+                    config_json = ApiStrategyJsonCodec.encode(strategy.config),
                     updated_at = now.toEpochMilliseconds(),
                     id = strategy.id.id.toString(),
                 )
@@ -80,34 +79,4 @@ class ApiImportStrategyWriteRepositoryImpl(
         withContext(coroutineContext) {
             writeQueries.deleteById(id.id.toString())
         }
-
-    private fun ApiImportStrategy.toConfigJson(): ApiStrategyConfigJson =
-        ApiStrategyConfigJson(
-            baseUrl = baseUrl,
-            authType = authType,
-            accountsEndpoint = accountsEndpoint,
-            transactionsEndpoint = transactionsEndpoint,
-            accountMappings = accountMappings,
-            transactionMappings = transactionMappings,
-            peopleMappings = peopleMappings,
-            accountIdentifiersEndpoint = accountIdentifiersEndpoint,
-            ancestorEndpoints = ancestorEndpoints,
-            builtInCounterpartyRules = builtInCounterpartyRules,
-            signing = signing,
-            peopleDownload = peopleDownload,
-            personExternalIdAttribute = personExternalIdAttribute,
-            requestSigning = requestSigning,
-            dataEndpoints = dataEndpoints,
-            syntheticAccount = syntheticAccount,
-            internalTransferReconcile = internalTransferReconcile,
-            assetAliases = assetAliases,
-            tokenPageUrl = tokenPageUrl,
-            connectInstructions = connectInstructions,
-            rateLimitMillis = rateLimitMillis,
-            rateLimitErrorSubstrings = rateLimitErrorSubstrings,
-            rateLimitBackoffMillis = rateLimitBackoffMillis,
-            maxRateLimitRetries = maxRateLimitRetries,
-            assetSuffixesToStrip = assetSuffixesToStrip,
-            minorUnitDivisorOverrides = minorUnitDivisorOverrides,
-        )
 }

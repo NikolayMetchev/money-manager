@@ -1054,9 +1054,10 @@ class MonzoImportE2ETest : DbTest() {
                     .single { it.name == "Monzo" }
                     .let { strategy ->
                         strategy.copy(
-                            transactionMappings =
-                                strategy.transactionMappings.copy(
-                                    counterpartyIdField = "counterparty.id",
+                            config =
+                                strategy.config.copy(
+                                    transactionMappings =
+                                        strategy.config.transactionMappings.copy(counterpartyIdField = "counterparty.id"),
                                 ),
                         )
                     }
@@ -1227,9 +1228,12 @@ class MonzoImportE2ETest : DbTest() {
                     .single { it.name == "Monzo" }
                     .let { strategy ->
                         strategy.copy(
-                            transactionMappings =
-                                strategy.transactionMappings.copy(
-                                    counterpartyIdField = "counterparty.account_id",
+                            config =
+                                strategy.config.copy(
+                                    transactionMappings =
+                                        strategy.config.transactionMappings.copy(
+                                            counterpartyIdField = "counterparty.account_id",
+                                        ),
                                 ),
                         )
                     }
@@ -1318,9 +1322,10 @@ class MonzoImportE2ETest : DbTest() {
                     .single { it.name == "Monzo" }
                     .let { strategy ->
                         strategy.copy(
-                            transactionMappings =
-                                strategy.transactionMappings.copy(
-                                    counterpartyIdField = "counterparty.id",
+                            config =
+                                strategy.config.copy(
+                                    transactionMappings =
+                                        strategy.config.transactionMappings.copy(counterpartyIdField = "counterparty.id"),
                                 ),
                         )
                     }
@@ -1464,9 +1469,10 @@ class MonzoImportE2ETest : DbTest() {
                     .single { it.name == "Monzo" }
                     .let { strategy ->
                         strategy.copy(
-                            transactionMappings =
-                                strategy.transactionMappings.copy(
-                                    counterpartyIdField = "counterparty.id",
+                            config =
+                                strategy.config.copy(
+                                    transactionMappings =
+                                        strategy.config.transactionMappings.copy(counterpartyIdField = "counterparty.id"),
                                 ),
                         )
                     }
@@ -1515,9 +1521,10 @@ class MonzoImportE2ETest : DbTest() {
                     .single { it.name == "Monzo" }
                     .let { strategy ->
                         strategy.copy(
-                            transactionMappings =
-                                strategy.transactionMappings.copy(
-                                    counterpartyIdField = "counterparty.id",
+                            config =
+                                strategy.config.copy(
+                                    transactionMappings =
+                                        strategy.config.transactionMappings.copy(counterpartyIdField = "counterparty.id"),
                                 ),
                         )
                     }
@@ -1836,10 +1843,13 @@ class MonzoImportE2ETest : DbTest() {
                     .single { it.name == "Monzo" }
                     .let { baseStrategy ->
                         baseStrategy.copy(
-                            transactionMappings =
-                                baseStrategy.transactionMappings.copy(
-                                    localAmountField = "local_amount",
-                                    localCurrencyField = "local_currency",
+                            config =
+                                baseStrategy.config.copy(
+                                    transactionMappings =
+                                        baseStrategy.config.transactionMappings.copy(
+                                            localAmountField = "local_amount",
+                                            localCurrencyField = "local_currency",
+                                        ),
                                 ),
                         )
                     }

@@ -4,81 +4,19 @@ import com.moneymanager.domain.model.ApiImportStrategyId
 import kotlin.time.Instant
 
 /**
- * Represents a reusable API import strategy that defines how to communicate with an external API
- * and map its responses to accounts, transactions, and people.
+ * A reusable, persisted API import strategy: an identity ([id]/[name]) plus the portable
+ * [ApiStrategyConfig] describing how to talk to the API and map its responses to accounts,
+ * transactions and people.
  *
- * @property id Unique identifier for this strategy
- * @property name Human-readable name for the strategy (must be unique)
- * @property baseUrl Base URL of the API (e.g. "https://api.monzo.com")
- * @property authType Authentication mechanism used by the API
- * @property accountsEndpoint Configuration for the accounts endpoint
- * @property transactionsEndpoint Configuration for the transactions endpoint
- * @property accountMappings JSON field paths for mapping account fields
- * @property transactionMappings JSON field paths for mapping transaction fields
- * @property peopleMappings JSON field paths/values for people and personal counterparties
- * @property accountIdentifiersEndpoint Optional per-account endpoint fetched after accounts that
- *                                      returns the account's own bank details (sort code + account
- *                                      number) when they are not present on the accounts response
- *                                      itself (e.g. Starling's `/accounts/{account.id}/identifiers`).
- *                                      The sort code / account number fields within its response are
- *                                      read using [accountMappings] sortCode/accountNumber fields.
- * @property ancestorEndpoints Resource endpoints fetched before accounts whose items supply context
- *                             for templating descendant endpoint paths/params (e.g. Wise "profiles")
- * @property builtInCounterpartyRules Declarative rules routing matching transactions to a single
- *                                    consolidated built-in counterparty account (e.g. ATM)
+ * @property config The strategy's full configuration; also the shape persisted as [configJson]
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
+ * @property configJson The raw persisted JSON of [config] (empty for a not-yet-persisted strategy)
  */
 data class ApiImportStrategy(
     val id: ApiImportStrategyId,
     val name: String,
-    val baseUrl: String,
-    val authType: ApiAuthType,
-    val accountsEndpoint: ApiEndpointConfig,
-    val transactionsEndpoint: ApiEndpointConfig,
-    val accountMappings: ApiAccountMappings,
-    val transactionMappings: ApiTransactionMappings,
-    val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
-    val accountIdentifiersEndpoint: ApiEndpointConfig? = null,
-    val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
-    val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
-    val signing: ApiSigningConfig? = null,
-    val peopleDownload: ApiPersonImportConfig? = null,
-    val personExternalIdAttribute: String? = null,
-    val requestSigning: ApiRequestSigningConfig? = null,
-    val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
-    val syntheticAccount: ApiSyntheticAccount? = null,
-    val internalTransferReconcile: ApiInternalTransferReconcile? = null,
-    val assetAliases: Map<String, String> = emptyMap(),
-    /** Deep-link to the provider's own page for creating/managing API tokens; null shows no button. */
-    val tokenPageUrl: String? = null,
-    /** Ordered, numbered steps shown to the user for obtaining credentials from this provider. */
-    val connectInstructions: List<String> = emptyList(),
-    /** Delay between exchange-download requests; null uses the download function's own default. */
-    val rateLimitMillis: Long? = null,
-    /**
-     * Case-insensitive substrings that mark an exchange error response as transient rate-limiting
-     * (retried with backoff) rather than a hard failure (which abandons the rest of the endpoint).
-     */
-    val rateLimitErrorSubstrings: List<String> = emptyList(),
-    /** Base backoff before the first retry of a rate-limited request; doubles each subsequent retry. */
-    val rateLimitBackoffMillis: Long = 5_000L,
-    /** Maximum retries for a request repeatedly classified as rate-limited before giving up. */
-    val maxRateLimitRetries: Int = 5,
-    /**
-     * Suffixes stripped from a raw asset code before [assetAliases]/currency lookup (e.g. Kraken's
-     * Earn-holding codes "XETH.F"/"XETH.S" -> "XETH"). Without this, a suffixed code fails asset
-     * resolution and its transfer is silently dropped.
-     */
-    val assetSuffixesToStrip: Set<String> = emptySet(),
-    /**
-     * Overrides [com.moneymanager.domain.model.IsoMinorUnitDivisors]' per-currency divisor for
-     * interpreting a [com.moneymanager.domain.model.apistrategy.ApiAmountFormat.MINOR_UNITS_INTEGER]
-     * amount (a bank API's raw integer in its own minor units). Only meaningful for a strategy using
-     * that format; a provider whose minor-unit width doesn't follow the ISO 4217 standard for a given
-     * currency can be corrected here instead of the global table.
-     */
-    val minorUnitDivisorOverrides: Map<String, Long> = emptyMap(),
+    val config: ApiStrategyConfig,
     val createdAt: Instant,
     val updatedAt: Instant,
     val revisionId: Long = 1,

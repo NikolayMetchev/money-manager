@@ -103,7 +103,7 @@ suspend fun downloadApiSessionExchange(
     rateLimitMillis: Long = 1100,
     onProgress: (ApiTransactionsDownloadProgress) -> Unit = {},
 ): ApiTransactionsDownloadResult {
-    val signing = requireNotNull(strategy.requestSigning) { "SIGNED strategy '${strategy.name}' has no requestSigning" }
+    val signing = requireNotNull(strategy.config.requestSigning) { "SIGNED strategy '${strategy.name}' has no requestSigning" }
     val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
     val existingResponses = apiSessionRepository.getResponsesBySession(sessionId).associateBy { it.requestId }
     val downloadedUrls = existingRequests.filter { existingResponses.containsKey(it.id) }.map { it.url }.toSet()
@@ -121,7 +121,7 @@ suspend fun downloadApiSessionExchange(
     val existingResponseJsonByUrl =
         existingRequests.mapNotNull { req -> existingResponses[req.id]?.let { req.url to it.json } }.toMap()
 
-    strategy.dataEndpoints.forEachIndexed { endpointIndex, dataEndpoint ->
+    strategy.config.dataEndpoints.forEachIndexed { endpointIndex, dataEndpoint ->
         val endpoint = dataEndpoint.endpoint
         val windows = dateWindowsOrSingle(endpoint.pagination, now)
         // A single failing endpoint (e.g. a path this account/product doesn't support) must not abort
@@ -148,7 +148,7 @@ suspend fun downloadApiSessionExchange(
                 onProgress(
                     ApiTransactionsDownloadProgress(
                         accountIndex = endpointIndex + 1,
-                        accountCount = strategy.dataEndpoints.size,
+                        accountCount = strategy.config.dataEndpoints.size,
                         page = windowIndex + 1,
                         downloadedResponsePageCount = responseCount,
                     ),
@@ -156,12 +156,12 @@ suspend fun downloadApiSessionExchange(
 
                 // The nonce must be fresh on every real attempt (a repeated nonce is rejected), so a
                 // retried request is re-signed from scratch rather than resent as-is.
-                val effectiveDelayMillis = (strategy.rateLimitMillis ?: rateLimitMillis) * endpoint.requestCostWeight
+                val effectiveDelayMillis = (strategy.config.rateLimitMillis ?: rateLimitMillis) * endpoint.requestCostWeight
                 var pageBody: String? = null
                 var rateLimitRetries = 0
                 var keepRetrying = true
                 while (keepRetrying) {
-                    val endpointUrl = buildExchangeEndpointUrl(strategy.baseUrl, endpoint.path)
+                    val endpointUrl = buildExchangeEndpointUrl(strategy.config.baseUrl, endpoint.path)
                     val nonce = nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds())
                     lastNonce = nonce
                     val signed =
@@ -226,19 +226,19 @@ suspend fun downloadApiSessionExchange(
                             // back off and retry the same request rather than abandoning the rest of
                             // the endpoint's windows, which previously turned one rate-limit hit into a
                             // near-empty download.
-                            val isRateLimited = strategy.rateLimitErrorSubstrings.any { error.contains(it, ignoreCase = true) }
-                            if (!isRateLimited || rateLimitRetries >= strategy.maxRateLimitRetries) {
+                            val isRateLimited = strategy.config.rateLimitErrorSubstrings.any { error.contains(it, ignoreCase = true) }
+                            if (!isRateLimited || rateLimitRetries >= strategy.config.maxRateLimitRetries) {
                                 logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
                                 endpointBroken = true
                                 return@forEachIndexed
                             }
                             rateLimitRetries += 1
                             val backoffMillis =
-                                (strategy.rateLimitBackoffMillis * (1L shl (rateLimitRetries - 1)))
+                                (strategy.config.rateLimitBackoffMillis * (1L shl (rateLimitRetries - 1)))
                                     .coerceAtMost(MAX_RATE_LIMIT_BACKOFF_MILLIS)
                             logger.warn {
                                 "Rate-limited on '${endpoint.path}' " +
-                                    "(attempt $rateLimitRetries/${strategy.maxRateLimitRetries}); retrying in ${backoffMillis}ms"
+                                    "(attempt $rateLimitRetries/${strategy.config.maxRateLimitRetries}); retrying in ${backoffMillis}ms"
                             }
                             delay(backoffMillis.milliseconds)
                         }
@@ -268,7 +268,7 @@ suspend fun downloadApiSessionExchange(
             }
         }
     }
-    return ApiTransactionsDownloadResult(accountCount = strategy.dataEndpoints.size, transactionResponseCount = responseCount)
+    return ApiTransactionsDownloadResult(accountCount = strategy.config.dataEndpoints.size, transactionResponseCount = responseCount)
 }
 
 /** A window with epoch bounds; null means a single non-windowed request. */
@@ -516,7 +516,7 @@ suspend fun importApiSessionExchange(
     strategy: ApiImportStrategy,
     importEngine: ImportEngine,
 ): ExchangeImportResult {
-    val synthetic = requireNotNull(strategy.syntheticAccount) { "Exchange strategy '${strategy.name}' has no syntheticAccount" }
+    val synthetic = requireNotNull(strategy.config.syntheticAccount) { "Exchange strategy '${strategy.name}' has no syntheticAccount" }
     val source = Source.Api(sessionId)
 
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
@@ -529,8 +529,8 @@ suspend fun importApiSessionExchange(
         // Ledgers deposit/withdrawal split); a QUERY_ONLY signed URL (Binance) carries no marker, so fall
         // back to a plain path match, which is unambiguous there since query params live in the URL.
         val dataEndpoint =
-            strategy.dataEndpoints.firstOrNull { request.url.contains("ep=${endpointDedupeKey(it.endpoint)}") }
-                ?: strategy.dataEndpoints.firstOrNull { request.url.contains(it.endpoint.path) }
+            strategy.config.dataEndpoints.firstOrNull { request.url.contains("ep=${endpointDedupeKey(it.endpoint)}") }
+                ?: strategy.config.dataEndpoints.firstOrNull { request.url.contains(it.endpoint.path) }
                 ?: return@forEach
         val items =
             responseItemsWithKeys(
@@ -556,13 +556,13 @@ suspend fun importApiSessionExchange(
 
     // Normalize legacy/provider-specific asset codes (e.g. Kraken "XXBT" -> "BTC") before any
     // currency/crypto lookup, so an aliased code and its canonical form always resolve to one asset.
-    val aliases = strategy.assetAliases.mapKeys { it.key.uppercase() }
+    val aliases = strategy.config.assetAliases.mapKeys { it.key.uppercase() }
 
     // Strip a suffix that marks a sub-holding of the same asset (e.g. Kraken's Earn positions
     // "XETH.F"/"XETH.S") before alias/currency lookup — otherwise the suffixed code fails resolution
     // and the item is silently dropped.
     fun stripAssetSuffix(code: String): String =
-        strategy.assetSuffixesToStrip
+        strategy.config.assetSuffixesToStrip
             .firstOrNull { code.endsWith(it, ignoreCase = true) }
             ?.let { code.dropLast(it.length) }
             ?: code
@@ -804,7 +804,7 @@ suspend fun importApiSessionExchange(
 
     // Internal-transfer reconciliation: bridge the exchange account to any configured app account
     // (e.g. the CSV "Crypto.com" App account) so App<->Exchange transfers collapse into one movement.
-    val reconcile = strategy.internalTransferReconcile
+    val reconcile = strategy.config.internalTransferReconcile
     val existingAccounts = accountRepository.getAllAccounts().first()
     val bridges =
         reconcile

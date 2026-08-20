@@ -1,57 +1,22 @@
 package com.moneymanager.ui.screens.apistrategy.editor
 
 import com.moneymanager.domain.model.ApiImportStrategyId
-import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
-import com.moneymanager.domain.model.apistrategy.ApiAuthType
-import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
-import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
-import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
-import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
-import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
-import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
-import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
-import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
+import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import kotlin.time.Instant
 
 /**
  * Immutable snapshot of the API strategy editor form. Bridges [ApiImportStrategy] ↔ the mutable
- * [ApiStrategyEditorState]. Most config is held as the domain nested types directly; only the
+ * [ApiStrategyEditorState]. Most config is held as the domain [ApiStrategyConfig] directly; only the
  * `customFields` map and its `uniqueIdentifierFields` companion set are projected onto an editable
- * [CustomFieldState] list (the mapping objects below carry those two fields normalized to empty).
+ * [CustomFieldState] list (the mapping objects inside [config] carry those two fields normalized to
+ * empty).
  */
 data class ApiStrategyFormState(
     val name: String,
-    val baseUrl: String,
-    val authType: ApiAuthType,
-    val personExternalIdAttribute: String?,
-    val tokenPageUrl: String?,
-    val connectInstructions: List<String>,
-    val rateLimitMillis: Long?,
-    val rateLimitErrorSubstrings: List<String>,
-    val rateLimitBackoffMillis: Long,
-    val maxRateLimitRetries: Int,
-    val accountsEndpoint: ApiEndpointConfig,
-    val transactionsEndpoint: ApiEndpointConfig,
-    val accountIdentifiersEndpoint: ApiEndpointConfig?,
-    val ancestorEndpoints: List<ApiEndpointConfig>,
-    val accountMappings: ApiAccountMappings,
+    val config: ApiStrategyConfig,
     val accountCustomFields: List<CustomFieldState>,
-    val transactionMappings: ApiTransactionMappings,
     val txCustomFields: List<CustomFieldState>,
-    val peopleMappings: ApiPeopleMappings,
-    val builtInCounterpartyRules: List<BuiltInCounterpartyRule>,
-    val signing: ApiSigningConfig?,
-    val peopleDownload: ApiPersonImportConfig?,
-    val requestSigning: ApiRequestSigningConfig?,
-    val dataEndpoints: List<ApiDataEndpoint>,
-    val syntheticAccount: ApiSyntheticAccount?,
-    val internalTransferReconcile: ApiInternalTransferReconcile?,
-    val assetAliases: Map<String, String>,
-    val assetSuffixesToStrip: Set<String>,
-    val minorUnitDivisorOverrides: Map<String, Long>,
 )
 
 /** Projects a mapping's `customFields` map + `uniqueIdentifierFields` set onto editable rows. */
@@ -67,40 +32,20 @@ private fun List<CustomFieldState>.toUniqueIdentifierFields(): Set<String> =
     filter { it.name.isNotBlank() && it.isUniqueId }.map { it.name.trim() }.toSet()
 
 /** Extracts editable form state from a persisted [ApiImportStrategy]. */
-fun extractFormStateFromStrategy(strategy: ApiImportStrategy): ApiStrategyFormState =
-    ApiStrategyFormState(
+fun extractFormStateFromStrategy(strategy: ApiImportStrategy): ApiStrategyFormState {
+    val accounts = strategy.config.accountMappings
+    val transactions = strategy.config.transactionMappings
+    return ApiStrategyFormState(
         name = strategy.name,
-        baseUrl = strategy.baseUrl,
-        authType = strategy.authType,
-        personExternalIdAttribute = strategy.personExternalIdAttribute,
-        tokenPageUrl = strategy.tokenPageUrl,
-        connectInstructions = strategy.connectInstructions,
-        rateLimitMillis = strategy.rateLimitMillis,
-        rateLimitErrorSubstrings = strategy.rateLimitErrorSubstrings,
-        rateLimitBackoffMillis = strategy.rateLimitBackoffMillis,
-        maxRateLimitRetries = strategy.maxRateLimitRetries,
-        accountsEndpoint = strategy.accountsEndpoint,
-        transactionsEndpoint = strategy.transactionsEndpoint,
-        accountIdentifiersEndpoint = strategy.accountIdentifiersEndpoint,
-        ancestorEndpoints = strategy.ancestorEndpoints,
-        accountMappings = strategy.accountMappings.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()),
-        accountCustomFields =
-            customFieldStates(strategy.accountMappings.customFields, strategy.accountMappings.uniqueIdentifierFields),
-        transactionMappings = strategy.transactionMappings.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()),
-        txCustomFields =
-            customFieldStates(strategy.transactionMappings.customFields, strategy.transactionMappings.uniqueIdentifierFields),
-        peopleMappings = strategy.peopleMappings,
-        builtInCounterpartyRules = strategy.builtInCounterpartyRules,
-        signing = strategy.signing,
-        peopleDownload = strategy.peopleDownload,
-        requestSigning = strategy.requestSigning,
-        dataEndpoints = strategy.dataEndpoints,
-        syntheticAccount = strategy.syntheticAccount,
-        internalTransferReconcile = strategy.internalTransferReconcile,
-        assetAliases = strategy.assetAliases,
-        assetSuffixesToStrip = strategy.assetSuffixesToStrip,
-        minorUnitDivisorOverrides = strategy.minorUnitDivisorOverrides,
+        config =
+            strategy.config.copy(
+                accountMappings = accounts.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()),
+                transactionMappings = transactions.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()),
+            ),
+        accountCustomFields = customFieldStates(accounts.customFields, accounts.uniqueIdentifierFields),
+        txCustomFields = customFieldStates(transactions.customFields, transactions.uniqueIdentifierFields),
     )
+}
 
 /** Reassembles an [ApiImportStrategy] from edited form state. The DB regenerates revisionId/configJson. */
 fun buildStrategyFromApiFormState(
@@ -108,44 +53,30 @@ fun buildStrategyFromApiFormState(
     id: ApiImportStrategyId,
     createdAt: Instant,
     updatedAt: Instant,
-): ApiImportStrategy =
-    ApiImportStrategy(
+): ApiImportStrategy {
+    val config = state.config
+    return ApiImportStrategy(
         id = id,
         name = state.name.trim(),
-        baseUrl = state.baseUrl.trim(),
-        authType = state.authType,
-        accountsEndpoint = state.accountsEndpoint,
-        transactionsEndpoint = state.transactionsEndpoint,
-        accountMappings =
-            state.accountMappings.copy(
-                customFields = state.accountCustomFields.toCustomFieldMap(),
-                uniqueIdentifierFields = state.accountCustomFields.toUniqueIdentifierFields(),
+        config =
+            config.copy(
+                baseUrl = config.baseUrl.trim(),
+                accountMappings =
+                    config.accountMappings.copy(
+                        customFields = state.accountCustomFields.toCustomFieldMap(),
+                        uniqueIdentifierFields = state.accountCustomFields.toUniqueIdentifierFields(),
+                    ),
+                transactionMappings =
+                    config.transactionMappings.copy(
+                        customFields = state.txCustomFields.toCustomFieldMap(),
+                        uniqueIdentifierFields = state.txCustomFields.toUniqueIdentifierFields(),
+                    ),
+                personExternalIdAttribute = config.personExternalIdAttribute?.trim()?.ifBlank { null },
+                tokenPageUrl = config.tokenPageUrl?.trim()?.ifBlank { null },
+                connectInstructions = config.connectInstructions.map { it.trim() }.filter { it.isNotEmpty() },
+                rateLimitErrorSubstrings = config.rateLimitErrorSubstrings.map { it.trim() }.filter { it.isNotEmpty() },
             ),
-        transactionMappings =
-            state.transactionMappings.copy(
-                customFields = state.txCustomFields.toCustomFieldMap(),
-                uniqueIdentifierFields = state.txCustomFields.toUniqueIdentifierFields(),
-            ),
-        peopleMappings = state.peopleMappings,
-        accountIdentifiersEndpoint = state.accountIdentifiersEndpoint,
-        ancestorEndpoints = state.ancestorEndpoints,
-        builtInCounterpartyRules = state.builtInCounterpartyRules,
-        signing = state.signing,
-        peopleDownload = state.peopleDownload,
-        personExternalIdAttribute = state.personExternalIdAttribute?.trim()?.ifBlank { null },
-        tokenPageUrl = state.tokenPageUrl?.trim()?.ifBlank { null },
-        connectInstructions = state.connectInstructions.map { it.trim() }.filter { it.isNotEmpty() },
-        rateLimitMillis = state.rateLimitMillis,
-        rateLimitErrorSubstrings = state.rateLimitErrorSubstrings.map { it.trim() }.filter { it.isNotEmpty() },
-        rateLimitBackoffMillis = state.rateLimitBackoffMillis,
-        maxRateLimitRetries = state.maxRateLimitRetries,
-        requestSigning = state.requestSigning,
-        dataEndpoints = state.dataEndpoints,
-        syntheticAccount = state.syntheticAccount,
-        internalTransferReconcile = state.internalTransferReconcile,
-        assetAliases = state.assetAliases,
-        assetSuffixesToStrip = state.assetSuffixesToStrip,
-        minorUnitDivisorOverrides = state.minorUnitDivisorOverrides,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
+}

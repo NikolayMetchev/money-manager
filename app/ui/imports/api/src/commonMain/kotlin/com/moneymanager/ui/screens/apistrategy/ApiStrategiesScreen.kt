@@ -255,17 +255,17 @@ private fun StrategyCard(
                 }
             }
             Text(
-                text = "Base URL: ${strategy.baseUrl}",
+                text = "Base URL: ${strategy.config.baseUrl}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "Auth: ${strategy.authType.name}",
+                text = "Auth: ${strategy.config.authType.name}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "Accounts: ${strategy.accountsEndpoint.path}  |  Transactions: ${strategy.transactionsEndpoint.path}",
+                text = "Accounts: ${strategy.config.accountsEndpoint.path}  |  Transactions: ${strategy.config.transactionsEndpoint.path}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

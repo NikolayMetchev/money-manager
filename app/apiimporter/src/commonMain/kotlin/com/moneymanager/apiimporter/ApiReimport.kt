@@ -186,7 +186,7 @@ suspend fun executeApiReimport(
 
     onProgress?.invoke(ImportProgress("Re-importing"))
     val rerun =
-        if (strategy.syntheticAccount != null) {
+        if (strategy.config.syntheticAccount != null) {
             val exchangeResult =
                 importApiSessionExchange(
                     apiSessionRepository = apiSessionRepository,
@@ -210,7 +210,7 @@ suspend fun executeApiReimport(
                     passThroughAccounts = passThroughAccounts,
                 )
             val peopleResult =
-                if (strategy.peopleDownload != null) {
+                if (strategy.config.peopleDownload != null) {
                     importApiSessionPeople(
                         apiSessionRepository = apiSessionRepository,
                         accountAttributeRepository = accountAttributeRepository,

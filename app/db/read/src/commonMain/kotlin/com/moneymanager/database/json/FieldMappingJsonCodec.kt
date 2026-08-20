@@ -12,7 +12,9 @@ import com.moneymanager.domain.serialization.UuidSerializersModule
 import kotlinx.serialization.json.Json
 
 /**
- * Codec for encoding/decoding field mappings to/from JSON using kotlinx.serialization.
+ * Codec for the JSON-valued columns of a CSV import strategy. One named encode/decode pair per
+ * column, so a call site names the column it is reading; the pairs taking/returning a nullable value
+ * back a nullable column.
  */
 object FieldMappingJsonCodec {
     private val json =
@@ -22,83 +24,35 @@ object FieldMappingJsonCodec {
             serializersModule = UuidSerializersModule
         }
 
-    /**
-     * Encodes field mappings to JSON string.
-     */
     fun encode(mappings: Map<TransferField, FieldMapping>): String = json.encodeToString(mappings)
 
-    /**
-     * Decodes field mappings from JSON string.
-     */
     fun decode(jsonString: String): Map<TransferField, FieldMapping> = json.decodeFromString(jsonString)
 
-    /**
-     * Encodes identification columns to JSON array string.
-     */
     fun encodeColumns(columns: Set<String>): String = json.encodeToString(columns)
 
-    /**
-     * Decodes identification columns from JSON array string.
-     */
     fun decodeColumns(jsonString: String): Set<String> = json.decodeFromString(jsonString)
 
-    /**
-     * Encodes attribute column mappings to JSON array string.
-     */
     fun encodeAttributeMappings(mappings: List<AttributeColumnMapping>): String = json.encodeToString(mappings)
 
-    /**
-     * Decodes attribute column mappings from JSON array string.
-     */
     fun decodeAttributeMappings(jsonString: String): List<AttributeColumnMapping> = json.decodeFromString(jsonString)
 
-    /**
-     * Encodes row preprocessing rules to JSON array string.
-     */
     fun encodeRowRules(rules: List<RowPreprocessingRule>): String = json.encodeToString(rules)
 
-    /**
-     * Decodes row preprocessing rules from JSON array string.
-     */
     fun decodeRowRules(jsonString: String): List<RowPreprocessingRule> = json.decodeFromString(jsonString)
 
-    /**
-     * Encodes companion transaction rules to JSON array string.
-     */
     fun encodeCompanionRules(rules: List<CompanionTransactionRule>): String = json.encodeToString(rules)
 
-    /**
-     * Decodes companion transaction rules from JSON array string.
-     */
     fun decodeCompanionRules(jsonString: String): List<CompanionTransactionRule> = json.decodeFromString(jsonString)
 
-    /**
-     * Encodes content match rules to JSON array string.
-     */
     fun encodeContentRules(rules: List<ContentMatchRule>): String = json.encodeToString(rules)
 
-    /**
-     * Decodes content match rules from JSON array string.
-     */
     fun decodeContentRules(jsonString: String): List<ContentMatchRule> = json.decodeFromString(jsonString)
 
-    /**
-     * Encodes an optional conversion config to a JSON string, or null when absent.
-     */
     fun encodeConversionConfig(config: ConversionConfig?): String? = config?.let { json.encodeToString(it) }
 
-    /**
-     * Decodes an optional conversion config from a JSON string (null when the column is null).
-     */
     fun decodeConversionConfig(jsonString: String?): ConversionConfig? = jsonString?.let { json.decodeFromString(it) }
 
-    /**
-     * Encodes an optional funding attribute-account match to a JSON string, or null when absent.
-     */
     fun encodeAttributeAccountMatch(match: AttributeAccountMatch?): String? = match?.let { json.encodeToString(it) }
 
-    /**
-     * Decodes an optional funding attribute-account match from a JSON string (null when the column is null).
-     */
     fun decodeAttributeAccountMatch(jsonString: String?): AttributeAccountMatch? = jsonString?.let { json.decodeFromString(it) }
 }

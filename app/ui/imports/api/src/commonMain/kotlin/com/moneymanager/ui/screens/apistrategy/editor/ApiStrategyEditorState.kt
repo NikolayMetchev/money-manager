@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
+import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.PredicateOp
 import com.moneymanager.domain.model.apistrategy.TransferDirection
@@ -51,39 +52,47 @@ private val DEFAULT_TRANSACTIONS_ENDPOINT =
 internal class ApiStrategyEditorState(
     initial: ApiStrategyFormState?,
 ) {
+    /**
+     * The config this editor was seeded from, kept so [toFormState] can `copy` the edited fields onto
+     * it rather than rebuilding a config from scratch. A field added to [ApiStrategyConfig] later but
+     * not wired into the editor then keeps its persisted value instead of silently resetting to its
+     * default on the next save. Null when creating a strategy, where there is nothing to preserve.
+     */
+    private val seededConfig = initial?.config
+
     var selectedTab by mutableStateOf(EditorTab.GENERAL)
     var isSaving by mutableStateOf(false)
     var errorMessage by mutableStateOf<String?>(null)
 
     var name by mutableStateOf(initial?.name.orEmpty())
-    var baseUrl by mutableStateOf(initial?.baseUrl.orEmpty())
-    var authType by mutableStateOf(initial?.authType ?: ApiAuthType.BEARER_TOKEN)
-    var personExternalIdAttribute by mutableStateOf(initial?.personExternalIdAttribute.orEmpty())
-    var tokenPageUrl by mutableStateOf(initial?.tokenPageUrl.orEmpty())
-    var connectInstructions by mutableStateOf(initial?.connectInstructions.orEmpty())
-    var rateLimitMillis by mutableStateOf(initial?.rateLimitMillis)
-    var rateLimitErrorSubstrings by mutableStateOf(initial?.rateLimitErrorSubstrings.orEmpty())
-    var rateLimitBackoffMillis by mutableStateOf(initial?.rateLimitBackoffMillis ?: 5_000L)
-    var maxRateLimitRetries by mutableStateOf(initial?.maxRateLimitRetries ?: 5)
+    var baseUrl by mutableStateOf(initial?.config?.baseUrl.orEmpty())
+    var authType by mutableStateOf(initial?.config?.authType ?: ApiAuthType.BEARER_TOKEN)
+    var personExternalIdAttribute by mutableStateOf(initial?.config?.personExternalIdAttribute.orEmpty())
+    var tokenPageUrl by mutableStateOf(initial?.config?.tokenPageUrl.orEmpty())
+    var connectInstructions by mutableStateOf(initial?.config?.connectInstructions.orEmpty())
+    var rateLimitMillis by mutableStateOf(initial?.config?.rateLimitMillis)
+    var rateLimitErrorSubstrings by mutableStateOf(initial?.config?.rateLimitErrorSubstrings.orEmpty())
+    var rateLimitBackoffMillis by mutableStateOf(initial?.config?.rateLimitBackoffMillis ?: 5_000L)
+    var maxRateLimitRetries by mutableStateOf(initial?.config?.maxRateLimitRetries ?: 5)
 
-    var accountsEndpoint by mutableStateOf(initial?.accountsEndpoint ?: DEFAULT_ACCOUNTS_ENDPOINT)
-    var transactionsEndpoint by mutableStateOf(initial?.transactionsEndpoint ?: DEFAULT_TRANSACTIONS_ENDPOINT)
-    var accountIdentifiersEndpoint by mutableStateOf(initial?.accountIdentifiersEndpoint)
-    var ancestorEndpoints by mutableStateOf(initial?.ancestorEndpoints.orEmpty())
+    var accountsEndpoint by mutableStateOf(initial?.config?.accountsEndpoint ?: DEFAULT_ACCOUNTS_ENDPOINT)
+    var transactionsEndpoint by mutableStateOf(initial?.config?.transactionsEndpoint ?: DEFAULT_TRANSACTIONS_ENDPOINT)
+    var accountIdentifiersEndpoint by mutableStateOf(initial?.config?.accountIdentifiersEndpoint)
+    var ancestorEndpoints by mutableStateOf(initial?.config?.ancestorEndpoints.orEmpty())
 
-    var accountMappings by mutableStateOf(initial?.accountMappings ?: ApiAccountMappings())
+    var accountMappings by mutableStateOf(initial?.config?.accountMappings ?: ApiAccountMappings())
     var accountCustomFields by mutableStateOf(initial?.accountCustomFields.orEmpty())
-    var transactionMappings by mutableStateOf(initial?.transactionMappings ?: ApiTransactionMappings())
+    var transactionMappings by mutableStateOf(initial?.config?.transactionMappings ?: ApiTransactionMappings())
     var txCustomFields by mutableStateOf(initial?.txCustomFields.orEmpty())
-    var peopleMappings by mutableStateOf(initial?.peopleMappings ?: ApiPeopleMappings())
-    var builtInCounterpartyRules by mutableStateOf(initial?.builtInCounterpartyRules.orEmpty())
-    var signing by mutableStateOf(initial?.signing)
-    var peopleDownload by mutableStateOf(initial?.peopleDownload)
+    var peopleMappings by mutableStateOf(initial?.config?.peopleMappings ?: ApiPeopleMappings())
+    var builtInCounterpartyRules by mutableStateOf(initial?.config?.builtInCounterpartyRules.orEmpty())
+    var signing by mutableStateOf(initial?.config?.signing)
+    var peopleDownload by mutableStateOf(initial?.config?.peopleDownload)
 
     // Config-driven exchange fields (crypto.com/Binance/Kraken). Held as domain types directly and
     // edited on the Endpoints tab (synthetic account, data endpoints) and Advanced tab (request
     // signing, internal-transfer reconciliation).
-    var requestSigning by mutableStateOf(initial?.requestSigning)
+    var requestSigning by mutableStateOf(initial?.config?.requestSigning)
 
     // A directional (deposit/withdrawal) endpoint with a null fixedDirection displays as "IN" in the
     // Endpoints tab (a rendering fallback), but that fallback is never persisted on its own — so a
@@ -92,7 +101,7 @@ internal class ApiStrategyEditorState(
     // fix applies without the user ever having to visit the Endpoints tab.
     var dataEndpoints by
         mutableStateOf(
-            initial?.dataEndpoints.orEmpty().map { endpoint ->
+            initial?.config?.dataEndpoints.orEmpty().map { endpoint ->
                 if (endpoint.kind in DIRECTIONAL_KINDS && !endpoint.enrichesTransfers && endpoint.fixedDirection == null) {
                     endpoint.copy(fixedDirection = TransferDirection.IN)
                 } else {
@@ -100,11 +109,11 @@ internal class ApiStrategyEditorState(
                 }
             },
         )
-    var syntheticAccount by mutableStateOf(initial?.syntheticAccount)
-    var internalTransferReconcile by mutableStateOf(initial?.internalTransferReconcile)
-    var assetAliases by mutableStateOf(initial?.assetAliases.orEmpty())
-    var assetSuffixesToStrip by mutableStateOf(initial?.assetSuffixesToStrip.orEmpty())
-    var minorUnitDivisorOverrides by mutableStateOf(initial?.minorUnitDivisorOverrides.orEmpty())
+    var syntheticAccount by mutableStateOf(initial?.config?.syntheticAccount)
+    var internalTransferReconcile by mutableStateOf(initial?.config?.internalTransferReconcile)
+    var assetAliases by mutableStateOf(initial?.config?.assetAliases.orEmpty())
+    var assetSuffixesToStrip by mutableStateOf(initial?.config?.assetSuffixesToStrip.orEmpty())
+    var minorUnitDivisorOverrides by mutableStateOf(initial?.config?.minorUnitDivisorOverrides.orEmpty())
 
     val generalHasError: Boolean
         get() =
@@ -174,34 +183,48 @@ internal class ApiStrategyEditorState(
     fun toFormState(): ApiStrategyFormState =
         ApiStrategyFormState(
             name = name,
+            config =
+                (seededConfig ?: newConfig()).copy(
+                    baseUrl = baseUrl,
+                    authType = authType,
+                    accountsEndpoint = accountsEndpoint,
+                    transactionsEndpoint = transactionsEndpoint,
+                    accountMappings = accountMappings,
+                    transactionMappings = transactionMappings,
+                    peopleMappings = peopleMappings,
+                    accountIdentifiersEndpoint = accountIdentifiersEndpoint,
+                    ancestorEndpoints = ancestorEndpoints,
+                    builtInCounterpartyRules = builtInCounterpartyRules,
+                    signing = signing,
+                    peopleDownload = peopleDownload,
+                    personExternalIdAttribute = personExternalIdAttribute,
+                    requestSigning = requestSigning,
+                    dataEndpoints = dataEndpoints,
+                    syntheticAccount = syntheticAccount,
+                    internalTransferReconcile = internalTransferReconcile,
+                    assetAliases = assetAliases,
+                    tokenPageUrl = tokenPageUrl,
+                    connectInstructions = connectInstructions,
+                    rateLimitMillis = rateLimitMillis,
+                    rateLimitErrorSubstrings = rateLimitErrorSubstrings,
+                    rateLimitBackoffMillis = rateLimitBackoffMillis,
+                    maxRateLimitRetries = maxRateLimitRetries,
+                    assetSuffixesToStrip = assetSuffixesToStrip,
+                    minorUnitDivisorOverrides = minorUnitDivisorOverrides,
+                ),
+            accountCustomFields = accountCustomFields,
+            txCustomFields = txCustomFields,
+        )
+
+    /** The [ApiStrategyConfig] required arguments, for the create case where there is no seed to copy. */
+    private fun newConfig() =
+        ApiStrategyConfig(
             baseUrl = baseUrl,
             authType = authType,
-            personExternalIdAttribute = personExternalIdAttribute,
-            tokenPageUrl = tokenPageUrl,
-            connectInstructions = connectInstructions,
-            rateLimitMillis = rateLimitMillis,
-            rateLimitErrorSubstrings = rateLimitErrorSubstrings,
-            rateLimitBackoffMillis = rateLimitBackoffMillis,
-            maxRateLimitRetries = maxRateLimitRetries,
             accountsEndpoint = accountsEndpoint,
             transactionsEndpoint = transactionsEndpoint,
-            accountIdentifiersEndpoint = accountIdentifiersEndpoint,
-            ancestorEndpoints = ancestorEndpoints,
             accountMappings = accountMappings,
-            accountCustomFields = accountCustomFields,
             transactionMappings = transactionMappings,
-            txCustomFields = txCustomFields,
-            peopleMappings = peopleMappings,
-            builtInCounterpartyRules = builtInCounterpartyRules,
-            signing = signing,
-            peopleDownload = peopleDownload,
-            requestSigning = requestSigning,
-            dataEndpoints = dataEndpoints,
-            syntheticAccount = syntheticAccount,
-            internalTransferReconcile = internalTransferReconcile,
-            assetAliases = assetAliases,
-            assetSuffixesToStrip = assetSuffixesToStrip,
-            minorUnitDivisorOverrides = minorUnitDivisorOverrides,
         )
 }
 

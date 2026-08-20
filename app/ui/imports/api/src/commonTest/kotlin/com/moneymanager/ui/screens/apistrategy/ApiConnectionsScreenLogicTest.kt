@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,12 +24,15 @@ class ApiConnectionsScreenLogicTest {
         ApiImportStrategy(
             id = ApiImportStrategyId(Uuid.random()),
             name = name,
-            baseUrl = "https://api.$name.com",
-            authType = ApiAuthType.BEARER_TOKEN,
-            accountsEndpoint = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts"),
-            transactionsEndpoint = ApiEndpointConfig(path = "/transactions", responseArrayKey = "transactions"),
-            accountMappings = ApiAccountMappings(),
-            transactionMappings = ApiTransactionMappings(),
+            config =
+                ApiStrategyConfig(
+                    baseUrl = "https://api.$name.com",
+                    authType = ApiAuthType.BEARER_TOKEN,
+                    accountsEndpoint = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts"),
+                    transactionsEndpoint = ApiEndpointConfig(path = "/transactions", responseArrayKey = "transactions"),
+                    accountMappings = ApiAccountMappings(),
+                    transactionMappings = ApiTransactionMappings(),
+                ),
             createdAt = now,
             updatedAt = now,
         )
