@@ -59,7 +59,7 @@ import kotlin.uuid.Uuid
  *
  * Loads the CSV [csvImportId]'s columns and sample rows (and, when [strategyId] is non-null, the
  * existing strategy) from the repositories, then presents a tabbed form. Saving builds the strategy
- * via [buildStrategyFromFormState] and navigates back.
+ * via [buildStrategyFromEditorState] and navigates back.
  */
 @Composable
 fun CsvStrategyEditorScreen(
@@ -147,12 +147,8 @@ fun CsvStrategyEditorScreen(
 
     val csvColumns = columnsOverride ?: requireNotNull(currentImport).columns
     val availableColumnNames = remember(csvColumns) { csvColumns.map { it.originalName }.toSet() }
-    val initial =
-        remember(existingStrategy, availableColumnNames) {
-            existingStrategy?.let { extractFormStateFromStrategy(it, availableColumnNames) }
-        }
     val editKey = strategyId?.toString() ?: "create:${csvImportId?.toString() ?: "external"}"
-    val state = rememberCsvStrategyEditorState(editKey, initial, availableColumnNames)
+    val state = rememberCsvStrategyEditorState(editKey, existingStrategy, availableColumnNames)
 
     val firstRow = rows.firstOrNull()
 
@@ -213,8 +209,8 @@ fun CsvStrategyEditorScreen(
             try {
                 val now = Clock.System.now()
                 val strategy =
-                    buildStrategyFromFormState(
-                        state = state.toFormState(),
+                    buildStrategyFromEditorState(
+                        state = state,
                         id = existingStrategy?.id ?: CsvImportStrategyId(Uuid.random()),
                         createdAt = existingStrategy?.createdAt ?: now,
                         updatedAt = now,

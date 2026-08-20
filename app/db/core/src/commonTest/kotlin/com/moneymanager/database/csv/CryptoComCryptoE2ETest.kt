@@ -337,7 +337,6 @@ class CryptoComCryptoE2ETest : DbTest() {
                             .mapValues { (field, mapping) ->
                                 if (field == TransferField.TARGET_ACCOUNT) {
                                     RegexAccountMapping(
-                                        id = mapping.id,
                                         fieldType = TransferField.TARGET_ACCOUNT,
                                         columnName = "Transaction Description",
                                         rules = listOf(RegexRule(pattern = "App wallet", accountName = "Crypto.com Exchange")),

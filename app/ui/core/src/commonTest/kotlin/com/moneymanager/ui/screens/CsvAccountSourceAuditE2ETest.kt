@@ -26,7 +26,6 @@ import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
@@ -203,39 +202,33 @@ class CsvAccountSourceAuditE2ETest {
                 mapOf(
                     TransferField.SOURCE_ACCOUNT to
                         HardCodedAccountMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.SOURCE_ACCOUNT,
                             accountId = sourceAccountId,
                         ),
                     TransferField.TARGET_ACCOUNT to
                         AccountLookupMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TARGET_ACCOUNT,
                             columnName = "Payee",
                         ),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TIMESTAMP,
                             dateColumnName = "Date",
                             dateFormat = "dd/MM/yyyy",
                         ),
                     TransferField.DESCRIPTION to
                         DirectColumnMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.DESCRIPTION,
                             columnName = "Description",
                         ),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
                             amountColumnName = "Amount",
                         ),
                     TransferField.CURRENCY to
                         HardCodedCurrencyMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.CURRENCY,
                             currencyId = currencyId,
                         ),

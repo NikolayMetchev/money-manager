@@ -21,7 +21,6 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
@@ -83,32 +82,27 @@ class CsvTransferMapperTest {
                 mapOf(
                     TransferField.SOURCE_ACCOUNT to
                         HardCodedAccountMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.SOURCE_ACCOUNT,
                             accountId = testSourceAccountId,
                         ),
                     TransferField.TARGET_ACCOUNT to
                         AccountLookupMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TARGET_ACCOUNT,
                             columnName = "Payee",
                         ),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TIMESTAMP,
                             dateColumnName = "Date",
                             dateFormat = "dd/MM/yyyy",
                         ),
                     TransferField.DESCRIPTION to
                         DirectColumnMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.DESCRIPTION,
                             columnName = "Description",
                         ),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
                             amountColumnName = "Amount",
@@ -117,7 +111,6 @@ class CsvTransferMapperTest {
                         ),
                     TransferField.CURRENCY to
                         HardCodedCurrencyMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.CURRENCY,
                             currencyId = testCurrencyId,
                         ),
@@ -562,39 +555,33 @@ class CsvTransferMapperTest {
                     mapOf(
                         TransferField.SOURCE_ACCOUNT to
                             HardCodedAccountMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.SOURCE_ACCOUNT,
                                 accountId = testSourceAccountId,
                             ),
                         TransferField.TARGET_ACCOUNT to
                             AccountLookupMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TIMESTAMP,
                                 dateColumnName = "Date",
                                 dateFormat = "dd/MM/yyyy",
                             ),
                         TransferField.DESCRIPTION to
                             DirectColumnMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.DESCRIPTION,
                                 columnName = "Description",
                             ),
                         TransferField.AMOUNT to
                             AmountParsingMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.AMOUNT,
                                 mode = AmountMode.SINGLE_COLUMN,
                                 amountColumnName = "Amount",
                             ),
                         TransferField.CURRENCY to
                             CurrencyLookupMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.CURRENCY,
                                 columnName = "Currency",
                             ),
@@ -643,39 +630,33 @@ class CsvTransferMapperTest {
                     mapOf(
                         TransferField.SOURCE_ACCOUNT to
                             HardCodedAccountMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.SOURCE_ACCOUNT,
                                 accountId = testSourceAccountId,
                             ),
                         TransferField.TARGET_ACCOUNT to
                             AccountLookupMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TIMESTAMP,
                                 dateColumnName = "Date",
                                 dateFormat = "dd/MM/yyyy",
                             ),
                         TransferField.DESCRIPTION to
                             DirectColumnMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.DESCRIPTION,
                                 columnName = "Description",
                             ),
                         TransferField.AMOUNT to
                             AmountParsingMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.AMOUNT,
                                 mode = AmountMode.SINGLE_COLUMN,
                                 amountColumnName = "Amount",
                             ),
                         TransferField.CURRENCY to
                             CurrencyLookupMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.CURRENCY,
                                 columnName = "Currency",
                             ),
@@ -714,45 +695,38 @@ class CsvTransferMapperTest {
                     mapOf(
                         TransferField.SOURCE_ACCOUNT to
                             HardCodedAccountMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.SOURCE_ACCOUNT,
                                 accountId = testSourceAccountId,
                             ),
                         TransferField.TARGET_ACCOUNT to
                             AccountLookupMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TIMESTAMP,
                                 dateColumnName = "Date",
                                 dateFormat = "dd/MM/yyyy",
                             ),
                         TransferField.DESCRIPTION to
                             DirectColumnMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.DESCRIPTION,
                                 columnName = "Description",
                             ),
                         TransferField.AMOUNT to
                             AmountParsingMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.AMOUNT,
                                 mode = AmountMode.SINGLE_COLUMN,
                                 amountColumnName = "Amount",
                             ),
                         TransferField.CURRENCY to
                             HardCodedCurrencyMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.CURRENCY,
                                 currencyId = testCurrencyId,
                             ),
                         TransferField.TIMEZONE to
                             HardCodedTimezoneMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TIMEZONE,
                                 timezoneId = "UTC",
                             ),
@@ -802,45 +776,38 @@ class CsvTransferMapperTest {
                     mapOf(
                         TransferField.SOURCE_ACCOUNT to
                             HardCodedAccountMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.SOURCE_ACCOUNT,
                                 accountId = testSourceAccountId,
                             ),
                         TransferField.TARGET_ACCOUNT to
                             AccountLookupMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TIMESTAMP,
                                 dateColumnName = "Date",
                                 dateFormat = "dd/MM/yyyy",
                             ),
                         TransferField.DESCRIPTION to
                             DirectColumnMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.DESCRIPTION,
                                 columnName = "Description",
                             ),
                         TransferField.AMOUNT to
                             AmountParsingMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.AMOUNT,
                                 mode = AmountMode.SINGLE_COLUMN,
                                 amountColumnName = "Amount",
                             ),
                         TransferField.CURRENCY to
                             HardCodedCurrencyMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.CURRENCY,
                                 currencyId = testCurrencyId,
                             ),
                         TransferField.TIMEZONE to
                             TimezoneLookupMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TIMEZONE,
                                 columnName = "Timezone",
                             ),
@@ -886,45 +853,38 @@ class CsvTransferMapperTest {
                     mapOf(
                         TransferField.SOURCE_ACCOUNT to
                             HardCodedAccountMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.SOURCE_ACCOUNT,
                                 accountId = testSourceAccountId,
                             ),
                         TransferField.TARGET_ACCOUNT to
                             AccountLookupMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TIMESTAMP,
                                 dateColumnName = "Date",
                                 dateFormat = "dd/MM/yyyy",
                             ),
                         TransferField.DESCRIPTION to
                             DirectColumnMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.DESCRIPTION,
                                 columnName = "Description",
                             ),
                         TransferField.AMOUNT to
                             AmountParsingMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.AMOUNT,
                                 mode = AmountMode.SINGLE_COLUMN,
                                 amountColumnName = "Amount",
                             ),
                         TransferField.CURRENCY to
                             HardCodedCurrencyMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.CURRENCY,
                                 currencyId = testCurrencyId,
                             ),
                         TransferField.TIMEZONE to
                             HardCodedTimezoneMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TIMEZONE,
                                 timezoneId = timezoneId,
                             ),
@@ -1004,40 +964,34 @@ class CsvTransferMapperTest {
                 mapOf(
                     TransferField.SOURCE_ACCOUNT to
                         HardCodedAccountMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.SOURCE_ACCOUNT,
                             accountId = testSourceAccountId,
                         ),
                     TransferField.TARGET_ACCOUNT to
                         AccountLookupMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TARGET_ACCOUNT,
                             columnName = primaryColumn,
                             fallbackColumns = fallbackColumns,
                         ),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TIMESTAMP,
                             dateColumnName = "Date",
                             dateFormat = "dd/MM/yyyy",
                         ),
                     TransferField.DESCRIPTION to
                         DirectColumnMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.DESCRIPTION,
                             columnName = "Description",
                         ),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
                             amountColumnName = "Amount",
                         ),
                     TransferField.CURRENCY to
                         HardCodedCurrencyMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.CURRENCY,
                             currencyId = testCurrencyId,
                         ),
@@ -1216,13 +1170,11 @@ class CsvTransferMapperTest {
                 mapOf(
                     TransferField.SOURCE_ACCOUNT to
                         HardCodedAccountMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.SOURCE_ACCOUNT,
                             accountId = testSourceAccountId,
                         ),
                     TransferField.TARGET_ACCOUNT to
                         RegexAccountMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TARGET_ACCOUNT,
                             columnName = "Name",
                             rules = rules,
@@ -1230,27 +1182,23 @@ class CsvTransferMapperTest {
                         ),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TIMESTAMP,
                             dateColumnName = "Date",
                             dateFormat = "dd/MM/yyyy",
                         ),
                     TransferField.DESCRIPTION to
                         DirectColumnMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.DESCRIPTION,
                             columnName = "Description",
                         ),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
                             amountColumnName = "Amount",
                         ),
                     TransferField.CURRENCY to
                         HardCodedCurrencyMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.CURRENCY,
                             currencyId = testCurrencyId,
                         ),
@@ -1606,7 +1554,6 @@ class CsvTransferMapperTest {
                     (
                         TransferField.TARGET_ACCOUNT to
                             AttributeMatchAccountMapping(
-                                id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
                                 attributeTypeName = "card-last4",

@@ -18,7 +18,6 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
@@ -129,34 +128,6 @@ object BuiltInCsvStrategies {
      */
     private const val CURVE_RECONCILE_WINDOW_SECONDS = 172_800L
 
-    private fun builtInCsvMappingId(
-        strategyGroup: Int,
-        index: Int,
-    ): FieldMappingId =
-        FieldMappingId(
-            Uuid.parse(
-                "00000000-0000-0000-${strategyGroup.toString().padStart(4, '0')}-${index.toString().padStart(12, '0')}",
-            ),
-        )
-
-    private fun wiseCsvMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 1, index = index)
-
-    private fun monzoCsvMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 2, index = index)
-
-    private fun qifMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 3, index = index)
-
-    private fun santanderQifMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 4, index = index)
-
-    private fun cryptoComCardMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 5, index = index)
-
-    private fun cryptoComFiatMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 6, index = index)
-
-    private fun cryptoComCryptoMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 7, index = index)
-
-    private fun curveCsvMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 8, index = index)
-
-    private fun cryptoComCardXlsxMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 9, index = index)
-
     /**
      * All built-in CSV import strategies seeded into a fresh database. [qifCurrencyId] is the fixed
      * currency the QIF strategies carry (the default the QIF import dialog pre-selects); it is resolved
@@ -216,14 +187,12 @@ object BuiltInCsvStrategies {
                 // matches; users with an existing differently-named card account remap once.
                 TransferField.SOURCE_ACCOUNT to
                     RegexAccountMapping(
-                        id = cryptoComCardMappingId(1),
                         fieldType = TransferField.SOURCE_ACCOUNT,
                         columnName = "Transaction Description",
                         rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CARD_ACCOUNT)),
                     ),
                 TransferField.TARGET_ACCOUNT to
                     RegexAccountMapping(
-                        id = cryptoComCardMappingId(2),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         columnName = "Transaction Description",
                         rules =
@@ -250,7 +219,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
-                        id = cryptoComCardMappingId(3),
                         fieldType = TransferField.TIMESTAMP,
                         dateColumnName = "Timestamp (UTC)",
                         dateFormat = "yyyy-MM-dd",
@@ -258,14 +226,12 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
-                        id = cryptoComCardMappingId(4),
                         fieldType = TransferField.DESCRIPTION,
                         columnName = "Transaction Description",
                     ),
                 // Negative = money out of the card; positive (top-ups, refunds) flows in, so flip.
                 TransferField.AMOUNT to
                     AmountParsingMapping(
-                        id = cryptoComCardMappingId(5),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Native Amount",
@@ -273,13 +239,11 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(
-                        id = cryptoComCardMappingId(6),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Native Currency",
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
-                        id = cryptoComCardMappingId(7),
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),
@@ -323,7 +287,6 @@ object BuiltInCsvStrategies {
                 // strategy above (both are exports of the same physical card).
                 TransferField.SOURCE_ACCOUNT to
                     RegexAccountMapping(
-                        id = cryptoComCardXlsxMappingId(1),
                         fieldType = TransferField.SOURCE_ACCOUNT,
                         columnName = "Service Abbreviation",
                         rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CARD_ACCOUNT)),
@@ -333,12 +296,10 @@ object BuiltInCsvStrategies {
                     // transfer", …) are account-level credits, not merchant purchases — a raw AccountLookup
                     // would fail to resolve an empty name and error the row, so route them to Cash first.
                     ConditionalAccountMapping(
-                        id = cryptoComCardXlsxMappingId(10),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         conditions = listOf(RowCondition("Card Acceptor Name", RowConditionOperator.IS_BLANK)),
                         whenTrue =
                             RegexAccountMapping(
-                                id = cryptoComCardXlsxMappingId(11),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Service Abbreviation",
                                 rules =
@@ -352,7 +313,6 @@ object BuiltInCsvStrategies {
                             ),
                         whenFalse =
                             ConditionalAccountMapping(
-                                id = cryptoComCardXlsxMappingId(2),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 conditions =
                                     listOf(
@@ -362,7 +322,6 @@ object BuiltInCsvStrategies {
                                 // CSV export's "GBP Deposit" rows.
                                 whenTrue =
                                     RegexAccountMapping(
-                                        id = cryptoComCardXlsxMappingId(3),
                                         fieldType = TransferField.TARGET_ACCOUNT,
                                         columnName = "Service Abbreviation",
                                         rules =
@@ -383,7 +342,6 @@ object BuiltInCsvStrategies {
                                 // same trimmed text).
                                 whenFalse =
                                     RegexAccountMapping(
-                                        id = cryptoComCardXlsxMappingId(4),
                                         fieldType = TransferField.TARGET_ACCOUNT,
                                         columnName = "Card Acceptor Name",
                                         rules =
@@ -399,7 +357,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
-                        id = cryptoComCardXlsxMappingId(5),
                         fieldType = TransferField.TIMESTAMP,
                         dateColumnName = "Transaction Date",
                         dateFormat = "MM/dd/yyyy",
@@ -412,7 +369,6 @@ object BuiltInCsvStrategies {
                 // but with any "CRV*" prefix left intact for the detector to peel.
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
-                        id = cryptoComCardXlsxMappingId(6),
                         fieldType = TransferField.DESCRIPTION,
                         columnName = "Card Acceptor Name",
                         fallbackColumns = listOf("Description"),
@@ -421,7 +377,6 @@ object BuiltInCsvStrategies {
                 // Already signed: negative = spend, positive (loads/refunds) flows in, so flip.
                 TransferField.AMOUNT to
                     AmountParsingMapping(
-                        id = cryptoComCardXlsxMappingId(7),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Amount Processed",
@@ -430,13 +385,11 @@ object BuiltInCsvStrategies {
                 // Column header has a trailing space in the source workbook.
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(
-                        id = cryptoComCardXlsxMappingId(8),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Currency ",
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
-                        id = cryptoComCardXlsxMappingId(9),
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),
@@ -490,14 +443,12 @@ object BuiltInCsvStrategies {
             mapOf(
                 TransferField.SOURCE_ACCOUNT to
                     RegexAccountMapping(
-                        id = cryptoComFiatMappingId(1),
                         fieldType = TransferField.SOURCE_ACCOUNT,
                         columnName = "Transaction Description",
                         rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CASH_ACCOUNT)),
                     ),
                 TransferField.TARGET_ACCOUNT to
                     ConditionalAccountMapping(
-                        id = cryptoComFiatMappingId(2),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         conditions =
                             listOf(
@@ -507,14 +458,12 @@ object BuiltInCsvStrategies {
                         // (the To Currency asset), not a per-currency wallet.
                         whenTrue =
                             RegexAccountMapping(
-                                id = cryptoComFiatMappingId(3),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Transaction Description",
                                 rules = listOf(RegexRule(pattern = "^", accountName = CRYPTO_COM_CRYPTO_ACCOUNT)),
                             ),
                         whenFalse =
                             RegexAccountMapping(
-                                id = cryptoComFiatMappingId(4),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Transaction Description",
                                 rules =
@@ -540,7 +489,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
-                        id = cryptoComFiatMappingId(5),
                         fieldType = TransferField.TIMESTAMP,
                         dateColumnName = "Timestamp (UTC)",
                         dateFormat = "yyyy-MM-dd",
@@ -548,7 +496,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
-                        id = cryptoComFiatMappingId(6),
                         fieldType = TransferField.DESCRIPTION,
                         columnName = "Transaction Description",
                     ),
@@ -556,7 +503,6 @@ object BuiltInCsvStrategies {
                 // a crypto buy). When To Currency is a different, resolvable asset the row becomes a trade.
                 TransferField.AMOUNT to
                     AmountParsingMapping(
-                        id = cryptoComFiatMappingId(7),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Amount",
@@ -564,7 +510,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(
-                        id = cryptoComFiatMappingId(8),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Currency",
                     ),
@@ -573,20 +518,17 @@ object BuiltInCsvStrategies {
                 // demand as a crypto asset, so the conversion becomes a trade.
                 TransferField.TO_AMOUNT to
                     AmountParsingMapping(
-                        id = cryptoComFiatMappingId(11),
                         fieldType = TransferField.TO_AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "To Amount",
                     ),
                 TransferField.TO_CURRENCY to
                     CurrencyLookupMapping(
-                        id = cryptoComFiatMappingId(10),
                         fieldType = TransferField.TO_CURRENCY,
                         columnName = "To Currency",
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
-                        id = cryptoComFiatMappingId(9),
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),
@@ -674,7 +616,6 @@ object BuiltInCsvStrategies {
                 // the Crypto.com account.
                 TransferField.SOURCE_ACCOUNT to
                     RegexAccountMapping(
-                        id = cryptoComCryptoMappingId(1),
                         fieldType = TransferField.SOURCE_ACCOUNT,
                         columnName = "Transaction Kind",
                         rules =
@@ -693,7 +634,6 @@ object BuiltInCsvStrategies {
                 // turns the pre-flip target into the source for the "Exchange -> App wallet" direction.
                 TransferField.TARGET_ACCOUNT to
                     ConditionalAccountMapping(
-                        id = cryptoComCryptoMappingId(2),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         conditions =
                             listOf(
@@ -702,7 +642,6 @@ object BuiltInCsvStrategies {
                             ),
                         whenTrue =
                             RegexAccountMapping(
-                                id = cryptoComCryptoMappingId(10),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Transaction Kind",
                                 rules =
@@ -713,7 +652,6 @@ object BuiltInCsvStrategies {
                             ),
                         whenFalse =
                             RegexAccountMapping(
-                                id = cryptoComCryptoMappingId(11),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Transaction Description",
                                 rules = listOf(RegexRule(pattern = "App wallet", accountName = CRYPTO_COM_EXCHANGE_ACCOUNT)),
@@ -721,7 +659,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
-                        id = cryptoComCryptoMappingId(3),
                         fieldType = TransferField.TIMESTAMP,
                         dateColumnName = "Timestamp (UTC)",
                         dateFormat = "yyyy-MM-dd",
@@ -729,14 +666,12 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
-                        id = cryptoComCryptoMappingId(4),
                         fieldType = TransferField.DESCRIPTION,
                         columnName = "Transaction Description",
                     ),
                 // Positive = crypto received into the wallet (flip so the wallet is the target).
                 TransferField.AMOUNT to
                     AmountParsingMapping(
-                        id = cryptoComCryptoMappingId(5),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Amount",
@@ -745,13 +680,11 @@ object BuiltInCsvStrategies {
                 // The row's real asset (crypto ticker or, for the odd fiat row, a currency code).
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(
-                        id = cryptoComCryptoMappingId(6),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Currency",
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
-                        id = cryptoComCryptoMappingId(7),
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),
@@ -760,14 +693,12 @@ object BuiltInCsvStrategies {
                 // is created on demand as a crypto asset.
                 TransferField.TO_AMOUNT to
                     AmountParsingMapping(
-                        id = cryptoComCryptoMappingId(8),
                         fieldType = TransferField.TO_AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "To Amount",
                     ),
                 TransferField.TO_CURRENCY to
                     CurrencyLookupMapping(
-                        id = cryptoComCryptoMappingId(9),
                         fieldType = TransferField.TO_CURRENCY,
                         columnName = "To Currency",
                     ),
@@ -842,7 +773,6 @@ object BuiltInCsvStrategies {
                 // with the pass-through spend leg. The catch-all pattern always matches.
                 TransferField.SOURCE_ACCOUNT to
                     RegexAccountMapping(
-                        id = curveCsvMappingId(1),
                         fieldType = TransferField.SOURCE_ACCOUNT,
                         columnName = "Merchant Name",
                         rules = listOf(RegexRule(pattern = "^", accountName = CURVE_CONDUIT_ACCOUNT)),
@@ -852,39 +782,33 @@ object BuiltInCsvStrategies {
                 // pass-through spend leg resolves to (which is what makes reconciliation link them).
                 TransferField.TARGET_ACCOUNT to
                     AccountLookupMapping(
-                        id = curveCsvMappingId(2),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         columnName = "Merchant Name",
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
-                        id = curveCsvMappingId(3),
                         fieldType = TransferField.TIMESTAMP,
                         dateColumnName = "Created Date",
                         dateFormat = "yyyy-MM-dd",
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
-                        id = curveCsvMappingId(4),
                         fieldType = TransferField.DESCRIPTION,
                         columnName = "Merchant Name",
                     ),
                 TransferField.AMOUNT to
                     AmountParsingMapping(
-                        id = curveCsvMappingId(5),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Txn Amount",
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(
-                        id = curveCsvMappingId(6),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Txn Currency",
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
-                        id = curveCsvMappingId(7),
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),
@@ -944,14 +868,12 @@ object BuiltInCsvStrategies {
     fun buildWiseCsvStrategy(now: Instant): CsvImportStrategy {
         val sourceAccount =
             TemplateAccountMapping(
-                id = wiseCsvMappingId(1),
                 fieldType = TransferField.SOURCE_ACCOUNT,
                 columnName = "Source currency",
                 prefix = WISE_ACCOUNT_PREFIX,
             )
         val targetAccount =
             ConditionalAccountMapping(
-                id = wiseCsvMappingId(2),
                 fieldType = TransferField.TARGET_ACCOUNT,
                 conditions =
                     listOf(
@@ -961,14 +883,12 @@ object BuiltInCsvStrategies {
                     ),
                 whenTrue =
                     TemplateAccountMapping(
-                        id = wiseCsvMappingId(3),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         columnName = "Target currency",
                         prefix = WISE_ACCOUNT_PREFIX,
                     ),
                 whenFalse =
                     AccountLookupMapping(
-                        id = wiseCsvMappingId(4),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         columnName = "Target name",
                         fallbackColumns = listOf("Source name"),
@@ -980,7 +900,6 @@ object BuiltInCsvStrategies {
                 TransferField.TARGET_ACCOUNT to targetAccount,
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
-                        id = wiseCsvMappingId(5),
                         fieldType = TransferField.TIMESTAMP,
                         dateColumnName = "Created on",
                         dateFormat = "yyyy-MM-dd",
@@ -988,14 +907,12 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
-                        id = wiseCsvMappingId(6),
                         fieldType = TransferField.DESCRIPTION,
                         columnName = "Reference",
                         fallbackColumns = listOf("Note", "Category", "Target name"),
                     ),
                 TransferField.AMOUNT to
                     AmountParsingMapping(
-                        id = wiseCsvMappingId(7),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Source amount (after fees)",
@@ -1007,13 +924,11 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(
-                        id = wiseCsvMappingId(8),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Source currency",
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
-                        id = wiseCsvMappingId(9),
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),
@@ -1104,21 +1019,18 @@ object BuiltInCsvStrategies {
                 // the other side of the transaction.
                 TransferField.TARGET_ACCOUNT to
                     AccountLookupMapping(
-                        id = qifMappingId(1),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         columnName = QifColumns.COL_TRANSFER_ACCOUNT,
                         fallbackColumns = listOf(QifColumns.COL_PAYEE, QifColumns.COL_CATEGORY),
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
-                        id = qifMappingId(2),
                         fieldType = TransferField.TIMESTAMP,
                         dateColumnName = QifColumns.COL_DATE,
                         dateFormat = "dd/MM/yyyy",
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
-                        id = qifMappingId(3),
                         fieldType = TransferField.DESCRIPTION,
                         columnName = QifColumns.COL_PAYEE,
                         fallbackColumns = listOf(QifColumns.COL_MEMO),
@@ -1127,7 +1039,6 @@ object BuiltInCsvStrategies {
                 // so positive amounts flip source/target.
                 TransferField.AMOUNT to
                     AmountParsingMapping(
-                        id = qifMappingId(4),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = QifColumns.COL_AMOUNT,
@@ -1135,14 +1046,12 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.CURRENCY to
                     HardCodedCurrencyMapping(
-                        id = qifMappingId(5),
                         fieldType = TransferField.CURRENCY,
                         // The QIF apply flow pre-selects this as the default; the user can override it.
                         currencyId = currencyId,
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
-                        id = qifMappingId(6),
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),
@@ -1281,7 +1190,6 @@ object BuiltInCsvStrategies {
             mapOf(
                 TransferField.TARGET_ACCOUNT to
                     RegexAccountMapping(
-                        id = santanderQifMappingId(1),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         columnName = QifColumns.COL_PAYEE,
                         rules = counterpartyRules,
@@ -1290,14 +1198,12 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
-                        id = santanderQifMappingId(2),
                         fieldType = TransferField.TIMESTAMP,
                         dateColumnName = QifColumns.COL_DATE,
                         dateFormat = "dd/MM/yyyy",
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
-                        id = santanderQifMappingId(3),
                         fieldType = TransferField.DESCRIPTION,
                         columnName = QifColumns.COL_PAYEE,
                         fallbackColumns = listOf(QifColumns.COL_MEMO),
@@ -1306,7 +1212,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.AMOUNT to
                     AmountParsingMapping(
-                        id = santanderQifMappingId(4),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = QifColumns.COL_AMOUNT,
@@ -1314,7 +1219,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.CURRENCY to
                     HardCodedCurrencyMapping(
-                        id = santanderQifMappingId(5),
                         fieldType = TransferField.CURRENCY,
                         // The QIF apply flow pre-selects this as the default (GBP for Santander); the
                         // user can override it.
@@ -1322,7 +1226,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
-                        id = santanderQifMappingId(6),
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),
@@ -1419,12 +1322,10 @@ object BuiltInCsvStrategies {
                 // counterparty a person, so the import also creates/links a Person as its owner.
                 TransferField.TARGET_ACCOUNT to
                     ConditionalAccountMapping(
-                        id = monzoCsvMappingId(7),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         conditions = listOf(RowCondition("Type", RowConditionOperator.EQUALS_VALUE, "Monzo-to-Monzo")),
                         whenTrue =
                             RegexAccountMapping(
-                                id = monzoCsvMappingId(8),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Name",
                                 rules =
@@ -1440,7 +1341,6 @@ object BuiltInCsvStrategies {
                             ),
                         whenFalse =
                             AccountLookupMapping(
-                                id = monzoCsvMappingId(9),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Name",
                                 fallbackColumns = listOf("Type"),
@@ -1448,7 +1348,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
-                        id = monzoCsvMappingId(2),
                         fieldType = TransferField.TIMESTAMP,
                         dateColumnName = "Date",
                         dateFormat = "dd/MM/yyyy",
@@ -1457,14 +1356,12 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
-                        id = monzoCsvMappingId(3),
                         fieldType = TransferField.DESCRIPTION,
                         columnName = "Description",
                         fallbackColumns = listOf("Type"),
                     ),
                 TransferField.AMOUNT to
                     AmountParsingMapping(
-                        id = monzoCsvMappingId(4),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Amount",
@@ -1472,7 +1369,6 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(
-                        id = monzoCsvMappingId(5),
                         fieldType = TransferField.CURRENCY,
                         columnName = "Currency",
                     ),
@@ -1484,7 +1380,6 @@ object BuiltInCsvStrategies {
                     // outside the cross-source reconcile window and creating duplicates instead of
                     // reconciled pairs.
                     HardCodedTimezoneMapping(
-                        id = monzoCsvMappingId(6),
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),

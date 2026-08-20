@@ -3,18 +3,8 @@ package com.moneymanager.domain.model.csvstrategy
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
-import kotlin.uuid.Uuid
-
-@Serializable
-@JvmInline
-value class FieldMappingId(
-    @Contextual val id: Uuid,
-) {
-    override fun toString() = id.toString()
-}
 
 /**
  * Base interface for all field mapping types.
@@ -22,7 +12,6 @@ value class FieldMappingId(
  */
 @Serializable
 sealed interface FieldMapping {
-    val id: FieldMappingId
     val fieldType: TransferField
 }
 
@@ -32,7 +21,6 @@ sealed interface FieldMapping {
  */
 @Serializable
 data class HardCodedAccountMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val accountId: AccountId,
 ) : FieldMapping
@@ -47,7 +35,6 @@ data class HardCodedAccountMapping(
  */
 @Serializable
 data class AccountLookupMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val columnName: String,
     val fallbackColumns: List<String> = emptyList(),
@@ -121,7 +108,6 @@ data class RegexRule(
  */
 @Serializable
 data class RegexAccountMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val columnName: String,
     val rules: List<RegexRule>,
@@ -150,7 +136,6 @@ data class RegexAccountMapping(
  */
 @Serializable
 data class AttributeMatchAccountMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val columnName: String,
     val attributeTypeName: String,
@@ -168,7 +153,6 @@ data class AttributeMatchAccountMapping(
  */
 @Serializable
 data class TemplateAccountMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val columnName: String,
     val prefix: String = "",
@@ -183,7 +167,6 @@ data class TemplateAccountMapping(
  */
 @Serializable
 data class ConditionalAccountMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val conditions: List<RowCondition>,
     val whenTrue: FieldMapping,
@@ -199,7 +182,6 @@ data class ConditionalAccountMapping(
  */
 @Serializable
 data class DateTimeParsingMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val dateColumnName: String,
     val dateFormat: String,
@@ -222,7 +204,6 @@ data class DateTimeParsingMapping(
  */
 @Serializable
 data class DirectColumnMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val columnName: String,
     val fallbackColumns: List<String> = emptyList(),
@@ -250,7 +231,6 @@ data class DirectColumnMapping(
  */
 @Serializable
 data class AmountParsingMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val mode: AmountMode,
     val amountColumnName: String? = null,
@@ -284,7 +264,6 @@ data class AmountParsingMapping(
  */
 @Serializable
 data class HardCodedCurrencyMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val currencyId: CurrencyId,
 ) : FieldMapping
@@ -295,7 +274,6 @@ data class HardCodedCurrencyMapping(
  */
 @Serializable
 data class CurrencyLookupMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val columnName: String,
 ) : FieldMapping
@@ -306,7 +284,6 @@ data class CurrencyLookupMapping(
  */
 @Serializable
 data class HardCodedTimezoneMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val timezoneId: String,
 ) : FieldMapping
@@ -317,7 +294,6 @@ data class HardCodedTimezoneMapping(
  */
 @Serializable
 data class TimezoneLookupMapping(
-    override val id: FieldMappingId,
     override val fieldType: TransferField,
     val columnName: String,
 ) : FieldMapping

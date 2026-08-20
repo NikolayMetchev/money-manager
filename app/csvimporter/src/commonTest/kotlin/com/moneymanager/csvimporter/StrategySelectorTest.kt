@@ -12,7 +12,6 @@ import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
@@ -45,25 +44,23 @@ class StrategySelectorTest {
             fieldMappings =
                 mapOf(
                     TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(FieldMappingId(Uuid.random()), TransferField.SOURCE_ACCOUNT, AccountId(1)),
+                        HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, AccountId(1)),
                     TransferField.TARGET_ACCOUNT to
-                        HardCodedAccountMapping(FieldMappingId(Uuid.random()), TransferField.TARGET_ACCOUNT, AccountId(2)),
+                        HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, AccountId(2)),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TIMESTAMP,
                             dateColumnName = "Date",
                             dateFormat = "dd/MM/yyyy",
                         ),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
                             amountColumnName = "Amount",
                         ),
                     TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(FieldMappingId(Uuid.random()), TransferField.CURRENCY, CurrencyId(1L)),
+                        HardCodedCurrencyMapping(TransferField.CURRENCY, CurrencyId(1L)),
                 ),
             contentMatchRules = contentMatchRules,
             fileNamePattern = fileNamePattern,

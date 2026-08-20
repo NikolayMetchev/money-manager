@@ -15,7 +15,6 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
@@ -43,8 +42,6 @@ class ConversionConfigMapperTest {
         listOf("Kind", "Amount", "Asset", "Date", "Memo")
             .mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
 
-    private fun fieldId() = FieldMappingId(Uuid.random())
-
     private val strategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
@@ -53,27 +50,25 @@ class ConversionConfigMapperTest {
             fieldMappings =
                 mapOf(
                     TransferField.SOURCE_ACCOUNT to
-                        RegexAccountMapping(fieldId(), TransferField.SOURCE_ACCOUNT, "Memo", listOf(RegexRule("^", "Wallet"))),
+                        RegexAccountMapping(TransferField.SOURCE_ACCOUNT, "Memo", listOf(RegexRule("^", "Wallet"))),
                     TransferField.TARGET_ACCOUNT to
-                        RegexAccountMapping(fieldId(), TransferField.TARGET_ACCOUNT, "Memo", listOf(RegexRule("^", "Counterparty"))),
+                        RegexAccountMapping(TransferField.TARGET_ACCOUNT, "Memo", listOf(RegexRule("^", "Counterparty"))),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
-                            fieldId(),
                             TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
                             amountColumnName = "Amount",
                             flipAccountsOnPositive = true,
                         ),
-                    TransferField.CURRENCY to CurrencyLookupMapping(fieldId(), TransferField.CURRENCY, "Asset"),
+                    TransferField.CURRENCY to CurrencyLookupMapping(TransferField.CURRENCY, "Asset"),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
-                            fieldId(),
                             TransferField.TIMESTAMP,
                             dateColumnName = "Date",
                             dateFormat = "yyyy-MM-dd",
                             dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
                         ),
-                    TransferField.DESCRIPTION to DirectColumnMapping(fieldId(), TransferField.DESCRIPTION, "Memo"),
+                    TransferField.DESCRIPTION to DirectColumnMapping(TransferField.DESCRIPTION, "Memo"),
                 ),
             conversionConfig =
                 ConversionConfig(
