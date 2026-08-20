@@ -52,6 +52,14 @@ private val DEFAULT_TRANSACTIONS_ENDPOINT =
 internal class ApiStrategyEditorState(
     initial: ApiStrategyFormState?,
 ) {
+    /**
+     * The config this editor was seeded from, kept so [toFormState] can `copy` the edited fields onto
+     * it rather than rebuilding a config from scratch. A field added to [ApiStrategyConfig] later but
+     * not wired into the editor then keeps its persisted value instead of silently resetting to its
+     * default on the next save. Null when creating a strategy, where there is nothing to preserve.
+     */
+    private val seededConfig = initial?.config
+
     var selectedTab by mutableStateOf(EditorTab.GENERAL)
     var isSaving by mutableStateOf(false)
     var errorMessage by mutableStateOf<String?>(null)
@@ -176,7 +184,7 @@ internal class ApiStrategyEditorState(
         ApiStrategyFormState(
             name = name,
             config =
-                ApiStrategyConfig(
+                (seededConfig ?: newConfig()).copy(
                     baseUrl = baseUrl,
                     authType = authType,
                     accountsEndpoint = accountsEndpoint,
@@ -206,6 +214,17 @@ internal class ApiStrategyEditorState(
                 ),
             accountCustomFields = accountCustomFields,
             txCustomFields = txCustomFields,
+        )
+
+    /** The [ApiStrategyConfig] required arguments, for the create case where there is no seed to copy. */
+    private fun newConfig() =
+        ApiStrategyConfig(
+            baseUrl = baseUrl,
+            authType = authType,
+            accountsEndpoint = accountsEndpoint,
+            transactionsEndpoint = transactionsEndpoint,
+            accountMappings = accountMappings,
+            transactionMappings = transactionMappings,
         )
 }
 

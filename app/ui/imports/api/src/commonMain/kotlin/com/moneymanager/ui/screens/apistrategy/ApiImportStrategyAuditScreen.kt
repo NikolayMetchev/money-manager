@@ -153,11 +153,11 @@ private fun diffConfigs(
         }.sortedBy { it.first }
 }
 
-private val configJson = Json { encodeDefaults = true }
+private val configEncoder = Json { encodeDefaults = true }
 
 /** Flattens a config's JSON form to `dotted.path` → rendered-value, dropping nulls. */
 private fun flattenConfig(config: ApiStrategyConfig): Map<String, String> =
-    buildMap { flattenInto(configJson.encodeToJsonElement(config), prefix = "", target = this) }
+    buildMap { flattenInto(configEncoder.encodeToJsonElement(config), prefix = "", target = this) }
 
 private fun flattenInto(
     element: JsonElement,

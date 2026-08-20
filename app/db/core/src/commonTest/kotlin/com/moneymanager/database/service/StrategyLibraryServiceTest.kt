@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -126,6 +127,13 @@ class StrategyLibraryServiceTest : DbTest() {
             val key = StrategyKey(StrategyKind.API, "MonzoTest")
             val entry = library.listLocal(version).first { it.key == key }
             assertTrue(entry.json.contains("api.monzo.com"))
+
+            // The published shape is flat - config fields sit beside version/name, never nested under
+            // a "config" key. Every already-published catalog file and synced Drive library uses it,
+            // and nesting would change every canonicalHash, so this is a compatibility guarantee.
+            assertTrue(entry.json.contains("\"baseUrl\""), "baseUrl must stay a top-level key")
+            assertFalse(entry.json.contains("\"config\""), "the config must not be nested in the export")
+            assertEquals(entry.contentHash, library.canonicalHash(key, entry.json))
 
             library.applyIncoming(key, entry.json, emptyMap())
             val apiStrategies = repositories.apiImportStrategyRepository.getAllStrategies().first()

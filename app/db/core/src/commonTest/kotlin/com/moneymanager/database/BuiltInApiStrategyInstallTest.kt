@@ -1,7 +1,13 @@
 package com.moneymanager.database
 
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
+import com.moneymanager.domain.model.apistrategy.ApiAuthType
+import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
+import com.moneymanager.domain.model.apistrategy.SecretEncoding
+import com.moneymanager.domain.model.apistrategy.SignatureEncoding
+import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
+import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInApiStrategies
 import kotlinx.coroutines.flow.first
@@ -37,15 +43,15 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .first { it.name == "Kraken" }
 
-            assertEquals(com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED, kraken.config.authType)
+            assertEquals(ApiAuthType.SIGNED, kraken.config.authType)
             val signing = assertNotNull(kraken.config.requestSigning, "signing recipe persisted")
-            assertEquals(com.moneymanager.domain.model.apistrategy.SigningAlgorithm.HMAC_SHA512, signing.algorithm)
-            assertEquals(com.moneymanager.domain.model.apistrategy.SecretEncoding.BASE64, signing.secretEncoding)
-            assertEquals(com.moneymanager.domain.model.apistrategy.SignatureEncoding.BASE64, signing.signatureEncoding)
+            assertEquals(SigningAlgorithm.HMAC_SHA512, signing.algorithm)
+            assertEquals(SecretEncoding.BASE64, signing.secretEncoding)
+            assertEquals(SignatureEncoding.BASE64, signing.signatureEncoding)
             assertEquals("Kraken", assertNotNull(kraken.config.syntheticAccount).name)
             assertTrue(kraken.config.dataEndpoints.isNotEmpty(), "data endpoints persisted")
             assertTrue(kraken.config.assetAliases.containsKey("XXBT"), "asset aliases persisted")
-            val trades = kraken.config.dataEndpoints.first { it.kind == com.moneymanager.domain.model.apistrategy.ApiEndpointKind.TRADES }
+            val trades = kraken.config.dataEndpoints.first { it.kind == ApiEndpointKind.TRADES }
             assertTrue(trades.endpoint.responseObjectValues, "trades response is a keyed object")
             assertEquals("error", trades.endpoint.errorArrayField)
             val enrichers = kraken.config.dataEndpoints.filter { it.enrichesTransfers }
@@ -62,7 +68,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .first { it.name == "Crypto.com Exchange" }
 
-            assertEquals(com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED, exchange.config.authType)
+            assertEquals(ApiAuthType.SIGNED, exchange.config.authType)
             // The generic signing recipe + single account + data endpoints survive the JSON round trip.
             assertNotNull(exchange.config.requestSigning, "signing recipe persisted")
             assertEquals("Crypto.com Exchange", assertNotNull(exchange.config.syntheticAccount).name)
@@ -88,11 +94,11 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .cryptoComExchange(now)
             val json =
                 com.moneymanager.database.json.ApiStrategyExportCodec.encode(
-                    com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
+                    ApiStrategyExportMapper
                         .toExport(original, "test"),
                 )
             val rebuilt =
-                com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper.fromExport(
+                ApiStrategyExportMapper.fromExport(
                     com.moneymanager.database.json.ApiStrategyExportCodec
                         .decode(json),
                     original.id,
