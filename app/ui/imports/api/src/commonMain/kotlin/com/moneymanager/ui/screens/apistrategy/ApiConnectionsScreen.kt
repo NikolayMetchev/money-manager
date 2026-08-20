@@ -201,7 +201,7 @@ private fun ApiConnectionRow(
                         text =
                             when {
                                 credential != null -> "Connected · ${maskToken(credential.token)}"
-                                strategy.authType == ApiAuthType.SIGNED -> "Needs an API key and secret"
+                                strategy.config.authType == ApiAuthType.SIGNED -> "Needs an API key and secret"
                                 else -> "Needs an access token"
                             },
                         style = MaterialTheme.typography.bodySmall,
@@ -255,7 +255,7 @@ private fun ApiConnectionRow(
                     onSkip = onSkip.takeIf { credential == null },
                 )
 
-                if (credential != null && strategy.signing != null) {
+                if (credential != null && strategy.config.signing != null) {
                     HorizontalDivider()
                     SigningKeySection(
                         publicKey = credential.publicKey,
@@ -286,21 +286,21 @@ private fun ApiCredentialForm(
     onSubmit: (token: String, secret: String?, onFailure: (String) -> Unit) -> Unit,
     onSkip: (() -> Unit)?,
 ) {
-    val isSigned = strategy.authType == ApiAuthType.SIGNED
+    val isSigned = strategy.config.authType == ApiAuthType.SIGNED
     var tokenInput by remember(strategy.id) { mutableStateOf("") }
     var secretInput by remember(strategy.id) { mutableStateOf("") }
     var isSaving by remember(strategy.id) { mutableStateOf(false) }
     var errorMessage by remember(strategy.id) { mutableStateOf<String?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        val instructions = strategy.connectInstructions
+        val instructions = strategy.config.connectInstructions
         if (instructions.isNotEmpty()) {
             Text("How to connect ${strategy.name}", style = MaterialTheme.typography.labelLarge)
             instructions.forEachIndexed { index, step ->
                 Text("${index + 1}. $step", style = MaterialTheme.typography.bodySmall)
             }
         }
-        strategy.tokenPageUrl?.let { url ->
+        strategy.config.tokenPageUrl?.let { url ->
             OutlinedButton(onClick = { onOpenTokenPage(url) }) { Text("Open ${strategy.name} token page") }
         }
 

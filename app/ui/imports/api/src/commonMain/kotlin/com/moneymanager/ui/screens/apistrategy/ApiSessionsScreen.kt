@@ -204,7 +204,7 @@ fun ApiSessionsScreen(
         strategy: ApiImportStrategy,
         credential: ApiCredential,
     ): ScaParams? {
-        val signing = strategy.signing ?: return null
+        val signing = strategy.config.signing ?: return null
         val privateKey = credential.privateKey ?: return null
         return ScaParams(
             challengeHeader = signing.challengeHeader,
@@ -243,14 +243,19 @@ fun ApiSessionsScreen(
                 requiresSigningByCredential =
                     allCredentials.associate { credential ->
                         val strategy = credential.strategyId?.let { strategyById[it] }
-                        credential.id to (strategy?.signing != null)
+                        credential.id to (strategy?.config?.signing != null)
                     }
                 val country = currentCountryCode()
                 transactionsBlockReasonByCredential =
                     allCredentials
                         .mapNotNull { credential ->
                             val strategy = credential.strategyId?.let { strategyById[it] }
-                            val countries = strategy?.signing?.statementCountries.orEmpty()
+                            val countries =
+                                strategy
+                                    ?.config
+                                    ?.signing
+                                    ?.statementCountries
+                                    .orEmpty()
                             if (countries.isNotEmpty() && (country == null || country !in countries)) {
                                 credential.id to
                                     "Transaction download isn't available for your region" +
@@ -282,7 +287,7 @@ fun ApiSessionsScreen(
 
             // Signed exchange strategies use the generic exchange import (trades + deposits/withdrawals)
             // instead of the bank-shaped accounts→transactions→people path.
-            if (strategy.syntheticAccount != null) {
+            if (strategy.config.syntheticAccount != null) {
                 val exchangeResult =
                     com.moneymanager.apiimporter.importApiSessionExchange(
                         apiSessionRepository = apiSessionRepository,
@@ -338,7 +343,7 @@ fun ApiSessionsScreen(
             // The dedicated people endpoint (account holders) is imported afterwards so the accounts
             // it links owners to already exist. No-op when the strategy has no people-download config.
             val peopleResult =
-                if (strategy.peopleDownload != null) {
+                if (strategy.config.peopleDownload != null) {
                     importApiSessionPeople(
                         apiSessionRepository = apiSessionRepository,
                         accountAttributeRepository = accountAttributeRepository,
@@ -551,12 +556,12 @@ fun ApiSessionsScreen(
                                                 )
                                             // Signed exchange strategies download via the generic
                                             // config-driven exchange path (signed POST/GET per endpoint).
-                                            if (strategy.syntheticAccount != null) {
+                                            if (strategy.config.syntheticAccount != null) {
                                                 // Fail with a clear message before making any signed request
                                                 // if the strategy is misconfigured or the credential has no
                                                 // secret (e.g. imported/migrated without one).
                                                 val requestSigning =
-                                                    strategy.requestSigning
+                                                    strategy.config.requestSigning
                                                         ?: return@startTask "This strategy is missing its request-signing config."
                                                 val apiSecret =
                                                     credential.apiSecret?.takeIf { it.isNotBlank() }
@@ -601,7 +606,7 @@ fun ApiSessionsScreen(
                                                     strategy = strategy,
                                                     sca = sca,
                                                 )
-                                            if (strategy.accountIdentifiersEndpoint != null) {
+                                            if (strategy.config.accountIdentifiersEndpoint != null) {
                                                 update("Downloading account identifiers...")
                                                 downloadApiSessionAccountIdentifiers(
                                                     token = credential.token,
@@ -632,7 +637,7 @@ fun ApiSessionsScreen(
                                                     )
                                                 }
                                             val people =
-                                                if (strategy.peopleDownload != null) {
+                                                if (strategy.config.peopleDownload != null) {
                                                     update("Downloading people...")
                                                     downloadApiSessionPeople(
                                                         token = credential.token,

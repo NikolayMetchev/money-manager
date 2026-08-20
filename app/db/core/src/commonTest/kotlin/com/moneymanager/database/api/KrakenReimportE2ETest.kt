@@ -157,10 +157,13 @@ class KrakenReimportE2ETest : DbTest() {
             val strategyBeforeBridge = repositories.apiImportStrategyRepository.getStrategyByName("Kraken").first()!!
             repositories.importEngine.updateApiStrategy(
                 strategyBeforeBridge.copy(
-                    internalTransferReconcile =
-                        ApiInternalTransferReconcile(
-                            bridges = listOf(ApiAccountBridge(otherAccountName = "Monzo")),
-                            windowSeconds = 86_400,
+                    config =
+                        strategyBeforeBridge.config.copy(
+                            internalTransferReconcile =
+                                ApiInternalTransferReconcile(
+                                    bridges = listOf(ApiAccountBridge(otherAccountName = "Monzo")),
+                                    windowSeconds = 86_400,
+                                ),
                         ),
                 ),
             )

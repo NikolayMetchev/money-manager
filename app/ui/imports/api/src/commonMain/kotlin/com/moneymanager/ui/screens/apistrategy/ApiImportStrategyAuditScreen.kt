@@ -6,10 +6,8 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.SourceRecord
-import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
-import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.ui.audit.AuditDiffCard
@@ -23,6 +21,13 @@ import com.moneymanager.ui.audit.NoVisibleChangesText
 import com.moneymanager.ui.audit.SourceInfoSection
 import com.moneymanager.ui.audit.changedOrUnchanged
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlin.time.Instant
 
 @Composable
@@ -39,23 +44,11 @@ fun ApiImportStrategyAuditScreen(
         loadData = {
             val entries = auditRepository.getAuditHistoryForApiImportStrategy(strategyId)
             val currentStrategy = apiImportStrategyRepository.getStrategyById(strategyId).first()
-            val currentConfig =
-                currentStrategy?.let {
-                    ApiStrategyConfig(
-                        baseUrl = it.baseUrl,
-                        authType = it.authType,
-                        accountsEndpoint = it.accountsEndpoint,
-                        transactionsEndpoint = it.transactionsEndpoint,
-                        accountMappings = it.accountMappings,
-                        transactionMappings = it.transactionMappings,
-                        peopleMappings = it.peopleMappings,
-                    )
-                }
             val diffs =
                 computeApiImportStrategyAuditDiffs(
                     entries = entries,
                     currentName = currentStrategy?.name,
-                    currentConfig = currentConfig,
+                    currentConfig = currentStrategy?.config,
                 )
             AuditScreenData(
                 title = "API Strategy Audit: ${currentStrategy?.name ?: strategyId}",
@@ -141,8 +134,10 @@ private fun computeApiImportStrategyAuditDiffs(
     }
 
 /**
- * Flattens two configs to label→value maps and returns only the fields that differ.
- * [oldConfig] is the state *before* this change; [newConfig] is the state *after*.
+ * Diffs two configs field by field and returns only what differs, most readable label first.
+ * Both sides are flattened through the config's own JSON form rather than a hand-maintained field
+ * list, so every field — including ones added later — is diffed; [labelForPath] then gives each one
+ * a human label. [oldConfig] is the state *before* this change; [newConfig] is the state *after*.
  */
 private fun diffConfigs(
     oldConfig: ApiStrategyConfig,
@@ -150,94 +145,102 @@ private fun diffConfigs(
 ): List<Pair<String, FieldChange<String>>> {
     val old = flattenConfig(oldConfig)
     val new = flattenConfig(newConfig)
-    return old.keys
-        .union(new.keys)
-        .sorted()
-        .mapNotNull { key ->
-            val o = old[key] ?: ""
-            val n = new[key] ?: ""
-            if (o != n) key to FieldChange.Changed(o, n) else null
-        }
+    return (old.keys + new.keys)
+        .mapNotNull { path ->
+            val o = old[path].orEmpty()
+            val n = new[path].orEmpty()
+            if (o != n) labelForPath(path) to FieldChange.Changed(o, n) else null
+        }.sortedBy { it.first }
 }
 
+private val configJson = Json { encodeDefaults = true }
+
+/** Flattens a config's JSON form to `dotted.path` → rendered-value, dropping nulls. */
 private fun flattenConfig(config: ApiStrategyConfig): Map<String, String> =
-    buildMap {
-        put("Base URL", config.baseUrl)
-        put("Auth type", config.authType.name)
-        flattenEndpoint("Accounts endpoint", config.accountsEndpoint, this)
-        flattenEndpoint("Transactions endpoint", config.transactionsEndpoint, this)
-        put("Account ID field", config.accountMappings.idField)
-        put("Account description field", config.accountMappings.descriptionField)
-        config.accountMappings.ownerNameField?.let { put("Account owner name field", it) }
-        if (config.accountMappings.customFields.isNotEmpty()) {
-            put(
-                "Account custom fields",
-                config.accountMappings.customFields.entries
-                    .sortedBy { it.key }
-                    .joinToString { "${it.key}=${it.value}" },
-            )
-        }
-        put("Transaction amount field", config.transactionMappings.amountField)
-        put("Transaction timestamp field", config.transactionMappings.timestampField)
-        put("Transaction currency field", config.transactionMappings.currencyField)
-        put("Transaction description field", config.transactionMappings.descriptionField)
-        config.transactionMappings.merchantNameField?.let { put("Merchant name field", it) }
-        config.transactionMappings.counterpartyNameField?.let { put("Counterparty name field", it) }
-        config.transactionMappings.counterpartyIdField?.let { put("Counterparty ID field", it) }
-        config.transactionMappings.declineReasonField?.let { put("Decline reason field", it) }
-        config.transactionMappings.localAmountField?.let { put("Local amount field", it) }
-        config.transactionMappings.localCurrencyField?.let { put("Local currency field", it) }
-        if (config.transactionMappings.customFields.isNotEmpty()) {
-            put(
-                "Transaction custom fields",
-                config.transactionMappings.customFields.entries
-                    .sortedBy { it.key }
-                    .joinToString { "${it.key}=${it.value}" },
-            )
-        }
-        val people = config.peopleMappings
-        put("Counterparty object field", people.counterpartyObjectField)
-        put("Beneficiary account type field", people.beneficiaryAccountTypeField)
-        put("Personal beneficiary account type value", people.personalBeneficiaryAccountTypeValue)
-        put("Counterparty name field (people)", people.counterpartyNameField)
-        put("Counterparty user ID field", people.counterpartyUserIdField)
-        put("Counterparty sort code field", people.counterpartySortCodeField)
-        put("Counterparty account number field", people.counterpartyAccountNumberField)
-        put("Counterparty service user number field", people.counterpartyServiceUserNumberField)
-        put("Counterparty account ID field", people.counterpartyAccountIdField)
-    }
+    buildMap { flattenInto(configJson.encodeToJsonElement(config), prefix = "", target = this) }
 
-private fun flattenEndpoint(
+private fun flattenInto(
+    element: JsonElement,
     prefix: String,
-    endpoint: ApiEndpointConfig,
-    map: MutableMap<String, String>,
+    target: MutableMap<String, String>,
 ) {
-    map["$prefix path"] = endpoint.path
-    map["$prefix response key"] = endpoint.responseArrayKey
-    if (endpoint.queryParams.isNotEmpty()) {
-        map["$prefix query params"] =
-            endpoint.queryParams.joinToString { p ->
-                "${p.name}=${p.value ?: p.dynamicSource ?: ""}"
-            }
-    }
-    endpoint.pagination?.let { pag ->
-        map["$prefix pagination mode"] = pag.mode.name
-        when (pag.mode) {
-            PaginationMode.CURSOR -> {
-                map["$prefix pagination limit param"] = pag.limitParam
-                map["$prefix pagination limit"] = pag.limitValue.toString()
-                map["$prefix pagination cursor param"] = pag.cursorParam
-                map["$prefix pagination cursor field"] = pag.cursorResponseField
-            }
-            PaginationMode.DATE_WINDOW -> {
-                map["$prefix pagination start param"] = pag.startParam
-                map["$prefix pagination end param"] = pag.endParam
-                map["$prefix pagination window days"] = pag.windowDays.toString()
-                map["$prefix pagination lookback days"] = pag.lookbackDays.toString()
-            }
-        }
+    when (element) {
+        is JsonObject -> element.forEach { (key, value) -> flattenInto(value, if (prefix.isEmpty()) key else "$prefix.$key", target) }
+        is JsonArray ->
+            element.forEachIndexed { index, value -> flattenInto(value, "$prefix[$index]", target) }
+        is JsonPrimitive -> if (element !is JsonNull) target[prefix] = element.content
     }
 }
+
+// ─── Field labels ─────────────────────────────────────────────────────────────
+
+/**
+ * Human names for the config's top-level sections, used as the prefix of every label beneath them
+ * (`accountMappings.idField` → "Account ID field"). An empty prefix drops the section from the label
+ * entirely, and a section missing here falls back to its own humanized name — so a config field added
+ * later still gets a readable label instead of disappearing from the diff.
+ */
+private val sectionLabels =
+    mapOf(
+        "accountMappings" to "Account",
+        "transactionMappings" to "Transaction",
+        "peopleMappings" to "",
+        "accountsEndpoint" to "Accounts endpoint",
+        "transactionsEndpoint" to "Transactions endpoint",
+        "accountIdentifiersEndpoint" to "Account identifiers endpoint",
+        "ancestorEndpoints" to "Ancestor endpoint",
+        "builtInCounterpartyRules" to "Counterparty rule",
+        "dataEndpoints" to "Data endpoint",
+        "peopleDownload" to "People download",
+        "requestSigning" to "Request signing",
+        "syntheticAccount" to "Synthetic account",
+        "internalTransferReconcile" to "Internal transfer reconcile",
+    )
+
+private val acronyms =
+    mapOf(
+        "url" to "URL",
+        "id" to "ID",
+        "ids" to "IDs",
+        "api" to "API",
+        "json" to "JSON",
+        "http" to "HTTP",
+        "csv" to "CSV",
+        "qif" to "QIF",
+        "iso" to "ISO",
+        "utc" to "UTC",
+        "hmac" to "HMAC",
+    )
+
+private val camelBoundary = Regex("(?<=[a-z0-9])(?=[A-Z])")
+private val camelIdentifier = Regex("[a-z][A-Za-z0-9]*")
+private val arrayIndexSuffix = Regex("""\[(\d+)]$""")
+
+/** Turns a flattened JSON path into a display label, e.g. `accountMappings.idField` → "Account ID field". */
+internal fun labelForPath(path: String): String {
+    val words = mutableListOf<String>()
+    path.split('.').forEachIndexed { depth, rawSegment ->
+        val index = arrayIndexSuffix.find(rawSegment)?.groupValues?.get(1)
+        val segment = index?.let { rawSegment.removeSuffix("[$it]") } ?: rawSegment
+        val label = if (depth == 0) sectionLabels[segment] ?: humanize(segment) else humanize(segment)
+        if (label.isNotEmpty()) words += label
+        // 1-based so "dataEndpoints[0]" reads as the first data endpoint, matching the editor's numbering.
+        if (index != null) words += "#${index.toInt() + 1}"
+    }
+    return words.joinToString(" ").replaceFirstChar { it.uppercase() }
+}
+
+/**
+ * Splits a camelCase field name into lower-case words with known acronyms restored. Segments that
+ * are not camelCase identifiers are map keys the user named (a custom field, an asset alias), so
+ * they are left exactly as typed.
+ */
+private fun humanize(segment: String): String =
+    if (!camelIdentifier.matches(segment)) {
+        segment
+    } else {
+        segment.split(camelBoundary).joinToString(" ") { word -> acronyms[word.lowercase()] ?: word.lowercase() }
+    }
 
 // ─── Diff card ────────────────────────────────────────────────────────────────
 

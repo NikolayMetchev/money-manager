@@ -3,6 +3,7 @@ package com.moneymanager.domain.model.apistrategy
 import com.moneymanager.domain.model.serialization.SortedListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
+import com.moneymanager.domain.model.serialization.SortedStringToLongMapSerializer
 import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.Serializable
 
@@ -15,7 +16,7 @@ enum class ApiAuthType {
     BEARER_TOKEN,
 
     /**
-     * Proactive per-request signing driven by [ApiImportStrategy.requestSigning] — an HMAC signature
+     * Proactive per-request signing driven by [ApiStrategyConfig.requestSigning] — an HMAC signature
      * computed over a configurable message and placed in a header/query/body field on every request.
      * Used by exchange APIs (Crypto.com, and later Binance/Kraken) that authenticate with an
      * api-key + secret rather than a bearer token.
@@ -178,7 +179,7 @@ data class ApiEndpointConfig(
     /**
      * Relative rate-limit cost of one request to this endpoint (e.g. Kraken's ledger/trade-history
      * calls cost 2 counter units against 1 for other endpoints). Multiplies the strategy's
-     * [ApiImportStrategy.rateLimitMillis] delay so a mixed-cost exchange doesn't have to pace every
+     * [ApiStrategyConfig.rateLimitMillis] delay so a mixed-cost exchange doesn't have to pace every
      * endpoint as slowly as its most expensive one.
      */
     val requestCostWeight: Int = 1,
@@ -760,7 +761,7 @@ data class ApiRequestSigningConfig(
 /** What kind of imported record an [ApiDataEndpoint] produces. */
 @Serializable
 enum class ApiEndpointKind {
-    /** A bank-style single-asset transaction feed (the legacy [ApiImportStrategy.transactionsEndpoint] shape). */
+    /** A bank-style single-asset transaction feed (the legacy [ApiStrategyConfig.transactionsEndpoint] shape). */
     BANK_TRANSACTIONS,
 
     /** Executed exchange fills — cross-asset trades (two legs). */
@@ -923,8 +924,9 @@ data class ApiInternalTransferReconcile(
 )
 
 /**
- * Decoded, domain-level view of an API import strategy's full configuration.
- * Stored as JSON in the database; decoded by the db layer for use across all layers.
+ * Decoded, domain-level view of an API import strategy's full configuration — and the portable JSON
+ * shape it is persisted (`api_import_strategy.config_json`) and exported in. Holds no database entity
+ * references (only URLs, JSON field paths and enums), so it is fully portable as-is.
  *
  * @property ancestorEndpoints Resource endpoints fetched before accounts whose items supply context
  *                             ids/fields for templating descendant endpoint paths and params
@@ -932,6 +934,7 @@ data class ApiInternalTransferReconcile(
  * @property builtInCounterpartyRules Declarative rules routing matching transactions to a single
  *                                    consolidated built-in counterparty account (e.g. ATM).
  */
+@Serializable
 data class ApiStrategyConfig(
     val baseUrl: String,
     val authType: ApiAuthType,
@@ -939,9 +942,19 @@ data class ApiStrategyConfig(
     val transactionsEndpoint: ApiEndpointConfig,
     val accountMappings: ApiAccountMappings,
     val transactionMappings: ApiTransactionMappings,
-    val peopleMappings: ApiPeopleMappings,
+    val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
+    /**
+     * Optional per-account endpoint fetched after accounts that returns the account's own bank details
+     * (sort code + account number) when they are not present on the accounts response itself (e.g.
+     * Starling's `/accounts/{account.id}/identifiers`). Those fields within its response are read using
+     * [accountMappings] sortCode/accountNumber.
+     */
     val accountIdentifiersEndpoint: ApiEndpointConfig? = null,
+    // Order is semantic (referenced by position via "ancestor[N]." dynamicSource expressions) - keeps
+    // default insertion-order serialization.
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
+    // First-match-wins (see resolveBuiltInCounterpartyType) - order is semantic, keeps default
+    // insertion-order serialization.
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val signing: ApiSigningConfig? = null,
     val peopleDownload: ApiPersonImportConfig? = null,
@@ -958,6 +971,7 @@ data class ApiStrategyConfig(
      * Multiple data endpoints (trades/orders/deposits/withdrawals) for exchange strategies. When
      * non-empty this supersedes [transactionsEndpoint] for the download/import loop.
      */
+    @Serializable(with = SortedDataEndpointListSerializer::class)
     val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
     /** When set, import into one fixed account holding all assets instead of enumerating accounts. */
     val syntheticAccount: ApiSyntheticAccount? = null,
@@ -969,6 +983,7 @@ data class ApiStrategyConfig(
      * a trade or transfer item before currency/crypto-asset lookup. Empty for providers that already
      * use canonical codes.
      */
+    @Serializable(with = SortedStringToStringMapSerializer::class)
     val assetAliases: Map<String, String> = emptyMap(),
     /** Deep-link to the provider's own page for creating/managing API tokens; null shows no button. */
     val tokenPageUrl: String? = null,
@@ -981,6 +996,7 @@ data class ApiStrategyConfig(
     /** Delay between exchange-download requests; null uses the download function's own default. */
     val rateLimitMillis: Long? = null,
     /** Case-insensitive substrings marking an error response as transient rate-limiting to retry. */
+    @Serializable(with = SortedStringListSerializer::class)
     val rateLimitErrorSubstrings: List<String> = emptyList(),
     /** Base backoff before the first retry of a rate-limited request; doubles each subsequent retry. */
     val rateLimitBackoffMillis: Long = 5_000L,
@@ -991,7 +1007,14 @@ data class ApiStrategyConfig(
      * Earn-holding codes "XETH.F"/"XETH.S" -> "XETH"). Without this, a suffixed code fails asset
      * resolution and its transfer is silently dropped.
      */
+    @Serializable(with = SortedStringSetSerializer::class)
     val assetSuffixesToStrip: Set<String> = emptySet(),
-    /** Overrides the ISO 4217 minor-unit divisor for a MINOR_UNITS_INTEGER amount (see the field doc). */
+    /**
+     * Overrides [com.moneymanager.domain.model.IsoMinorUnitDivisors]' per-currency divisor for
+     * interpreting a [ApiAmountFormat.MINOR_UNITS_INTEGER] amount (a bank API's raw integer in its own
+     * minor units). A provider whose minor-unit width doesn't follow the ISO 4217 standard for a given
+     * currency can be corrected here instead of the global table.
+     */
+    @Serializable(with = SortedStringToLongMapSerializer::class)
     val minorUnitDivisorOverrides: Map<String, Long> = emptyMap(),
 )

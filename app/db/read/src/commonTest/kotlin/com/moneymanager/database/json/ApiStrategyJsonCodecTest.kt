@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
+import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
@@ -33,7 +34,7 @@ import kotlin.test.assertTrue
 
 class ApiStrategyJsonCodecTest {
     private fun config(pagination: ApiPaginationConfig?) =
-        ApiStrategyConfigJson(
+        ApiStrategyConfig(
             baseUrl = "https://example.com",
             authType = ApiAuthType.BEARER_TOKEN,
             accountsEndpoint = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts"),

@@ -37,18 +37,18 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .first { it.name == "Kraken" }
 
-            assertEquals(com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED, kraken.authType)
-            val signing = assertNotNull(kraken.requestSigning, "signing recipe persisted")
+            assertEquals(com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED, kraken.config.authType)
+            val signing = assertNotNull(kraken.config.requestSigning, "signing recipe persisted")
             assertEquals(com.moneymanager.domain.model.apistrategy.SigningAlgorithm.HMAC_SHA512, signing.algorithm)
             assertEquals(com.moneymanager.domain.model.apistrategy.SecretEncoding.BASE64, signing.secretEncoding)
             assertEquals(com.moneymanager.domain.model.apistrategy.SignatureEncoding.BASE64, signing.signatureEncoding)
-            assertEquals("Kraken", assertNotNull(kraken.syntheticAccount).name)
-            assertTrue(kraken.dataEndpoints.isNotEmpty(), "data endpoints persisted")
-            assertTrue(kraken.assetAliases.containsKey("XXBT"), "asset aliases persisted")
-            val trades = kraken.dataEndpoints.first { it.kind == com.moneymanager.domain.model.apistrategy.ApiEndpointKind.TRADES }
+            assertEquals("Kraken", assertNotNull(kraken.config.syntheticAccount).name)
+            assertTrue(kraken.config.dataEndpoints.isNotEmpty(), "data endpoints persisted")
+            assertTrue(kraken.config.assetAliases.containsKey("XXBT"), "asset aliases persisted")
+            val trades = kraken.config.dataEndpoints.first { it.kind == com.moneymanager.domain.model.apistrategy.ApiEndpointKind.TRADES }
             assertTrue(trades.endpoint.responseObjectValues, "trades response is a keyed object")
             assertEquals("error", trades.endpoint.errorArrayField)
-            val enrichers = kraken.dataEndpoints.filter { it.enrichesTransfers }
+            val enrichers = kraken.config.dataEndpoints.filter { it.enrichesTransfers }
             assertTrue(enrichers.isNotEmpty(), "at least one enrichment-only endpoint persisted")
         }
 
@@ -62,15 +62,15 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .first { it.name == "Crypto.com Exchange" }
 
-            assertEquals(com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED, exchange.authType)
+            assertEquals(com.moneymanager.domain.model.apistrategy.ApiAuthType.SIGNED, exchange.config.authType)
             // The generic signing recipe + single account + data endpoints survive the JSON round trip.
-            assertNotNull(exchange.requestSigning, "signing recipe persisted")
-            assertEquals("Crypto.com Exchange", assertNotNull(exchange.syntheticAccount).name)
-            assertTrue(exchange.dataEndpoints.isNotEmpty(), "data endpoints persisted")
-            assertNotNull(exchange.internalTransferReconcile, "internal-transfer reconciliation persisted")
+            assertNotNull(exchange.config.requestSigning, "signing recipe persisted")
+            assertEquals("Crypto.com Exchange", assertNotNull(exchange.config.syntheticAccount).name)
+            assertTrue(exchange.config.dataEndpoints.isNotEmpty(), "data endpoints persisted")
+            assertNotNull(exchange.config.internalTransferReconcile, "internal-transfer reconciliation persisted")
             assertEquals(
                 "Crypto.com",
-                exchange.internalTransferReconcile!!
+                exchange.config.internalTransferReconcile!!
                     .bridges
                     .single()
                     .otherAccountName,
@@ -98,13 +98,13 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     original.id,
                     now,
                 )
-            assertEquals(original.authType, rebuilt.authType)
-            assertEquals(original.requestSigning, rebuilt.requestSigning)
+            assertEquals(original.config.authType, rebuilt.config.authType)
+            assertEquals(original.config.requestSigning, rebuilt.config.requestSigning)
             // dataEndpoints round-trips through a canonical (sorted) order - see
             // SortedDataEndpointListSerializer - so compare as sets rather than ordered lists.
-            assertEquals(original.dataEndpoints.toSet(), rebuilt.dataEndpoints.toSet())
-            assertEquals(original.syntheticAccount, rebuilt.syntheticAccount)
-            assertEquals(original.internalTransferReconcile, rebuilt.internalTransferReconcile)
+            assertEquals(original.config.dataEndpoints.toSet(), rebuilt.config.dataEndpoints.toSet())
+            assertEquals(original.config.syntheticAccount, rebuilt.config.syntheticAccount)
+            assertEquals(original.config.internalTransferReconcile, rebuilt.config.internalTransferReconcile)
         }
 
     @Test
@@ -117,28 +117,28 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .first { it.name == "Starling" }
 
-            assertEquals("https://api.starlingbank.com", starling.baseUrl)
-            assertEquals("/api/v2/accounts", starling.accountsEndpoint.path)
-            assertEquals("accounts", starling.accountsEndpoint.responseArrayKey)
+            assertEquals("https://api.starlingbank.com", starling.config.baseUrl)
+            assertEquals("/api/v2/accounts", starling.config.accountsEndpoint.path)
+            assertEquals("accounts", starling.config.accountsEndpoint.responseArrayKey)
             assertEquals(
                 "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
-                starling.transactionsEndpoint.path,
+                starling.config.transactionsEndpoint.path,
             )
-            assertEquals("feedItems", starling.transactionsEndpoint.responseArrayKey)
+            assertEquals("feedItems", starling.config.transactionsEndpoint.responseArrayKey)
             // Full history is returned in one response, so no pagination is configured.
-            assertEquals(null, starling.transactionsEndpoint.pagination)
+            assertEquals(null, starling.config.transactionsEndpoint.pagination)
 
-            assertEquals("accountUid", starling.accountMappings.idField)
-            assertEquals("currency", starling.accountMappings.currencyField)
+            assertEquals("accountUid", starling.config.accountMappings.idField)
+            assertEquals("currency", starling.config.accountMappings.currencyField)
             // Own bank details come from the per-account identifiers endpoint, not the /accounts response.
-            assertEquals("bankIdentifier", starling.accountMappings.sortCodeField)
-            assertEquals("accountIdentifier", starling.accountMappings.accountNumberField)
+            assertEquals("bankIdentifier", starling.config.accountMappings.sortCodeField)
+            assertEquals("accountIdentifier", starling.config.accountMappings.accountNumberField)
             assertEquals(
                 "/api/v2/accounts/{account.id}/identifiers",
-                assertNotNull(starling.accountIdentifiersEndpoint, "Starling should configure an identifiers endpoint").path,
+                assertNotNull(starling.config.accountIdentifiersEndpoint, "Starling should configure an identifiers endpoint").path,
             )
 
-            with(starling.transactionMappings) {
+            with(starling.config.transactionMappings) {
                 assertEquals("amount.minorUnits", amountField)
                 assertEquals(ApiAmountFormat.MINOR_UNITS_INTEGER, amountFormat)
                 assertEquals(ApiSignSource.FIELD, signSource)
@@ -153,7 +153,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             }
 
             // PAYEE/SENDER counterparties are treated as people, read from flat feed-item fields.
-            with(starling.peopleMappings) {
+            with(starling.config.peopleMappings) {
                 assertEquals("", counterpartyObjectField)
                 assertEquals("counterPartyType", beneficiaryAccountTypeField)
                 assertEquals(setOf("PAYEE", "SENDER"), personalBeneficiaryAccountTypeValues)
@@ -165,7 +165,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                 assertTrue(preferBankIdentity)
             }
 
-            val people = assertNotNull(starling.peopleDownload, "Starling should configure a people download")
+            val people = assertNotNull(starling.config.peopleDownload, "Starling should configure a people download")
             assertEquals("/api/v2/account-holder/individual", people.endpoint.path)
             assertTrue(people.ownsAllAccounts, "Starling's global holder should own all accounts")
         }

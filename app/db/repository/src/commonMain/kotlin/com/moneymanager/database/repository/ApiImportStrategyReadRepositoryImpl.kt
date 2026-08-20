@@ -43,41 +43,14 @@ class ApiImportStrategyReadRepositoryImpl(
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }
 
-    private fun toDomain(entity: Api_import_strategy): ApiImportStrategy {
-        val config = ApiStrategyJsonCodec.decode(entity.config_json)
-        return ApiImportStrategy(
+    private fun toDomain(entity: Api_import_strategy): ApiImportStrategy =
+        ApiImportStrategy(
             id = ApiImportStrategyId(Uuid.parse(entity.id)),
             name = entity.name,
-            baseUrl = config.baseUrl,
-            authType = config.authType,
-            accountsEndpoint = config.accountsEndpoint,
-            transactionsEndpoint = config.transactionsEndpoint,
-            accountMappings = config.accountMappings,
-            transactionMappings = config.transactionMappings,
-            peopleMappings = config.peopleMappings,
-            accountIdentifiersEndpoint = config.accountIdentifiersEndpoint,
-            ancestorEndpoints = config.ancestorEndpoints,
-            builtInCounterpartyRules = config.builtInCounterpartyRules,
-            signing = config.signing,
-            peopleDownload = config.peopleDownload,
-            personExternalIdAttribute = config.personExternalIdAttribute,
-            requestSigning = config.requestSigning,
-            dataEndpoints = config.dataEndpoints,
-            syntheticAccount = config.syntheticAccount,
-            internalTransferReconcile = config.internalTransferReconcile,
-            assetAliases = config.assetAliases,
-            tokenPageUrl = config.tokenPageUrl,
-            connectInstructions = config.connectInstructions,
-            rateLimitMillis = config.rateLimitMillis,
-            rateLimitErrorSubstrings = config.rateLimitErrorSubstrings,
-            rateLimitBackoffMillis = config.rateLimitBackoffMillis,
-            maxRateLimitRetries = config.maxRateLimitRetries,
-            assetSuffixesToStrip = config.assetSuffixesToStrip,
-            minorUnitDivisorOverrides = config.minorUnitDivisorOverrides,
+            config = ApiStrategyJsonCodec.decode(entity.config_json),
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
             revisionId = entity.revision_id,
             configJson = entity.config_json,
         )
-    }
 }

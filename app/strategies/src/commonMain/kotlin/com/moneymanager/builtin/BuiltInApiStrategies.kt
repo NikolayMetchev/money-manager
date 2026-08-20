@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
+import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
@@ -61,70 +62,73 @@ object BuiltInApiStrategies {
         ApiImportStrategy(
             id = ApiImportStrategyId(monzoStrategyId),
             name = "Monzo",
-            baseUrl = "https://api.monzo.com",
-            authType = ApiAuthType.BEARER_TOKEN,
-            accountsEndpoint =
-                ApiEndpointConfig(
-                    path = "/accounts",
-                    responseArrayKey = "accounts",
-                ),
-            transactionsEndpoint =
-                ApiEndpointConfig(
-                    path = "/transactions",
-                    responseArrayKey = "transactions",
-                    queryParams =
-                        listOf(
-                            ApiQueryParam(name = "account_id", dynamicSource = "account.id"),
+            config =
+                ApiStrategyConfig(
+                    baseUrl = "https://api.monzo.com",
+                    authType = ApiAuthType.BEARER_TOKEN,
+                    accountsEndpoint =
+                        ApiEndpointConfig(
+                            path = "/accounts",
+                            responseArrayKey = "accounts",
                         ),
-                    pagination = ApiPaginationConfig(),
-                ),
-            accountMappings =
-                ApiAccountMappings(
-                    ownerNameField = "preferred_name",
-                    // Monzo's account "description" is the account holder's own user id, not a
-                    // display name — Monzo's API has no field meant for this, so use a fixed name
-                    // ("Monzo Joint" for a joint account, detected by having more than one owner).
-                    staticAccountName = "Monzo",
-                    // Monzo's cashback/rewards opt-in is a pseudo-account with no bank details and (for
-                    // most users) no activity — it would otherwise collide with the main "Monzo" name.
-                    accountNameRules =
-                        listOf(
-                            ApiAccountNameRule(
-                                suffix = "Rewards",
-                                predicates = listOf(RulePredicate(path = "type", op = PredicateOp.EQUALS, value = "uk_rewards")),
-                            ),
+                    transactionsEndpoint =
+                        ApiEndpointConfig(
+                            path = "/transactions",
+                            responseArrayKey = "transactions",
+                            queryParams =
+                                listOf(
+                                    ApiQueryParam(name = "account_id", dynamicSource = "account.id"),
+                                ),
+                            pagination = ApiPaginationConfig(),
                         ),
-                ),
-            transactionMappings =
-                ApiTransactionMappings(
-                    merchantNameField = "merchant.name",
-                    counterpartyNameField = "counterparty.name",
-                    counterpartyIdField = "counterparty.id",
-                    declineReasonField = "decline_reason",
-                    localAmountField = "local_amount",
-                    localCurrencyField = "local_currency",
-                    // Foreign ATM withdrawals above the fee-free allowance carry a charge in
-                    // `atm_fees_detailed.fee_amount` (integer minor units; null/0 otherwise). Import it
-                    // as its own linked fee transfer. Monzo's `amount` is gross (= withdrawal_amount +
-                    // fee_amount), so the fee is carved out of the main transfer rather than added on top.
-                    feeAmountField = "atm_fees_detailed.fee_amount",
-                    feeIncludedInAmount = true,
-                ),
-            // Monzo issues a throwaway `anonuser_…` user id for every bank transfer, so the same person
-            // would otherwise become one counterparty account per transaction. Mark the prefix ephemeral
-            // so such no-bank counterparties are matched by name instead.
-            peopleMappings = ApiPeopleMappings(ephemeralCounterpartyIdPrefixes = setOf("anonuser_")),
-            builtInCounterpartyRules = monzoAtmRules,
-            personExternalIdAttribute = "monzo-external-id",
-            tokenPageUrl = "https://developers.monzo.com/",
-            connectInstructions =
-                listOf(
-                    "Open the Monzo Developer Playground in your browser.",
-                    "Log in with your Monzo account credentials.",
-                    "Monzo will send a magic link to your email or app. Approve the login.",
-                    "Copy the access token shown on the playground page.",
-                    "Paste the token below and save.",
-                    "In the Monzo app, approve the API access notification so transactions can be read.",
+                    accountMappings =
+                        ApiAccountMappings(
+                            ownerNameField = "preferred_name",
+                            // Monzo's account "description" is the account holder's own user id, not a
+                            // display name — Monzo's API has no field meant for this, so use a fixed name
+                            // ("Monzo Joint" for a joint account, detected by having more than one owner).
+                            staticAccountName = "Monzo",
+                            // Monzo's cashback/rewards opt-in is a pseudo-account with no bank details and (for
+                            // most users) no activity — it would otherwise collide with the main "Monzo" name.
+                            accountNameRules =
+                                listOf(
+                                    ApiAccountNameRule(
+                                        suffix = "Rewards",
+                                        predicates = listOf(RulePredicate(path = "type", op = PredicateOp.EQUALS, value = "uk_rewards")),
+                                    ),
+                                ),
+                        ),
+                    transactionMappings =
+                        ApiTransactionMappings(
+                            merchantNameField = "merchant.name",
+                            counterpartyNameField = "counterparty.name",
+                            counterpartyIdField = "counterparty.id",
+                            declineReasonField = "decline_reason",
+                            localAmountField = "local_amount",
+                            localCurrencyField = "local_currency",
+                            // Foreign ATM withdrawals above the fee-free allowance carry a charge in
+                            // `atm_fees_detailed.fee_amount` (integer minor units; null/0 otherwise). Import it
+                            // as its own linked fee transfer. Monzo's `amount` is gross (= withdrawal_amount +
+                            // fee_amount), so the fee is carved out of the main transfer rather than added on top.
+                            feeAmountField = "atm_fees_detailed.fee_amount",
+                            feeIncludedInAmount = true,
+                        ),
+                    // Monzo issues a throwaway `anonuser_…` user id for every bank transfer, so the same person
+                    // would otherwise become one counterparty account per transaction. Mark the prefix ephemeral
+                    // so such no-bank counterparties are matched by name instead.
+                    peopleMappings = ApiPeopleMappings(ephemeralCounterpartyIdPrefixes = setOf("anonuser_")),
+                    builtInCounterpartyRules = monzoAtmRules,
+                    personExternalIdAttribute = "monzo-external-id",
+                    tokenPageUrl = "https://developers.monzo.com/",
+                    connectInstructions =
+                        listOf(
+                            "Open the Monzo Developer Playground in your browser.",
+                            "Log in with your Monzo account credentials.",
+                            "Monzo will send a magic link to your email or app. Approve the login.",
+                            "Copy the access token shown on the playground page.",
+                            "Paste the token below and save.",
+                            "In the Monzo app, approve the API access notification so transactions can be read.",
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -173,84 +177,87 @@ object BuiltInApiStrategies {
         ApiImportStrategy(
             id = ApiImportStrategyId(wiseStrategyId),
             name = "Wise",
-            baseUrl = "https://api.wise.com",
-            authType = ApiAuthType.BEARER_TOKEN,
-            ancestorEndpoints =
-                listOf(
-                    ApiEndpointConfig(path = "/v1/profiles", responseArrayKey = ""),
-                ),
-            accountsEndpoint =
-                ApiEndpointConfig(
-                    path = "/v4/profiles/{ancestor[0].id}/balances",
-                    responseArrayKey = "",
-                    queryParams = listOf(ApiQueryParam(name = "types", value = "STANDARD")),
-                ),
-            transactionsEndpoint =
-                ApiEndpointConfig(
-                    path = "/v1/profiles/{ancestor[0].id}/balance-statements/{account.id}/statement.json",
-                    responseArrayKey = "transactions",
-                    queryParams =
+            config =
+                ApiStrategyConfig(
+                    baseUrl = "https://api.wise.com",
+                    authType = ApiAuthType.BEARER_TOKEN,
+                    ancestorEndpoints =
                         listOf(
-                            ApiQueryParam(name = "currency", dynamicSource = "account.currency"),
-                            ApiQueryParam(name = "type", value = "FLAT"),
+                            ApiEndpointConfig(path = "/v1/profiles", responseArrayKey = ""),
                         ),
-                    // startParam/endParam/windowDays default to Wise's values (intervalStart,
-                    // intervalEnd, 469).
-                    pagination = ApiPaginationConfig(mode = PaginationMode.DATE_WINDOW),
-                ),
-            accountMappings =
-                ApiAccountMappings(
-                    // Balances only have a "name" when the user explicitly names them (null by
-                    // default), which made account names fall back to the opaque balance id.
-                    // Use the currency code instead so accounts are named "Wise: EUR" etc.,
-                    // matching the accounts the built-in Wise CSV strategy resolves per-row.
-                    descriptionField = "currency",
-                    ownersArrayField = null,
-                    currencyField = "currency",
-                ),
-            transactionMappings =
-                ApiTransactionMappings(
-                    amountField = "amount.value",
-                    currencyField = "amount.currency",
-                    timestampField = "date",
-                    descriptionField = "details.description",
-                    amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                    signSource = ApiSignSource.FIELD,
-                    signField = "type",
-                    creditValues = setOf("CREDIT"),
-                    idField = "referenceNumber",
-                    merchantNameField = "details.merchant.name",
-                    counterpartyNameField = "details.senderName",
-                ),
-            // Wise balance statements are SCA-protected: a 403 returns an x-2fa-approval one-time
-            // token that must be signed with the credential's private key and replayed. Statements
-            // are only available via the API for accounts based in these countries.
-            signing =
-                ApiSigningConfig(
-                    statementCountries = setOf("US", "CA", "AU", "NZ", "SG", "MY"),
-                ),
-            // The account holder lives on the profile (the ancestor), not the balance, so people
-            // are downloaded/imported separately from the /v1/profiles endpoint.
-            peopleDownload =
-                ApiPersonImportConfig(
-                    endpoint = ApiEndpointConfig(path = "/v1/profiles", responseArrayKey = ""),
-                    firstNameField = "details.firstName",
-                    lastNameField = "details.lastName",
-                    preferredNameField = "details.preferredName",
-                    fallbackNameField = "details.name",
-                    accountOwnerAncestorExpr = "ancestor[0].id",
-                ),
-            personExternalIdAttribute = "wise-external-id",
-            tokenPageUrl = "https://wise.com/your-account/integrations-and-tools/api-tokens",
-            connectInstructions =
-                listOf(
-                    "Open the Wise API tokens page in your browser and sign in.",
-                    "Create a new API token (read access is sufficient) and copy it.",
-                    "Paste the token below and save.",
-                    "Statements are protected by Strong Customer Authentication: generate a signing key below and " +
-                        "register its public key in Wise (Settings → API tokens → Manage public keys).",
-                    "Note: retrieving statements via the API is only supported for accounts based in the US, Canada, " +
-                        "Australia, New Zealand, Singapore, and Malaysia.",
+                    accountsEndpoint =
+                        ApiEndpointConfig(
+                            path = "/v4/profiles/{ancestor[0].id}/balances",
+                            responseArrayKey = "",
+                            queryParams = listOf(ApiQueryParam(name = "types", value = "STANDARD")),
+                        ),
+                    transactionsEndpoint =
+                        ApiEndpointConfig(
+                            path = "/v1/profiles/{ancestor[0].id}/balance-statements/{account.id}/statement.json",
+                            responseArrayKey = "transactions",
+                            queryParams =
+                                listOf(
+                                    ApiQueryParam(name = "currency", dynamicSource = "account.currency"),
+                                    ApiQueryParam(name = "type", value = "FLAT"),
+                                ),
+                            // startParam/endParam/windowDays default to Wise's values (intervalStart,
+                            // intervalEnd, 469).
+                            pagination = ApiPaginationConfig(mode = PaginationMode.DATE_WINDOW),
+                        ),
+                    accountMappings =
+                        ApiAccountMappings(
+                            // Balances only have a "name" when the user explicitly names them (null by
+                            // default), which made account names fall back to the opaque balance id.
+                            // Use the currency code instead so accounts are named "Wise: EUR" etc.,
+                            // matching the accounts the built-in Wise CSV strategy resolves per-row.
+                            descriptionField = "currency",
+                            ownersArrayField = null,
+                            currencyField = "currency",
+                        ),
+                    transactionMappings =
+                        ApiTransactionMappings(
+                            amountField = "amount.value",
+                            currencyField = "amount.currency",
+                            timestampField = "date",
+                            descriptionField = "details.description",
+                            amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                            signSource = ApiSignSource.FIELD,
+                            signField = "type",
+                            creditValues = setOf("CREDIT"),
+                            idField = "referenceNumber",
+                            merchantNameField = "details.merchant.name",
+                            counterpartyNameField = "details.senderName",
+                        ),
+                    // Wise balance statements are SCA-protected: a 403 returns an x-2fa-approval one-time
+                    // token that must be signed with the credential's private key and replayed. Statements
+                    // are only available via the API for accounts based in these countries.
+                    signing =
+                        ApiSigningConfig(
+                            statementCountries = setOf("US", "CA", "AU", "NZ", "SG", "MY"),
+                        ),
+                    // The account holder lives on the profile (the ancestor), not the balance, so people
+                    // are downloaded/imported separately from the /v1/profiles endpoint.
+                    peopleDownload =
+                        ApiPersonImportConfig(
+                            endpoint = ApiEndpointConfig(path = "/v1/profiles", responseArrayKey = ""),
+                            firstNameField = "details.firstName",
+                            lastNameField = "details.lastName",
+                            preferredNameField = "details.preferredName",
+                            fallbackNameField = "details.name",
+                            accountOwnerAncestorExpr = "ancestor[0].id",
+                        ),
+                    personExternalIdAttribute = "wise-external-id",
+                    tokenPageUrl = "https://wise.com/your-account/integrations-and-tools/api-tokens",
+                    connectInstructions =
+                        listOf(
+                            "Open the Wise API tokens page in your browser and sign in.",
+                            "Create a new API token (read access is sufficient) and copy it.",
+                            "Paste the token below and save.",
+                            "Statements are protected by Strong Customer Authentication: generate a signing key below and " +
+                                "register its public key in Wise (Settings → API tokens → Manage public keys).",
+                            "Note: retrieving statements via the API is only supported for accounts based in the US, Canada, " +
+                                "Australia, New Zealand, Singapore, and Malaysia.",
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -268,105 +275,108 @@ object BuiltInApiStrategies {
         ApiImportStrategy(
             id = ApiImportStrategyId(starlingStrategyId),
             name = "Starling",
-            baseUrl = "https://api.starlingbank.com",
-            authType = ApiAuthType.BEARER_TOKEN,
-            accountsEndpoint =
-                ApiEndpointConfig(
-                    path = "/api/v2/accounts",
-                    responseArrayKey = "accounts",
-                ),
-            transactionsEndpoint =
-                ApiEndpointConfig(
-                    // {account.defaultCategory} resolves the account's defaultCategory from its raw
-                    // JSON; the feed endpoint returns the full history in a single response.
-                    path = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
-                    responseArrayKey = "feedItems",
-                    // Starling requires a mandatory `changesSince` ISO-8601 bound; anchoring it to
-                    // the epoch returns the account's entire feed history in one response.
-                    queryParams =
-                        listOf(
-                            ApiQueryParam(name = "changesSince", value = "1970-01-01T00:00:00.000Z"),
+            config =
+                ApiStrategyConfig(
+                    baseUrl = "https://api.starlingbank.com",
+                    authType = ApiAuthType.BEARER_TOKEN,
+                    accountsEndpoint =
+                        ApiEndpointConfig(
+                            path = "/api/v2/accounts",
+                            responseArrayKey = "accounts",
                         ),
-                ),
-            accountMappings =
-                ApiAccountMappings(
-                    idField = "accountUid",
-                    descriptionField = "name",
-                    currencyField = "currency",
-                    ownersArrayField = null,
-                    // Starling's /accounts response omits bank details; they come from the
-                    // account-identifiers endpoint below, where the sort code is `bankIdentifier`
-                    // and the account number is `accountIdentifier`.
-                    sortCodeField = "bankIdentifier",
-                    accountNumberField = "accountIdentifier",
-                ),
-            // Per-account endpoint that returns the account's own sort code + account number, so the
-            // source account can be matched/merged with counterparties other providers create for it.
-            accountIdentifiersEndpoint =
-                ApiEndpointConfig(
-                    path = "/api/v2/accounts/{account.id}/identifiers",
-                    responseArrayKey = "",
-                ),
-            transactionMappings =
-                ApiTransactionMappings(
-                    amountField = "amount.minorUnits",
-                    currencyField = "amount.currency",
-                    timestampField = "transactionTime",
-                    descriptionField = "reference",
-                    amountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
-                    signSource = ApiSignSource.FIELD,
-                    signField = "direction",
-                    creditValues = setOf("IN"),
-                    idField = "feedItemUid",
-                    counterpartyNameField = "counterPartyName",
-                    // counterPartyUid is the fallback counterparty-account id; bank details
-                    // (sub-entity sort code + account number) take precedence where present, see
-                    // peopleMappings.preferBankIdentity. A single real account can otherwise be
-                    // split across uids (e.g. the same account as both a payee and a sender).
-                    counterpartyIdField = "counterPartyUid",
-                    // Declined feed items never moved money; import them but exclude from balances
-                    // (same treatment as Monzo's `decline_reason`), keyed off Starling's status.
-                    declineStatusField = "status",
-                    declinedStatusValues = setOf("DECLINED"),
-                    // Persist the feed item's stable id as a transaction attribute so each imported
-                    // transfer is uniquely identifiable and re-imports dedupe on it.
-                    customFields = mapOf("starling-transaction-id" to "feedItemUid"),
-                    uniqueIdentifierFields = setOf("starling-transaction-id"),
-                ),
-            // Starling's counterparty fields are flat on the feed item (no nested object), so the
-            // counterparty object path is blank (the item itself). PAYEE/SENDER counterparties are
-            // people; MERCHANT/STARLING are not. counterPartyUid identifies the person.
-            peopleMappings =
-                ApiPeopleMappings(
-                    counterpartyObjectField = "",
-                    beneficiaryAccountTypeField = "counterPartyType",
-                    personalBeneficiaryAccountTypeValues = setOf("PAYEE", "SENDER"),
-                    counterpartyNameField = "counterPartyName",
-                    counterpartyUserIdField = "counterPartyUid",
-                    // Starling exposes the counterparty's bank details flat on the feed item;
-                    // together they uniquely identify the account and take precedence over the
-                    // per-counterparty uid when de-duplicating counterparty accounts.
-                    counterpartySortCodeField = "counterPartySubEntityIdentifier",
-                    counterpartyAccountNumberField = "counterPartySubEntitySubIdentifier",
-                    preferBankIdentity = true,
-                ),
-            // The account holder is global (one per connection) and returned as a single object,
-            // so it is linked to every account imported in the session.
-            peopleDownload =
-                ApiPersonImportConfig(
-                    endpoint = ApiEndpointConfig(path = "/api/v2/account-holder/individual", responseArrayKey = ""),
-                    firstNameField = "firstName",
-                    lastNameField = "lastName",
-                    ownsAllAccounts = true,
-                ),
-            personExternalIdAttribute = "starling-external-id",
-            tokenPageUrl = "https://developer.starlingbank.com/",
-            connectInstructions =
-                listOf(
-                    "Open the Starling Developer portal in your browser and sign in with your Starling account.",
-                    "Create a personal access token with the account:read, transaction:read and " +
-                        "account-holder-name:read scopes.",
-                    "Copy the token, paste it below and save.",
+                    transactionsEndpoint =
+                        ApiEndpointConfig(
+                            // {account.defaultCategory} resolves the account's defaultCategory from its raw
+                            // JSON; the feed endpoint returns the full history in a single response.
+                            path = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
+                            responseArrayKey = "feedItems",
+                            // Starling requires a mandatory `changesSince` ISO-8601 bound; anchoring it to
+                            // the epoch returns the account's entire feed history in one response.
+                            queryParams =
+                                listOf(
+                                    ApiQueryParam(name = "changesSince", value = "1970-01-01T00:00:00.000Z"),
+                                ),
+                        ),
+                    accountMappings =
+                        ApiAccountMappings(
+                            idField = "accountUid",
+                            descriptionField = "name",
+                            currencyField = "currency",
+                            ownersArrayField = null,
+                            // Starling's /accounts response omits bank details; they come from the
+                            // account-identifiers endpoint below, where the sort code is `bankIdentifier`
+                            // and the account number is `accountIdentifier`.
+                            sortCodeField = "bankIdentifier",
+                            accountNumberField = "accountIdentifier",
+                        ),
+                    // Per-account endpoint that returns the account's own sort code + account number, so the
+                    // source account can be matched/merged with counterparties other providers create for it.
+                    accountIdentifiersEndpoint =
+                        ApiEndpointConfig(
+                            path = "/api/v2/accounts/{account.id}/identifiers",
+                            responseArrayKey = "",
+                        ),
+                    transactionMappings =
+                        ApiTransactionMappings(
+                            amountField = "amount.minorUnits",
+                            currencyField = "amount.currency",
+                            timestampField = "transactionTime",
+                            descriptionField = "reference",
+                            amountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
+                            signSource = ApiSignSource.FIELD,
+                            signField = "direction",
+                            creditValues = setOf("IN"),
+                            idField = "feedItemUid",
+                            counterpartyNameField = "counterPartyName",
+                            // counterPartyUid is the fallback counterparty-account id; bank details
+                            // (sub-entity sort code + account number) take precedence where present, see
+                            // peopleMappings.preferBankIdentity. A single real account can otherwise be
+                            // split across uids (e.g. the same account as both a payee and a sender).
+                            counterpartyIdField = "counterPartyUid",
+                            // Declined feed items never moved money; import them but exclude from balances
+                            // (same treatment as Monzo's `decline_reason`), keyed off Starling's status.
+                            declineStatusField = "status",
+                            declinedStatusValues = setOf("DECLINED"),
+                            // Persist the feed item's stable id as a transaction attribute so each imported
+                            // transfer is uniquely identifiable and re-imports dedupe on it.
+                            customFields = mapOf("starling-transaction-id" to "feedItemUid"),
+                            uniqueIdentifierFields = setOf("starling-transaction-id"),
+                        ),
+                    // Starling's counterparty fields are flat on the feed item (no nested object), so the
+                    // counterparty object path is blank (the item itself). PAYEE/SENDER counterparties are
+                    // people; MERCHANT/STARLING are not. counterPartyUid identifies the person.
+                    peopleMappings =
+                        ApiPeopleMappings(
+                            counterpartyObjectField = "",
+                            beneficiaryAccountTypeField = "counterPartyType",
+                            personalBeneficiaryAccountTypeValues = setOf("PAYEE", "SENDER"),
+                            counterpartyNameField = "counterPartyName",
+                            counterpartyUserIdField = "counterPartyUid",
+                            // Starling exposes the counterparty's bank details flat on the feed item;
+                            // together they uniquely identify the account and take precedence over the
+                            // per-counterparty uid when de-duplicating counterparty accounts.
+                            counterpartySortCodeField = "counterPartySubEntityIdentifier",
+                            counterpartyAccountNumberField = "counterPartySubEntitySubIdentifier",
+                            preferBankIdentity = true,
+                        ),
+                    // The account holder is global (one per connection) and returned as a single object,
+                    // so it is linked to every account imported in the session.
+                    peopleDownload =
+                        ApiPersonImportConfig(
+                            endpoint = ApiEndpointConfig(path = "/api/v2/account-holder/individual", responseArrayKey = ""),
+                            firstNameField = "firstName",
+                            lastNameField = "lastName",
+                            ownsAllAccounts = true,
+                        ),
+                    personExternalIdAttribute = "starling-external-id",
+                    tokenPageUrl = "https://developer.starlingbank.com/",
+                    connectInstructions =
+                        listOf(
+                            "Open the Starling Developer portal in your browser and sign in with your Starling account.",
+                            "Create a personal access token with the account:read, transaction:read and " +
+                                "account-holder-name:read scopes.",
+                            "Copy the token, paste it below and save.",
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -466,69 +476,72 @@ object BuiltInApiStrategies {
         return ApiImportStrategy(
             id = ApiImportStrategyId(cryptoComExchangeStrategyId),
             name = "Crypto.com Exchange",
-            baseUrl = "https://api.crypto.com/exchange/v1",
-            authType = ApiAuthType.SIGNED,
-            accountsEndpoint = unused,
-            transactionsEndpoint = unused,
-            accountMappings = ApiAccountMappings(),
-            transactionMappings = ApiTransactionMappings(),
-            requestSigning =
-                ApiRequestSigningConfig(
-                    algorithm = SigningAlgorithm.HMAC_SHA256,
-                    message =
-                        listOf(
-                            SigPart.Method,
-                            SigPart.RequestId,
-                            SigPart.ApiKey,
-                            SigPart.ParamString(ParamStringFormat.SORTED_CONCAT),
-                            SigPart.Nonce,
+            config =
+                ApiStrategyConfig(
+                    baseUrl = "https://api.crypto.com/exchange/v1",
+                    authType = ApiAuthType.SIGNED,
+                    accountsEndpoint = unused,
+                    transactionsEndpoint = unused,
+                    accountMappings = ApiAccountMappings(),
+                    transactionMappings = ApiTransactionMappings(),
+                    requestSigning =
+                        ApiRequestSigningConfig(
+                            algorithm = SigningAlgorithm.HMAC_SHA256,
+                            message =
+                                listOf(
+                                    SigPart.Method,
+                                    SigPart.RequestId,
+                                    SigPart.ApiKey,
+                                    SigPart.ParamString(ParamStringFormat.SORTED_CONCAT),
+                                    SigPart.Nonce,
+                                ),
+                            apiKey = FieldPlacement(SigFieldLocation.BODY_FIELD, "api_key"),
+                            nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.BODY_FIELD, "nonce")),
+                            signature = FieldPlacement(SigFieldLocation.BODY_FIELD, "sig"),
+                            requestId = RequestIdSpec(placement = FieldPlacement(SigFieldLocation.BODY_FIELD, "id")),
+                            method = FieldPlacement(SigFieldLocation.BODY_FIELD, "method"),
+                            bodyFormat = BodyFormat.JSON_ENVELOPE,
+                            paramsEnvelopeKey = "params",
                         ),
-                    apiKey = FieldPlacement(SigFieldLocation.BODY_FIELD, "api_key"),
-                    nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.BODY_FIELD, "nonce")),
-                    signature = FieldPlacement(SigFieldLocation.BODY_FIELD, "sig"),
-                    requestId = RequestIdSpec(placement = FieldPlacement(SigFieldLocation.BODY_FIELD, "id")),
-                    method = FieldPlacement(SigFieldLocation.BODY_FIELD, "method"),
-                    bodyFormat = BodyFormat.JSON_ENVELOPE,
-                    paramsEnvelopeKey = "params",
-                ),
-            syntheticAccount = ApiSyntheticAccount(name = "Crypto.com Exchange", externalId = "crypto-com-exchange"),
-            dataEndpoints =
-                listOf(
-                    ApiDataEndpoint(
-                        signed("private/get-trades", "result.data", recentWindow),
-                        ApiEndpointKind.TRADES,
-                        tradeMappings = tradeMappings,
-                    ),
-                    ApiDataEndpoint(
-                        signed("private/get-order-history", "result.data", recentWindow),
-                        ApiEndpointKind.ORDERS,
-                        tradeMappings = orderMappings,
-                    ),
-                    ApiDataEndpoint(
-                        signed("private/get-deposit-history", "result.deposit_list", historyWindow),
-                        ApiEndpointKind.DEPOSITS,
-                        transactionMappings = transferMappings("source_address"),
-                    ),
-                    ApiDataEndpoint(
-                        signed("private/get-withdrawal-history", "result.withdrawal_list", historyWindow),
-                        ApiEndpointKind.WITHDRAWALS,
-                        transactionMappings = transferMappings("address"),
-                    ),
-                ),
-            internalTransferReconcile =
-                ApiInternalTransferReconcile(
-                    bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
-                    windowSeconds = 24 * 3600,
-                    amountTolerancePercent = "2",
-                ),
-            tokenPageUrl = "https://exchange.crypto.com/settings/api-management",
-            connectInstructions =
-                listOf(
-                    "Open the Crypto.com Exchange API management page in your browser and sign in.",
-                    "Create a new API key with read-only permissions (do not grant withdrawal or " +
-                        "trading permissions).",
-                    "Copy the API key and paste it below as the API key.",
-                    "Copy the Secret Key and paste it below as the API secret.",
+                    syntheticAccount = ApiSyntheticAccount(name = "Crypto.com Exchange", externalId = "crypto-com-exchange"),
+                    dataEndpoints =
+                        listOf(
+                            ApiDataEndpoint(
+                                signed("private/get-trades", "result.data", recentWindow),
+                                ApiEndpointKind.TRADES,
+                                tradeMappings = tradeMappings,
+                            ),
+                            ApiDataEndpoint(
+                                signed("private/get-order-history", "result.data", recentWindow),
+                                ApiEndpointKind.ORDERS,
+                                tradeMappings = orderMappings,
+                            ),
+                            ApiDataEndpoint(
+                                signed("private/get-deposit-history", "result.deposit_list", historyWindow),
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings = transferMappings("source_address"),
+                            ),
+                            ApiDataEndpoint(
+                                signed("private/get-withdrawal-history", "result.withdrawal_list", historyWindow),
+                                ApiEndpointKind.WITHDRAWALS,
+                                transactionMappings = transferMappings("address"),
+                            ),
+                        ),
+                    internalTransferReconcile =
+                        ApiInternalTransferReconcile(
+                            bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
+                            windowSeconds = 24 * 3600,
+                            amountTolerancePercent = "2",
+                        ),
+                    tokenPageUrl = "https://exchange.crypto.com/settings/api-management",
+                    connectInstructions =
+                        listOf(
+                            "Open the Crypto.com Exchange API management page in your browser and sign in.",
+                            "Create a new API key with read-only permissions (do not grant withdrawal or " +
+                                "trading permissions).",
+                            "Copy the API key and paste it below as the API key.",
+                            "Copy the Secret Key and paste it below as the API secret.",
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -701,108 +714,111 @@ object BuiltInApiStrategies {
         return ApiImportStrategy(
             id = ApiImportStrategyId(krakenStrategyId),
             name = "Kraken",
-            baseUrl = "https://api.kraken.com",
-            authType = ApiAuthType.SIGNED,
-            accountsEndpoint = unused,
-            transactionsEndpoint = unused,
-            accountMappings = ApiAccountMappings(),
-            transactionMappings = ApiTransactionMappings(),
-            requestSigning =
-                ApiRequestSigningConfig(
-                    algorithm = SigningAlgorithm.HMAC_SHA512,
-                    secretEncoding = SecretEncoding.BASE64,
-                    signatureEncoding = SignatureEncoding.BASE64,
-                    message = listOf(SigPart.Path, SigPart.Sha256(listOf(SigPart.Nonce, SigPart.Body))),
-                    apiKey = FieldPlacement(SigFieldLocation.HEADER, "API-Key"),
-                    nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.BODY_FIELD, "nonce")),
-                    signature = FieldPlacement(SigFieldLocation.HEADER, "API-Sign"),
-                    bodyFormat = BodyFormat.FORM_URLENCODED,
-                ),
-            syntheticAccount = ApiSyntheticAccount(name = "Kraken", externalId = "kraken"),
-            dataEndpoints =
-                listOf(
-                    ApiDataEndpoint(
-                        // Splice the response object's own key (e.g. "STVCTCR-ERSZJ-HBXQB2") over the
-                        // "trade_id" field before mapping: the native `trade_id` is a small per-fill
-                        // sequence number that collides across unrelated trades (observed repeatedly as
-                        // 0), whereas the key is unique and — critically — is the same identifier
-                        // Kraken's Ledgers rows carry as `refid`, letting reconcileTradeAmountsField join
-                        // a trade to its authoritative ledger legs (see ledgerMappings).
-                        signed(
-                            "0/private/TradesHistory",
-                            "result.trades",
-                            responseObjectValues = true,
-                            itemKeyField = "trade_id",
+            config =
+                ApiStrategyConfig(
+                    baseUrl = "https://api.kraken.com",
+                    authType = ApiAuthType.SIGNED,
+                    accountsEndpoint = unused,
+                    transactionsEndpoint = unused,
+                    accountMappings = ApiAccountMappings(),
+                    transactionMappings = ApiTransactionMappings(),
+                    requestSigning =
+                        ApiRequestSigningConfig(
+                            algorithm = SigningAlgorithm.HMAC_SHA512,
+                            secretEncoding = SecretEncoding.BASE64,
+                            signatureEncoding = SignatureEncoding.BASE64,
+                            message = listOf(SigPart.Path, SigPart.Sha256(listOf(SigPart.Nonce, SigPart.Body))),
+                            apiKey = FieldPlacement(SigFieldLocation.HEADER, "API-Key"),
+                            nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.BODY_FIELD, "nonce")),
+                            signature = FieldPlacement(SigFieldLocation.HEADER, "API-Sign"),
+                            bodyFormat = BodyFormat.FORM_URLENCODED,
                         ),
-                        ApiEndpointKind.TRADES,
-                        tradeMappings = tradeMappings,
-                    ),
-                    // Every non-trade ledger movement in one pass. Kraken's Ledgers `type` enum is
-                    // `all, trade, deposit, withdrawal, transfer, margin, adjustment, rollover, credit,
-                    // settled, staking, dividend, sale, nft_rebate` (default "all") — earlier revisions
-                    // of this strategy only requested deposit/withdrawal/reward/staking, so any balance
-                    // movement Kraken books under transfer/margin/adjustment/rollover/credit/settled/
-                    // sale/nft_rebate (Earn subscribe/unsubscribe, internal moves, fee rebates, etc.) was
-                    // invisible to the importer — the account balance would silently drift from the true
-                    // Kraken balance by exactly the missed amount. `type=all` also returns `trade`-type
-                    // entries that duplicate what TradesHistory already supplies, so those are dropped via
-                    // excludeField/excludeValues. Direction comes from the signed `amount` field
-                    // (directionFromAmountSign), not the ledger `type`, so this single endpoint covers
-                    // every type without per-type direction mapping — including the historical "reward"
-                    // vs "staking" naming inconsistency between Kraken account vintages.
-                    ApiDataEndpoint(
-                        signed(
-                            "0/private/Ledgers",
-                            "result.ledger",
-                            responseObjectValues = true,
-                            itemKeyField = "ledger_id",
-                            queryParams = listOf(ApiQueryParam(name = "type", value = "all")),
+                    syntheticAccount = ApiSyntheticAccount(name = "Kraken", externalId = "kraken"),
+                    dataEndpoints =
+                        listOf(
+                            ApiDataEndpoint(
+                                // Splice the response object's own key (e.g. "STVCTCR-ERSZJ-HBXQB2") over the
+                                // "trade_id" field before mapping: the native `trade_id` is a small per-fill
+                                // sequence number that collides across unrelated trades (observed repeatedly as
+                                // 0), whereas the key is unique and — critically — is the same identifier
+                                // Kraken's Ledgers rows carry as `refid`, letting reconcileTradeAmountsField join
+                                // a trade to its authoritative ledger legs (see ledgerMappings).
+                                signed(
+                                    "0/private/TradesHistory",
+                                    "result.trades",
+                                    responseObjectValues = true,
+                                    itemKeyField = "trade_id",
+                                ),
+                                ApiEndpointKind.TRADES,
+                                tradeMappings = tradeMappings,
+                            ),
+                            // Every non-trade ledger movement in one pass. Kraken's Ledgers `type` enum is
+                            // `all, trade, deposit, withdrawal, transfer, margin, adjustment, rollover, credit,
+                            // settled, staking, dividend, sale, nft_rebate` (default "all") — earlier revisions
+                            // of this strategy only requested deposit/withdrawal/reward/staking, so any balance
+                            // movement Kraken books under transfer/margin/adjustment/rollover/credit/settled/
+                            // sale/nft_rebate (Earn subscribe/unsubscribe, internal moves, fee rebates, etc.) was
+                            // invisible to the importer — the account balance would silently drift from the true
+                            // Kraken balance by exactly the missed amount. `type=all` also returns `trade`-type
+                            // entries that duplicate what TradesHistory already supplies, so those are dropped via
+                            // excludeField/excludeValues. Direction comes from the signed `amount` field
+                            // (directionFromAmountSign), not the ledger `type`, so this single endpoint covers
+                            // every type without per-type direction mapping — including the historical "reward"
+                            // vs "staking" naming inconsistency between Kraken account vintages.
+                            ApiDataEndpoint(
+                                signed(
+                                    "0/private/Ledgers",
+                                    "result.ledger",
+                                    responseObjectValues = true,
+                                    itemKeyField = "ledger_id",
+                                    queryParams = listOf(ApiQueryParam(name = "type", value = "all")),
+                                ),
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings = ledgerMappings("refid").copy(excludeField = "type", excludeValues = setOf("trade")),
+                            ),
+                            // Known limitation: Kraken paginates these funding-status endpoints with an opaque
+                            // cursor token (not the offset/date-window shapes the generic engine implements), so
+                            // only the first page is fetched here — enrichment (on-chain address/txid) beyond
+                            // that page is silently skipped, though the underlying deposit/withdrawal transfer
+                            // itself (from Ledgers, above) is unaffected. Extending PaginationMode.CURSOR to the
+                            // exchange engine to cover this needs the real cursor field verified against a live
+                            // response before it's worth adding.
+                            ApiDataEndpoint(
+                                signed("0/private/DepositStatus", "result", pagination = null, requestCostWeight = 1),
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings = enrichMappings,
+                                enrichesTransfers = true,
+                            ),
+                            ApiDataEndpoint(
+                                signed("0/private/WithdrawStatus", "result", pagination = null, requestCostWeight = 1),
+                                ApiEndpointKind.WITHDRAWALS,
+                                transactionMappings = enrichMappings,
+                                enrichesTransfers = true,
+                            ),
                         ),
-                        ApiEndpointKind.DEPOSITS,
-                        transactionMappings = ledgerMappings("refid").copy(excludeField = "type", excludeValues = setOf("trade")),
-                    ),
-                    // Known limitation: Kraken paginates these funding-status endpoints with an opaque
-                    // cursor token (not the offset/date-window shapes the generic engine implements), so
-                    // only the first page is fetched here — enrichment (on-chain address/txid) beyond
-                    // that page is silently skipped, though the underlying deposit/withdrawal transfer
-                    // itself (from Ledgers, above) is unaffected. Extending PaginationMode.CURSOR to the
-                    // exchange engine to cover this needs the real cursor field verified against a live
-                    // response before it's worth adding.
-                    ApiDataEndpoint(
-                        signed("0/private/DepositStatus", "result", pagination = null, requestCostWeight = 1),
-                        ApiEndpointKind.DEPOSITS,
-                        transactionMappings = enrichMappings,
-                        enrichesTransfers = true,
-                    ),
-                    ApiDataEndpoint(
-                        signed("0/private/WithdrawStatus", "result", pagination = null, requestCostWeight = 1),
-                        ApiEndpointKind.WITHDRAWALS,
-                        transactionMappings = enrichMappings,
-                        enrichesTransfers = true,
-                    ),
-                ),
-            assetAliases = assetAliasMap,
-            // Kraken Earn holdings use a suffixed asset code for the same underlying asset (e.g. the
-            // "Flexible Earn" ETH position is "XETH.F", staked is "XETH.S"); strip it so the position's
-            // deposit/withdrawal ledger entries resolve to the ordinary "ETH" asset like any other.
-            assetSuffixesToStrip = setOf(".F", ".S", ".M"),
-            // Starter-tier decay is 0.33 counter/sec (Kraken's slowest verification tier), so 1 unit of
-            // cost needs ~3.03s to fully decay; 3100ms per unit keeps even the slowest tier clear of
-            // "EAPI:Rate limit exceeded" with a small margin. requestCostWeight above scales this per
-            // endpoint (2 for ledger/trade-history calls, 1 for the rest) so cheaper endpoints aren't
-            // paced as conservatively as the most expensive ones.
-            rateLimitMillis = 3_100L,
-            rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Too many requests", "Throttled"),
-            maxRateLimitRetries = 6,
-            tokenPageUrl = "https://pro.kraken.com/app/settings/api",
-            connectInstructions =
-                listOf(
-                    "Open the Kraken API management page in your browser and sign in.",
-                    "Create a new API key with the \"Query Funds\", \"Query Ledger Entries\", " +
-                        "\"Query Open/Closed Orders & Trades\" and \"Export Data\" permissions (read-only " +
-                        "access is sufficient; do not grant withdrawal or trading permissions).",
-                    "Copy the API key and paste it below as the API key.",
-                    "Copy the Private Key and paste it below as the API secret.",
+                    assetAliases = assetAliasMap,
+                    // Kraken Earn holdings use a suffixed asset code for the same underlying asset (e.g. the
+                    // "Flexible Earn" ETH position is "XETH.F", staked is "XETH.S"); strip it so the position's
+                    // deposit/withdrawal ledger entries resolve to the ordinary "ETH" asset like any other.
+                    assetSuffixesToStrip = setOf(".F", ".S", ".M"),
+                    // Starter-tier decay is 0.33 counter/sec (Kraken's slowest verification tier), so 1 unit of
+                    // cost needs ~3.03s to fully decay; 3100ms per unit keeps even the slowest tier clear of
+                    // "EAPI:Rate limit exceeded" with a small margin. requestCostWeight above scales this per
+                    // endpoint (2 for ledger/trade-history calls, 1 for the rest) so cheaper endpoints aren't
+                    // paced as conservatively as the most expensive ones.
+                    rateLimitMillis = 3_100L,
+                    rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Too many requests", "Throttled"),
+                    maxRateLimitRetries = 6,
+                    tokenPageUrl = "https://pro.kraken.com/app/settings/api",
+                    connectInstructions =
+                        listOf(
+                            "Open the Kraken API management page in your browser and sign in.",
+                            "Create a new API key with the \"Query Funds\", \"Query Ledger Entries\", " +
+                                "\"Query Open/Closed Orders & Trades\" and \"Export Data\" permissions (read-only " +
+                                "access is sufficient; do not grant withdrawal or trading permissions).",
+                            "Copy the API key and paste it below as the API key.",
+                            "Copy the Private Key and paste it below as the API secret.",
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,
