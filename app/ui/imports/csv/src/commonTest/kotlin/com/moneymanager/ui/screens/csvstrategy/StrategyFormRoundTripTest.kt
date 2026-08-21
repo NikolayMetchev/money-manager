@@ -310,6 +310,12 @@ class StrategyFormRoundTripTest {
 
         assertEquals(original.fieldMappings, rebuilt.fieldMappings)
         assertEquals(original.worksheetName, rebuilt.worksheetName)
+
+        // Pin the extraction's actual value, not just that it round-trips: comparing against the
+        // escaped "\$1" proves the fixture's "$1" really is the literal replacement-group marker.
+        val description = rebuilt.fieldMappings[TransferField.DESCRIPTION]
+        assertIs<DirectColumnMapping>(description)
+        assertEquals("\$1", description.extraction?.outputTemplate)
     }
 
     /** The same, for the target modes that each carry their own `defaultCategoryId`. */
