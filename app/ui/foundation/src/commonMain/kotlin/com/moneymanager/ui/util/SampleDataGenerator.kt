@@ -170,7 +170,6 @@ suspend fun generateSampleData(
             size = size,
             categoriesCreated = totalCategories,
             totalCategories = totalCategories,
-            cryptoAssetsCreated = cryptoAssets.size,
             totalAccounts = accounts.totalAccounts,
         )
 
@@ -1120,7 +1119,6 @@ data class GenerationProgress(
     val totalAccounts: Int = 0,
     val categoriesCreated: Int = 0,
     val totalCategories: Int = 0,
-    val cryptoAssetsCreated: Int = 0,
     val transactionsCreated: Int = 0,
     val totalTransactions: Int = 0,
     val tradesCreated: Int = 0,

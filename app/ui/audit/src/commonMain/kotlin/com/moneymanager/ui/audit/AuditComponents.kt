@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
@@ -124,11 +125,18 @@ fun DeletedFinalValuesLabel(errorColor: Color) {
     )
 }
 
+/**
+ * Renders the provenance of one audit revision: where the row came from, which device recorded it,
+ * and — for imports — deep links back to the originating CSV row / QIF record / API response.
+ *
+ * When [currentDeviceId] is supplied, sources recorded on that device are marked "(This Device)".
+ */
 @Composable
 fun SourceInfoSection(
     source: SourceRecord?,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     labelWidth: Dp = 100.dp,
+    currentDeviceId: DeviceId? = null,
     onApiSourceClick: ((ApiSessionId, ApiRequestId, String) -> Unit)? = null,
     onCsvSourceClick: ((CsvImportId, Long) -> Unit)? = null,
     onQifSourceClick: ((QifImportId, Long?) -> Unit)? = null,
@@ -149,132 +157,121 @@ fun SourceInfoSection(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
-        } else {
-            when (val origin = source.source) {
-                Source.Manual -> {
-                    when (val deviceInfo = source.deviceInfo) {
-                        is DeviceInfo.Jvm -> {
-                            FieldValueRow("Origin", "Manual (Desktop)", labelWidth = labelWidth)
-                            DeviceInfoRows(deviceInfo, labelWidth)
-                        }
-                        is DeviceInfo.Android -> {
-                            FieldValueRow("Origin", "Manual (Android)", labelWidth = labelWidth)
-                            DeviceInfoRows(deviceInfo, labelWidth)
-                        }
-                        null -> {
-                            FieldValueRow("Origin", "Manual", labelWidth = labelWidth)
-                        }
-                    }
-                }
-                is Source.Csv -> {
-                    val rowIndex = origin.rowIndex
-                    val fileName = source.fileName
-                    FieldValueRow("Origin", "CSV Import", labelWidth = labelWidth)
-                    if (onCsvSourceClick != null) {
-                        // The File link always opens the import; entities derived from the import as a
-                        // whole (e.g. a pass-through conduit/merchant account, which has no single
-                        // originating row) only show a Row link when the row is actually known — otherwise
-                        // it would link to the non-existent "row 0".
+            return@Column
+        }
+
+        val deviceSuffix = if (currentDeviceId != null && source.deviceId == currentDeviceId.id) " (This Device)" else ""
+        when (val origin = source.source) {
+            Source.Manual -> PlatformOriginRows("Manual", deviceSuffix, source.deviceInfo, labelWidth)
+            Source.SampleGenerator -> PlatformOriginRows("Sample Generator", deviceSuffix, source.deviceInfo, labelWidth)
+            is Source.Csv -> {
+                val rowIndex = origin.rowIndex
+                val fileName = source.fileName
+                FieldValueRow("Origin", "CSV Import$deviceSuffix", labelWidth = labelWidth)
+                if (onCsvSourceClick != null) {
+                    // The File link always opens the import; entities derived from the import as a
+                    // whole (e.g. a pass-through conduit/merchant account, which has no single
+                    // originating row) only show a Row link when the row is actually known — otherwise
+                    // it would link to the non-existent "row 0".
+                    CsvSourceLinkRow(
+                        label = "File",
+                        value = fileName ?: "Unknown file",
+                        importId = origin.importId,
+                        rowIndex = rowIndex ?: 0,
+                        onCsvSourceClick = onCsvSourceClick,
+                        labelWidth = labelWidth,
+                    )
+                    if (rowIndex != null) {
                         CsvSourceLinkRow(
-                            label = "File",
-                            value = fileName ?: "Unknown file",
+                            label = "Row",
+                            value = rowIndex.toString(),
                             importId = origin.importId,
-                            rowIndex = rowIndex ?: 0,
+                            rowIndex = rowIndex,
                             onCsvSourceClick = onCsvSourceClick,
                             labelWidth = labelWidth,
                         )
-                        if (rowIndex != null) {
-                            CsvSourceLinkRow(
-                                label = "Row",
-                                value = rowIndex.toString(),
-                                importId = origin.importId,
-                                rowIndex = rowIndex,
-                                onCsvSourceClick = onCsvSourceClick,
-                                labelWidth = labelWidth,
-                            )
-                        }
-                    } else if (fileName != null) {
-                        FieldValueRow("File", fileName, labelWidth = labelWidth)
                     }
-                    DeviceInfoRows(source.deviceInfo, labelWidth)
+                } else if (fileName != null) {
+                    FieldValueRow("File", fileName, labelWidth = labelWidth)
                 }
-                is Source.Qif -> {
-                    val recordIndex = origin.recordIndex
-                    val fileName = source.fileName
-                    FieldValueRow("Origin", "QIF Import", labelWidth = labelWidth)
-                    if (onQifSourceClick != null) {
-                        // The File link always opens the QIF import; entities derived from the import as a
-                        // whole (e.g. accounts) have no single record, so only show a Record link when known.
+                DeviceInfoRows(source.deviceInfo, labelWidth)
+            }
+            is Source.Qif -> {
+                val recordIndex = origin.recordIndex
+                val fileName = source.fileName
+                FieldValueRow("Origin", "QIF Import$deviceSuffix", labelWidth = labelWidth)
+                if (onQifSourceClick != null) {
+                    // The File link always opens the QIF import; entities derived from the import as a
+                    // whole (e.g. accounts) have no single record, so only show a Record link when known.
+                    QifSourceLinkRow(
+                        label = "File",
+                        value = fileName ?: "Unknown file",
+                        importId = origin.importId,
+                        recordIndex = recordIndex,
+                        onQifSourceClick = onQifSourceClick,
+                        labelWidth = labelWidth,
+                    )
+                    if (recordIndex != null) {
                         QifSourceLinkRow(
-                            label = "File",
-                            value = fileName ?: "Unknown file",
+                            label = "Record",
+                            value = recordIndex.toString(),
                             importId = origin.importId,
                             recordIndex = recordIndex,
                             onQifSourceClick = onQifSourceClick,
                             labelWidth = labelWidth,
                         )
-                        if (recordIndex != null) {
-                            QifSourceLinkRow(
-                                label = "Record",
-                                value = recordIndex.toString(),
-                                importId = origin.importId,
-                                recordIndex = recordIndex,
-                                onQifSourceClick = onQifSourceClick,
-                                labelWidth = labelWidth,
-                            )
-                        }
-                    } else {
-                        FieldValueRow("File", fileName ?: "Unknown file", labelWidth = labelWidth)
-                        recordIndex?.let { FieldValueRow("Record", it.toString(), labelWidth = labelWidth) }
                     }
-                    DeviceInfoRows(source.deviceInfo, labelWidth)
+                } else {
+                    FieldValueRow("File", fileName ?: "Unknown file", labelWidth = labelWidth)
+                    recordIndex?.let { FieldValueRow("Record", it.toString(), labelWidth = labelWidth) }
                 }
-                Source.SampleGenerator -> {
-                    when (val deviceInfo = source.deviceInfo) {
-                        is DeviceInfo.Jvm -> {
-                            FieldValueRow("Origin", "Sample Generator (Desktop)", labelWidth = labelWidth)
-                            DeviceInfoRows(deviceInfo, labelWidth)
-                        }
-                        is DeviceInfo.Android -> {
-                            FieldValueRow("Origin", "Sample Generator (Android)", labelWidth = labelWidth)
-                            DeviceInfoRows(deviceInfo, labelWidth)
-                        }
-                        null -> {
-                            FieldValueRow("Origin", "Sample Generator", labelWidth = labelWidth)
-                        }
-                    }
+                DeviceInfoRows(source.deviceInfo, labelWidth)
+            }
+            Source.System -> FieldValueRow("Origin", "System", labelWidth = labelWidth)
+            Source.Merge, Source.Unmerge -> {
+                val label = if (origin == Source.Merge) "Merge" else "Undo Merge"
+                FieldValueRow("Origin", "$label$deviceSuffix", labelWidth = labelWidth)
+                DeviceInfoRows(source.deviceInfo, labelWidth)
+            }
+            is Source.Api -> {
+                val requestId = origin.requestId
+                val jsonPath = origin.jsonPath
+                if (requestId != null && jsonPath != null && onApiSourceClick != null) {
+                    ApiSourceLinkRow(
+                        sessionId = origin.sessionId,
+                        requestId = requestId,
+                        jsonPath = jsonPath.value,
+                        onApiSourceClick = onApiSourceClick,
+                        labelWidth = labelWidth,
+                    )
+                } else {
+                    FieldValueRow("Origin", "API Import$deviceSuffix", labelWidth = labelWidth)
                 }
-                Source.System -> {
-                    FieldValueRow("Origin", "System", labelWidth = labelWidth)
-                }
-                Source.Merge -> {
-                    FieldValueRow("Origin", "Merge", labelWidth = labelWidth)
-                    DeviceInfoRows(source.deviceInfo, labelWidth)
-                }
-                Source.Unmerge -> {
-                    FieldValueRow("Origin", "Undo Merge", labelWidth = labelWidth)
-                    DeviceInfoRows(source.deviceInfo, labelWidth)
-                }
-                is Source.Api -> {
-                    val deviceInfo = source.deviceInfo
-                    val requestId = origin.requestId
-                    val jsonPath = origin.jsonPath
-                    if (requestId != null && jsonPath != null && onApiSourceClick != null) {
-                        ApiSourceLinkRow(
-                            sessionId = origin.sessionId,
-                            requestId = requestId,
-                            jsonPath = jsonPath.value,
-                            onApiSourceClick = onApiSourceClick,
-                            labelWidth = labelWidth,
-                        )
-                    } else {
-                        FieldValueRow("Origin", "API Import", labelWidth = labelWidth)
-                    }
-                    DeviceInfoRows(deviceInfo, labelWidth)
-                }
+                DeviceInfoRows(source.deviceInfo, labelWidth)
             }
         }
     }
+}
+
+/**
+ * "Origin" row for a source whose label names the platform it was recorded on (manual entry, sample
+ * generation), followed by that device's details.
+ */
+@Composable
+private fun PlatformOriginRows(
+    label: String,
+    deviceSuffix: String,
+    deviceInfo: DeviceInfo?,
+    labelWidth: Dp,
+) {
+    val platform =
+        when (deviceInfo) {
+            is DeviceInfo.Jvm -> " (Desktop)"
+            is DeviceInfo.Android -> " (Android)"
+            null -> ""
+        }
+    FieldValueRow("Origin", "$label$platform$deviceSuffix", labelWidth = labelWidth)
+    DeviceInfoRows(deviceInfo, labelWidth)
 }
 
 @Composable

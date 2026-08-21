@@ -28,10 +28,7 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.QifImportId
-import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeAuditEntry
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
@@ -46,6 +43,7 @@ import com.moneymanager.ui.audit.AuditScreenData
 import com.moneymanager.ui.audit.FieldChange
 import com.moneymanager.ui.audit.FieldChangeRow
 import com.moneymanager.ui.audit.FieldValueRow
+import com.moneymanager.ui.audit.SourceInfoSection
 import com.moneymanager.ui.audit.UpdateNewValues
 import com.moneymanager.ui.audit.computeAuditDiff
 import com.moneymanager.ui.audit.reverseAttributeChanges
@@ -217,6 +215,7 @@ private fun TradeAuditDiffCard(
             }
             SourceInfoSection(
                 entry.source,
+                labelWidth = LABEL_WIDTH,
                 currentDeviceId = currentDeviceId,
                 onCsvSourceClick = onCsvSourceClick,
                 onQifSourceClick = onQifSourceClick,
@@ -405,6 +404,7 @@ private fun InsertDiffContent(
         AttributesSection(diff.attributeChanges)
         SourceInfoSection(
             diff.source,
+            labelWidth = LABEL_WIDTH,
             currentDeviceId = currentDeviceId,
             onCsvSourceClick = onCsvSourceClick,
             onQifSourceClick = onQifSourceClick,
@@ -487,6 +487,7 @@ private fun UpdateDiffContent(
         }
         SourceInfoSection(
             diff.source,
+            labelWidth = LABEL_WIDTH,
             currentDeviceId = currentDeviceId,
             onCsvSourceClick = onCsvSourceClick,
             onQifSourceClick = onQifSourceClick,
@@ -522,6 +523,7 @@ private fun DeleteDiffContent(
         AttributesSection(diff.attributeChanges, errorColor)
         SourceInfoSection(
             diff.source,
+            labelWidth = LABEL_WIDTH,
             currentDeviceId = currentDeviceId,
             labelColor = errorColor.copy(alpha = 0.8f),
             onCsvSourceClick = onCsvSourceClick,
@@ -680,153 +682,6 @@ private fun AttributeChangesSection(attributeChanges: List<AttributeChange>) {
     }
 }
 
-@Composable
-private fun SourceInfoSection(
-    source: SourceRecord?,
-    currentDeviceId: DeviceId? = null,
-    labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
-    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
-) {
-    if (source == null) return
-
-    val isThisDevice = currentDeviceId != null && source.deviceId == currentDeviceId.id
-    val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
-
-    Column(
-        modifier = Modifier.padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            text = "Source:",
-            style = MaterialTheme.typography.labelMedium,
-            color = labelColor,
-        )
-
-        when (val origin = source.source) {
-            Source.Manual -> {
-                when (val deviceInfo = source.deviceInfo) {
-                    is DeviceInfo.Jvm -> {
-                        FieldValueRow("Origin", "Manual (Desktop)$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                        FieldValueRow("Machine", deviceInfo.machineName, labelWidth = LABEL_WIDTH)
-                        FieldValueRow("OS", deviceInfo.osName, labelWidth = LABEL_WIDTH)
-                    }
-                    is DeviceInfo.Android -> {
-                        FieldValueRow("Origin", "Manual (Android)$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = LABEL_WIDTH)
-                    }
-                    null -> FieldValueRow("Origin", "Manual$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                }
-            }
-            is Source.Csv -> {
-                val fileName = source.fileName ?: "Unknown file"
-                val rowIndex = origin.rowIndex ?: 0
-                FieldValueRow("Origin", "CSV Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                CsvSourceLinkRow(
-                    label = "File",
-                    value = fileName,
-                    csvImportId = origin.importId,
-                    rowIndex = rowIndex,
-                    onCsvSourceClick = onCsvSourceClick,
-                )
-                CsvSourceLinkRow(
-                    label = "Row",
-                    value = rowIndex.toString(),
-                    csvImportId = origin.importId,
-                    rowIndex = rowIndex,
-                    onCsvSourceClick = onCsvSourceClick,
-                )
-                DeviceInfoFields(source.deviceInfo)
-            }
-            is Source.Qif -> {
-                val recordIndex = origin.recordIndex
-                FieldValueRow("Origin", "QIF Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                // The File link always opens the QIF import; only show a Record link when a single
-                // originating record is known (file-level provenance has none).
-                QifSourceLinkRow(
-                    label = "File",
-                    value = source.fileName ?: "Unknown file",
-                    qifImportId = origin.importId,
-                    recordIndex = recordIndex,
-                    onQifSourceClick = onQifSourceClick,
-                )
-                if (recordIndex != null) {
-                    QifSourceLinkRow(
-                        label = "Record",
-                        value = recordIndex.toString(),
-                        qifImportId = origin.importId,
-                        recordIndex = recordIndex,
-                        onQifSourceClick = onQifSourceClick,
-                    )
-                }
-                DeviceInfoFields(source.deviceInfo)
-            }
-            Source.SampleGenerator -> {
-                when (val deviceInfo = source.deviceInfo) {
-                    is DeviceInfo.Jvm -> {
-                        FieldValueRow("Origin", "Sample Generator (Desktop)$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                        FieldValueRow("Machine", deviceInfo.machineName, labelWidth = LABEL_WIDTH)
-                        FieldValueRow("OS", deviceInfo.osName, labelWidth = LABEL_WIDTH)
-                    }
-                    is DeviceInfo.Android -> {
-                        FieldValueRow("Origin", "Sample Generator (Android)$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = LABEL_WIDTH)
-                    }
-                    null -> FieldValueRow("Origin", "Sample Generator$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                }
-            }
-            Source.System -> {
-                FieldValueRow("Origin", "System", labelWidth = LABEL_WIDTH)
-            }
-            Source.Merge, Source.Unmerge -> {
-                val originLabel = if (origin == Source.Merge) "Merge" else "Undo Merge"
-                FieldValueRow("Origin", "$originLabel$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                DeviceInfoFields(source.deviceInfo)
-            }
-            is Source.Api -> {
-                FieldValueRow("Origin", "API Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                val requestId = origin.requestId
-                val jsonPath = origin.jsonPath
-                if (requestId != null && jsonPath != null) {
-                    ApiSourceLinkRow(
-                        label = "Session",
-                        value = origin.sessionId.id.toString(),
-                        sessionId = origin.sessionId,
-                        requestId = requestId,
-                        jsonPath = jsonPath.value,
-                        onApiSourceClick = onApiSourceClick,
-                    )
-                    FieldValueRow("Request", requestId.id.toString(), labelWidth = LABEL_WIDTH)
-                    ApiSourceLinkRow(
-                        label = "JSON Path",
-                        value = jsonPath.value,
-                        sessionId = origin.sessionId,
-                        requestId = requestId,
-                        jsonPath = jsonPath.value,
-                        onApiSourceClick = onApiSourceClick,
-                    )
-                }
-                DeviceInfoFields(source.deviceInfo)
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeviceInfoFields(deviceInfo: DeviceInfo?) {
-    when (deviceInfo) {
-        is DeviceInfo.Jvm -> {
-            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = LABEL_WIDTH)
-            FieldValueRow("OS", deviceInfo.osName, labelWidth = LABEL_WIDTH)
-        }
-        is DeviceInfo.Android -> {
-            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = LABEL_WIDTH)
-        }
-        null -> Unit
-    }
-}
-
 /**
  * Renders an account reference in the audit trail as "Name (#id)". Accounts that still exist are
  * clickable links; accounts that no longer exist (e.g. merged-away/deleted) are shown struck-through
@@ -939,90 +794,5 @@ private fun AccountChangeRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         AccountReference(newAccountId, accounts, auditedAccountNames, onAccountClick)
-    }
-}
-
-@Composable
-private fun CsvSourceLinkRow(
-    label: String,
-    value: String,
-    csvImportId: CsvImportId,
-    rowIndex: Long,
-    onCsvSourceClick: (CsvImportId, Long) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "$label:",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(LABEL_WIDTH),
-        )
-        TextButton(
-            onClick = { onCsvSourceClick(csvImportId, rowIndex) },
-            contentPadding = PaddingValues(0.dp),
-        ) {
-            Text(value)
-        }
-    }
-}
-
-@Composable
-private fun QifSourceLinkRow(
-    label: String,
-    value: String,
-    qifImportId: QifImportId,
-    recordIndex: Long?,
-    onQifSourceClick: (QifImportId, Long?) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "$label:",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(LABEL_WIDTH),
-        )
-        TextButton(
-            onClick = { onQifSourceClick(qifImportId, recordIndex) },
-            contentPadding = PaddingValues(0.dp),
-        ) {
-            Text(value)
-        }
-    }
-}
-
-@Composable
-private fun ApiSourceLinkRow(
-    label: String,
-    value: String,
-    sessionId: ApiSessionId,
-    requestId: ApiRequestId,
-    jsonPath: String,
-    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "$label:",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(LABEL_WIDTH),
-        )
-        TextButton(
-            onClick = { onApiSourceClick(sessionId, requestId, jsonPath) },
-            contentPadding = PaddingValues(0.dp),
-        ) {
-            Text(value)
-        }
     }
 }

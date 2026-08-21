@@ -65,12 +65,9 @@ suspend fun planApiReimport(
 /** Outcome of [executeApiReimport]. */
 data class ApiReimportResult(
     val transfersDeleted: Int,
-    val tradesDeleted: Int,
-    val unexcludedPartners: Int,
     val deletedEmptyAccounts: List<String>,
     val transactionsImported: Int,
     val tradesImported: Int,
-    val peopleImported: Int,
 )
 
 /**
@@ -146,43 +143,35 @@ suspend fun executeApiReimport(
     // A surviving partner un-excludes only once it has no RECONCILED relationship left at all — one
     // reconciled against more than one deleted session leg (unusual, but possible) must stay hidden
     // until every one of them is gone.
-    val unexcluded =
-        if (reconciledPartners.isEmpty()) {
-            emptySet()
-        } else {
-            val remainingRelationships = transferRelationshipRepository.getByTransfers(reconciledPartners)
-            val stillReconciled =
-                remainingRelationships
-                    .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-                    .flatMap { listOf(it.id1, it.id2) }
-                    .toSet()
-            val toUnexclude = reconciledPartners - stillReconciled
-            if (toUnexclude.isEmpty()) {
-                emptySet()
-            } else {
-                val partnerTransfers = transactionRepository.getTransactionsByIds(toUnexclude)
-                val updates =
-                    toUnexclude.mapNotNull { id ->
-                        val attr =
-                            partnerTransfers[id]?.attributes?.firstOrNull {
-                                it.attributeType.id.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID && it.value == EXCLUDED_ATTR_VALUE
-                            } ?: return@mapNotNull null
-                        ImportTransfer(
-                            source = Source.System,
-                            operation = ImportOperation.UPDATE,
-                            existingId = id,
-                            deletedAttributeIds = setOf(attr.id),
-                        )
-                    }
-                if (updates.isNotEmpty()) {
-                    onProgress?.invoke(ImportProgress("Un-hiding reconciled transactions"))
-                    importEngine.import(ImportBatch(transfers = updates, dedupePolicy = DedupePolicy.None))
+    if (reconciledPartners.isNotEmpty()) {
+        val remainingRelationships = transferRelationshipRepository.getByTransfers(reconciledPartners)
+        val stillReconciled =
+            remainingRelationships
+                .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
+                .flatMap { listOf(it.id1, it.id2) }
+                .toSet()
+        val toUnexclude = reconciledPartners - stillReconciled
+        if (toUnexclude.isNotEmpty()) {
+            val partnerTransfers = transactionRepository.getTransactionsByIds(toUnexclude)
+            val updates =
+                toUnexclude.mapNotNull { id ->
+                    val attr =
+                        partnerTransfers[id]?.attributes?.firstOrNull {
+                            it.attributeType.id.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID && it.value == EXCLUDED_ATTR_VALUE
+                        } ?: return@mapNotNull null
+                    ImportTransfer(
+                        source = Source.System,
+                        operation = ImportOperation.UPDATE,
+                        existingId = id,
+                        deletedAttributeIds = setOf(attr.id),
+                    )
                 }
-                // Only the transfers actually represented by an update (i.e. that still carried the
-                // exclusion attribute) were un-excluded — a candidate missing it contributes nothing.
-                updates.mapNotNull { it.existingId }.toSet()
+            if (updates.isNotEmpty()) {
+                onProgress?.invoke(ImportProgress("Un-hiding reconciled transactions"))
+                importEngine.import(ImportBatch(transfers = updates, dedupePolicy = DedupePolicy.None))
             }
         }
+    }
 
     onProgress?.invoke(ImportProgress("Re-importing"))
     val rerun =
@@ -197,7 +186,7 @@ suspend fun executeApiReimport(
                     strategy = strategy,
                     importEngine = importEngine,
                 )
-            RerunOutcome(transactions = exchangeResult.transfersImported, trades = exchangeResult.tradesImported, people = 0)
+            RerunOutcome(transactions = exchangeResult.transfersImported, trades = exchangeResult.tradesImported)
         } else {
             val transactionsResult =
                 importApiSessionTransactions(
@@ -209,24 +198,17 @@ suspend fun executeApiReimport(
                     counterpartyAccountNames = counterpartyAccountNames,
                     passThroughAccounts = passThroughAccounts,
                 )
-            val peopleResult =
-                if (strategy.config.peopleDownload != null) {
-                    importApiSessionPeople(
-                        apiSessionRepository = apiSessionRepository,
-                        accountAttributeRepository = accountAttributeRepository,
-                        importEngine = importEngine,
-                        sessionId = session.id,
-                        strategy = strategy,
-                        accountsSessionId = session.id,
-                    )
-                } else {
-                    null
-                }
-            RerunOutcome(
-                transactions = transactionsResult.transactionCount,
-                trades = 0,
-                people = peopleResult?.personCount ?: 0,
-            )
+            if (strategy.config.peopleDownload != null) {
+                importApiSessionPeople(
+                    apiSessionRepository = apiSessionRepository,
+                    accountAttributeRepository = accountAttributeRepository,
+                    importEngine = importEngine,
+                    sessionId = session.id,
+                    strategy = strategy,
+                    accountsSessionId = session.id,
+                )
+            }
+            RerunOutcome(transactions = transactionsResult.transactionCount, trades = 0)
         }
 
     importEngine.markApiSessionImported(
@@ -247,19 +229,15 @@ suspend fun executeApiReimport(
 
     return ApiReimportResult(
         transfersDeleted = plan.transferIds.size,
-        tradesDeleted = plan.tradeIds.size,
-        unexcludedPartners = unexcluded.size,
         deletedEmptyAccounts = deletedEmptyAccounts,
         transactionsImported = rerun.transactions,
         tradesImported = rerun.trades,
-        peopleImported = rerun.people,
     )
 }
 
 private data class RerunOutcome(
     val transactions: Int,
     val trades: Int,
-    val people: Int,
 )
 
 /**
@@ -302,7 +280,6 @@ private suspend fun deleteEmptyAccountsCreatedBySession(
 /** Aggregated outcome of [bulkReimportApiSessions]. */
 data class ApiBulkReimportResult(
     val sessionsReimported: Int,
-    val results: Map<ApiSessionId, ApiReimportResult>,
 )
 
 /**
@@ -339,7 +316,6 @@ suspend fun bulkReimportApiSessions(
             .filter { it.id in importedSessionIds }
             .sortedBy { it.createdAt }
 
-    val results = mutableMapOf<ApiSessionId, ApiReimportResult>()
     for ((index, session) in sessions.withIndex()) {
         onProgress?.invoke(
             ImportProgress(
@@ -350,26 +326,25 @@ suspend fun bulkReimportApiSessions(
             ),
         )
         val plan = planApiReimport(session.id, apiSessionRepository)
-        results[session.id] =
-            executeApiReimport(
-                plan = plan,
-                session = session,
-                strategy = strategy,
-                apiSessionRepository = apiSessionRepository,
-                accountRepository = accountRepository,
-                currencyRepository = currencyRepository,
-                cryptoRepository = cryptoRepository,
-                accountAttributeRepository = accountAttributeRepository,
-                transactionRepository = transactionRepository,
-                transferRelationshipRepository = transferRelationshipRepository,
-                tradeRepository = tradeRepository,
-                maintenance = maintenance,
-                importEngine = importEngine,
-                counterpartyAccountNames = counterpartyAccountNames,
-                passThroughAccounts = passThroughAccounts,
-                refreshViews = false,
-            )
+        executeApiReimport(
+            plan = plan,
+            session = session,
+            strategy = strategy,
+            apiSessionRepository = apiSessionRepository,
+            accountRepository = accountRepository,
+            currencyRepository = currencyRepository,
+            cryptoRepository = cryptoRepository,
+            accountAttributeRepository = accountAttributeRepository,
+            transactionRepository = transactionRepository,
+            transferRelationshipRepository = transferRelationshipRepository,
+            tradeRepository = tradeRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+            counterpartyAccountNames = counterpartyAccountNames,
+            passThroughAccounts = passThroughAccounts,
+            refreshViews = false,
+        )
     }
     maintenance.refreshMaterializedViews()
-    return ApiBulkReimportResult(sessionsReimported = sessions.size, results = results)
+    return ApiBulkReimportResult(sessionsReimported = sessions.size)
 }
