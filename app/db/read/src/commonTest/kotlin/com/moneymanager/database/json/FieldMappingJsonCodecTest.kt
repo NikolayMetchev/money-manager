@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
@@ -26,14 +25,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import kotlin.uuid.Uuid
 
 class FieldMappingJsonCodecTest {
     @Test
     fun `encode and decode HardCodedAccountMapping`() {
         val mapping =
             HardCodedAccountMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.SOURCE_ACCOUNT,
                 accountId = AccountId(123),
             )
@@ -53,7 +50,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode AccountLookupMapping`() {
         val mapping =
             AccountLookupMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.TARGET_ACCOUNT,
                 columnName = "Payee",
             )
@@ -71,7 +67,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode RegexAccountMapping`() {
         val mapping =
             RegexAccountMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.TARGET_ACCOUNT,
                 columnName = "Name",
                 rules =
@@ -101,7 +96,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode DateTimeParsingMapping`() {
         val mapping =
             DateTimeParsingMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.TIMESTAMP,
                 dateColumnName = "Date",
                 dateFormat = "dd/MM/yyyy",
@@ -126,7 +120,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode DirectColumnMapping`() {
         val mapping =
             DirectColumnMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.DESCRIPTION,
                 columnName = "Description",
             )
@@ -144,7 +137,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode AmountParsingMapping with SINGLE_COLUMN mode`() {
         val mapping =
             AmountParsingMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.AMOUNT,
                 mode = AmountMode.SINGLE_COLUMN,
                 amountColumnName = "Amount",
@@ -168,7 +160,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode AmountParsingMapping with CREDIT_DEBIT_COLUMNS mode`() {
         val mapping =
             AmountParsingMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.AMOUNT,
                 mode = AmountMode.CREDIT_DEBIT_COLUMNS,
                 creditColumnName = "Credit",
@@ -191,7 +182,6 @@ class FieldMappingJsonCodecTest {
         val currencyId = CurrencyId(1L)
         val mapping =
             HardCodedCurrencyMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.CURRENCY,
                 currencyId = currencyId,
             )
@@ -209,7 +199,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode CurrencyLookupMapping`() {
         val mapping =
             CurrencyLookupMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.CURRENCY,
                 columnName = "Currency",
             )
@@ -230,39 +219,33 @@ class FieldMappingJsonCodecTest {
             mapOf(
                 TransferField.SOURCE_ACCOUNT to
                     HardCodedAccountMapping(
-                        id = FieldMappingId(Uuid.random()),
                         fieldType = TransferField.SOURCE_ACCOUNT,
                         accountId = AccountId(1),
                     ),
                 TransferField.TARGET_ACCOUNT to
                     AccountLookupMapping(
-                        id = FieldMappingId(Uuid.random()),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         columnName = "Payee",
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
-                        id = FieldMappingId(Uuid.random()),
                         fieldType = TransferField.TIMESTAMP,
                         dateColumnName = "Date",
                         dateFormat = "yyyy-MM-dd",
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
-                        id = FieldMappingId(Uuid.random()),
                         fieldType = TransferField.DESCRIPTION,
                         columnName = "Memo",
                     ),
                 TransferField.AMOUNT to
                     AmountParsingMapping(
-                        id = FieldMappingId(Uuid.random()),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Amount",
                     ),
                 TransferField.CURRENCY to
                     HardCodedCurrencyMapping(
-                        id = FieldMappingId(Uuid.random()),
                         fieldType = TransferField.CURRENCY,
                         currencyId = currencyId,
                     ),
@@ -304,7 +287,6 @@ class FieldMappingJsonCodecTest {
     fun `encoded JSON is valid and parseable`() {
         val mapping =
             HardCodedAccountMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.SOURCE_ACCOUNT,
                 accountId = AccountId(42),
             )
@@ -321,7 +303,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode HardCodedTimezoneMapping`() {
         val mapping =
             HardCodedTimezoneMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.TIMEZONE,
                 timezoneId = "Europe/London",
             )
@@ -340,7 +321,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode TimezoneLookupMapping`() {
         val mapping =
             TimezoneLookupMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.TIMEZONE,
                 columnName = "Timezone",
             )
@@ -359,7 +339,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode TemplateAccountMapping`() {
         val mapping =
             TemplateAccountMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.SOURCE_ACCOUNT,
                 columnName = "Source currency",
                 prefix = "Wise: ",
@@ -380,7 +359,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode ConditionalAccountMapping with nested mappings`() {
         val mapping =
             ConditionalAccountMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.TARGET_ACCOUNT,
                 conditions =
                     listOf(
@@ -389,14 +367,12 @@ class FieldMappingJsonCodecTest {
                     ),
                 whenTrue =
                     TemplateAccountMapping(
-                        id = FieldMappingId(Uuid.random()),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         columnName = "Target currency",
                         prefix = "Wise: ",
                     ),
                 whenFalse =
                     AccountLookupMapping(
-                        id = FieldMappingId(Uuid.random()),
                         fieldType = TransferField.TARGET_ACCOUNT,
                         columnName = "Target name",
                         fallbackColumns = listOf("Source name"),
@@ -419,7 +395,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode DateTimeParsingMapping with combined date-time format`() {
         val mapping =
             DateTimeParsingMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.TIMESTAMP,
                 dateColumnName = "Created on",
                 dateFormat = "yyyy-MM-dd",
@@ -439,7 +414,6 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode AmountParsingMapping with conditional fee column`() {
         val mapping =
             AmountParsingMapping(
-                id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.AMOUNT,
                 mode = AmountMode.SINGLE_COLUMN,
                 amountColumnName = "Source amount (after fees)",

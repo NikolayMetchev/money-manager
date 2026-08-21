@@ -18,7 +18,6 @@ import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
@@ -483,13 +482,10 @@ class CsvStrategyExportService(
         accountsByName: Map<String, Account>,
         currenciesByCode: Map<String, Currency>,
         categoriesByName: Map<String, Category>,
-    ): FieldMapping {
-        val newId = FieldMappingId(Uuid.random())
-
-        return when (this) {
+    ): FieldMapping =
+        when (this) {
             is HardCodedAccountExport ->
                 HardCodedAccountMapping(
-                    id = newId,
                     fieldType = fieldType,
                     accountId =
                         accountsByName[accountName]?.id
@@ -497,7 +493,6 @@ class CsvStrategyExportService(
                 )
             is AccountLookupExport ->
                 AccountLookupMapping(
-                    id = newId,
                     fieldType = fieldType,
                     columnName = columnName,
                     fallbackColumns = fallbackColumns,
@@ -507,7 +502,6 @@ class CsvStrategyExportService(
                 )
             is RegexAccountExport ->
                 RegexAccountMapping(
-                    id = newId,
                     fieldType = fieldType,
                     columnName = columnName,
                     rules = rules,
@@ -518,7 +512,6 @@ class CsvStrategyExportService(
                 )
             is AttributeMatchAccountExport ->
                 AttributeMatchAccountMapping(
-                    id = newId,
                     fieldType = fieldType,
                     columnName = columnName,
                     attributeTypeName = attributeTypeName,
@@ -528,7 +521,6 @@ class CsvStrategyExportService(
                 )
             is TemplateAccountExport ->
                 TemplateAccountMapping(
-                    id = newId,
                     fieldType = fieldType,
                     columnName = columnName,
                     prefix = prefix,
@@ -539,7 +531,6 @@ class CsvStrategyExportService(
                 )
             is ConditionalAccountExport ->
                 ConditionalAccountMapping(
-                    id = newId,
                     fieldType = fieldType,
                     conditions = conditions,
                     whenTrue = whenTrue.toDomain(accountsByName, currenciesByCode, categoriesByName),
@@ -547,7 +538,6 @@ class CsvStrategyExportService(
                 )
             is DateTimeParsingExport ->
                 DateTimeParsingMapping(
-                    id = newId,
                     fieldType = fieldType,
                     dateColumnName = dateColumnName,
                     dateFormat = dateFormat,
@@ -558,7 +548,6 @@ class CsvStrategyExportService(
                 )
             is DirectColumnExport ->
                 DirectColumnMapping(
-                    id = newId,
                     fieldType = fieldType,
                     columnName = columnName,
                     fallbackColumns = fallbackColumns,
@@ -566,7 +555,6 @@ class CsvStrategyExportService(
                 )
             is AmountParsingExport ->
                 AmountParsingMapping(
-                    id = newId,
                     fieldType = fieldType,
                     mode = mode,
                     amountColumnName = amountColumnName,
@@ -579,7 +567,6 @@ class CsvStrategyExportService(
                 )
             is HardCodedCurrencyExport ->
                 HardCodedCurrencyMapping(
-                    id = newId,
                     fieldType = fieldType,
                     currencyId =
                         currenciesByCode[currencyCode]?.id
@@ -587,22 +574,18 @@ class CsvStrategyExportService(
                 )
             is CurrencyLookupExport ->
                 CurrencyLookupMapping(
-                    id = newId,
                     fieldType = fieldType,
                     columnName = columnName,
                 )
             is HardCodedTimezoneExport ->
                 HardCodedTimezoneMapping(
-                    id = newId,
                     fieldType = fieldType,
                     timezoneId = timezoneId,
                 )
             is TimezoneLookupExport ->
                 TimezoneLookupMapping(
-                    id = newId,
                     fieldType = fieldType,
                     columnName = columnName,
                 )
         }
-    }
 }

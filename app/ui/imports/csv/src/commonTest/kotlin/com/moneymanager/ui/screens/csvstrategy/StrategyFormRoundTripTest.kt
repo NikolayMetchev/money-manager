@@ -19,19 +19,14 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
-import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
-import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
-import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.ui.screens.csvstrategy.editor.buildStrategyFromFormState
-import com.moneymanager.ui.screens.csvstrategy.editor.extractFormStateFromStrategy
+import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorState
+import com.moneymanager.ui.screens.csvstrategy.editor.buildStrategyFromEditorState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -44,36 +39,7 @@ import kotlin.uuid.Uuid
  * dialog no longer carries any mapping over unchanged).
  */
 class StrategyFormRoundTripTest {
-    private val fixedId = FieldMappingId(Uuid.fromLongs(0L, 0L))
     private val timestamp = Instant.fromEpochMilliseconds(1_000)
-
-    private fun mappingId(value: Long) = FieldMappingId(Uuid.fromLongs(0L, value))
-
-    /** Rewrites every FieldMappingId to a constant so structural comparison ignores ids. */
-    private fun normalize(mapping: FieldMapping): FieldMapping =
-        when (mapping) {
-            is AccountLookupMapping -> mapping.copy(id = fixedId)
-            is RegexAccountMapping -> mapping.copy(id = fixedId)
-            is AttributeMatchAccountMapping -> mapping.copy(id = fixedId)
-            is TemplateAccountMapping -> mapping.copy(id = fixedId)
-            is ConditionalAccountMapping ->
-                mapping.copy(
-                    id = fixedId,
-                    whenTrue = normalize(mapping.whenTrue),
-                    whenFalse = normalize(mapping.whenFalse),
-                )
-            is DateTimeParsingMapping -> mapping.copy(id = fixedId)
-            is DirectColumnMapping -> mapping.copy(id = fixedId)
-            is AmountParsingMapping -> mapping.copy(id = fixedId)
-            is HardCodedCurrencyMapping -> mapping.copy(id = fixedId)
-            is CurrencyLookupMapping -> mapping.copy(id = fixedId)
-            is HardCodedTimezoneMapping -> mapping.copy(id = fixedId)
-            is TimezoneLookupMapping -> mapping.copy(id = fixedId)
-            else -> error("Unexpected mapping type: $mapping")
-        }
-
-    private fun normalize(mappings: Map<TransferField, FieldMapping>): Map<TransferField, FieldMapping> =
-        mappings.mapValues { (_, mapping) -> normalize(mapping) }
 
     private val columns =
         listOf(
@@ -98,10 +64,9 @@ class StrategyFormRoundTripTest {
             fieldMappings =
                 mapOf(
                     TransferField.SOURCE_ACCOUNT to
-                        TemplateAccountMapping(mappingId(1), TransferField.SOURCE_ACCOUNT, "Source currency", prefix = "Wise: "),
+                        TemplateAccountMapping(TransferField.SOURCE_ACCOUNT, "Source currency", prefix = "Wise: "),
                     TransferField.TARGET_ACCOUNT to
                         ConditionalAccountMapping(
-                            id = mappingId(2),
                             fieldType = TransferField.TARGET_ACCOUNT,
                             conditions =
                                 listOf(
@@ -110,14 +75,12 @@ class StrategyFormRoundTripTest {
                                 ),
                             whenTrue =
                                 TemplateAccountMapping(
-                                    mappingId(3),
                                     TransferField.TARGET_ACCOUNT,
                                     "Target currency",
                                     prefix = "Wise: ",
                                 ),
                             whenFalse =
                                 AccountLookupMapping(
-                                    mappingId(4),
                                     TransferField.TARGET_ACCOUNT,
                                     "Target name",
                                     fallbackColumns = listOf("Source name"),
@@ -125,17 +88,15 @@ class StrategyFormRoundTripTest {
                         ),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
-                            id = mappingId(5),
                             fieldType = TransferField.TIMESTAMP,
                             dateColumnName = "Created on",
                             dateFormat = "yyyy-MM-dd",
                             dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
                         ),
                     TransferField.DESCRIPTION to
-                        DirectColumnMapping(mappingId(6), TransferField.DESCRIPTION, "Reference"),
+                        DirectColumnMapping(TransferField.DESCRIPTION, "Reference"),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
-                            id = mappingId(7),
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
                             amountColumnName = "Source amount (after fees)",
@@ -143,9 +104,9 @@ class StrategyFormRoundTripTest {
                             feeConditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "OUT")),
                         ),
                     TransferField.CURRENCY to
-                        CurrencyLookupMapping(mappingId(8), TransferField.CURRENCY, "Source currency"),
+                        CurrencyLookupMapping(TransferField.CURRENCY, "Source currency"),
                     TransferField.TIMEZONE to
-                        HardCodedTimezoneMapping(mappingId(9), TransferField.TIMEZONE, "Europe/London"),
+                        HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                 ),
             attributeMappings =
                 listOf(AttributeColumnMapping(columnName = "ID", attributeTypeName = "wise-id", isUniqueIdentifier = true)),
@@ -180,10 +141,10 @@ class StrategyFormRoundTripTest {
         val original = advancedStrategy()
         val availableColumns = columns.map { it.originalName }.toSet()
 
-        val state = extractFormStateFromStrategy(original, availableColumns)
-        val rebuilt = buildStrategyFromFormState(state, original.id, original.createdAt, original.updatedAt)
+        val state = CsvStrategyEditorState(original, availableColumns)
+        val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
-        assertEquals(normalize(original.fieldMappings), normalize(rebuilt.fieldMappings))
+        assertEquals(original.fieldMappings, rebuilt.fieldMappings)
         assertEquals(original.identificationColumns, rebuilt.identificationColumns)
         assertEquals(original.attributeMappings, rebuilt.attributeMappings)
         assertEquals(original.rowPreprocessingRules, rebuilt.rowPreprocessingRules)
@@ -206,34 +167,31 @@ class StrategyFormRoundTripTest {
                 fieldMappings =
                     mapOf(
                         TransferField.SOURCE_ACCOUNT to
-                            TemplateAccountMapping(mappingId(1), TransferField.SOURCE_ACCOUNT, "Source currency", prefix = "Wise: "),
+                            TemplateAccountMapping(TransferField.SOURCE_ACCOUNT, "Source currency", prefix = "Wise: "),
                         TransferField.TARGET_ACCOUNT to
                             AttributeMatchAccountMapping(
-                                id = mappingId(2),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Target name",
                                 attributeTypeName = "card-last4",
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
-                                id = mappingId(5),
                                 fieldType = TransferField.TIMESTAMP,
                                 dateColumnName = "Created on",
                                 dateFormat = "yyyy-MM-dd",
                             ),
                         TransferField.DESCRIPTION to
-                            DirectColumnMapping(mappingId(6), TransferField.DESCRIPTION, "Reference"),
+                            DirectColumnMapping(TransferField.DESCRIPTION, "Reference"),
                         TransferField.AMOUNT to
                             AmountParsingMapping(
-                                id = mappingId(7),
                                 fieldType = TransferField.AMOUNT,
                                 mode = AmountMode.SINGLE_COLUMN,
                                 amountColumnName = "Source amount (after fees)",
                             ),
                         TransferField.CURRENCY to
-                            CurrencyLookupMapping(mappingId(8), TransferField.CURRENCY, "Source currency"),
+                            CurrencyLookupMapping(TransferField.CURRENCY, "Source currency"),
                         TransferField.TIMEZONE to
-                            HardCodedTimezoneMapping(mappingId(9), TransferField.TIMEZONE, "Europe/London"),
+                            HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                     ),
                 fundingAttributeMatch = AttributeAccountMatch(column = "Reference", attributeTypeName = "card-last4"),
                 createdAt = timestamp,
@@ -241,10 +199,10 @@ class StrategyFormRoundTripTest {
             )
         val availableColumns = columns.map { it.originalName }.toSet()
 
-        val state = extractFormStateFromStrategy(original, availableColumns)
-        val rebuilt = buildStrategyFromFormState(state, original.id, original.createdAt, original.updatedAt)
+        val state = CsvStrategyEditorState(original, availableColumns)
+        val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
-        assertEquals(normalize(original.fieldMappings), normalize(rebuilt.fieldMappings))
+        assertEquals(original.fieldMappings, rebuilt.fieldMappings)
         assertEquals(original.fundingAttributeMatch, rebuilt.fundingAttributeMatch)
         val target = rebuilt.fieldMappings[TransferField.TARGET_ACCOUNT]
         assertIs<AttributeMatchAccountMapping>(target)
@@ -280,8 +238,8 @@ class StrategyFormRoundTripTest {
             )
         val availableColumns = columns.map { it.originalName }.toSet()
 
-        val state = extractFormStateFromStrategy(original, availableColumns)
-        val rebuilt = buildStrategyFromFormState(state, original.id, original.createdAt, original.updatedAt)
+        val state = CsvStrategyEditorState(original, availableColumns)
+        val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
         assertEquals(original.contentMatchRules, rebuilt.contentMatchRules)
         assertEquals(original.crossSourceReconcileWindowSeconds, rebuilt.crossSourceReconcileWindowSeconds)
@@ -304,7 +262,7 @@ class StrategyFormRoundTripTest {
                     "ID",
                 )
 
-        val state = extractFormStateFromStrategy(original, availableColumns)
+        val state = CsvStrategyEditorState(original, availableColumns)
 
         // The condition comparing against "Target name" is dropped; the IS_NOT_BLANK one stays.
         assertEquals(1, state.targetConditions.size)

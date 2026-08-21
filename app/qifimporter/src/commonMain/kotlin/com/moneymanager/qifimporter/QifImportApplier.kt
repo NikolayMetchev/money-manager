@@ -27,7 +27,6 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.isQifStrategy
@@ -55,7 +54,6 @@ import com.moneymanager.importengineapi.normalizeNameKey
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
-import kotlin.uuid.Uuid
 
 private val logger = logging()
 
@@ -223,7 +221,6 @@ fun CsvImportStrategy.withQifCurrency(currencyId: CurrencyId?): CsvImportStrateg
                 (
                     TransferField.CURRENCY to
                         HardCodedCurrencyMapping(
-                            id = FieldMappingId(Uuid.parse("00000000-0000-0000-0000-0000000c0de1")),
                             fieldType = TransferField.CURRENCY,
                             currencyId = currencyId,
                         )

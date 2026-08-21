@@ -14,7 +14,6 @@ import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
@@ -61,29 +60,27 @@ class QifApplyIntegrationTest : DbTest() {
             fieldMappings =
                 mapOf(
                     TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(FieldMappingId(Uuid.random()), TransferField.SOURCE_ACCOUNT, source.id),
+                        HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, source.id),
                     TransferField.TARGET_ACCOUNT to
-                        HardCodedAccountMapping(FieldMappingId(Uuid.random()), TransferField.TARGET_ACCOUNT, target.id),
+                        HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, target.id),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TIMESTAMP,
                             dateColumnName = QifColumns.COL_DATE,
                             dateFormat = "MM/dd/yyyy",
                         ),
                     TransferField.DESCRIPTION to
-                        DirectColumnMapping(FieldMappingId(Uuid.random()), TransferField.DESCRIPTION, QifColumns.COL_PAYEE),
+                        DirectColumnMapping(TransferField.DESCRIPTION, QifColumns.COL_PAYEE),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
                             amountColumnName = QifColumns.COL_AMOUNT,
                         ),
                     TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(FieldMappingId(Uuid.random()), TransferField.CURRENCY, currency.id),
+                        HardCodedCurrencyMapping(TransferField.CURRENCY, currency.id),
                     TransferField.TIMEZONE to
-                        HardCodedTimezoneMapping(FieldMappingId(Uuid.random()), TransferField.TIMEZONE, "UTC"),
+                        HardCodedTimezoneMapping(TransferField.TIMEZONE, "UTC"),
                 ),
             createdAt = Clock.System.now(),
             updatedAt = Clock.System.now(),

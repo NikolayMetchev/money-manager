@@ -23,7 +23,6 @@ import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
@@ -95,32 +94,27 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                 mapOf(
                     TransferField.SOURCE_ACCOUNT to
                         HardCodedAccountMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.SOURCE_ACCOUNT,
                             accountId = sourceAccount.id,
                         ),
                     TransferField.TARGET_ACCOUNT to
                         HardCodedAccountMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TARGET_ACCOUNT,
                             accountId = targetAccount.id,
                         ),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TIMESTAMP,
                             dateColumnName = "Date",
                             dateFormat = "dd/MM/yyyy",
                         ),
                     TransferField.DESCRIPTION to
                         DirectColumnMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.DESCRIPTION,
                             columnName = "Description",
                         ),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
                             amountColumnName = "Amount",
@@ -128,13 +122,11 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                         ),
                     TransferField.CURRENCY to
                         HardCodedCurrencyMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.CURRENCY,
                             currencyId = testCurrency.id,
                         ),
                     TransferField.TIMEZONE to
                         HardCodedTimezoneMapping(
-                            id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TIMEZONE,
                             timezoneId = "UTC",
                         ),
