@@ -363,8 +363,6 @@ data class ExchangeImportResult(
     val tradesImported: Int,
     val transfersImported: Int,
     val duplicatesSkipped: Int,
-    val ordersImported: Int = 0,
-    val ordersUpdated: Int = 0,
 )
 
 private data class ParsedTrade(
@@ -868,8 +866,6 @@ suspend fun importApiSessionExchange(
         tradesImported = tradeIntents.size,
         transfersImported = result.transfersImported,
         duplicatesSkipped = result.duplicates,
-        ordersImported = orderIntents.size - result.updatedOrderKeys.size - result.dedupedOrderKeys.size,
-        ordersUpdated = result.updatedOrderKeys.size,
     )
 }
 

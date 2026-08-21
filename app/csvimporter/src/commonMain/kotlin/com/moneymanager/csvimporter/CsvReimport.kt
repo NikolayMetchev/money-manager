@@ -160,15 +160,13 @@ data class ReimportStaleDuplicate(
  * One already-imported trade row whose trade duplicates an earlier one: two exports recorded the same
  * conversion (same instant, accounts, assets and amounts) under different wording, which the trade
  * identity check used to treat as distinct. This row's redundant trade is deleted and the row reset, so
- * the re-run reuses [keptTradeId] and the conversion is booked once.
+ * the re-run books the conversion once, against the earlier trade.
  */
 data class ReimportDuplicateTrade(
     val rowIndex: Long,
     val tradeId: TradeId,
     /** The row's statement description, for the preview. */
     val description: String,
-    /** The earlier trade the row will reuse. */
-    val keptTradeId: TradeId,
 )
 
 /**
@@ -290,8 +288,6 @@ data class CsvReimportResult(
     val reversedMerges: List<ReimportReversal> = emptyList(),
     /** Rows whose single-asset transfer was deleted and re-imported as a cross-asset trade. */
     val convertedRows: List<ReimportTradeConversion> = emptyList(),
-    /** Conduit-spend rows deleted and re-imported so they reconcile against a funding leg. */
-    val reconciledRows: List<ReimportFundingReconcile> = emptyList(),
     /** Rows deleted and re-imported so their unidentified counterparty is booked/reconciled correctly. */
     val counterpartyReconciledRows: List<ReimportCounterpartyReconcile> = emptyList(),
     /** Trade rows whose duplicate trade was deleted so the conversion is booked once. */
@@ -795,7 +791,7 @@ suspend fun computeDuplicateTradeReruns(
         val kept = group.minByOrNull { it.id.id }
         val redundant = own ?: group.filter { it.id !in claimedByOtherRows }.maxByOrNull { it.id.id }
         if (group.size > 1 && kept != null && redundant != null && redundant.id != kept.id && planned.add(redundant.id)) {
-            duplicates += ReimportDuplicateTrade(mapped.rowIndex, redundant.id, redundant.description, kept.id)
+            duplicates += ReimportDuplicateTrade(mapped.rowIndex, redundant.id, redundant.description)
         }
     }
     return duplicates
@@ -1485,7 +1481,6 @@ suspend fun executeCsvReimport(
     // One batch per reconcile: the plain conduit-spend transfer is deleted and its row status reset in
     // the same batch, so the re-run below re-imports it through the engine's funding-card reconcile
     // (which links it to the funding leg + excludes it instead of double-counting).
-    val reconciled = mutableListOf<ReimportFundingReconcile>()
     for ((index, reconcile) in plan.fundingReconciles.withIndex()) {
         onProgress?.invoke(
             ImportProgress(
@@ -1510,7 +1505,6 @@ suspend fun executeCsvReimport(
                     csvImportMutations = listOf(CsvImportMutation.ResetRowStatuses(csvImport.id, listOf(reconcile.rowIndex))),
                 ),
             )
-            reconciled += reconcile
         } catch (expected: Exception) {
             logger.warn(expected) { "Re-import funding reconcile of row ${reconcile.rowIndex} ('${reconcile.description}') failed" }
             skipped +=
@@ -1560,7 +1554,6 @@ suspend fun executeCsvReimport(
         updatedRows = updatedRows,
         reversedMerges = reversedMerges,
         convertedRows = converted,
-        reconciledRows = reconciled,
         counterpartyReconciledRows = counterpartyReconciled,
         duplicateTradeRows = deduplicatedTrades,
         staleDuplicateRows = releasedDuplicates,

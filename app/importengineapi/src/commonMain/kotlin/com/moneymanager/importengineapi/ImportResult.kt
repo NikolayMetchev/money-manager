@@ -70,10 +70,6 @@ data class ImportResult(
     val dedupedTradeKeys: Set<LocalTradeKey> = emptySet(),
     /** Ids of exchange orders upserted for each [LocalOrderKey] in [ImportBatch.orders] (all outcomes). */
     val orderIds: Map<LocalOrderKey, ExchangeOrderId> = emptyMap(),
-    /** Keys of order intents that revised an existing order (status/price change since last import). */
-    val updatedOrderKeys: Set<LocalOrderKey> = emptySet(),
-    /** Keys of order intents that matched an identical existing order (idempotent re-import). */
-    val dedupedOrderKeys: Set<LocalOrderKey> = emptySet(),
     /** Resolved (get-or-create) attribute-type ids for each name in [ImportBatch.attributeTypeNames]. */
     val attributeTypeIds: Map<String, AttributeTypeId> = emptyMap(),
     /** Resolved (get-or-create) relationship-type ids for each name in [ImportBatch.relationshipTypeNames]. */

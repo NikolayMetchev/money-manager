@@ -44,7 +44,6 @@ import com.moneymanager.domain.repository.write.CsvImportWriteRepository
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
-import com.moneymanager.domain.repository.write.OrderUpsertResult
 import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
@@ -225,8 +224,6 @@ class ImportEngineImpl(
             if (!tradeResult.created) dedupedTradeKeys += intent.key
         }
         val orderIds = mutableMapOf<LocalOrderKey, ExchangeOrderId>()
-        val updatedOrderKeys = mutableSetOf<LocalOrderKey>()
-        val dedupedOrderKeys = mutableSetOf<LocalOrderKey>()
         for (intent in batch.orders) {
             val orderResult =
                 exchangeOrderRepository.upsertOrder(
@@ -245,11 +242,6 @@ class ImportEngineImpl(
                     source = intent.source,
                 )
             orderIds[intent.key] = orderResult.id
-            when (orderResult.outcome) {
-                OrderUpsertResult.Outcome.UPDATED -> updatedOrderKeys += intent.key
-                OrderUpsertResult.Outcome.UNCHANGED -> dedupedOrderKeys += intent.key
-                OrderUpsertResult.Outcome.CREATED -> Unit
-            }
             for (tradeKey in intent.tradeKeys) {
                 // A dangling key means the producer's trade/order keys diverged — losing the link
                 // silently would be far worse than failing the import.
@@ -359,8 +351,6 @@ class ImportEngineImpl(
             createdTradeIds = createdTradeIds,
             dedupedTradeKeys = dedupedTradeKeys,
             orderIds = orderIds,
-            updatedOrderKeys = updatedOrderKeys,
-            dedupedOrderKeys = dedupedOrderKeys,
             attributeTypeIds = attributeTypeIds,
             relationshipTypeIds = relationshipTypeIds,
             createdCsvStrategyIds = config.csvStrategyIds,
