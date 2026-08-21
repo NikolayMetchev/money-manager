@@ -5,8 +5,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
@@ -63,6 +65,10 @@ internal class CsvStrategyEditorState(
     var timeColumnName by mutableStateOf(timestampMapping?.timeColumnName.takeIfPresentIn(availableColumnNames))
     var timeFormat by mutableStateOf(timestampMapping?.timeFormat ?: "HH:mm:ss")
 
+    // The time stamped onto date-only rows. No widget yet, so it is carried verbatim: rebuilding it
+    // from the model default would shift every timestamp of a source that chose another midpoint.
+    var defaultTime by mutableStateOf(timestampMapping?.defaultTime ?: DateTimeParsingMapping.DEFAULT_TIME)
+
     // Keep the combined format only while its date column still exists.
     var dateTimeFormat by mutableStateOf(timestampMapping?.dateTimeFormat?.takeIf { dateColumnName != null }.orEmpty())
 
@@ -80,13 +86,20 @@ internal class CsvStrategyEditorState(
     var dateFormatTouched by mutableStateOf(strategy != null)
     var timeFormatTouched by mutableStateOf(strategy != null)
 
+    // The description's cleanup regex has no widget yet, so it is carried verbatim rather than
+    // reconstructed — dropping it would silently import raw, untrimmed descriptions.
     private val descriptionMapping = strategy?.fieldMappings?.get(TransferField.DESCRIPTION) as? DirectColumnMapping
     var descriptionColumnName by mutableStateOf(descriptionMapping?.columnName.takeIfPresentIn(availableColumnNames))
     var descriptionFallbackColumns by
         mutableStateOf(descriptionMapping?.fallbackColumns.orEmpty().mapNotNull { it.takeIfPresentIn(availableColumnNames) })
+    var descriptionExtraction by mutableStateOf(descriptionMapping?.extraction)
 
     private val amountMapping = strategy?.fieldMappings?.get(TransferField.AMOUNT) as? AmountParsingMapping
+    var amountMode by mutableStateOf(amountMapping?.mode ?: AmountMode.SINGLE_COLUMN)
     var amountColumnName by mutableStateOf(amountMapping?.amountColumnName.takeIfPresentIn(availableColumnNames))
+    var creditColumnName by mutableStateOf(amountMapping?.creditColumnName.takeIfPresentIn(availableColumnNames))
+    var debitColumnName by mutableStateOf(amountMapping?.debitColumnName.takeIfPresentIn(availableColumnNames))
+    var negateValues by mutableStateOf(amountMapping?.negateValues ?: false)
     var flipAccountsOnPositive by mutableStateOf(amountMapping?.flipAccountsOnPositive ?: true)
     var feeColumnName by mutableStateOf(amountMapping?.feeColumnName.takeIfPresentIn(availableColumnNames))
     var feeConditions by
@@ -100,6 +113,11 @@ internal class CsvStrategyEditorState(
     var sourceTemplateColumnName by mutableStateOf(sourceTemplate?.columnName.takeIfPresentIn(availableColumnNames))
     var sourceTemplatePrefix by mutableStateOf(sourceTemplate?.prefix.orEmpty())
     var sourceTemplateSuffix by mutableStateOf(sourceTemplate?.suffix.orEmpty())
+
+    // The category given to accounts the mapping has to create. No widget yet, so it is carried
+    // verbatim; rebuilding it as UNCATEGORIZED would quietly re-file every account a future import
+    // creates. One field per side: all four target modes store it, so the value follows a mode switch.
+    var sourceDefaultCategoryId by mutableStateOf(sourceTemplate?.defaultCategoryId ?: Category.UNCATEGORIZED_ID)
 
     private val targetMapping = strategy?.fieldMappings?.get(TransferField.TARGET_ACCOUNT)
     private val targetTemplate = targetMapping as? TemplateAccountMapping
@@ -133,6 +151,18 @@ internal class CsvStrategyEditorState(
                 is RegexAccountMapping -> targetMapping.fallbackColumns
                 else -> emptyList()
             }.mapNotNull { it.takeIfPresentIn(availableColumnNames) },
+        )
+
+    /** See [sourceDefaultCategoryId]; every target mode but the conditional one persists this. */
+    var targetDefaultCategoryId by
+        mutableStateOf(
+            when (targetMapping) {
+                is AccountLookupMapping -> targetMapping.defaultCategoryId
+                is RegexAccountMapping -> targetMapping.defaultCategoryId
+                is AttributeMatchAccountMapping -> targetMapping.defaultCategoryId
+                is TemplateAccountMapping -> targetMapping.defaultCategoryId
+                else -> Category.UNCATEGORIZED_ID
+            },
         )
 
     // Nullable and seeded verbatim so a non-attribute target extracts/round-trips as null; the UI
@@ -181,6 +211,10 @@ internal class CsvStrategyEditorState(
     var companionTransactionRules by mutableStateOf(strategy?.companionTransactionRules.orEmpty())
     var fileNamePattern by mutableStateOf(strategy?.fileNamePattern.orEmpty())
 
+    // Set only on Excel strategies, which target a worksheet instead of a file. Carried verbatim:
+    // clearing it would turn an .xlsx strategy into a plain-CSV one that no longer matches anything.
+    var worksheetName by mutableStateOf(strategy?.worksheetName)
+
     // Funding reconciliation: match a CSV column value against an account attribute's regex tokens to
     // resolve the hidden funding account (e.g. Curve's last-4 -> the underlying card). Edited as two
     // fields and reassembled into an [AttributeAccountMatch] on save; the attribute type defaults to
@@ -217,6 +251,14 @@ internal class CsvStrategyEditorState(
                         targetConditions.all { it.isComplete() } &&
                         targetWhenTrue.isLeafAccountValid() &&
                         targetWhenFalse.isLeafAccountValid()
+            }
+
+    /** Whether the columns the chosen [amountMode] requires have all been picked. */
+    private val amountValid: Boolean
+        get() =
+            when (amountMode) {
+                AmountMode.SINGLE_COLUMN -> amountColumnName != null
+                AmountMode.CREDIT_DEBIT_COLUMNS -> creditColumnName != null && debitColumnName != null
             }
 
     private val feeValid: Boolean
@@ -285,7 +327,7 @@ internal class CsvStrategyEditorState(
     /** Whether the Amount & Date tab has an unsatisfied required field. */
     val amountDateHasError: Boolean
         get() =
-            amountColumnName == null ||
+            !amountValid ||
                 dateColumnName == null ||
                 !dateTimeFormatValid ||
                 !feeValid ||
@@ -318,7 +360,7 @@ internal class CsvStrategyEditorState(
                 dateColumnName != null &&
                 dateTimeFormatValid &&
                 descriptionColumnName != null &&
-                amountColumnName != null &&
+                amountValid &&
                 feeValid &&
                 rowPreprocessingValid &&
                 companionRulesValid &&

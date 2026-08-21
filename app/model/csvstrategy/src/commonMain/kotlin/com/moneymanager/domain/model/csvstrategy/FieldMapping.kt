@@ -187,9 +187,14 @@ data class DateTimeParsingMapping(
     val dateFormat: String,
     val timeColumnName: String? = null,
     val timeFormat: String? = null,
-    val defaultTime: String = "12:00:00",
+    val defaultTime: String = DEFAULT_TIME,
     val dateTimeFormat: String? = null,
-) : FieldMapping
+) : FieldMapping {
+    companion object {
+        /** The time stamped onto rows whose source carries only a date. */
+        const val DEFAULT_TIME: String = "12:00:00"
+    }
+}
 
 /**
  * Directly copies a string value from a CSV column.
