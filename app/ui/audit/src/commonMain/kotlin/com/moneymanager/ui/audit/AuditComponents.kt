@@ -241,6 +241,7 @@ fun SourceInfoSection(
                         sessionId = origin.sessionId,
                         requestId = requestId,
                         jsonPath = jsonPath.value,
+                        originLabel = "API Import$deviceSuffix",
                         onApiSourceClick = onApiSourceClick,
                         labelWidth = labelWidth,
                     )
@@ -354,6 +355,7 @@ private fun ApiSourceLinkRow(
     sessionId: ApiSessionId,
     requestId: ApiRequestId,
     jsonPath: String,
+    originLabel: String,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit,
     labelWidth: Dp = 100.dp,
 ) {
@@ -372,7 +374,7 @@ private fun ApiSourceLinkRow(
             onClick = { onApiSourceClick(sessionId, requestId, jsonPath) },
             contentPadding = PaddingValues(0.dp),
         ) {
-            Text("API Import")
+            Text(originLabel)
         }
     }
 }
