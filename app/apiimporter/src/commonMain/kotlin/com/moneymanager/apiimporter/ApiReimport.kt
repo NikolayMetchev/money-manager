@@ -31,8 +31,14 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.markApiSessionImported
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+
+private val logger = logging()
 
 /** Value an internal-transfer reconcile's exclusion attribute always carries (see `ImportDeduper`). */
 private const val EXCLUDED_ATTR_VALUE = "reconciled"
@@ -277,9 +283,17 @@ private suspend fun deleteEmptyAccountsCreatedBySession(
     return emptyAccounts.map { it.name }
 }
 
+/** One session a bulk re-import could not complete; the run carried on with the rest. */
+data class ApiSessionReimportFailure(
+    val sessionId: ApiSessionId,
+    val message: String,
+)
+
 /** Aggregated outcome of [bulkReimportApiSessions]. */
 data class ApiBulkReimportResult(
+    /** Sessions that completed — failed ones are in [failures], not counted here. */
     val sessionsReimported: Int,
+    val failures: List<ApiSessionReimportFailure> = emptyList(),
 )
 
 /**
@@ -290,6 +304,11 @@ data class ApiBulkReimportResult(
  * excluded until that session's turn — the ordering of delete vs. rerun across sessions doesn't
  * change the outcome, only the ordering of sessions relative to each other (oldest first, so an
  * earlier session's re-created transfers exist before a later session's own dedupe runs against them).
+ *
+ * A session that fails does not abort the run: it is logged, recorded in
+ * [ApiBulkReimportResult.failures] and the remaining sessions are still re-imported — mirroring how
+ * `bulkReimportCsv` collects per-file failures. Materialized views are refreshed once at the end
+ * whatever happens, since the sessions that did run have already changed the data they describe.
  */
 @Suppress("LongParameterList")
 suspend fun bulkReimportApiSessions(
@@ -316,15 +335,7 @@ suspend fun bulkReimportApiSessions(
             .filter { it.id in importedSessionIds }
             .sortedBy { it.createdAt }
 
-    for ((index, session) in sessions.withIndex()) {
-        onProgress?.invoke(
-            ImportProgress(
-                "Re-importing session #${session.id}",
-                fraction = index.toFloat() / sessions.size,
-                processed = index,
-                total = sessions.size,
-            ),
-        )
+    return reimportSessionsResiliently(sessions, maintenance, onProgress) { session ->
         val plan = planApiReimport(session.id, apiSessionRepository)
         executeApiReimport(
             plan = plan,
@@ -345,6 +356,44 @@ suspend fun bulkReimportApiSessions(
             refreshViews = false,
         )
     }
-    maintenance.refreshMaterializedViews()
-    return ApiBulkReimportResult(sessionsReimported = sessions.size)
+}
+
+/**
+ * Runs [reimport] over [sessions] in order, tolerating a failing session, and refreshes the
+ * materialized views exactly once at the end — including on the failure path, since a session that
+ * got as far as deleting its transfers has already invalidated them.
+ */
+internal suspend fun reimportSessionsResiliently(
+    sessions: List<ApiSession>,
+    maintenance: Maintenance,
+    onProgress: (suspend (ImportProgress) -> Unit)?,
+    reimport: suspend (ApiSession) -> Unit,
+): ApiBulkReimportResult {
+    var reimported = 0
+    val failures = mutableListOf<ApiSessionReimportFailure>()
+    try {
+        for ((index, session) in sessions.withIndex()) {
+            onProgress?.invoke(
+                ImportProgress(
+                    "Re-importing session #${session.id}",
+                    fraction = index.toFloat() / sessions.size,
+                    processed = index,
+                    total = sessions.size,
+                ),
+            )
+            try {
+                reimport(session)
+                reimported++
+            } catch (expected: CancellationException) {
+                throw expected
+            } catch (expected: Exception) {
+                logger.error(expected) { "Bulk API re-import failed for session ${session.id}: ${expected.message}" }
+                failures += ApiSessionReimportFailure(session.id, expected.message ?: "Re-import failed")
+            }
+        }
+    } finally {
+        // NonCancellable so a cancelled run doesn't leave stale balances behind either.
+        withContext(NonCancellable) { maintenance.refreshMaterializedViews() }
+    }
+    return ApiBulkReimportResult(sessionsReimported = reimported, failures = failures)
 }

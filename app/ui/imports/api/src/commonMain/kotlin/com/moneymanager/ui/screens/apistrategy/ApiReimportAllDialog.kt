@@ -86,6 +86,23 @@ fun ApiReimportAllDialog(
                         text = "Re-imported ${currentResult.sessionsReimported} session(s) under \"${strategy.name}\".",
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    if (currentResult.failures.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text =
+                                "${currentResult.failures.size} session(s) failed and were left as they were — " +
+                                    "re-run once the cause is fixed:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        currentResult.failures.forEach { failure ->
+                            Text(
+                                text = "Session #${failure.sessionId.id}: ${failure.message}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
                 } else {
                     Text(
                         text =

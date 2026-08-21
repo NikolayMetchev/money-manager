@@ -52,8 +52,10 @@ fun KotlinMultiplatformExtension.configureAndroidTarget() {
             }
         }
 
-        // Enable host tests so commonTest can be shared without KMP Android warnings.
-        withHostTest {}
+        // Enable host tests so commonTest can be shared without KMP Android warnings. Host tests run
+        // on a plain JVM with a stub android.jar, so any production code that logs would blow up on an
+        // unmocked android.util.Log — return defaults instead of throwing.
+        withHostTest { isReturnDefaultValues = true }
     }
 }
 
