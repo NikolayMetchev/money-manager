@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
+import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
@@ -20,6 +21,8 @@ import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
+import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
@@ -29,7 +32,10 @@ import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorState
 import com.moneymanager.ui.screens.csvstrategy.editor.buildStrategyFromEditorState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -244,6 +250,151 @@ class StrategyFormRoundTripTest {
         assertEquals(original.contentMatchRules, rebuilt.contentMatchRules)
         assertEquals(original.crossSourceReconcileWindowSeconds, rebuilt.crossSourceReconcileWindowSeconds)
         assertEquals(original.conversionConfig, rebuilt.conversionConfig)
+    }
+
+    /**
+     * Every property the editor has no widget for is still persisted, so a no-op Save must not
+     * quietly replace it with a default (issue #735): the sign of every imported amount, the
+     * description cleanup regex, the time given to date-only rows, the category new accounts land
+     * in, and the worksheet an Excel strategy targets all have to survive load -> build untouched.
+     */
+    @Test
+    fun `properties with no widget survive a no-op save`() {
+        val original =
+            advancedStrategy().copy(
+                worksheetName = "Statement",
+                fieldMappings =
+                    advancedStrategy().fieldMappings +
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                TemplateAccountMapping(
+                                    TransferField.SOURCE_ACCOUNT,
+                                    "Source currency",
+                                    prefix = "Wise: ",
+                                    defaultCategoryId = 41L,
+                                ),
+                            TransferField.TARGET_ACCOUNT to
+                                AccountLookupMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    columnName = "Target name",
+                                    fallbackColumns = listOf("Source name"),
+                                    defaultCategoryId = 42L,
+                                ),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Created on",
+                                    dateFormat = "yyyy-MM-dd",
+                                    defaultTime = "03:30:00",
+                                ),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(
+                                    fieldType = TransferField.DESCRIPTION,
+                                    columnName = "Reference",
+                                    extraction = ColumnExtraction(pattern = "^(.*?),\\s*[0-9.]+$", outputTemplate = "$1"),
+                                ),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Source amount (after fees)",
+                                    negateValues = true,
+                                    flipAccountsOnPositive = true,
+                                ),
+                        ),
+            )
+        val availableColumns = columns.map { it.originalName }.toSet()
+
+        val state = CsvStrategyEditorState(original, availableColumns)
+        val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
+
+        assertEquals(original.fieldMappings, rebuilt.fieldMappings)
+        assertEquals(original.worksheetName, rebuilt.worksheetName)
+
+        // Pin the extraction itself, not just that the mapping round-trips: a dropped extraction
+        // would leave this null. `$1` needs no escaping — a `$` before a digit cannot start a
+        // template, which is why the model's own `outputTemplate` default is written `"$0"`.
+        val description = rebuilt.fieldMappings[TransferField.DESCRIPTION]
+        assertIs<DirectColumnMapping>(description)
+        assertEquals("$1", description.extraction?.outputTemplate)
+    }
+
+    /** The same, for the target modes that each carry their own `defaultCategoryId`. */
+    @Test
+    fun `default category survives on every target account mode`() {
+        val availableColumns = columns.map { it.originalName }.toSet()
+        val targets =
+            listOf(
+                AccountLookupMapping(TransferField.TARGET_ACCOUNT, "Target name", defaultCategoryId = 7L),
+                RegexAccountMapping(
+                    fieldType = TransferField.TARGET_ACCOUNT,
+                    columnName = "Target name",
+                    rules = listOf(RegexRule(pattern = "^AMZN", accountName = "Amazon")),
+                    defaultCategoryId = 8L,
+                ),
+                AttributeMatchAccountMapping(TransferField.TARGET_ACCOUNT, "Target name", "card-last4", defaultCategoryId = 9L),
+                TemplateAccountMapping(TransferField.TARGET_ACCOUNT, "Target currency", prefix = "Wise: ", defaultCategoryId = 10L),
+            )
+
+        for (target in targets) {
+            val base = advancedStrategy()
+            val original = base.copy(fieldMappings = base.fieldMappings + (TransferField.TARGET_ACCOUNT to target))
+            val state = CsvStrategyEditorState(original, availableColumns)
+            val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
+
+            assertEquals(target, rebuilt.fieldMappings[TransferField.TARGET_ACCOUNT])
+        }
+    }
+
+    /**
+     * A credit/debit strategy has no single amount column, so before #735 it could neither be
+     * validated nor rebuilt. It must now round-trip and report the form as valid.
+     */
+    @Test
+    fun `credit-debit amount mode round-trips and validates`() {
+        val amount =
+            AmountParsingMapping(
+                fieldType = TransferField.AMOUNT,
+                mode = AmountMode.CREDIT_DEBIT_COLUMNS,
+                creditColumnName = "Source amount (after fees)",
+                debitColumnName = "Source fee amount",
+            )
+        val original = advancedStrategy().copy(fieldMappings = advancedStrategy().fieldMappings + (TransferField.AMOUNT to amount))
+        val availableColumns = columns.map { it.originalName }.toSet()
+
+        val state = CsvStrategyEditorState(original, availableColumns)
+
+        assertEquals(AmountMode.CREDIT_DEBIT_COLUMNS, state.amountMode)
+        assertTrue(state.isValid, "a credit/debit strategy must be savable")
+
+        val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
+        assertEquals(amount, rebuilt.fieldMappings[TransferField.AMOUNT])
+    }
+
+    /**
+     * Switching a single-column strategy to credit/debit drops the now-meaningless amount column.
+     *
+     * The name avoids an apostrophe on purpose: dex cannot represent one in a method name, so it
+     * would build on the JVM and fail only in the Android instrumented run.
+     */
+    @Test
+    fun `switching amount mode clears the columns of the other mode`() {
+        val original = advancedStrategy()
+        val availableColumns = columns.map { it.originalName }.toSet()
+
+        val state = CsvStrategyEditorState(original, availableColumns)
+        state.amountMode = AmountMode.CREDIT_DEBIT_COLUMNS
+        assertFalse(state.isValid, "credit and debit columns are still unset")
+
+        state.creditColumnName = "Source amount (after fees)"
+        state.debitColumnName = "Source fee amount"
+        val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
+
+        val amount = rebuilt.fieldMappings[TransferField.AMOUNT]
+        assertIs<AmountParsingMapping>(amount)
+        assertNull(amount.amountColumnName)
+        assertEquals("Source amount (after fees)", amount.creditColumnName)
+        assertEquals("Source fee amount", amount.debitColumnName)
     }
 
     @Test

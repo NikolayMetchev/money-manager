@@ -168,8 +168,8 @@ internal fun FieldMapping.withColumnsPresentIn(columns: Set<String>): FieldMappi
  * Builds a [CsvImportStrategy] from the editor's live state. Shared by the save handler and tests so
  * the round-trip (load → edit → save) is exercised by a single code path.
  *
- * Required columns (date, description, amount, and the target column/template depending on mode)
- * are asserted non-null; callers gate this behind form validation.
+ * Required columns (date, description, the amount columns the chosen [AmountMode] needs, and the
+ * target column/template depending on mode) must be set; callers gate this behind form validation.
  */
 internal fun buildStrategyFromEditorState(
     state: CsvStrategyEditorState,
@@ -199,6 +199,7 @@ internal fun buildStrategyFromEditorState(
                                 columnName = column,
                                 prefix = state.sourceTemplatePrefix,
                                 suffix = state.sourceTemplateSuffix,
+                                defaultCategoryId = state.sourceDefaultCategoryId,
                             ),
                         )
                     }
@@ -211,6 +212,7 @@ internal fun buildStrategyFromEditorState(
                             fieldType = TransferField.TARGET_ACCOUNT,
                             columnName = state.targetAccountColumnName!!,
                             fallbackColumns = state.targetAccountFallbackColumns,
+                            defaultCategoryId = state.targetDefaultCategoryId,
                         )
                     TargetAccountMode.REGEX_MATCH ->
                         RegexAccountMapping(
@@ -218,12 +220,14 @@ internal fun buildStrategyFromEditorState(
                             columnName = state.targetAccountColumnName!!,
                             rules = state.regexRules,
                             fallbackColumns = state.targetAccountFallbackColumns,
+                            defaultCategoryId = state.targetDefaultCategoryId,
                         )
                     TargetAccountMode.ATTRIBUTE_MATCH ->
                         AttributeMatchAccountMapping(
                             fieldType = TransferField.TARGET_ACCOUNT,
                             columnName = state.targetAccountColumnName!!,
                             attributeTypeName = state.targetAttributeTypeName!!,
+                            defaultCategoryId = state.targetDefaultCategoryId,
                         )
                     TargetAccountMode.TEMPLATE ->
                         TemplateAccountMapping(
@@ -231,6 +235,7 @@ internal fun buildStrategyFromEditorState(
                             columnName = state.targetTemplateColumnName!!,
                             prefix = state.targetTemplatePrefix,
                             suffix = state.targetTemplateSuffix,
+                            defaultCategoryId = state.targetDefaultCategoryId,
                         )
                     TargetAccountMode.CONDITIONAL ->
                         ConditionalAccountMapping(
@@ -252,6 +257,7 @@ internal fun buildStrategyFromEditorState(
                     dateFormat = state.dateFormat,
                     timeColumnName = timeColumnName,
                     timeFormat = timeColumnName?.let { state.timeFormat },
+                    defaultTime = state.defaultTime,
                     dateTimeFormat = state.dateTimeFormat.takeIf { state.dateTimeInOneColumn && it.isNotBlank() },
                 ),
             )
@@ -261,14 +267,21 @@ internal fun buildStrategyFromEditorState(
                     fieldType = TransferField.DESCRIPTION,
                     columnName = state.descriptionColumnName!!,
                     fallbackColumns = state.descriptionFallbackColumns,
+                    extraction = state.descriptionExtraction,
                 ),
             )
+            // The two amount modes are mutually exclusive, so only the chosen mode's columns are
+            // saved; carrying the other mode's leftovers would make the mapping self-contradictory.
+            val singleColumn = state.amountMode == AmountMode.SINGLE_COLUMN
             put(
                 TransferField.AMOUNT,
                 AmountParsingMapping(
                     fieldType = TransferField.AMOUNT,
-                    mode = AmountMode.SINGLE_COLUMN,
-                    amountColumnName = state.amountColumnName!!,
+                    mode = state.amountMode,
+                    amountColumnName = if (singleColumn) state.amountColumnName else null,
+                    creditColumnName = if (singleColumn) null else state.creditColumnName,
+                    debitColumnName = if (singleColumn) null else state.debitColumnName,
+                    negateValues = state.negateValues,
                     flipAccountsOnPositive = state.flipAccountsOnPositive,
                     feeColumnName = state.feeColumnName,
                     feeConditions = if (state.feeColumnName != null) state.feeConditions else emptyList(),
@@ -315,6 +328,7 @@ internal fun buildStrategyFromEditorState(
         companionTransactionRules = state.companionTransactionRules,
         contentMatchRules = state.contentMatchRules,
         fileNamePattern = state.fileNamePattern.takeIf { it.isNotBlank() },
+        worksheetName = state.worksheetName,
         crossSourceReconcileWindowSeconds = state.crossSourceReconcileWindowSeconds,
         // A funding match is saved only once a column is chosen; the attribute type always has a value.
         fundingAttributeMatch =

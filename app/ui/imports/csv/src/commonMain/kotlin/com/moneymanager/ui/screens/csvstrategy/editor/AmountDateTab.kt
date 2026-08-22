@@ -20,12 +20,16 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.DateFormatDetector
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
  * Amount & Date tab: amount + fee, currency, timezone, and date/time parsing.
+ *
+ * The amount comes either from one signed column or from a credit/debit column pair; a radio pair
+ * picks the mode and only that mode's column dropdowns are shown.
  */
 @Composable
 internal fun AmountDateTab(
@@ -37,17 +41,66 @@ internal fun AmountDateTab(
     currencyRepository: CurrencyReadRepository,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Amount Column", style = MaterialTheme.typography.titleSmall)
-        ColumnDropdown(
-            columns = csvColumns,
-            selectedColumn = state.amountColumnName,
-            onColumnSelected = { state.amountColumnName = it },
-            label = "Column containing transaction amount",
-            sampleValue = getSampleValue(csvColumns, firstRow, state.amountColumnName),
-            enabled = enabled,
-            isError = state.amountColumnName == null,
-        )
+        Text("Amount", style = MaterialTheme.typography.titleSmall)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(
+                selected = state.amountMode == AmountMode.SINGLE_COLUMN,
+                onClick = { state.amountMode = AmountMode.SINGLE_COLUMN },
+                enabled = enabled,
+            )
+            Text("Single Column", modifier = Modifier.padding(end = 16.dp))
+            RadioButton(
+                selected = state.amountMode == AmountMode.CREDIT_DEBIT_COLUMNS,
+                onClick = { state.amountMode = AmountMode.CREDIT_DEBIT_COLUMNS },
+                enabled = enabled,
+            )
+            Text("Credit / Debit Columns")
+        }
+        when (state.amountMode) {
+            AmountMode.SINGLE_COLUMN ->
+                ColumnDropdown(
+                    columns = csvColumns,
+                    selectedColumn = state.amountColumnName,
+                    onColumnSelected = { state.amountColumnName = it },
+                    label = "Column containing transaction amount",
+                    sampleValue = getSampleValue(csvColumns, firstRow, state.amountColumnName),
+                    enabled = enabled,
+                    isError = state.amountColumnName == null,
+                )
+            AmountMode.CREDIT_DEBIT_COLUMNS -> {
+                ColumnDropdown(
+                    columns = csvColumns,
+                    selectedColumn = state.creditColumnName,
+                    onColumnSelected = { state.creditColumnName = it },
+                    label = "Column containing money in (credit)",
+                    sampleValue = getSampleValue(csvColumns, firstRow, state.creditColumnName),
+                    enabled = enabled,
+                    isError = state.creditColumnName == null,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                ColumnDropdown(
+                    columns = csvColumns,
+                    selectedColumn = state.debitColumnName,
+                    onColumnSelected = { state.debitColumnName = it },
+                    label = "Column containing money out (debit)",
+                    sampleValue = getSampleValue(csvColumns, firstRow, state.debitColumnName),
+                    enabled = enabled,
+                    isError = state.debitColumnName == null,
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(
+                checked = state.negateValues,
+                onCheckedChange = { state.negateValues = it },
+                enabled = enabled,
+            )
+            Text(
+                "Flip the sign of every parsed amount",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
                 checked = state.flipAccountsOnPositive,
