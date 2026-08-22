@@ -59,6 +59,8 @@ internal fun AdvancedTab(
                         state.timeColumnName,
                         state.descriptionColumnName,
                         state.amountColumnName,
+                        state.creditColumnName,
+                        state.debitColumnName,
                         state.targetAccountColumnName,
                         state.currencyColumnName,
                         state.timezoneColumnName,
