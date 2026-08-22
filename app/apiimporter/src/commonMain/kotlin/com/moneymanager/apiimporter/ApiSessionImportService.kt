@@ -193,7 +193,6 @@ fun ApiSessionDownloadResult.displaySummary(): String =
 
 data class ApiPeopleImportResult(
     val personCount: Int,
-    val ownershipCount: Int,
 )
 
 data class ApiTransactionsDownloadProgress(
@@ -504,7 +503,7 @@ suspend fun importApiSessionPeople(
     strategy: ApiImportStrategy,
     accountsSessionId: ApiSessionId? = null,
 ): ApiPeopleImportResult {
-    val config = strategy.config.peopleDownload ?: return ApiPeopleImportResult(personCount = 0, ownershipCount = 0)
+    val config = strategy.config.peopleDownload ?: return ApiPeopleImportResult(personCount = 0)
     validatePeopleOwnershipConfig(config)
     val externalIdAttributeTypeId = strategy.config.personExternalIdAttribute?.let { importEngine.getOrCreateAttributeType(it) }
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
@@ -558,7 +557,7 @@ suspend fun importApiSessionPeople(
     }
 
     val people = peopleResolver.intents()
-    if (people.isEmpty()) return ApiPeopleImportResult(personCount = 0, ownershipCount = 0)
+    if (people.isEmpty()) return ApiPeopleImportResult(personCount = 0)
     val batch =
         ImportBatch(
             transfers = emptyList(),
@@ -567,7 +566,7 @@ suspend fun importApiSessionPeople(
             ownerships = peopleResolver.ownershipIntents(),
         )
     val result = importEngine.import(batch)
-    return ApiPeopleImportResult(personCount = result.peopleCreated, ownershipCount = result.ownershipsCreated)
+    return ApiPeopleImportResult(personCount = result.peopleCreated)
 }
 
 /** Builds a map of profile external id → the [AccountId]s fetched under that profile. */

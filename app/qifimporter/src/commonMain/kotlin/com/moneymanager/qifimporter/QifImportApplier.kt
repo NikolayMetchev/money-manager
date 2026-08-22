@@ -329,7 +329,7 @@ suspend fun runImport(
     )
 
     if (finalPrep.validTransfers.isEmpty()) {
-        return QifImportResult(successCount = 0, failedCount = finalPrep.errorRows.size)
+        return QifImportResult(successCount = 0)
     }
 
     // Pre-resolve attribute types.
@@ -465,6 +465,5 @@ suspend fun runImport(
     return QifImportResult(
         successCount = importedRecords.size + updatedRecords.size,
         duplicateCount = duplicateRecords.size,
-        failedCount = finalPrep.errorRows.size,
     )
 }

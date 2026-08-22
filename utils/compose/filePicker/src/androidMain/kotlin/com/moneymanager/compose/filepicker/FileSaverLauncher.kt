@@ -9,7 +9,7 @@ actual class FileSaverLauncher(
     private val mimeType: String,
     private val launcher: (String) -> Unit,
     private val context: Context,
-    private val onResult: (FileSaverResult?) -> Unit,
+    private val onResult: () -> Unit,
     private val setPendingContent: (String) -> Unit,
 ) {
     actual fun launch(
@@ -21,19 +21,17 @@ actual class FileSaverLauncher(
     }
 }
 
-/**
- * Writes content to a Uri using the ContentResolver.
- */
+/** Writes [content] to [uri]; a failed write is swallowed, as no caller acts on the outcome. */
 internal fun writeContentToUri(
     context: Context,
     uri: Uri,
     content: String,
-): FileSaverResult =
+) {
     try {
         context.contentResolver.openOutputStream(uri)?.use { outputStream ->
             outputStream.write(content.toByteArray(Charsets.UTF_8))
         }
-        FileSaverResult(success = true, filePath = uri.toString())
     } catch (_: Exception) {
-        FileSaverResult(success = false)
+        // Nothing to report back to.
     }
+}

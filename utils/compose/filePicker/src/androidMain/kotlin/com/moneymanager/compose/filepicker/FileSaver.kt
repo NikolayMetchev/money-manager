@@ -13,7 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 @Composable
 actual fun rememberFileSaver(
     mimeType: String,
-    onResult: (FileSaverResult?) -> Unit,
+    onResult: () -> Unit,
 ): FileSaverLauncher {
     val context = LocalContext.current
     var pendingContent by remember { mutableStateOf<String?>(null) }
@@ -23,11 +23,9 @@ actual fun rememberFileSaver(
             contract = ActivityResultContracts.CreateDocument(mimeType),
         ) { uri: Uri? ->
             if (uri != null && pendingContent != null) {
-                val result = writeContentToUri(context, uri, pendingContent!!)
-                onResult(result)
-            } else {
-                onResult(null)
+                writeContentToUri(context, uri, pendingContent!!)
             }
+            onResult()
             pendingContent = null
         }
 

@@ -4,5 +4,4 @@ package com.moneymanager.qifimporter
 data class QifImportResult(
     val successCount: Int,
     val duplicateCount: Int = 0,
-    val failedCount: Int = 0,
 )

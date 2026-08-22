@@ -225,14 +225,12 @@ data class CsvTransferWithAttributes(
  * @property validTransfers List of transfers to import with their status
  * @property errorRows Rows that failed to parse
  * @property newAccounts New accounts that need to be created
- * @property existingAccountMatches Map of account name to existing account ID
  * @property statusCounts Count of transfers by import status
  */
 data class ImportPreparation(
     val validTransfers: List<CsvTransferWithAttributes>,
     val errorRows: List<MappingResult.Error>,
     val newAccounts: Set<NewAccount>,
-    val existingAccountMatches: Map<String, AccountId>,
     val statusCounts: Map<ImportStatus, Int> = emptyMap(),
 )
 
@@ -377,7 +375,6 @@ class CsvTransferMapper(
         val validTransfers = mutableListOf<CsvTransferWithAttributes>()
         val errorRows = mutableListOf<MappingResult.Error>()
         val newAccounts = mutableSetOf<NewAccount>()
-        val existingMatches = mutableMapOf<String, AccountId>()
         val statusCounts = mutableMapOf<ImportStatus, Int>()
 
         for (row in rows) {
@@ -411,22 +408,10 @@ class CsvTransferMapper(
             }
         }
 
-        // Collect existing account matches
-        for (transferWithAttrs in validTransfers) {
-            for ((name, account) in existingAccounts) {
-                if (account.id == transferWithAttrs.transfer.sourceAccountId ||
-                    account.id == transferWithAttrs.transfer.targetAccountId
-                ) {
-                    existingMatches[name] = account.id
-                }
-            }
-        }
-
         return ImportPreparation(
             validTransfers = validTransfers,
             errorRows = errorRows,
             newAccounts = newAccounts,
-            existingAccountMatches = existingMatches,
             statusCounts = statusCounts,
         )
     }
@@ -1153,7 +1138,6 @@ class CsvTransferMapper(
      */
     private data class RegexAccountResult(
         val accountName: String,
-        val sourceColumnName: String,
         val sourceColumnValue: String,
         val matchedPattern: String?,
         val counterpartyIsPerson: Boolean = false,
@@ -1188,7 +1172,6 @@ class CsvTransferMapper(
                             ?: rule.accountName
                     return RegexAccountResult(
                         accountName = accountName,
-                        sourceColumnName = mapping.columnName,
                         sourceColumnValue = primaryValue,
                         matchedPattern = rule.pattern,
                         counterpartyIsPerson = rule.counterpartyIsPerson,
@@ -1200,13 +1183,11 @@ class CsvTransferMapper(
         }
 
         // No rules matched - use fallback logic (try columns in order for non-empty value)
-        // Track which column provided the value
         for (columnName in mapping.allColumns) {
             val columnValue = getColumnValue(columnName, values)
             if (columnValue.isNotBlank()) {
                 return RegexAccountResult(
                     accountName = columnValue,
-                    sourceColumnName = columnName,
                     sourceColumnValue = columnValue,
                     matchedPattern = null,
                 )
@@ -1216,7 +1197,6 @@ class CsvTransferMapper(
         // No value found in any column
         return RegexAccountResult(
             accountName = "",
-            sourceColumnName = mapping.columnName,
             sourceColumnValue = "",
             matchedPattern = null,
         )
