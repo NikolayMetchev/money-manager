@@ -1,14 +1,11 @@
 package com.moneymanager.domain.model
 
-import kotlin.time.Instant
-
 /**
  * A reversible record of an account merge: the [deletedAccountId] account was merged into
  * [survivingAccountId], moving [transferCount] transactions, and can be undone (unmerge).
  */
 data class AccountMerge(
     val id: MergeId,
-    val mergedAt: Instant,
     val survivingAccountId: AccountId,
     val deletedAccountId: AccountId,
     val deletedAccountName: String,
@@ -35,11 +32,10 @@ value class MergeId(
 }
 
 /**
- * One transfer a merge moved onto the surviving account, recording which side(s) had pointed at the
- * deleted account. Used by re-import auto-split to trace a moved transfer back to its source row.
+ * One transfer a merge moved onto the surviving account, recording whether its target side had pointed
+ * at the deleted account. Used by re-import auto-split to trace a moved transfer back to its source row.
  */
 data class MergeMovedTransfer(
     val transferId: TransferId,
-    val movedSource: Boolean,
     val movedTarget: Boolean,
 )
