@@ -1,25 +1,16 @@
 package com.moneymanager.ui.screens.apistrategy
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiImportStrategyId
-import com.moneymanager.domain.model.AuditType
-import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
-import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
-import com.moneymanager.ui.audit.AuditSectionLabel
-import com.moneymanager.ui.audit.FieldChange
-import com.moneymanager.ui.audit.FieldChangeRow
-import com.moneymanager.ui.audit.FieldValueRow
-import com.moneymanager.ui.audit.NoVisibleChangesText
-import com.moneymanager.ui.audit.SourceInfoSection
-import com.moneymanager.ui.audit.changedOrUnchanged
+import com.moneymanager.ui.audit.NamedConfigAuditDiffCard
+import com.moneymanager.ui.audit.NamedConfigRevision
+import com.moneymanager.ui.audit.computeNamedConfigAuditDiffs
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -28,7 +19,6 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
-import kotlin.time.Instant
 
 @Composable
 fun ApiImportStrategyAuditScreen(
@@ -44,118 +34,41 @@ fun ApiImportStrategyAuditScreen(
         loadData = {
             val entries = auditRepository.getAuditHistoryForApiImportStrategy(strategyId)
             val currentStrategy = apiImportStrategyRepository.getStrategyById(strategyId).first()
-            val diffs =
-                computeApiImportStrategyAuditDiffs(
-                    entries = entries,
-                    currentName = currentStrategy?.name,
-                    currentConfig = currentStrategy?.config,
-                )
             AuditScreenData(
                 title = "API Strategy Audit: ${currentStrategy?.name ?: strategyId}",
-                diffs = diffs,
+                diffs =
+                    computeNamedConfigAuditDiffs(
+                        revisions = entries.map { it.toRevision() },
+                        currentName = currentStrategy?.name,
+                        currentConfig = currentStrategy?.config?.let { flattenConfig(it) },
+                        label = ::labelForPath,
+                    ),
             )
         },
         diffKey = { it.id },
         onBack = onBack,
-        diffCard = { diff -> ApiImportStrategyAuditDiffCard(diff) },
+        diffCard = { diff -> NamedConfigAuditDiffCard(diff) },
     )
 }
 
-// ─── Diff model ──────────────────────────────────────────────────────────────
-
-private data class ApiImportStrategyAuditDiff(
-    val id: Long,
-    val auditTimestamp: Instant,
-    val auditType: AuditType,
-    val revisionId: Long,
-    val name: FieldChange<String>,
-    val configChanges: List<Pair<String, FieldChange<String>>>,
-    val source: SourceRecord?,
-) {
-    val hasChanges: Boolean
-        get() = name is FieldChange.Changed || configChanges.isNotEmpty()
-}
-
-// ─── Diff computation ─────────────────────────────────────────────────────────
-
-private fun computeApiImportStrategyAuditDiffs(
-    entries: List<ApiImportStrategyAuditEntry>,
-    currentName: String?,
-    currentConfig: ApiStrategyConfig?,
-): List<ApiImportStrategyAuditDiff> =
-    entries.mapIndexed { index, entry ->
-        when (entry.auditType) {
-            AuditType.INSERT ->
-                ApiImportStrategyAuditDiff(
-                    id = entry.id,
-                    auditTimestamp = entry.auditTimestamp,
-                    auditType = entry.auditType,
-                    revisionId = entry.revisionId,
-                    name = FieldChange.Created(entry.name),
-                    configChanges = emptyList(),
-                    source = entry.source,
-                )
-
-            AuditType.DELETE ->
-                ApiImportStrategyAuditDiff(
-                    id = entry.id,
-                    auditTimestamp = entry.auditTimestamp,
-                    auditType = entry.auditType,
-                    revisionId = entry.revisionId,
-                    name = FieldChange.Deleted(entry.name),
-                    configChanges = emptyList(),
-                    source = entry.source,
-                )
-
-            AuditType.UPDATE -> {
-                val previousEntry = entries.getOrNull(index - 1)
-                val newName =
-                    when {
-                        index == 0 && currentName != null -> currentName
-                        index > 0 && previousEntry != null -> previousEntry.name
-                        else -> entry.name
-                    }
-                val newConfig =
-                    when {
-                        index == 0 -> currentConfig
-                        else -> previousEntry?.config
-                    }
-                ApiImportStrategyAuditDiff(
-                    id = entry.id,
-                    auditTimestamp = entry.auditTimestamp,
-                    auditType = entry.auditType,
-                    revisionId = entry.revisionId,
-                    name = changedOrUnchanged(entry.name, newName),
-                    configChanges = if (newConfig != null) diffConfigs(entry.config, newConfig) else emptyList(),
-                    source = entry.source,
-                )
-            }
-        }
-    }
-
-/**
- * Diffs two configs field by field and returns only what differs, most readable label first.
- * Both sides are flattened through the config's own JSON form rather than a hand-maintained field
- * list, so every field — including ones added later — is diffed; [labelForPath] then gives each one
- * a human label. [oldConfig] is the state *before* this change; [newConfig] is the state *after*.
- */
-private fun diffConfigs(
-    oldConfig: ApiStrategyConfig,
-    newConfig: ApiStrategyConfig,
-): List<Pair<String, FieldChange<String>>> {
-    val old = flattenConfig(oldConfig)
-    val new = flattenConfig(newConfig)
-    return (old.keys + new.keys)
-        .mapNotNull { path ->
-            val o = old[path].orEmpty()
-            val n = new[path].orEmpty()
-            if (o != n) labelForPath(path) to FieldChange.Changed(o, n) else null
-        }.sortedBy { it.first }
-}
+private fun ApiImportStrategyAuditEntry.toRevision() =
+    NamedConfigRevision(
+        id = id,
+        auditTimestamp = auditTimestamp,
+        auditType = auditType,
+        revisionId = revisionId,
+        name = name,
+        config = flattenConfig(config),
+        source = source,
+    )
 
 private val configEncoder = Json { encodeDefaults = true }
 
-/** Flattens a config's JSON form to `dotted.path` → rendered-value, dropping nulls. */
+/**
+ * Flattens a config's JSON form to `dotted.path` -> rendered-value, dropping nulls. Going through the
+ * config's own JSON form rather than a hand-maintained field list means every field — including ones
+ * added later — is diffed; [labelForPath] then gives each one a human label.
+ */
 private fun flattenConfig(config: ApiStrategyConfig): Map<String, String> =
     buildMap { flattenInto(configEncoder.encodeToJsonElement(config), prefix = "", target = this) }
 
@@ -241,47 +154,3 @@ private fun humanize(segment: String): String =
     } else {
         segment.split(camelBoundary).joinToString(" ") { word -> acronyms[word.lowercase()] ?: word.lowercase() }
     }
-
-// ─── Diff card ────────────────────────────────────────────────────────────────
-
-@Composable
-private fun ApiImportStrategyAuditDiffCard(diff: ApiImportStrategyAuditDiff) {
-    AuditDiffCard(
-        auditType = diff.auditType,
-        auditTimestamp = diff.auditTimestamp,
-        revisionId = diff.revisionId,
-    ) {
-        when (diff.auditType) {
-            AuditType.INSERT -> {
-                AuditSectionLabel("Created with:")
-                FieldValueRow("Name", diff.name.value())
-                SourceInfoSection(diff.source)
-            }
-
-            AuditType.UPDATE -> {
-                if (!diff.hasChanges) {
-                    NoVisibleChangesText()
-                } else {
-                    AuditSectionLabel("Changed:")
-                    val nameChange = diff.name
-                    if (nameChange is FieldChange.Changed) {
-                        FieldChangeRow("Name", nameChange.oldValue, nameChange.newValue, labelWidth = 200.dp)
-                    }
-                    diff.configChanges.forEach { (label, change) ->
-                        if (change is FieldChange.Changed) {
-                            FieldChangeRow(label, change.oldValue, change.newValue, labelWidth = 200.dp)
-                        }
-                    }
-                }
-                SourceInfoSection(diff.source)
-            }
-
-            AuditType.DELETE -> {
-                val errorColor = MaterialTheme.colorScheme.error
-                AuditSectionLabel("Deleted (final values):")
-                FieldValueRow("Name", diff.name.value(), errorColor)
-                SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f))
-            }
-        }
-    }
-}
