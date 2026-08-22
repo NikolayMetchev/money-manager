@@ -8,21 +8,17 @@ import kotlinx.coroutines.flow.asStateFlow
  * Global state holder for schema errors detected anywhere in the application.
  * Used by uncaught exception handlers to report schema errors, which are then
  * observed by MoneyManagerApp to display the DatabaseSchemaErrorDialog.
+ *
+ * Only the error itself is carried: the observer already knows which database is open, and resolves
+ * the location to show from that.
  */
 object GlobalSchemaErrorState {
-    private val _schemaError = MutableStateFlow<SchemaErrorInfo?>(null)
-    val schemaError: StateFlow<SchemaErrorInfo?> = _schemaError.asStateFlow()
+    private val _schemaError = MutableStateFlow<Throwable?>(null)
+    val schemaError: StateFlow<Throwable?> = _schemaError.asStateFlow()
 
-    /**
-     * Reports a schema error to be displayed globally.
-     * @param databaseLocation The path/location of the database that caused the error
-     * @param error The exception that was thrown
-     */
-    fun reportError(
-        databaseLocation: String,
-        error: Throwable,
-    ) {
-        _schemaError.value = SchemaErrorInfo(databaseLocation, error)
+    /** Reports a schema [error] to be displayed globally. */
+    fun reportError(error: Throwable) {
+        _schemaError.value = error
     }
 
     /**
@@ -32,11 +28,3 @@ object GlobalSchemaErrorState {
         _schemaError.value = null
     }
 }
-
-/**
- * Data class holding schema error information.
- */
-data class SchemaErrorInfo(
-    val databaseLocation: String,
-    val error: Throwable,
-)

@@ -87,11 +87,11 @@ internal object MoneyManagerTestApp {
 
         // Determine which error to show - prioritize global errors (runtime) over local (startup)
         val effectiveSchemaError: Pair<DbLocation, Throwable>? =
-            globalSchemaError?.let { info ->
+            globalSchemaError?.let { error ->
                 val location =
                     (databaseState as? TestDatabaseState.Loaded)?.location
                         ?: databaseManager.getDefaultLocation()
-                location to info.error
+                location to error
             } ?: (databaseState as? TestDatabaseState.Error)?.let { it.location to it.error }
 
         when (val state = databaseState) {

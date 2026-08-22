@@ -73,8 +73,6 @@ suspend fun scanImportDirectory(
     }
     val entries = fileSource.list()
     var downloaded = 0
-    var csvDownloaded = 0
-    var qifDownloaded = 0
     var unchanged = 0
     var skipped = 0
     var failed = 0
@@ -145,19 +143,16 @@ suspend fun scanImportDirectory(
                     csvImportId =
                         csvImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
                             ?: stageCsv(importEngine, entry, checkNotNull(content), checksum, lastModified)
-                    csvDownloaded++
                 }
                 SupportedKind.QIF -> {
                     qifImportId =
                         qifImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
                             ?: stageQif(importEngine, entry, checkNotNull(content), checksum, lastModified)
-                    qifDownloaded++
                 }
                 SupportedKind.XLSX -> {
                     csvImportId =
                         csvImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
                             ?: stageXlsx(importEngine, entry, rawBytes, checksum, lastModified)
-                    csvDownloaded++
                 }
             }
 
@@ -186,8 +181,6 @@ suspend fun scanImportDirectory(
 
     return ScanResult(
         filesDownloaded = downloaded,
-        csvDownloaded = csvDownloaded,
-        qifDownloaded = qifDownloaded,
         filesUnchanged = unchanged,
         filesSkipped = skipped,
         filesFailed = failed,

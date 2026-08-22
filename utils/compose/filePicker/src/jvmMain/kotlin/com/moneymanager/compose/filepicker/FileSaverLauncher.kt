@@ -9,7 +9,7 @@ import java.io.File
 
 actual class FileSaverLauncher(
     private val mimeType: String,
-    private val onResult: (FileSaverResult?) -> Unit,
+    private val onResult: () -> Unit,
 ) {
     actual fun launch(
         fileName: String,
@@ -45,13 +45,9 @@ actual class FileSaverLauncher(
 
             if (directory != null && file != null) {
                 localSettings.putString(KEY_LAST_DIRECTORY, directory)
-                val targetFile = File(directory, file)
-                val result = writeFileContent(targetFile, content)
-                onResult(result)
-            } else {
-                // User cancelled
-                onResult(null)
+                writeFileContent(File(directory, file), content)
             }
+            onResult()
         } finally {
             frame.dispose()
         }
@@ -69,16 +65,14 @@ internal fun mimeTypeToExtension(mimeType: String): String? =
         else -> null
     }
 
-/**
- * Writes content to a file and returns the result.
- */
+/** Writes [content] to [file]; a failed write is swallowed, as no caller acts on the outcome. */
 internal fun writeFileContent(
     file: File,
     content: String,
-): FileSaverResult =
+) {
     try {
         file.writeText(content, Charsets.UTF_8)
-        FileSaverResult(success = true, filePath = file.absolutePath)
     } catch (_: Exception) {
-        FileSaverResult(success = false)
+        // Nothing to report back to.
     }
+}

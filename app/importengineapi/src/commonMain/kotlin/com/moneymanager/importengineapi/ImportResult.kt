@@ -50,7 +50,6 @@ data class ImportResult(
     val transfersImported: Int = 0,
     val duplicates: Int = 0,
     val updated: Int = 0,
-    val errors: Int = 0,
     val excluded: Int = 0,
     val createdTransferIds: Map<ImportRowKey, TransferId> = emptyMap(),
     val rowOutcomes: Map<ImportRowKey, RowOutcome> = emptyMap(),

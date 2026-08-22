@@ -19,7 +19,6 @@ enum class SyncStatus { NO_SESSION, IN_SYNC, LOCAL_AHEAD, REMOTE_AHEAD, CONFLICT
  */
 data class SyncState(
     val status: SyncStatus = SyncStatus.NO_SESSION,
-    val localDirty: Boolean = false,
     val remoteChanged: Boolean = false,
     /** True while a remote check / sync operation is in flight (for spinners and disabling buttons). */
     val busy: Boolean = false,
