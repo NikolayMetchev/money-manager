@@ -255,7 +255,7 @@ jobs:
     needs: [changes, lint-format]
     # Unlike the other heavy jobs this one also runs on workflow_dispatch, so it has no
     # event-name condition.
-    # Runs the community 2026.2-eap linter (qodana.yaml). QODANA_TOKEN is a Qodana Cloud
+    # Runs the community 2026.2 linter (qodana.yaml). QODANA_TOKEN is a Qodana Cloud
     # community-tier project token, so results upload to Qodana Cloud; the SARIF also goes to
     # GitHub Code Scanning and the run artifact.
     if: >-
@@ -286,8 +286,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/qodana/caches
-          key: qodana-2026.2-eap-refs/heads/main
-          restore-keys: qodana-2026.2-eap-
+          key: qodana-2026.2-refs/heads/main
+          restore-keys: qodana-2026.2-
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.2
         env:
