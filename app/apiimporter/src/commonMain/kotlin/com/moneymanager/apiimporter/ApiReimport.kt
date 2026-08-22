@@ -371,29 +371,38 @@ internal suspend fun reimportSessionsResiliently(
 ): ApiBulkReimportResult {
     var reimported = 0
     val failures = mutableListOf<ApiSessionReimportFailure>()
-    try {
-        for ((index, session) in sessions.withIndex()) {
-            onProgress?.invoke(
-                ImportProgress(
-                    "Re-importing session #${session.id}",
-                    fraction = index.toFloat() / sessions.size,
-                    processed = index,
-                    total = sessions.size,
-                ),
-            )
-            try {
-                reimport(session)
-                reimported++
-            } catch (expected: CancellationException) {
-                throw expected
-            } catch (expected: Exception) {
-                logger.error(expected) { "Bulk API re-import failed for session ${session.id}: ${expected.message}" }
-                failures += ApiSessionReimportFailure(session.id, expected.message ?: "Re-import failed")
+    val runFailure =
+        runCatching {
+            for ((index, session) in sessions.withIndex()) {
+                onProgress?.invoke(
+                    ImportProgress(
+                        "Re-importing session #${session.id}",
+                        fraction = index.toFloat() / sessions.size,
+                        processed = index,
+                        total = sessions.size,
+                    ),
+                )
+                try {
+                    reimport(session)
+                    reimported++
+                } catch (expected: CancellationException) {
+                    throw expected
+                } catch (expected: Exception) {
+                    logger.error(expected) { "Bulk API re-import failed for session ${session.id}: ${expected.message}" }
+                    failures += ApiSessionReimportFailure(session.id, expected.message ?: "Re-import failed")
+                }
             }
-        }
-    } finally {
-        // NonCancellable so a cancelled run doesn't leave stale balances behind either.
-        withContext(NonCancellable) { maintenance.refreshMaterializedViews() }
+        }.exceptionOrNull()
+
+    // NonCancellable so a cancelled run doesn't leave stale balances behind either.
+    val refreshFailure =
+        runCatching { withContext(NonCancellable) { maintenance.refreshMaterializedViews() } }.exceptionOrNull()
+
+    // A refresh that fails while the run is already unwinding must not replace the exception that ended
+    // it — the caller needs to see the cancellation or error that actually happened.
+    if (runFailure != null && refreshFailure != null) {
+        logger.error(refreshFailure) { "Refreshing views after an aborted bulk API re-import failed" }
     }
+    (runFailure ?: refreshFailure)?.let { throw it }
     return ApiBulkReimportResult(sessionsReimported = reimported, failures = failures)
 }

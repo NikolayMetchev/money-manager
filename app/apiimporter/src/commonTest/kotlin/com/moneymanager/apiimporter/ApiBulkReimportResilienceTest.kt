@@ -35,6 +35,23 @@ class ApiBulkReimportResilienceTest {
         override suspend fun fullRefreshMaterializedViews(): Duration = Duration.ZERO
     }
 
+    private class FailingRefreshMaintenance : Maintenance {
+        var attempts = 0
+
+        override suspend fun reindex(): Duration = Duration.ZERO
+
+        override suspend fun vacuum(): Duration = Duration.ZERO
+
+        override suspend fun analyze(): Duration = Duration.ZERO
+
+        override suspend fun refreshMaterializedViews(): Duration {
+            attempts++
+            error("refresh failed")
+        }
+
+        override suspend fun fullRefreshMaterializedViews(): Duration = Duration.ZERO
+    }
+
     private fun session(id: Long) =
         ApiSession(
             id = ApiSessionId(id),
@@ -84,6 +101,39 @@ class ApiBulkReimportResilienceTest {
             }
 
             assertEquals(1, maintenance.refreshes, "the sessions already re-imported have invalidated the views")
+        }
+
+    @Test
+    fun `a failing refresh does not mask the cancellation that ended the run`() =
+        runTest {
+            val maintenance = FailingRefreshMaintenance()
+
+            val thrown =
+                assertFailsWith<CancellationException> {
+                    reimportSessionsResiliently(
+                        sessions = (1L..3L).map { session(it) },
+                        maintenance = maintenance,
+                        onProgress = null,
+                    ) { session ->
+                        if (session.id.id == 2L) throw CancellationException("cancelled")
+                    }
+                }
+
+            assertEquals("cancelled", thrown.message, "the refresh failure must not replace the cancellation")
+            assertEquals(1, maintenance.attempts, "the refresh should still have been attempted")
+        }
+
+    @Test
+    fun `a failing refresh surfaces when the run itself succeeded`() =
+        runTest {
+            val maintenance = FailingRefreshMaintenance()
+
+            val thrown =
+                assertFailsWith<IllegalStateException> {
+                    reimportSessionsResiliently((1L..2L).map { session(it) }, maintenance, onProgress = null) { }
+                }
+
+            assertEquals("refresh failed", thrown.message, "nothing else was in flight to mask it")
         }
 
     @Test

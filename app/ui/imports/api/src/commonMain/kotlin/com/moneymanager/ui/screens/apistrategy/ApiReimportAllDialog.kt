@@ -90,8 +90,8 @@ fun ApiReimportAllDialog(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text =
-                                "${currentResult.failures.size} session(s) failed and were left as they were — " +
-                                    "re-run once the cause is fixed:",
+                                "${currentResult.failures.size} session(s) failed. Their data may be partially " +
+                                    "changed — re-run once the cause is fixed:",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )
