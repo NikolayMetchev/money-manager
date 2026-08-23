@@ -117,6 +117,15 @@ enum class WindowBoundFormat {
 }
 
 /**
+ * How [ApiPaginationConfig.offsetParam] advances between pages of the same window.
+ *
+ * [OFFSET] — starts at 0, advances by [ApiPaginationConfig.limitValue] each page (Kraken `ofs`).
+ * [PAGE_NUMBER] — starts at 1, advances by 1 each page (Binance fiat `page`/`rows`).
+ */
+@Serializable
+enum class OffsetMode { OFFSET, PAGE_NUMBER }
+
+/**
  * Pagination strategy for an API endpoint. A single flat shape carries the parameters for both
  * schemes; [mode] selects which set applies. A flat (rather than sealed) shape keeps this model
  * module free of the serialization-json artifact and stays backward compatible: legacy configs
@@ -141,16 +150,6 @@ enum class WindowBoundFormat {
  * so rows the provider posts with a backdated timestamp after a download are still picked up. The
  * overlap is re-fetched every time, and duplicates are absorbed by the import deduper.
  */
-
-/**
- * How [ApiPaginationConfig.offsetParam] advances between pages of the same window.
- *
- * [OFFSET] — starts at 0, advances by [ApiPaginationConfig.limitValue] each page (Kraken `ofs`).
- * [PAGE_NUMBER] — starts at 1, advances by 1 each page (Binance fiat `page`/`rows`).
- */
-@Serializable
-enum class OffsetMode { OFFSET, PAGE_NUMBER }
-
 @Serializable
 data class ApiPaginationConfig(
     val mode: PaginationMode = PaginationMode.CURSOR,
