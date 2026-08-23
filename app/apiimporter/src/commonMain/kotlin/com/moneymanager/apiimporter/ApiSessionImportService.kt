@@ -3197,7 +3197,7 @@ private fun strategyAttributeNameForJsonPath(
 private fun JsonObject.stringOrNull(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
 /** Resolves a dot-notation path (e.g. "merchant.name") against this JSON object. */
-private fun JsonObject.resolveJsonPath(dotPath: String): String? = (resolveJsonPathElement(dotPath) as? JsonPrimitive)?.contentOrNull
+internal fun JsonObject.resolveJsonPath(dotPath: String): String? = (resolveJsonPathElement(dotPath) as? JsonPrimitive)?.contentOrNull
 
 /**
  * Resolves a dot-notation path to a `JsonElement`, supporting array indexing so exchange responses
@@ -3230,12 +3230,14 @@ internal fun JsonElement.resolveJsonPathElement(dotPath: String): JsonElement? {
 }
 
 /**
- * Parses an API timestamp string per its [TimestampFormat] — ISO-8601 (bank APIs) or epoch
- * milliseconds/seconds (most exchanges), including fractional seconds (Kraken).
+ * Parses an API timestamp string per its [TimestampFormat] — ISO-8601 (bank APIs), epoch
+ * milliseconds/seconds (most exchanges) including fractional seconds (Kraken), or a [pattern] string
+ * (Binance withdrawal history's `"yyyy-MM-dd HH:mm:ss"`, always UTC; see [parseSpaceDateTimeUtc]).
  */
 internal fun parseApiTimestamp(
     value: String,
     format: TimestampFormat,
+    pattern: String? = null,
 ): Instant? =
     when (format) {
         TimestampFormat.ISO_8601 -> runCatching { Instant.parse(value) }.getOrNull()
@@ -3246,7 +3248,77 @@ internal fun parseApiTimestamp(
                 val seconds = it.toLong()
                 Instant.fromEpochSeconds(seconds, ((it - seconds) * 1_000_000_000L).toLong())
             }
+        TimestampFormat.PATTERN -> pattern?.let { parsePatternedTimestamp(value, it) }
     }
+
+/**
+ * Parses [value] against a small vocabulary of date-time tokens in [pattern] — `yyyy`, `MM`, `dd`,
+ * `HH`, `mm`, `ss` separated by fixed literal characters, interpreted as UTC. Deliberately not a general
+ * date-time formatting engine (kotlinx-datetime's `DateTimeComponents.Format`/`byUnicodePattern` is
+ * `@FormatStringsInDatetimeFormats`-experimental); every provider needing [TimestampFormat.PATTERN] so
+ * far uses this exact shape (Binance: `"yyyy-MM-dd HH:mm:ss"`).
+ */
+internal fun parsePatternedTimestamp(
+    value: String,
+    pattern: String,
+): Instant? {
+    val fields = mapOf("yyyy" to 4, "MM" to 2, "dd" to 2, "HH" to 2, "mm" to 2, "ss" to 2)
+    var year = 1970
+    var month = 1
+    var day = 1
+    var hour = 0
+    var minute = 0
+    var second = 0
+    var pi = 0
+    var vi = 0
+    while (pi < pattern.length) {
+        val token = fields.keys.firstOrNull { pattern.startsWith(it, pi) }
+        if (token != null) {
+            val width = fields.getValue(token)
+            if (vi + width > value.length) return null
+            val digits = value.substring(vi, vi + width)
+            val number = digits.toIntOrNull() ?: return null
+            when (token) {
+                "yyyy" -> year = number
+                "MM" -> month = number
+                "dd" -> day = number
+                "HH" -> hour = number
+                "mm" -> minute = number
+                "ss" -> second = number
+            }
+            pi += width
+            vi += width
+        } else {
+            if (vi >= value.length || value[vi] != pattern[pi]) return null
+            pi += 1
+            vi += 1
+        }
+    }
+    if (vi != value.length) return null
+    if (month < 1 || month > 12 || day < 1 || day > 31 || hour !in 0..23 || minute !in 0..59 || second !in 0..60) return null
+    val epochDay = daysFromCivil(year, month, day)
+    val epochSeconds = epochDay * 86_400L + hour * 3_600L + minute * 60L + second
+    return Instant.fromEpochSeconds(epochSeconds)
+}
+
+/**
+ * Days since the epoch (1970-01-01) for a proleptic-Gregorian UTC date — Howard Hinnant's `days_from_civil`
+ * algorithm. Avoids pulling in kotlinx-datetime just for [TimestampFormat.PATTERN]'s handful of exchange
+ * date-time strings.
+ */
+private fun daysFromCivil(
+    year: Int,
+    month: Int,
+    day: Int,
+): Long {
+    val y = (if (month <= 2) year - 1 else year).toLong()
+    val era = (if (y >= 0) y else y - 399) / 400
+    val yoe = y - era * 400
+    val mp = (month + 9) % 12
+    val doy = (153 * mp + 2) / 5 + day - 1
+    val doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+    return era * 146_097 + doe - 719_468
+}
 
 private fun JsonObject.resolveCounterpartyIdentity(
     counterpartyIdField: String?,
@@ -3333,7 +3405,7 @@ private fun bankIdentityFromDedupeKey(dedupeKey: String?): Pair<String, String>?
     return if (sortCode.isNotBlank() && accountNumber.isNotBlank()) sortCode to accountNumber else null
 }
 
-private fun JsonObject.resolveJsonObjectPath(dotPath: String): JsonObject? {
+internal fun JsonObject.resolveJsonObjectPath(dotPath: String): JsonObject? {
     // A blank path means "this object" — used by providers whose counterparty fields are flat on the
     // transaction item rather than nested under a sub-object.
     if (dotPath.isBlank()) return this
@@ -3367,7 +3439,7 @@ private fun RuleSign.matches(sign: Int): Boolean =
         RuleSign.POSITIVE -> sign > 0
     }
 
-private fun JsonObject.evaluatePredicate(predicate: RulePredicate): Boolean {
+internal fun JsonObject.evaluatePredicate(predicate: RulePredicate): Boolean {
     val operand = predicate.value.orEmpty()
     return when (predicate.op) {
         // A present-but-JSON-null field (e.g. Monzo sends `atm_fees_detailed: null` on every
@@ -3382,11 +3454,13 @@ private fun JsonObject.evaluatePredicate(predicate: RulePredicate): Boolean {
             } == true
         PredicateOp.OBJECT_EMPTY -> resolveJsonObjectPath(predicate.path).isNullOrEmpty()
         PredicateOp.OBJECT_NON_EMPTY -> resolveJsonObjectPath(predicate.path)?.isNotEmpty() == true
+        PredicateOp.NOT_EQUALS -> resolveJsonPath(predicate.path) != predicate.value
+        PredicateOp.IN -> resolveJsonPath(predicate.path)?.let { it in operand.split(",") } == true
     }
 }
 
 /** Resolves a dot-notation path to its `JsonElement` (object, array, or primitive), or null. */
-private fun JsonObject.resolveJsonElementPath(dotPath: String): JsonElement? {
+internal fun JsonObject.resolveJsonElementPath(dotPath: String): JsonElement? {
     var current: JsonElement = this
     for (part in dotPath.split(".")) {
         current = (current as? JsonObject)?.get(part) ?: return null

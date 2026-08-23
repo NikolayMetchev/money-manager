@@ -372,10 +372,10 @@ internal fun TradeMappingsEditor(
         }
         TextFieldRow(
             "Side field",
-            mappings.sideField,
-            { onChange(mappings.copy(sideField = it)) },
+            mappings.sideField.orEmpty(),
+            { onChange(mappings.copy(sideField = it.ifBlank { null })) },
             enabled,
-            isError = mappings.sideField.isBlank(),
+            isError = mappings.sideField.isNullOrBlank() && mappings.fixedSideBuy == null,
         )
         StringSetEditor(
             label = "Buy values (mean BUY side)",
@@ -573,7 +573,7 @@ private fun defaultTradeMappings(): ApiTradeMappings =
 
 private fun ApiTradeMappings.isValidForSave(): Boolean =
     instrumentField.isNotBlank() &&
-        sideField.isNotBlank() &&
+        (!sideField.isNullOrBlank() || fixedSideBuy != null) &&
         baseQuantityField.isNotBlank() &&
         timestampField.isNotBlank() &&
         idField.isNotBlank() &&

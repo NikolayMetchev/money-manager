@@ -4,6 +4,8 @@ import com.moneymanager.domain.model.accountmapping.export.AccountMappingsExport
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
+import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
+import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
@@ -48,6 +50,11 @@ class StrategyExportUnsortedCollectionGuardTest {
             ApiStrategyConfig::class to "connectInstructions",
             ApiRequestSigningConfig::class to "message",
             SigPart.Sha256::class to "parts",
+            // Order-carrying by design: readable composite-key construction / template substitution
+            // order. Neither is authored through a row-based UI editor (built-in-strategy code only),
+            // so the false-conflict risk the guard protects against doesn't apply.
+            ApiTradeMappings::class to "compositeIdFields",
+            ApiValueSet.Union::class to "sets",
             CsvStrategyExport::class to "rowPreprocessingRules",
             RegexAccountExport::class to "rules",
             RegexAccountExport::class to "fallbackColumns",

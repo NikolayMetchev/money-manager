@@ -22,3 +22,13 @@ object SortedDataEndpointListSerializer : SortedByListSerializer<ApiDataEndpoint
     ApiDataEndpoint.serializer(),
     compareBy({ it.kind.name }, { it.endpoint.path }, { it.endpoint.responseArrayKey }),
 )
+
+/**
+ * Serializes [ApiStrategyConfig.valueEndpoints] sorted by path. Safe because fan-out value sources
+ * reference an endpoint by its [ApiEndpointConfig.path] (see [ApiValueSet.FromValueEndpoint]), not by
+ * list position, so this stays byte-stable regardless of authoring order.
+ */
+object SortedValueEndpointListSerializer : SortedByListSerializer<ApiEndpointConfig>(
+    ApiEndpointConfig.serializer(),
+    compareBy { it.path },
+)
