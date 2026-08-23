@@ -342,6 +342,18 @@ suspend fun ImportEngine.insertApiRequest(
             .apiRequestIds[url],
     )
 
+suspend fun ImportEngine.recordApiDownloadCoverage(
+    sessionId: ApiSessionId,
+    endpointKey: String,
+    coversUntil: Instant,
+) {
+    import(
+        ImportBatch(
+            apiSessionMutations = listOf(ApiSessionMutation.RecordDownloadCoverage(sessionId, endpointKey, coversUntil)),
+        ),
+    )
+}
+
 suspend fun ImportEngine.insertApiResponse(
     requestId: ApiRequestId,
     sessionId: ApiSessionId,

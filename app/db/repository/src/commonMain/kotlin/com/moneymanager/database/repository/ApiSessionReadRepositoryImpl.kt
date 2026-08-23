@@ -93,6 +93,19 @@ class ApiSessionReadRepositoryImpl(
             }
         }
 
+    override suspend fun getDownloadWatermarks(
+        credentialId: ApiCredentialId,
+        excludingSessionId: ApiSessionId,
+    ): Map<String, Instant> =
+        withContext(Dispatchers.Default) {
+            selectQueries
+                .selectDownloadWatermarksByCredential(credentialId.id, excludingSessionId.id)
+                .executeAsList()
+                .mapNotNull { row ->
+                    row.covers_until?.let { row.endpoint_key to Instant.fromEpochMilliseconds(it) }
+                }.toMap()
+        }
+
     override suspend fun getResponsesBySession(sessionId: ApiSessionId): List<ApiResponse> =
         withContext(Dispatchers.Default) {
             selectQueries.selectResponsesBySession(sessionId.id).executeAsList().map { it.toApiResponse() }

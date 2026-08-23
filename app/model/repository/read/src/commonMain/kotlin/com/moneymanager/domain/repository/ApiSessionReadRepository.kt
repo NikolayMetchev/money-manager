@@ -60,6 +60,17 @@ interface ApiSessionReadRepository {
     suspend fun getRequestsBySession(sessionId: ApiSessionId): List<ApiRequest>
 
     /**
+     * How far each endpoint of [credentialId] has already been downloaded, keyed by the downloader's
+     * endpoint key, across every session except [excludingSessionId] (the one being downloaded into).
+     * Only requests that actually received a response count, so an interrupted download does not
+     * advance the watermark past data it never stored.
+     */
+    suspend fun getDownloadWatermarks(
+        credentialId: ApiCredentialId,
+        excludingSessionId: ApiSessionId,
+    ): Map<String, Instant>
+
+    /**
      * Returns all responses for the given session, newest first.
      */
     suspend fun getResponsesBySession(sessionId: ApiSessionId): List<ApiResponse>

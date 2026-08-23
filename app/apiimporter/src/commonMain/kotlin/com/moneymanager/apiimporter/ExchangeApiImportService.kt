@@ -46,6 +46,7 @@ import com.moneymanager.importengineapi.LocalOrderKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeType
+import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
 import kotlinx.coroutines.delay
@@ -87,8 +88,14 @@ private const val MAX_RATE_LIMIT_BACKOFF_MILLIS = 60_000L
 
 /**
  * Downloads every data endpoint of an exchange [strategy] into [sessionId] as signed POST/GET requests,
- * paged by date window. Incremental: a window already stored (recorded URL present) is skipped. The
- * request body carries the api secret/signature and is never persisted (see `ApiClient`).
+ * paged by date window. The request body carries the api secret/signature and is never persisted (see
+ * `ApiClient`).
+ *
+ * Incremental on two levels: a window already stored in *this* session (recorded URL present) is
+ * skipped, which lets an interrupted download resume; and [watermarks] — how far earlier sessions of
+ * the same credential already reached, keyed by [endpointDedupeKey] — moves each endpoint's sweep start
+ * forward so a routine download fetches only the recent tail. Pass empty [watermarks] (or
+ * [forceFullDownload]) to re-sweep the whole configured lookback from scratch.
  */
 suspend fun downloadApiSessionExchange(
     apiClient: ApiClient,
@@ -98,6 +105,9 @@ suspend fun downloadApiSessionExchange(
     apiSessionRepository: ApiSessionReadRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
+    importEngine: ImportEngine,
+    watermarks: Map<String, Instant> = emptyMap(),
+    forceFullDownload: Boolean = false,
     // Crypto.com's get-trades / get-order-history are limited to 1 request/second, so pace every request
     // just over 1s to stay clear of rate-limit rejections across all endpoints.
     rateLimitMillis: Long = 1100,
@@ -121,9 +131,18 @@ suspend fun downloadApiSessionExchange(
     val existingResponseJsonByUrl =
         existingRequests.mapNotNull { req -> existingResponses[req.id]?.let { req.url to it.json } }.toMap()
 
+    var earliestIncrementalStart: Instant? = null
+
     strategy.config.dataEndpoints.forEachIndexed { endpointIndex, dataEndpoint ->
         val endpoint = dataEndpoint.endpoint
-        val windows = dateWindowsOrSingle(endpoint.pagination, now)
+        val endpointKey = endpointDedupeKey(endpoint)
+        val since = if (forceFullDownload) null else watermarks[endpointKey]
+        val windows = dateWindowsOrSingle(endpoint.pagination, now, since)
+        if (since != null) {
+            windows.firstOrNull()?.start?.let { start ->
+                earliestIncrementalStart = minOf(start, earliestIncrementalStart ?: start)
+            }
+        }
         // A single failing endpoint (e.g. a path this account/product doesn't support) must not abort
         // the whole download; once one window fails, skip the rest of that endpoint's windows.
         var endpointBroken = false
@@ -188,7 +207,7 @@ suspend fun downloadApiSessionExchange(
                         if (signing.bodyFormat == BodyFormat.QUERY_ONLY) {
                             signed.url
                         } else {
-                            appendMarker(signed.url, endpointDedupeKey(endpoint), window, offsetParam?.let { offset })
+                            appendMarker(signed.url, endpointKey, window, offsetParam?.let { offset })
                         }
 
                     if (recordedUrl in downloadedUrls) {
@@ -266,18 +285,27 @@ suspend fun downloadApiSessionExchange(
                         pageItemCount >= pagination.limitValue && (totalCount == null || itemsSeenInWindow < totalCount)
                     }
             }
+            // Reached only when every offset page of this window succeeded: a failing page sets
+            // endpointBroken and returns out of the endpoint, so a half-paged window never advances
+            // the watermark past data it did not store.
+            importEngine.recordApiDownloadCoverage(sessionId, endpointKey, window?.end ?: now)
         }
     }
-    return ApiTransactionsDownloadResult(accountCount = strategy.config.dataEndpoints.size, transactionResponseCount = responseCount)
+    return ApiTransactionsDownloadResult(
+        accountCount = strategy.config.dataEndpoints.size,
+        transactionResponseCount = responseCount,
+        incrementalSince = earliestIncrementalStart,
+    )
 }
 
 /** A window with epoch bounds; null means a single non-windowed request. */
 private fun dateWindowsOrSingle(
     pagination: ApiPaginationConfig?,
     now: Instant,
+    since: Instant?,
 ): List<ApiDateWindow?> =
     if (pagination?.mode == PaginationMode.DATE_WINDOW) {
-        dateWindows(pagination, now)
+        dateWindows(pagination, now, since)
     } else {
         listOf(null)
     }
@@ -305,7 +333,7 @@ private fun buildExchangeEndpointUrl(
  * string). Used both for the incremental-download marker and for matching a stored response back to the
  * data endpoint that produced it.
  */
-private fun endpointDedupeKey(endpoint: ApiEndpointConfig): String {
+internal fun endpointDedupeKey(endpoint: ApiEndpointConfig): String {
     val staticParams =
         endpoint.queryParams
             .filter { it.value != null }

@@ -146,6 +146,20 @@ class ApiSessionWriteRepositoryImpl(
             ApiRequestId(id)
         }
 
+    override suspend fun recordDownloadCoverage(
+        sessionId: ApiSessionId,
+        endpointKey: String,
+        coversUntil: Instant,
+    ) {
+        withContext(Dispatchers.Default) {
+            writeQueries.insertDownloadCoverage(
+                session_id = sessionId.id,
+                endpoint_key = endpointKey,
+                covers_until = coversUntil.toEpochMilliseconds(),
+            )
+        }
+    }
+
     override suspend fun insertResponse(
         requestId: ApiRequestId,
         sessionId: ApiSessionId,

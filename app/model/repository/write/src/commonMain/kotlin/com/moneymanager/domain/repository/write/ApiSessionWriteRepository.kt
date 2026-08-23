@@ -88,6 +88,18 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
     ): ApiRequestId
 
     /**
+     * Records that [endpointKey] is downloaded up to [coversUntil] for [sessionId] — the watermark a
+     * later download of the same credential resumes from. Call this only once a whole download unit
+     * has succeeded; see the `api_download_coverage` table comment for why this is not derived from
+     * the recorded request/response rows.
+     */
+    suspend fun recordDownloadCoverage(
+        sessionId: ApiSessionId,
+        endpointKey: String,
+        coversUntil: Instant,
+    )
+
+    /**
      * Stores one API response payload for the given session.
      */
     suspend fun insertResponse(

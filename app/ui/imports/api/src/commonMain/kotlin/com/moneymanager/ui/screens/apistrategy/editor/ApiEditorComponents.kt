@@ -753,6 +753,13 @@ internal fun PaginationEditor(
             QueryParamsEditor(params = config.extraParams, onChange = { onChange(config.copy(extraParams = it)) }, enabled = enabled)
         }
     }
+    // Applies to both modes: it clamps the date-window sweep and sets the cursor loop's stop point.
+    IntFieldRow(
+        "Incremental overlap days",
+        config.incrementalOverlapDays,
+        { onChange(config.copy(incrementalOverlapDays = it)) },
+        enabled,
+    )
     ToggleRow(
         label = "Offset paging (e.g. Kraken \"ofs\")",
         checked = config.offsetParam != null,

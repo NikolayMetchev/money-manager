@@ -194,6 +194,7 @@ class MonzoImportAuditE2ETest {
                     apiSessionRepository = dc.apiSessionRepository,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = dc.importEngine,
                 )
                 importApiSessionTransactions(
                     apiSessionRepository = dc.apiSessionRepository,

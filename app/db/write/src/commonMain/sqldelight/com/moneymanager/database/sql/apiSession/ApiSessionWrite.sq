@@ -28,6 +28,12 @@ insertRequestHeader:
 INSERT INTO api_request_header(request_id, key, value)
 VALUES (?, ?, ?);
 
+insertDownloadCoverage:
+INSERT INTO api_download_coverage(session_id, endpoint_key, covers_until)
+VALUES (?, ?, ?)
+ON CONFLICT(session_id, endpoint_key) DO UPDATE
+SET covers_until = MAX(api_download_coverage.covers_until, excluded.covers_until);
+
 insertResponse:
 INSERT INTO api_response(request_id, session_id, json)
 VALUES (?, ?, ?);

@@ -1842,6 +1842,8 @@ class ImportEngineImpl(
                         apiSessionRepository.insertRequest(m.sessionId, m.method, m.url, m.headers),
                         "ApiRequest",
                     )
+                is ApiSessionMutation.RecordDownloadCoverage ->
+                    apiSessionRepository.recordDownloadCoverage(m.sessionId, m.endpointKey, m.coversUntil)
                 is ApiSessionMutation.InsertResponse ->
                     apiResponseIds.putUnique(
                         m.key,

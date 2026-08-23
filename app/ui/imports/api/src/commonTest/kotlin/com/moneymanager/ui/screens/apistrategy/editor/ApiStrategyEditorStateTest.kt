@@ -165,6 +165,7 @@ class ApiStrategyEditorStateTest {
                                                 windowBoundFormat = WindowBoundFormat.EPOCH_S,
                                                 offsetParam = "ofs",
                                                 totalCountField = "result.count",
+                                                incrementalOverlapDays = 3,
                                             ),
                                     ),
                                 kind = ApiEndpointKind.TRADES,
