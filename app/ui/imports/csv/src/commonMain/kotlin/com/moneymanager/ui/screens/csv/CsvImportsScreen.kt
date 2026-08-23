@@ -1,9 +1,7 @@
 package com.moneymanager.ui.screens.csv
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,13 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SecondaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -73,11 +66,18 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createCsvImport
 import com.moneymanager.importengineapi.createXlsxImport
 import com.moneymanager.importengineapi.setCsvImportIgnored
+import com.moneymanager.ui.components.imports.ImportCardDetailText
+import com.moneymanager.ui.components.imports.ImportFileCard
+import com.moneymanager.ui.components.imports.ImportStatusMessage
+import com.moneymanager.ui.components.imports.ImportTab
+import com.moneymanager.ui.components.imports.ImportTabsRow
+import com.moneymanager.ui.components.imports.ImportsEmptyMessage
+import com.moneymanager.ui.components.imports.ImportsScreenHeader
+import com.moneymanager.ui.components.imports.emptyImportTabMessage
+import com.moneymanager.ui.components.imports.importPickedFiles
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.util.displayDate
-import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.sha256Hex
 import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.flow.first
@@ -85,8 +85,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
-// Mirrors QifImportsScreen (QIF reuses the CSV import engine); overlap is intentional.
-@Suppress("LongParameterList", "DuplicatedCode")
+@Suppress("LongParameterList", "LongMethod")
 @Composable
 fun CsvImportsScreen(
     csvImportRepository: CsvImportReadRepository,
@@ -173,15 +172,11 @@ fun CsvImportsScreen(
                 isImporting = true
                 importMessage = null
                 scope.launch {
-                    var imported = 0
-                    var skipped = 0
-                    val failures = mutableListOf<String>()
-                    for (result in results) {
-                        try {
+                    val outcome =
+                        importPickedFiles(results, fileName = { it.fileName }) { result ->
                             val checksum = sha256Hex(result.content)
                             if (csvImportRepository.findImportsByChecksum(checksum).isNotEmpty()) {
-                                skipped++
-                                continue
+                                return@importPickedFiles false
                             }
                             val parser = CsvParser()
                             val delimiter = parser.detectDelimiter(result.content)
@@ -197,22 +192,11 @@ fun CsvImportsScreen(
                                 fileChecksum = checksum,
                                 fileLastModified = result.lastModified ?: Clock.System.now(),
                             )
-                            imported++
-                        } catch (expected: Exception) {
-                            failures.add("${result.fileName}: ${expected.message}")
+                            true
                         }
-                    }
                     isImporting = false
-                    importMessageIsError = failures.isNotEmpty()
-                    importMessage =
-                        buildString {
-                            append("Imported $imported file${if (imported == 1) "" else "s"}")
-                            if (skipped > 0) append(", skipped $skipped already imported")
-                            if (failures.isNotEmpty()) {
-                                append(", ${failures.size} failed: ")
-                                append(failures.joinToString("; "))
-                            }
-                        }
+                    importMessageIsError = outcome.isError
+                    importMessage = outcome.message
                 }
             }
         }
@@ -261,66 +245,27 @@ fun CsvImportsScreen(
                 .fillMaxSize()
                 .padding(16.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+        ImportsScreenHeader(
+            title = "CSV Imports",
+            importButtonLabel = "+ Import CSV",
+            isImporting = isImporting,
+            onImportClick = { filePicker.launch() },
+            onStrategiesClick = onStrategiesClick,
         ) {
-            Text(
-                text = "CSV Imports",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            TextButton(
+                onClick = { xlsxFilePicker.launch() },
+                enabled = !isImporting,
             ) {
-                TextButton(
-                    onClick = onStrategiesClick,
-                ) {
-                    Text("Strategies")
-                }
-                TextButton(
-                    onClick = { filePicker.launch() },
-                    enabled = !isImporting,
-                ) {
-                    if (isImporting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.height(16.dp),
-                        )
-                    } else {
-                        Text("+ Import CSV")
-                    }
-                }
-                TextButton(
-                    onClick = { xlsxFilePicker.launch() },
-                    enabled = !isImporting,
-                ) {
-                    Text("+ Import Excel")
-                }
+                Text("+ Import Excel")
             }
         }
 
-        importMessage?.let { message ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = message,
-                color = if (importMessageIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
+        ImportStatusMessage(message = importMessage, isError = importMessageIsError)
 
         Spacer(modifier = Modifier.height(16.dp))
 
         if (imports.isEmpty() && !isImporting) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "No CSV files imported yet. Click '+ Import CSV' to add one or more.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            ImportsEmptyMessage("No CSV files imported yet. Click '+ Import CSV' to add one or more.")
         } else {
             // Split files into those still needing a strategy applied vs. already imported, so a large
             // set of files is easy to work through. The Unimported tab is the default/actionable one.
@@ -328,25 +273,15 @@ fun CsvImportsScreen(
             val unimported = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt == null } }
             val importedList = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt != null } }
             val ignoredList = remember(imports) { imports.filter { it.ignored } }
-            var selectedTab by remember { mutableStateOf(0) }
+            var selectedTab by remember { mutableStateOf(ImportTab.UNIMPORTED) }
 
-            SecondaryTabRow(selectedTabIndex = selectedTab) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Unimported (${unimported.size})") },
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Imported (${importedList.size})") },
-                )
-                Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    text = { Text("Ignored (${ignoredList.size})") },
-                )
-            }
+            ImportTabsRow(
+                selectedTab = selectedTab,
+                unimportedCount = unimported.size,
+                importedCount = importedList.size,
+                ignoredCount = ignoredList.size,
+                onTabSelected = { selectedTab = it },
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -356,7 +291,7 @@ fun CsvImportsScreen(
             // Same idea for "Re-import all".
             var reimportAllScope by remember { mutableStateOf<List<CsvImport>?>(null) }
 
-            if (selectedTab == 0 && unimported.isNotEmpty()) {
+            if (selectedTab == ImportTab.UNIMPORTED && unimported.isNotEmpty()) {
                 Button(
                     onClick = { importAllScope = unimported },
                     modifier = Modifier.fillMaxWidth(),
@@ -366,7 +301,7 @@ fun CsvImportsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            if (selectedTab == 1 && importedList.isNotEmpty()) {
+            if (selectedTab == ImportTab.IMPORTED && importedList.isNotEmpty()) {
                 Button(
                     onClick = { reimportAllScope = importedList },
                     modifier = Modifier.fillMaxWidth(),
@@ -421,27 +356,13 @@ fun CsvImportsScreen(
 
             val shown =
                 when (selectedTab) {
-                    0 -> unimported
-                    1 -> importedList
+                    ImportTab.UNIMPORTED -> unimported
+                    ImportTab.IMPORTED -> importedList
                     else -> ignoredList
                 }
             if (shown.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text =
-                            when (selectedTab) {
-                                0 -> "All files have been imported."
-                                1 -> "No files imported yet."
-                                else -> "No ignored files."
-                            },
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else if (selectedTab == 2) {
+                ImportsEmptyMessage(emptyImportTabMessage(selectedTab))
+            } else if (selectedTab == ImportTab.IGNORED) {
                 // Ignored files span every strategy and need no scoped bulk action, so this tab stays flat.
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -462,7 +383,7 @@ fun CsvImportsScreen(
             } else {
                 val groups =
                     remember(unimported, importedList, matchedStrategies, selectedTab) {
-                        if (selectedTab == 0) {
+                        if (selectedTab == ImportTab.UNIMPORTED) {
                             buildUnimportedStrategyGroups(unimported, matchedStrategies)
                         } else {
                             buildImportedStrategyGroups(importedList)
@@ -476,7 +397,8 @@ fun CsvImportsScreen(
                         val sectionKey = "$selectedTab:${group.key?.toString() ?: "none"}"
                         val expanded = expandedSections[sectionKey] ?: true
                         item(key = "header-$sectionKey") {
-                            val isNoStrategyGroup = selectedTab == 0 && group.key == null && group.actionable
+                            val isNoStrategyGroup =
+                                selectedTab == ImportTab.UNIMPORTED && group.key == null && group.actionable
                             StrategySectionHeader(
                                 title = group.label,
                                 count = group.imports.size,
@@ -486,7 +408,7 @@ fun CsvImportsScreen(
                                     when {
                                         !group.actionable -> null
                                         isNoStrategyGroup -> "Ignore all"
-                                        selectedTab == 0 -> "Import all"
+                                        selectedTab == ImportTab.UNIMPORTED -> "Import all"
                                         else -> "Re-import all"
                                     },
                                 onAction = {
@@ -495,7 +417,7 @@ fun CsvImportsScreen(
                                             scope.launch {
                                                 group.imports.forEach { importEngine.setCsvImportIgnored(it.id, true) }
                                             }
-                                        selectedTab == 0 -> importAllScope = group.imports
+                                        selectedTab == ImportTab.UNIMPORTED -> importAllScope = group.imports
                                         else -> reimportAllScope = group.imports
                                     }
                                 },
@@ -509,8 +431,12 @@ fun CsvImportsScreen(
                                     dateRange = dateRanges[import.id.id.toString()],
                                     sourceAccountName = resolveSourceAccountName(import, strategies, directoryAccounts, accounts),
                                     matchedStrategyName =
-                                        if (selectedTab == 0 && group.actionable && !group.isWarning) group.label else null,
-                                    noMatchingStrategy = selectedTab == 0 && group.isWarning,
+                                        if (selectedTab == ImportTab.UNIMPORTED && group.actionable && !group.isWarning) {
+                                            group.label
+                                        } else {
+                                            null
+                                        },
+                                    noMatchingStrategy = selectedTab == ImportTab.UNIMPORTED && group.isWarning,
                                     onClick = { onImportClick(import.id) },
                                     ignored = false,
                                     onSetIgnored = { ignore ->
@@ -646,8 +572,7 @@ private fun resolveSourceAccountName(
     return accountId?.let { id -> accounts.firstOrNull { it.id == id }?.name }
 }
 
-// The QIF import card mirrors this one by design.
-@Suppress("DuplicatedCode")
+@Suppress("LongParameterList")
 @Composable
 private fun CsvImportCard(
     import: CsvImport,
@@ -662,187 +587,36 @@ private fun CsvImportCard(
     noMatchingStrategy: Boolean = false,
 ) {
     val isImported = import.lastAppliedAt != null
-    val containerColor =
-        if (isImported) {
-            MaterialTheme.colorScheme.surfaceVariant
-        } else {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
-        }
-    val metadataColor =
-        if (isImported) {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        } else {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        }
-
-    Card(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = containerColor,
-            ),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = import.originalFileName,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (!ignored) {
-                        ImportStateBadge(isImported = isImported)
-                    }
-                    // Only unimported files can be ignored; the Ignored tab offers Restore.
-                    if (ignored) {
-                        TextButton(onClick = { onSetIgnored(false) }) { Text("Restore") }
-                    } else if (!isImported) {
-                        TextButton(onClick = { onSetIgnored(true) }) { Text("Ignore") }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = "${import.rowCount} rows, ${import.columnCount} columns",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = metadataColor,
-                )
-                Text(
-                    text = "Added ${import.importTimestamp.displayDateTime()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = metadataColor,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
+    ImportFileCard(
+        fileName = import.originalFileName,
+        metadataText = "${import.rowCount} rows, ${import.columnCount} columns",
+        addedAt = import.importTimestamp,
+        errorCount = import.errorCount,
+        lastAppliedAt = import.lastAppliedAt,
+        applicationCount = import.applicationCount,
+        lastAppliedStrategyName = import.lastAppliedStrategyName,
+        dateRange = dateRange,
+        ignored = ignored,
+        onClick = onClick,
+        onSetIgnored = onSetIgnored,
+        details = { metadataColor ->
+            ImportCardDetailText(
                 text = "Source account: ${sourceAccountName ?: "Not set — choose at import"}",
-                style = MaterialTheme.typography.bodySmall,
                 color = metadataColor,
             )
             if (matchedStrategyName != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Strategy: $matchedStrategyName",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = metadataColor,
-                )
+                ImportCardDetailText(text = "Strategy: $matchedStrategyName", color = metadataColor)
             } else if (noMatchingStrategy) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "⚠ No matching strategy",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
+                ImportCardDetailText(text = "⚠ No matching strategy", color = MaterialTheme.colorScheme.error)
             }
-            if (import.errorCount > 0) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${import.errorCount} error${if (import.errorCount == 1) "" else "s"}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            val lastAppliedAt = import.lastAppliedAt
-            Text(
-                text =
-                    if (lastAppliedAt != null) {
-                        buildString {
-                            if (import.applicationCount > 1) {
-                                append("Latest import on ")
-                            } else {
-                                append("Imported on ")
-                            }
-                            append(lastAppliedAt.displayDateTime())
-                            import.lastAppliedStrategyName?.takeIf(String::isNotBlank)?.let { strategyName ->
-                                append(" via ")
-                                append(strategyName)
-                            }
-                        }
-                    } else {
-                        "Not imported yet"
-                    },
-                style = MaterialTheme.typography.bodySmall,
-                color =
-                    if (isImported) {
-                        metadataColor
-                    } else {
-                        MaterialTheme.colorScheme.secondary
-                    },
-            )
-            if (dateRange != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text =
-                        "Transactions ${dateRange.earliest.displayDate()} → ${dateRange.latest.displayDate()} " +
-                            "(${dateRange.transactionCount})",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = metadataColor,
-                )
-            }
+        },
+        footer = { metadataColor ->
             if (isImported && import.lastAppliedStrategyName.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Strategy information unavailable",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = metadataColor,
-                )
+                ImportCardDetailText(text = "Strategy information unavailable", color = metadataColor, spacing = 2.dp)
             }
             if (isImported && import.applicationCount > 1) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Applied ${import.applicationCount} times",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = metadataColor,
-                )
+                ImportCardDetailText(text = "Applied ${import.applicationCount} times", color = metadataColor, spacing = 2.dp)
             }
-        }
-    }
-}
-
-@Composable
-private fun ImportStateBadge(isImported: Boolean) {
-    val containerColor =
-        if (isImported) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            MaterialTheme.colorScheme.secondaryContainer
-        }
-    val contentColor =
-        if (isImported) {
-            MaterialTheme.colorScheme.onPrimaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        }
-
-    Box(
-        modifier =
-            Modifier
-                .background(
-                    color = containerColor,
-                    shape = MaterialTheme.shapes.small,
-                ).padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Text(
-            text = if (isImported) "Imported" else "Unimported",
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor,
-        )
-    }
+        },
+    )
 }

@@ -33,6 +33,7 @@ kotlin {
             dependencies {
                 implementation(projects.test.app.ui)
                 implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
         getByName("androidMain") {
