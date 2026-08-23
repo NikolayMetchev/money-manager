@@ -122,10 +122,7 @@ fun main() {
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
         if (SchemaErrorDetector.isSchemaError(throwable)) {
             logger.error(throwable) { "Schema error detected: ${throwable.message}" }
-            GlobalSchemaErrorState.reportError(
-                databaseLocation = "default",
-                error = throwable,
-            )
+            GlobalSchemaErrorState.reportError(throwable)
         } else {
             // Delegate to default handler for non-schema errors
             logger.error(throwable) { "Uncaught exception on thread ${thread.name}: ${throwable.message}" }

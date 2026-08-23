@@ -22,7 +22,7 @@ val SchemaAwareExceptionHandler: CoroutineExceptionHandler =
     CoroutineExceptionHandler { _, throwable ->
         if (SchemaErrorDetector.isSchemaError(throwable)) {
             logger.error(throwable) { "Schema error caught by global handler: ${throwable.message}" }
-            GlobalSchemaErrorState.reportError("default", throwable)
+            GlobalSchemaErrorState.reportError(throwable)
         } else {
             // Log non-schema errors but let them propagate through normal channels
             logger.error(throwable) { "Non-schema error in coroutine: ${throwable.message}" }

@@ -166,12 +166,12 @@ fun AppStartupHost(
     var isRecreatingDatabase by remember { mutableStateOf(false) }
     val effectiveSchemaError: Pair<DbLocation, Throwable>? =
         globalSchemaError
-            ?.takeIf { info -> SchemaErrorDetector.isSchemaError(info.error) }
-            ?.let { info ->
+            ?.takeIf { SchemaErrorDetector.isSchemaError(it) }
+            ?.let { error ->
                 val location =
                     (databaseState as? AppDatabaseState.Loaded)?.location
                         ?: databaseManager.getDefaultLocation()
-                location to info.error
+                location to error
             } ?: (databaseState as? AppDatabaseState.Error)
             ?.takeIf { SchemaErrorDetector.isSchemaError(it.error) }
             ?.let { it.location to it.error }

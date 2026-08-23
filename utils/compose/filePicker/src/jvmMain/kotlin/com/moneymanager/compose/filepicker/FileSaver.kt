@@ -8,16 +8,16 @@ import kotlinx.coroutines.launch
 @Composable
 actual fun rememberFileSaver(
     mimeType: String,
-    onResult: (FileSaverResult?) -> Unit,
+    onResult: () -> Unit,
 ): FileSaverLauncher {
     val scope = rememberCoroutineScope()
 
     return remember(mimeType, onResult) {
         FileSaverLauncher(
             mimeType = mimeType,
-            onResult = { result ->
+            onResult = {
                 scope.launch {
-                    onResult(result)
+                    onResult()
                 }
             },
         )

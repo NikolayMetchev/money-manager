@@ -86,10 +86,7 @@ class MainActivity : ComponentActivity() {
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             if (SchemaErrorDetector.isSchemaError(throwable)) {
                 Log.e(TAG, "Schema error detected: ${throwable.message}", throwable)
-                GlobalSchemaErrorState.reportError(
-                    databaseLocation = "default",
-                    error = throwable,
-                )
+                GlobalSchemaErrorState.reportError(throwable)
             } else {
                 Log.e(TAG, "Uncaught exception on thread ${thread.name}: ${throwable.message}", throwable)
                 defaultHandler?.uncaughtException(thread, throwable)

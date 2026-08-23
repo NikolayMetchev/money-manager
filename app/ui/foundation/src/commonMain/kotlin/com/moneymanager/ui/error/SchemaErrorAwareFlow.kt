@@ -15,19 +15,15 @@ private val logger = logging()
  * If a schema error occurs, it's reported to GlobalSchemaErrorState and the initial value is returned.
  *
  * @param initial The initial value to use before the first emission and if a schema error occurs
- * @param databaseLocation The database location to report with the error
  * @return State containing the flow's current value or initial if error occurred
  */
 @Composable
-fun <T> Flow<T>.collectAsStateWithSchemaErrorHandling(
-    initial: T,
-    databaseLocation: String = "default",
-): State<T> =
+fun <T> Flow<T>.collectAsStateWithSchemaErrorHandling(initial: T): State<T> =
     produceState(initial, this) {
         catch { e ->
             if (SchemaErrorDetector.isSchemaError(e)) {
                 logger.error(e) { "Schema error in Flow collection: ${e.message}" }
-                GlobalSchemaErrorState.reportError(databaseLocation, e)
+                GlobalSchemaErrorState.reportError(e)
             } else {
                 throw e
             }
@@ -54,6 +50,5 @@ fun <T> Flow<T>.collectAsStateWithSchemaErrorHandling(
 fun <T> rememberFlowAsStateWithSchemaErrorHandling(
     vararg keys: Any?,
     initial: T,
-    databaseLocation: String = "default",
     flow: () -> Flow<T>,
-): State<T> = remember(*keys) { flow() }.collectAsStateWithSchemaErrorHandling(initial, databaseLocation)
+): State<T> = remember(*keys) { flow() }.collectAsStateWithSchemaErrorHandling(initial)

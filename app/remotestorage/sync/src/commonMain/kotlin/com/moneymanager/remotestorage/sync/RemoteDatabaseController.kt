@@ -113,7 +113,7 @@ class RemoteDatabaseController(
     ) {
         val status =
             if (session == null) SyncStatus.NO_SESSION else SyncState.statusFor(localDirty, remoteChanged)
-        _syncState.value = SyncState(status, localDirty, remoteChanged)
+        _syncState.value = SyncState(status, remoteChanged)
     }
 
     /**

@@ -46,7 +46,6 @@ data class StrategyItem(
 
 /** Reactive snapshot of the whole library relative to the remote (drives the settings card). */
 data class StrategyLibraryState(
-    val connected: Boolean = false,
     val items: List<StrategyItem> = emptyList(),
     val busy: Boolean = false,
 ) {
@@ -75,7 +74,7 @@ class StrategySyncController(
     private val providerFactory: RemoteStorageProviderFactory,
     private val store: StrategyRemoteConnectionStore,
 ) {
-    private val _state = MutableStateFlow(StrategyLibraryState(connected = store.isConnected()))
+    private val _state = MutableStateFlow(StrategyLibraryState())
     val state: StateFlow<StrategyLibraryState> = _state.asStateFlow()
 
     fun isConnected(): Boolean = store.isConnected()
@@ -90,7 +89,6 @@ class StrategySyncController(
     ) = clearingBusyOnFailure {
         resolveSignedIn(providerId, config)
         store.saveConnection(providerId, config)
-        _state.value = _state.value.copy(connected = true)
     }
 
     /**
@@ -149,7 +147,7 @@ class StrategySyncController(
             (local.keys + remote.keys).map { key ->
                 StrategyItem(key, classify(provider, library, key, local[key]?.contentHash, remote[key]))
             }
-        _state.value = StrategyLibraryState(connected = true, items = items.sortedBy { it.key.name.lowercase() })
+        _state.value = StrategyLibraryState(items = items.sortedBy { it.key.name.lowercase() })
     }
 
     /**

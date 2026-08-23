@@ -147,31 +147,18 @@ suspend fun generateSampleData(
 
     // Step 1: categories. Children need their parent's real id, so parents go in first.
     val categoryHierarchy = generateCategoryHierarchy()
-    val totalCategories = categoryHierarchy.sumOf { 1 + it.children.size }
-    progressFlow.emit(
-        GenerationProgress(size = size, totalCategories = totalCategories, currentOperation = "Creating categories..."),
-    )
+    progressFlow.emit(GenerationProgress(size = size, currentOperation = "Creating categories..."))
     val categoryIds = createCategories(importEngine, categoryHierarchy, sampleSource)
 
     // Step 2: crypto assets, so their ids are available to denominate crypto transfers and trades.
     progressFlow.emit(
-        GenerationProgress(
-            size = size,
-            categoriesCreated = totalCategories,
-            totalCategories = totalCategories,
-            currentOperation = "Creating crypto assets...",
-        ),
+        GenerationProgress(size = size, currentOperation = "Creating crypto assets..."),
     )
     val cryptoAssets = createCryptoAssets(importEngine, sampleSource)
 
     val accounts = AccountPlan(size)
     val baseProgress =
-        GenerationProgress(
-            size = size,
-            categoriesCreated = totalCategories,
-            totalCategories = totalCategories,
-            totalAccounts = accounts.totalAccounts,
-        )
+        GenerationProgress(size = size, totalAccounts = accounts.totalAccounts)
 
     // Step 3: people, accounts, ownerships.
     progressFlow.emit(baseProgress.copy(currentOperation = "Preparing accounts..."))
@@ -1117,8 +1104,6 @@ data class GenerationProgress(
     val size: SampleDataSize = SampleDataSize.LARGE,
     val accountsCreated: Int = 0,
     val totalAccounts: Int = 0,
-    val categoriesCreated: Int = 0,
-    val totalCategories: Int = 0,
     val transactionsCreated: Int = 0,
     val totalTransactions: Int = 0,
     val tradesCreated: Int = 0,

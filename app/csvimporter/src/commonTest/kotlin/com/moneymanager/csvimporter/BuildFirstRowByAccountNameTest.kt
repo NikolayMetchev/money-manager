@@ -35,7 +35,7 @@ class BuildFirstRowByAccountNameTest {
     )
 
     private fun prep(rows: List<CsvTransferWithAttributes>) =
-        ImportPreparation(validTransfers = rows, errorRows = emptyList(), newAccounts = emptySet(), existingAccountMatches = emptyMap())
+        ImportPreparation(validTransfers = rows, errorRows = emptyList(), newAccounts = emptySet())
 
     @Test
     fun passThroughConduitAndMerchant_recordTheirOriginatingRow() {
