@@ -573,7 +573,9 @@ internal fun InternalTransferReconcileEditor(
 }
 
 /** UI-only tri-state for [ApiTradeMappings.fixedSideBuy] - a per-item side field, or a fixed direction. */
-private enum class FixedSide(val label: String) {
+private enum class FixedSide(
+    val label: String,
+) {
     PER_ITEM_FIELD("Per-item side field"),
     FIXED_BUY("Fixed: always BUY"),
     FIXED_SELL("Fixed: always SELL"),
