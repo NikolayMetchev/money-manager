@@ -7,7 +7,6 @@ data class CryptoAuditEntry(
     val id: Long,
     val auditTimestamp: Instant,
     val auditType: AuditType,
-    val cryptoId: CryptoId,
     val revisionId: Long,
     val code: String,
     val name: String,

@@ -2,7 +2,6 @@
 selectReversible:
 SELECT
     account_merge.id,
-    account_merge.merged_at,
     account_merge.surviving_account_id,
     account_merge.deleted_account_id,
     account_merge.deleted_account_name,
@@ -20,7 +19,6 @@ SELECT * FROM account_merge WHERE id = ?;
 selectBySurvivingAccount:
 SELECT
     account_merge.id,
-    account_merge.merged_at,
     account_merge.surviving_account_id,
     account_merge.deleted_account_id,
     account_merge.deleted_account_name,

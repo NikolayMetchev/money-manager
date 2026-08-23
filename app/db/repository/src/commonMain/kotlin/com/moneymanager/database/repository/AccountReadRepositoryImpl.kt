@@ -19,7 +19,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlin.time.Instant
 
 class AccountReadRepositoryImpl(
     database: MoneyManagerDatabase,
@@ -82,10 +81,9 @@ class AccountReadRepositoryImpl(
 
     override fun getReversibleMerges(): Flow<List<AccountMerge>> =
         mergeSelectQueries
-            .selectReversible { id, mergedAt, survivingAccountId, deletedAccountId, deletedAccountName, transferCount ->
+            .selectReversible { id, survivingAccountId, deletedAccountId, deletedAccountName, transferCount ->
                 AccountMerge(
                     id = MergeId(id),
-                    mergedAt = Instant.fromEpochMilliseconds(mergedAt),
                     survivingAccountId = AccountId(survivingAccountId),
                     deletedAccountId = AccountId(deletedAccountId),
                     deletedAccountName = deletedAccountName,
@@ -98,7 +96,6 @@ class AccountReadRepositoryImpl(
         mergeSelectQueries
             .selectBySurvivingAccount(accountId.id) {
                 id,
-                mergedAt,
                 survivingAccountId,
                 deletedAccountId,
                 deletedAccountName,
@@ -107,7 +104,6 @@ class AccountReadRepositoryImpl(
                 ->
                 AccountMerge(
                     id = MergeId(id),
-                    mergedAt = Instant.fromEpochMilliseconds(mergedAt),
                     survivingAccountId = AccountId(survivingAccountId),
                     deletedAccountId = AccountId(deletedAccountId),
                     deletedAccountName = deletedAccountName,
@@ -133,10 +129,9 @@ class AccountReadRepositoryImpl(
     override suspend fun getMergeMovedTransfers(mergeId: MergeId): List<MergeMovedTransfer> =
         withContext(Dispatchers.Default) {
             mergeSelectQueries
-                .selectTransfersForMerge(mergeId.id) { transferId, movedSource, movedTarget ->
+                .selectTransfersForMerge(mergeId.id) { transferId, _, movedTarget ->
                     MergeMovedTransfer(
                         transferId = TransferId(transferId),
-                        movedSource = movedSource != 0L,
                         movedTarget = movedTarget != 0L,
                     )
                 }.executeAsList()

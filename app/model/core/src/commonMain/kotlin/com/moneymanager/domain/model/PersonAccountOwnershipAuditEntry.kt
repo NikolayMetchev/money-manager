@@ -9,7 +9,6 @@ import kotlin.time.Instant
  * @property id Unique identifier for this audit entry
  * @property auditTimestamp When this audit entry was created
  * @property auditType The type of operation that triggered this audit (INSERT, UPDATE, DELETE)
- * @property personAccountOwnershipId The ID of the ownership that was audited
  * @property revisionId The revision of the ownership at the time of the audit
  * @property personId The person ID at the time of the audit
  * @property accountId The account ID at the time of the audit
@@ -20,7 +19,6 @@ data class PersonAccountOwnershipAuditEntry(
     val id: Long,
     val auditTimestamp: Instant,
     val auditType: AuditType,
-    val personAccountOwnershipId: Long,
     val revisionId: Long,
     val personId: PersonId,
     val accountId: AccountId,
