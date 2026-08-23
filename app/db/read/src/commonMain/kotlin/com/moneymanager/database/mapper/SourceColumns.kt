@@ -14,15 +14,18 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * The flat source columns selected by every audit/source query, split into the per-entity head
- * (which row this source belongs to and when) and the common [SourceDetailColumns] tail (device
- * metadata plus the per-source-type import detail columns). Splitting out the tail — which every
- * query selects under the same generated names — keeps each mapper's construction down to its own
- * entity head, instead of repeating the ~14 identical detail columns in every mapper.
+ * The flat source columns a source-carrying query selects: which row this source belongs to and
+ * when, the device metadata, and the per-source-type import detail. A source with no per-type
+ * detail row (the strategy and import-directory tables have none) simply leaves the csv/qif/api
+ * fields at their null defaults.
  *
- * Each mapper maps its query row's columns onto these fields; [buildSourceRecord] then reconstructs
- * the single read-side [SourceRecord] (with its [Source] sealed value) from them. This is the one
- * place entity- and transfer-source rows are turned into the unified read model.
+ * Four call sites build one: [toSourceRecord] for everything in the unified `entity_source` store,
+ * and the three mappers whose provenance lives in a dedicated `*_source` table. Audit queries used
+ * to select these columns once per entity type, which made this a shape every audit mapper
+ * repeated; they no longer do — see `selectEntitySources` in EntitySourceSelect.sq.
+ *
+ * [buildSourceRecord] turns these columns into the single read-side [SourceRecord] (with its
+ * [Source] sealed value). This is the one place source rows become the unified read model.
  */
 data class SourceColumns(
     val sourceId: Long?,
@@ -32,14 +35,6 @@ data class SourceColumns(
     val entityType: EntityType,
     val entityId: Long,
     val revisionId: Long,
-    val detail: SourceDetailColumns,
-)
-
-/**
- * The device-metadata and per-source-type import detail columns shared by every audit/source query.
- * Sources without per-type import detail rows simply pass nulls for the csv/qif/api fields.
- */
-data class SourceDetailColumns(
     val platformName: String?,
     val osName: String?,
     val machineName: String?,
@@ -68,8 +63,7 @@ fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
     val deviceId = columns.deviceId ?: return null
     val createdAt = columns.createdAt ?: return null
 
-    val detail = columns.detail
-    val (source, fileName) = detail.reconstructSource(SourceType.fromName(sourceTypeName))
+    val (source, fileName) = columns.reconstructSource(SourceType.fromName(sourceTypeName))
 
     return SourceRecord(
         id = sourceId,
@@ -80,11 +74,11 @@ fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
         deviceId = deviceId,
         deviceInfo =
             auditDeviceInfo(
-                platformName = detail.platformName,
-                machineName = detail.machineName,
-                osName = detail.osName,
-                deviceMake = detail.deviceMake,
-                deviceModel = detail.deviceModel,
+                platformName = columns.platformName,
+                machineName = columns.machineName,
+                osName = columns.osName,
+                deviceMake = columns.deviceMake,
+                deviceModel = columns.deviceModel,
             ),
         fileName = fileName,
         createdAt = Instant.fromEpochMilliseconds(createdAt),
@@ -95,7 +89,7 @@ fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
  * Reconstructs the [Source] for [sourceType] from this row's detail columns, paired with the
  * join-derived import file name (CSV/QIF only; null otherwise). Mirrors `Source.toSourceType`.
  */
-private fun SourceDetailColumns.reconstructSource(sourceType: SourceType): Pair<Source, String?> =
+private fun SourceColumns.reconstructSource(sourceType: SourceType): Pair<Source, String?> =
     when (sourceType) {
         SourceType.MANUAL -> Source.Manual to null
         SourceType.SAMPLE_GENERATOR -> Source.SampleGenerator to null

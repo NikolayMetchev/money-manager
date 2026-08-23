@@ -28,6 +28,7 @@ import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.ExchangeOrderAuditEntry
 import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.ImportDirectoryAuditEntry
@@ -36,6 +37,7 @@ import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeAuditEntry
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferAttributeAuditEntry
@@ -52,6 +54,7 @@ class AuditReadRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : AuditReadRepository {
     private val auditSelectQueries = database.auditSelectQueries
+    private val entitySources = EntitySourceReader(database)
 
     override suspend fun getAuditHistoryForTransfer(transferId: TransferId): List<TransferAuditEntry> =
         withContext(Dispatchers.Default) {
@@ -60,6 +63,9 @@ class AuditReadRepositoryImpl(
                     .selectAuditHistoryForTransfer(transferId.id)
                     .executeAsList()
                     .map(TransferAuditEntryMapper::map)
+                    .withSources(EntityType.TRANSFER, { EntityRevision(it.transferId.id, it.revisionId) }) { entry, source ->
+                        entry.copy(source = source)
+                    }
 
             attachAttributeChanges(transferId, entries)
         }
@@ -71,6 +77,9 @@ class AuditReadRepositoryImpl(
                     .selectAuditHistoryForAccount(accountId.id)
                     .executeAsList()
                     .map(AccountAuditEntryMapper::map)
+                    .withSources(EntityType.ACCOUNT, { EntityRevision(it.accountId.id, it.revisionId) }) { entry, source ->
+                        entry.copy(source = source)
+                    }
 
             attachAccountAttributeChanges(accountId, entries)
         }
@@ -90,6 +99,9 @@ class AuditReadRepositoryImpl(
                     .selectAuditHistoryForPerson(personId.id)
                     .executeAsList()
                     .map(PersonAuditEntryMapper::map)
+                    .withSources(EntityType.PERSON, { EntityRevision(it.personId.id, it.revisionId) }) { entry, source ->
+                        entry.copy(source = source)
+                    }
             attachPersonAttributeChanges(personId, entries)
         }
 
@@ -99,6 +111,7 @@ class AuditReadRepositoryImpl(
                 .selectAuditHistoryForPersonAccountOwnership(ownershipId)
                 .executeAsList()
                 .map(PersonAccountOwnershipAuditEntryMapper::map)
+                .withOwnershipSources()
         }
 
     override suspend fun getOwnershipAuditHistoryForAccount(accountId: AccountId): List<PersonAccountOwnershipAuditEntry> =
@@ -107,6 +120,7 @@ class AuditReadRepositoryImpl(
                 .selectOwnershipAuditHistoryForAccount(accountId.id)
                 .executeAsList()
                 .map(OwnershipAuditHistoryForAccountMapper::map)
+                .withOwnershipSources()
         }
 
     override suspend fun getAuditHistoryForCurrency(currencyId: CurrencyId): List<CurrencyAuditEntry> =
@@ -115,6 +129,9 @@ class AuditReadRepositoryImpl(
                 .selectAuditHistoryForCurrency(currencyId.id)
                 .executeAsList()
                 .map(CurrencyAuditEntryMapper::map)
+                .withSources(EntityType.CURRENCY, { EntityRevision(it.currencyId.id, it.revisionId) }) { entry, source ->
+                    entry.copy(source = source)
+                }
         }
 
     override suspend fun getAuditHistoryForCrypto(cryptoId: CryptoId): List<CryptoAuditEntry> =
@@ -123,6 +140,9 @@ class AuditReadRepositoryImpl(
                 .selectAuditHistoryForCrypto(cryptoId.id)
                 .executeAsList()
                 .map(CryptoAuditEntryMapper::map)
+                .withSources(EntityType.CRYPTO, { EntityRevision(it.cryptoId.id, it.revisionId) }) { entry, source ->
+                    entry.copy(source = source)
+                }
         }
 
     override suspend fun getAuditHistoryForTrade(tradeId: TradeId): List<TradeAuditEntry> =
@@ -131,6 +151,9 @@ class AuditReadRepositoryImpl(
                 .selectAuditHistoryForTrade(tradeId.id)
                 .executeAsList()
                 .map(TradeAuditEntryMapper::map)
+                .withSources(EntityType.TRADE, { EntityRevision(it.tradeId.id, it.revisionId) }) { entry, source ->
+                    entry.copy(source = source)
+                }
         }
 
     override suspend fun getAuditHistoryForExchangeOrder(orderId: ExchangeOrderId): List<ExchangeOrderAuditEntry> =
@@ -139,6 +162,9 @@ class AuditReadRepositoryImpl(
                 .selectAuditHistoryForExchangeOrder(orderId.id)
                 .executeAsList()
                 .map(ExchangeOrderAuditEntryMapper::map)
+                .withSources(EntityType.EXCHANGE_ORDER, { EntityRevision(it.orderId.id, it.revisionId) }) { entry, source ->
+                    entry.copy(source = source)
+                }
         }
 
     override suspend fun getAuditHistoryForCategory(categoryId: Long): List<CategoryAuditEntry> =
@@ -147,6 +173,9 @@ class AuditReadRepositoryImpl(
                 .selectAuditHistoryForCategory(categoryId)
                 .executeAsList()
                 .map(CategoryAuditEntryMapper::map)
+                .withSources(EntityType.CATEGORY, { EntityRevision(it.categoryId, it.revisionId) }) { entry, source ->
+                    entry.copy(source = source)
+                }
         }
 
     override suspend fun getAttributeAuditByAccount(accountId: AccountId): List<AccountAttributeAuditEntry> =
@@ -269,6 +298,31 @@ class AuditReadRepositoryImpl(
             entry.copy(attributeChanges = changesByRevision[entry.revisionId].orEmpty())
         }
     }
+
+    /**
+     * Attaches provenance to freshly mapped audit rows. The audit queries select the audited entity
+     * only; sources come from the one shared `entity_source` read and are paired back by
+     * (entity id, revision id) — the same pairing the per-query LEFT JOIN used to do in SQL.
+     */
+    private fun <T : Any> List<T>.withSources(
+        entityType: EntityType,
+        key: (T) -> EntityRevision,
+        attach: (T, SourceRecord?) -> T,
+    ): List<T> {
+        if (isEmpty()) return this
+        val sources = entitySources.sourcesByRevision(entityType, map { key(it).entityId }.toSet())
+        return map { attach(it, sources[key(it)]) }
+    }
+
+    /**
+     * Ownership audit rows are read two ways — for one ownership, and for every ownership of an
+     * account — so both mappers attach their sources through this.
+     */
+    private fun List<PersonAccountOwnershipAuditEntry>.withOwnershipSources(): List<PersonAccountOwnershipAuditEntry> =
+        withSources(
+            EntityType.PERSON_ACCOUNT_OWNERSHIP,
+            { EntityRevision(it.personAccountOwnershipId, it.revisionId) },
+        ) { entry, source -> entry.copy(source = source) }
 
     private fun mapAuditType(name: String): AuditType =
         when (name) {
