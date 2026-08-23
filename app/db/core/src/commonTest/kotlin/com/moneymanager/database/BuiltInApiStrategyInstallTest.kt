@@ -1,5 +1,7 @@
 package com.moneymanager.database
 
+import com.moneymanager.builtin.BuiltInApiStrategies
+import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
@@ -8,8 +10,6 @@ import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
-import com.moneymanager.builtin.BuiltInApiStrategies
-import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInApiStrategies
 import kotlinx.coroutines.flow.first
