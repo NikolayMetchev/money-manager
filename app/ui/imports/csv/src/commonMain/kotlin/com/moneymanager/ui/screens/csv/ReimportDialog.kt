@@ -9,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,8 +59,6 @@ import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
 private val logger = logging()
-
-private const val VALUE_UPDATE_PREVIEW_LIMIT = 20
 
 /**
  * Re-imports an already-imported CSV so strategy/mapping changes take effect retroactively: shows a
@@ -218,7 +215,7 @@ fun ReimportDialog(
                                     ReimportProgressIndicator(executeProgress ?: ImportProgress("Starting re-import"))
                                     Spacer(modifier = Modifier.height(12.dp))
                                 }
-                                ReimportPlanPreview(currentPlan, hasUnimportedRows)
+                                CsvReimportPlanPreview(currentPlan, hasUnimportedRows)
                             }
                         }
                     }
@@ -292,317 +289,94 @@ fun ReimportDialog(
 }
 
 /**
- * Phase label (plus "x of y" when counts are known) over a linear progress bar — determinate when
- * the phase reports a fraction, indeterminate otherwise.
+ * The shared re-import preview plus the CSV-only sections: pass-through rewrites, transfer→trade
+ * conversions and the cross-source reconciliations, which a QIF plan can never contain.
  */
 @Composable
-private fun ReimportProgressIndicator(progress: ImportProgress) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        val counts =
-            progress.processed
-                ?.let { processed ->
-                    progress.total?.let { total -> " — $processed of $total" }
-                }.orEmpty()
-        Text(
-            text = "${progress.detail}$counts…",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        val fraction = progress.fraction
-        if (fraction != null) {
-            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-        } else {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
-
-@Composable
-private fun ReimportPlanPreview(
+private fun CsvReimportPlanPreview(
     plan: ReimportPlan,
     hasUnimportedRows: Boolean,
 ) {
-    Column {
-        if (plan.merges.isNotEmpty()) {
-            Text(
-                text = "Duplicate accounts to merge:",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.merges.forEach { merge ->
-                Text(
-                    text = "• ${merge.duplicateName} → ${merge.targetName} (${merge.transferCount} transaction(s))",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
-                    "Merges move ALL of the duplicate's transactions (from any import) and can be undone " +
-                        "from the account merge history.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Text(
-                text = "No duplicate accounts to merge under the current account mappings.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (plan.reversals.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Merges to reverse (accounts to split back out):",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.reversals.forEach { reversal ->
-                Text(
-                    text = "• ${reversal.deletedAccountName} ← ${reversal.survivingName} (${reversal.transferCount} transaction(s))",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
-                    "The current mappings no longer consolidate these onto the survivor, so the earlier merge " +
-                        "is undone — the account is recreated and its transactions move back.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (plan.valueUpdates.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Transactions to update to the strategy's current values (${plan.valueUpdates.size}):",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.valueUpdates.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { update ->
-                Text(
-                    text = "• ${update.description}: ${update.changes.joinToString("; ")}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (plan.valueUpdates.size > VALUE_UPDATE_PREVIEW_LIMIT) {
-                Text(
-                    text = "…and ${plan.valueUpdates.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
-                    "Each transaction is updated in place — including over any manual edits made to " +
-                        "its amount, date or description.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
+    ReimportPlanPreview(
+        plan = plan,
+        hasPendingItems = hasUnimportedRows,
+        valueUpdateNote =
+            "Each transaction is updated in place — including over any manual edits made to " +
+                "its amount, date or description.",
+        pendingItemsNote = "Rows not yet imported (or in error) will also be imported using the current mappings.",
+    ) {
         if (plan.rewrites.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Rows to reroute through pass-through accounts:",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.rewrites.forEach { rewrite ->
-                Text(
-                    text = "• ${rewrite.description} → ${(rewrite.conduitNames + rewrite.merchantName).joinToString(" → ")}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
+            ReimportPlanSection(
+                title = "Rows to reroute through pass-through accounts:",
+                lines =
+                    plan.rewrites.map { rewrite ->
+                        "${rewrite.description} → ${(rewrite.conduitNames + rewrite.merchantName).joinToString(" → ")}"
+                    },
+                note =
                     "Each row's old transaction(s) are deleted — including any manual edits made to " +
                         "them — and the row is re-imported through the conduit chain.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
         if (plan.tradeConversions.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Transfers to convert to trades (${plan.tradeConversions.size}):",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.tradeConversions.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { conversion ->
-                Text(
-                    text = "• ${conversion.description}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (plan.tradeConversions.size > VALUE_UPDATE_PREVIEW_LIMIT) {
-                Text(
-                    text = "…and ${plan.tradeConversions.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
+            ReimportPlanSection(
+                title = "Transfers to convert to trades (${plan.tradeConversions.size}):",
+                lines = plan.tradeConversions.map { conversion -> conversion.description },
+                note =
                     "These rows exchange one asset for another: each row's old single-asset transaction(s) " +
                         "are deleted — including any manual edits made to them — and the row is re-imported " +
                         "as a trade.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                limit = REIMPORT_PREVIEW_LIMIT,
             )
         }
 
         if (plan.duplicateTrades.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Conversions another export already recorded (${plan.duplicateTrades.size}):",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.duplicateTrades.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { duplicate ->
-                Text(text = "• ${duplicate.description}", style = MaterialTheme.typography.bodySmall)
-            }
-            if (plan.duplicateTrades.size > VALUE_UPDATE_PREVIEW_LIMIT) {
-                Text(
-                    text = "…and ${plan.duplicateTrades.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
+            ReimportPlanSection(
+                title = "Conversions another export already recorded (${plan.duplicateTrades.size}):",
+                lines = plan.duplicateTrades.map { duplicate -> duplicate.description },
+                note =
                     "These rows describe a conversion another export already imported under different " +
                         "wording (same instant, accounts, assets and amounts), so it was booked twice. The " +
                         "duplicate is deleted and the row re-linked to the surviving one.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                limit = REIMPORT_PREVIEW_LIMIT,
             )
         }
 
         if (plan.staleDuplicates.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Rows sharing or missing a transaction (${plan.staleDuplicates.size}):",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.staleDuplicates.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { stale ->
-                Text(text = "\u2022 ${stale.description}", style = MaterialTheme.typography.bodySmall)
-            }
-            if (plan.staleDuplicates.size > VALUE_UPDATE_PREVIEW_LIMIT) {
-                Text(
-                    text = "\u2026and ${plan.staleDuplicates.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
+            ReimportPlanSection(
+                title = "Rows sharing or missing a transaction (${plan.staleDuplicates.size}):",
+                lines = plan.staleDuplicates.map { stale -> stale.description },
+                note =
                     "These rows were collapsed onto a transaction another row also claims, or onto one that " +
                         "no longer exists, so the movement they record is missing from balances. They are " +
                         "released and re-imported so each gets its own transaction.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                limit = REIMPORT_PREVIEW_LIMIT,
             )
         }
 
         if (plan.counterpartyReconciles.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Rows whose counterparty is unknown to this export (${plan.counterpartyReconciles.size}):",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.counterpartyReconciles.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { reconcile ->
-                Text(text = "• ${reconcile.description} — ${reconcile.detail}", style = MaterialTheme.typography.bodySmall)
-            }
-            if (plan.counterpartyReconciles.size > VALUE_UPDATE_PREVIEW_LIMIT) {
-                Text(
-                    text = "…and ${plan.counterpartyReconciles.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
+            ReimportPlanSection(
+                title = "Rows whose counterparty is unknown to this export (${plan.counterpartyReconciles.size}):",
+                lines = plan.counterpartyReconciles.map { reconcile -> "${reconcile.description} — ${reconcile.detail}" },
+                note =
                     "This export records that money moved but not whose account it came from or went to. " +
                         "Each row's transaction is deleted and re-imported against a placeholder counterparty, " +
                         "and where another source already recorded the same movement against a real account the " +
                         "row is linked to it and excluded from balances (counted once).",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                limit = REIMPORT_PREVIEW_LIMIT,
             )
         }
 
         if (plan.fundingReconciles.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Conduit spends to reconcile against their funding card (${plan.fundingReconciles.size}):",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.fundingReconciles.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { reconcile ->
-                Text(text = "• ${reconcile.description}", style = MaterialTheme.typography.bodySmall)
-            }
-            if (plan.fundingReconciles.size > VALUE_UPDATE_PREVIEW_LIMIT) {
-                Text(
-                    text = "…and ${plan.fundingReconciles.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
+            ReimportPlanSection(
+                title = "Conduit spends to reconcile against their funding card (${plan.fundingReconciles.size}):",
+                lines = plan.fundingReconciles.map { reconcile -> reconcile.description },
+                note =
                     "These spends match a funding leg on the account holding their card number, so each is " +
                         "re-imported linked to that leg and excluded from balances (counted once) instead of " +
                         "double-counting the underlying card charge.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                limit = REIMPORT_PREVIEW_LIMIT,
             )
         }
-
-        if (plan.skipped.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Not merged:",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.skipped.forEach { skip ->
-                Text(
-                    text = "• ${skip.accountName}: ${skip.detail}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-
-        if (hasUnimportedRows) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Rows not yet imported (or in error) will also be imported using the current mappings.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "Accounts created by this import that end up with no transactions will be deleted.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
