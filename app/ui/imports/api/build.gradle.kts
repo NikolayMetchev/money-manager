@@ -12,8 +12,8 @@ kotlin {
                 api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
-                api(projects.app.ui.audit)
                 api(projects.app.model.timeline)
+                api(projects.app.ui.audit)
 
                 implementation(projects.app.db.read)
                 implementation(projects.app.ui.components)
@@ -63,8 +63,8 @@ kotlin {
                 api(projects.app.importengineapi)
                 api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
-                api(projects.app.ui.audit)
                 api(projects.app.model.repository.read)
+                api(projects.app.ui.audit)
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
 
