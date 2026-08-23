@@ -141,6 +141,7 @@ enum class WindowBoundFormat {
  * so rows the provider posts with a backdated timestamp after a download are still picked up. The
  * overlap is re-fetched every time, and duplicates are absorbed by the import deduper.
  */
+
 /**
  * How [ApiPaginationConfig.offsetParam] advances between pages of the same window.
  *
