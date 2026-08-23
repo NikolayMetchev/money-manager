@@ -13,9 +13,9 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
+                api(projects.app.ui.audit)
 
                 implementation(projects.app.db.read)
-                implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
                 implementation(projects.utils.bigdecimal)
@@ -64,6 +64,7 @@ kotlin {
                 api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
+                api(projects.app.ui.audit)
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
 

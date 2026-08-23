@@ -16,8 +16,8 @@ kotlin {
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
+                api(projects.app.ui.audit)
 
-                implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
                 implementation(projects.utils.compose.filePicker)
@@ -68,6 +68,7 @@ kotlin {
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
+                api(projects.app.ui.audit)
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
                 api(libs.compose.ui.desktop)
