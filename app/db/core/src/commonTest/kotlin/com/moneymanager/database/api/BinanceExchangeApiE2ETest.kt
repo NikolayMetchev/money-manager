@@ -165,7 +165,14 @@ class BinanceExchangeApiE2ETest : DbTest() {
                     ).first()
                     .filter { it.targetAccountId == exchange.id && it.amount.asset.code == "BTC" }
             assertEquals(1, btcDeposits.size, "the still-pending deposit must not be imported")
-            assertEquals("0.01", btcDeposits.single().amount.toDisplayValue().toString())
+            assertEquals(
+                "0.01",
+                btcDeposits
+                    .single()
+                    .amount
+                    .toDisplayValue()
+                    .toString(),
+            )
 
             // Withdrawal parsed from a "yyyy-MM-dd HH:mm:ss" applyTime (TimestampFormat.PATTERN), fee
             // booked as its own linked transfer.
@@ -175,14 +182,22 @@ class BinanceExchangeApiE2ETest : DbTest() {
                         startDate = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                         endDate = Instant.fromEpochMilliseconds(1_700_000_010_000L),
                     ).first()
-                    .first { it.sourceAccountId == exchange.id && it.amount.asset.code == "USDT" && it.amount.toDisplayValue().toString() == "100" }
+                    .first {
+                        it.sourceAccountId == exchange.id &&
+                            it.amount.asset.code == "USDT" &&
+                            it.amount.toDisplayValue().toString() == "100"
+                    }
             val withdrawalFee =
                 repositories.transactionRepository
                     .getTransactionsByDateRange(
                         startDate = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                         endDate = Instant.fromEpochMilliseconds(1_700_000_010_000L),
                     ).first()
-                    .firstOrNull { it.sourceAccountId == exchange.id && it.amount.asset.code == "USDT" && it.amount.toDisplayValue().toString() == "1" }
+                    .firstOrNull {
+                        it.sourceAccountId == exchange.id &&
+                            it.amount.asset.code == "USDT" &&
+                            it.amount.toDisplayValue().toString() == "1"
+                    }
             assertNotNull(withdrawalFee, "the withdrawal fee should be booked as its own linked transfer")
             assertNotNull(usdtWithdrawal)
 
