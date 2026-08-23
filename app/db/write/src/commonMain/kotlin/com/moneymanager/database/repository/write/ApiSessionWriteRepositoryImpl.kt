@@ -122,8 +122,6 @@ class ApiSessionWriteRepositoryImpl(
         method: String,
         url: String,
         headers: Map<String, String>,
-        endpointKey: String?,
-        coversUntil: Instant?,
     ): ApiRequestId =
         withContext(Dispatchers.Default) {
             val id =
@@ -132,8 +130,6 @@ class ApiSessionWriteRepositoryImpl(
                         session_id = sessionId.id,
                         method = method,
                         url = url,
-                        endpoint_key = endpointKey,
-                        covers_until = coversUntil?.toEpochMilliseconds(),
                     )
                     val requestId = writeQueries.lastInsertRowId().executeAsOne()
 
@@ -149,6 +145,20 @@ class ApiSessionWriteRepositoryImpl(
                 }
             ApiRequestId(id)
         }
+
+    override suspend fun recordDownloadCoverage(
+        sessionId: ApiSessionId,
+        endpointKey: String,
+        coversUntil: Instant,
+    ) {
+        withContext(Dispatchers.Default) {
+            writeQueries.insertDownloadCoverage(
+                session_id = sessionId.id,
+                endpoint_key = endpointKey,
+                covers_until = coversUntil.toEpochMilliseconds(),
+            )
+        }
+    }
 
     override suspend fun insertResponse(
         requestId: ApiRequestId,

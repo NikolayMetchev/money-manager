@@ -64,6 +64,16 @@ class IncrementalDateWindowsTest {
     }
 
     @Test
+    fun `a negative overlap is clamped so it can never skip past the watermark`() {
+        val since = now - kotlin.time.Duration.parse("30d")
+        val negative = pagination.copy(incrementalOverlapDays = -3)
+
+        // Without the clamp this would start three days AFTER the watermark, dropping those records.
+        assertEquals(since.toEpochMilliseconds(), incrementalStartMillis(since, negative))
+        assertTrue(dateWindows(negative, now, since).first().start <= since)
+    }
+
+    @Test
     fun `zero overlap starts exactly at the watermark`() {
         val since = now - kotlin.time.Duration.parse("30d")
         val noOverlap = pagination.copy(incrementalOverlapDays = 0)

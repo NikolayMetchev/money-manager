@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.insertApiRequest
 import com.moneymanager.importengineapi.insertApiResponse
-import kotlin.time.Instant
 
 /**
  * Records API request/response traffic through the [ImportEngine] (the single DB writer) rather than a
@@ -20,8 +19,6 @@ class ApiSessionTrafficRecorder(
         method: String,
         url: String,
         headers: Map<String, String>,
-        endpointKey: String?,
-        coversUntil: Instant?,
     ): Long =
         importEngine
             .insertApiRequest(
@@ -29,8 +26,6 @@ class ApiSessionTrafficRecorder(
                 method = method,
                 url = url,
                 headers = headers,
-                endpointKey = endpointKey,
-                coversUntil = coversUntil,
             ).id
 
     override suspend fun recordResponse(

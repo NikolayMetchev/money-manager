@@ -61,8 +61,15 @@ sealed interface ApiSessionMutation {
         val method: String,
         val url: String,
         val headers: Map<String, String>,
-        val endpointKey: String? = null,
-        val coversUntil: Instant? = null,
+    ) : ApiSessionMutation
+
+    /**
+     * Records that a download unit for [endpointKey] completed, covering data up to [coversUntil].
+     */
+    data class RecordDownloadCoverage(
+        val sessionId: ApiSessionId,
+        val endpointKey: String,
+        val coversUntil: Instant,
     ) : ApiSessionMutation
 
     data class InsertResponse(

@@ -48,10 +48,6 @@ data class ApiRequest(
     val method: String,
     val url: String,
     val headers: List<ApiRequestHeader>,
-    /** Which logical endpoint this request served; null for traffic recorded before this was tracked. */
-    val endpointKey: String? = null,
-    /** How far this request's data reaches — the download watermark it contributes. */
-    val coversUntil: Instant? = null,
 )
 
 @Serializable

@@ -269,6 +269,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -340,6 +341,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
@@ -438,6 +440,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
@@ -517,6 +520,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
@@ -597,6 +601,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
@@ -689,6 +694,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
@@ -745,6 +751,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
@@ -799,6 +806,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             val downloadResult =
                 downloadApiSessionPeople(
@@ -881,6 +889,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             // 1) People FIRST, before any accounts exist — the holder is created but can link to nothing.
@@ -968,6 +977,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = txSessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
@@ -1025,6 +1035,7 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             val importResult =
                 importApiSessionTransactions(

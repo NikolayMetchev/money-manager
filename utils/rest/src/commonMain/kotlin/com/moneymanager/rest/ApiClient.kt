@@ -4,7 +4,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpSend
 import io.ktor.client.plugins.plugin
-import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -15,7 +14,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.util.AttributeKey
-import kotlin.time.Instant
 
 /**
  * Strong Customer Authentication challenge-signing parameters. When a request is rejected with
@@ -37,13 +35,10 @@ class ApiClient(
         url: String,
         bearerToken: String,
         sca: ScaParams? = null,
-        endpointKey: String? = null,
-        coversUntil: Instant? = null,
     ): ApiHttpResponse {
         val response =
             httpClient.get(url) {
                 bearerAuth(bearerToken)
-                recordProvenance(endpointKey, coversUntil)
             }
         if (sca != null && response.status.value == sca.triggerStatus) {
             val oneTimeToken = response.headers[sca.challengeHeader]
@@ -52,7 +47,6 @@ class ApiClient(
                 val signed =
                     httpClient.get(url) {
                         bearerAuth(bearerToken)
-                        recordProvenance(endpointKey, coversUntil)
                         header(sca.challengeHeader, oneTimeToken)
                         header(sca.signatureHeader, signature)
                     }
@@ -79,14 +73,11 @@ class ApiClient(
         body: String? = null,
         contentType: String? = null,
         recordUrl: String? = null,
-        endpointKey: String? = null,
-        coversUntil: Instant? = null,
     ): ApiHttpResponse {
         val response =
             httpClient.request(url) {
                 this.method = HttpMethod.parse(method)
                 recordUrl?.let { attributes.put(apiRecordUrlKey, it) }
-                recordProvenance(endpointKey, coversUntil)
                 headers.forEach { (name, value) -> header(name, value) }
                 if (body != null) {
                     contentType?.let { header(HttpHeaders.ContentType, it) }
@@ -117,8 +108,6 @@ interface ApiTrafficRecorder {
         method: String,
         url: String,
         headers: Map<String, String>,
-        endpointKey: String?,
-        coversUntil: Instant?,
     ): Long
 
     suspend fun recordResponse(
@@ -143,8 +132,6 @@ fun createApiClient(
                         .entries()
                         .associate { (key, values) -> key to values.joinToString(",") }
                         .filterKeys { !isSensitiveHeader(it) },
-                endpointKey = request.attributes.getOrNull(apiEndpointKeyKey),
-                coversUntil = request.attributes.getOrNull(apiCoversUntilKey)?.let(Instant::fromEpochMilliseconds),
             )
 
         val call = execute(request)
@@ -184,22 +171,7 @@ private fun isSensitiveHeader(key: String): Boolean {
         lower.contains("api-sign")
 }
 
-/**
- * Tags a request with the download provenance the traffic recorder persists alongside it: which logical
- * endpoint it served and how far its data reaches. A later download of the same credential reads these
- * back as its incremental watermark, so it can resume instead of re-sweeping the whole lookback.
- */
-private fun HttpRequestBuilder.recordProvenance(
-    endpointKey: String?,
-    coversUntil: Instant?,
-) {
-    endpointKey?.let { attributes.put(apiEndpointKeyKey, it) }
-    coversUntil?.let { attributes.put(apiCoversUntilKey, it.toEpochMilliseconds()) }
-}
-
 private val apiRecordUrlKey = AttributeKey<String>("ApiRecordUrl")
-private val apiEndpointKeyKey = AttributeKey<String>("ApiEndpointKey")
-private val apiCoversUntilKey = AttributeKey<Long>("ApiCoversUntil")
 private val apiResponseBodyKey = AttributeKey<String>("ApiResponseBody")
 private val apiResponseIdKey = AttributeKey<Long>("ApiResponseId")
 private val apiRequestIdKey = AttributeKey<Long>("ApiRequestId")

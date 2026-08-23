@@ -4,6 +4,7 @@ import com.moneymanager.apiimporter.downloadApiSessionExchange
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.importengineapi.createApiCredential
+import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.rest.ApiRequestSigner
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
@@ -47,7 +48,7 @@ class IncrementalExchangeDownloadE2ETest : DbTest() {
     ): Int {
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
         val strategy = krakenStrategy()
-        val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null, credentialId)
+        val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
         val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
         val apiClient =
             createApiClient(
@@ -71,6 +72,7 @@ class IncrementalExchangeDownloadE2ETest : DbTest() {
             apiSessionRepository = repositories.apiSessionRepository,
             sessionId = sessionId,
             strategy = strategy,
+            importEngine = repositories.importEngine,
             watermarks = watermarks,
             forceFullDownload = forceFullDownload,
             // No pacing: the test must not sleep through the real rate-limit delay.
@@ -97,7 +99,7 @@ class IncrementalExchangeDownloadE2ETest : DbTest() {
             download(credentialId)
 
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-            val probeSession = repositories.apiSessionRepository.createSession(token, deviceId, now, null, credentialId)
+            val probeSession = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
             val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, probeSession)
 
             assertEquals(

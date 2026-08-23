@@ -1,11 +1,13 @@
 package com.moneymanager.ui.wise
 
+import com.moneymanager.apiimporter.ApiSessionImportException
 import com.moneymanager.apiimporter.downloadApiSessionAccounts
 import com.moneymanager.apiimporter.downloadApiSessionTransactions
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.importengineapi.createApiCredential
+import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -82,7 +85,7 @@ class IncrementalApiDownloadE2ETest : DbTest() {
                 .getAllStrategies()
                 .first()
                 .single { it.name == "Wise" }
-        val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null, credentialId)
+        val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
         val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
 
         fun clientFor() =
@@ -105,6 +108,7 @@ class IncrementalApiDownloadE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
                 watermarks = if (forceFullDownload) emptyMap() else watermarks,
                 forceFullDownload = forceFullDownload,
             )
@@ -142,24 +146,69 @@ class IncrementalApiDownloadE2ETest : DbTest() {
         }
 
     @Test
-    fun `a watermark only counts requests that actually got a response`() =
+    fun `a failed download does not advance the watermark`() =
         runTest {
             val credentialId = repositories.importEngine.createApiCredential(token, now)
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-            val staleSession = repositories.apiSessionRepository.createSession(token, deviceId, now, null, credentialId)
-            // A request recorded but never answered — an interrupted download must not advance the
-            // watermark past data it never stored.
-            repositories.apiSessionRepository.insertRequest(
-                sessionId = staleSession,
-                method = "GET",
-                url = "https://api.wise.com/v1/profiles/111/balances/222/statement.json",
-                headers = emptyMap(),
-                endpointKey = "unanswered",
-                coversUntil = now,
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Wise" }
+            val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+
+            // The statement endpoint errors with a JSON body, which the traffic interceptor still
+            // records as a request+response pair. Coverage must not follow from those rows.
+            val failing =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
+                    engine =
+                        MockEngine { request ->
+                            val url = request.url.toString()
+                            when {
+                                url.contains("statement.json") ->
+                                    respond(
+                                        content = """{ "error": "server exploded" }""",
+                                        status = HttpStatusCode.InternalServerError,
+                                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                                    )
+                                url.contains("/balances") ->
+                                    respond(
+                                        content = INCREMENTAL_BALANCES_JSON,
+                                        status = HttpStatusCode.OK,
+                                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                                    )
+                                else ->
+                                    respond(
+                                        content = INCREMENTAL_PROFILES_JSON,
+                                        status = HttpStatusCode.OK,
+                                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                                    )
+                            }
+                        },
+                )
+
+            downloadApiSessionAccounts(
+                token = token,
+                apiClient = failing,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
             )
+            assertFailsWith<ApiSessionImportException> {
+                downloadApiSessionTransactions(
+                    token = token,
+                    apiClient = failing,
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                    importEngine = repositories.importEngine,
+                )
+            }
 
-            val liveSession = repositories.apiSessionRepository.createSession(token, deviceId, now, null, credentialId)
-
-            assertEquals(emptyMap(), repositories.apiSessionRepository.getDownloadWatermarks(credentialId, liveSession))
+            // The failed session stored request and response rows, but no coverage.
+            assertTrue(repositories.apiSessionRepository.getResponsesBySession(sessionId).isNotEmpty())
+            val probe = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+            assertEquals(emptyMap(), repositories.apiSessionRepository.getDownloadWatermarks(credentialId, probe))
         }
 }

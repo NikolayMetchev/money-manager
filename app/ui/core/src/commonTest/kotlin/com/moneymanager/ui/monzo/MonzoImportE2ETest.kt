@@ -801,6 +801,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -983,6 +984,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -1075,6 +1077,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -1157,6 +1160,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -1251,6 +1255,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             importApiSessionTransactions(
@@ -1343,6 +1348,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -1490,6 +1496,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -1571,6 +1578,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val suggestions =
@@ -1656,6 +1664,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             val importResult =
                 importApiSessionTransactions(
@@ -1739,6 +1748,7 @@ class MonzoImportE2ETest : DbTest() {
                     apiSessionRepository = repositories.apiSessionRepository,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
@@ -1867,6 +1877,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -1958,6 +1969,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -2072,6 +2084,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -2151,6 +2164,7 @@ class MonzoImportE2ETest : DbTest() {
                     apiSessionRepository = repositories.apiSessionRepository,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
@@ -2235,6 +2249,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -2309,6 +2324,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -2424,6 +2440,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
@@ -2523,6 +2540,7 @@ class MonzoImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =

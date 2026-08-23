@@ -336,17 +336,23 @@ suspend fun ImportEngine.insertApiRequest(
     method: String,
     url: String,
     headers: Map<String, String>,
-    endpointKey: String? = null,
-    coversUntil: Instant? = null,
 ): ApiRequestId =
     requireNotNull(
-        import(
-            ImportBatch(
-                apiSessionMutations =
-                    listOf(ApiSessionMutation.InsertRequest(url, sessionId, method, url, headers, endpointKey, coversUntil)),
-            ),
-        ).apiRequestIds[url],
+        import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.InsertRequest(url, sessionId, method, url, headers))))
+            .apiRequestIds[url],
     )
+
+suspend fun ImportEngine.recordApiDownloadCoverage(
+    sessionId: ApiSessionId,
+    endpointKey: String,
+    coversUntil: Instant,
+) {
+    import(
+        ImportBatch(
+            apiSessionMutations = listOf(ApiSessionMutation.RecordDownloadCoverage(sessionId, endpointKey, coversUntil)),
+        ),
+    )
+}
 
 suspend fun ImportEngine.insertApiResponse(
     requestId: ApiRequestId,

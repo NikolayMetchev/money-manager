@@ -185,8 +185,6 @@ class ApiSessionReadRepositoryImpl(
             method = method,
             url = url,
             headers = headers.map { it.toApiRequestHeader() },
-            endpointKey = endpoint_key,
-            coversUntil = covers_until?.let(Instant::fromEpochMilliseconds),
         )
 
     private fun com.moneymanager.database.sql.apiSession.Api_request_header.toApiRequestHeader(): ApiRequestHeader =

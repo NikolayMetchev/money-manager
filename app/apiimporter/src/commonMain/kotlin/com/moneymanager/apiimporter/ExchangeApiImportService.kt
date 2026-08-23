@@ -46,6 +46,7 @@ import com.moneymanager.importengineapi.LocalOrderKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeType
+import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
 import kotlinx.coroutines.delay
@@ -104,6 +105,7 @@ suspend fun downloadApiSessionExchange(
     apiSessionRepository: ApiSessionReadRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
+    importEngine: ImportEngine,
     watermarks: Map<String, Instant> = emptyMap(),
     forceFullDownload: Boolean = false,
     // Crypto.com's get-trades / get-order-history are limited to 1 request/second, so pace every request
@@ -221,8 +223,6 @@ suspend fun downloadApiSessionExchange(
                                 signed.body,
                                 signed.contentType,
                                 recordUrl = recordedUrl.takeIf { it != signed.url },
-                                endpointKey = endpointKey,
-                                coversUntil = window?.end ?: now,
                             )
                         val error =
                             when {
@@ -285,6 +285,10 @@ suspend fun downloadApiSessionExchange(
                         pageItemCount >= pagination.limitValue && (totalCount == null || itemsSeenInWindow < totalCount)
                     }
             }
+            // Reached only when every offset page of this window succeeded: a failing page sets
+            // endpointBroken and returns out of the endpoint, so a half-paged window never advances
+            // the watermark past data it did not store.
+            importEngine.recordApiDownloadCoverage(sessionId, endpointKey, window?.end ?: now)
         }
     }
     return ApiTransactionsDownloadResult(

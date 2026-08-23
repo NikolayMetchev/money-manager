@@ -140,6 +140,7 @@ class WiseImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val importResult =
@@ -294,6 +295,7 @@ class WiseImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = accountsSessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,

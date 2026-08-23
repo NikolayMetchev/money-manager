@@ -70,17 +70,31 @@ CREATE TABLE api_request (
     requested_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
     method TEXT NOT NULL CHECK(length(trim(method)) > 0),
     url TEXT NOT NULL CHECK(length(trim(url)) > 0),
-    -- Which logical endpoint (plus account, for per-account bank endpoints) this request served, and
-    -- the epoch-ms high-water mark it covers. Together they let a later download of the same
-    -- credential start where the previous one finished instead of re-sweeping the whole lookback.
-    endpoint_key TEXT,
-    covers_until INTEGER,
     FOREIGN KEY (session_id) REFERENCES api_session(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_api_request_session ON api_request(session_id);
 CREATE INDEX idx_api_request_requested_at ON api_request(requested_at);
-CREATE INDEX idx_api_request_endpoint_key ON api_request(endpoint_key);
+
+-- How far a download actually got, per logical endpoint (plus account, for per-account bank
+-- endpoints). A later download of the same credential reads these back as its watermark and starts
+-- there instead of re-sweeping the whole lookback.
+--
+-- Deliberately NOT derived from api_request/api_response: those rows are written by the HTTP
+-- interceptor before the caller has validated the response, so an HTTP error with a JSON body, or a
+-- date window whose later offset pages failed, would look like covered ground. A row here is written
+-- only once a whole download unit — a complete date window, or a finished cursor walk — has
+-- succeeded, so the watermark can never run ahead of data that was actually stored.
+CREATE TABLE api_download_coverage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    endpoint_key TEXT NOT NULL CHECK(length(trim(endpoint_key)) > 0),
+    covers_until INTEGER NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES api_session(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_api_download_coverage_session ON api_download_coverage(session_id);
+CREATE INDEX idx_api_download_coverage_endpoint ON api_download_coverage(endpoint_key);
 
 CREATE TABLE api_request_header (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

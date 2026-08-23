@@ -5,6 +5,7 @@ import com.moneymanager.apiimporter.downloadApiSessionTransactions
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.importengineapi.createApiCredential
+import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
@@ -92,7 +93,7 @@ class IncrementalCursorDownloadE2ETest : DbTest() {
                 .getAllStrategies()
                 .first()
                 .single { it.name == "Monzo" }
-        val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null, credentialId)
+        val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
         val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
 
         fun clientFor() =
@@ -114,6 +115,7 @@ class IncrementalCursorDownloadE2ETest : DbTest() {
             apiSessionRepository = repositories.apiSessionRepository,
             sessionId = sessionId,
             strategy = strategy,
+            importEngine = repositories.importEngine,
             watermarks = watermarks,
         ).transactionResponseCount
     }

@@ -66,6 +66,7 @@ import com.moneymanager.importengineapi.bankKeysFrom
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.personalCounterpartyKey
+import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
 import com.moneymanager.rest.ScaParams
@@ -301,6 +302,7 @@ suspend fun downloadApiSessionTransactions(
     strategy: ApiImportStrategy,
     accountsSessionId: ApiSessionId? = null,
     sca: ScaParams? = null,
+    importEngine: ImportEngine,
     watermarks: Map<String, Instant> = emptyMap(),
     forceFullDownload: Boolean = false,
     onProgress: (ApiTransactionsDownloadProgress) -> Unit = {},
@@ -370,16 +372,12 @@ suspend fun downloadApiSessionTransactions(
                 )
                 val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
                 if (existingResponse == null) {
-                    fetchResponse(
-                        url = url,
-                        token = token,
-                        apiClient = apiClient,
-                        sca = sca,
-                        endpointKey = endpointKey,
-                        coversUntil = window.end,
-                    )
+                    // fetchResponse throws on a non-200, so coverage is recorded only for a window
+                    // whose response actually validated.
+                    fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca)
                     transactionResponseCount += 1
                 }
+                importEngine.recordApiDownloadCoverage(sessionId, endpointKey, window.end)
             }
         } else {
             // Cursor paging walks newest-first, so an incremental run can stop as soon as a page falls
@@ -414,15 +412,7 @@ suspend fun downloadApiSessionTransactions(
                     if (existingResponse != null) {
                         parseTransactionsWithPath(existingResponse.json, strategy)
                     } else {
-                        val response =
-                            fetchResponse(
-                                url = url,
-                                token = token,
-                                apiClient = apiClient,
-                                sca = sca,
-                                endpointKey = endpointKey,
-                                coversUntil = now,
-                            )
+                        val response = fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca)
                         transactionResponseCount += 1
                         parseTransactionsWithPath(response.body, strategy)
                     }
@@ -436,6 +426,9 @@ suspend fun downloadApiSessionTransactions(
                 // empty. Without this guard a non-paginating endpoint that ignores the cursor would
                 // return the same items forever and loop indefinitely.
             } while (hasTransactions && pagination != null && !reachedWatermark)
+            // Reached only when the whole walk finished: fetchResponse throws out of this function on
+            // any failure, so a partial walk never advances the watermark.
+            importEngine.recordApiDownloadCoverage(sessionId, endpointKey, now)
         }
     }
 
@@ -1309,11 +1302,8 @@ private suspend fun fetchResponse(
     token: String,
     apiClient: ApiClient,
     sca: ScaParams? = null,
-    endpointKey: String? = null,
-    coversUntil: Instant? = null,
 ): ApiHttpResponse {
-    val response =
-        apiClient.get(url = url, bearerToken = token, sca = sca, endpointKey = endpointKey, coversUntil = coversUntil)
+    val response = apiClient.get(url = url, bearerToken = token, sca = sca)
     if (response.statusCode != 200) {
         throw ApiSessionImportException("HTTP ${response.statusCode}: ${response.body}")
     }
@@ -2552,11 +2542,15 @@ internal data class ApiDateWindow(
 /**
  * The epoch-ms an incremental download starts at given a [since] watermark: the watermark rolled back
  * by [ApiPaginationConfig.incrementalOverlapDays], so recently-posted or backdated rows are re-fetched.
+ *
+ * A negative overlap is clamped to zero. Nothing stops a hand-edited or imported config from carrying
+ * one, and it would push the start *past* the watermark — skipping records outright — which is the one
+ * direction this must never fail in.
  */
 internal fun incrementalStartMillis(
     since: Instant,
     pagination: ApiPaginationConfig,
-): Long = since.toEpochMilliseconds() - pagination.incrementalOverlapDays.toLong() * MILLIS_PER_DAY
+): Long = since.toEpochMilliseconds() - pagination.incrementalOverlapDays.coerceAtLeast(0).toLong() * MILLIS_PER_DAY
 
 /**
  * Produces the date windows to fetch, anchored to fixed epoch boundaries so earlier windows yield

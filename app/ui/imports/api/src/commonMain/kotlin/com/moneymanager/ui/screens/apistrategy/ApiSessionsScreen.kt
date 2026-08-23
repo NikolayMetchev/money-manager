@@ -190,7 +190,9 @@ fun ApiSessionsScreen(
     var downloadResultByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiSessionDownloadResult>>(emptyMap()) }
     var downloadProgressByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiTransactionsDownloadProgress?>>(emptyMap()) }
 
-    // Credentials whose next download should ignore what earlier sessions already covered.
+    // Credentials whose next download should ignore what earlier sessions already covered. Consumed by
+    // that download, so the box visibly unticks rather than silently leaving every later download a
+    // full re-sweep.
     var forceFullDownloadByCredential by remember { mutableStateOf<Set<ApiCredentialId>>(emptySet()) }
     var pendingImport by remember { mutableStateOf<PendingApiImport?>(null) }
     var pendingReimport by remember { mutableStateOf<PendingApiReimport?>(null) }
@@ -538,6 +540,7 @@ fun ApiSessionsScreen(
                                     downloadProgressByCredential = downloadProgressByCredential - credential.id
                                     val transactionsBlocked = transactionsBlockReasonByCredential[credential.id] != null
                                     val forceFull = credential.id in forceFullDownloadByCredential
+                                    forceFullDownloadByCredential = forceFullDownloadByCredential - credential.id
                                     scope.launch {
                                         val resolvedStrategy = resolveStrategy(credential)
                                         val newSessionId =
@@ -601,6 +604,7 @@ fun ApiSessionsScreen(
                                                         apiSessionRepository = apiSessionRepository,
                                                         sessionId = newSessionId,
                                                         strategy = strategy,
+                                                        importEngine = importEngine,
                                                         watermarks = watermarks,
                                                         forceFullDownload = forceFull,
                                                         onProgress = { progress ->
@@ -655,6 +659,7 @@ fun ApiSessionsScreen(
                                                         sessionId = newSessionId,
                                                         strategy = strategy,
                                                         sca = sca,
+                                                        importEngine = importEngine,
                                                         watermarks = watermarks,
                                                         forceFullDownload = forceFull,
                                                         onProgress = { progress ->
