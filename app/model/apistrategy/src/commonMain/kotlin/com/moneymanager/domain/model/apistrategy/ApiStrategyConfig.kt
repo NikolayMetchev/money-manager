@@ -44,6 +44,13 @@ enum class TimestampFormat {
     EPOCH_MS,
     EPOCH_S,
     EPOCH_S_FLOAT,
+
+    /**
+     * A custom date-time pattern (e.g. Binance withdrawal history's `"yyyy-MM-dd HH:mm:ss"`, always
+     * UTC), given per-mapping in `timestampPattern`. Not a Java/ICU pattern — see
+     * `parseApiTimestamp` (`app:apiimporter`) for the small set of tokens supported.
+     */
+    PATTERN,
 }
 
 /**
@@ -78,6 +85,20 @@ enum class PaginationMode {
 
     /** Fixed-length date windows, one request per window. */
     DATE_WINDOW,
+
+    /**
+     * A single (non-windowed) forward sweep paged by an ascending numeric id, for an endpoint whose own
+     * time-range parameters are too short-lived to sweep a full history in [DATE_WINDOW] windows
+     * (Binance `myTrades` caps `startTime`/`endTime` to 24h apart). Each page after the first sends
+     * [ApiPaginationConfig.cursorParam] = one past the maximum [ApiPaginationConfig.cursorResponseField]
+     * seen so far; the loop ends when a page returns fewer than [ApiPaginationConfig.limitValue] items.
+     *
+     * Unlike [DATE_WINDOW]/[CURSOR], this mode does **not** consult the incremental watermark (a time
+     * value can't seed a numeric id cursor without an extra lookup) — every download walks the id space
+     * from the start. Cheap because `ApiClient`'s per-page resume-skip still applies within one
+     * interrupted-and-retried session, and any cross-session overlap is absorbed by the import deduper.
+     */
+    FORWARD_ID_CURSOR,
 }
 
 /**
@@ -94,6 +115,15 @@ enum class WindowBoundFormat {
     EPOCH_S,
     ISO_8601,
 }
+
+/**
+ * How [ApiPaginationConfig.offsetParam] advances between pages of the same window.
+ *
+ * [OFFSET] — starts at 0, advances by [ApiPaginationConfig.limitValue] each page (Kraken `ofs`).
+ * [PAGE_NUMBER] — starts at 1, advances by 1 each page (Binance fiat `page`/`rows`).
+ */
+@Serializable
+enum class OffsetMode { OFFSET, PAGE_NUMBER }
 
 /**
  * Pagination strategy for an API endpoint. A single flat shape carries the parameters for both
@@ -137,6 +167,15 @@ data class ApiPaginationConfig(
     val windowBoundFormat: WindowBoundFormat = WindowBoundFormat.EPOCH_MS,
     /** When set, page each window by this offset parameter (page size = [limitValue]); e.g. Kraken "ofs". */
     val offsetParam: String? = null,
+    /** How [offsetParam] advances between pages; see [OffsetMode]. */
+    val offsetMode: OffsetMode = OffsetMode.OFFSET,
+    /**
+     * When true, an offset-paged request also sends [limitParam] = [limitValue] on the wire (some APIs'
+     * default page size doesn't match [limitValue] unless told explicitly - Binance `rows`/`limit`).
+     * False (the default) preserves existing strategies, whose configured [limitValue] already matches
+     * the endpoint's fixed/default page size.
+     */
+    val sendLimitParam: Boolean = false,
     /** Optional dot-path to a total-count field in the response envelope, used to bound the offset loop. */
     val totalCountField: String? = null,
     /** Days of already-downloaded history an incremental download re-fetches; see the class KDoc. */
@@ -190,6 +229,23 @@ data class ApiEndpointConfig(
      * endpoint as slowly as its most expensive one.
      */
     val requestCostWeight: Int = 1,
+    /**
+     * When set, this endpoint is fetched once per value in a runtime-derived set (e.g. Binance
+     * `myTrades`'s required `symbol`, which has no account-wide feed) rather than once. See [ApiFanOut].
+     */
+    val fanOut: ApiFanOut? = null,
+    /**
+     * When true, the request is sent without [ApiStrategyConfig.requestSigning] applied — for a public
+     * endpoint used only as a [ApiStrategyConfig.valueEndpoints] value source (e.g. Binance
+     * `exchangeInfo`), which rejects the api-key/signature params a private endpoint expects.
+     */
+    val unsigned: Boolean = false,
+    /**
+     * When false, the response is used to resolve values but never written to `api_response` (e.g.
+     * Binance `exchangeInfo`'s multi-megabyte symbol list) — every other endpoint is persisted so its
+     * audit trail and incremental-resume skip keep working.
+     */
+    val storeResponse: Boolean = true,
 )
 
 /**
@@ -302,6 +358,8 @@ data class ApiTransactionMappings(
     val amountField: String = "amount",
     val timestampField: String = "created",
     val timestampFormat: TimestampFormat = TimestampFormat.ISO_8601,
+    /** Pattern string for [TimestampFormat.PATTERN]; ignored for every other [timestampFormat]. */
+    val timestampPattern: String? = null,
     val currencyField: String = "currency",
     val descriptionField: String = "description",
     val amountFormat: ApiAmountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
@@ -390,6 +448,13 @@ data class ApiTransactionMappings(
      * own trade from the two legs, so no movement the ledger reports is ever silently dropped.
      */
     val reconcileTradeAmountsField: String? = null,
+    /**
+     * Conditions that must all hold (logical AND) against the item's raw JSON for it to be imported at
+     * all — the include-form counterpart of [excludeField]/[excludeValues] (e.g. Binance's
+     * `status == 1` on deposits, `status == 6` on withdrawals). Empty imposes no filter.
+     */
+    @Serializable(with = SortedRulePredicateListSerializer::class)
+    val itemFilters: List<RulePredicate> = emptyList(),
 )
 
 @Serializable
@@ -449,6 +514,12 @@ enum class PredicateOp {
 
     /** The resolved string starts with [RulePredicate.value]. */
     STARTS_WITH,
+
+    /** The resolved string does not equal [RulePredicate.value] (absent also counts as "not equal"). */
+    NOT_EQUALS,
+
+    /** The resolved string is one of [RulePredicate.value]'s comma-separated members. */
+    IN,
 
     /** The path resolves to an array with any element starting with [RulePredicate.value]. */
     ARRAY_ANY_STARTS_WITH,
@@ -761,6 +832,91 @@ data class ApiRequestSigningConfig(
 )
 
 // ---------------------------------------------------------------------------------------------
+// Endpoint fan-out — call one endpoint once per value in a runtime-derived set, for a provider whose
+// API has no account-wide feed for some resource and instead scopes it per-symbol/per-asset (Binance
+// `myTrades` requires a `symbol`). Generic: any exchange needing this reuses the same shape.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A set of string values resolved once per download, from a static list, from field(s) of items
+ * already fetched by another endpoint, from a union of other sets, or from the cross product of two
+ * sets joined by [ApiValueSet.CrossProduct.template]. Used to drive [ApiFanOut.values] and
+ * [ApiFanOut.validAgainst].
+ */
+@Serializable
+sealed interface ApiValueSet {
+    /** A fixed, hand-written list of values. Order carries no meaning (a plain set of candidates). */
+    @Serializable
+    data class Static(
+        @Serializable(with = SortedStringListSerializer::class)
+        val values: List<String>,
+    ) : ApiValueSet
+
+    /**
+     * Every value of [fields] (dot-paths, read independently and unioned) across the items already
+     * fetched by the [ApiStrategyConfig.valueEndpoints] entry keyed by [endpointPath] this session
+     * (e.g. Binance's held balances from `getUserAsset`). [endpointPath] must match how the engine
+     * keys that endpoint's items - its plain path, unless two endpoints there share a path (as with
+     * two [ApiStrategyConfig.dataEndpoints] differing only by a static query param), in which case it
+     * is the path plus `?name=value` for each such param, sorted by name and `&`-joined (matching
+     * `endpointDedupeKey` in `app:apiimporter`). [fields] order carries no meaning.
+     */
+    @Serializable
+    data class FromValueEndpoint(
+        val endpointPath: String,
+        @Serializable(with = SortedStringListSerializer::class)
+        val fields: List<String>,
+    ) : ApiValueSet
+
+    /**
+     * Like [FromValueEndpoint], but reads from the items already downloaded (this session) by the
+     * [ApiStrategyConfig.dataEndpoints] entry keyed by [endpointPath] instead (same keying rule) — so
+     * an asset that was fully disposed of before this download (no balance left, but present in a
+     * deposit/withdrawal/trade already fetched) still contributes a value. A fan-out endpoint is
+     * always resolved after every non-fan-out data endpoint has downloaded, so these items are
+     * available.
+     */
+    @Serializable
+    data class FromDataEndpoint(
+        val endpointPath: String,
+        @Serializable(with = SortedStringListSerializer::class)
+        val fields: List<String>,
+    ) : ApiValueSet
+
+    /** The union of [sets]. Commutative - list order carries no meaning. */
+    @Serializable
+    data class Union(
+        val sets: List<ApiValueSet>,
+    ) : ApiValueSet
+
+    /**
+     * Every combination of a [left] value and a [right] value, joined via [template] (occurrences of
+     * `{left}`/`{right}` substituted) — e.g. Binance spot symbols: held/seen assets x quote assets,
+     * `template = "{left}{right}"` producing "BTCUSDT".
+     */
+    @Serializable
+    data class CrossProduct(
+        val left: ApiValueSet,
+        val right: ApiValueSet,
+        val template: String = "{left}{right}",
+    ) : ApiValueSet
+}
+
+/**
+ * Fans an endpoint's whole download (window/offset/cursor loop) out over [values], resolved once per
+ * download and sent one at a time as the [param] query/body parameter. When [validAgainst] is set, a
+ * resolved value not present in it is dropped (e.g. intersecting candidate symbols against Binance
+ * `exchangeInfo`'s real symbol universe, so a nonexistent pair is never requested). A value that still
+ * fails at request time (e.g. HTTP 400) is skipped without aborting the rest of the fan-out.
+ */
+@Serializable
+data class ApiFanOut(
+    val param: String,
+    val values: ApiValueSet,
+    val validAgainst: ApiValueSet? = null,
+)
+
+// ---------------------------------------------------------------------------------------------
 // Multiple data endpoints + entity kinds — exchanges expose several endpoints (trades, deposits,
 // withdrawals, order history), each mapping to a different kind of imported record.
 // ---------------------------------------------------------------------------------------------
@@ -860,9 +1016,17 @@ data class ApiTradeMappings(
     val quoteAssetField: String? = null,
     @Serializable(with = SortedStringListSerializer::class)
     val quoteAssets: List<String> = emptyList(),
-    val sideField: String,
+    /** Dot-path to the buy/sell side; null when [fixedSideBuy] fixes the direction instead. */
+    val sideField: String? = null,
     @Serializable(with = SortedStringSetSerializer::class)
     val buyValues: Set<String> = setOf("BUY", "buy"),
+    /**
+     * Fixes every trade from this endpoint to BUY (true) or SELL (false), for an endpoint whose side is
+     * implied by which endpoint it is rather than carried on each item (e.g. Binance Convert always
+     * acquires `toAsset` with `fromAsset`; Binance fiat buy/sell are two separate endpoints). Overrides
+     * [sideField] when set.
+     */
+    val fixedSideBuy: Boolean? = null,
     val baseQuantityField: String,
     val priceField: String? = null,
     val quoteQuantityField: String? = null,
@@ -870,7 +1034,17 @@ data class ApiTradeMappings(
     val feeCurrencyField: String? = null,
     val timestampField: String,
     val timestampFormat: TimestampFormat = TimestampFormat.EPOCH_MS,
+    /** Pattern string for [TimestampFormat.PATTERN]; ignored for every other [timestampFormat]. */
+    val timestampPattern: String? = null,
     val idField: String,
+    /**
+     * Dot-paths joined (in list order, hyphen-separated) into the trade's de-duplication id instead of
+     * [idField], for an endpoint whose own id is scoped to another field rather than globally unique
+     * (Binance `myTrades`' `id` is scoped per `symbol`, so two different pairs can share the same
+     * numeric id). Order is semantic (produces a readable, stable composite key) - keeps default
+     * insertion-order serialization. Empty (the default) uses [idField] alone.
+     */
+    val compositeIdFields: List<String> = emptyList(),
     val orderIdField: String? = null,
     val descriptionField: String? = null,
     /** Order-only fields surfaced as trade attributes when ORDERS metadata is joined in. */
@@ -882,6 +1056,12 @@ data class ApiTradeMappings(
     val updateTimestampField: String? = null,
     val clientOidField: String? = null,
     val timeInForceField: String? = null,
+    /**
+     * Conditions that must all hold (logical AND) against the item's raw JSON for it to be imported at
+     * all. Empty imposes no filter.
+     */
+    @Serializable(with = SortedRulePredicateListSerializer::class)
+    val itemFilters: List<RulePredicate> = emptyList(),
 )
 
 /**
@@ -980,6 +1160,15 @@ data class ApiStrategyConfig(
      */
     @Serializable(with = SortedDataEndpointListSerializer::class)
     val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
+    /**
+     * Endpoints fetched (unpaged loop aside — each still runs its own pagination) before
+     * [dataEndpoints], purely to supply values for an [ApiFanOut] (e.g. Binance `getUserAsset` for held
+     * balances, `exchangeInfo` for the valid symbol universe). Produce no transfers/trades of their own.
+     * Referenced by path from [ApiValueSet.FromValueEndpoint.endpointPath], so list order carries no
+     * meaning.
+     */
+    @Serializable(with = SortedValueEndpointListSerializer::class)
+    val valueEndpoints: List<ApiEndpointConfig> = emptyList(),
     /** When set, import into one fixed account holding all assets instead of enumerating accounts. */
     val syntheticAccount: ApiSyntheticAccount? = null,
     /** Reconcile internal transfers against another owned account (e.g. the Crypto.com App account). */

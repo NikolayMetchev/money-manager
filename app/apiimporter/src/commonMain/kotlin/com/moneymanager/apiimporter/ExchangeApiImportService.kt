@@ -20,8 +20,9 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.domain.model.apistrategy.BodyFormat
+import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
+import com.moneymanager.domain.model.apistrategy.OffsetMode
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
@@ -49,10 +50,12 @@ import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
+import io.ktor.http.encodeURLParameter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.lighthousegames.logging.logging
@@ -88,15 +91,21 @@ private const val MAX_RATE_LIMIT_BACKOFF_MILLIS = 60_000L
 
 /**
  * Downloads every data endpoint of an exchange [strategy] into [sessionId] as signed POST/GET requests,
- * paged by date window. The request body carries the api secret/signature and is never persisted (see
- * `ApiClient`).
+ * paged by date window (or, for [ApiEndpointConfig.fanOut], once per resolved value). The request body
+ * carries the api secret/signature and is never persisted (see `ApiClient`).
  *
- * Incremental on two levels: a window already stored in *this* session (recorded URL present) is
- * skipped, which lets an interrupted download resume; and [watermarks] — how far earlier sessions of
- * the same credential already reached, keyed by [endpointDedupeKey] — moves each endpoint's sweep start
- * forward so a routine download fetches only the recent tail. Pass empty [watermarks] (or
- * [forceFullDownload]) to re-sweep the whole configured lookback from scratch.
+ * Runs in two passes: every non-fan-out data endpoint first (so [ApiValueSet.FromDataEndpoint] has
+ * something to read), then every fan-out endpoint, each expanded per [ApiEndpointConfig.fanOut] and
+ * swept once per surviving value. `ApiStrategyConfig.valueEndpoints` are fetched before either pass.
+ *
+ * Incremental on two levels: a page already stored in *this* session (recorded URL present) is skipped,
+ * which lets an interrupted download resume; and [watermarks] — how far earlier sessions of the same
+ * credential already reached, keyed by [endpointDedupeKey] (fan-out endpoints: keyed additionally by
+ * value) — moves each endpoint's sweep start forward so a routine download fetches only the recent tail.
+ * Pass empty [watermarks] (or [forceFullDownload]) to re-sweep the whole configured lookback from
+ * scratch. [PaginationMode.FORWARD_ID_CURSOR] endpoints ignore the watermark entirely; see its KDoc.
  */
+@Suppress("LongMethod", "CyclomaticComplexMethod", "NestedBlockDepth")
 suspend fun downloadApiSessionExchange(
     apiClient: ApiClient,
     signer: ApiRequestSigner,
@@ -113,10 +122,12 @@ suspend fun downloadApiSessionExchange(
     rateLimitMillis: Long = 1100,
     onProgress: (ApiTransactionsDownloadProgress) -> Unit = {},
 ): ApiTransactionsDownloadResult {
-    val signing = requireNotNull(strategy.config.requestSigning) { "SIGNED strategy '${strategy.name}' has no requestSigning" }
+    requireNotNull(strategy.config.requestSigning) { "SIGNED strategy '${strategy.name}' has no requestSigning" }
     val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
     val existingResponses = apiSessionRepository.getResponsesBySession(sessionId).associateBy { it.requestId }
     val downloadedUrls = existingRequests.filter { existingResponses.containsKey(it.id) }.map { it.url }.toSet()
+    val existingResponseJsonByUrl =
+        existingRequests.mapNotNull { req -> existingResponses[req.id]?.let { req.url to it.json } }.toMap()
 
     var responseCount = 0
     // The nonce must be the CURRENT epoch-ms on every request (exchanges reject a nonce that drifts too
@@ -125,62 +136,33 @@ suspend fun downloadApiSessionExchange(
     var lastNonce = 0L
     var requestId = 1L
     val now = Clock.System.now()
-
-    // Bodies of previously downloaded requests, keyed by url — lets a resumed offset-paged window (see
-    // below) decide whether to keep paging without re-fetching pages it already has.
-    val existingResponseJsonByUrl =
-        existingRequests.mapNotNull { req -> existingResponses[req.id]?.let { req.url to it.json } }.toMap()
-
     var earliestIncrementalStart: Instant? = null
+    val endpointCount = strategy.config.dataEndpoints.size
 
-    strategy.config.dataEndpoints.forEachIndexed { endpointIndex, dataEndpoint ->
-        val endpoint = dataEndpoint.endpoint
-        val endpointKey = endpointDedupeKey(endpoint)
-        val since = if (forceFullDownload) null else watermarks[endpointKey]
-        val windows = dateWindowsOrSingle(endpoint.pagination, now, since)
-        if (since != null) {
-            windows.firstOrNull()?.start?.let { start ->
-                earliestIncrementalStart = minOf(start, earliestIncrementalStart ?: start)
-            }
-        }
-        // A single failing endpoint (e.g. a path this account/product doesn't support) must not abort
-        // the whole download; once one window fails, skip the rest of that endpoint's windows.
-        var endpointBroken = false
-        windows.forEachIndexed { windowIndex, window ->
-            if (endpointBroken) return@forEachIndexed
-            // A non-positive limitValue would never advance the offset (see below), looping forever on
-            // the same page; treat a misconfigured limit as "no offset paging" rather than hang.
-            val offsetParam = endpoint.pagination?.offsetParam?.takeIf { (endpoint.pagination?.limitValue ?: 0) > 0 }
-            var offset = 0
-            var itemsSeenInWindow = 0
-            var keepPaging = true
-            while (keepPaging) {
-                val params = linkedMapOf<String, String>()
-                endpoint.queryParams.forEach { p -> p.value?.let { params[p.name] = it } }
-                if (window != null) {
-                    val pagination = endpoint.pagination!!
-                    params[pagination.startParam] = formatWindowBound(window.start, pagination.windowBoundFormat)
-                    params[pagination.endParam] = formatWindowBound(window.end, pagination.windowBoundFormat)
-                }
-                if (offsetParam != null) params[offsetParam] = offset.toString()
+    // Items already downloaded THIS call, keyed by data-endpoint path — feeds ApiValueSet.FromDataEndpoint
+    // for a fan-out resolved once every non-fan-out endpoint has run (see the two-pass split below).
+    val dataItemsByPath = mutableMapOf<String, MutableList<JsonObject>>()
+    val valueItemsByPath = mutableMapOf<String, List<JsonObject>>()
 
-                onProgress(
-                    ApiTransactionsDownloadProgress(
-                        accountIndex = endpointIndex + 1,
-                        accountCount = strategy.config.dataEndpoints.size,
-                        page = windowIndex + 1,
-                        downloadedResponsePageCount = responseCount,
-                    ),
-                )
-
-                // The nonce must be fresh on every real attempt (a repeated nonce is rejected), so a
-                // retried request is re-signed from scratch rather than resent as-is.
-                val effectiveDelayMillis = (strategy.config.rateLimitMillis ?: rateLimitMillis) * endpoint.requestCostWeight
-                var pageBody: String? = null
-                var rateLimitRetries = 0
-                var keepRetrying = true
-                while (keepRetrying) {
-                    val endpointUrl = buildExchangeEndpointUrl(strategy.config.baseUrl, endpoint.path)
+    /** One HTTP attempt (signed or [ApiEndpointConfig.unsigned]) with rate-limit retry/backoff. */
+    suspend fun fetchPage(
+        endpoint: ApiEndpointConfig,
+        params: LinkedHashMap<String, String>,
+        recordedUrl: String,
+    ): String? {
+        if (recordedUrl in downloadedUrls) return existingResponseJsonByUrl[recordedUrl]
+        var rateLimitRetries = 0
+        while (true) {
+            val endpointUrl = buildExchangeEndpointUrl(strategy.config.baseUrl, endpoint.path)
+            val response =
+                if (endpoint.unsigned) {
+                    apiClient.send(
+                        method = endpoint.method.name,
+                        url = appendUnsignedQueryParams(endpointUrl, params),
+                        recordUrl = recordedUrl,
+                        storeResponse = endpoint.storeResponse,
+                    )
+                } else {
                     val nonce = nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds())
                     lastNonce = nonce
                     val signed =
@@ -195,107 +177,273 @@ suspend fun downloadApiSessionExchange(
                             requestId = requestId,
                         )
                     requestId += 1
-
-                    // Make the recorded URL unique per (endpoint, window, offset) so incremental skip
-                    // works and a stored response can be matched back to its data endpoint. The marker
-                    // is recorded out-of-band, never sent on the wire: Kraken verifies its signature
-                    // against the full request path+query, so an unsigned query marker breaks
-                    // authentication (surfacing as EAPI:Invalid key). For a signed query string
-                    // (Binance) the signed URL already encodes the window, so body-based requests
-                    // (Crypto.com/Kraken) are the only ones marked.
-                    val recordedUrl =
-                        if (signing.bodyFormat == BodyFormat.QUERY_ONLY) {
-                            signed.url
-                        } else {
-                            appendMarker(signed.url, endpointKey, window, offsetParam?.let { offset })
-                        }
-
-                    if (recordedUrl in downloadedUrls) {
-                        pageBody = existingResponseJsonByUrl[recordedUrl]
-                        keepRetrying = false
-                    } else {
-                        val method = endpoint.method.name
-                        val response =
-                            apiClient.send(
-                                method,
-                                signed.url,
-                                signed.headers,
-                                signed.body,
-                                signed.contentType,
-                                recordUrl = recordedUrl.takeIf { it != signed.url },
-                            )
-                        val error =
-                            when {
-                                response.statusCode != 200 -> "HTTP ${response.statusCode}: ${response.body}"
-                                !responseCodeOk(
-                                    response.body,
-                                    endpoint.successCodeField,
-                                    endpoint.successCodeOkValue,
-                                    endpoint.errorArrayField,
-                                ) -> "API error: ${response.body}"
-                                else -> null
-                            }
-                        if (error == null) {
-                            responseCount += 1
-                            pageBody = response.body
-                            if (effectiveDelayMillis > 0) delay(effectiveDelayMillis.milliseconds)
-                            keepRetrying = false
-                        } else {
-                            // A rate-limit-shaped error (per the strategy's own config) is transient:
-                            // back off and retry the same request rather than abandoning the rest of
-                            // the endpoint's windows, which previously turned one rate-limit hit into a
-                            // near-empty download.
-                            val isRateLimited = strategy.config.rateLimitErrorSubstrings.any { error.contains(it, ignoreCase = true) }
-                            if (!isRateLimited || rateLimitRetries >= strategy.config.maxRateLimitRetries) {
-                                logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
-                                endpointBroken = true
-                                return@forEachIndexed
-                            }
-                            rateLimitRetries += 1
-                            val backoffMillis =
-                                (strategy.config.rateLimitBackoffMillis * (1L shl (rateLimitRetries - 1)))
-                                    .coerceAtMost(MAX_RATE_LIMIT_BACKOFF_MILLIS)
-                            logger.warn {
-                                "Rate-limited on '${endpoint.path}' " +
-                                    "(attempt $rateLimitRetries/${strategy.config.maxRateLimitRetries}); retrying in ${backoffMillis}ms"
-                            }
-                            delay(backoffMillis.milliseconds)
-                        }
-                    }
+                    apiClient.send(
+                        method = endpoint.method.name,
+                        url = signed.url,
+                        headers = signed.headers,
+                        body = signed.body,
+                        contentType = signed.contentType,
+                        recordUrl = recordedUrl,
+                        storeResponse = endpoint.storeResponse,
+                    )
                 }
+            val error =
+                when {
+                    response.statusCode != 200 -> "HTTP ${response.statusCode}: ${response.body}"
+                    !responseCodeOk(
+                        response.body,
+                        endpoint.successCodeField,
+                        endpoint.successCodeOkValue,
+                        endpoint.errorArrayField,
+                    ) -> "API error: ${response.body}"
+                    else -> null
+                }
+            if (error == null) {
+                responseCount += 1
+                val effectiveDelayMillis = (strategy.config.rateLimitMillis ?: rateLimitMillis) * endpoint.requestCostWeight
+                if (effectiveDelayMillis > 0) delay(effectiveDelayMillis.milliseconds)
+                return response.body
+            }
+            val isRateLimited = strategy.config.rateLimitErrorSubstrings.any { error.contains(it, ignoreCase = true) }
+            if (!isRateLimited || rateLimitRetries >= strategy.config.maxRateLimitRetries) {
+                logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
+                return null
+            }
+            rateLimitRetries += 1
+            val backoffMillis =
+                (strategy.config.rateLimitBackoffMillis * (1L shl (rateLimitRetries - 1))).coerceAtMost(MAX_RATE_LIMIT_BACKOFF_MILLIS)
+            logger.warn {
+                "Rate-limited on '${endpoint.path}' " +
+                    "(attempt $rateLimitRetries/${strategy.config.maxRateLimitRetries}); retrying in ${backoffMillis}ms"
+            }
+            delay(backoffMillis.milliseconds)
+        }
+    }
+
+    fun pageItems(
+        endpoint: ApiEndpointConfig,
+        body: String?,
+    ): List<JsonObject> =
+        body
+            ?.let { responseItemsArray(it, endpoint.responseArrayKey, endpoint.responseObjectValues, endpoint.itemKeyField) }
+            ?.filterIsInstance<JsonObject>()
+            .orEmpty()
+
+    /** Downloads one endpoint's whole sweep for a single fan-out value ([fanOutParam]/[fanOutValue] null for none). */
+    suspend fun sweepEndpoint(
+        endpoint: ApiEndpointConfig,
+        endpointIndex: Int,
+        fanOutParam: String?,
+        fanOutValue: String?,
+        itemSink: MutableList<JsonObject>?,
+    ) {
+        val endpointKey = endpointDedupeKey(endpoint)
+        val coverageKey = fanOutValue?.let { "$endpointKey|fv=$it" } ?: endpointKey
+        val since = if (forceFullDownload) null else watermarks[coverageKey]
+        val pagination = endpoint.pagination
+        var endpointBroken = false
+
+        if (pagination?.mode == PaginationMode.FORWARD_ID_CURSOR) {
+            var cursor: String? = null
+            var keepPaging = true
+            while (keepPaging && !endpointBroken) {
+                val params = linkedMapOf<String, String>()
+                endpoint.queryParams.forEach { p -> p.value?.let { params[p.name] = it } }
+                if (fanOutParam != null && fanOutValue != null) params[fanOutParam] = fanOutValue
+                cursor?.let { params[pagination.cursorParam] = it }
+                if (pagination.sendLimitParam) params[pagination.limitParam] = pagination.limitValue.toString()
+                onProgress(
+                    ApiTransactionsDownloadProgress(
+                        accountIndex = endpointIndex + 1,
+                        accountCount = endpointCount,
+                        page = 1,
+                        downloadedResponsePageCount = responseCount,
+                    ),
+                )
+                val recordedUrl = markerUrl(strategy.config.baseUrl, endpoint.path, endpointKey, null, cursor, fanOutValue)
+                val body = fetchPage(endpoint, params, recordedUrl)
+                if (body == null) {
+                    endpointBroken = true
+                } else {
+                    val items = pageItems(endpoint, body)
+                    itemSink?.addAll(items)
+                    val maxCursor =
+                        items
+                            .mapNotNull { it[pagination.cursorResponseField]?.jsonPrimitiveOrNull()?.toLongOrNull() }
+                            .maxOrNull()
+                    keepPaging = items.size >= pagination.limitValue && maxCursor != null
+                    cursor = maxCursor?.let { (it + 1).toString() }
+                }
+            }
+            if (!endpointBroken) importEngine.recordApiDownloadCoverage(sessionId, coverageKey, now)
+            return
+        }
+
+        val windows = dateWindowsOrSingle(pagination, now, since)
+        if (since != null) {
+            windows.firstOrNull()?.start?.let { start -> earliestIncrementalStart = minOf(start, earliestIncrementalStart ?: start) }
+        }
+        windows.forEachIndexed { windowIndex, window ->
+            if (endpointBroken) return@forEachIndexed
+            // A non-positive limitValue would never advance the offset, looping forever on the same
+            // page; treat a misconfigured limit as "no offset paging" rather than hang.
+            val offsetParam = pagination?.offsetParam?.takeIf { (pagination.limitValue) > 0 }
+            var offset = if (pagination?.offsetMode == OffsetMode.PAGE_NUMBER) 1 else 0
+            var itemsSeenInWindow = 0
+            var keepPaging = true
+            while (keepPaging) {
+                val params = linkedMapOf<String, String>()
+                endpoint.queryParams.forEach { p -> p.value?.let { params[p.name] = it } }
+                if (fanOutParam != null && fanOutValue != null) params[fanOutParam] = fanOutValue
+                if (window != null) {
+                    val pg = pagination!!
+                    params[pg.startParam] = formatWindowBound(window.start, pg.windowBoundFormat)
+                    params[pg.endParam] = formatWindowBound(window.end, pg.windowBoundFormat)
+                }
+                if (offsetParam != null) {
+                    params[offsetParam] = offset.toString()
+                    if (pagination.sendLimitParam) params[pagination.limitParam] = pagination.limitValue.toString()
+                }
+
+                onProgress(
+                    ApiTransactionsDownloadProgress(
+                        accountIndex = endpointIndex + 1,
+                        accountCount = endpointCount,
+                        page = windowIndex + 1,
+                        downloadedResponsePageCount = responseCount,
+                    ),
+                )
+
+                val recordedUrl =
+                    markerUrl(
+                        strategy.config.baseUrl,
+                        endpoint.path,
+                        endpointKey,
+                        window,
+                        offsetParam?.let { offset.toString() },
+                        fanOutValue,
+                    )
+                val body = fetchPage(endpoint, params, recordedUrl)
+                if (body == null) {
+                    endpointBroken = true
+                    return@forEachIndexed
+                }
+                val items = pageItems(endpoint, body)
+                itemSink?.addAll(items)
 
                 keepPaging =
                     if (offsetParam == null) {
                         false
                     } else {
-                        val pagination = endpoint.pagination!!
-                        val pageItemCount =
-                            pageBody
-                                ?.let {
-                                    responseItemsArray(
-                                        it,
-                                        endpoint.responseArrayKey,
-                                        endpoint.responseObjectValues,
-                                        endpoint.itemKeyField,
-                                    )
-                                }?.size ?: 0
-                        itemsSeenInWindow += pageItemCount
-                        offset += pagination.limitValue
-                        val totalCount = pagination.totalCountField?.let { field -> pageBody?.let { totalCountFromJson(it, field) } }
-                        pageItemCount >= pagination.limitValue && (totalCount == null || itemsSeenInWindow < totalCount)
+                        itemsSeenInWindow += items.size
+                        offset += if (pagination.offsetMode == OffsetMode.PAGE_NUMBER) 1 else pagination.limitValue
+                        val totalCount = pagination.totalCountField?.let { field -> totalCountFromJson(body, field) }
+                        items.size >= pagination.limitValue && (totalCount == null || itemsSeenInWindow < totalCount)
                     }
             }
             // Reached only when every offset page of this window succeeded: a failing page sets
             // endpointBroken and returns out of the endpoint, so a half-paged window never advances
             // the watermark past data it did not store.
-            importEngine.recordApiDownloadCoverage(sessionId, endpointKey, window?.end ?: now)
+            importEngine.recordApiDownloadCoverage(sessionId, coverageKey, window?.end ?: now)
         }
     }
+
+    // Value endpoints: fetched once each (no windowing - a snapshot, e.g. balances/symbol universe),
+    // optionally offset-paged, before either data-endpoint pass so fan-out resolution can read them.
+    strategy.config.valueEndpoints.forEach { endpoint ->
+        val endpointKey = endpointDedupeKey(endpoint)
+        val items = mutableListOf<JsonObject>()
+        val pagination = endpoint.pagination
+        val offsetParam = pagination?.offsetParam?.takeIf { (pagination.limitValue) > 0 }
+        var offset = if (pagination?.offsetMode == OffsetMode.PAGE_NUMBER) 1 else 0
+        var keepPaging = true
+        while (keepPaging) {
+            val params = linkedMapOf<String, String>()
+            endpoint.queryParams.forEach { p -> p.value?.let { params[p.name] = it } }
+            if (offsetParam != null) {
+                params[offsetParam] = offset.toString()
+                if (pagination.sendLimitParam) params[pagination.limitParam] = pagination.limitValue.toString()
+            }
+            val recordedUrl =
+                markerUrl(strategy.config.baseUrl, endpoint.path, endpointKey, null, offsetParam?.let { offset.toString() }, null)
+            val body = fetchPage(endpoint, params, recordedUrl) ?: break
+            val page = pageItems(endpoint, body)
+            items += page
+            keepPaging =
+                if (offsetParam == null) {
+                    false
+                } else {
+                    offset += if (pagination.offsetMode == OffsetMode.PAGE_NUMBER) 1 else pagination.limitValue
+                    page.size >= pagination.limitValue
+                }
+        }
+        valueItemsByPath[endpointDedupeKey(endpoint)] = items
+    }
+
+    // Pass 1: every non-fan-out data endpoint, so fan-out endpoints (pass 2) can read what they fetched.
+    strategy.config.dataEndpoints.forEachIndexed { endpointIndex, dataEndpoint ->
+        if (dataEndpoint.endpoint.fanOut != null) return@forEachIndexed
+        val sink = mutableListOf<JsonObject>()
+        sweepEndpoint(dataEndpoint.endpoint, endpointIndex, null, null, sink)
+        dataItemsByPath[endpointDedupeKey(dataEndpoint.endpoint)] = sink
+    }
+
+    // Pass 2: every fan-out data endpoint, once per resolved value.
+    strategy.config.dataEndpoints.forEachIndexed { endpointIndex, dataEndpoint ->
+        val fanOut = dataEndpoint.endpoint.fanOut ?: return@forEachIndexed
+        val values = resolveValueSet(fanOut.values, valueItemsByPath, dataItemsByPath)
+        val allowed = fanOut.validAgainst?.let { resolveValueSet(it, valueItemsByPath, dataItemsByPath).toSet() }
+        val surviving = (if (allowed != null) values.filter { it in allowed } else values).distinct().sorted()
+        surviving.forEach { value -> sweepEndpoint(dataEndpoint.endpoint, endpointIndex, fanOut.param, value, null) }
+    }
+
     return ApiTransactionsDownloadResult(
-        accountCount = strategy.config.dataEndpoints.size,
+        accountCount = endpointCount,
         transactionResponseCount = responseCount,
         incrementalSince = earliestIncrementalStart,
     )
+}
+
+/** The string content of a `JsonElement` if it is a `JsonPrimitive`, else null. */
+private fun JsonElement.jsonPrimitiveOrNull(): String? = (this as? JsonPrimitive)?.contentOrNullCompat()
+
+/**
+ * Resolves an [ApiValueSet] to its concrete string values, given the value-endpoint and (non-fan-out)
+ * data-endpoint items already downloaded this session (see [ApiValueSet]'s KDoc for the vocabulary).
+ * Every resolved value is uppercased and blank values are dropped, matching how asset/symbol codes are
+ * conventionally cased by every exchange this engine targets.
+ */
+internal fun resolveValueSet(
+    valueSet: ApiValueSet,
+    valueItemsByPath: Map<String, List<JsonObject>>,
+    dataItemsByPath: Map<String, List<JsonObject>>,
+): List<String> =
+    when (valueSet) {
+        is ApiValueSet.Static -> valueSet.values
+        is ApiValueSet.FromValueEndpoint ->
+            valueItemsByPath[valueSet.endpointPath].orEmpty().flatMap { item ->
+                valueSet.fields.mapNotNull { field -> item.str(field) }
+            }
+        is ApiValueSet.FromDataEndpoint ->
+            dataItemsByPath[valueSet.endpointPath].orEmpty().flatMap { item ->
+                valueSet.fields.mapNotNull { field -> item.str(field) }
+            }
+        is ApiValueSet.Union -> valueSet.sets.flatMap { resolveValueSet(it, valueItemsByPath, dataItemsByPath) }
+        is ApiValueSet.CrossProduct -> {
+            val lefts = resolveValueSet(valueSet.left, valueItemsByPath, dataItemsByPath).distinct()
+            val rights = resolveValueSet(valueSet.right, valueItemsByPath, dataItemsByPath).distinct()
+            lefts.flatMap { l -> rights.map { r -> valueSet.template.replace("{left}", l).replace("{right}", r) } }
+        }
+    }.filter { it.isNotBlank() }.map { it.uppercase() }
+
+/** Appends [params] as an unsigned, percent-encoded query string — used for [ApiEndpointConfig.unsigned]. */
+private fun appendUnsignedQueryParams(
+    baseUrl: String,
+    params: Map<String, String>,
+): String {
+    if (params.isEmpty()) return baseUrl
+    val query = params.entries.joinToString("&") { (k, v) -> "$k=${v.encodeURLParameter()}" }
+    return "$baseUrl?$query"
 }
 
 /** A window with epoch bounds; null means a single non-windowed request. */
@@ -348,16 +496,32 @@ private fun uriPathOf(url: String): String {
     return if (slash >= 0) afterScheme.substring(slash) else "/"
 }
 
-private fun appendMarker(
-    url: String,
+/**
+ * The recorded URL for a page — deliberately built from the plain endpoint path plus out-of-band markers
+ * (never the signed URL/query string), so it stays byte-identical across retries of the same logical
+ * page regardless of a fresh nonce/signature/timestamp (a signed query string, e.g. Binance's, changes
+ * every request; a URL built from it would never resume-skip, nor match back to its endpoint on import).
+ * The marker is never sent on the wire (see [ApiClient.send]'s `recordUrl`).
+ */
+private fun markerUrl(
+    baseUrl: String,
+    path: String,
     endpointKey: String,
     window: ApiDateWindow?,
-    offset: Int? = null,
+    page: String?,
+    fanOutValue: String?,
 ): String {
-    val sep = if (url.contains('?')) '&' else '?'
-    val windowMarker = window?.let { "&ws=${it.start.toEpochMilliseconds()}&we=${it.end.toEpochMilliseconds()}" } ?: ""
-    val offsetMarker = offset?.let { "&ofs=$it" } ?: ""
-    return "$url${sep}ep=$endpointKey$windowMarker$offsetMarker"
+    val sb = StringBuilder(buildExchangeEndpointUrl(baseUrl, path)).append("?ep=").append(endpointKey)
+    window?.let {
+        sb
+            .append("&ws=")
+            .append(it.start.toEpochMilliseconds())
+            .append("&we=")
+            .append(it.end.toEpochMilliseconds())
+    }
+    page?.let { sb.append("&pg=").append(it) }
+    fanOutValue?.let { sb.append("&fv=").append(it) }
+    return sb.toString()
 }
 
 /** Formats a date-window bound per [WindowBoundFormat] for a request parameter. */
@@ -943,8 +1107,9 @@ private fun parseOrder(
     jsonPath: String,
 ): ParsedOrder? {
     val orderRef = (tm.orderIdField?.let { obj.str(it) } ?: obj.str(tm.idField)) ?: return null
-    val side = obj.str(tm.sideField) ?: return null
-    val createdAt = obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat) } ?: return null
+    val side = tm.sideField?.let { obj.str(it) } ?: return null
+    val createdAt =
+        obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) } ?: return null
     return ParsedOrder(
         orderRef = orderRef,
         clientOid = tm.clientOidField?.let { obj.str(it) },
@@ -956,7 +1121,7 @@ private fun parseOrder(
         quantity = obj.str(tm.baseQuantityField),
         avgPrice = tm.avgPriceField?.let { obj.str(it) },
         createdAt = createdAt,
-        updatedAt = tm.updateTimestampField?.let { obj.str(it) }?.let { parseApiTimestamp(it, tm.timestampFormat) },
+        updatedAt = tm.updateTimestampField?.let { obj.str(it) }?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) },
         requestId = requestId,
         jsonPath = jsonPath,
     )
@@ -968,6 +1133,7 @@ private fun parseTrade(
     requestId: ApiRequestId,
     jsonPath: String,
 ): ParsedTrade? {
+    if (!tm.itemFilters.all { obj.evaluatePredicate(it) }) return null
     val (baseCode, quoteCode) =
         if (tm.splitMode == InstrumentSplitMode.EXPLICIT_FIELDS) {
             val base = tm.baseAssetField?.let { obj.str(it) }
@@ -977,15 +1143,20 @@ private fun parseTrade(
             val instrument = obj.str(tm.instrumentField) ?: return null
             splitInstrument(instrument, tm) ?: return null
         }
-    val side = obj.str(tm.sideField) ?: return null
-    val isBuy = side in tm.buyValues
+    val isBuy = tm.fixedSideBuy ?: (tm.sideField?.let { obj.str(it) }?.let { it in tm.buyValues } ?: return null)
     val baseQty = obj.str(tm.baseQuantityField)?.let { runCatching { BigDecimal(it) }.getOrNull() } ?: return null
     val quoteAmount =
         tm.quoteQuantityField?.let { obj.str(it)?.let { v -> runCatching { BigDecimal(v) }.getOrNull() } }
             ?: tm.priceField?.let { obj.str(it)?.let { p -> runCatching { baseQty * BigDecimal(p) }.getOrNull() } }
             ?: return null
-    val timestamp = obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat) } ?: return null
-    val id = obj.str(tm.idField) ?: return null
+    val timestamp = obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) } ?: return null
+    val id =
+        tm.compositeIdFields
+            .takeIf { it.isNotEmpty() }
+            ?.map { field -> obj.str(field) ?: return null }
+            ?.joinToString("-")
+            ?: obj.str(tm.idField)
+            ?: return null
     return ParsedTrade(
         id = id,
         timestamp = timestamp,
@@ -1039,8 +1210,10 @@ private fun parseExchangeTransfer(
     jsonPath: String,
     into: ParsedExchangeData,
 ): List<ParsedExchangeTransfer> {
+    if (!tm.itemFilters.all { obj.evaluatePredicate(it) }) return emptyList()
     val currency = obj.str(tm.currencyField) ?: return emptyList()
-    val timestamp = obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat) } ?: return emptyList()
+    val timestamp =
+        obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) } ?: return emptyList()
     val id = obj.str(tm.idField) ?: return emptyList()
     val excludeField = tm.excludeField
     val excluded = excludeField != null && obj.str(excludeField) in tm.excludeValues

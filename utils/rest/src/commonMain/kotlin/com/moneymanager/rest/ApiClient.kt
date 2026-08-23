@@ -65,6 +65,10 @@ class ApiClient(
      * [recordUrl] is persisted by the traffic recorder in place of the wire [url] when set. Exchanges
      * that sign the request path (Kraken) reject any unsigned query marker appended to the real URL, so
      * bookkeeping markers must travel out-of-band of the wire request.
+     *
+     * [storeResponse] false skips persisting this request/response through the traffic recorder
+     * entirely (used for a large public value-source endpoint, e.g. Binance `exchangeInfo`, that would
+     * otherwise bloat every session's `api_response` table for no importable content).
      */
     suspend fun send(
         method: String,
@@ -73,11 +77,13 @@ class ApiClient(
         body: String? = null,
         contentType: String? = null,
         recordUrl: String? = null,
+        storeResponse: Boolean = true,
     ): ApiHttpResponse {
         val response =
             httpClient.request(url) {
                 this.method = HttpMethod.parse(method)
                 recordUrl?.let { attributes.put(apiRecordUrlKey, it) }
+                if (!storeResponse) attributes.put(apiSkipStoreKey, true)
                 headers.forEach { (name, value) -> header(name, value) }
                 if (body != null) {
                     contentType?.let { header(HttpHeaders.ContentType, it) }
@@ -123,23 +129,29 @@ fun createApiClient(
     val httpClient = if (engine != null) HttpClient(engine) else HttpClient()
 
     httpClient.plugin(HttpSend).intercept { request ->
+        val skipStore = request.attributes.getOrNull(apiSkipStoreKey) == true
         val requestId =
-            trafficRecorder.recordRequest(
-                method = request.method.value,
-                url = request.attributes.getOrNull(apiRecordUrlKey) ?: request.url.buildString(),
-                headers =
-                    request.headers
-                        .entries()
-                        .associate { (key, values) -> key to values.joinToString(",") }
-                        .filterKeys { !isSensitiveHeader(it) },
-            )
+            if (skipStore) {
+                NO_RESPONSE_ID
+            } else {
+                trafficRecorder.recordRequest(
+                    method = request.method.value,
+                    url = request.attributes.getOrNull(apiRecordUrlKey) ?: request.url.buildString(),
+                    headers =
+                        request.headers
+                            .entries()
+                            .associate { (key, values) -> key to values.joinToString(",") }
+                            .filterKeys { !isSensitiveHeader(it) },
+                )
+            }
 
         val call = execute(request)
         val responseBody = call.response.bodyAsText()
         // Only persist non-blank bodies: the api_response.json column rejects empty values, and an
         // empty body (e.g. an error or no-content response) carries nothing importable. The caller
         // still sees the status code and can surface a meaningful error.
-        val responseId = if (responseBody.isNotBlank()) trafficRecorder.recordResponse(requestId, responseBody) else NO_RESPONSE_ID
+        val responseId =
+            if (skipStore || responseBody.isBlank()) NO_RESPONSE_ID else trafficRecorder.recordResponse(requestId, responseBody)
         call.attributes.put(apiResponseBodyKey, responseBody)
         call.attributes.put(apiResponseIdKey, responseId)
         call.attributes.put(apiRequestIdKey, requestId)
@@ -172,6 +184,7 @@ private fun isSensitiveHeader(key: String): Boolean {
 }
 
 private val apiRecordUrlKey = AttributeKey<String>("ApiRecordUrl")
+private val apiSkipStoreKey = AttributeKey<Boolean>("ApiSkipStore")
 private val apiResponseBodyKey = AttributeKey<String>("ApiResponseBody")
 private val apiResponseIdKey = AttributeKey<Long>("ApiResponseId")
 private val apiRequestIdKey = AttributeKey<Long>("ApiRequestId")

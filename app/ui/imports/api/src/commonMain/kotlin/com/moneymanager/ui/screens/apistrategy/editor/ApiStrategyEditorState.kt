@@ -34,6 +34,7 @@ internal enum class EditorTab(
 internal fun PredicateOp.requiresValue(): Boolean =
     when (this) {
         PredicateOp.EQUALS, PredicateOp.EQUALS_IGNORE_CASE, PredicateOp.STARTS_WITH, PredicateOp.ARRAY_ANY_STARTS_WITH -> true
+        PredicateOp.NOT_EQUALS, PredicateOp.IN -> true
         PredicateOp.EXISTS, PredicateOp.OBJECT_EMPTY, PredicateOp.OBJECT_NON_EMPTY -> false
     }
 

@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
+import com.moneymanager.domain.model.apistrategy.ApiFanOut
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
@@ -22,6 +23,7 @@ import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import com.moneymanager.domain.model.apistrategy.FieldPlacement
@@ -29,6 +31,7 @@ import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.NonceFormat
 import com.moneymanager.domain.model.apistrategy.NonceSpec
+import com.moneymanager.domain.model.apistrategy.OffsetMode
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.ParamStringFormat
 import com.moneymanager.domain.model.apistrategy.PredicateOp
@@ -41,6 +44,7 @@ import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
+import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -52,10 +56,11 @@ object BuiltInApiStrategies {
     val starlingStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000005")
     val cryptoComExchangeStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
     val krakenStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
+    val binanceStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
 
     /** All built-in API import strategies. */
     fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> =
-        listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now), kraken(now))
+        listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now), kraken(now), binance(now))
 
     /** The built-in Monzo API import strategy. */
     fun monzo(now: Instant): ApiImportStrategy =
@@ -818,6 +823,430 @@ object BuiltInApiStrategies {
                                 "access is sufficient; do not grant withdrawal or trading permissions).",
                             "Copy the API key and paste it below as the API key.",
                             "Copy the Private Key and paste it below as the API secret.",
+                        ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in Binance API strategy — pure config over the generic signed-exchange engine (no provider
+     * code). Binance's REST auth is HMAC-SHA256 over the query string + body, api key in the
+     * `X-MBX-APIKEY` header, `timestamp` and `signature` appended to the query — the
+     * [ApiRequestSigningConfig] KDoc names this shape explicitly, and `ApiRequestSignerTest` (`utils:rest`)
+     * carries Binance's own published signature vector.
+     *
+     * Binance has no account-wide trade feed (`myTrades` requires a `symbol`), so spot trades are
+     * fetched via [ApiEndpointConfig.fanOut]: candidate symbols are the cross product of every asset
+     * seen this session (current balances, plus assets seen in deposits/withdrawals/convert/fiat
+     * payments, so a fully-disposed-of asset is still swept) with a static list of quote assets,
+     * intersected against `exchangeInfo`'s real symbol universe so a nonexistent pair is never
+     * requested. `myTrades` also caps `startTime`/`endTime` to 24h apart, so it pages by ascending trade
+     * id instead ([PaginationMode.FORWARD_ID_CURSOR]) rather than by date window.
+     *
+     * Field paths follow the Binance REST docs; verify against a live response when connecting real
+     * keys (same caveat as the Kraken/Crypto.com built-ins).
+     */
+    fun binance(now: Instant): ApiImportStrategy {
+        val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
+
+        // Deposit/withdrawal history: a date window further paged by "offset"/"limit" (max 1000/page).
+        val cryptoHistoryWindow =
+            ApiPaginationConfig(
+                mode = PaginationMode.DATE_WINDOW,
+                startParam = "startTime",
+                endParam = "endTime",
+                windowBoundFormat = WindowBoundFormat.EPOCH_MS,
+                windowDays = 90,
+                offsetParam = "offset",
+                limitValue = 1_000,
+                sendLimitParam = true,
+            )
+
+        // Fiat orders/payments: a date window further paged by 1-based "page"/"rows" (max 500/page),
+        // bounded by the envelope's top-level "total".
+        val fiatHistoryWindow =
+            ApiPaginationConfig(
+                mode = PaginationMode.DATE_WINDOW,
+                startParam = "beginTime",
+                endParam = "endTime",
+                windowBoundFormat = WindowBoundFormat.EPOCH_MS,
+                windowDays = 90,
+                offsetParam = "page",
+                offsetMode = OffsetMode.PAGE_NUMBER,
+                limitParam = "rows",
+                limitValue = 500,
+                sendLimitParam = true,
+                totalCountField = "total",
+            )
+
+        // Convert's tradeFlow enforces a hard 30-day max between startTime/endTime.
+        val convertWindow =
+            ApiPaginationConfig(
+                mode = PaginationMode.DATE_WINDOW,
+                startParam = "startTime",
+                endParam = "endTime",
+                windowBoundFormat = WindowBoundFormat.EPOCH_MS,
+                windowDays = 30,
+            )
+
+        // myTrades needs a symbol (see fan-out below) and caps startTime/endTime to 24h, so it walks
+        // forward by trade id instead of by date window.
+        val spotTradeCursor =
+            ApiPaginationConfig(
+                mode = PaginationMode.FORWARD_ID_CURSOR,
+                cursorParam = "fromId",
+                cursorResponseField = "id",
+                limitValue = 1_000,
+                sendLimitParam = true,
+            )
+
+        fun signed(
+            path: String,
+            key: String,
+            pagination: ApiPaginationConfig?,
+            method: HttpMethodType = HttpMethodType.GET,
+            queryParams: List<ApiQueryParam> = emptyList(),
+            requestCostWeight: Int = 1,
+        ) = ApiEndpointConfig(
+            path = path,
+            responseArrayKey = key,
+            queryParams = queryParams,
+            method = method,
+            pagination = pagination,
+            requestCostWeight = requestCostWeight,
+        )
+
+        // Fiat-envelope endpoints (fiat/orders, fiat/payments) report success via "code" == "000000",
+        // never an HTTP-status-only or error-array shape.
+        fun signedFiat(
+            path: String,
+            transactionType: String,
+            requestCostWeight: Int = 1,
+        ) = ApiEndpointConfig(
+            path = path,
+            responseArrayKey = "data",
+            queryParams = listOf(ApiQueryParam(name = "transactionType", value = transactionType)),
+            pagination = fiatHistoryWindow,
+            successCodeField = "code",
+            successCodeOkValue = "000000",
+            requestCostWeight = requestCostWeight,
+        )
+
+        // Longest-match-wins quote-asset suffixes for QUOTE_SUFFIX symbol splitting (spot trades) and,
+        // doubled as the fan-out cross product's other side, for candidate symbol generation.
+        val quoteAssets =
+            listOf(
+                "USDT",
+                "FDUSD",
+                "USDC",
+                "BUSD",
+                "TUSD",
+                "DAI",
+                "BTC",
+                "ETH",
+                "BNB",
+                "EUR",
+                "GBP",
+                "TRY",
+                "BRL",
+                "AUD",
+                "RUB",
+                "UAH",
+                "ZAR",
+                "PLN",
+                "RON",
+                "ARS",
+                "NGN",
+            )
+
+        val depositsEndpoint =
+            signed(
+                "sapi/v1/capital/deposit/hisrec",
+                "",
+                cryptoHistoryWindow,
+            )
+        val withdrawalsEndpoint =
+            signed(
+                "sapi/v1/capital/withdraw/history",
+                "",
+                cryptoHistoryWindow,
+            )
+        // tradeFlow returns "moreData": true when a single 30-day window holds more than [limitValue]
+        // conversions - the engine has no continuation scheme for that flag (unlike offset/cursor
+        // paging), so a window with more than 1000 conversions silently truncates. Requesting the
+        // maximum page size makes that essentially never happen for a personal account.
+        val convertEndpoint =
+            signed(
+                "sapi/v1/convert/tradeFlow",
+                "list",
+                convertWindow,
+                queryParams = listOf(ApiQueryParam(name = "limit", value = "1000")),
+                requestCostWeight = 20,
+            )
+        val fiatBuyEndpoint = signedFiat("sapi/v1/fiat/payments", transactionType = "0")
+        val fiatSellEndpoint = signedFiat("sapi/v1/fiat/payments", transactionType = "1")
+
+        // Mirrors ExchangeApiImportService.endpointDedupeKey (path + sorted static query params) so
+        // ApiValueSet.From*Endpoint references below match how the engine keys its per-session item
+        // maps - this module can't depend on app:apiimporter (config-only, no engine coupling), so the
+        // tiny computation is duplicated here rather than shared.
+        fun dedupeKey(endpoint: ApiEndpointConfig): String {
+            val staticParams =
+                endpoint.queryParams
+                    .filter { it.value != null }
+                    .sortedBy { it.name }
+                    .joinToString("&") { "${it.name}=${it.value}" }
+            return if (staticParams.isEmpty()) endpoint.path else "${endpoint.path}?$staticParams"
+        }
+
+        val myTradesEndpoint =
+            signed(
+                "api/v3/myTrades",
+                "",
+                spotTradeCursor,
+                requestCostWeight = 2,
+            ).copy(
+                fanOut =
+                    ApiFanOut(
+                        param = "symbol",
+                        values =
+                            ApiValueSet.CrossProduct(
+                                left =
+                                    ApiValueSet.Union(
+                                        listOf(
+                                            ApiValueSet.FromValueEndpoint("sapi/v3/asset/getUserAsset", listOf("asset")),
+                                            ApiValueSet.FromDataEndpoint(depositsEndpoint.path, listOf("coin")),
+                                            ApiValueSet.FromDataEndpoint(withdrawalsEndpoint.path, listOf("coin")),
+                                            ApiValueSet.FromDataEndpoint(convertEndpoint.path, listOf("fromAsset", "toAsset")),
+                                            ApiValueSet.FromDataEndpoint(dedupeKey(fiatBuyEndpoint), listOf("cryptoCurrency")),
+                                            ApiValueSet.FromDataEndpoint(dedupeKey(fiatSellEndpoint), listOf("cryptoCurrency")),
+                                        ),
+                                    ),
+                                right = ApiValueSet.Static(quoteAssets),
+                            ),
+                        // exchangeInfo's responseArrayKey ("symbols") already unwraps the response to individual
+                        // symbol objects before they're stored, so each item's own "symbol" field is read
+                        // directly here - not "symbols.symbol".
+                        validAgainst = ApiValueSet.FromValueEndpoint("api/v3/exchangeInfo", listOf("symbol")),
+                    ),
+            )
+
+        return ApiImportStrategy(
+            id = ApiImportStrategyId(binanceStrategyId),
+            name = "Binance",
+            config =
+                ApiStrategyConfig(
+                    baseUrl = "https://api.binance.com",
+                    authType = ApiAuthType.SIGNED,
+                    accountsEndpoint = unused,
+                    transactionsEndpoint = unused,
+                    accountMappings = ApiAccountMappings(),
+                    transactionMappings = ApiTransactionMappings(),
+                    requestSigning =
+                        ApiRequestSigningConfig(
+                            algorithm = SigningAlgorithm.HMAC_SHA256,
+                            secretEncoding = SecretEncoding.UTF8,
+                            signatureEncoding = SignatureEncoding.HEX,
+                            message = listOf(SigPart.QueryString, SigPart.Body),
+                            apiKey = FieldPlacement(SigFieldLocation.HEADER, "X-MBX-APIKEY"),
+                            nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.QUERY, "timestamp")),
+                            signature = FieldPlacement(SigFieldLocation.QUERY, "signature"),
+                            bodyFormat = BodyFormat.QUERY_ONLY,
+                        ),
+                    syntheticAccount = ApiSyntheticAccount(name = "Binance", externalId = "binance"),
+                    valueEndpoints =
+                        listOf(
+                            signed("sapi/v3/asset/getUserAsset", "", pagination = null, method = HttpMethodType.POST),
+                            // Public, unsigned and never persisted (~2MB of symbol metadata unrelated to
+                            // anything importable) — used only to validate fan-out candidate symbols.
+                            ApiEndpointConfig(
+                                path = "api/v3/exchangeInfo",
+                                responseArrayKey = "symbols",
+                                unsigned = true,
+                                storeResponse = false,
+                            ),
+                        ),
+                    dataEndpoints =
+                        listOf(
+                            ApiDataEndpoint(
+                                depositsEndpoint,
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "coin",
+                                        timestampField = "insertTime",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        counterpartyAddressField = "address",
+                                        counterpartyNetworkField = "network",
+                                        txidField = "txId",
+                                        // status: 0=pending, 1=success, 2=rejected, 6=credited but cannot
+                                        // withdraw, 7=wrong deposit, 8=waiting user confirm.
+                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "1")),
+                                    ),
+                                fixedDirection = TransferDirection.IN,
+                                counterpartyAccountName = "Binance Funding",
+                            ),
+                            ApiDataEndpoint(
+                                withdrawalsEndpoint,
+                                ApiEndpointKind.WITHDRAWALS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "coin",
+                                        timestampField = "applyTime",
+                                        timestampFormat = TimestampFormat.PATTERN,
+                                        timestampPattern = "yyyy-MM-dd HH:mm:ss",
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        counterpartyAddressField = "address",
+                                        counterpartyNetworkField = "network",
+                                        txidField = "txId",
+                                        // "amount" is net of the fee - transactionFee is booked separately.
+                                        feeAmountField = "transactionFee",
+                                        // status 6 = completed (see the capital/withdraw/history docs).
+                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "6")),
+                                    ),
+                                fixedDirection = TransferDirection.OUT,
+                                counterpartyAccountName = "Binance Funding",
+                            ),
+                            ApiDataEndpoint(
+                                signedFiat("sapi/v1/fiat/orders", transactionType = "0"),
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "fiatCurrency",
+                                        timestampField = "createTime",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        idField = "orderNo",
+                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "Successful")),
+                                    ),
+                                fixedDirection = TransferDirection.IN,
+                                counterpartyAccountName = "Binance Bank",
+                            ),
+                            ApiDataEndpoint(
+                                signedFiat("sapi/v1/fiat/orders", transactionType = "1"),
+                                ApiEndpointKind.WITHDRAWALS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "fiatCurrency",
+                                        timestampField = "createTime",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        idField = "orderNo",
+                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "Successful")),
+                                    ),
+                                fixedDirection = TransferDirection.OUT,
+                                counterpartyAccountName = "Binance Bank",
+                            ),
+                            ApiDataEndpoint(
+                                fiatBuyEndpoint,
+                                ApiEndpointKind.TRADES,
+                                tradeMappings =
+                                    ApiTradeMappings(
+                                        instrumentField = "unused",
+                                        splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
+                                        baseAssetField = "cryptoCurrency",
+                                        quoteAssetField = "fiatCurrency",
+                                        fixedSideBuy = true,
+                                        // Buying crypto with fiat: obtainAmount = crypto received (base),
+                                        // sourceAmount = fiat spent (quote).
+                                        baseQuantityField = "obtainAmount",
+                                        quoteQuantityField = "sourceAmount",
+                                        feeField = "totalFee",
+                                        feeCurrencyField = "fiatCurrency",
+                                        timestampField = "createTime",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        idField = "orderNo",
+                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "Completed")),
+                                    ),
+                            ),
+                            ApiDataEndpoint(
+                                fiatSellEndpoint,
+                                ApiEndpointKind.TRADES,
+                                tradeMappings =
+                                    ApiTradeMappings(
+                                        instrumentField = "unused",
+                                        splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
+                                        baseAssetField = "cryptoCurrency",
+                                        quoteAssetField = "fiatCurrency",
+                                        fixedSideBuy = false,
+                                        // Selling crypto for fiat: sourceAmount = crypto given (base),
+                                        // obtainAmount = fiat received (quote).
+                                        baseQuantityField = "sourceAmount",
+                                        quoteQuantityField = "obtainAmount",
+                                        feeField = "totalFee",
+                                        feeCurrencyField = "fiatCurrency",
+                                        timestampField = "createTime",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        idField = "orderNo",
+                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "Completed")),
+                                    ),
+                            ),
+                            ApiDataEndpoint(
+                                convertEndpoint,
+                                ApiEndpointKind.TRADES,
+                                tradeMappings =
+                                    ApiTradeMappings(
+                                        instrumentField = "unused",
+                                        splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
+                                        baseAssetField = "toAsset",
+                                        quoteAssetField = "fromAsset",
+                                        fixedSideBuy = true,
+                                        baseQuantityField = "toAmount",
+                                        quoteQuantityField = "fromAmount",
+                                        timestampField = "createTime",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        idField = "orderId",
+                                        itemFilters =
+                                            listOf(
+                                                RulePredicate(path = "orderStatus", op = PredicateOp.EQUALS, value = "SUCCESS"),
+                                            ),
+                                    ),
+                            ),
+                            ApiDataEndpoint(
+                                myTradesEndpoint,
+                                ApiEndpointKind.TRADES,
+                                tradeMappings =
+                                    ApiTradeMappings(
+                                        instrumentField = "symbol",
+                                        splitMode = InstrumentSplitMode.QUOTE_SUFFIX,
+                                        quoteAssets = quoteAssets,
+                                        sideField = "isBuyer",
+                                        buyValues = setOf("true"),
+                                        baseQuantityField = "qty",
+                                        quoteQuantityField = "quoteQty",
+                                        feeField = "commission",
+                                        feeCurrencyField = "commissionAsset",
+                                        timestampField = "time",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        idField = "id",
+                                        // Binance's numeric trade "id" is scoped per symbol, not global —
+                                        // two different pairs can report the same id, so the composite key
+                                        // (symbol + id) is what's actually unique.
+                                        compositeIdFields = listOf("symbol", "id"),
+                                        orderIdField = "orderId",
+                                    ),
+                            ),
+                        ),
+                    // Binance's overall REST budget is ~6000 request-weight/min; 350ms between requests
+                    // (scaled per endpoint by requestCostWeight) stays comfortably inside that for a
+                    // personal read-only key.
+                    rateLimitMillis = 350L,
+                    rateLimitErrorSubstrings = listOf("Too many requests", "Way too many requests", "-1003", "IP banned"),
+                    maxRateLimitRetries = 6,
+                    tokenPageUrl = "https://www.binance.com/en/my/settings/api-management",
+                    connectInstructions =
+                        listOf(
+                            "Open the Binance API Management page in your browser and sign in.",
+                            "Create a new API key (System generated) and complete the security verification.",
+                            "Enable only \"Enable Reading\" for the key's permissions — leave Spot & Margin " +
+                                "Trading and Withdrawals off. Binance only allows an unrestricted-IP key to be " +
+                                "read-only, so this is the only option offered unless you also add an IP " +
+                                "access restriction.",
+                            "Copy the API key and paste it below as the API key.",
+                            "Copy the Secret Key — shown only once — and paste it below as the API secret.",
                         ),
                 ),
             createdAt = now,

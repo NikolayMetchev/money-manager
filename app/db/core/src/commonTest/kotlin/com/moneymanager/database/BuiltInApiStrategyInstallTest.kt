@@ -1,5 +1,7 @@
 package com.moneymanager.database
 
+import com.moneymanager.builtin.BuiltInApiStrategies
+import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
@@ -16,6 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 // Built-in strategies are no longer seeded; installing them through the engine (the same
 // path a catalog install takes) must survive the JSON round trip through the database.
@@ -30,7 +33,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .map { it.name }
                     .toSet()
-            assertEquals(setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken"), names)
+            assertEquals(setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken", "Binance"), names)
         }
 
     @Test
@@ -111,6 +114,50 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertEquals(original.config.dataEndpoints.toSet(), rebuilt.config.dataEndpoints.toSet())
             assertEquals(original.config.syntheticAccount, rebuilt.config.syntheticAccount)
             assertEquals(original.config.internalTransferReconcile, rebuilt.config.internalTransferReconcile)
+        }
+
+    @Test
+    fun `the Binance strategy installs with its signed-exchange configuration`() =
+        runTest {
+            repositories.installBuiltInApiStrategies()
+            val binance =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Binance" }
+
+            assertEquals(ApiAuthType.SIGNED, binance.config.authType)
+            val signing = assertNotNull(binance.config.requestSigning, "signing recipe persisted")
+            assertEquals(SigningAlgorithm.HMAC_SHA256, signing.algorithm)
+            assertEquals("Binance", assertNotNull(binance.config.syntheticAccount).name)
+            assertTrue(binance.config.valueEndpoints.isNotEmpty(), "value endpoints persisted")
+            val myTrades = binance.config.dataEndpoints.first { it.endpoint.path == "api/v3/myTrades" }
+            assertNotNull(myTrades.endpoint.fanOut, "spot-trade fan-out persisted")
+            val fiatOrders = binance.config.dataEndpoints.filter { it.endpoint.path == "sapi/v1/fiat/orders" }
+            assertEquals(2, fiatOrders.size, "fiat deposit and withdrawal endpoints share a path, disambiguated by transactionType")
+        }
+
+    @Test
+    fun `the Binance strategy survives an export file round trip`() =
+        runTest {
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val original = BuiltInApiStrategies.binance(now)
+            val json = ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(original, "test"))
+            val rebuilt = ApiStrategyExportMapper.fromExport(ApiStrategyExportCodec.decode(json), original.id, now)
+            assertEquals(original.config.authType, rebuilt.config.authType)
+            assertEquals(original.config.requestSigning, rebuilt.config.requestSigning)
+            assertEquals(original.config.syntheticAccount, rebuilt.config.syntheticAccount)
+            assertEquals(original.config.dataEndpoints.size, rebuilt.config.dataEndpoints.size)
+            assertEquals(original.config.valueEndpoints.size, rebuilt.config.valueEndpoints.size)
+            val rebuiltMyTrades = rebuilt.config.dataEndpoints.first { it.endpoint.path == "api/v3/myTrades" }
+            val originalMyTrades = original.config.dataEndpoints.first { it.endpoint.path == "api/v3/myTrades" }
+            // ApiValueSet.Static.values is sorted-on-decode (order carries no meaning) - compare as sets,
+            // like ApiTradeMappings.quoteAssets/dataEndpoints elsewhere in these round-trip assertions.
+            assertEquals(originalMyTrades.endpoint.fanOut != null, rebuiltMyTrades.endpoint.fanOut != null)
+            assertEquals(
+                assertNotNull(originalMyTrades.tradeMappings).compositeIdFields,
+                assertNotNull(rebuiltMyTrades.tradeMappings).compositeIdFields,
+            )
         }
 
     @Test

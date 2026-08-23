@@ -370,13 +370,23 @@ internal fun TradeMappingsEditor(
                     enabled = enabled,
                 )
         }
-        TextFieldRow(
-            "Side field",
-            mappings.sideField,
-            { onChange(mappings.copy(sideField = it)) },
-            enabled,
-            isError = mappings.sideField.isBlank(),
+        EnumDropdown(
+            label = "Side",
+            options = FixedSide.entries,
+            selected = FixedSide.from(mappings.fixedSideBuy),
+            onSelect = { onChange(mappings.copy(fixedSideBuy = it.toBoolean())) },
+            optionLabel = { it.label },
+            enabled = enabled,
         )
+        if (mappings.fixedSideBuy == null) {
+            TextFieldRow(
+                "Side field",
+                mappings.sideField.orEmpty(),
+                { onChange(mappings.copy(sideField = it.ifBlank { null })) },
+                enabled,
+                isError = mappings.sideField.isNullOrBlank(),
+            )
+        }
         StringSetEditor(
             label = "Buy values (mean BUY side)",
             values = mappings.buyValues,
@@ -562,6 +572,32 @@ internal fun InternalTransferReconcileEditor(
     }
 }
 
+/** UI-only tri-state for [ApiTradeMappings.fixedSideBuy] - a per-item side field, or a fixed direction. */
+private enum class FixedSide(
+    val label: String,
+) {
+    PER_ITEM_FIELD("Per-item side field"),
+    FIXED_BUY("Fixed: always BUY"),
+    FIXED_SELL("Fixed: always SELL"),
+    ;
+
+    fun toBoolean(): Boolean? =
+        when (this) {
+            PER_ITEM_FIELD -> null
+            FIXED_BUY -> true
+            FIXED_SELL -> false
+        }
+
+    companion object {
+        fun from(fixedSideBuy: Boolean?): FixedSide =
+            when (fixedSideBuy) {
+                null -> PER_ITEM_FIELD
+                true -> FIXED_BUY
+                false -> FIXED_SELL
+            }
+    }
+}
+
 private fun defaultTradeMappings(): ApiTradeMappings =
     ApiTradeMappings(
         instrumentField = "",
@@ -573,7 +609,7 @@ private fun defaultTradeMappings(): ApiTradeMappings =
 
 private fun ApiTradeMappings.isValidForSave(): Boolean =
     instrumentField.isNotBlank() &&
-        sideField.isNotBlank() &&
+        (!sideField.isNullOrBlank() || fixedSideBuy != null) &&
         baseQuantityField.isNotBlank() &&
         timestampField.isNotBlank() &&
         idField.isNotBlank() &&
