@@ -17,7 +17,7 @@ class IncrementalDateWindowsTest {
             mode = PaginationMode.DATE_WINDOW,
             windowDays = 7,
             lookbackDays = 365,
-            incrementalOverlapDays = 7,
+            incrementalOverlapDays = 5,
         )
 
     @Test
@@ -37,12 +37,12 @@ class IncrementalDateWindowsTest {
 
         val windows = dateWindows(pagination, now, since)
 
-        val expectedStart = since.toEpochMilliseconds() - 7 * MILLIS_PER_DAY
+        val expectedStart = since.toEpochMilliseconds() - 5 * MILLIS_PER_DAY
         val firstStart = windows.first().start.toEpochMilliseconds()
         assertTrue(firstStart <= expectedStart, "first window must cover the overlap")
         assertTrue(firstStart > expectedStart - 7 * MILLIS_PER_DAY, "and must not reach further back than one window")
         assertEquals(now, windows.last().end)
-        // 37 days of history in 7-day windows is far fewer requests than a full 365-day sweep.
+        // 35 days of history in 7-day windows is far fewer requests than a full 365-day sweep.
         assertTrue(windows.size < dateWindows(pagination, now).size)
     }
 
