@@ -973,13 +973,34 @@ object BuiltInApiStrategies {
                 "",
                 cryptoHistoryWindow,
             )
+        // tradeFlow returns "moreData": true when a single 30-day window holds more than [limitValue]
+        // conversions - the engine has no continuation scheme for that flag (unlike offset/cursor
+        // paging), so a window with more than 1000 conversions silently truncates. Requesting the
+        // maximum page size makes that essentially never happen for a personal account.
         val convertEndpoint =
             signed(
                 "sapi/v1/convert/tradeFlow",
                 "list",
                 convertWindow,
+                queryParams = listOf(ApiQueryParam(name = "limit", value = "1000")),
                 requestCostWeight = 20,
             )
+        val fiatBuyEndpoint = signedFiat("sapi/v1/fiat/payments", transactionType = "0")
+        val fiatSellEndpoint = signedFiat("sapi/v1/fiat/payments", transactionType = "1")
+
+        // Mirrors ExchangeApiImportService.endpointDedupeKey (path + sorted static query params) so
+        // ApiValueSet.From*Endpoint references below match how the engine keys its per-session item
+        // maps - this module can't depend on app:apiimporter (config-only, no engine coupling), so the
+        // tiny computation is duplicated here rather than shared.
+        fun dedupeKey(endpoint: ApiEndpointConfig): String {
+            val staticParams =
+                endpoint.queryParams
+                    .filter { it.value != null }
+                    .sortedBy { it.name }
+                    .joinToString("&") { "${it.name}=${it.value}" }
+            return if (staticParams.isEmpty()) endpoint.path else "${endpoint.path}?$staticParams"
+        }
+
         val myTradesEndpoint =
             signed(
                 "api/v3/myTrades",
@@ -999,6 +1020,8 @@ object BuiltInApiStrategies {
                                             ApiValueSet.FromDataEndpoint(depositsEndpoint.path, listOf("coin")),
                                             ApiValueSet.FromDataEndpoint(withdrawalsEndpoint.path, listOf("coin")),
                                             ApiValueSet.FromDataEndpoint(convertEndpoint.path, listOf("fromAsset", "toAsset")),
+                                            ApiValueSet.FromDataEndpoint(dedupeKey(fiatBuyEndpoint), listOf("cryptoCurrency")),
+                                            ApiValueSet.FromDataEndpoint(dedupeKey(fiatSellEndpoint), listOf("cryptoCurrency")),
                                         ),
                                     ),
                                 right = ApiValueSet.Static(quoteAssets),
@@ -1118,7 +1141,7 @@ object BuiltInApiStrategies {
                                 counterpartyAccountName = "Binance Bank",
                             ),
                             ApiDataEndpoint(
-                                signedFiat("sapi/v1/fiat/payments", transactionType = "0"),
+                                fiatBuyEndpoint,
                                 ApiEndpointKind.TRADES,
                                 tradeMappings =
                                     ApiTradeMappings(
@@ -1140,7 +1163,7 @@ object BuiltInApiStrategies {
                                     ),
                             ),
                             ApiDataEndpoint(
-                                signedFiat("sapi/v1/fiat/payments", transactionType = "1"),
+                                fiatSellEndpoint,
                                 ApiEndpointKind.TRADES,
                                 tradeMappings =
                                     ApiTradeMappings(

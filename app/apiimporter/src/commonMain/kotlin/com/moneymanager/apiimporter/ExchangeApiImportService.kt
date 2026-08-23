@@ -251,6 +251,7 @@ suspend fun downloadApiSessionExchange(
                 endpoint.queryParams.forEach { p -> p.value?.let { params[p.name] = it } }
                 if (fanOutParam != null && fanOutValue != null) params[fanOutParam] = fanOutValue
                 cursor?.let { params[pagination.cursorParam] = it }
+                if (pagination.sendLimitParam) params[pagination.limitParam] = pagination.limitValue.toString()
                 onProgress(
                     ApiTransactionsDownloadProgress(
                         accountIndex = endpointIndex + 1,
@@ -376,7 +377,7 @@ suspend fun downloadApiSessionExchange(
                     page.size >= pagination.limitValue
                 }
         }
-        valueItemsByPath[endpoint.path] = items
+        valueItemsByPath[endpointDedupeKey(endpoint)] = items
     }
 
     // Pass 1: every non-fan-out data endpoint, so fan-out endpoints (pass 2) can read what they fetched.
@@ -384,7 +385,7 @@ suspend fun downloadApiSessionExchange(
         if (dataEndpoint.endpoint.fanOut != null) return@forEachIndexed
         val sink = mutableListOf<JsonObject>()
         sweepEndpoint(dataEndpoint.endpoint, endpointIndex, null, null, sink)
-        dataItemsByPath[dataEndpoint.endpoint.path] = sink
+        dataItemsByPath[endpointDedupeKey(dataEndpoint.endpoint)] = sink
     }
 
     // Pass 2: every fan-out data endpoint, once per resolved value.
@@ -1120,7 +1121,7 @@ private fun parseOrder(
         quantity = obj.str(tm.baseQuantityField),
         avgPrice = tm.avgPriceField?.let { obj.str(it) },
         createdAt = createdAt,
-        updatedAt = tm.updateTimestampField?.let { obj.str(it) }?.let { parseApiTimestamp(it, tm.timestampFormat) },
+        updatedAt = tm.updateTimestampField?.let { obj.str(it) }?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) },
         requestId = requestId,
         jsonPath = jsonPath,
     )

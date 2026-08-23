@@ -854,8 +854,12 @@ sealed interface ApiValueSet {
 
     /**
      * Every value of [fields] (dot-paths, read independently and unioned) across the items already
-     * fetched by [ApiStrategyConfig.valueEndpoints]`[endpointPath]` this session (e.g. Binance's held
-     * balances from `getUserAsset`). [fields] order carries no meaning.
+     * fetched by the [ApiStrategyConfig.valueEndpoints] entry keyed by [endpointPath] this session
+     * (e.g. Binance's held balances from `getUserAsset`). [endpointPath] must match how the engine
+     * keys that endpoint's items - its plain path, unless two endpoints there share a path (as with
+     * two [ApiStrategyConfig.dataEndpoints] differing only by a static query param), in which case it
+     * is the path plus `?name=value` for each such param, sorted by name and `&`-joined (matching
+     * `endpointDedupeKey` in `app:apiimporter`). [fields] order carries no meaning.
      */
     @Serializable
     data class FromValueEndpoint(
@@ -865,11 +869,12 @@ sealed interface ApiValueSet {
     ) : ApiValueSet
 
     /**
-     * Like [FromValueEndpoint], but reads from the items already downloaded (this session) by
-     * [ApiStrategyConfig.dataEndpoints]`[endpointPath]` instead — so an asset that was fully disposed of
-     * before this download (no balance left, but present in a deposit/withdrawal/trade already fetched)
-     * still contributes a value. A fan-out endpoint is always resolved after every non-fan-out data
-     * endpoint has downloaded, so these items are available.
+     * Like [FromValueEndpoint], but reads from the items already downloaded (this session) by the
+     * [ApiStrategyConfig.dataEndpoints] entry keyed by [endpointPath] instead (same keying rule) — so
+     * an asset that was fully disposed of before this download (no balance left, but present in a
+     * deposit/withdrawal/trade already fetched) still contributes a value. A fan-out endpoint is
+     * always resolved after every non-fan-out data endpoint has downloaded, so these items are
+     * available.
      */
     @Serializable
     data class FromDataEndpoint(

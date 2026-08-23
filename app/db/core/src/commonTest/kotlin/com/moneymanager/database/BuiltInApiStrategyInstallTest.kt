@@ -8,6 +8,8 @@ import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
+import com.moneymanager.builtin.BuiltInApiStrategies
+import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInApiStrategies
 import kotlinx.coroutines.flow.first
@@ -16,6 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 // Built-in strategies are no longer seeded; installing them through the engine (the same
 // path a catalog install takes) must survive the JSON round trip through the database.
@@ -137,22 +140,10 @@ class BuiltInApiStrategyInstallTest : DbTest() {
     @Test
     fun `the Binance strategy survives an export file round trip`() =
         runTest {
-            val now = kotlin.time.Instant.fromEpochMilliseconds(1_700_000_000_000L)
-            val original =
-                com.moneymanager.builtin.BuiltInApiStrategies
-                    .binance(now)
-            val json =
-                com.moneymanager.database.json.ApiStrategyExportCodec.encode(
-                    ApiStrategyExportMapper
-                        .toExport(original, "test"),
-                )
-            val rebuilt =
-                ApiStrategyExportMapper.fromExport(
-                    com.moneymanager.database.json.ApiStrategyExportCodec
-                        .decode(json),
-                    original.id,
-                    now,
-                )
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val original = BuiltInApiStrategies.binance(now)
+            val json = ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(original, "test"))
+            val rebuilt = ApiStrategyExportMapper.fromExport(ApiStrategyExportCodec.decode(json), original.id, now)
             assertEquals(original.config.authType, rebuilt.config.authType)
             assertEquals(original.config.requestSigning, rebuilt.config.requestSigning)
             assertEquals(original.config.syntheticAccount, rebuilt.config.syntheticAccount)

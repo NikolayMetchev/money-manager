@@ -112,9 +112,16 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
                     createApiClient(
                         trafficRecorder = ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
                         engine =
-                            MockEngine {
+                            MockEngine { request ->
+                                val path = request.url.encodedPath.trimStart('/')
+                                val body =
+                                    if (path.endsWith("fiat/orders") || path.endsWith("fiat/payments")) {
+                                        "{\"code\":\"000000\",\"message\":\"success\",\"data\":[],\"total\":0,\"success\":true}"
+                                    } else {
+                                        "[]"
+                                    }
                                 respond(
-                                    content = "[]",
+                                    content = body,
                                     status = HttpStatusCode.OK,
                                     headers = headersOf(HttpHeaders.ContentType, "application/json"),
                                 )

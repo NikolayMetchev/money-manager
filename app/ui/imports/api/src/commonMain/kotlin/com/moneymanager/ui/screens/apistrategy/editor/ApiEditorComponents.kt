@@ -733,7 +733,7 @@ internal fun PaginationEditor(
     TextFieldRow("Limit param", config.limitParam, { onChange(config.copy(limitParam = it)) }, enabled)
     IntFieldRow("Limit value", config.limitValue, { onChange(config.copy(limitValue = it)) }, enabled)
     when (config.mode) {
-        PaginationMode.CURSOR -> {
+        PaginationMode.CURSOR, PaginationMode.FORWARD_ID_CURSOR -> {
             TextFieldRow("Cursor param", config.cursorParam, { onChange(config.copy(cursorParam = it)) }, enabled)
             TextFieldRow("Cursor response field", config.cursorResponseField, { onChange(config.copy(cursorResponseField = it)) }, enabled)
         }
@@ -752,12 +752,8 @@ internal fun PaginationEditor(
             IntFieldRow("Lookback days", config.lookbackDays, { onChange(config.copy(lookbackDays = it)) }, enabled)
             QueryParamsEditor(params = config.extraParams, onChange = { onChange(config.copy(extraParams = it)) }, enabled = enabled)
         }
-        PaginationMode.FORWARD_ID_CURSOR -> {
-            TextFieldRow("Cursor param", config.cursorParam, { onChange(config.copy(cursorParam = it)) }, enabled)
-            TextFieldRow("Cursor response field", config.cursorResponseField, { onChange(config.copy(cursorResponseField = it)) }, enabled)
-        }
     }
-    // Applies to both modes: it clamps the date-window sweep and sets the cursor loop's stop point.
+    // Applies to every mode: it clamps the date-window sweep and sets the cursor loop's stop point.
     IntFieldRow(
         "Incremental overlap days",
         config.incrementalOverlapDays,
