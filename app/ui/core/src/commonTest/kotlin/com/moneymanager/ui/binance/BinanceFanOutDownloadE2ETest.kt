@@ -61,7 +61,9 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
                                     path.endsWith("exchangeInfo") -> """{"symbols":[{"symbol":"BTCUSDT"}]}"""
                                     path.endsWith("fiat/orders") || path.endsWith("fiat/payments") ->
                                         """{"code":"000000","message":"success","data":[],"total":0,"success":true}"""
-                                    path.endsWith("convert/tradeFlow") -> """{"list":[],"startTime":0,"endTime":0,"limit":100,"moreData":false}"""
+                                    path.endsWith(
+                                        "convert/tradeFlow",
+                                    ) -> """{"list":[],"startTime":0,"endTime":0,"limit":100,"moreData":false}"""
                                     // capital/deposit/hisrec, capital/withdraw/history, myTrades all return a bare array.
                                     else -> "[]"
                                 }
