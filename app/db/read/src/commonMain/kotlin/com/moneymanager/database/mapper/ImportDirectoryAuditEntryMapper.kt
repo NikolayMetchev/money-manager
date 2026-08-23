@@ -24,14 +24,11 @@ object ImportDirectoryAuditEntryMapper {
                     entityType = EntityType.IMPORT_DIRECTORY,
                     entityId = 0,
                     revisionId = from.revision_id,
-                    detail =
-                        SourceDetailColumns(
-                            platformName = from.source_platform_name,
-                            osName = from.source_os_name,
-                            machineName = from.source_machine_name,
-                            deviceMake = from.source_device_make,
-                            deviceModel = from.source_device_model,
-                        ),
+                    platformName = from.source_platform_name,
+                    osName = from.source_os_name,
+                    machineName = from.source_machine_name,
+                    deviceMake = from.source_device_make,
+                    deviceModel = from.source_device_model,
                 ),
             )
         return ImportDirectoryAuditEntry(

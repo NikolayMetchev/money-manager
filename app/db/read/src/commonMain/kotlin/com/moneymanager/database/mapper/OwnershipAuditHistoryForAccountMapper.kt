@@ -1,9 +1,7 @@
 package com.moneymanager.database.mapper
 
 import com.moneymanager.database.sql.audit.SelectOwnershipAuditHistoryForAccount
-import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
-import com.moneymanager.domain.model.SourceRecord
 import tech.mappie.api.ObjectMappie
 
 object OwnershipAuditHistoryForAccountMapper :
@@ -19,36 +17,5 @@ object OwnershipAuditHistoryForAccountMapper :
                     from.person_middle_name,
                     from.person_last_name,
                 )
-            PersonAccountOwnershipAuditEntry::source fromValue from.toSourceRecord()
         }
 }
-
-private fun SelectOwnershipAuditHistoryForAccount.toSourceRecord(): SourceRecord? =
-    buildSourceRecord(
-        SourceColumns(
-            sourceId = source_id,
-            sourceTypeName = source_type_name,
-            deviceId = source_device_id,
-            createdAt = source_created_at,
-            entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
-            entityId = person_account_ownership_id,
-            revisionId = revision_id,
-            detail =
-                SourceDetailColumns(
-                    platformName = source_platform_name,
-                    osName = source_os_name,
-                    machineName = source_machine_name,
-                    deviceMake = source_device_make,
-                    deviceModel = source_device_model,
-                    csvImportId = source_csv_import_id,
-                    csvRowIndex = source_csv_row_index,
-                    csvFileName = source_csv_file_name,
-                    qifImportId = source_qif_import_id,
-                    qifRecordIndex = source_qif_record_index,
-                    qifFileName = source_qif_file_name,
-                    apiSessionId = source_api_session_id,
-                    apiRequestId = source_api_request_id,
-                    apiJsonPath = source_api_json_path,
-                ),
-        ),
-    )
