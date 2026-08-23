@@ -69,6 +69,7 @@ class AccountAuditDiffTest {
         id = id,
         auditTimestamp = Instant.fromEpochMilliseconds(timestampMs),
         auditType = auditType,
+        personAccountOwnershipId = id,
         revisionId = 1,
         personId = PersonId(id),
         accountId = accountId,
