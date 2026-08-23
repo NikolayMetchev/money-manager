@@ -9,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,13 +54,13 @@ import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.screens.csv.ReimportPlanPreview
+import com.moneymanager.ui.screens.csv.ReimportProgressIndicator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
 private val logger = logging()
-
-private const val VALUE_UPDATE_PREVIEW_LIMIT = 20
 
 /**
  * Re-imports an already-imported QIF so strategy/mapping changes take effect retroactively: shows a
@@ -221,11 +220,11 @@ fun QifReimportDialog(
                         when (val currentPlan = plan) {
                             null ->
                                 if (errorMessage == null) {
-                                    QifReimportProgressIndicator(planProgress ?: ImportProgress("Preparing preview"))
+                                    ReimportProgressIndicator(planProgress ?: ImportProgress("Preparing preview"))
                                 }
                             else -> {
                                 if (isRunning) {
-                                    QifReimportProgressIndicator(executeProgress ?: ImportProgress("Starting re-import"))
+                                    ReimportProgressIndicator(executeProgress ?: ImportProgress("Starting re-import"))
                                     Spacer(modifier = Modifier.height(12.dp))
                                 }
                                 QifReimportPlanPreview(currentPlan, hasPendingRecords)
@@ -318,147 +317,21 @@ private fun CsvReimportResult.toDisplaySummary(): String =
         if (skipped.isNotEmpty()) append(" · ${skipped.size} not merged/updated")
     }
 
-@Composable
-private fun QifReimportProgressIndicator(progress: ImportProgress) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        val counts =
-            progress.processed
-                ?.let { processed ->
-                    progress.total?.let { total -> " — $processed of $total" }
-                }.orEmpty()
-        Text(
-            text = "${progress.detail}$counts…",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        val fraction = progress.fraction
-        if (fraction != null) {
-            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-        } else {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
-
+/**
+ * The shared re-import preview, worded for QIF records. A QIF plan never carries the CSV-only
+ * pass-through/trade/reconcile sections, so no extra sections are contributed.
+ */
 @Composable
 private fun QifReimportPlanPreview(
     plan: ReimportPlan,
     hasPendingRecords: Boolean,
 ) {
-    Column {
-        if (plan.merges.isNotEmpty()) {
-            Text(
-                text = "Duplicate accounts to merge:",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.merges.forEach { merge ->
-                Text(
-                    text = "• ${merge.duplicateName} → ${merge.targetName} (${merge.transferCount} transaction(s))",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
-                    "Merges move ALL of the duplicate's transactions (from any import) and can be undone " +
-                        "from the account merge history.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Text(
-                text = "No duplicate accounts to merge under the current account mappings.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (plan.reversals.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Merges to reverse (accounts to split back out):",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.reversals.forEach { reversal ->
-                Text(
-                    text = "• ${reversal.deletedAccountName} ← ${reversal.survivingName} (${reversal.transferCount} transaction(s))",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
-                    "The current mappings no longer consolidate these onto the survivor, so the earlier merge " +
-                        "is undone — the account is recreated and its transactions move back.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (plan.valueUpdates.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Transactions to update to the strategy's current values (${plan.valueUpdates.size}):",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.valueUpdates.take(VALUE_UPDATE_PREVIEW_LIMIT).forEach { update ->
-                Text(
-                    text = "• ${update.description}: ${update.changes.joinToString("; ")}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (plan.valueUpdates.size > VALUE_UPDATE_PREVIEW_LIMIT) {
-                Text(
-                    text = "…and ${plan.valueUpdates.size - VALUE_UPDATE_PREVIEW_LIMIT} more",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text =
-                    "Each transaction is updated in place — including over any manual edits made to " +
-                        "its amount, date or description. Split transactions are not value-updated.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (plan.skipped.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Not merged:",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            plan.skipped.forEach { skip ->
-                Text(
-                    text = "• ${skip.accountName}: ${skip.detail}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-
-        if (hasPendingRecords) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Records not yet imported (or in error) will also be imported using the current mappings.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "Accounts created by this import that end up with no transactions will be deleted.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    ReimportPlanPreview(
+        plan = plan,
+        hasPendingItems = hasPendingRecords,
+        valueUpdateNote =
+            "Each transaction is updated in place — including over any manual edits made to " +
+                "its amount, date or description. Split transactions are not value-updated.",
+        pendingItemsNote = "Records not yet imported (or in error) will also be imported using the current mappings.",
+    )
 }
