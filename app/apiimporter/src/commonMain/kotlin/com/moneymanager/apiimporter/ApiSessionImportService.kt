@@ -145,6 +145,11 @@ data class ApiAccountsDownloadResult(
 data class ApiTransactionsDownloadResult(
     val accountCount: Int,
     val transactionResponseCount: Int,
+    /**
+     * Where this download actually started because earlier sessions had already covered the history
+     * before it; null when the full configured lookback was swept.
+     */
+    val incrementalSince: Instant? = null,
 )
 
 data class ApiAccountIdentifiersDownloadResult(
@@ -175,7 +180,11 @@ fun ApiAccountsDownloadResult.displaySummary(): String =
     }
 
 fun ApiTransactionsDownloadResult.displaySummary(): String =
-    "Transactions downloaded: $accountCount account(s), $transactionResponseCount new response page(s)."
+    buildString {
+        append("Transactions downloaded: $accountCount account(s), $transactionResponseCount new response page(s).")
+        // Date-only, in UTC: this is a coarse "how far back did we go" hint, not a precise timestamp.
+        incrementalSince?.let { append(" Incremental: fetched from ${it.toString().substringBefore('T')} onwards.") }
+    }
 
 fun ApiPeopleDownloadResult.displaySummary(): String =
     if (skipped) {
@@ -274,7 +283,13 @@ private suspend fun fetchAncestorContexts(
 
 /**
  * Downloads transactions for all accounts stored in [accountsSessionId] (or [sessionId] if not
- * provided). Incremental: pages whose URL is already stored in [sessionId] are skipped.
+ * provided).
+ *
+ * Incremental on two levels: pages whose URL is already stored in [sessionId] are skipped, which lets
+ * an interrupted download resume; and [watermarks] — how far earlier sessions of the same credential
+ * already reached, keyed by [transactionsEndpointKey] — moves each account's start forward, clamping
+ * the date-window sweep and ending cursor paging early. Pass empty [watermarks] (or
+ * [forceFullDownload]) to fetch the whole configured history from scratch.
  *
  * Call [downloadApiSessionAccounts] first so that an accounts response exists.
  */
@@ -286,6 +301,8 @@ suspend fun downloadApiSessionTransactions(
     strategy: ApiImportStrategy,
     accountsSessionId: ApiSessionId? = null,
     sca: ScaParams? = null,
+    watermarks: Map<String, Instant> = emptyMap(),
+    forceFullDownload: Boolean = false,
     onProgress: (ApiTransactionsDownloadProgress) -> Unit = {},
 ): ApiTransactionsDownloadResult {
     val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
@@ -322,10 +339,19 @@ suspend fun downloadApiSessionTransactions(
     var transactionResponseCount = 0
     val pagination = strategy.config.transactionsEndpoint.pagination
     val now = Clock.System.now()
+    var earliestIncrementalStart: Instant? = null
 
     accountEntries.forEachIndexed { index, (account, ancestorVars) ->
+        val endpointKey = transactionsEndpointKey(strategy, account.id)
+        val since = if (forceFullDownload) null else watermarks[endpointKey]
         if (pagination?.mode == PaginationMode.DATE_WINDOW) {
-            dateWindows(pagination, now).forEachIndexed { windowIndex, window ->
+            val windows = dateWindows(pagination, now, since)
+            if (since != null) {
+                windows.firstOrNull()?.start?.let { start ->
+                    earliestIncrementalStart = minOf(start, earliestIncrementalStart ?: start)
+                }
+            }
+            windows.forEachIndexed { windowIndex, window ->
                 val ctx =
                     ImportUrlContext(
                         account = account,
@@ -344,11 +370,27 @@ suspend fun downloadApiSessionTransactions(
                 )
                 val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
                 if (existingResponse == null) {
-                    fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca)
+                    fetchResponse(
+                        url = url,
+                        token = token,
+                        apiClient = apiClient,
+                        sca = sca,
+                        endpointKey = endpointKey,
+                        coversUntil = window.end,
+                    )
                     transactionResponseCount += 1
                 }
             }
         } else {
+            // Cursor paging walks newest-first, so an incremental run can stop as soon as a page falls
+            // below the watermark (less the overlap) rather than paging back to the account's opening.
+            val cursorCutoff =
+                if (since != null && pagination != null) {
+                    Instant.fromEpochMilliseconds(incrementalStartMillis(since, pagination))
+                } else {
+                    null
+                }
+            cursorCutoff?.let { earliestIncrementalStart = minOf(it, earliestIncrementalStart ?: it) }
             var before: Instant? = null
             var page = 1
             var hasTransactions: Boolean
@@ -372,7 +414,15 @@ suspend fun downloadApiSessionTransactions(
                     if (existingResponse != null) {
                         parseTransactionsWithPath(existingResponse.json, strategy)
                     } else {
-                        val response = fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca)
+                        val response =
+                            fetchResponse(
+                                url = url,
+                                token = token,
+                                apiClient = apiClient,
+                                sca = sca,
+                                endpointKey = endpointKey,
+                                coversUntil = now,
+                            )
                         transactionResponseCount += 1
                         parseTransactionsWithPath(response.body, strategy)
                     }
@@ -380,19 +430,30 @@ suspend fun downloadApiSessionTransactions(
                 before = transactions.minOfOrNull { it.created }
                 hasTransactions = transactions.isNotEmpty()
                 page += 1
+                val reachedWatermark = cursorCutoff != null && before != null && before <= cursorCutoff
                 // A null pagination config means the endpoint returns the whole feed in one response
                 // (e.g. Starling); fetch exactly one page. Cursor mode keeps paging until a page is
                 // empty. Without this guard a non-paginating endpoint that ignores the cursor would
                 // return the same items forever and loop indefinitely.
-            } while (hasTransactions && pagination != null)
+            } while (hasTransactions && pagination != null && !reachedWatermark)
         }
     }
 
     return ApiTransactionsDownloadResult(
         accountCount = accountEntries.size,
         transactionResponseCount = transactionResponseCount,
+        incrementalSince = earliestIncrementalStart,
     )
 }
+
+/**
+ * The incremental-watermark key for one account's transactions feed. Per-account, because each account
+ * pages independently and one account's coverage says nothing about another's.
+ */
+internal fun transactionsEndpointKey(
+    strategy: ApiImportStrategy,
+    accountExternalId: String,
+): String = "${strategy.config.transactionsEndpoint.path}|$accountExternalId"
 
 /**
  * Downloads the per-account identifiers endpoint (the account's own sort code + account number) into
@@ -1248,8 +1309,11 @@ private suspend fun fetchResponse(
     token: String,
     apiClient: ApiClient,
     sca: ScaParams? = null,
+    endpointKey: String? = null,
+    coversUntil: Instant? = null,
 ): ApiHttpResponse {
-    val response = apiClient.get(url = url, bearerToken = token, sca = sca)
+    val response =
+        apiClient.get(url = url, bearerToken = token, sca = sca, endpointKey = endpointKey, coversUntil = coversUntil)
     if (response.statusCode != 200) {
         throw ApiSessionImportException("HTTP ${response.statusCode}: ${response.body}")
     }
@@ -2486,17 +2550,39 @@ internal data class ApiDateWindow(
 )
 
 /**
+ * The epoch-ms an incremental download starts at given a [since] watermark: the watermark rolled back
+ * by [ApiPaginationConfig.incrementalOverlapDays], so recently-posted or backdated rows are re-fetched.
+ */
+internal fun incrementalStartMillis(
+    since: Instant,
+    pagination: ApiPaginationConfig,
+): Long = since.toEpochMilliseconds() - pagination.incrementalOverlapDays.toLong() * MILLIS_PER_DAY
+
+/**
  * Produces the date windows to fetch, anchored to fixed epoch boundaries so earlier windows yield
  * stable, cacheable URLs across re-imports; only the final window (ending [now]) shifts.
+ *
+ * [since] is the incremental watermark — how far an earlier download of the same credential already
+ * reached. When set, the sweep starts at that point less [ApiPaginationConfig.incrementalOverlapDays]
+ * (never earlier than the full [ApiPaginationConfig.lookbackDays] start, so a watermark can only ever
+ * shorten the sweep), which re-fetches the recent tail so rows the provider backdates after a download
+ * are still picked up.
  */
 internal fun dateWindows(
     pagination: ApiPaginationConfig,
     now: Instant,
+    since: Instant? = null,
 ): List<ApiDateWindow> {
     val windowMillis = pagination.windowDays.toLong() * MILLIS_PER_DAY
     if (windowMillis <= 0L) return emptyList()
     val nowMillis = now.toEpochMilliseconds()
-    val rawStart = nowMillis - pagination.lookbackDays.toLong() * MILLIS_PER_DAY
+    val lookbackStart = nowMillis - pagination.lookbackDays.toLong() * MILLIS_PER_DAY
+    val rawStart =
+        if (since == null) {
+            lookbackStart
+        } else {
+            maxOf(lookbackStart, incrementalStartMillis(since, pagination))
+        }
     var start = (rawStart / windowMillis) * windowMillis
     val windows = mutableListOf<ApiDateWindow>()
     while (start < nowMillis) {

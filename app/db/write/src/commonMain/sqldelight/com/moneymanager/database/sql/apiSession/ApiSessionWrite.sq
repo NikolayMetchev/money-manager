@@ -21,8 +21,8 @@ INSERT INTO api_session(token, device_id, created_at, expires_at, credential_id)
 VALUES (?, ?, ?, ?, ?);
 
 insertRequest:
-INSERT INTO api_request(session_id, method, url)
-VALUES (?, ?, ?);
+INSERT INTO api_request(session_id, method, url, endpoint_key, covers_until)
+VALUES (?, ?, ?, ?, ?);
 
 insertRequestHeader:
 INSERT INTO api_request_header(request_id, key, value)

@@ -70,11 +70,17 @@ CREATE TABLE api_request (
     requested_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
     method TEXT NOT NULL CHECK(length(trim(method)) > 0),
     url TEXT NOT NULL CHECK(length(trim(url)) > 0),
+    -- Which logical endpoint (plus account, for per-account bank endpoints) this request served, and
+    -- the epoch-ms high-water mark it covers. Together they let a later download of the same
+    -- credential start where the previous one finished instead of re-sweeping the whole lookback.
+    endpoint_key TEXT,
+    covers_until INTEGER,
     FOREIGN KEY (session_id) REFERENCES api_session(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_api_request_session ON api_request(session_id);
 CREATE INDEX idx_api_request_requested_at ON api_request(requested_at);
+CREATE INDEX idx_api_request_endpoint_key ON api_request(endpoint_key);
 
 CREATE TABLE api_request_header (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

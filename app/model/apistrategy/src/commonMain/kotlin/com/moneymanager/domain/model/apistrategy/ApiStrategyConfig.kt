@@ -114,6 +114,11 @@ enum class WindowBoundFormat {
  * is further paged by an integer offset that starts at 0 and advances by [limitValue] until a page
  * returns fewer than [limitValue] items — or, when [totalCountField] is set, until that many items
  * have been read. This covers APIs that cap results per response and page with an offset (Kraken `ofs`).
+ *
+ * Incremental downloads: when earlier sessions of the same credential already covered a period, the
+ * download starts at that watermark minus [incrementalOverlapDays] rather than at [lookbackDays] ago,
+ * so rows the provider posts with a backdated timestamp after a download are still picked up. The
+ * overlap is re-fetched every time, and duplicates are absorbed by the import deduper.
  */
 @Serializable
 data class ApiPaginationConfig(
@@ -134,6 +139,8 @@ data class ApiPaginationConfig(
     val offsetParam: String? = null,
     /** Optional dot-path to a total-count field in the response envelope, used to bound the offset loop. */
     val totalCountField: String? = null,
+    /** Days of already-downloaded history an incremental download re-fetches; see the class KDoc. */
+    val incrementalOverlapDays: Int = 7,
 )
 
 /**

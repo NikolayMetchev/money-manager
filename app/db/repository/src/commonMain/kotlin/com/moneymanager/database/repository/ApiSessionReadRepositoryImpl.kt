@@ -93,6 +93,19 @@ class ApiSessionReadRepositoryImpl(
             }
         }
 
+    override suspend fun getDownloadWatermarks(
+        credentialId: ApiCredentialId,
+        excludingSessionId: ApiSessionId,
+    ): Map<String, Instant> =
+        withContext(Dispatchers.Default) {
+            selectQueries
+                .selectDownloadWatermarksByCredential(credentialId.id, excludingSessionId.id)
+                .executeAsList()
+                .mapNotNull { row ->
+                    row.covers_until?.let { row.endpoint_key to Instant.fromEpochMilliseconds(it) }
+                }.toMap()
+        }
+
     override suspend fun getResponsesBySession(sessionId: ApiSessionId): List<ApiResponse> =
         withContext(Dispatchers.Default) {
             selectQueries.selectResponsesBySession(sessionId.id).executeAsList().map { it.toApiResponse() }
@@ -172,6 +185,8 @@ class ApiSessionReadRepositoryImpl(
             method = method,
             url = url,
             headers = headers.map { it.toApiRequestHeader() },
+            endpointKey = endpoint_key,
+            coversUntil = covers_until?.let(Instant::fromEpochMilliseconds),
         )
 
     private fun com.moneymanager.database.sql.apiSession.Api_request_header.toApiRequestHeader(): ApiRequestHeader =

@@ -24,6 +24,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -188,6 +189,9 @@ fun ApiSessionsScreen(
     // Per-credential download result state (cleared when a new download starts)
     var downloadResultByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiSessionDownloadResult>>(emptyMap()) }
     var downloadProgressByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiTransactionsDownloadProgress?>>(emptyMap()) }
+
+    // Credentials whose next download should ignore what earlier sessions already covered.
+    var forceFullDownloadByCredential by remember { mutableStateOf<Set<ApiCredentialId>>(emptySet()) }
     var pendingImport by remember { mutableStateOf<PendingApiImport?>(null) }
     var pendingReimport by remember { mutableStateOf<PendingApiReimport?>(null) }
     var pendingReimportAll by remember { mutableStateOf<PendingApiReimportAll?>(null) }
@@ -520,10 +524,20 @@ fun ApiSessionsScreen(
                                     sessionsByCredential[credential.id].orEmpty().any {
                                         backgroundTasks.isRunning(apiImportTaskKey(it.id)) || it.id in preparingImportSessions
                                     },
+                                forceFullDownload = credential.id in forceFullDownloadByCredential,
+                                onForceFullDownloadChange = { checked ->
+                                    forceFullDownloadByCredential =
+                                        if (checked) {
+                                            forceFullDownloadByCredential + credential.id
+                                        } else {
+                                            forceFullDownloadByCredential - credential.id
+                                        }
+                                },
                                 onDownload = {
                                     downloadResultByCredential = downloadResultByCredential - credential.id
                                     downloadProgressByCredential = downloadProgressByCredential - credential.id
                                     val transactionsBlocked = transactionsBlockReasonByCredential[credential.id] != null
+                                    val forceFull = credential.id in forceFullDownloadByCredential
                                     scope.launch {
                                         val resolvedStrategy = resolveStrategy(credential)
                                         val newSessionId =
@@ -533,6 +547,16 @@ fun ApiSessionsScreen(
                                                 createdAt = Clock.System.now(),
                                                 credentialId = credential.id,
                                             )
+                                        // How far earlier sessions of this credential already reached, so
+                                        // this download only fetches the tail. Read before any request is
+                                        // recorded into the new session, and skipped entirely when the user
+                                        // asked for a full re-download.
+                                        val watermarks =
+                                            if (forceFull) {
+                                                emptyMap()
+                                            } else {
+                                                apiSessionRepository.getDownloadWatermarks(credential.id, newSessionId)
+                                            }
                                         refresh()
                                         backgroundTasks.startTask(
                                             key = apiDownloadTaskKey(credential.id),
@@ -577,6 +601,8 @@ fun ApiSessionsScreen(
                                                         apiSessionRepository = apiSessionRepository,
                                                         sessionId = newSessionId,
                                                         strategy = strategy,
+                                                        watermarks = watermarks,
+                                                        forceFullDownload = forceFull,
                                                         onProgress = { progress ->
                                                             downloadProgressByCredential =
                                                                 downloadProgressByCredential + (credential.id to progress)
@@ -629,6 +655,8 @@ fun ApiSessionsScreen(
                                                         sessionId = newSessionId,
                                                         strategy = strategy,
                                                         sca = sca,
+                                                        watermarks = watermarks,
+                                                        forceFullDownload = forceFull,
                                                         onProgress = { progress ->
                                                             downloadProgressByCredential =
                                                                 downloadProgressByCredential + (credential.id to progress)
@@ -932,6 +960,8 @@ private fun CredentialCard(
     hasEverBeenImported: (ApiSessionId) -> Boolean,
     importedSessionCount: Int,
     isAnySessionImporting: Boolean,
+    forceFullDownload: Boolean,
+    onForceFullDownloadChange: (Boolean) -> Unit,
     onDownload: () -> Unit,
     onImport: (ApiSession) -> Unit,
     onReimport: (ApiSession) -> Unit,
@@ -987,6 +1017,18 @@ private fun CredentialCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = forceFullDownload, onCheckedChange = onForceFullDownloadChange, enabled = !isDownloading)
+                Column {
+                    Text("Re-download full history", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Ignores what earlier sessions already downloaded and fetches everything from scratch.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             Button(onClick = onDownload, enabled = !isDownloading, modifier = Modifier.fillMaxWidth()) {

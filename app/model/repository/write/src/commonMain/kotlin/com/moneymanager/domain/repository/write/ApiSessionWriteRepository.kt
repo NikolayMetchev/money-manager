@@ -85,6 +85,8 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
         method: String,
         url: String,
         headers: Map<String, String>,
+        endpointKey: String? = null,
+        coversUntil: Instant? = null,
     ): ApiRequestId
 
     /**

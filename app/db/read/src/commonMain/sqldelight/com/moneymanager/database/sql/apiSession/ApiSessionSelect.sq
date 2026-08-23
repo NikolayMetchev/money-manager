@@ -21,6 +21,19 @@ ORDER BY created_at DESC;
 selectRequestsBySession:
 SELECT * FROM api_request WHERE session_id = ? ORDER BY requested_at DESC, id DESC;
 
+-- How far each endpoint has already been downloaded for a credential, across every session but the
+-- one being downloaded into. Only a request that actually got a response counts as covered.
+selectDownloadWatermarksByCredential:
+SELECT api_request.endpoint_key AS endpoint_key, MAX(api_request.covers_until) AS covers_until
+FROM api_request
+JOIN api_response ON api_response.request_id = api_request.id
+JOIN api_session ON api_session.id = api_request.session_id
+WHERE api_session.credential_id = ?
+  AND api_session.id != ?
+  AND api_request.endpoint_key IS NOT NULL
+  AND api_request.covers_until IS NOT NULL
+GROUP BY api_request.endpoint_key;
+
 selectHeadersByRequestIds:
 SELECT * FROM api_request_header WHERE request_id IN ? ORDER BY request_id, id;
 

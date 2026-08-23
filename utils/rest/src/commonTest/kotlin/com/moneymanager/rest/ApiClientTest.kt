@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.time.Instant
 
 class ApiClientTest {
     private val testBody = """{"ok":true}"""
@@ -208,6 +209,8 @@ private data class RecordedRequest(
     val method: String,
     val url: String,
     val headers: Map<String, String>,
+    val endpointKey: String? = null,
+    val coversUntil: Instant? = null,
 )
 
 private class FakeTrafficRecorder(
@@ -221,8 +224,10 @@ private class FakeTrafficRecorder(
         method: String,
         url: String,
         headers: Map<String, String>,
+        endpointKey: String?,
+        coversUntil: Instant?,
     ): Long {
-        lastRecordedRequest = RecordedRequest(method, url, headers)
+        lastRecordedRequest = RecordedRequest(method, url, headers, endpointKey, coversUntil)
         return requestIdToReturn
     }
 

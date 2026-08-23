@@ -61,6 +61,8 @@ sealed interface ApiSessionMutation {
         val method: String,
         val url: String,
         val headers: Map<String, String>,
+        val endpointKey: String? = null,
+        val coversUntil: Instant? = null,
     ) : ApiSessionMutation
 
     data class InsertResponse(

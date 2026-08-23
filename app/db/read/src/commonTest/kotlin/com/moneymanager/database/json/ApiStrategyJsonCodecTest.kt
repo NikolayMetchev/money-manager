@@ -220,6 +220,7 @@ class ApiStrategyJsonCodecTest {
                                             offsetParam = "ofs",
                                             limitValue = 50,
                                             totalCountField = "result.count",
+                                            incrementalOverlapDays = 3,
                                         ),
                                 ),
                             kind = ApiEndpointKind.TRADES,

@@ -1839,7 +1839,7 @@ class ImportEngineImpl(
                 is ApiSessionMutation.InsertRequest ->
                     apiRequestIds.putUnique(
                         m.key,
-                        apiSessionRepository.insertRequest(m.sessionId, m.method, m.url, m.headers),
+                        apiSessionRepository.insertRequest(m.sessionId, m.method, m.url, m.headers, m.endpointKey, m.coversUntil),
                         "ApiRequest",
                     )
                 is ApiSessionMutation.InsertResponse ->
