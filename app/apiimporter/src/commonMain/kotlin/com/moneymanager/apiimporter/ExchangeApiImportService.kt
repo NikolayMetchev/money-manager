@@ -96,7 +96,7 @@ private const val MAX_RATE_LIMIT_BACKOFF_MILLIS = 60_000L
  *
  * Runs in two passes: every non-fan-out data endpoint first (so [ApiValueSet.FromDataEndpoint] has
  * something to read), then every fan-out endpoint, each expanded per [ApiEndpointConfig.fanOut] and
- * swept once per surviving value. [ApiStrategyConfig.valueEndpoints] are fetched before either pass.
+ * swept once per surviving value. `ApiStrategyConfig.valueEndpoints` are fetched before either pass.
  *
  * Incremental on two levels: a page already stored in *this* session (recorded URL present) is skipped,
  * which lets an interrupted download resume; and [watermarks] — how far earlier sessions of the same
@@ -334,11 +334,10 @@ suspend fun downloadApiSessionExchange(
                     if (offsetParam == null) {
                         false
                     } else {
-                        val pg = pagination
                         itemsSeenInWindow += items.size
-                        offset += if (pg.offsetMode == OffsetMode.PAGE_NUMBER) 1 else pg.limitValue
-                        val totalCount = pg.totalCountField?.let { field -> totalCountFromJson(body, field) }
-                        items.size >= pg.limitValue && (totalCount == null || itemsSeenInWindow < totalCount)
+                        offset += if (pagination.offsetMode == OffsetMode.PAGE_NUMBER) 1 else pagination.limitValue
+                        val totalCount = pagination.totalCountField?.let { field -> totalCountFromJson(body, field) }
+                        items.size >= pagination.limitValue && (totalCount == null || itemsSeenInWindow < totalCount)
                     }
             }
             // Reached only when every offset page of this window succeeded: a failing page sets
@@ -373,9 +372,8 @@ suspend fun downloadApiSessionExchange(
                 if (offsetParam == null) {
                     false
                 } else {
-                    val pg = pagination
-                    offset += if (pg.offsetMode == OffsetMode.PAGE_NUMBER) 1 else pg.limitValue
-                    page.size >= pg.limitValue
+                    offset += if (pagination.offsetMode == OffsetMode.PAGE_NUMBER) 1 else pagination.limitValue
+                    page.size >= pagination.limitValue
                 }
         }
         valueItemsByPath[endpoint.path] = items
@@ -405,7 +403,7 @@ suspend fun downloadApiSessionExchange(
     )
 }
 
-/** The string content of a [JsonElement] if it is a [JsonPrimitive], else null. */
+/** The string content of a `JsonElement` if it is a `JsonPrimitive`, else null. */
 private fun JsonElement.jsonPrimitiveOrNull(): String? = (this as? JsonPrimitive)?.contentOrNullCompat()
 
 /**
@@ -1154,7 +1152,8 @@ private fun parseTrade(
     val id =
         tm.compositeIdFields
             .takeIf { it.isNotEmpty() }
-            ?.let { fields -> fields.map { obj.str(it) ?: return null }.joinToString("-") }
+            ?.map { field -> obj.str(field) ?: return null }
+            ?.joinToString("-")
             ?: obj.str(tm.idField)
             ?: return null
     return ParsedTrade(

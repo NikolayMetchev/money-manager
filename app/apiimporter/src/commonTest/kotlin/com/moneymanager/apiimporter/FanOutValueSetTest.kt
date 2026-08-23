@@ -59,7 +59,6 @@ class FanOutValueSetTest {
                 ApiValueSet.CrossProduct(
                     left = ApiValueSet.Static(listOf("btc", "eth")),
                     right = ApiValueSet.Static(listOf("usdt", "gbp")),
-                    template = "{left}{right}",
                 ),
                 emptyMap(),
                 emptyMap(),
@@ -80,7 +79,6 @@ class FanOutValueSetTest {
                 ApiValueSet.CrossProduct(
                     left = ApiValueSet.Static(listOf("btc", "doge")),
                     right = ApiValueSet.Static(listOf("gbp")),
-                    template = "{left}{right}",
                 ),
                 emptyMap(),
                 emptyMap(),

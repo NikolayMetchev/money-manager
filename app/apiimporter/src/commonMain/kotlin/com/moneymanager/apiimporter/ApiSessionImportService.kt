@@ -3232,7 +3232,7 @@ internal fun JsonElement.resolveJsonPathElement(dotPath: String): JsonElement? {
 /**
  * Parses an API timestamp string per its [TimestampFormat] — ISO-8601 (bank APIs), epoch
  * milliseconds/seconds (most exchanges) including fractional seconds (Kraken), or a [pattern] string
- * (Binance withdrawal history's `"yyyy-MM-dd HH:mm:ss"`, always UTC; see [parseSpaceDateTimeUtc]).
+ * (Binance withdrawal history's `"yyyy-MM-dd HH:mm:ss"`, always UTC; see [parsePatternedTimestamp]).
  */
 internal fun parseApiTimestamp(
     value: String,
@@ -3295,7 +3295,7 @@ internal fun parsePatternedTimestamp(
         }
     }
     if (vi != value.length) return null
-    if (month < 1 || month > 12 || day < 1 || day > 31 || hour !in 0..23 || minute !in 0..59 || second !in 0..60) return null
+    if (month !in 1..12 || day !in 1..31 || hour !in 0..23 || minute !in 0..59 || second !in 0..60) return null
     val epochDay = daysFromCivil(year, month, day)
     val epochSeconds = epochDay * 86_400L + hour * 3_600L + minute * 60L + second
     return Instant.fromEpochSeconds(epochSeconds)

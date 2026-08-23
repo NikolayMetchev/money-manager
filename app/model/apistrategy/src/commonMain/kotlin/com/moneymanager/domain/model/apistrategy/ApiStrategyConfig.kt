@@ -48,7 +48,7 @@ enum class TimestampFormat {
     /**
      * A custom date-time pattern (e.g. Binance withdrawal history's `"yyyy-MM-dd HH:mm:ss"`, always
      * UTC), given per-mapping in `timestampPattern`. Not a Java/ICU pattern — see
-     * [com.moneymanager.apiimporter.parseApiTimestamp] for the small set of tokens supported.
+     * `parseApiTimestamp` (`app:apiimporter`) for the small set of tokens supported.
      */
     PATTERN,
 }
@@ -95,7 +95,7 @@ enum class PaginationMode {
      *
      * Unlike [DATE_WINDOW]/[CURSOR], this mode does **not** consult the incremental watermark (a time
      * value can't seed a numeric id cursor without an extra lookup) — every download walks the id space
-     * from the start. Cheap because [ApiClient]'s per-page resume-skip still applies within one
+     * from the start. Cheap because `ApiClient`'s per-page resume-skip still applies within one
      * interrupted-and-retried session, and any cross-session overlap is absorbed by the import deduper.
      */
     FORWARD_ID_CURSOR,

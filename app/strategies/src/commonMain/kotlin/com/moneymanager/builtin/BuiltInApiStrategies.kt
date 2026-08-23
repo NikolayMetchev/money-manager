@@ -834,8 +834,8 @@ object BuiltInApiStrategies {
      * Built-in Binance API strategy — pure config over the generic signed-exchange engine (no provider
      * code). Binance's REST auth is HMAC-SHA256 over the query string + body, api key in the
      * `X-MBX-APIKEY` header, `timestamp` and `signature` appended to the query — the
-     * [ApiRequestSigningConfig] KDoc names this shape explicitly, and [ApiRequestSignerTest] carries
-     * Binance's own published signature vector.
+     * [ApiRequestSigningConfig] KDoc names this shape explicitly, and `ApiRequestSignerTest` (`utils:rest`)
+     * carries Binance's own published signature vector.
      *
      * Binance has no account-wide trade feed (`myTrades` requires a `symbol`), so spot trades are
      * fetched via [ApiEndpointConfig.fanOut]: candidate symbols are the cross product of every asset
@@ -860,7 +860,6 @@ object BuiltInApiStrategies {
                 windowBoundFormat = WindowBoundFormat.EPOCH_MS,
                 windowDays = 90,
                 offsetParam = "offset",
-                limitParam = "limit",
                 limitValue = 1_000,
                 sendLimitParam = true,
             )
@@ -899,7 +898,6 @@ object BuiltInApiStrategies {
                 mode = PaginationMode.FORWARD_ID_CURSOR,
                 cursorParam = "fromId",
                 cursorResponseField = "id",
-                limitParam = "limit",
                 limitValue = 1_000,
                 sendLimitParam = true,
             )
@@ -1004,7 +1002,6 @@ object BuiltInApiStrategies {
                                         ),
                                     ),
                                 right = ApiValueSet.Static(quoteAssets),
-                                template = "{left}{right}",
                             ),
                         // exchangeInfo's responseArrayKey ("symbols") already unwraps the response to individual
                         // symbol objects before they're stored, so each item's own "symbol" field is read
@@ -1055,12 +1052,10 @@ object BuiltInApiStrategies {
                                 ApiEndpointKind.DEPOSITS,
                                 transactionMappings =
                                     ApiTransactionMappings(
-                                        amountField = "amount",
                                         currencyField = "coin",
                                         timestampField = "insertTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                                        idField = "id",
                                         counterpartyAddressField = "address",
                                         counterpartyNetworkField = "network",
                                         txidField = "txId",
@@ -1076,13 +1071,11 @@ object BuiltInApiStrategies {
                                 ApiEndpointKind.WITHDRAWALS,
                                 transactionMappings =
                                     ApiTransactionMappings(
-                                        amountField = "amount",
                                         currencyField = "coin",
                                         timestampField = "applyTime",
                                         timestampFormat = TimestampFormat.PATTERN,
                                         timestampPattern = "yyyy-MM-dd HH:mm:ss",
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                                        idField = "id",
                                         counterpartyAddressField = "address",
                                         counterpartyNetworkField = "network",
                                         txidField = "txId",
@@ -1099,7 +1092,6 @@ object BuiltInApiStrategies {
                                 ApiEndpointKind.DEPOSITS,
                                 transactionMappings =
                                     ApiTransactionMappings(
-                                        amountField = "amount",
                                         currencyField = "fiatCurrency",
                                         timestampField = "createTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
@@ -1115,7 +1107,6 @@ object BuiltInApiStrategies {
                                 ApiEndpointKind.WITHDRAWALS,
                                 transactionMappings =
                                     ApiTransactionMappings(
-                                        amountField = "amount",
                                         currencyField = "fiatCurrency",
                                         timestampField = "createTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,

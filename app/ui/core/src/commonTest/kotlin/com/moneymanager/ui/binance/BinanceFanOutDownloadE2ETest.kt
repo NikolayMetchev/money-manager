@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 /**
- * End-to-end test of [com.moneymanager.domain.model.apistrategy.ApiFanOut] resolution against the
+ * End-to-end test of `ApiFanOut` resolution against the
  * built-in Binance config: the `getUserAsset` value endpoint supplies one held asset (BTC), crossed
  * with Binance's static quote-asset list produces many candidate symbols, and `exchangeInfo`'s real
  * symbol universe (mocked to contain only `BTCUSDT`) intersects that down to exactly one - so exactly
