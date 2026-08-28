@@ -902,8 +902,8 @@ object BuiltInApiStrategies {
                 windowDays = 90,
                 offsetParam = "current",
                 offsetMode = OffsetMode.PAGE_NUMBER,
+                // "size" caps at 100 a page, which is already ApiPaginationConfig's default limitValue.
                 limitParam = "size",
-                limitValue = 100,
                 sendLimitParam = true,
                 totalCountField = "total",
             )
