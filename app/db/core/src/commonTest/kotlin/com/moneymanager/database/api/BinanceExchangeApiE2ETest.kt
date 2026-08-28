@@ -3,6 +3,7 @@
 package com.moneymanager.database.api
 
 import com.moneymanager.apiimporter.importApiSessionExchange
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
@@ -99,6 +100,67 @@ class BinanceExchangeApiE2ETest : DbTest() {
           "isBuyer":false}]
         """.trimIndent()
 
+    // Simple Earn: principal moving between the Spot wallet and the Earn wallet. "PURCHASING" is still
+    // in flight, so only the SUCCESS row imports.
+    private val earnSubscriptionsJson =
+        """
+        {"rows":[
+          {"purchaseId":26055,"asset":"XMR","amount":"5.81000000","time":1700000006000,"status":"SUCCESS"},
+          {"purchaseId":26056,"asset":"XMR","amount":"1.00000000","time":1700000006100,"status":"PURCHASING"}
+        ],"total":2}
+        """.trimIndent()
+
+    private val earnRedemptionsJson =
+        """
+        {"rows":[
+          {"redeemId":40607,"asset":"BUSD","amount":"1373.16000000","time":1700000007000,"projectId":"BUSD001","status":"PAID"}
+        ],"total":1}
+        """.trimIndent()
+
+    // Reward rows carry no id of any kind - only the composite key (asset + project + time + amount) keeps
+    // these two apart.
+    private val earnRewardsBonusJson =
+        """
+        {"rows":[
+          {"asset":"BUSD","rewards":"0.00006408","projectId":"BUSD001","type":"BONUS","time":1700000008000},
+          {"asset":"BUSD","rewards":"0.00007000","projectId":"BUSD001","type":"BONUS","time":1700000008500}
+        ],"total":2}
+        """.trimIndent()
+
+    // One dust conversion sweeping two small balances into BNB; the money is in the nested detail rows.
+    private val dustJson =
+        """
+        {"total":1,"userAssetDribblets":[
+          {"operateTime":1700000009000,"totalTransferedAmount":"0.00023200","totalServiceChargeAmount":"0.00000600",
+           "transId":45178372831,
+           "userAssetDribbletDetails":[
+             {"transId":4359321,"fromAsset":"XRP","amount":"0.17015309","transferedAmount":"0.00009100",
+              "serviceChargeAmount":"0.00000900","operateTime":1700000009000},
+             {"transId":4359322,"fromAsset":"ADA","amount":"1.50000000","transferedAmount":"0.00014100",
+              "serviceChargeAmount":"0.00000400","operateTime":1700000009000}
+           ]}
+        ]}
+        """.trimIndent()
+
+    private val dividendJson =
+        """
+        {"rows":[
+          {"id":1637366104,"amount":"10.00000000","asset":"BHFT","divTime":1700000010000,"enInfo":"BHFT distribution",
+           "tranId":2968885920}
+        ],"total":1}
+        """.trimIndent()
+
+    // A universal transfer out to the Funding wallet; the PENDING row must not import.
+    private val spotToFundingJson =
+        """
+        {"rows":[
+          {"asset":"USDT","amount":"25.00000000","type":"MAIN_FUNDING","status":"CONFIRMED","tranId":11945860693,
+           "timestamp":1700000011000},
+          {"asset":"USDT","amount":"9.00000000","type":"MAIN_FUNDING","status":"PENDING","tranId":11945860694,
+           "timestamp":1700000011500}
+        ],"total":2}
+        """.trimIndent()
+
     private suspend fun stageSessionAndImport(): Int {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Binance").first()
         assertNotNull(strategy, "built-in Binance strategy should be installed")
@@ -129,6 +191,23 @@ class BinanceExchangeApiE2ETest : DbTest() {
         stage("sapi/v1/convert/tradeFlow?ep=sapi/v1/convert/tradeFlow", convertJson)
         // Two fan-out requests for the SAME data endpoint (different symbols) both carry the base "ep="
         // marker - the import phase matches by that marker alone, not by fan-out value, so both are parsed.
+        stage(
+            "sapi/v1/simple-earn/flexible/history/subscriptionRecord" +
+                "?ep=sapi/v1/simple-earn/flexible/history/subscriptionRecord",
+            earnSubscriptionsJson,
+        )
+        stage(
+            "sapi/v1/simple-earn/flexible/history/redemptionRecord?ep=sapi/v1/simple-earn/flexible/history/redemptionRecord",
+            earnRedemptionsJson,
+        )
+        // The three rewardsRecord endpoints share one path and differ only by the required "type" param.
+        stage(
+            "sapi/v1/simple-earn/flexible/history/rewardsRecord?ep=sapi/v1/simple-earn/flexible/history/rewardsRecord?type=BONUS",
+            earnRewardsBonusJson,
+        )
+        stage("sapi/v1/asset/dribblet?ep=sapi/v1/asset/dribblet", dustJson)
+        stage("sapi/v1/asset/assetDividend?ep=sapi/v1/asset/assetDividend", dividendJson)
+        stage("sapi/v1/asset/transfer?ep=sapi/v1/asset/transfer?type=MAIN_FUNDING", spotToFundingJson)
         stage("api/v3/myTrades?ep=api/v3/myTrades&fv=BTCUSDT", myTradesBtcUsdtJson)
         stage("api/v3/myTrades?ep=api/v3/myTrades&fv=ETHUSDT", myTradesEthUsdtJson)
 
@@ -210,6 +289,11 @@ class BinanceExchangeApiE2ETest : DbTest() {
                     ).first()
                     .firstOrNull { it.targetAccountId == exchange.id && it.amount.asset.code == "GBP" }
             assertNotNull(fiatDeposit, "fiat deposit (transactionType=0) should be booked as incoming")
+            assertEquals(
+                "Binance Bank",
+                accountName(fiatDeposit.sourceAccountId),
+                "the fiat endpoint's declared counterparty account is honoured, not the generic funding account",
+            )
             val fiatWithdrawal =
                 repositories.transactionRepository
                     .getTransactionsByDateRange(
@@ -223,7 +307,8 @@ class BinanceExchangeApiE2ETest : DbTest() {
             val trades = repositories.tradeRepository.getTradesByAccount(exchange.id).first()
             val fiatBuy = trades.first { it.to.asset.code == "BTC" && it.from.asset.code == "GBP" }
             assertEquals("0.005", fiatBuy.to.toDisplayValue().toString())
-            val convert = trades.first { it.to.asset.code == "BNB" }
+            // Picked by its own BNB amount - dust conversions also acquire BNB (see the Simple Earn test).
+            val convert = trades.first { it.to.asset.code == "BNB" && it.to.toDisplayValue().toString() == "0.06154036" }
             assertEquals("USDT", convert.from.asset.code)
 
             // Fan-out spot trades: BTCUSDT and ETHUSDT both carry the raw id "28457", but
@@ -243,5 +328,80 @@ class BinanceExchangeApiE2ETest : DbTest() {
                     .size,
                 "re-import must not double-book trades",
             )
+        }
+
+    private suspend fun accountName(id: AccountId?): String? {
+        val wanted = id ?: return null
+        return repositories.accountRepository
+            .getAllAccounts()
+            .first()
+            .firstOrNull { it.id == wanted }
+            ?.name
+    }
+
+    private suspend fun transfersInWindow() =
+        repositories.transactionRepository
+            .getTransactionsByDateRange(
+                startDate = Instant.fromEpochMilliseconds(1_700_000_005_900L),
+                endDate = Instant.fromEpochMilliseconds(1_700_000_012_000L),
+            ).first()
+
+    @Test
+    fun `imports Simple Earn principal and rewards, dust conversions, distributions and wallet transfers`() =
+        runTest {
+            stageSessionAndImport()
+
+            val exchange =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .firstOrNull { it.name == "Binance" }
+            assertNotNull(exchange)
+            val transfers = transfersInWindow()
+
+            // Earn principal leaves the spot account for its own wallet account, and comes back on redemption.
+            val subscription = transfers.single { it.amount.asset.code == "XMR" }
+            assertEquals(exchange.id, subscription.sourceAccountId)
+            assertEquals("Binance Earn", accountName(subscription.targetAccountId))
+            assertEquals("5.81", subscription.amount.toDisplayValue().toString(), "the PURCHASING row must not import")
+
+            val redemption = transfers.single { it.amount.asset.code == "BUSD" && it.amount.toDisplayValue().toString() == "1373.16" }
+            assertEquals("Binance Earn", accountName(redemption.sourceAccountId))
+            assertEquals(exchange.id, redemption.targetAccountId)
+
+            // Rewards: two id-less rows kept apart by their composite key, credited from their own account.
+            val rewards = transfers.filter { accountName(it.sourceAccountId) == "Binance Earn Rewards" }
+            assertEquals(2, rewards.size, "both id-less reward rows import (composite id, not a shared null id)")
+            assertEquals(setOf("BUSD"), rewards.map { it.amount.asset.code }.toSet())
+            assertEquals(setOf("0.00006408", "0.00007"), rewards.map { it.amount.toDisplayValue().toString() }.toSet())
+
+            // A distribution credits in from its own counterparty account.
+            val dividend = transfers.single { it.amount.asset.code == "BHFT" }
+            assertEquals(exchange.id, dividend.targetAccountId)
+            assertEquals("Binance Distribution", accountName(dividend.sourceAccountId))
+
+            // Spot -> Funding wallet; the PENDING row is filtered out.
+            val walletTransfer = transfers.single { it.amount.asset.code == "USDT" && it.sourceAccountId == exchange.id }
+            assertEquals("Binance Funding Wallet", accountName(walletTransfer.targetAccountId))
+            assertEquals("25", walletTransfer.amount.toDisplayValue().toString())
+
+            // Dust: the nested detail rows are the movement, each acquiring BNB with the swept asset.
+            val trades = repositories.tradeRepository.getTradesByAccount(exchange.id).first()
+            val dustXrp = trades.single { it.from.asset.code == "XRP" }
+            assertEquals("BNB", dustXrp.to.asset.code)
+            assertEquals("0.000091", dustXrp.to.toDisplayValue().toString())
+            assertEquals("0.17015309", dustXrp.from.toDisplayValue().toString())
+            assertTrue(trades.any { it.from.asset.code == "ADA" && it.to.asset.code == "BNB" }, "both detail rows import")
+
+            val tradesBefore = trades.size
+            val transfersBefore = transfers.size
+            stageSessionAndImport()
+            val tradesAfter =
+                repositories.tradeRepository
+                    .getTradesByAccount(exchange.id)
+                    .first()
+                    .size
+            assertEquals(tradesBefore, tradesAfter)
+            assertEquals(transfersBefore, transfersInWindow().size, "re-import must not double-book the new endpoints")
         }
 }

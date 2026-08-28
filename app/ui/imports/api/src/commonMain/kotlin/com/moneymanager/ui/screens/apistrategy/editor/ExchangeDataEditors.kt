@@ -361,6 +361,18 @@ internal fun TradeMappingsEditor(
                     { onChange(mappings.copy(quoteAssetField = it.ifBlank { null })) },
                     enabled,
                 )
+                TextFieldRow(
+                    "Fixed base asset (used when the row never names it, e.g. BNB)",
+                    mappings.fixedBaseAsset.orEmpty(),
+                    { onChange(mappings.copy(fixedBaseAsset = it.ifBlank { null })) },
+                    enabled,
+                )
+                TextFieldRow(
+                    "Fixed quote asset (used when the row never names it)",
+                    mappings.fixedQuoteAsset.orEmpty(),
+                    { onChange(mappings.copy(fixedQuoteAsset = it.ifBlank { null })) },
+                    enabled,
+                )
             }
             InstrumentSplitMode.QUOTE_SUFFIX ->
                 StringSetEditor(
@@ -617,7 +629,9 @@ private fun ApiTradeMappings.isValidForSave(): Boolean =
         (!priceField.isNullOrBlank() || !quoteQuantityField.isNullOrBlank()) &&
         when (splitMode) {
             InstrumentSplitMode.SEPARATOR -> instrumentSeparator.isNotBlank()
-            InstrumentSplitMode.EXPLICIT_FIELDS -> !baseAssetField.isNullOrBlank() && !quoteAssetField.isNullOrBlank()
+            InstrumentSplitMode.EXPLICIT_FIELDS ->
+                (!baseAssetField.isNullOrBlank() || !fixedBaseAsset.isNullOrBlank()) &&
+                    (!quoteAssetField.isNullOrBlank() || !fixedQuoteAsset.isNullOrBlank())
             InstrumentSplitMode.QUOTE_SUFFIX -> quoteAssets.isNotEmpty()
         }
 
@@ -626,7 +640,8 @@ private fun ApiTransactionMappings.isValidForSave(): Boolean =
         timestampField.isNotBlank() &&
         currencyField.isNotBlank() &&
         descriptionField.isNotBlank() &&
-        idField.isNotBlank() &&
+        // A row with no id of its own (Binance Simple Earn rewards) is identified by a composite key instead.
+        (idField.isNotBlank() || compositeIdFields.isNotEmpty()) &&
         (signSource != ApiSignSource.FIELD || !signField.isNullOrBlank())
 
 /** Whether an [ApiEndpointConfig] is complete enough to save, independent of what kind of record it produces. */

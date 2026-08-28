@@ -823,6 +823,12 @@ internal fun EndpointEditor(
         )
     }
     TextFieldRow(
+        label = "Nested items key (optional, e.g. userAssetDribbletDetails)",
+        value = endpoint.nestedItemsKey.orEmpty(),
+        onValueChange = { onChange(endpoint.copy(nestedItemsKey = it.ifBlank { null })) },
+        enabled = enabled,
+    )
+    TextFieldRow(
         label = "Success code field (optional, e.g. code)",
         value = endpoint.successCodeField.orEmpty(),
         onValueChange = { onChange(endpoint.copy(successCodeField = it.ifBlank { null })) },
