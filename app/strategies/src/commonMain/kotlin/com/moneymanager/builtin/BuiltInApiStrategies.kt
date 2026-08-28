@@ -1455,7 +1455,11 @@ object BuiltInApiStrategies {
                                             timestampField = "time",
                                             timestampFormat = TimestampFormat.EPOCH_MS,
                                             amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                                            compositeIdFields = listOf("asset", "projectId", "time", "rewards"),
+                                            // "type" is part of the key because the three reward endpoints
+                                            // are otherwise indistinguishable: a BONUS and a REALTIME row
+                                            // for the same project, second and amount would collide and
+                                            // one of the two would be dropped as a duplicate.
+                                            compositeIdFields = listOf("asset", "projectId", "type", "time", "rewards"),
                                         ),
                                     fixedDirection = TransferDirection.IN,
                                     counterpartyAccountName = "Binance Earn Rewards",

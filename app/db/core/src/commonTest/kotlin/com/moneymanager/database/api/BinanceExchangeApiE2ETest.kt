@@ -117,14 +117,22 @@ class BinanceExchangeApiE2ETest : DbTest() {
         ],"total":1}
         """.trimIndent()
 
-    // Reward rows carry no id of any kind - only the composite key (asset + project + time + amount) keeps
-    // these two apart.
+    // Reward rows carry no id of any kind - only the composite key keeps them apart.
     private val earnRewardsBonusJson =
         """
         {"rows":[
           {"asset":"BUSD","rewards":"0.00006408","projectId":"BUSD001","type":"BONUS","time":1700000008000},
           {"asset":"BUSD","rewards":"0.00007000","projectId":"BUSD001","type":"BONUS","time":1700000008500}
         ],"total":2}
+        """.trimIndent()
+
+    // Same asset, project, second and amount as the first BONUS row, differing only by reward type - the
+    // two must stay distinct records rather than one suppressing the other as a duplicate.
+    private val earnRewardsRealtimeJson =
+        """
+        {"rows":[
+          {"asset":"BUSD","rewards":"0.00006408","projectId":"BUSD001","type":"REALTIME","time":1700000008000}
+        ],"total":1}
         """.trimIndent()
 
     // One dust conversion sweeping two small balances into BNB; the money is in the nested detail rows.
@@ -204,6 +212,11 @@ class BinanceExchangeApiE2ETest : DbTest() {
         stage(
             "sapi/v1/simple-earn/flexible/history/rewardsRecord?ep=sapi/v1/simple-earn/flexible/history/rewardsRecord?type=BONUS",
             earnRewardsBonusJson,
+        )
+        stage(
+            "sapi/v1/simple-earn/flexible/history/rewardsRecord" +
+                "?ep=sapi/v1/simple-earn/flexible/history/rewardsRecord?type=REALTIME",
+            earnRewardsRealtimeJson,
         )
         stage("sapi/v1/asset/dribblet?ep=sapi/v1/asset/dribblet", dustJson)
         stage("sapi/v1/asset/assetDividend?ep=sapi/v1/asset/assetDividend", dividendJson)
@@ -371,9 +384,17 @@ class BinanceExchangeApiE2ETest : DbTest() {
 
             // Rewards: two id-less rows kept apart by their composite key, credited from their own account.
             val rewards = transfers.filter { accountName(it.sourceAccountId) == "Binance Earn Rewards" }
-            assertEquals(2, rewards.size, "both id-less reward rows import (composite id, not a shared null id)")
+            assertEquals(
+                3,
+                rewards.size,
+                "every id-less reward row imports - including the REALTIME row identical to a BONUS one but " +
+                    "for its type, which the composite id keeps distinct",
+            )
             assertEquals(setOf("BUSD"), rewards.map { it.amount.asset.code }.toSet())
-            assertEquals(setOf("0.00006408", "0.00007"), rewards.map { it.amount.toDisplayValue().toString() }.toSet())
+            assertEquals(
+                listOf("0.00006408", "0.00006408", "0.00007"),
+                rewards.map { it.amount.toDisplayValue().toString() }.sorted(),
+            )
 
             // A distribution credits in from its own counterparty account.
             val dividend = transfers.single { it.amount.asset.code == "BHFT" }

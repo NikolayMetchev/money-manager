@@ -281,7 +281,7 @@ class ApiStrategyJsonCodecTest {
                                 ApiTransactionMappings(
                                     amountField = "rewards",
                                     currencyField = "asset",
-                                    compositeIdFields = listOf("asset", "projectId", "time", "rewards"),
+                                    compositeIdFields = listOf("asset", "projectId", "type", "time", "rewards"),
                                 ),
                         ),
                         ApiDataEndpoint(
@@ -313,7 +313,7 @@ class ApiStrategyJsonCodecTest {
         assertEquals("BNB", decoded.dataEndpoints[1].tradeMappings?.fixedBaseAsset)
         assertEquals("Binance Earn Rewards", decoded.dataEndpoints[0].counterpartyAccountName)
         assertEquals(
-            listOf("asset", "projectId", "time", "rewards"),
+            listOf("asset", "projectId", "type", "time", "rewards"),
             decoded.dataEndpoints[0].transactionMappings?.compositeIdFields,
         )
     }
