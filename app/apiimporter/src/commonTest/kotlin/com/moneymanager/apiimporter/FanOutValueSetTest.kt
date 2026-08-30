@@ -42,6 +42,27 @@ class FanOutValueSetTest {
     }
 
     @Test
+    fun `a flattened endpoint's nested rows feed the fan-out`() {
+        // An asset only ever swept as dust appears nowhere but the nested detail rows, so the fan-out has
+        // to see the flattened items (Binance asset/dribblet -> myTrades symbol candidates).
+        val response =
+            """{ "userAssetDribblets": [ { "userAssetDribbletDetails": [
+                { "fromAsset": "xrp" }, { "fromAsset": "ada" }
+            ] } ] }"""
+        val items =
+            responseItemsArray(response, "userAssetDribblets", nestedItemsKey = "userAssetDribbletDetails")
+                .orEmpty()
+                .filterIsInstance<JsonObject>()
+        val result =
+            resolveValueSet(
+                ApiValueSet.FromDataEndpoint("sapi/v1/asset/dribblet", listOf("fromAsset")),
+                emptyMap(),
+                mapOf("sapi/v1/asset/dribblet" to items),
+            )
+        assertEquals(listOf("XRP", "ADA"), result)
+    }
+
+    @Test
     fun `union combines several sets`() {
         val result =
             resolveValueSet(

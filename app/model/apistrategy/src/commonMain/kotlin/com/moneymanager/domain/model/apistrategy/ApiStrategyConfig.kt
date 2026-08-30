@@ -208,6 +208,13 @@ data class ApiPaginationConfig(
  * @property itemKeyField When [responseObjectValues] is set, the map key of each entry is spliced into
  *                        that entry's JSON object under this field name before mapping (e.g. Kraken's
  *                        ledger id, which appears only as the object key, not as a value field).
+ * @property nestedItemsKey Dot-path to an array *inside* each element at [responseArrayKey] whose elements
+ *                          are the real items (Binance `asset/dribblet`, where one dust conversion holds a
+ *                          `userAssetDribbletDetails` array with one entry per asset swept into BNB). The
+ *                          outer elements are then only containers and never mapped themselves. Because
+ *                          flattening changes how many items a page appears to hold, it must not be combined
+ *                          with [ApiPaginationConfig.offsetParam] paging, whose loop compares an item count
+ *                          against the page size.
  */
 @Serializable
 data class ApiEndpointConfig(
@@ -222,6 +229,7 @@ data class ApiEndpointConfig(
     val errorArrayField: String? = null,
     val responseObjectValues: Boolean = false,
     val itemKeyField: String? = null,
+    val nestedItemsKey: String? = null,
     /**
      * Relative rate-limit cost of one request to this endpoint (e.g. Kraken's ledger/trade-history
      * calls cost 2 counter units against 1 for other endpoints). Multiplies the strategy's
@@ -455,6 +463,13 @@ data class ApiTransactionMappings(
      */
     @Serializable(with = SortedRulePredicateListSerializer::class)
     val itemFilters: List<RulePredicate> = emptyList(),
+    /**
+     * Dot-paths joined (in list order, hyphen-separated) into the transfer's de-duplication id instead of
+     * [idField], for an endpoint whose rows carry no id at all (Binance Simple Earn `rewardsRecord`, whose
+     * rows are only asset + project + type + time + amount). Order is semantic (produces a readable, stable
+     * composite key) - keeps default insertion-order serialization. Empty (the default) uses [idField] alone.
+     */
+    val compositeIdFields: List<String> = emptyList(),
 )
 
 @Serializable
@@ -954,8 +969,11 @@ enum class TransferDirection {
  * @property transactionMappings Field mappings for [ApiEndpointKind.BANK_TRANSACTIONS]/DEPOSITS/WITHDRAWALS.
  * @property tradeMappings Field mappings for [ApiEndpointKind.TRADES]/ORDERS.
  * @property fixedDirection For DEPOSITS/WITHDRAWALS, the movement direction (amounts are unsigned).
- * @property counterpartyAccountName For DEPOSITS/WITHDRAWALS, the fixed external/funding account name
- *                                   the money comes from / goes to (e.g. "Crypto.com Exchange Funding").
+ * @property counterpartyAccountName For DEPOSITS/WITHDRAWALS, the fixed account the money comes from /
+ *                                   goes to when the row carries neither a counterparty alias nor a wallet
+ *                                   address (e.g. "Binance Earn" for a Simple Earn subscription, "Binance
+ *                                   Bank" for a fiat on-ramp). Null falls back to the strategy-wide
+ *                                   "<synthetic account> Funding".
  * @property enrichesTransfers When true, this endpoint produces no transfers/trades of its own; its
  *                             items are indexed by [transactionMappings]' `idField` and used only to
  *                             enrich transfers built from other endpoints whose mapping sets a matching
@@ -997,6 +1015,7 @@ enum class InstrumentSplitMode {
  * @property splitMode How [instrumentField] is split into base/quote assets.
  * @property instrumentSeparator Separator for [InstrumentSplitMode.SEPARATOR] (default "_").
  * @property baseAssetField/quoteAssetField Dot-paths for [InstrumentSplitMode.EXPLICIT_FIELDS].
+ * @property fixedBaseAsset/fixedQuoteAsset Constant asset codes used when the matching field is null.
  * @property quoteAssets Known quote assets for [InstrumentSplitMode.QUOTE_SUFFIX] (longest match wins).
  * @property sideField Dot-path to the buy/sell side; [buyValues] enumerates the values meaning BUY.
  * @property baseQuantityField Dot-path to the base-asset quantity traded.
@@ -1014,6 +1033,14 @@ data class ApiTradeMappings(
     val instrumentSeparator: String = "_",
     val baseAssetField: String? = null,
     val quoteAssetField: String? = null,
+    /**
+     * A constant base asset code for [InstrumentSplitMode.EXPLICIT_FIELDS], used when [baseAssetField] is
+     * null because the item never names the asset it acquired (Binance dust conversions always credit BNB).
+     * Mirrors [fixedSideBuy]: what the endpoint *is* carries the information, not the row.
+     */
+    val fixedBaseAsset: String? = null,
+    /** A constant quote asset code, the [fixedBaseAsset] counterpart for [quoteAssetField]. */
+    val fixedQuoteAsset: String? = null,
     @Serializable(with = SortedStringListSerializer::class)
     val quoteAssets: List<String> = emptyList(),
     /** Dot-path to the buy/sell side; null when [fixedSideBuy] fixes the direction instead. */

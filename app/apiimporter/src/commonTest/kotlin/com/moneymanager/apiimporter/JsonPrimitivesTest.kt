@@ -91,6 +91,41 @@ class JsonPrimitivesTest {
     }
 
     @Test
+    fun `a nested items key flattens each container into its own rows, with resolvable audit paths`() {
+        // Binance asset/dribblet: one conversion sweeps several small balances into BNB, and only the
+        // nested detail rows carry the per-asset movement.
+        val json =
+            """{ "total": 1, "userAssetDribblets": [
+                { "operateTime": 1615985535000, "totalTransferedAmount": "0.00132256", "transId": 45178372831,
+                  "userAssetDribbletDetails": [
+                    { "transId": 4359321, "fromAsset": "XRP", "amount": "0.17015309", "transferedAmount": "0.000091" },
+                    { "transId": 4359322, "fromAsset": "ADA", "amount": "1.5", "transferedAmount": "0.000141" }
+                  ] }
+            ] }"""
+        val items = responseItemsWithKeys(json, "userAssetDribblets", nestedItemsKey = "userAssetDribbletDetails")
+        assertEquals(2, items?.size)
+        assertEquals(
+            listOf("XRP", "ADA"),
+            items.orEmpty().map { (_, item) -> ((item as JsonObject)["fromAsset"] as JsonPrimitive).content },
+        )
+
+        val firstKey = items.orEmpty().first().first
+        assertEquals("[0].userAssetDribbletDetails[0]", firstKey)
+        val path = keyedItemJsonPath("userAssetDribblets", firstKey!!)
+        assertEquals(JsonPath("$.userAssetDribblets[0].userAssetDribbletDetails[0]"), path)
+
+        // The audit path resolves against the real response, so "view origin" lands on the mapped row.
+        val resolved = Json.parseToJsonElement(json).resolveJsonPathElement(path.value.removePrefix("$."))
+        assertEquals("0.17015309", ((resolved as? JsonObject)?.get("amount") as? JsonPrimitive)?.content)
+    }
+
+    @Test
+    fun `a container with no nested array contributes no rows`() {
+        val json = """{ "userAssetDribblets": [ { "transId": 1 } ] }"""
+        assertEquals(0, responseItemsArray(json, "userAssetDribblets", nestedItemsKey = "userAssetDribbletDetails")?.size)
+    }
+
+    @Test
     fun `plain array items report no key, falling back to index paths`() {
         val json = """{ "trades": [ { "id": "T1" }, { "id": "T2" } ] }"""
         val items = responseItemsWithKeys(json, "trades")

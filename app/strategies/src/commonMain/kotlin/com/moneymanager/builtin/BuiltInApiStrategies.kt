@@ -891,6 +891,38 @@ object BuiltInApiStrategies {
                 windowDays = 30,
             )
 
+        // Simple Earn history: a date window (Binance rejects a range longer than 3 months) further paged
+        // by 1-based "current"/"size" (max 100/page), bounded by the envelope's top-level "total".
+        val earnHistoryWindow =
+            ApiPaginationConfig(
+                mode = PaginationMode.DATE_WINDOW,
+                startParam = "startTime",
+                endParam = "endTime",
+                windowBoundFormat = WindowBoundFormat.EPOCH_MS,
+                windowDays = 90,
+                offsetParam = "current",
+                offsetMode = OffsetMode.PAGE_NUMBER,
+                // "size" caps at 100 a page, which is already ApiPaginationConfig's default limitValue.
+                limitParam = "size",
+                sendLimitParam = true,
+                totalCountField = "total",
+            )
+
+        // asset/transfer rejects a window longer than 30 days ("-5026 Start time query records range is
+        // too large"), unlike the 90 the deposit/withdraw history accepts.
+        val universalTransferWindow = earnHistoryWindow.copy(windowDays = 30)
+
+        // dribblet has no page/offset scheme at all, which is exactly what [nestedItemsKey] requires (a
+        // flattened page's item count no longer matches the page size an offset loop compares against).
+        val dustWindow =
+            ApiPaginationConfig(
+                mode = PaginationMode.DATE_WINDOW,
+                startParam = "startTime",
+                endParam = "endTime",
+                windowBoundFormat = WindowBoundFormat.EPOCH_MS,
+                windowDays = 30,
+            )
+
         // myTrades needs a symbol (see fan-out below) and caps startTime/endTime to 24h, so it walks
         // forward by trade id instead of by date window.
         val spotTradeCursor =
@@ -1001,6 +1033,108 @@ object BuiltInApiStrategies {
             return if (staticParams.isEmpty()) endpoint.path else "${endpoint.path}?$staticParams"
         }
 
+        // Binance's Earn and Funding wallets are separate balances the spot-only getUserAsset never
+        // reports; each gets its own counterparty account so the "Binance" account stays spot-shaped.
+        val binanceEarnAccount = "Binance Earn"
+        val binanceFundingWalletAccount = "Binance Funding Wallet"
+
+        val universalTransferMappings =
+            ApiTransactionMappings(
+                currencyField = "asset",
+                timestampField = "timestamp",
+                timestampFormat = TimestampFormat.EPOCH_MS,
+                amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                idField = "tranId",
+                itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "CONFIRMED")),
+            )
+
+        // Simple Earn history costs 150 request-weight a call against Binance's ~6000/min budget, so it is
+        // paced several times slower than the weight-1 endpoints (see requestCostWeight).
+        val earnRequestCostWeight = 5
+        val earnSubscriptionsEndpoint =
+            signed(
+                "sapi/v1/simple-earn/flexible/history/subscriptionRecord",
+                "rows",
+                earnHistoryWindow,
+                requestCostWeight = earnRequestCostWeight,
+            )
+        val earnRedemptionsEndpoint =
+            signed(
+                "sapi/v1/simple-earn/flexible/history/redemptionRecord",
+                "rows",
+                earnHistoryWindow,
+                requestCostWeight = earnRequestCostWeight,
+            )
+
+        // rewardsRecord requires a "type", so each kind of interest is its own endpoint sharing one path -
+        // told apart by the static query param, exactly like the two fiat/orders endpoints.
+        fun earnRewardsEndpoint(type: String) =
+            signed(
+                "sapi/v1/simple-earn/flexible/history/rewardsRecord",
+                "rows",
+                earnHistoryWindow,
+                queryParams = listOf(ApiQueryParam(name = "type", value = type)),
+                requestCostWeight = earnRequestCostWeight,
+            )
+        val earnRewardTypes = listOf("BONUS", "REALTIME", "REWARDS")
+
+        // One conversion sweeps several small balances into BNB at once, so the rows that carry the money
+        // are the nested per-asset details, not the conversions themselves.
+        val dustEndpoint =
+            signed("sapi/v1/asset/dribblet", "userAssetDribblets", dustWindow)
+                .copy(nestedItemsKey = "userAssetDribbletDetails")
+
+        // assetDividend pages only by "limit" (max 500) within a window - like convert/tradeFlow it has no
+        // continuation scheme the engine can drive, so ask for the maximum page and accept that a single
+        // 90-day window holding more than 500 distributions would truncate (never true for a personal account).
+        val dividendEndpoint =
+            signed(
+                "sapi/v1/asset/assetDividend",
+                "rows",
+                earnHistoryWindow.copy(
+                    offsetParam = null,
+                    limitParam = "limit",
+                    limitValue = 500,
+                    sendLimitParam = false,
+                    totalCountField = null,
+                ),
+                queryParams = listOf(ApiQueryParam(name = "limit", value = "500")),
+            )
+
+        // Universal transfers between the Spot and Funding wallets; "type" is required, so the two
+        // directions are two endpoints sharing a path.
+        fun universalTransferEndpoint(type: String) =
+            signed(
+                "sapi/v1/asset/transfer",
+                "rows",
+                universalTransferWindow,
+                queryParams = listOf(ApiQueryParam(name = "type", value = type)),
+            )
+        val spotToFundingEndpoint = universalTransferEndpoint("MAIN_FUNDING")
+        val fundingToSpotEndpoint = universalTransferEndpoint("FUNDING_MAIN")
+
+        // Every asset the account is known to have touched - the left side of the spot-symbol cross
+        // product. An asset only ever held inside Earn, swept as dust or received as a distribution has no
+        // balance and no deposit, so those endpoints are the only places its symbol ever appears.
+        val myTradesAssetSources =
+            listOf(
+                ApiValueSet.FromValueEndpoint("sapi/v3/asset/getUserAsset", listOf("asset")),
+                ApiValueSet.FromDataEndpoint(depositsEndpoint.path, listOf("coin")),
+                ApiValueSet.FromDataEndpoint(withdrawalsEndpoint.path, listOf("coin")),
+                ApiValueSet.FromDataEndpoint(convertEndpoint.path, listOf("fromAsset", "toAsset")),
+                ApiValueSet.FromDataEndpoint(dedupeKey(fiatBuyEndpoint), listOf("cryptoCurrency")),
+                ApiValueSet.FromDataEndpoint(dedupeKey(fiatSellEndpoint), listOf("cryptoCurrency")),
+                ApiValueSet.FromDataEndpoint(earnSubscriptionsEndpoint.path, listOf("asset")),
+                ApiValueSet.FromDataEndpoint(earnRedemptionsEndpoint.path, listOf("asset")),
+                ApiValueSet.FromDataEndpoint(dividendEndpoint.path, listOf("asset")),
+                ApiValueSet.FromDataEndpoint(dustEndpoint.path, listOf("fromAsset")),
+                ApiValueSet.FromDataEndpoint(dedupeKey(spotToFundingEndpoint), listOf("asset")),
+                ApiValueSet.FromDataEndpoint(dedupeKey(fundingToSpotEndpoint), listOf("asset")),
+            ) +
+                earnRewardTypes.map { type ->
+                    ApiValueSet.FromDataEndpoint(dedupeKey(earnRewardsEndpoint(type)), listOf("asset"))
+                }
+
         val myTradesEndpoint =
             signed(
                 "api/v3/myTrades",
@@ -1013,17 +1147,7 @@ object BuiltInApiStrategies {
                         param = "symbol",
                         values =
                             ApiValueSet.CrossProduct(
-                                left =
-                                    ApiValueSet.Union(
-                                        listOf(
-                                            ApiValueSet.FromValueEndpoint("sapi/v3/asset/getUserAsset", listOf("asset")),
-                                            ApiValueSet.FromDataEndpoint(depositsEndpoint.path, listOf("coin")),
-                                            ApiValueSet.FromDataEndpoint(withdrawalsEndpoint.path, listOf("coin")),
-                                            ApiValueSet.FromDataEndpoint(convertEndpoint.path, listOf("fromAsset", "toAsset")),
-                                            ApiValueSet.FromDataEndpoint(dedupeKey(fiatBuyEndpoint), listOf("cryptoCurrency")),
-                                            ApiValueSet.FromDataEndpoint(dedupeKey(fiatSellEndpoint), listOf("cryptoCurrency")),
-                                        ),
-                                    ),
+                                left = ApiValueSet.Union(myTradesAssetSources),
                                 right = ApiValueSet.Static(quoteAssets),
                             ),
                         // exchangeInfo's responseArrayKey ("symbols") already unwraps the response to individual
@@ -1205,6 +1329,93 @@ object BuiltInApiStrategies {
                                             ),
                                     ),
                             ),
+                            // Simple Earn moves principal between the Spot wallet and the Earn wallet.
+                            // Booking it against a named "Binance Earn" account (rather than netting it
+                            // away) keeps the Binance account comparable with the spot-only balances
+                            // getUserAsset reports, and leaves the staked principal visible.
+                            ApiDataEndpoint(
+                                earnSubscriptionsEndpoint,
+                                ApiEndpointKind.WITHDRAWALS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "asset",
+                                        timestampField = "time",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        idField = "purchaseId",
+                                        // A subscription can be funded partly from the Funding wallet
+                                        // (amtFromSpot/amtFromFunding), but both wallets are the one
+                                        // Binance account here, so the whole amount moves as one leg.
+                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "SUCCESS")),
+                                    ),
+                                fixedDirection = TransferDirection.OUT,
+                                counterpartyAccountName = binanceEarnAccount,
+                            ),
+                            ApiDataEndpoint(
+                                earnRedemptionsEndpoint,
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "asset",
+                                        timestampField = "time",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        idField = "redeemId",
+                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "PAID")),
+                                    ),
+                                fixedDirection = TransferDirection.IN,
+                                counterpartyAccountName = binanceEarnAccount,
+                            ),
+                            ApiDataEndpoint(
+                                spotToFundingEndpoint,
+                                ApiEndpointKind.WITHDRAWALS,
+                                transactionMappings = universalTransferMappings,
+                                fixedDirection = TransferDirection.OUT,
+                                counterpartyAccountName = binanceFundingWalletAccount,
+                            ),
+                            ApiDataEndpoint(
+                                fundingToSpotEndpoint,
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings = universalTransferMappings,
+                                fixedDirection = TransferDirection.IN,
+                                counterpartyAccountName = binanceFundingWalletAccount,
+                            ),
+                            ApiDataEndpoint(
+                                dividendEndpoint,
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "asset",
+                                        timestampField = "divTime",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        descriptionField = "enInfo",
+                                        idField = "tranId",
+                                    ),
+                                fixedDirection = TransferDirection.IN,
+                                counterpartyAccountName = "Binance Distribution",
+                            ),
+                            // A dust conversion's detail rows are what actually moved: each swaps one small
+                            // balance for BNB. "transferedAmount" is already net of "serviceChargeAmount", so
+                            // the charge is deliberately not mapped as a fee - booking it as its own movement
+                            // would take the same BNB out twice.
+                            ApiDataEndpoint(
+                                dustEndpoint,
+                                ApiEndpointKind.TRADES,
+                                tradeMappings =
+                                    ApiTradeMappings(
+                                        instrumentField = "unused",
+                                        splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
+                                        fixedBaseAsset = "BNB",
+                                        quoteAssetField = "fromAsset",
+                                        fixedSideBuy = true,
+                                        baseQuantityField = "transferedAmount",
+                                        quoteQuantityField = "amount",
+                                        timestampField = "operateTime",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        idField = "transId",
+                                    ),
+                            ),
                             ApiDataEndpoint(
                                 myTradesEndpoint,
                                 ApiEndpointKind.TRADES,
@@ -1229,7 +1440,31 @@ object BuiltInApiStrategies {
                                         orderIdField = "orderId",
                                     ),
                             ),
-                        ),
+                        ) +
+                            // Interest is real income the ledger never sees otherwise; its own counterparty
+                            // account makes lifetime interest readable on its own. Reward rows carry no id
+                            // of any kind, so the dedupe key has to be composed from the row's own fields.
+                            earnRewardTypes.map { type ->
+                                ApiDataEndpoint(
+                                    earnRewardsEndpoint(type),
+                                    ApiEndpointKind.DEPOSITS,
+                                    transactionMappings =
+                                        ApiTransactionMappings(
+                                            amountField = "rewards",
+                                            currencyField = "asset",
+                                            timestampField = "time",
+                                            timestampFormat = TimestampFormat.EPOCH_MS,
+                                            amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                            // "type" is part of the key because the three reward endpoints
+                                            // are otherwise indistinguishable: a BONUS and a REALTIME row
+                                            // for the same project, second and amount would collide and
+                                            // one of the two would be dropped as a duplicate.
+                                            compositeIdFields = listOf("asset", "projectId", "type", "time", "rewards"),
+                                        ),
+                                    fixedDirection = TransferDirection.IN,
+                                    counterpartyAccountName = "Binance Earn Rewards",
+                                )
+                            },
                     // Binance's overall REST budget is ~6000 request-weight/min; 350ms between requests
                     // (scaled per endpoint by requestCostWeight) stays comfortably inside that for a
                     // personal read-only key.

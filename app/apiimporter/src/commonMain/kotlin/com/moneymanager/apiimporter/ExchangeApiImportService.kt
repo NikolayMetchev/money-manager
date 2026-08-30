@@ -225,8 +225,15 @@ suspend fun downloadApiSessionExchange(
         body: String?,
     ): List<JsonObject> =
         body
-            ?.let { responseItemsArray(it, endpoint.responseArrayKey, endpoint.responseObjectValues, endpoint.itemKeyField) }
-            ?.filterIsInstance<JsonObject>()
+            ?.let {
+                responseItemsArray(
+                    it,
+                    endpoint.responseArrayKey,
+                    endpoint.responseObjectValues,
+                    endpoint.itemKeyField,
+                    endpoint.nestedItemsKey,
+                )
+            }?.filterIsInstance<JsonObject>()
             .orEmpty()
 
     /** Downloads one endpoint's whole sweep for a single fan-out value ([fanOutParam]/[fanOutValue] null for none). */
@@ -588,6 +595,12 @@ private data class ParsedExchangeTransfer(
     val txid: String?,
     /** Name of an owned account the counterparty aliases to (e.g. "Crypto.com" for an internal deposit). */
     val aliasAccount: String?,
+    /**
+     * The endpoint's fixed counterparty account name ([ApiDataEndpoint.counterpartyAccountName], e.g.
+     * "Binance Earn" for a Simple Earn subscription) — used when the row carries neither an alias nor a
+     * wallet address, in place of the strategy-wide funding account.
+     */
+    val counterpartyAccountName: String?,
     /** Value looked up against an [ApiDataEndpoint.enrichesTransfers] index (e.g. Kraken Ledgers `refid`). */
     val joinKey: String?,
     /**
@@ -669,12 +682,30 @@ private fun parseExchangeItem(
             dataEndpoint.tradeMappings?.let { parseOrder(obj, it, requestId, jsonPath) }?.let(into.orders::add)
         ApiEndpointKind.DEPOSITS ->
             dataEndpoint.transactionMappings
-                ?.let { parseExchangeTransfer(obj, it, TransferDirection.IN, requestId, jsonPath, into) }
-                ?.let(into.transfers::addAll)
+                ?.let {
+                    parseExchangeTransfer(
+                        obj,
+                        it,
+                        TransferDirection.IN,
+                        requestId,
+                        jsonPath,
+                        into,
+                        dataEndpoint.counterpartyAccountName,
+                    )
+                }?.let(into.transfers::addAll)
         ApiEndpointKind.WITHDRAWALS ->
             dataEndpoint.transactionMappings
-                ?.let { parseExchangeTransfer(obj, it, TransferDirection.OUT, requestId, jsonPath, into) }
-                ?.let(into.transfers::addAll)
+                ?.let {
+                    parseExchangeTransfer(
+                        obj,
+                        it,
+                        TransferDirection.OUT,
+                        requestId,
+                        jsonPath,
+                        into,
+                        dataEndpoint.counterpartyAccountName,
+                    )
+                }?.let(into.transfers::addAll)
         ApiEndpointKind.BANK_TRANSACTIONS -> Unit
     }
 }
@@ -728,6 +759,7 @@ suspend fun importApiSessionExchange(
                 dataEndpoint.endpoint.responseArrayKey,
                 dataEndpoint.endpoint.responseObjectValues,
                 dataEndpoint.endpoint.itemKeyField,
+                dataEndpoint.endpoint.nestedItemsKey,
             ) ?: return@forEach
         items.forEachIndexed { index, (key, element) ->
             (element as? JsonObject)?.let {
@@ -921,15 +953,25 @@ suspend fun importApiSessionExchange(
     // fiat exclusion matters because a provider's "address"-shaped field can carry something else entirely
     // for fiat movements — e.g. Kraken's WithdrawStatus `info` is a blockchain address for a crypto
     // withdrawal but the user's own bank-transfer label (e.g. "Monzo") for a fiat one, and minting a wallet
-    // account from that label collides by name with the user's real bank account.
+    // account from that label collides by name with the user's real bank account. Failing all of those, an
+    // endpoint that declares an [ApiDataEndpoint.counterpartyAccountName] books against that named account
+    // (Binance Earn/Bank), and only an endpoint declaring nothing lands in the generic funding account.
     val accountKeys = mutableMapOf<String, LocalAccountKey>()
     val counterpartyIntents = mutableListOf<ImportAccountIntent>()
-    transfers.mapNotNull { it.aliasAccount }.distinct().forEach { name ->
-        val key = LocalAccountKey("alias-$name")
-        accountKeys[name] = key
-        counterpartyIntents +=
-            ImportAccountIntent(key = key, source = source, match = AccountMatchKey.ByName(name), name = name, openingDate = openingDate)
-    }
+    (transfers.mapNotNull { it.aliasAccount } + transfers.mapNotNull { it.counterpartyAccountName })
+        .distinct()
+        .forEach { name ->
+            val key = LocalAccountKey("alias-$name")
+            accountKeys[name] = key
+            counterpartyIntents +=
+                ImportAccountIntent(
+                    key = key,
+                    source = source,
+                    match = AccountMatchKey.ByName(name),
+                    name = name,
+                    openingDate = openingDate,
+                )
+        }
     transfers
         .filter { it.aliasAccount == null && asset(it.currencyCode) is CryptoAsset }
         .mapNotNull { it.counterpartyAddress?.takeIf(String::isNotBlank) }
@@ -972,6 +1014,10 @@ suspend fun importApiSessionExchange(
                         ?: tx.counterpartyAddress
                             ?.takeIf { txAsset is CryptoAsset && it.isNotBlank() }
                             ?.let { accountKeys[it] }
+                        // The endpoint's own counterparty (e.g. Binance's Earn wallet or its fiat
+                        // on/off-ramp) — a named account, so the same movement seen from the other side
+                        // reconciles to it instead of everything piling into one funding account.
+                        ?: tx.counterpartyAccountName?.let { accountKeys[it] }
                 val counterparty = counterpartyKey?.let { AccountRef.Local(it) } ?: AccountRef.Existing(fundingId)
                 if (tx.direction == TransferDirection.IN) counterparty to exchangeRef else exchangeRef to counterparty
             }
@@ -1136,8 +1182,9 @@ private fun parseTrade(
     if (!tm.itemFilters.all { obj.evaluatePredicate(it) }) return null
     val (baseCode, quoteCode) =
         if (tm.splitMode == InstrumentSplitMode.EXPLICIT_FIELDS) {
-            val base = tm.baseAssetField?.let { obj.str(it) }
-            val quote = tm.quoteAssetField?.let { obj.str(it) }
+            // A constant asset stands in where the row never names it (Binance dust always credits BNB).
+            val base = tm.baseAssetField?.let { obj.str(it) } ?: tm.fixedBaseAsset
+            val quote = tm.quoteAssetField?.let { obj.str(it) } ?: tm.fixedQuoteAsset
             if (base != null && quote != null) base to quote else return null
         } else {
             val instrument = obj.str(tm.instrumentField) ?: return null
@@ -1209,12 +1256,19 @@ private fun parseExchangeTransfer(
     requestId: ApiRequestId,
     jsonPath: String,
     into: ParsedExchangeData,
+    counterpartyAccountName: String? = null,
 ): List<ParsedExchangeTransfer> {
     if (!tm.itemFilters.all { obj.evaluatePredicate(it) }) return emptyList()
     val currency = obj.str(tm.currencyField) ?: return emptyList()
     val timestamp =
         obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) } ?: return emptyList()
-    val id = obj.str(tm.idField) ?: return emptyList()
+    val id =
+        tm.compositeIdFields
+            .takeIf { it.isNotEmpty() }
+            ?.map { field -> obj.str(field) ?: return emptyList() }
+            ?.joinToString("-")
+            ?: obj.str(tm.idField)
+            ?: return emptyList()
     val excludeField = tm.excludeField
     val excluded = excludeField != null && obj.str(excludeField) in tm.excludeValues
     val rawAmount = obj.str(tm.amountField)?.let { runCatching { BigDecimal(it) }.getOrNull() }
@@ -1263,6 +1317,7 @@ private fun parseExchangeTransfer(
                 network = tm.counterpartyNetworkField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
                 txid = tm.txidField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
                 aliasAccount = tm.counterpartyAliasField?.let { obj.str(it) }?.let { tm.counterpartyAccountAliases[it] },
+                counterpartyAccountName = counterpartyAccountName,
                 joinKey = tm.joinKeyField?.let { obj.str(it) },
             )
     }
@@ -1293,6 +1348,7 @@ private fun parseExchangeTransfer(
                 network = null,
                 txid = null,
                 aliasAccount = null,
+                counterpartyAccountName = null,
                 joinKey = null,
                 isFeeOnly = true,
             )

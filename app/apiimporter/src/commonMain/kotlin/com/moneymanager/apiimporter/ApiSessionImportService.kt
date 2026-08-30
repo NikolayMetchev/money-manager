@@ -2311,11 +2311,18 @@ internal fun arrayItemJsonPath(
     index: Int,
 ): JsonPath = if (responseArrayKey.isBlank()) JsonPath("$[$index]") else JsonPath("$.$responseArrayKey[$index]")
 
-/** The real JSON path of an item inside a keyed-object response (see [responseItemsWithKeys]). */
+/**
+ * The real JSON path of an item inside a keyed-object response (see [responseItemsWithKeys]). A [key] that
+ * already starts with an index (`[0].details[1]`, produced by nested-array flattening) is appended without
+ * the joining dot, so the path stays resolvable.
+ */
 internal fun keyedItemJsonPath(
     responseArrayKey: String,
     key: String,
-): JsonPath = if (responseArrayKey.isBlank()) JsonPath("$.$key") else JsonPath("$.$responseArrayKey.$key")
+): JsonPath {
+    val separator = if (key.startsWith("[")) "" else "."
+    return if (responseArrayKey.isBlank()) JsonPath("$$separator$key") else JsonPath("$.$responseArrayKey$separator$key")
+}
 
 /**
  * Extracts the items array from a response body; a blank [responseArrayKey] means the body is the
@@ -2326,14 +2333,19 @@ internal fun keyedItemJsonPath(
  * by id (Kraken `result.trades`/`result.ledger`) rather than an array; its values become the items. When
  * [itemKeyField] is also set, each entry's map key is spliced into that entry's object under this field
  * name first, since the id sometimes appears only as the key (Kraken ledger entries).
+ *
+ * When [nestedItemsKey] is set, each element at [responseArrayKey] is only a container: the items are the
+ * elements of its nested array at that path (Binance `asset/dribblet`), each paired with its real
+ * `[outer].<key>[inner]` path so the audit trail points at the row that was actually mapped.
  */
 internal fun responseItemsArray(
     json: String,
     responseArrayKey: String,
     responseObjectValues: Boolean = false,
     itemKeyField: String? = null,
+    nestedItemsKey: String? = null,
 ): JsonArray? =
-    responseItemsWithKeys(json, responseArrayKey, responseObjectValues, itemKeyField)
+    responseItemsWithKeys(json, responseArrayKey, responseObjectValues, itemKeyField, nestedItemsKey)
         ?.let { items -> JsonArray(items.map { (_, item) -> item }) }
 
 /**
@@ -2349,11 +2361,19 @@ internal fun responseItemsWithKeys(
     responseArrayKey: String,
     responseObjectValues: Boolean = false,
     itemKeyField: String? = null,
+    nestedItemsKey: String? = null,
 ): List<Pair<String?, JsonElement>>? =
     try {
         val root = Json.parseToJsonElement(json)
         val resolved = if (responseArrayKey.isBlank()) root else root.resolveJsonPathElement(responseArrayKey)
-        if (responseObjectValues) {
+        if (nestedItemsKey != null) {
+            (resolved as? JsonArray)?.flatMapIndexed { outerIndex, container ->
+                val nested = (container as? JsonObject)?.resolveJsonPathElement(nestedItemsKey) as? JsonArray
+                nested.orEmpty().mapIndexed { innerIndex, item ->
+                    "[$outerIndex].$nestedItemsKey[$innerIndex]" to item
+                }
+            }
+        } else if (responseObjectValues) {
             (resolved as? JsonObject)?.entries?.map { (key, value) ->
                 val item =
                     if (itemKeyField != null && value is JsonObject) {

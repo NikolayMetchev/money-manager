@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.FieldPlacement
 import com.moneymanager.domain.model.apistrategy.HttpMethodType
+import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.SecretEncoding
@@ -256,6 +257,65 @@ class ApiStrategyJsonCodecTest {
         assertEquals("ledger_id", decoded.dataEndpoints[1].endpoint.itemKeyField)
         assertEquals("refid", decoded.dataEndpoints[1].transactionMappings?.joinKeyField)
         assertTrue(decoded.dataEndpoints[0].enrichesTransfers)
+    }
+
+    @Test
+    fun `nested items, fixed trade assets and a composite transfer id round-trip`() {
+        val original =
+            config(null).copy(
+                syntheticAccount = ApiSyntheticAccount(name = "Binance", externalId = "binance"),
+                // Canonical (sorted) order: DEPOSITS before TRADES.
+                dataEndpoints =
+                    listOf(
+                        ApiDataEndpoint(
+                            endpoint =
+                                ApiEndpointConfig(
+                                    path = "sapi/v1/simple-earn/flexible/history/rewardsRecord",
+                                    responseArrayKey = "rows",
+                                    queryParams = listOf(ApiQueryParam(name = "type", value = "BONUS")),
+                                ),
+                            kind = ApiEndpointKind.DEPOSITS,
+                            fixedDirection = TransferDirection.IN,
+                            counterpartyAccountName = "Binance Earn Rewards",
+                            transactionMappings =
+                                ApiTransactionMappings(
+                                    amountField = "rewards",
+                                    currencyField = "asset",
+                                    compositeIdFields = listOf("asset", "projectId", "type", "time", "rewards"),
+                                ),
+                        ),
+                        ApiDataEndpoint(
+                            endpoint =
+                                ApiEndpointConfig(
+                                    path = "sapi/v1/asset/dribblet",
+                                    responseArrayKey = "userAssetDribblets",
+                                    nestedItemsKey = "userAssetDribbletDetails",
+                                ),
+                            kind = ApiEndpointKind.TRADES,
+                            tradeMappings =
+                                ApiTradeMappings(
+                                    instrumentField = "unused",
+                                    splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
+                                    fixedBaseAsset = "BNB",
+                                    quoteAssetField = "fromAsset",
+                                    fixedSideBuy = true,
+                                    baseQuantityField = "transferedAmount",
+                                    quoteQuantityField = "amount",
+                                    timestampField = "operateTime",
+                                    idField = "transId",
+                                ),
+                        ),
+                    ),
+            )
+        val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
+        assertEquals(original, decoded)
+        assertEquals("userAssetDribbletDetails", decoded.dataEndpoints[1].endpoint.nestedItemsKey)
+        assertEquals("BNB", decoded.dataEndpoints[1].tradeMappings?.fixedBaseAsset)
+        assertEquals("Binance Earn Rewards", decoded.dataEndpoints[0].counterpartyAccountName)
+        assertEquals(
+            listOf("asset", "projectId", "type", "time", "rewards"),
+            decoded.dataEndpoints[0].transactionMappings?.compositeIdFields,
+        )
     }
 
     @Test
