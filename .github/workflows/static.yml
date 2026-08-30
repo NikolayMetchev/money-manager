@@ -14,6 +14,8 @@ on:
       - 'app/db/core/src/commonMain/sqldelight/**'
       - '.github/workflows/static.yml'
       - 'settings.gradle.kts'
+      - 'app/**/src/**'
+      - 'utils/**/src/**'
       - '**/build.gradle.kts'
       - 'gradle/libs.versions.toml'
 
@@ -67,6 +69,16 @@ jobs:
         uses: ./.github/actions/gradle-run
         with:
           command: ':tools:strategy-catalog:generateCatalogSite --stacktrace'
+          cache-read-only: true
+      - name: Generate KDoc API documentation
+        # Renders every module's KDoc into webpage/kdoc via Dokka's multi-module aggregation.
+        # `-PenableDokka=true` opts the root build into wiring the aggregation; that aggregation
+        # reads all subprojects, so — like the module graph above — Isolated Projects and the
+        # configuration cache must be disabled for this task. webpage/kdoc is gitignored, generated
+        # per deploy.
+        uses: ./.github/actions/gradle-run
+        with:
+          command: 'publishKdoc -PenableDokka=true -Dorg.gradle.isolated-projects=false --no-configuration-cache --stacktrace'
           cache-read-only: true
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5

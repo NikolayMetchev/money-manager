@@ -1,5 +1,6 @@
 package com.moneymanager.domain.model.apistrategy
 
+import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport
 import com.moneymanager.domain.model.serialization.SortedByListSerializer
 import com.moneymanager.domain.model.serialization.SortedListSerializer
 
@@ -13,7 +14,7 @@ object SortedQueryParamListSerializer : SortedListSerializer<ApiQueryParam>(ApiQ
 
 /**
  * Serializes [ApiDataEndpoint] lists (kind, then endpoint path/response key) so
- * [ApiStrategyConfig.dataEndpoints]/[com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport.dataEndpoints]
+ * [ApiStrategyConfig.dataEndpoints] — and hence the config nested in [ApiStrategyExport.config] —
  * is byte-stable regardless of the order endpoints were added in the editor UI on a given device. Safe
  * because [com.moneymanager.apiimporter] processes each endpoint independently (no first-match /
  * positional-index semantics) — enrichment indexing is built from all endpoints before consumers read it.
