@@ -130,6 +130,10 @@ suspend fun downloadApiSessionExchange(
         existingRequests.mapNotNull { req -> existingResponses[req.id]?.let { req.url to it.json } }.toMap()
 
     var responseCount = 0
+    // Set by [fetchPage] when a request failed with a [ApiPaginationConfig.windowRangeErrorSubstrings]
+    // match: the provider won't serve that date window (too old, or the span is wider than it allows),
+    // but the other windows are fine, so the caller skips just this one instead of dropping the endpoint.
+    var lastFetchWindowOutOfRange = false
     // The nonce must be the CURRENT epoch-ms on every request (exchanges reject a nonce that drifts too
     // far from server time), yet also strictly increasing. Sampling the clock per request and clamping
     // to lastNonce+1 guarantees both across a long multi-endpoint, multi-window download.
@@ -151,6 +155,7 @@ suspend fun downloadApiSessionExchange(
         recordedUrl: String,
     ): String? {
         if (recordedUrl in downloadedUrls) return existingResponseJsonByUrl[recordedUrl]
+        lastFetchWindowOutOfRange = false
         var rateLimitRetries = 0
         while (true) {
             val endpointUrl = buildExchangeEndpointUrl(strategy.config.baseUrl, endpoint.path)
@@ -206,7 +211,14 @@ suspend fun downloadApiSessionExchange(
             }
             val isRateLimited = strategy.config.rateLimitErrorSubstrings.any { error.contains(it, ignoreCase = true) }
             if (!isRateLimited || rateLimitRetries >= strategy.config.maxRateLimitRetries) {
-                logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
+                val windowOutOfRange =
+                    endpoint.pagination?.windowRangeErrorSubstrings?.any { error.contains(it, ignoreCase = true) } == true
+                if (windowOutOfRange) {
+                    lastFetchWindowOutOfRange = true
+                    logger.warn { "Skipping one out-of-range date window of '${endpoint.path}': $error" }
+                } else {
+                    logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
+                }
                 return null
             }
             rateLimitRetries += 1
@@ -332,7 +344,9 @@ suspend fun downloadApiSessionExchange(
                     )
                 val body = fetchPage(endpoint, params, recordedUrl)
                 if (body == null) {
-                    endpointBroken = true
+                    // A window the provider won't serve is skipped (no coverage recorded for it) so the
+                    // newer windows still run; any other failure abandons the endpoint as before.
+                    if (!lastFetchWindowOutOfRange) endpointBroken = true
                     return@forEachIndexed
                 }
                 val items = pageItems(endpoint, body)

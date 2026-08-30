@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -146,5 +147,95 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
 
             val secondPages = download()
             assertTrue(secondPages < firstPages, "the second download must be shorter ($secondPages vs $firstPages)")
+        }
+
+    /**
+     * `asset/transfer` only serves the last 6 months; a window older than that comes back as
+     * `HTTP 400 {"code":-5026,"msg":"Start time query records range is too large"}`. That must skip only
+     * the out-of-range window - the newer windows (and every other endpoint) still download - rather than
+     * abandon the whole endpoint on the first failure.
+     */
+    @Test
+    fun `an out-of-range date window is skipped without dropping the rest of the endpoint`() =
+        runTest {
+            val strategy = binanceStrategy()
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val credentialId = repositories.importEngine.createApiCredential(token, now)
+            val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+            val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
+
+            var transferAttempts = 0
+            var transferRejections = 0
+            var transferSuccesses = 0
+            // downloadApiSessionExchange anchors its date windows to the real wall clock, not the test's
+            // fixed `now`, so the cutoff has to be relative to real time too. The built-in transfer
+            // window's lookback is ~135 days; reject anything older than 60 days so the sweep straddles
+            // the cutoff - some windows rejected, some served.
+            val rangeCutoffMillis = Clock.System.now().toEpochMilliseconds() - 60L * 24 * 60 * 60 * 1000
+
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
+                    engine =
+                        MockEngine { request ->
+                            val path = request.url.encodedPath.trimStart('/')
+                            when {
+                                path.endsWith("asset/transfer") -> {
+                                    transferAttempts++
+                                    val startMillis = request.url.parameters["startTime"]?.toLongOrNull() ?: 0L
+                                    if (startMillis < rangeCutoffMillis) {
+                                        transferRejections++
+                                        respond(
+                                            content = """{"code":-5026,"msg":"Start time query records range is too large"}""",
+                                            status = HttpStatusCode.BadRequest,
+                                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                                        )
+                                    } else {
+                                        transferSuccesses++
+                                        respond(
+                                            content = """{"rows":[],"total":0}""",
+                                            status = HttpStatusCode.OK,
+                                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                                        )
+                                    }
+                                }
+                                path.endsWith("fiat/orders") || path.endsWith("fiat/payments") ->
+                                    respond(
+                                        content = """{"code":"000000","message":"success","data":[],"total":0,"success":true}""",
+                                        status = HttpStatusCode.OK,
+                                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                                    )
+                                else ->
+                                    respond(
+                                        content = "[]",
+                                        status = HttpStatusCode.OK,
+                                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                                    )
+                            }
+                        },
+                )
+
+            downloadApiSessionExchange(
+                apiClient = apiClient,
+                signer = ApiRequestSigner(checkNotNull(strategy.config.requestSigning)),
+                apiKey = token,
+                apiSecret = "test-secret",
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+                importEngine = repositories.importEngine,
+                watermarks = watermarks,
+                rateLimitMillis = 0,
+            )
+
+            assertTrue(
+                transferRejections > 0,
+                "the oldest windows must be rejected as out of range " +
+                    "(attempts=$transferAttempts rejections=$transferRejections successes=$transferSuccesses)",
+            )
+            assertTrue(transferSuccesses > 0, "the recent windows must still be fetched after a rejection")
+            // Both transfer directions walk every window; without the skip the endpoint would stop at its
+            // first rejection, capping attempts at 2 (one per `type`).
+            assertTrue(transferAttempts > 2, "the endpoint keeps paging past a rejected window (got $transferAttempts)")
         }
 }

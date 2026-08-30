@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.serialization.SortedStringListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
 import com.moneymanager.domain.model.serialization.SortedStringToLongMapSerializer
 import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
@@ -180,6 +181,22 @@ data class ApiPaginationConfig(
     val totalCountField: String? = null,
     /** Days of already-downloaded history an incremental download re-fetches; see the class KDoc. */
     val incrementalOverlapDays: Int = 7,
+    /**
+     * Case-insensitive error-body substrings that mean "this particular date window is outside the range
+     * the provider will serve" (e.g. Binance `asset/transfer` only answers for the last 6 months:
+     * "-5026 Start time query records range is too large"; its Simple Earn history caps the span at 30
+     * days: "-6021 Query time range too large"). When a windowed request fails with one of these, the
+     * engine skips just that window and carries on to the newer ones instead of abandoning the whole
+     * endpoint. The default covers the Binance phrasings; other providers can override.
+     *
+     * Never encoded when left at the default (the same trick CsvStrategyExport.fundingAttributeMatch
+     * uses) so adding the field doesn't rehash every existing strategy on catalog/Drive sync; a config
+     * carrying the default still gets it applied on decode, so the fix reaches strategies already
+     * installed.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @Serializable(with = SortedStringListSerializer::class)
+    val windowRangeErrorSubstrings: List<String> = listOf("range is too large", "time range too large"),
 )
 
 /**
