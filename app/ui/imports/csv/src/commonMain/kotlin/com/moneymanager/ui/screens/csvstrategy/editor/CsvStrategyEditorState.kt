@@ -231,6 +231,11 @@ internal class CsvStrategyEditorState(
     // Edited via ConversionConfigEditor (Advanced tab); null when the source has no such conversions.
     var conversionConfig by mutableStateOf(strategy?.conversionConfig)
 
+    // Carried through verbatim, like conversionConfig above, but with no editor of its own yet: row-group
+    // trade assembly is configured only by built-in strategies. Held here so editing such a strategy in
+    // the UI round-trips it instead of silently dropping the trades it assembles.
+    val tradeGroupConfig = strategy?.tradeGroupConfig
+
     // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialTargetAccountColumnName: String? = targetAccountColumnName
     val initialDescriptionColumnName: String? = descriptionColumnName

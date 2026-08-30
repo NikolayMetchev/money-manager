@@ -281,4 +281,53 @@ class StrategySelectorTest {
         val selected = builtIns.selectForCsv("transaction-history.csv", wiseColumns, listOf(wiseRow))
         assertEquals("Wise CSV", selected?.name)
     }
+
+    private val binanceHeaders = listOf("User_ID", "UTC_Time", "Account", "Operation", "Coin", "Change", "Remark")
+
+    private fun binanceColumns(headers: List<String>) =
+        headers.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+
+    private fun binanceRow(
+        index: Long,
+        values: List<String>,
+    ) = CsvRow(rowIndex = index, values = values)
+
+    @Test
+    fun `a modern Binance export selects the Binance CSV strategy`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val rows =
+            List(4) { i ->
+                binanceRow(
+                    i.toLong(),
+                    listOf("53064551", "2021-01-01 00:58:16", "Spot", "BNB Vault Rewards", "ASR", "0.00294372", ""),
+                )
+            }
+        // Binance names its exports with bare UUIDs, so only the columns + content can identify one.
+        val selected = builtIns.selectForCsv("bc9a136a-8713-11ee-8edb-06655da838d5-1.csv", binanceColumns(binanceHeaders), rows)
+        assertEquals("Binance CSV", selected?.name)
+    }
+
+    @Test
+    fun `a legacy Binance export without User_ID selects no strategy`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val legacyHeaders = binanceHeaders.drop(1)
+        val rows =
+            List(4) { i ->
+                binanceRow(i.toLong(), listOf("2020-10-11 09:31:32", "Spot", "Savings purchase", "BNB", "-4.82096423", ""))
+            }
+        // The legacy columns are a strict subset of the modern ones, so the tolerant fallback does make
+        // the Binance strategy a candidate - the content rule on User_ID is what rejects it. Legacy
+        // exports use a different Operation vocabulary and would double-book every event.
+        assertNull(builtIns.selectForCsv("20210424.csv", binanceColumns(legacyHeaders), rows))
+    }
+
+    @Test
+    fun `a Monzo export still selects the Monzo CSV strategy alongside Binance`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val monzo = builtIns.single { it.name == "Monzo CSV" }
+        val monzoColumns =
+            monzo.identificationColumns.toList().mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+        val monzoRow = CsvRow(rowIndex = 1L, values = monzo.identificationColumns.map { "" })
+        assertEquals("Monzo CSV", builtIns.selectForCsv("monzo.csv", monzoColumns, listOf(monzoRow))?.name)
+    }
 }

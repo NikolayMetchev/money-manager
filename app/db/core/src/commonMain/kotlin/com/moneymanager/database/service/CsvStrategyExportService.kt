@@ -416,6 +416,7 @@ class CsvStrategyExportService(
                 fileNamePattern = export.fileNamePattern,
                 crossSourceReconcileWindowSeconds = export.crossSourceReconcileWindowSeconds,
                 conversionConfig = export.conversionConfig,
+                tradeGroupConfig = export.tradeGroupConfig,
                 fundingAttributeMatch = export.fundingAttributeMatch,
                 worksheetName = export.worksheetName,
                 createdAt = now,

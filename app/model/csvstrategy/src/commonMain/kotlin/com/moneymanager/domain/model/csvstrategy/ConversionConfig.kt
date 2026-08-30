@@ -1,5 +1,6 @@
 package com.moneymanager.domain.model.csvstrategy
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
@@ -41,6 +42,13 @@ import kotlinx.serialization.Serializable
  *                                distinct events (typically far apart in time) separate.
  * @property relationshipTypeName Relationship type name linking each debit leg to its credit leg
  *                                (resolved get-or-create, so already-populated databases self-heal).
+ * @property sideAmountColumn Optional column whose sign decides the side, for sources that give both
+ *                            legs of a conversion the **same** [signalColumn] value (Binance's
+ *                            "Small Assets Exchange BNB" names the swept asset and the BNB received
+ *                            identically). When set, a row matching [debitPattern] or [creditPattern]
+ *                            is a DEBIT if this column parses negative and a CREDIT if positive; a
+ *                            row that parses to zero or unparseably is not a conversion leg. When
+ *                            null the patterns alone decide, as before.
  */
 @Serializable
 data class ConversionConfig(
@@ -56,6 +64,10 @@ data class ConversionConfig(
     val pairingKeyColumns: List<String> = emptyList(),
     val pairingWindowSeconds: Long,
     val relationshipTypeName: String,
+    // Omitted from JSON when null (@EncodeDefault NEVER on the export field) so adding this does not
+    // change the canonical hash of every existing strategy - only one that actually sets it rehashes.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val sideAmountColumn: String? = null,
 ) {
     init {
         require(conversionAccountName != null || conversionAccountRules.isNotEmpty()) {

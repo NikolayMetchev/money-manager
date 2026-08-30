@@ -344,8 +344,16 @@ suspend fun applyStagedCsv(
     val stagedImport = restageXlsxForStrategy(csvImport, strategy, csvImportRepository, importEngine)
 
     val allRows = csvImportRepository.getImportRows(stagedImport.id, limit = stagedImport.rowCount.coerceAtLeast(1), offset = 0)
-    val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
-    if (rows.isEmpty()) {
+    val unprocessedRows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
+    // A strategy that assembles a trade from a whole row group must see the group whole: mapping only
+    // the unprocessed rows would turn a group with one errored leg into a one-legged group and assemble
+    // it wrongly (or not at all). Re-mapping the settled legs costs a pass and changes nothing — the
+    // trade's exact-tuple idempotency makes re-emitting the group a no-op that resolves to DUPLICATE.
+    // Transfers are still emitted only for the unprocessed rows (see [unprocessedRowIndexes] below), so
+    // widening the mapped set changes what groups see and nothing else.
+    val rows = if (strategy.tradeGroupConfig != null) allRows else unprocessedRows
+    val unprocessedRowIndexes: Set<Long> = unprocessedRows.mapTo(mutableSetOf()) { it.rowIndex }
+    if (unprocessedRows.isEmpty()) {
         // A genuinely empty file (a header-only export with no data rows) has nothing to import, but
         // must still be marked applied or it reappears in the Unimported tab on every "Import all".
         // Record the strategy application once (the lastAppliedAt guard keeps repeated runs a no-op).
@@ -405,6 +413,7 @@ suspend fun applyStagedCsv(
         onProgress = onProgress,
         engineBatchSize = engineBatchSize,
         attributeAccountMatchers = attributeAccountMatchers,
+        unprocessedRowIndexes = unprocessedRowIndexes,
     )
 }
 
@@ -666,6 +675,10 @@ suspend fun runCsvImport(
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
+    // Rows still awaiting import. Equals every row index in [rows] except when the strategy assembles
+    // trades from row groups, where [rows] is widened to the whole file so a group is never seen with
+    // some of its legs missing; transfers are then still emitted only for the rows named here.
+    unprocessedRowIndexes: Set<Long> = rows.mapTo(mutableSetOf()) { it.rowIndex },
 ): CsvImportResult {
     logger.info { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
 
@@ -794,12 +807,26 @@ suspend fun runCsvImport(
             null
         }
 
+    // Sources that split one trade across several rows (Binance stamps every partial fill of both legs
+    // with the same second) are assembled here: each resolvable group folds into one trade and its legs
+    // drop out of the transfer list. A group that does not resolve assembles to null and its rows stay
+    // ordinary transfers, so nothing is ever dropped for want of a clean pairing.
+    val assembledTrades =
+        strategy.tradeGroupConfig?.let { config ->
+            groupTradeLegs(finalPrep.validTransfers, config).mapNotNull { it.assemble(config) }
+        }.orEmpty()
+    val assembledRowIndexes: Set<Long> = assembledTrades.flatMapTo(mutableSetOf()) { it.group.rowIndexes }
+    val assembledTradeRowIndexes: Map<LocalTradeKey, List<Long>> =
+        assembledTrades.associate { assembled ->
+            assembled.tradeKey(csvImport.id) to assembled.group.rowIndexes
+        }
+
     // Rows carrying a credited leg (Currency != To Currency) are cross-asset conversions → trades.
     val importTrades =
         finalPrep.validTransfers.mapNotNull { row ->
             val credit = row.tradeTo ?: return@mapNotNull null
             ImportTradeIntent(
-                key = LocalTradeKey("csv-${csvImport.id.id}-${row.rowIndex}"),
+                key = LocalTradeKey("$CSV_TRADE_KEY_PREFIX${csvImport.id.id}-${row.rowIndex}"),
                 source = Source.Csv(csvImport.id),
                 timestamp = row.transfer.timestamp,
                 description = row.transfer.description,
@@ -808,7 +835,19 @@ suspend fun runCsvImport(
                 toAccountId = row.transfer.targetAccountId,
                 toAmount = credit,
             )
-        }
+        } +
+            assembledTrades.map { assembled ->
+                ImportTradeIntent(
+                    key = assembled.tradeKey(csvImport.id),
+                    source = Source.Csv(csvImport.id),
+                    timestamp = assembled.timestamp,
+                    description = assembled.description,
+                    fromAccountId = assembled.ownerAccountId,
+                    fromAmount = assembled.fromAmount,
+                    toAccountId = assembled.ownerAccountId,
+                    toAmount = assembled.toAmount,
+                )
+            }
 
     // A trade carries no fee field, so a conversion row that also has a fee would otherwise drop it.
     // Emit each such fee as its own standalone movement (source account -> "<strategy> Fees") so the
@@ -859,7 +898,9 @@ suspend fun runCsvImport(
         }
 
     val importTransfers =
-        finalPrep.validTransfers.filter { it.tradeTo == null }.map { row ->
+        finalPrep.validTransfers
+            .filter { it.tradeTo == null && it.rowIndex !in assembledRowIndexes && it.rowIndex in unprocessedRowIndexes }
+            .map { row ->
             val uniqueKey =
                 if (uniqueIdTypeNames.isEmpty()) {
                     null
@@ -1049,16 +1090,21 @@ suspend fun runCsvImport(
     // same event arriving from another export) — and clear their errors too, otherwise a converted row
     // keeps a stale ERROR status and gets reprocessed on the next import. The key is
     // "csv-<importId>-<rowIndex>".
-    val tradeKeyPrefix = "csv-${csvImport.id.id}-"
+    val tradeKeyPrefix = "$CSV_TRADE_KEY_PREFIX${csvImport.id.id}-"
 
     fun LocalTradeKey.rowIndexOrNull(): Long? =
         if (value.startsWith(tradeKeyPrefix)) value.removePrefix(tradeKeyPrefix).toLongOrNull() else null
+
+    // An assembled trade speaks for every leg of its group, not just the row its key names, so all of
+    // them take the trade's outcome. A single-row conversion has no group and falls back to its own row.
+    fun LocalTradeKey.rowIndexes(): List<Long> =
+        assembledTradeRowIndexes[this] ?: listOfNotNull(rowIndexOrNull())
 
     // The row records the trade's transaction id, exactly as a transfer row records its transfer's:
     // it is what links the row to what it produced, and what lets a re-import find the trade again.
     val tradeRowsByStatus =
         importResult.createdTradeIds.entries
-            .mapNotNull { (key, tradeId) -> key.rowIndexOrNull()?.let { Triple(key, it, tradeId) } }
+            .flatMap { (key, tradeId) -> key.rowIndexes().map { Triple(key, it, tradeId) } }
             .groupBy(
                 keySelector = { (key, _, _) ->
                     if (key in importResult.dedupedTradeKeys) ImportStatus.DUPLICATE else ImportStatus.IMPORTED

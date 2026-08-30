@@ -97,6 +97,8 @@ sealed interface MappingResult {
         val passThrough: CsvPassThrough? = null,
         /** Set when the row is one leg of an asset conversion (see `ConversionConfig`); null otherwise. */
         val conversionLeg: ConversionLegInfo? = null,
+        /** Set when the row is one leg of a row-group trade (see `TradeGroupConfig`); null otherwise. */
+        val tradeLeg: TradeLegInfo? = null,
         /** Raw funding value from [CsvImportStrategy.fundingAttributeMatch]'s column; null when unset/blank. */
         val fundingMatchValue: String? = null,
         /**
@@ -177,6 +179,19 @@ data class ConversionLegInfo(
     val pairingKey: String,
 )
 
+/** Which leg of a row-group trade a row represents (see `TradeGroupConfig`). */
+enum class TradeLegSide { DEBIT, CREDIT }
+
+/**
+ * Marks a mapped row as one leg of a trade the source split across several rows (see
+ * `TradeGroupConfig`). The applier buckets legs sharing a timestamp and folds each resolvable bucket
+ * into one `trade`; a bucket that does not resolve leaves its rows to import as ordinary transfers,
+ * so this marker never causes a row to be dropped.
+ */
+data class TradeLegInfo(
+    val side: TradeLegSide,
+)
+
 /**
  * A transfer with its associated attributes extracted from CSV.
  * Uses attribute type names (not IDs) since types may need to be created.
@@ -205,6 +220,8 @@ data class CsvTransferWithAttributes(
     val passThrough: CsvPassThrough? = null,
     /** Set when the row is one leg of an asset conversion (see `ConversionConfig`); null otherwise. */
     val conversionLeg: ConversionLegInfo? = null,
+    /** Set when the row is one leg of a row-group trade (see `TradeGroupConfig`); null otherwise. */
+    val tradeLeg: TradeLegInfo? = null,
     /**
      * Raw value of the strategy's [CsvImportStrategy.fundingAttributeMatch] column for this row (e.g. a
      * card's last-4 like "7721"); null when the strategy declares no funding match or the cell is blank.
@@ -340,6 +357,12 @@ class CsvTransferMapper(
             .orEmpty()
             .map { Regex(it.pattern, RegexOption.IGNORE_CASE) to it }
 
+    // Precompiled row-group trade detection (null when the strategy declares no tradeGroupConfig).
+    private val tradeDebitRegex: Regex? =
+        strategy.tradeGroupConfig?.let { Regex(it.debitPattern, RegexOption.IGNORE_CASE) }
+    private val tradeCreditRegex: Regex? =
+        strategy.tradeGroupConfig?.let { Regex(it.creditPattern, RegexOption.IGNORE_CASE) }
+
     // Extract unique identifier column names from strategy
     private val uniqueIdentifierColumns: List<String> =
         strategy.attributeMappings.filter { it.isUniqueIdentifier }.map { it.columnName }
@@ -393,6 +416,7 @@ class CsvTransferMapper(
                             personalCounterpartyName = result.personalCounterpartyName,
                             passThrough = result.passThrough,
                             conversionLeg = result.conversionLeg,
+                            tradeLeg = result.tradeLeg,
                             fundingMatchValue = result.fundingMatchValue,
                             unidentifiedCounterpartyAccountId = result.unidentifiedCounterpartyAccountId,
                         ),
@@ -714,6 +738,7 @@ class CsvTransferMapper(
                 passThrough = passThrough,
                 conversionLeg =
                     conversionDetection?.let { ConversionLegInfo(side = it.side, pairingKey = it.pairingKey) },
+                tradeLeg = detectTradeLeg(originalValues),
                 fundingMatchValue =
                     strategy.fundingAttributeMatch?.let {
                         getColumnValueOrNull(it.column, originalValues)?.trim()?.takeIf { v -> v.isNotBlank() }
@@ -773,11 +798,31 @@ class CsvTransferMapper(
         val config = strategy.conversionConfig ?: return null
         val signal = getColumnValueOrNull(config.signalColumn, values)?.trim().orEmpty()
         if (signal.isEmpty()) return null
+        val matchesFamily =
+            conversionDebitRegex?.containsMatchIn(signal) == true ||
+                conversionCreditRegex?.containsMatchIn(signal) == true
+        if (!matchesFamily) return null
+        // A source that names both legs identically (Binance's "Small Assets Exchange BNB" labels the
+        // swept asset and the BNB received the same) can only be told apart by the sign of its amount.
         val side =
-            when {
-                conversionDebitRegex?.containsMatchIn(signal) == true -> ConversionSide.DEBIT
-                conversionCreditRegex?.containsMatchIn(signal) == true -> ConversionSide.CREDIT
-                else -> return null
+            when (val sideColumn = config.sideAmountColumn) {
+                null ->
+                    when {
+                        conversionDebitRegex?.containsMatchIn(signal) == true -> ConversionSide.DEBIT
+                        else -> ConversionSide.CREDIT
+                    }
+                else -> {
+                    val amount =
+                        getColumnValueOrNull(sideColumn, values)
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { runCatching { parseBigDecimal(it) }.getOrNull() }
+                            ?: return null
+                    when {
+                        amount < BigDecimal.ZERO -> ConversionSide.DEBIT
+                        amount > BigDecimal.ZERO -> ConversionSide.CREDIT
+                        else -> return null
+                    }
+                }
             }
         val accountName =
             conversionAccountRuleRegexes
@@ -795,6 +840,31 @@ class CsvTransferMapper(
                 .orEmpty()
         val extra = config.pairingKeyColumns.joinToString(PAIRING_KEY_SEPARATOR) { getColumnValueOrNull(it, values)?.trim().orEmpty() }
         return ConversionDetection(side, accountName, "$base$PAIRING_KEY_SEPARATOR$extra")
+    }
+
+    /**
+     * Detects whether [values] is a leg of a row-group trade per [CsvImportStrategy.tradeGroupConfig].
+     * Returns null when the strategy declares no trade-group config or the signal column matches
+     * neither the debit nor the credit pattern — including for a fee row, which the config leaves out
+     * on purpose so it imports as its own transfer.
+     */
+    private fun detectTradeLeg(values: List<String>): TradeLegInfo? {
+        val config = strategy.tradeGroupConfig ?: return null
+        val signal = getColumnValueOrNull(config.signalColumn, values)?.trim().orEmpty()
+        if (signal.isEmpty()) return null
+        val isDebitPattern = tradeDebitRegex?.containsMatchIn(signal) == true
+        if (!isDebitPattern && tradeCreditRegex?.containsMatchIn(signal) != true) return null
+        val sideColumn = config.sideAmountColumn ?: return TradeLegInfo(if (isDebitPattern) TradeLegSide.DEBIT else TradeLegSide.CREDIT)
+        val amount =
+            getColumnValueOrNull(sideColumn, values)
+                ?.takeIf { it.isNotBlank() }
+                ?.let { runCatching { parseBigDecimal(it) }.getOrNull() }
+                ?: return null
+        return when {
+            amount < BigDecimal.ZERO -> TradeLegInfo(TradeLegSide.DEBIT)
+            amount > BigDecimal.ZERO -> TradeLegInfo(TradeLegSide.CREDIT)
+            else -> null
+        }
     }
 
     private fun parseAmount(
