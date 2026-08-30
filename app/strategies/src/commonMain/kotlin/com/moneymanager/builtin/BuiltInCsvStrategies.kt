@@ -178,7 +178,9 @@ object BuiltInCsvStrategies {
      * Suspense counterparty for a trade leg whose group did not resolve into a trade — a one-sided
      * group, or one naming more than one asset on a side. Reached only in that case (an assembled
      * group's legs become the trade and never a transfer), so a non-zero balance here is a visible
-     * signal that an export had a shape the strategy does not model, rather than a silent loss.
+     * signal that an export had a shape the strategy does not model, rather than a silent loss. The
+     * account itself is created whenever the file has any trade rows — accounts are resolved while the
+     * rows are mapped, before groups are assembled — so an empty one is the normal, healthy state.
      */
     private const val BINANCE_TRADING_ACCOUNT = "Binance Trading"
 
