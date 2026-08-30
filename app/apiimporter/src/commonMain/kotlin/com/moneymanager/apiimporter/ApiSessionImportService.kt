@@ -2602,10 +2602,12 @@ internal fun dateWindows(
     while (start < nowMillis) {
         // Providers that cap the startTime/endTime span (Binance: "range too large" at exactly
         // [windowDays]) treat the bound as inclusive, so a full-[windowMillis] span is one millisecond
-        // over their limit. Every window but the last (which must reach [now] for the coverage
-        // watermark) ends a millisecond early; consecutive inclusive ranges still tile without a gap.
+        // over their limit. Every window but the last ends a millisecond early; consecutive inclusive
+        // ranges still tile without a gap. Only a window that actually runs past [now] is clamped back
+        // to it - a window landing exactly on [now] still ends a millisecond early (the coverage
+        // watermark being 1 ms short is harmless; the incremental overlap re-fetches far more).
         val fullEnd = start + windowMillis
-        val end = if (fullEnd >= nowMillis) nowMillis else fullEnd - 1
+        val end = if (fullEnd > nowMillis) nowMillis else fullEnd - 1
         windows += ApiDateWindow(Instant.fromEpochMilliseconds(start), Instant.fromEpochMilliseconds(end))
         start += windowMillis
     }

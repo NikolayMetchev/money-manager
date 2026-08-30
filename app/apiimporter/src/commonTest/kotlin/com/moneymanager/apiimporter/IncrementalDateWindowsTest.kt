@@ -64,6 +64,21 @@ class IncrementalDateWindowsTest {
     }
 
     @Test
+    fun `every window's span stays strictly under the configured window length`() {
+        val windowMillis = 7 * MILLIS_PER_DAY
+        // A now that lands exactly on a window boundary is the case that used to produce a
+        // full-length (provider-rejecting) final span.
+        val alignedNow = Instant.fromEpochMilliseconds((now.toEpochMilliseconds() / windowMillis) * windowMillis)
+
+        listOf(now, alignedNow).forEach { end ->
+            dateWindows(pagination, end).forEach { window ->
+                val span = window.end.toEpochMilliseconds() - window.start.toEpochMilliseconds()
+                assertTrue(span < windowMillis, "window $window spans $span, not under $windowMillis")
+            }
+        }
+    }
+
+    @Test
     fun `a negative overlap is clamped so it can never skip past the watermark`() {
         val since = now - kotlin.time.Duration.parse("30d")
         val negative = pagination.copy(incrementalOverlapDays = -3)
