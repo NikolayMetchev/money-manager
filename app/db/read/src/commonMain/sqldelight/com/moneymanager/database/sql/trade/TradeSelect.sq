@@ -72,6 +72,37 @@ JOIN asset_details ta ON trade.to_asset_id = ta.id
 WHERE trade.from_account_id = ? OR trade.to_account_id = ?
 ORDER BY trade.timestamp DESC;
 
+-- Trades on the given accounts within a time range, for fuzzy cross-source reconciliation: a CSV
+-- export stamps a trade to the second while an API feed stamps it to the millisecond, and a CSV
+-- aggregates the fills an API reports individually, so the exact-tuple match above cannot see that
+-- the two describe one movement. The caller loads one window per batch and matches in memory.
+selectByAccountsAndDateRange:
+SELECT
+    trade.id,
+    trade.revision_id,
+    trade.timestamp,
+    trade.description,
+    trade.from_account_id,
+    trade.from_asset_id,
+    trade.from_amount,
+    fa.code AS from_asset_code,
+    fa.name AS from_asset_name,
+    fa.scale_factor AS from_asset_scale_factor,
+    fa.kind AS from_asset_kind,
+    trade.to_account_id,
+    trade.to_asset_id,
+    trade.to_amount,
+    ta.code AS to_asset_code,
+    ta.name AS to_asset_name,
+    ta.scale_factor AS to_asset_scale_factor,
+    ta.kind AS to_asset_kind
+FROM trade
+JOIN asset_details fa ON trade.from_asset_id = fa.id
+JOIN asset_details ta ON trade.to_asset_id = ta.id
+WHERE trade.timestamp BETWEEN :minTimestamp AND :maxTimestamp
+  AND (trade.from_account_id IN :accountIds OR trade.to_account_id IN :accountIds)
+ORDER BY trade.timestamp, trade.id;
+
 countByAccount:
 SELECT COUNT(*)
 FROM trade

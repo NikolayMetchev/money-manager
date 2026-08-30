@@ -284,8 +284,7 @@ class StrategySelectorTest {
 
     private val binanceHeaders = listOf("User_ID", "UTC_Time", "Account", "Operation", "Coin", "Change", "Remark")
 
-    private fun binanceColumns(headers: List<String>) =
-        headers.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+    private fun binanceColumns(headers: List<String>) = headers.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
 
     private fun binanceRow(
         index: Long,

@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
@@ -27,6 +28,7 @@ import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.BatchRelationship
 import com.moneymanager.importengineapi.CsvImportMutation
@@ -46,6 +48,7 @@ import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createAccountMapping
@@ -248,6 +251,7 @@ suspend fun bulkApplyCsv(
     cryptoRepository: CryptoReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     directoryAccounts: Map<CsvImportId, AccountId> = emptyMap(),
+    tradeRepository: TradeReadRepository? = null,
 ): CsvBulkResult {
     var filesImported = 0
     var transfers = 0
@@ -291,6 +295,7 @@ suspend fun bulkApplyCsv(
                     engineBatchSize = BULK_ENGINE_BATCH_SIZE,
                     cryptoRepository = cryptoRepository,
                     attributeAccountMatchers = attributeAccountMatchers,
+                    tradeRepository = tradeRepository,
                 ) ?: return@forEachIndexed
             filesImported++
             transfers += result.successCount
@@ -337,6 +342,7 @@ suspend fun applyStagedCsv(
     engineBatchSize: Int = Int.MAX_VALUE,
     cryptoRepository: CryptoReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
+    tradeRepository: TradeReadRepository? = null,
 ): CsvImportResult? {
     // An Excel import is initially staged from the workbook's FIRST worksheet, but the matched strategy
     // may target a different sheet. Re-extract + re-stage the correct sheet before reading rows so the
@@ -414,6 +420,7 @@ suspend fun applyStagedCsv(
         engineBatchSize = engineBatchSize,
         attributeAccountMatchers = attributeAccountMatchers,
         unprocessedRowIndexes = unprocessedRowIndexes,
+        tradeRepository = tradeRepository,
     )
 }
 
@@ -679,6 +686,7 @@ suspend fun runCsvImport(
     // trades from row groups, where [rows] is widened to the whole file so a group is never seen with
     // some of its legs missing; transfers are then still emitted only for the rows named here.
     unprocessedRowIndexes: Set<Long> = rows.mapTo(mutableSetOf()) { it.rowIndex },
+    tradeRepository: TradeReadRepository? = null,
 ): CsvImportResult {
     logger.info { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
 
@@ -812,10 +820,18 @@ suspend fun runCsvImport(
     // drop out of the transfer list. A group that does not resolve assembles to null and its rows stay
     // ordinary transfers, so nothing is ever dropped for want of a clean pairing.
     val assembledTrades =
-        strategy.tradeGroupConfig?.let { config ->
-            groupTradeLegs(finalPrep.validTransfers, config).mapNotNull { it.assemble(config) }
-        }.orEmpty()
+        strategy.tradeGroupConfig
+            ?.let { config ->
+                groupTradeLegs(finalPrep.validTransfers, config).mapNotNull { it.assemble(config) }
+            }.orEmpty()
     val assembledRowIndexes: Set<Long> = assembledTrades.flatMapTo(mutableSetOf()) { it.group.rowIndexes }
+
+    // Conversion groups another source already recorded as trades (Binance's dust API reports the same
+    // sweep the export splits into unpairable legs). They are matched and dropped as whole groups: see
+    // ConversionGroupReconciler for why only the debited legs can be compared, and why a partial match
+    // must not suppress anything.
+    val reconciledConversionRows: Map<Long, TradeId> =
+        reconcileConversionGroups(strategy, finalPrep.validTransfers, tradeRepository)
     val assembledTradeRowIndexes: Map<LocalTradeKey, List<Long>> =
         assembledTrades.associate { assembled ->
             assembled.tradeKey(csvImport.id) to assembled.group.rowIndexes
@@ -899,86 +915,90 @@ suspend fun runCsvImport(
 
     val importTransfers =
         finalPrep.validTransfers
-            .filter { it.tradeTo == null && it.rowIndex !in assembledRowIndexes && it.rowIndex in unprocessedRowIndexes }
-            .map { row ->
-            val uniqueKey =
-                if (uniqueIdTypeNames.isEmpty()) {
-                    null
-                } else {
-                    row.attributes
-                        .filter { (name, _) -> name in uniqueIdTypeNames }
-                        .associate { (name, value) -> name to value }
-                }
-            val fee =
-                row.feeAmount?.let { feeMoney ->
-                    ImportFee(
-                        source = AccountRef.Existing(row.transfer.sourceAccountId),
-                        target = AccountRef.Existing(feeAccountId!!),
-                        amount = feeMoney,
-                        description = "Fee",
-                        relationshipTypeId = RelationshipTypeId(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID),
-                    )
-                }
-            // Pass-through (conduit) row: the mapper already routed the transfer's conduit side — the
-            // target for an outgoing charge, the source for an incoming refund/cancellation; that side
-            // is the chain's first conduit. Resolve the remaining chain conduits + the merchant account
-            // the mapper created and let the engine add the spend legs (C1 -> C2, …, Cn -> merchant, or
-            // reversed when incoming). accountsByName carries the created conduit + merchant ids.
-            val passThrough =
-                row.passThrough?.let { pt ->
-                    val merchantId = pt.merchantAccountId ?: accountsByName[pt.merchantName]?.id
-                    val firstConduitId = if (pt.incoming) row.transfer.sourceAccountId else row.transfer.targetAccountId
-                    val innerConduitIds = pt.conduitNames.drop(1).map { accountsByName[it]?.id }
-                    if (merchantId == null || innerConduitIds.any { it == null }) {
+            .filter {
+                it.tradeTo == null &&
+                    it.rowIndex !in assembledRowIndexes &&
+                    it.rowIndex !in reconciledConversionRows &&
+                    it.rowIndex in unprocessedRowIndexes
+            }.map { row ->
+                val uniqueKey =
+                    if (uniqueIdTypeNames.isEmpty()) {
                         null
                     } else {
-                        val nodes = listOf(firstConduitId) + innerConduitIds.filterNotNull() + merchantId
-                        collapsePassThroughChain(nodes, pt.spendDescriptions)?.let { (keptNodes, keptDescriptions) ->
-                            ImportPassThrough(
-                                conduits = keptNodes.dropLast(1).map { AccountRef.Existing(it) },
-                                merchantTarget = AccountRef.Existing(keptNodes.last()),
-                                amount = row.transfer.amount,
-                                spendDescriptions = keptDescriptions,
-                                relationshipTypeId = RelationshipTypeId(pt.relationshipTypeId),
-                                incoming = pt.incoming,
-                            )
+                        row.attributes
+                            .filter { (name, _) -> name in uniqueIdTypeNames }
+                            .associate { (name, value) -> name to value }
+                    }
+                val fee =
+                    row.feeAmount?.let { feeMoney ->
+                        ImportFee(
+                            source = AccountRef.Existing(row.transfer.sourceAccountId),
+                            target = AccountRef.Existing(feeAccountId!!),
+                            amount = feeMoney,
+                            description = "Fee",
+                            relationshipTypeId = RelationshipTypeId(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID),
+                        )
+                    }
+                // Pass-through (conduit) row: the mapper already routed the transfer's conduit side — the
+                // target for an outgoing charge, the source for an incoming refund/cancellation; that side
+                // is the chain's first conduit. Resolve the remaining chain conduits + the merchant account
+                // the mapper created and let the engine add the spend legs (C1 -> C2, …, Cn -> merchant, or
+                // reversed when incoming). accountsByName carries the created conduit + merchant ids.
+                val passThrough =
+                    row.passThrough?.let { pt ->
+                        val merchantId = pt.merchantAccountId ?: accountsByName[pt.merchantName]?.id
+                        val firstConduitId = if (pt.incoming) row.transfer.sourceAccountId else row.transfer.targetAccountId
+                        val innerConduitIds = pt.conduitNames.drop(1).map { accountsByName[it]?.id }
+                        if (merchantId == null || innerConduitIds.any { it == null }) {
+                            null
+                        } else {
+                            val nodes = listOf(firstConduitId) + innerConduitIds.filterNotNull() + merchantId
+                            collapsePassThroughChain(nodes, pt.spendDescriptions)?.let { (keptNodes, keptDescriptions) ->
+                                ImportPassThrough(
+                                    conduits = keptNodes.dropLast(1).map { AccountRef.Existing(it) },
+                                    merchantTarget = AccountRef.Existing(keptNodes.last()),
+                                    amount = row.transfer.amount,
+                                    spendDescriptions = keptDescriptions,
+                                    relationshipTypeId = RelationshipTypeId(pt.relationshipTypeId),
+                                    incoming = pt.incoming,
+                                )
+                            }
                         }
                     }
-                }
-            // Funding reconcile hint: match the row's funding value against the strategy's funding
-            // attribute type to find the account that must hold the matching funding leg (e.g. Curve's
-            // "7721" -> the Crypto.com Card account, via the `card-last4` attribute regexes). Never point
-            // at the row's own source conduit (a self-reconcile makes no sense).
-            val fundingMatcher = strategy.fundingAttributeMatch?.let { attributeAccountMatchers[it.attributeTypeName] }
-            val fundingAccountId =
-                row.fundingMatchValue
-                    ?.let { fundingMatcher?.match(it) }
-                    ?.takeIf { it != row.transfer.sourceAccountId }
-            ImportTransfer(
-                rowKey = ImportRowKey.CsvRow(row.rowIndex),
-                fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
-                toAccount = AccountRef.Existing(row.transfer.targetAccountId),
-                source = Source.Csv(csvImport.id),
-                timestamp = row.transfer.timestamp,
-                description = row.transfer.description,
-                amount = row.transfer.amount,
-                attributes =
-                    attributesFor(row.attributes) +
-                        listOfNotNull(
-                            // Marks the persisted leg as the placeholder record, so a later import that
-                            // does name both ends knows which of the two to exclude.
-                            unidentifiedCounterpartyTypeId
-                                ?.takeIf { row.unidentifiedCounterpartyAccountId != null }
-                                ?.let { NewAttribute(it, "true") },
-                        ),
-                uniqueKey = uniqueKey,
-                fee = fee,
-                passThrough = passThrough,
-                batchRelationships = listOfNotNull(conversionLinkByRow[row.rowIndex]),
-                reconcileFundingAccountId = fundingAccountId,
-                unidentifiedCounterpartyAccountId = row.unidentifiedCounterpartyAccountId,
-            )
-        }
+                // Funding reconcile hint: match the row's funding value against the strategy's funding
+                // attribute type to find the account that must hold the matching funding leg (e.g. Curve's
+                // "7721" -> the Crypto.com Card account, via the `card-last4` attribute regexes). Never point
+                // at the row's own source conduit (a self-reconcile makes no sense).
+                val fundingMatcher = strategy.fundingAttributeMatch?.let { attributeAccountMatchers[it.attributeTypeName] }
+                val fundingAccountId =
+                    row.fundingMatchValue
+                        ?.let { fundingMatcher?.match(it) }
+                        ?.takeIf { it != row.transfer.sourceAccountId }
+                ImportTransfer(
+                    rowKey = ImportRowKey.CsvRow(row.rowIndex),
+                    fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
+                    toAccount = AccountRef.Existing(row.transfer.targetAccountId),
+                    source = Source.Csv(csvImport.id),
+                    timestamp = row.transfer.timestamp,
+                    description = row.transfer.description,
+                    amount = row.transfer.amount,
+                    attributes =
+                        attributesFor(row.attributes) +
+                            listOfNotNull(
+                                // Marks the persisted leg as the placeholder record, so a later import that
+                                // does name both ends knows which of the two to exclude.
+                                unidentifiedCounterpartyTypeId
+                                    ?.takeIf { row.unidentifiedCounterpartyAccountId != null }
+                                    ?.let { NewAttribute(it, "true") },
+                            ),
+                    uniqueKey = uniqueKey,
+                    fee = fee,
+                    passThrough = passThrough,
+                    batchRelationships = listOfNotNull(conversionLinkByRow[row.rowIndex]),
+                    reconcileFundingAccountId = fundingAccountId,
+                    unidentifiedCounterpartyAccountId = row.unidentifiedCounterpartyAccountId,
+                )
+            }
 
     // Personal counterparties (resolved via person-flagged strategy rules, e.g. a RegexRule with
     // counterpartyIsPerson) become People with an ownership link to their counterparty account, in
@@ -1029,6 +1049,14 @@ suspend fun runCsvImport(
             peopleToCreate = peopleToCreate,
             ownerships = personOwnerships,
             trades = importTrades,
+            // Same window, same meaning as the transfer reconcile below: how far this source's clock may
+            // disagree with another's about one movement. Aggregation is what lets a group assembled from
+            // several fills match the per-fill trades an API import already booked for the same second.
+            tradeDedupePolicy =
+                strategy.crossSourceReconcileWindowSeconds
+                    ?.takeIf { strategy.tradeGroupConfig != null }
+                    ?.let { TradeDedupePolicy.Fuzzy(window = it.seconds, allowAggregation = true) }
+                    ?: TradeDedupePolicy.ExactTupleOnly,
             dedupePolicy =
                 if (uniqueIdTypeNames.isEmpty()) {
                     // Cross-source reconciliation is opt-in per strategy: rows recording a movement
@@ -1097,8 +1125,7 @@ suspend fun runCsvImport(
 
     // An assembled trade speaks for every leg of its group, not just the row its key names, so all of
     // them take the trade's outcome. A single-row conversion has no group and falls back to its own row.
-    fun LocalTradeKey.rowIndexes(): List<Long> =
-        assembledTradeRowIndexes[this] ?: listOfNotNull(rowIndexOrNull())
+    fun LocalTradeKey.rowIndexes(): List<Long> = assembledTradeRowIndexes[this] ?: listOfNotNull(rowIndexOrNull())
 
     // The row records the trade's transaction id, exactly as a transfer row records its transfer's:
     // it is what links the row to what it produced, and what lets a re-import find the trade again.
@@ -1111,6 +1138,12 @@ suspend fun runCsvImport(
                 },
                 valueTransform = { (_, rowIndex, tradeId) -> rowIndex to TransferId(tradeId.id) },
             )
+
+    // Conversion legs suppressed as already-recorded record the trade they duplicate, so the rows read
+    // as duplicates of something rather than as rows that quietly produced nothing.
+    for ((rowIndex, tradeId) in reconciledConversionRows) {
+        duplicateStatuses[rowIndex] = TransferId(tradeId.id)
+    }
 
     val statusMutations = mutableListOf<CsvImportMutation>()
     if (importedStatuses.isNotEmpty()) {

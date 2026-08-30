@@ -85,6 +85,7 @@ import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.QifImportMutation
 import com.moneymanager.importengineapi.RowOutcome
+import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.WriteIntent
 import com.moneymanager.importengineapi.bankKeyFromExternalId
 import com.moneymanager.importengineapi.bankKeysFrom
@@ -198,7 +199,18 @@ class ImportEngineImpl(
             val toAmount: Money?,
         )
         val tradeOccurrences = mutableMapOf<TradeTupleKey, Int>()
+        // Cross-source reconcile (opt-in): two sources describing one conversion rarely agree on the
+        // exact tuple the writer matches on, so load the window they could disagree within and match in
+        // memory. A hit suppresses the write and reports the existing trade, which is the only way a
+        // trade can be linked to its duplicate (see TradeDedupePolicy).
+        val tradeReconciler = buildTradeReconciler(batch)
         for (intent in batch.trades.creates()) {
+            val reconciledId = tradeReconciler?.match(intent)
+            if (reconciledId != null) {
+                createdTradeIds[intent.key] = reconciledId
+                dedupedTradeKeys += intent.key
+                continue
+            }
             val tupleKey =
                 TradeTupleKey(
                     intent.timestamp?.toEpochMilliseconds(),
@@ -1210,6 +1222,24 @@ class ImportEngineImpl(
             .getByTransfers(existing.map { it.transferId })
             .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
             .mapTo(mutableSetOf()) { it.id2 }
+    }
+
+    /**
+     * A [TradeReconciler] over the trades the batch's own trades could be duplicating, or null when the
+     * batch opts out, has no trades, or nothing exists to match. The window is loaded once and widened
+     * by the policy's tolerance, mirroring [loadExisting]'s slack: an existing trade stamped just
+     * outside the batch's own span is exactly the one a second-vs-millisecond disagreement produces.
+     */
+    private suspend fun buildTradeReconciler(batch: ImportBatch): TradeReconciler? {
+        val policy = batch.tradeDedupePolicy as? TradeDedupePolicy.Fuzzy ?: return null
+        val creates = batch.trades.creates().filter { it.timestamp != null }
+        if (creates.isEmpty()) return null
+        val accountIds = creates.flatMap { listOfNotNull(it.fromAccountId, it.toAccountId) }.toSet()
+        if (accountIds.isEmpty()) return null
+        val minTs = creates.minOf { requireNotNull(it.timestamp) } - policy.window
+        val maxTs = creates.maxOf { requireNotNull(it.timestamp) } + policy.window
+        val existing = tradeRepository.getTradesByAccountsAndDateRange(accountIds, minTs, maxTs)
+        return if (existing.isEmpty()) null else TradeReconciler(policy, existing)
     }
 
     private suspend fun loadExisting(

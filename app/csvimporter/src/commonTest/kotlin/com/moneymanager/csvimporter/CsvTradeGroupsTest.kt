@@ -86,8 +86,7 @@ class CsvTradeGroupsTest {
     }
 
     /** A row the strategy did not flag as a trade leg (a fee, a deposit). */
-    private fun nonLeg(display: String = "0.001"): CsvTransferWithAttributes =
-        leg(TradeLegSide.DEBIT, display, btc).copy(tradeLeg = null)
+    private fun nonLeg(display: String = "0.001"): CsvTransferWithAttributes = leg(TradeLegSide.DEBIT, display, btc).copy(tradeLeg = null)
 
     @Test
     fun oneFillPerSide_assemblesASingleTrade() {
