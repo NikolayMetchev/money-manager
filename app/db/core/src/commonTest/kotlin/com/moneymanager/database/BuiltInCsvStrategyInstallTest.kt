@@ -5,6 +5,7 @@ package com.moneymanager.database
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
+import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.test.database.DbTest
@@ -177,9 +178,16 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
             assertEquals("Change", conversion.sideAmountColumn)
             assertEquals(conversion.debitPattern, conversion.creditPattern, "both dust legs share one Operation")
 
-            // Fiat and crypto funding split to the two accounts the API strategy also creates.
+            // The Operation column routes every row's counterparty, and the funding rules survive as
+            // unidentified placeholders — which is what lets a deposit reconcile against the API's
+            // record of it, since the API names the on-chain address the export cannot.
             val target = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
-            assertIs<ConditionalAccountMapping>(target)
+            assertIs<RegexAccountMapping>(target)
+            assertEquals("Operation", target.columnName)
+            assertTrue(
+                target.rules.first { it.accountName == "Binance Funding" }.counterpartyIsUnidentified,
+                "a deposit/withdrawal counterparty is a placeholder, not an identity",
+            )
 
             val amount = strategy.fieldMappings[TransferField.AMOUNT]
             assertIs<AmountParsingMapping>(amount)

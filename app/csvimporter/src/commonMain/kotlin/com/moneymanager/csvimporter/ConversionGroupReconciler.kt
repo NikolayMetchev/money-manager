@@ -84,7 +84,7 @@ suspend fun reconcileConversionGroups(
     tradeRepository: TradeReadRepository?,
 ): Map<Long, TradeId> {
     val conversionConfig = strategy.conversionConfig ?: return emptyMap()
-    val window = strategy.crossSourceReconcileWindowSeconds?.seconds ?: return emptyMap()
+    val window = conversionConfig.reconcileWindowSeconds?.seconds ?: return emptyMap()
     val repository = tradeRepository ?: return emptyMap()
 
     val groups = conversionGroups(rows, conversionConfig.pairingWindowSeconds.seconds)

@@ -143,7 +143,16 @@ object BuiltInCsvStrategies {
      * versions of the same deposit/withdrawal/earn movement reconcilable.
      */
     private const val BINANCE_FEES_ACCOUNT = "Binance Fees"
+
+    /**
+     * Placeholder counterparty for a deposit or withdrawal. The export records that money arrived or
+     * left but never whose account it was, so this account is not an assertion — it is where an
+     * unidentified movement waits to be reconciled against a source that does name the counterparty
+     * (the API books a crypto deposit against the on-chain address, falling back to this same name).
+     */
     private const val BINANCE_FUNDING_ACCOUNT = "Binance Funding"
+
+    /** Same placeholder role as [BINANCE_FUNDING_ACCOUNT], for the explicitly fiat operations. */
     private const val BINANCE_BANK_ACCOUNT = "Binance Bank"
     private const val BINANCE_EARN_ACCOUNT = "Binance Earn"
     private const val BINANCE_EARN_REWARDS_ACCOUNT = "Binance Earn Rewards"
@@ -185,12 +194,26 @@ object BuiltInCsvStrategies {
     private const val BINANCE_TRADING_ACCOUNT = "Binance Trading"
 
     /**
-     * Cross-source reconciliation window for the Binance CSV strategy. The CSV and the API describe the
-     * same event with the same UTC second and differ only in sub-second precision, so this needs to be
-     * small; and Binance pays `Staking Rewards` in the same amount every day, so a wide window would
-     * start pairing genuinely distinct reward rows. Five minutes is far below that daily cadence.
+     * Cross-source reconciliation window for the Binance CSV strategy's **transfers**. Sized by fiat
+     * funding, which is the only thing the two sources disagree about by more than a moment: the API
+     * records when Binance credited the deposit, the export when the transfer was initiated, and in
+     * this user's data that gap runs from 1 second to about 7 minutes (an hour recovers 19 of 25 such
+     * rows; widening to a day recovers no more).
+     *
+     * It is not wider than that because Binance pays `Staking Rewards` in the same amount every day:
+     * at an hour, 65 of 9,303 reward rows have an identical-amount sibling in range, but at a day
+     * 4,088 do — a window that size would start pairing genuinely distinct rewards.
      */
-    private const val BINANCE_RECONCILE_WINDOW_SECONDS = 300L
+    private const val BINANCE_RECONCILE_WINDOW_SECONDS = 3600L
+
+    /**
+     * Reconciliation window for Binance **trades and dust sweeps**, which is a different question from
+     * the transfer window above: the two sources agree about a conversion's instant to the second and
+     * differ only in sub-second rounding. It stays tight because trade reconciliation matches a group
+     * against the whole in-window candidate set — at an hour, a later order's fills would be dragged in
+     * and the sums would stop matching.
+     */
+    private const val BINANCE_TRADE_RECONCILE_WINDOW_SECONDS = 5L
 
     /**
      * Window for pairing a dust sweep's debit legs to its credit legs. Binance stamps a sweep's rows
@@ -1521,6 +1544,13 @@ object BuiltInCsvStrategies {
      * folds each such group into one `trade`. Fee rows stay out of the group on purpose — a `trade` row
      * has no fee field — and route to [BINANCE_FEES_ACCOUNT] as their own transfers, as the API does.
      *
+     * **Known limitation — withdrawals do not reconcile.** A `Withdraw` row remarked
+     * "Withdraw fee is included" is the **gross** amount, while the API records the withdrawal net and
+     * books the fee as its own transfer. Cross-source reconciliation matches on the amount, so the two
+     * never pair and such a withdrawal is counted twice if both sources are imported. The export gives
+     * no way to recover the fee, so nothing here can fix it; the affected rows are the ones carrying
+     * that remark, plus `Fiat Withdrawal`.
+     *
      * Dust sweeps are the one conversion that cannot be assembled: a sweep debits several assets and
      * credits several BNB amounts, and nothing in the file says which credit came from which debit
      * (their order does not correspond, and the credited amount is net of Binance's service charge
@@ -1534,11 +1564,22 @@ object BuiltInCsvStrategies {
         // also claim "Fiat Deposit" and a bare "Buy" would claim "Transaction Buy".
         val targetAccountRules =
             listOf(
-                // Fiat funding is the API's fiat/orders endpoints (Binance Bank); crypto funding is
-                // capital/deposit|withdraw (Binance Funding). The Coin column decides which, so the
-                // fiat rules match on it and the crypto rules catch the rest.
-                RegexRule(pattern = "^(Fiat Deposit|Fiat Withdrawal)$", accountName = BINANCE_BANK_ACCOUNT),
-                RegexRule(pattern = "^(Deposit|Withdraw)$", accountName = BINANCE_FUNDING_ACCOUNT),
+                // The export says money arrived or left, never whose account it was: a deposit row names
+                // no bank and no wallet. The API does know — it books a crypto deposit against the
+                // on-chain address it came from ("ETH:0x9b4f…") and only falls back to Binance Funding
+                // when there is none. So the counterparty here is a *placeholder*: marking it
+                // unidentified lets the engine reconcile the row against the API's record of the same
+                // movement whatever counterparty that record names, instead of double-counting it.
+                RegexRule(
+                    pattern = "^(Fiat Deposit|Fiat Withdrawal)$",
+                    accountName = BINANCE_BANK_ACCOUNT,
+                    counterpartyIsUnidentified = true,
+                ),
+                RegexRule(
+                    pattern = "^(Deposit|Withdraw)$",
+                    accountName = BINANCE_FUNDING_ACCOUNT,
+                    counterpartyIsUnidentified = true,
+                ),
                 RegexRule(
                     pattern = "^Simple Earn (Flexible|Locked) (Subscription|Redemption)$",
                     accountName = BINANCE_EARN_ACCOUNT,
@@ -1597,24 +1638,10 @@ object BuiltInCsvStrategies {
                         rules = listOf(RegexRule(pattern = "^", accountName = BINANCE_ACCOUNT)),
                     ),
                 TransferField.TARGET_ACCOUNT to
-                    ConditionalAccountMapping(
+                    RegexAccountMapping(
                         fieldType = TransferField.TARGET_ACCOUNT,
-                        conditions = listOf(RowCondition("Coin", RowConditionOperator.EQUALS_VALUE, value = "GBP")),
-                        whenTrue =
-                            RegexAccountMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Operation",
-                                rules =
-                                    listOf(
-                                        RegexRule(pattern = "^(Deposit|Withdraw)$", accountName = BINANCE_BANK_ACCOUNT),
-                                    ) + targetAccountRules,
-                            ),
-                        whenFalse =
-                            RegexAccountMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Operation",
-                                rules = targetAccountRules,
-                            ),
+                        columnName = "Operation",
+                        rules = targetAccountRules,
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
@@ -1664,6 +1691,7 @@ object BuiltInCsvStrategies {
                     conversionAccountName = BINANCE_CONVERSIONS_ACCOUNT,
                     pairingWindowSeconds = BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS,
                     relationshipTypeName = "conversion",
+                    reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
                 ),
             tradeGroupConfig =
                 TradeGroupConfig(
@@ -1678,6 +1706,7 @@ object BuiltInCsvStrategies {
                     groupingWindowSeconds = 0L,
                     // Matches the API importer's "Buy BASE/QUOTE" wording for the same conversion.
                     descriptionTemplate = "Buy {to}/{from}",
+                    reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
                 ),
             createdAt = now,
             updatedAt = now,

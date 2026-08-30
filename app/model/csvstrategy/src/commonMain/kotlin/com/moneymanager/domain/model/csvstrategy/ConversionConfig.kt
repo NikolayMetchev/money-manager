@@ -49,6 +49,13 @@ import kotlinx.serialization.Serializable
  *                            is a DEBIT if this column parses negative and a CREDIT if positive; a
  *                            row that parses to zero or unparseably is not a conversion leg. When
  *                            null the patterns alone decide, as before.
+ * @property reconcileWindowSeconds When set, a conversion group another source already recorded as
+ *                                  trades is matched on its debit legs and not imported again. Kept
+ *                                  separate from the strategy's `crossSourceReconcileWindowSeconds`
+ *                                  for the same reason as `TradeGroupConfig.reconcileWindowSeconds`:
+ *                                  that window must tolerate a bank's settlement lag, while two
+ *                                  sources agree about a conversion's instant to within seconds.
+ *                                  Null disables it.
  */
 @Serializable
 data class ConversionConfig(
@@ -68,6 +75,8 @@ data class ConversionConfig(
     // change the canonical hash of every existing strategy - only one that actually sets it rehashes.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val sideAmountColumn: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val reconcileWindowSeconds: Long? = null,
 ) {
     init {
         require(conversionAccountName != null || conversionAccountRules.isNotEmpty()) {

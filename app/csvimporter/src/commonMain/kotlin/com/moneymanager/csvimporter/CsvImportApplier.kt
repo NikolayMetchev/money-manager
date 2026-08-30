@@ -1049,12 +1049,12 @@ suspend fun runCsvImport(
             peopleToCreate = peopleToCreate,
             ownerships = personOwnerships,
             trades = importTrades,
-            // Same window, same meaning as the transfer reconcile below: how far this source's clock may
-            // disagree with another's about one movement. Aggregation is what lets a group assembled from
-            // several fills match the per-fill trades an API import already booked for the same second.
+            // Trades get their own, much tighter window than the transfer reconcile below: aggregation
+            // matches a group against the WHOLE in-window candidate set, so a wide window would drag a
+            // later order's fills in and stop the sums matching at all.
             tradeDedupePolicy =
-                strategy.crossSourceReconcileWindowSeconds
-                    ?.takeIf { strategy.tradeGroupConfig != null }
+                strategy.tradeGroupConfig
+                    ?.reconcileWindowSeconds
                     ?.let { TradeDedupePolicy.Fuzzy(window = it.seconds, allowAggregation = true) }
                     ?: TradeDedupePolicy.ExactTupleOnly,
             dedupePolicy =

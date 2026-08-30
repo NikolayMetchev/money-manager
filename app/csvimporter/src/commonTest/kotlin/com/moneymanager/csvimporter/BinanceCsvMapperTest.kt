@@ -116,15 +116,28 @@ class BinanceCsvMapperTest {
     }
 
     @Test
-    fun depositAndWithdrawal_splitFiatFromCryptoFunding() {
-        // The API books crypto funding against "Binance Funding" and fiat against "Binance Bank"; the
-        // CSV has to make the same split or the two sources' versions of one movement never reconcile.
+    fun depositAndWithdrawal_bookAgainstAPlaceholderCounterparty() {
+        // The export never names the other side, so Deposit/Withdraw go to one placeholder whatever the
+        // coin — the same name the API falls back to when it has no address. Only the explicitly fiat
+        // operations, which the API books via its fiat endpoints, use the bank placeholder.
         assertEquals("Binance Funding", counterpartyName(map(row("Deposit", "BNB", "4.82096423"))))
         assertEquals("Binance Funding", counterpartyName(map(row("Withdraw", "BNB", "-1.0"))))
-        assertEquals("Binance Bank", counterpartyName(map(row("Deposit", "GBP", "500.00"))))
-        assertEquals("Binance Bank", counterpartyName(map(row("Withdraw", "GBP", "-500.00"))))
+        assertEquals("Binance Funding", counterpartyName(map(row("Deposit", "GBP", "500.00"))))
+        assertEquals("Binance Funding", counterpartyName(map(row("Withdraw", "GBP", "-500.00"))))
         assertEquals("Binance Bank", counterpartyName(map(row("Fiat Deposit", "GBP", "500.00"))))
         assertEquals("Binance Bank", counterpartyName(map(row("Fiat Withdrawal", "GBP", "-500.00"))))
+    }
+
+    @Test
+    fun depositAndWithdrawalCounterpartiesAreMarkedUnidentified() {
+        // This is what lets a deposit reconcile against the API's record of it, which names the on-chain
+        // address the CSV cannot see.
+        assertNotNull(map(row("Deposit", "BNB", "1.0")).unidentifiedCounterpartyAccountId)
+        assertNotNull(map(row("Withdraw", "BNB", "-1.0")).unidentifiedCounterpartyAccountId)
+        assertNull(
+            map(row("Staking Rewards", "BNB", "0.01")).unidentifiedCounterpartyAccountId,
+            "a product account is a real identity, not a placeholder",
+        )
     }
 
     @Test

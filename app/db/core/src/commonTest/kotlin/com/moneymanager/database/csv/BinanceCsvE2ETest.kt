@@ -152,8 +152,10 @@ class BinanceCsvE2ETest : DbTest() {
         }
 
     @Test
-    fun depositAndWithdrawal_splitFiatFromCryptoFundingLikeTheApiDoes() =
+    fun depositAndWithdrawal_bookAgainstThePlaceholderTheApiAlsoFallsBackTo() =
         runTest {
+            // The export never says whose account the money came from, so both fiat and crypto funding
+            // land on "Binance Funding" — the same name the API uses when it has no address either.
             val file =
                 stage(
                     "deposits.csv",
@@ -165,10 +167,66 @@ class BinanceCsvE2ETest : DbTest() {
                 )
             applyAll(listOf(file))
 
-            assertEquals("-500", balanceOf("Binance Bank", "GBP"), "fiat funding books against the bank account")
-            assertEquals("-0.4", balanceOf("Binance Funding", "BTC"), "crypto funding books against the funding account")
+            assertEquals("-500", balanceOf("Binance Funding", "GBP"))
+            assertEquals("-0.4", balanceOf("Binance Funding", "BTC"))
             assertEquals("500", balanceOf("Binance", "GBP"))
             assertEquals("0.4", balanceOf("Binance", "BTC"))
+        }
+
+    @Test
+    fun theExplicitlyFiatOperationsUseTheBankPlaceholder() =
+        runTest {
+            val file =
+                stage(
+                    "fiat.csv",
+                    listOf(
+                        row("2023-01-02 03:04:05", "Fiat Deposit", "GBP", "500.00"),
+                        row("2023-01-05 03:04:05", "Fiat Withdrawal", "GBP", "-100.00"),
+                    ),
+                )
+            applyAll(listOf(file))
+
+            assertEquals("-400", balanceOf("Binance Bank", "GBP"))
+            assertEquals("400", balanceOf("Binance", "GBP"))
+        }
+
+    @Test
+    fun aDepositTheApiAlreadyRecordedAgainstAWalletIsNotCountedTwice() =
+        runTest {
+            // The API books a crypto deposit against the on-chain address it came from. The CSV cannot
+            // name that address, so its counterparty is a placeholder — and being marked unidentified is
+            // what lets the engine reconcile the two instead of adding a second 0.5 BTC.
+            val binanceId = repositories.importEngine.createAccount(account("Binance"), Source.Manual)
+            val walletId = repositories.importEngine.createAccount(account("BTC:39pm1RoWPkVuSyd2gNGRz"), Source.Manual)
+            repositories.importEngine.createCrypto("BTC", "Bitcoin", Source.Manual)
+            val btc = assertNotNull(repositories.cryptoRepository.getCryptoAssetByCode("BTC").first())
+            repositories.importEngine.import(
+                com.moneymanager.importengineapi.ImportBatch(
+                    transfers =
+                        listOf(
+                            com.moneymanager.importengineapi.ImportTransfer(
+                                rowKey =
+                                    com.moneymanager.importengineapi.ImportRowKey
+                                        .Manual(1),
+                                fromAccount =
+                                    com.moneymanager.importengineapi.AccountRef
+                                        .Existing(walletId),
+                                toAccount =
+                                    com.moneymanager.importengineapi.AccountRef
+                                        .Existing(binanceId),
+                                source = Source.Manual,
+                                timestamp = Instant.parse("2023-01-03T03:04:05Z"),
+                                description = "Deposit BTC",
+                                amount = Money.fromDisplayValue(BigDecimal("0.5"), btc),
+                            ),
+                        ),
+                ),
+            )
+
+            val file = stage("dup-deposit.csv", listOf(row("2023-01-03 03:04:05", "Deposit", "BTC", "0.5")))
+            applyAll(listOf(file))
+
+            assertEquals("0.5", balanceOf("Binance", "BTC"), "the deposit is counted once, not twice")
         }
 
     @Test

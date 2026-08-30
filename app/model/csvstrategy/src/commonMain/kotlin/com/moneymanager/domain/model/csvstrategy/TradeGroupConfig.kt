@@ -46,6 +46,14 @@ import kotlinx.serialization.Serializable
  * @property descriptionTemplate Description given to the assembled trade. `{from}` and `{to}` are
  *                              substituted with the debited and credited asset codes. Cosmetic only:
  *                              a trade's identity never includes its description.
+ * @property reconcileWindowSeconds When set, an assembled trade that another source already recorded —
+ *                                  as one trade, or as the individual fills this group aggregates — is
+ *                                  not booked again. Deliberately **not** the strategy's
+ *                                  `crossSourceReconcileWindowSeconds`: that window has to be wide
+ *                                  enough for a bank's settlement lag, and a wide window here would
+ *                                  pull a later order's fills into the candidate set and stop the sums
+ *                                  matching at all. Sources disagree about a trade's instant only by
+ *                                  sub-second rounding, so keep this to a few seconds. Null disables it.
  */
 @Serializable
 data class TradeGroupConfig(
@@ -55,6 +63,7 @@ data class TradeGroupConfig(
     val sideAmountColumn: String? = null,
     val groupingWindowSeconds: Long = 0,
     val descriptionTemplate: String = "Buy {to}/{from}",
+    val reconcileWindowSeconds: Long? = null,
 ) {
     init {
         require(groupingWindowSeconds >= 0) { "TradeGroupConfig.groupingWindowSeconds must not be negative" }
