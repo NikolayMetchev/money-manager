@@ -2600,7 +2600,12 @@ internal fun dateWindows(
     var start = (rawStart / windowMillis) * windowMillis
     val windows = mutableListOf<ApiDateWindow>()
     while (start < nowMillis) {
-        val end = minOf(start + windowMillis, nowMillis)
+        // Providers that cap the startTime/endTime span (Binance: "range too large" at exactly
+        // [windowDays]) treat the bound as inclusive, so a full-[windowMillis] span is one millisecond
+        // over their limit. Every window but the last (which must reach [now] for the coverage
+        // watermark) ends a millisecond early; consecutive inclusive ranges still tile without a gap.
+        val fullEnd = start + windowMillis
+        val end = if (fullEnd >= nowMillis) nowMillis else fullEnd - 1
         windows += ApiDateWindow(Instant.fromEpochMilliseconds(start), Instant.fromEpochMilliseconds(end))
         start += windowMillis
     }

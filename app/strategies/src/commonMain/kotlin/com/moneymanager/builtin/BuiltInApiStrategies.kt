@@ -891,15 +891,16 @@ object BuiltInApiStrategies {
                 windowDays = 30,
             )
 
-        // Simple Earn history: a date window (Binance rejects a range longer than 3 months) further paged
-        // by 1-based "current"/"size" (max 100/page), bounded by the envelope's top-level "total".
+        // Simple Earn history: a date window (Binance's subscription/redemption/rewards history endpoints
+        // reject a startTime/endTime span longer than 30 days with "-6021 Query time range too large")
+        // further paged by 1-based "current"/"size" (max 100/page), bounded by the envelope's top-level "total".
         val earnHistoryWindow =
             ApiPaginationConfig(
                 mode = PaginationMode.DATE_WINDOW,
                 startParam = "startTime",
                 endParam = "endTime",
                 windowBoundFormat = WindowBoundFormat.EPOCH_MS,
-                windowDays = 90,
+                windowDays = 30,
                 offsetParam = "current",
                 offsetMode = OffsetMode.PAGE_NUMBER,
                 // "size" caps at 100 a page, which is already ApiPaginationConfig's default limitValue.
@@ -908,9 +909,13 @@ object BuiltInApiStrategies {
                 totalCountField = "total",
             )
 
-        // asset/transfer rejects a window longer than 30 days ("-5026 Start time query records range is
-        // too large"), unlike the 90 the deposit/withdraw history accepts.
-        val universalTransferWindow = earnHistoryWindow.copy(windowDays = 30)
+        // asset/transfer "Support query within the last 6 months only" - a startTime older than that is
+        // rejected with "-5026 Start time query records range is too large" (the message is about how far
+        // back startTime reaches, not the startTime/endTime span), so its sweep is capped at 6 months
+        // rather than the default multi-year lookback. dateWindows anchors the first window's start down
+        // to a windowDays-grid boundary, so it can reach ~windowDays before lookbackDays - 135 + 30 keeps
+        // the earliest startTime the engine ever sends comfortably inside 6 months.
+        val universalTransferWindow = earnHistoryWindow.copy(windowDays = 30, lookbackDays = 135)
 
         // dribblet has no page/offset scheme at all, which is exactly what [nestedItemsKey] requires (a
         // flattened page's item count no longer matches the page size an offset loop compares against).
@@ -1086,7 +1091,8 @@ object BuiltInApiStrategies {
 
         // assetDividend pages only by "limit" (max 500) within a window - like convert/tradeFlow it has no
         // continuation scheme the engine can drive, so ask for the maximum page and accept that a single
-        // 90-day window holding more than 500 distributions would truncate (never true for a personal account).
+        // window holding more than 500 distributions would truncate (never true for a personal account).
+        // assetDividend itself allows a 180-day span; it just inherits the stricter Simple Earn window.
         val dividendEndpoint =
             signed(
                 "sapi/v1/asset/assetDividend",
