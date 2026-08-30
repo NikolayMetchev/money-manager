@@ -2,6 +2,7 @@ import dev.iurysouza.modulegraph.LinkText
 import dev.iurysouza.modulegraph.Orientation
 import dev.iurysouza.modulegraph.Theme
 import org.jetbrains.dokka.gradle.DokkaExtension
+import org.jetbrains.dokka.gradle.DokkaPlugin
 
 plugins {
     base
@@ -118,7 +119,9 @@ moduleGraphConfig {
 // module-graph task above — is incompatible with Isolated Projects and the configuration cache, so
 // the Pages step also passes `-Dorg.gradle.isolated-projects=false --no-configuration-cache`.
 if (providers.gradleProperty("enableDokka").orNull == "true") {
-    apply(plugin = "org.jetbrains.dokka")
+    // Programmatic application (not the `plugins {}` block) because this is conditional on a
+    // project property — `pluginManager.apply`, not the legacy `apply(plugin = ...)` map form.
+    pluginManager.apply(DokkaPlugin::class.java)
 
     // Tooling and schema-only modules carry no public API worth publishing. The two application
     // entry points (:app:main:*) are thin `main()` wrappers and, being application rather than
@@ -138,7 +141,7 @@ if (providers.gradleProperty("enableDokka").orNull == "true") {
     // Each documented module needs the Dokka plugin so it publishes the HTML-partial artifact the
     // root aggregation consumes.
     configure(documentedProjects) {
-        apply(plugin = "org.jetbrains.dokka")
+        pluginManager.apply(DokkaPlugin::class.java)
         configure<DokkaExtension> {
             dokkaSourceSets.configureEach {
                 reportUndocumented.set(false)
