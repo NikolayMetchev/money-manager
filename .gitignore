@@ -50,6 +50,9 @@ app/db/core/src/commonTest/resources/monzo/sample-apis/
 webpage/database/
 webpage/strategy-library/
 
+# Generated Dokka KDoc API docs (regenerated and published by CI)
+webpage/kdoc/
+
 # Generated module dependency graph (regenerated and published by CI)
 webpage/modules-graph.md
 

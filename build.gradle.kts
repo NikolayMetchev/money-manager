@@ -1,12 +1,14 @@
 import dev.iurysouza.modulegraph.LinkText
 import dev.iurysouza.modulegraph.Orientation
 import dev.iurysouza.modulegraph.Theme
+import org.jetbrains.dokka.gradle.DokkaExtension
 
 plugins {
     base
     alias(libs.plugins.gradle.doctor) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.module.graph)
+    alias(libs.plugins.dokka) apply false
 }
 
 // Read version from system property, project property, or VERSION file
@@ -107,6 +109,66 @@ moduleGraphConfig {
     // Label each edge with its originating Gradle configuration (e.g. commonMainImplementation,
     // jvmTestImplementation) so the viewer can filter production vs. test dependencies.
     linkText.set(LinkText.CONFIGURATION)
+}
+
+// KDoc API documentation (Dokka), published to the static site under webpage/kdoc.
+//
+// Generated only on demand — the Deploy-to-Pages workflow passes `-PenableDokka=true`. Dokka's
+// multi-module aggregation reads every subproject via `subprojects`, which — exactly like the
+// module-graph task above — is incompatible with Isolated Projects and the configuration cache, so
+// the Pages step also passes `-Dorg.gradle.isolated-projects=false --no-configuration-cache`.
+if (providers.gradleProperty("enableDokka").orNull == "true") {
+    apply(plugin = "org.jetbrains.dokka")
+
+    // Tooling and schema-only modules carry no public API worth publishing. The two application
+    // entry points (:app:main:*) are thin `main()` wrappers and, being application rather than
+    // library projects, expose no Dokka-consumable variant for the aggregation to resolve.
+    val docsExcludedModules = setOf(":app:db:schemaspy", ":app:main:jvm", ":app:main:android")
+
+    // Reading `subprojects` here is why this block is gated behind -PenableDokka and the Pages step
+    // turns off Isolated Projects — see the comment above.
+    val documentedProjects =
+        subprojects.filter { subproject ->
+            subproject.buildFile.exists() &&
+                subproject.path !in docsExcludedModules &&
+                !subproject.path.startsWith(":test") &&
+                !subproject.path.startsWith(":tools")
+        }
+
+    // Each documented module needs the Dokka plugin so it publishes the HTML-partial artifact the
+    // root aggregation consumes.
+    configure(documentedProjects) {
+        apply(plugin = "org.jetbrains.dokka")
+        configure<DokkaExtension> {
+            dokkaSourceSets.configureEach {
+                reportUndocumented.set(false)
+                suppressGeneratedFiles.set(true)
+                skipEmptyPackages.set(true)
+            }
+        }
+    }
+
+    dependencies {
+        documentedProjects.forEach { subproject -> add("dokka", subproject) }
+    }
+
+    configure<DokkaExtension> {
+        moduleName.set("Money Manager")
+        dokkaPublications.named("html") {
+            outputDirectory.set(layout.buildDirectory.dir("dokka/html"))
+        }
+    }
+
+    tasks.register<Sync>("publishKdoc") {
+        group = "documentation"
+        description = "Copy generated Dokka HTML into the published docs site (webpage/kdoc)"
+
+        dependsOn("dokkaGeneratePublicationHtml")
+
+        // Sync mirrors the source, removing stale files (e.g. dropped/renamed modules and types).
+        from(layout.buildDirectory.dir("dokka/html"))
+        into(layout.projectDirectory.dir("webpage/kdoc"))
+    }
 }
 
 dependencyAnalysis {
