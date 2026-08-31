@@ -66,5 +66,11 @@ data class TradeGroupConfig(
 ) {
     init {
         require(groupingWindowSeconds >= 0) { "TradeGroupConfig.groupingWindowSeconds must not be negative" }
+        // A negative window would not disable reconciliation, it would silently defeat it: every check
+        // compares a non-negative absolute time difference against it, so nothing could ever match and
+        // trades another source already recorded would be booked again. Null is how you turn it off.
+        require(reconcileWindowSeconds == null || reconcileWindowSeconds >= 0) {
+            "TradeGroupConfig.reconcileWindowSeconds must not be negative"
+        }
     }
 }

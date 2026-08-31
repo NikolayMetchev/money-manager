@@ -10,6 +10,10 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportRowKey
+import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.createTrade
@@ -201,19 +205,13 @@ class BinanceCsvE2ETest : DbTest() {
             repositories.importEngine.createCrypto("BTC", "Bitcoin", Source.Manual)
             val btc = assertNotNull(repositories.cryptoRepository.getCryptoAssetByCode("BTC").first())
             repositories.importEngine.import(
-                com.moneymanager.importengineapi.ImportBatch(
+                ImportBatch(
                     transfers =
                         listOf(
-                            com.moneymanager.importengineapi.ImportTransfer(
-                                rowKey =
-                                    com.moneymanager.importengineapi.ImportRowKey
-                                        .Manual(1),
-                                fromAccount =
-                                    com.moneymanager.importengineapi.AccountRef
-                                        .Existing(walletId),
-                                toAccount =
-                                    com.moneymanager.importengineapi.AccountRef
-                                        .Existing(binanceId),
+                            ImportTransfer(
+                                rowKey = ImportRowKey.Manual(1),
+                                fromAccount = AccountRef.Existing(walletId),
+                                toAccount = AccountRef.Existing(binanceId),
                                 source = Source.Manual,
                                 timestamp = Instant.parse("2023-01-03T03:04:05Z"),
                                 description = "Deposit BTC",

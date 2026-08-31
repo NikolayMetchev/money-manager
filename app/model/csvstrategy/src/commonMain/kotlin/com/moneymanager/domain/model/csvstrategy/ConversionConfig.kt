@@ -82,6 +82,12 @@ data class ConversionConfig(
         require(conversionAccountName != null || conversionAccountRules.isNotEmpty()) {
             "ConversionConfig needs a conversionAccountName or at least one conversionAccountRule to route legs through"
         }
+        // A negative window would not disable reconciliation, it would silently defeat it: the check
+        // compares a non-negative absolute time difference against it, so no group could ever match and
+        // a sweep another source already recorded would be imported again. Null is how you turn it off.
+        require(reconcileWindowSeconds == null || reconcileWindowSeconds >= 0) {
+            "ConversionConfig.reconcileWindowSeconds must not be negative"
+        }
     }
 }
 

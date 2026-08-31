@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csvstrategy.TradeGroupConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Instant
@@ -216,6 +217,16 @@ class CsvTradeGroupsTest {
         val rows = listOf(nonLeg(), leg(TradeLegSide.DEBIT, "1.0", eth), leg(TradeLegSide.CREDIT, "0.03", btc), nonLeg())
         val group = groupTradeLegs(rows, config).single()
         assertEquals(2, group.rows.size, "fee and other rows stay out of the group and import as transfers")
+    }
+
+    @Test
+    fun aNegativeReconcileWindowIsRejected() {
+        // A negative window would not disable reconciliation, it would defeat it silently: every check
+        // compares a non-negative absolute time difference against it, so nothing would ever match and
+        // already-recorded trades would be booked a second time. Null is how you turn it off.
+        assertFailsWith<IllegalArgumentException> { config.copy(reconcileWindowSeconds = -1) }
+        assertFailsWith<IllegalArgumentException> { config.copy(groupingWindowSeconds = -1) }
+        assertEquals(null, config.copy(reconcileWindowSeconds = null).reconcileWindowSeconds)
     }
 
     @Test
