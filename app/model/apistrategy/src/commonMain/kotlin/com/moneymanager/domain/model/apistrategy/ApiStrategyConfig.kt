@@ -861,6 +861,42 @@ data class ApiRequestSigningConfig(
     val bodyFormat: BodyFormat = BodyFormat.NONE,
     /** For [BodyFormat.JSON_ENVELOPE], the key under which request params are nested (Crypto.com "params"). */
     val paramsEnvelopeKey: String? = null,
+    /**
+     * Extra parameters added to (and therefore covered by the signature of) **every** signed request.
+     * For a provider whose tolerance for a stale nonce is itself a request parameter — Binance's
+     * `recvWindow`, which defaults to a mere 5s and is what rejects a request with
+     * `-1021 Timestamp for this request is outside of the recvWindow`.
+     *
+     * Omitted from JSON when empty (@EncodeDefault NEVER) so adding it does not change the canonical
+     * hash of every existing API strategy — only one that actually sets it rehashes.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @Serializable(with = SortedQueryParamListSerializer::class)
+    val signedParams: List<ApiQueryParam> = emptyList(),
+    /**
+     * When set, the clock used for [nonce] is corrected by the provider's own clock before the first
+     * signed request. A provider that rejects a nonce too far from its server time is comparing against
+     * *its* clock, and an NTP-synced machine can still sit a second or more away from it — which eats
+     * most of the tolerance before the request is even sent, and, if the local clock runs fast instead,
+     * cannot be compensated by widening that tolerance at all.
+     *
+     * Same NEVER-encode rationale as [signedParams].
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val serverTimeSync: ApiServerTimeSync? = null,
+)
+
+/**
+ * Locates a provider's current server time, so signed requests can be stamped with the provider's clock
+ * rather than the local one (see [ApiRequestSigningConfig.serverTimeSync]).
+ *
+ * @property path Unsigned endpoint path relative to the strategy's base URL (Binance `api/v3/time`).
+ * @property field Dot-path to the epoch-millisecond value in the response (Binance `serverTime`).
+ */
+@Serializable
+data class ApiServerTimeSync(
+    val path: String,
+    val field: String,
 )
 
 // ---------------------------------------------------------------------------------------------
