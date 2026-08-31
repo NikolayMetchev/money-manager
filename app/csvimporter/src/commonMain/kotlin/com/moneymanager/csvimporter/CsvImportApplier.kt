@@ -1055,7 +1055,7 @@ suspend fun runCsvImport(
             tradeDedupePolicy =
                 strategy.tradeGroupConfig
                     ?.reconcileWindowSeconds
-                    ?.let { TradeDedupePolicy.Fuzzy(window = it.seconds, allowAggregation = true) }
+                    ?.let { TradeDedupePolicy.Fuzzy(window = it.seconds) }
                     ?: TradeDedupePolicy.ExactTupleOnly,
             dedupePolicy =
                 if (uniqueIdTypeNames.isEmpty()) {

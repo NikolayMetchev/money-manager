@@ -30,8 +30,8 @@ class CsvTradeGroupsTest {
             debitPattern = "^(Sell|Transaction (Spend|Sold))$",
             creditPattern = "^(Buy|Transaction (Buy|Revenue))$",
             sideAmountColumn = "Change",
-            groupingWindowSeconds = 0,
-            descriptionTemplate = "Buy {to}/{from}",
+            // groupingWindowSeconds and descriptionTemplate keep their defaults (0 / "Buy {to}/{from}"),
+            // which is what the Binance strategy uses.
         )
 
     private val binance = AccountId(1)
@@ -124,8 +124,8 @@ class CsvTradeGroupsTest {
     fun distinctTimestamps_makeDistinctGroups() {
         val rows =
             listOf(
-                leg(TradeLegSide.DEBIT, "1.0", eth, at = "2022-11-14T20:32:54Z"),
-                leg(TradeLegSide.CREDIT, "0.03", btc, at = "2022-11-14T20:32:54Z"),
+                leg(TradeLegSide.DEBIT, "1.0", eth, at = "2022-11-14T20:31:00Z"),
+                leg(TradeLegSide.CREDIT, "0.03", btc, at = "2022-11-14T20:31:00Z"),
                 leg(TradeLegSide.DEBIT, "2.0", eth, at = "2022-11-14T20:39:53Z"),
                 leg(TradeLegSide.CREDIT, "0.06", btc, at = "2022-11-14T20:39:53Z"),
             )

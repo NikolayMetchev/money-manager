@@ -200,8 +200,8 @@ class BinanceCsvMapperTest {
 
     @Test
     fun timestampIsParsedAsUtc() {
-        val r = map(row("Deposit", "GBP", "1.00", time = "2023-01-02 03:04:05"))
-        assertEquals("2023-01-02T03:04:05Z", r.transfer.timestamp.toString())
+        val r = map(row("Deposit", "GBP", "1.00", time = "2021-06-14 23:59:58"))
+        assertEquals("2021-06-14T23:59:58Z", r.transfer.timestamp.toString())
     }
 
     @Test

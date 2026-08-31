@@ -1529,7 +1529,7 @@ object BuiltInCsvStrategies {
      * an older `Operation` vocabulary (`Savings purchase` for `Simple Earn Flexible Subscription`,
      * `POS savings interest` for `Staking Rewards`, `Super BNB Mining` for `BNB Vault Rewards`, …) plus
      * `LD*` mirror rows the modern format dropped. Importing both would book the same event twice under
-     * two different descriptions, so [contentMatchRules] requires the `User_ID` column: a legacy file
+     * two different descriptions, so [CsvImportStrategy.contentMatchRules] requires the `User_ID` column: a legacy file
      * scores zero and, because this strategy carries content rules, is also excluded from the
      * no-signals fallback, so it resolves to no strategy and is reported skipped rather than misread.
      * Re-export the same period from Binance to import it.
@@ -1540,7 +1540,8 @@ object BuiltInCsvStrategies {
      * dual savings have no API endpoint at all and are the reason to import this file.
      *
      * Trades are split across rows: Binance stamps every partial fill of both legs with the same second
-     * (a single order can produce a dozen `Transaction Sold`/`Transaction Revenue` rows). [tradeGroupConfig]
+     * (a single order can produce a dozen `Transaction Sold`/`Transaction Revenue` rows).
+     * [CsvImportStrategy.tradeGroupConfig]
      * folds each such group into one `trade`. Fee rows stay out of the group on purpose — a `trade` row
      * has no fee field — and route to [BINANCE_FEES_ACCOUNT] as their own transfers, as the API does.
      *
@@ -1554,7 +1555,8 @@ object BuiltInCsvStrategies {
      * Dust sweeps are the one conversion that cannot be assembled: a sweep debits several assets and
      * credits several BNB amounts, and nothing in the file says which credit came from which debit
      * (their order does not correspond, and the credited amount is net of Binance's service charge
-     * while the debited amount is gross). They go through [conversionConfig] instead, which keeps every
+     * while the debited amount is gross). They go through [CsvImportStrategy.conversionConfig] instead,
+     * which keeps every
      * balance exact without inventing a pairing. Both legs share one `Operation`, so
      * [ConversionConfig.sideAmountColumn] classifies them by the sign of `Change`.
      */
@@ -1701,11 +1703,9 @@ object BuiltInCsvStrategies {
                     // "Transaction Related" is the older name for *either* leg of a fill, so the sign of
                     // Change - not the operation name - has to decide which side each row is.
                     sideAmountColumn = "Change",
-                    // Every leg of one fill carries the identical second, and distinct orders are
-                    // seconds-to-days apart, so no jitter needs tolerating.
-                    groupingWindowSeconds = 0L,
-                    // Matches the API importer's "Buy BASE/QUOTE" wording for the same conversion.
-                    descriptionTemplate = "Buy {to}/{from}",
+                    // groupingWindowSeconds and descriptionTemplate keep their defaults: every leg of
+                    // one fill carries the identical second so no jitter needs tolerating, and the
+                    // default "Buy {to}/{from}" already matches the API importer's wording.
                     reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
                 ),
             createdAt = now,

@@ -19,10 +19,9 @@ import kotlinx.serialization.Serializable
  * When set on a [CsvImportStrategy], the importer buckets matching rows by timestamp (widened by
  * [groupingWindowSeconds]), and for each bucket whose debits name exactly one asset and whose credits
  * name exactly one other asset emits a single trade — owner account on both sides, debit sum out,
- * credit sum in. Fee rows in the bucket become their own transfers to [feeAccountName], because a
- * `trade` row carries no fee field. A bucket that does not resolve — no credits, an empty side, or
- * more than one asset on a side — is left alone and its rows import as ordinary transfers to whatever
- * account the strategy's mappings chose, so no row is ever dropped and the residue is visible.
+ * credit sum in. A bucket that does not resolve — no credits, an empty side, or more than one asset on
+ * a side — is left alone and its rows import as ordinary transfers to whatever account the strategy's
+ * mappings chose, so no row is ever dropped and the residue is visible.
  *
  * A `trade` row carries no fee field, so fee rows are deliberately **not** part of this config: leave
  * them out of both patterns and let the strategy's ordinary account routing book them as their own
