@@ -5,6 +5,7 @@ package com.moneymanager.database
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
+import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.test.database.DbTest
@@ -14,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -140,5 +142,59 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
             // The Monzo transaction ID drives duplicate detection on re-import
             val idMapping = strategy.attributeMappings.single { it.columnName == "Transaction ID" }
             assertTrue(idMapping.isUniqueIdentifier)
+        }
+
+    @Test
+    fun `installing the built-in Binance CSV strategy round-trips through the database`() =
+        runTest {
+            repositories.installBuiltInCsvStrategies()
+            val strategy =
+                repositories.csvImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Binance CSV" }
+
+            // The modern export's header, and only it: the legacy one lacks User_ID.
+            assertTrue(
+                strategy.matchesColumns(setOf("User_ID", "UTC_Time", "Account", "Operation", "Coin", "Change", "Remark")),
+            )
+            assertTrue(
+                !strategy.matchesColumns(setOf("UTC_Time", "Account", "Operation", "Coin", "Change", "Remark")),
+                "the legacy 6-column header is not an exact match",
+            )
+            // The content rule is what keeps a legacy file out via the tolerant subset path.
+            assertEquals("User_ID", strategy.contentMatchRules.single().columnName)
+
+            // Trade-group assembly survives the round trip - without it the export's trade rows would
+            // import as suspense transfers instead of trades.
+            val tradeGroup = assertNotNull(strategy.tradeGroupConfig)
+            assertEquals("Operation", tradeGroup.signalColumn)
+            assertEquals("Change", tradeGroup.sideAmountColumn, "the ambiguous leg name is resolved by sign")
+            assertEquals(0L, tradeGroup.groupingWindowSeconds)
+
+            // So does the dust conversion config, including the sign-based side classification.
+            val conversion = assertNotNull(strategy.conversionConfig)
+            assertEquals("Binance Conversions", conversion.conversionAccountName)
+            assertEquals("Change", conversion.sideAmountColumn)
+            assertEquals(conversion.debitPattern, conversion.creditPattern, "both dust legs share one Operation")
+
+            // The Operation column routes every row's counterparty, and the funding rules survive as
+            // unidentified placeholders — which is what lets a deposit reconcile against the API's
+            // record of it, since the API names the on-chain address the export cannot.
+            val target = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
+            assertIs<RegexAccountMapping>(target)
+            assertEquals("Operation", target.columnName)
+            assertTrue(
+                target.rules.first { it.accountName == "Binance Funding" }.counterpartyIsUnidentified,
+                "a deposit/withdrawal counterparty is a placeholder, not an identity",
+            )
+
+            val amount = strategy.fieldMappings[TransferField.AMOUNT]
+            assertIs<AmountParsingMapping>(amount)
+            assertTrue(amount.flipAccountsOnPositive, "a positive Change arrives into the Binance account")
+
+            val timestamp = strategy.fieldMappings[TransferField.TIMESTAMP]
+            assertIs<DateTimeParsingMapping>(timestamp)
+            assertEquals("yyyy-MM-dd HH:mm:ss", timestamp.dateTimeFormat)
         }
 }

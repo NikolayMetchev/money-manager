@@ -1,5 +1,6 @@
 package com.moneymanager.domain.model.csvstrategy
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
@@ -41,6 +42,20 @@ import kotlinx.serialization.Serializable
  *                                distinct events (typically far apart in time) separate.
  * @property relationshipTypeName Relationship type name linking each debit leg to its credit leg
  *                                (resolved get-or-create, so already-populated databases self-heal).
+ * @property sideAmountColumn Optional column whose sign decides the side, for sources that give both
+ *                            legs of a conversion the **same** [signalColumn] value (Binance's
+ *                            "Small Assets Exchange BNB" names the swept asset and the BNB received
+ *                            identically). When set, a row matching [debitPattern] or [creditPattern]
+ *                            is a DEBIT if this column parses negative and a CREDIT if positive; a
+ *                            row that parses to zero or unparseably is not a conversion leg. When
+ *                            null the patterns alone decide, as before.
+ * @property reconcileWindowSeconds When set, a conversion group another source already recorded as
+ *                                  trades is matched on its debit legs and not imported again. Kept
+ *                                  separate from the strategy's `crossSourceReconcileWindowSeconds`
+ *                                  for the same reason as `TradeGroupConfig.reconcileWindowSeconds`:
+ *                                  that window must tolerate a bank's settlement lag, while two
+ *                                  sources agree about a conversion's instant to within seconds.
+ *                                  Null disables it.
  */
 @Serializable
 data class ConversionConfig(
@@ -56,10 +71,22 @@ data class ConversionConfig(
     val pairingKeyColumns: List<String> = emptyList(),
     val pairingWindowSeconds: Long,
     val relationshipTypeName: String,
+    // Omitted from JSON when null (@EncodeDefault NEVER on the export field) so adding this does not
+    // change the canonical hash of every existing strategy - only one that actually sets it rehashes.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val sideAmountColumn: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val reconcileWindowSeconds: Long? = null,
 ) {
     init {
         require(conversionAccountName != null || conversionAccountRules.isNotEmpty()) {
             "ConversionConfig needs a conversionAccountName or at least one conversionAccountRule to route legs through"
+        }
+        // A negative window would not disable reconciliation, it would silently defeat it: the check
+        // compares a non-negative absolute time difference against it, so no group could ever match and
+        // a sweep another source already recorded would be imported again. Null is how you turn it off.
+        require(reconcileWindowSeconds == null || reconcileWindowSeconds >= 0) {
+            "ConversionConfig.reconcileWindowSeconds must not be negative"
         }
     }
 }

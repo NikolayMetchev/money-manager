@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.SortedCompanionTransactionRuleListSerializer
 import com.moneymanager.domain.model.csvstrategy.SortedContentMatchRuleListSerializer
 import com.moneymanager.domain.model.csvstrategy.SortedRowConditionListSerializer
+import com.moneymanager.domain.model.csvstrategy.TradeGroupConfig
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
 import kotlinx.serialization.EncodeDefault
@@ -43,6 +44,8 @@ import kotlinx.serialization.Serializable
  * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.fundingAttributeMatch])
  * @property worksheetName When set, this is an Excel strategy targeting this worksheet
  * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.worksheetName])
+ * @property tradeGroupConfig Row-group trade assembly configuration (already portable, no IDs)
+ * (see [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.tradeGroupConfig])
  */
 @Serializable
 data class CsvStrategyExport(
@@ -79,6 +82,9 @@ data class CsvStrategyExport(
     // worksheet name (XLSX strategies) rehash when this field is added.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val worksheetName: String? = null,
+    // Same NEVER-encode rationale again: only a strategy that assembles trades from row groups rehashes.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val tradeGroupConfig: TradeGroupConfig? = null,
 )
 
 /**

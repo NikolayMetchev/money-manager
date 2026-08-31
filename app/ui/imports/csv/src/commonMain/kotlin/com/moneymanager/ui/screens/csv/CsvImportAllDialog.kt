@@ -38,6 +38,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
@@ -65,6 +66,7 @@ fun CsvImportAllDialog(
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     cryptoRepository: CryptoReadRepository,
+    tradeRepository: TradeReadRepository,
     personRepository: PersonReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
     csvImportRepository: CsvImportReadRepository,
@@ -190,6 +192,7 @@ fun CsvImportAllDialog(
                                         onProgress = { progress = it },
                                         passThroughAccounts = passThroughAccounts,
                                         cryptoRepository = cryptoRepository,
+                                        tradeRepository = tradeRepository,
                                         attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
                                         directoryAccounts = directoryAccounts,
                                     )

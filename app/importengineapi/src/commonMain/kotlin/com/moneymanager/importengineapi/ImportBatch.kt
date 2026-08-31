@@ -524,6 +524,7 @@ data class ImportBatch(
     val currencies: List<ImportCurrencyIntent> = emptyList(),
     val cryptoAssets: List<ImportCryptoIntent> = emptyList(),
     val trades: List<ImportTradeIntent> = emptyList(),
+    val tradeDedupePolicy: TradeDedupePolicy = TradeDedupePolicy.ExactTupleOnly,
     val orders: List<ImportOrderIntent> = emptyList(),
     val csvStrategyMutations: List<CsvStrategyMutation> = emptyList(),
     val apiStrategyMutations: List<ApiStrategyMutation> = emptyList(),
