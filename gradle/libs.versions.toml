@@ -38,7 +38,7 @@ cryptography = "0.6.0"
 dependency-analysis = "3.18.0"
 detekt = "2.0.0-alpha.6"
 dokka = "2.2.0"
-diamondedge-logging = "2.1.1"
+diamondedge-logging = "2.1.2"
 gradle-doctor = "0.12.1"
 human-readable = "1.13.1"
 # JVM version sync: keep jvm-target and jvm-toolchain aligned with .github/actions/gradle-setup/action.yml,
