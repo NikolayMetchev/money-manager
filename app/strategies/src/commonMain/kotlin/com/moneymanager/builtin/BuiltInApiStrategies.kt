@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
+import com.moneymanager.domain.model.apistrategy.ApiServerTimeSync
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
@@ -1184,6 +1185,15 @@ object BuiltInApiStrategies {
                             nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.QUERY, "timestamp")),
                             signature = FieldPlacement(SigFieldLocation.QUERY, "signature"),
                             bodyFormat = BodyFormat.QUERY_ONLY,
+                            // Binance rejects a request whose timestamp is older than recvWindow with
+                            // "-1021 Timestamp for this request is outside of the recvWindow". The default
+                            // is only 5s, which a full first download can exceed on a slow sapi/* call.
+                            // 60s is Binance's documented maximum.
+                            signedParams = listOf(ApiQueryParam("recvWindow", "60000")),
+                            // recvWindow only forgives a timestamp that is too OLD - Binance still rejects
+                            // one more than 1s in its future - so a locally-fast clock needs the offset,
+                            // not a wider window. Measured once per download against Binance's own clock.
+                            serverTimeSync = ApiServerTimeSync(path = "api/v3/time", field = "serverTime"),
                         ),
                     syntheticAccount = ApiSyntheticAccount(name = "Binance", externalId = "binance"),
                     valueEndpoints =
