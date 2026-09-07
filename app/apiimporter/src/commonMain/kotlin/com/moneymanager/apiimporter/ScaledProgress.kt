@@ -7,7 +7,7 @@ import com.moneymanager.importengineapi.ImportProgress
  *
  * A run is a sequence of phases of very different cost — parsing responses, resolving assets, the
  * engine write — and several of them emit their own independent 0..1 sweep. Each phase is given a
- * slice of the bar ([base]..[base] + [span]) that its inner fraction scales, and emissions are
+ * slice of the bar (`base`..`base + span`) that its inner fraction scales, and emissions are
  * clamped non-decreasing so a later phase starting its own sweep at 0 never rewinds the bar. This
  * mirrors how bulk CSV imports aggregate per-file progress (`BulkProgressTracker`).
  *
