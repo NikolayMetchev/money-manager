@@ -26,6 +26,7 @@ import com.moneymanager.importengineapi.ImportOrderIntent
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportPersonIntent
+import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
@@ -520,6 +521,66 @@ class ImportEngineDbTest : DbTest() {
                     .id
             val transfers = repositories.transactionRepository.getTransactionsByAccount(coffeeShopId).first()
             assertEquals(1, transfers.size)
+        }
+
+    /**
+     * A re-import deletes every transfer its session created before re-running it, and with a big
+     * session that is the slower half of the run — so the delete phase must report progress too,
+     * not leave the caller's bar frozen until the re-run starts.
+     */
+    @Test
+    fun deletingTransfers_reportsProgress() =
+        runTest {
+            val sourceId = createSourceAccount()
+            val currency = gbp()
+            val counterparty = LocalAccountKey("shop")
+            val created =
+                engine().import(
+                    ImportBatch(
+                        transfers =
+                            (0 until 3).map { i ->
+                                ImportTransfer(
+                                    rowKey = ImportRowKey.CsvRow(i.toLong()),
+                                    fromAccount = AccountRef.Existing(sourceId),
+                                    toAccount = AccountRef.Local(counterparty),
+                                    source = Source.SampleGenerator,
+                                    timestamp = baseTime.plus(i.hours),
+                                    description = "Row $i",
+                                    amount = Money(500 + i.toLong(), currency),
+                                )
+                            },
+                        dedupePolicy = DedupePolicy.None,
+                        accountsToCreate =
+                            listOf(
+                                ImportAccountIntent(
+                                    key = counterparty,
+                                    match = AccountMatchKey.ByName("Shop"),
+                                    name = "Shop",
+                                    openingDate = baseTime,
+                                    source = Source.SampleGenerator,
+                                ),
+                            ),
+                    ),
+                )
+            val ids = created.createdTransferIds.values.toList()
+            assertEquals(3, ids.size)
+
+            val progress = mutableListOf<ImportProgress>()
+            engine().import(
+                ImportBatch(
+                    transfers =
+                        ids.map { id ->
+                            ImportTransfer(source = Source.Manual, operation = ImportOperation.DELETE, existingId = id)
+                        },
+                    dedupePolicy = DedupePolicy.None,
+                ),
+                onProgress = { progress += it },
+            )
+
+            val last = progress.last { it.detail == "Deleting transactions" }
+            assertEquals(3, last.processed)
+            assertEquals(3, last.total)
+            assertEquals(1f, last.fraction)
         }
 
     private fun batchWithAttributes(

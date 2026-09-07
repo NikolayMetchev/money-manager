@@ -306,11 +306,15 @@ fun ApiSessionsScreen(
                         strategy = strategy,
                         importEngine = importEngine,
                         onProgress = { progress ->
-                            scope.launch {
-                                importProgressBySession =
-                                    importProgressBySession +
-                                    (session.id to ApiSessionImportProgress(progress.detail, progress.fraction))
-                            }
+                            // Joined, not fire-and-forget: the import runs off the Compose scope, so an
+                            // un-awaited update could land after the completion path clears this session
+                            // and leave a finished import showing progress forever.
+                            scope
+                                .launch {
+                                    importProgressBySession =
+                                        importProgressBySession +
+                                        (session.id to ApiSessionImportProgress(progress.detail, progress.fraction))
+                                }.join()
                             update(progress.detail, progress.fraction)
                         },
                         engineBatchSize = API_ENGINE_BATCH_SIZE,
