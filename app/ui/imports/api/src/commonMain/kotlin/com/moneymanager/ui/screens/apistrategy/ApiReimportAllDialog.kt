@@ -112,13 +112,9 @@ fun ApiReimportAllDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    progress?.let {
+                    if (isRunning) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = it.detail,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        ApiReimportProgress(progress ?: ImportProgress("Starting re-import"))
                     }
                 }
                 errorMessage?.let {

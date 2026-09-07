@@ -39,6 +39,7 @@ import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOrderIntent
+import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
@@ -122,6 +123,24 @@ private val TRADE_RECONCILE_WINDOW = 5.seconds
 
 /** Upper bound on exponential rate-limit backoff, so a misconfigured base delay can't stall for hours. */
 private const val MAX_RATE_LIMIT_BACKOFF_MILLIS = 60_000L
+
+// Slices of the import's progress bar (see ScaledProgress): parsing the stored responses, then
+// building the batch, then the engine write — which dominates, so it gets the largest share.
+private const val PARSE_BASE = 0f
+private const val PARSE_SPAN = 0.35f
+private const val BUILD_BASE = 0.35f
+private const val WRITE_BASE = 0.5f
+private const val WRITE_SPAN = 0.5f
+
+/** Emit a parse update every N responses rather than per response — parsing one is cheap. */
+private const val PARSE_PROGRESS_EVERY_RESPONSES = 20
+
+/**
+ * Engine write-batch size for an interactive exchange import, so the bar advances per chunk instead
+ * of freezing on one giant transaction (the same trade-off bulk CSV imports make — see
+ * `BULK_ENGINE_BATCH_SIZE`). Batch runs with no one watching keep the atomic default.
+ */
+const val API_ENGINE_BATCH_SIZE = 250
 
 /**
  * Downloads every data endpoint of an exchange [strategy] into [sessionId] as signed POST/GET requests,
@@ -838,23 +857,37 @@ suspend fun importApiSessionExchange(
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
     importEngine: ImportEngine,
+    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    engineBatchSize: Int = Int.MAX_VALUE,
 ): ExchangeImportResult {
     val synthetic = requireNotNull(strategy.config.syntheticAccount) { "Exchange strategy '${strategy.name}' has no syntheticAccount" }
     val source = Source.Api(sessionId)
+    val bar = ScaledProgress(onProgress)
 
+    bar.emit(base = 0f, detail = "Reading downloaded responses")
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val responses = apiSessionRepository.getResponsesBySession(sessionId)
 
     val parsed = ParsedExchangeData()
-    responses.forEach { response ->
-        val request = requestsById[response.requestId] ?: return@forEach
+    responses.forEachIndexed forEachResponse@{ responseIndex, response ->
+        if (responseIndex % PARSE_PROGRESS_EVERY_RESPONSES == 0) {
+            bar.emit(
+                base = PARSE_BASE,
+                span = PARSE_SPAN,
+                detail = "Parsing responses",
+                innerFraction = responseIndex.toFloat() / responses.size,
+                processed = responseIndex,
+                total = responses.size,
+            )
+        }
+        val request = requestsById[response.requestId] ?: return@forEachResponse
         // Prefer the precise "ep=<key>" marker (disambiguates endpoints sharing a path, e.g. Kraken's
         // Ledgers deposit/withdrawal split); a QUERY_ONLY signed URL (Binance) carries no marker, so fall
         // back to a plain path match, which is unambiguous there since query params live in the URL.
         val dataEndpoint =
             strategy.config.dataEndpoints.firstOrNull { request.url.contains("ep=${endpointDedupeKey(it.endpoint)}") }
                 ?: strategy.config.dataEndpoints.firstOrNull { request.url.contains(it.endpoint.path) }
-                ?: return@forEach
+                ?: return@forEachResponse
         val items =
             responseItemsWithKeys(
                 response.json,
@@ -862,7 +895,7 @@ suspend fun importApiSessionExchange(
                 dataEndpoint.endpoint.responseObjectValues,
                 dataEndpoint.endpoint.itemKeyField,
                 dataEndpoint.endpoint.nestedItemsKey,
-            ) ?: return@forEach
+            ) ?: return@forEachResponse
         items.forEachIndexed { index, (key, element) ->
             (element as? JsonObject)?.let {
                 // The real JSON path of this item so the audit view can expand to the exact node —
@@ -919,6 +952,7 @@ suspend fun importApiSessionExchange(
             .values
             .map { snapshots -> snapshots.maxBy { it.updatedAt ?: it.createdAt } }
 
+    bar.emit(base = BUILD_BASE, detail = "Resolving assets")
     // Resolve assets: any code that isn't a known fiat currency is treated as a crypto asset and
     // auto-created (the same rule as the CSV importer), sized to the precision the data actually uses.
     val fiatByCode = currencyRepository.getAllCurrencies().first().associateBy { it.code.uppercase() }
@@ -952,6 +986,7 @@ suspend fun importApiSessionExchange(
     val unidentifiedCounterpartyAttr =
         importEngine.getOrCreateAttributeType(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME)
 
+    bar.emit(base = BUILD_BASE + 0.05f, detail = "Resolving accounts")
     val syntheticKey = LocalAccountKey("exchange-synthetic")
     val feeKey = LocalAccountKey("exchange-fees")
     val fundingKey = LocalAccountKey("exchange-funding")
@@ -994,6 +1029,7 @@ suspend fun importApiSessionExchange(
     val feeAccountId = requireNotNull(accountResult.createdAccountIds[feeKey])
     val fundingId = requireNotNull(accountResult.createdAccountIds[fundingKey])
 
+    bar.emit(base = BUILD_BASE + 0.10f, detail = "Building trades and transfers")
     val tradeIntents = mutableListOf<ImportTradeIntent>()
     val transferIntents = mutableListOf<ImportTransfer>()
     // Fill-trade keys per order id, collected only for trades that actually became intents (a trade
@@ -1230,6 +1266,8 @@ suspend fun importApiSessionExchange(
                         transfer.attributes.firstOrNull { it.attributeType.id == txnIdAttr }?.value
                     },
             ),
+            onProgress = bar.sink(base = WRITE_BASE, span = WRITE_SPAN),
+            batchSize = engineBatchSize,
         )
     return ExchangeImportResult(
         tradesImported = tradeIntents.size,

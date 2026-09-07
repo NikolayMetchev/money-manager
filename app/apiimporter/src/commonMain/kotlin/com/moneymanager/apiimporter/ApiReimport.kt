@@ -43,6 +43,17 @@ private val logger = logging()
 /** Value an internal-transfer reconcile's exclusion attribute always carries (see `ImportDeduper`). */
 private const val EXCLUDED_ATTR_VALUE = "reconciled"
 
+// Slices one session's re-import gets on the progress bar (see ScaledProgress). Deleting the
+// session's own rows and re-running the import both sweep their own 0..1; the tail steps are single
+// unmeasurable operations, so they only advance the bar to their mark.
+private const val DELETE_BASE = 0f
+private const val DELETE_SPAN = 0.25f
+private const val UNHIDE_BASE = 0.25f
+private const val RERUN_BASE = 0.3f
+private const val RERUN_SPAN = 0.55f
+private const val CLEANUP_BASE = 0.88f
+private const val REFRESH_BASE = 0.93f
+
 /**
  * What re-importing an already-imported API session will delete before re-running it: the
  * transfers/trades/accounts THIS session (and only this session) created, per `entity_source`.
@@ -112,6 +123,7 @@ suspend fun executeApiReimport(
         "plan is for session ${plan.sessionId} but executeApiReimport was called with session ${session.id}"
     }
     val importStartedAt = Clock.System.now()
+    val bar = ScaledProgress(onProgress)
 
     // Snapshot RECONCILED-relationship partners of every to-be-deleted transfer BEFORE deleting: the
     // relationship row cascades away with the transfer, but a partner's EXCLUDED attribute does not —
@@ -125,7 +137,7 @@ suspend fun executeApiReimport(
             .filterNot { it in plan.transferIds }
             .toSet()
 
-    onProgress?.invoke(ImportProgress("Removing session's transactions"))
+    bar.emit(base = DELETE_BASE, detail = "Removing session's transactions")
     importEngine.import(
         ImportBatch(
             transfers =
@@ -144,6 +156,9 @@ suspend fun executeApiReimport(
             dedupePolicy = DedupePolicy.None,
             apiSessionMutations = listOf(ApiSessionMutation.DeleteResponseTransactionsBySession(session.id)),
         ),
+        // The engine words its write phase as "Importing transactions" whatever the operation is;
+        // during the deletion pass that would read as the opposite of what is happening.
+        onProgress = bar.sink(base = DELETE_BASE, span = DELETE_SPAN, detail = "Removing session's transactions"),
     )
 
     // A surviving partner un-excludes only once it has no RECONCILED relationship left at all — one
@@ -173,13 +188,13 @@ suspend fun executeApiReimport(
                     )
                 }
             if (updates.isNotEmpty()) {
-                onProgress?.invoke(ImportProgress("Un-hiding reconciled transactions"))
+                bar.emit(base = UNHIDE_BASE, detail = "Un-hiding reconciled transactions")
                 importEngine.import(ImportBatch(transfers = updates, dedupePolicy = DedupePolicy.None))
             }
         }
     }
 
-    onProgress?.invoke(ImportProgress("Re-importing"))
+    bar.emit(base = RERUN_BASE, detail = "Re-importing")
     val rerun =
         if (strategy.config.syntheticAccount != null) {
             val exchangeResult =
@@ -191,9 +206,14 @@ suspend fun executeApiReimport(
                     sessionId = session.id,
                     strategy = strategy,
                     importEngine = importEngine,
+                    onProgress = bar.sink(base = RERUN_BASE, span = RERUN_SPAN),
+                    engineBatchSize = if (onProgress == null) Int.MAX_VALUE else API_ENGINE_BATCH_SIZE,
                 )
             RerunOutcome(transactions = exchangeResult.transfersImported, trades = exchangeResult.tradesImported)
         } else {
+            // The bank path reports through a non-suspend `ApiSessionImportProgress` callback, which
+            // cannot drive this suspend bar; it stays on the phase message until that plumbing is
+            // made suspend like the exchange path's.
             val transactionsResult =
                 importApiSessionTransactions(
                     apiSessionRepository = apiSessionRepository,
@@ -224,12 +244,12 @@ suspend fun executeApiReimport(
         importDurationMillis = (Clock.System.now() - importStartedAt).inWholeMilliseconds,
     )
 
-    onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))
+    bar.emit(base = CLEANUP_BASE, detail = "Cleaning up empty accounts")
     val deletedEmptyAccounts =
         deleteEmptyAccountsCreatedBySession(session.id, plan.accountIds, accountRepository, tradeRepository, importEngine)
 
     if (refreshViews) {
-        onProgress?.invoke(ImportProgress("Refreshing views"))
+        bar.emit(base = REFRESH_BASE, detail = "Refreshing views")
         maintenance.refreshMaterializedViews()
     }
 
@@ -335,7 +355,7 @@ suspend fun bulkReimportApiSessions(
             .filter { it.id in importedSessionIds }
             .sortedBy { it.createdAt }
 
-    return reimportSessionsResiliently(sessions, maintenance, onProgress) { session ->
+    return reimportSessionsResiliently(sessions, maintenance, onProgress) { session, sessionProgress ->
         val plan = planApiReimport(session.id, apiSessionRepository)
         executeApiReimport(
             plan = plan,
@@ -353,6 +373,7 @@ suspend fun bulkReimportApiSessions(
             importEngine = importEngine,
             counterpartyAccountNames = counterpartyAccountNames,
             passThroughAccounts = passThroughAccounts,
+            onProgress = sessionProgress,
             refreshViews = false,
         )
     }
@@ -367,23 +388,37 @@ internal suspend fun reimportSessionsResiliently(
     sessions: List<ApiSession>,
     maintenance: Maintenance,
     onProgress: (suspend (ImportProgress) -> Unit)?,
-    reimport: suspend (ApiSession) -> Unit,
+    reimport: suspend (ApiSession, (suspend (ImportProgress) -> Unit)?) -> Unit,
 ): ApiBulkReimportResult {
     var reimported = 0
     val failures = mutableListOf<ApiSessionReimportFailure>()
+    val bar = ScaledProgress(onProgress)
     val runFailure =
         runCatching {
             for ((index, session) in sessions.withIndex()) {
-                onProgress?.invoke(
-                    ImportProgress(
-                        "Re-importing session #${session.id}",
-                        fraction = index.toFloat() / sessions.size,
-                        processed = index,
-                        total = sessions.size,
-                    ),
-                )
+                // Each session owns the slice of the bar its position gives it; its own phases sweep
+                // that slice, so the run reads as one bar rather than one that restarts per session.
+                val base = index.toFloat() / sessions.size
+                val span = 1f / sessions.size
+                val label = "Session ${index + 1} of ${sessions.size}"
+                val sessionProgress: (suspend (ImportProgress) -> Unit)? =
+                    if (onProgress == null) {
+                        null
+                    } else {
+                        { inner ->
+                            bar.emit(
+                                base = base,
+                                span = span,
+                                detail = "$label: ${inner.detail}",
+                                innerFraction = inner.fraction,
+                                processed = index,
+                                total = sessions.size,
+                            )
+                        }
+                    }
+                bar.emit(base = base, detail = label, processed = index, total = sessions.size)
                 try {
-                    reimport(session)
+                    reimport(session, sessionProgress)
                     reimported++
                 } catch (expected: CancellationException) {
                     throw expected

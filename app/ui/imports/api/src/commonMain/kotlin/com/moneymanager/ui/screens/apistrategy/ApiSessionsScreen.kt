@@ -59,6 +59,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.moneymanager.apiimporter.API_ENGINE_BATCH_SIZE
 import com.moneymanager.apiimporter.ApiCounterpartySuggestion
 import com.moneymanager.apiimporter.ApiSessionDownloadResult
 import com.moneymanager.apiimporter.ApiSessionImportProgress
@@ -70,6 +71,7 @@ import com.moneymanager.apiimporter.downloadApiSessionAccountIdentifiers
 import com.moneymanager.apiimporter.downloadApiSessionAccounts
 import com.moneymanager.apiimporter.downloadApiSessionPeople
 import com.moneymanager.apiimporter.downloadApiSessionTransactions
+import com.moneymanager.apiimporter.importApiSessionExchange
 import com.moneymanager.apiimporter.importApiSessionPeople
 import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
@@ -295,7 +297,7 @@ fun ApiSessionsScreen(
             // instead of the bank-shaped accounts→transactions→people path.
             if (strategy.config.syntheticAccount != null) {
                 val exchangeResult =
-                    com.moneymanager.apiimporter.importApiSessionExchange(
+                    importApiSessionExchange(
                         apiSessionRepository = apiSessionRepository,
                         accountRepository = accountRepository,
                         currencyRepository = currencyRepository,
@@ -303,6 +305,15 @@ fun ApiSessionsScreen(
                         sessionId = session.id,
                         strategy = strategy,
                         importEngine = importEngine,
+                        onProgress = { progress ->
+                            scope.launch {
+                                importProgressBySession =
+                                    importProgressBySession +
+                                    (session.id to ApiSessionImportProgress(progress.detail, progress.fraction))
+                            }
+                            update(progress.detail, progress.fraction)
+                        },
+                        engineBatchSize = API_ENGINE_BATCH_SIZE,
                     )
                 importEngine.markApiSessionImported(
                     id = session.id,
