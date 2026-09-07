@@ -336,6 +336,7 @@ internal fun buildStrategyFromEditorState(
                 ?.takeIf { it.isNotBlank() }
                 ?.let { AttributeAccountMatch(column = it, attributeTypeName = state.fundingMatchAttributeTypeName) },
         conversionConfig = state.conversionConfig,
+        tradeGroupConfig = state.tradeGroupConfig,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

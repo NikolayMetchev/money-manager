@@ -66,6 +66,10 @@ data class AttributeAccountMatch(
  *                            separate debited/credited rows; the importer routes the legs through a
  *                            shared counterparty account and links each debit to its credit (see
  *                            [ConversionConfig]). Null when the source has no such conversions.
+ * @property tradeGroupConfig When set, describes how this source splits one trade across several rows
+ *                            sharing a timestamp; the importer assembles each such group into a single
+ *                            `trade` on the owner account (see [TradeGroupConfig]). Null when every
+ *                            cross-asset movement already arrives on one row.
  * @property fundingAttributeMatch When set, resolves each row's hidden funding account by matching a
  *                             CSV column against an account-attribute type (see [AttributeAccountMatch];
  *                             e.g. Curve's "Funding Card Last 4 Digits" column against the `card-last4`
@@ -93,6 +97,7 @@ data class CsvImportStrategy(
     val fileNamePattern: String? = null,
     val crossSourceReconcileWindowSeconds: Long? = null,
     val conversionConfig: ConversionConfig? = null,
+    val tradeGroupConfig: TradeGroupConfig? = null,
     val fundingAttributeMatch: AttributeAccountMatch? = null,
     val worksheetName: String? = null,
     val createdAt: Instant,

@@ -330,6 +330,15 @@ class ImportDeduper(
             policy.reconciledRelationshipTypeId,
         )?.let { return it }
 
+        // This feed splits a charge the other source folded into one gross row, so the amounts never
+        // match; pair them on the gross total instead and exclude that row.
+        classifyAsGrossNetReconciled(
+            transfer,
+            policy.unidentifiedCounterpartyWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
+
         // ... then an earlier accepted transfer in this same batch (resolved to its created id later).
         val batchMatchIndex =
             transfer.apiId?.let { batchApiId[it] }
@@ -486,6 +495,55 @@ class ImportDeduper(
             ImportStatus.IMPORTED,
             existing = null,
         )
+    }
+
+    /**
+     * Reconciles a leg this source reports **net** of a charge it books separately against the single
+     * **gross** leg another source recorded for the same movement. A Binance withdrawal is the case:
+     * the API returns the amount that left the account and a `transactionFee`/`totalFee` beside it,
+     * which become two transfers, while the statement export has one row for the sum. Amount equality
+     * — which every other rule here rests on — can never pair those, so both are counted.
+     *
+     * The incoming pair is kept and the existing gross leg excluded, rather than the other way round:
+     * this source knows the fee and usually the real counterparty, and net + fee is exactly the gross,
+     * so no balance moves. Matching is counterparty-agnostic (the gross row typically named only a
+     * placeholder) and each existing leg is claimed once, nearest first.
+     *
+     * Only this direction is handled. The opposite order — a gross row arriving against an existing
+     * net leg — would have to find and sum *two* existing rows, which is a different search.
+     */
+    private fun classifyAsGrossNetReconciled(
+        transfer: ImportTransfer,
+        window: Duration?,
+        exclusionTypeId: AttributeTypeId?,
+        relationshipTypeId: RelationshipTypeId?,
+    ): Classified? {
+        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
+        val gross = transfer.reconcileGrossAmount ?: return null
+        if (gross == transfer.amount) return null
+        val timestamp = transfer.timestamp ?: return null
+        val from = transfer.fromAccount.requireId()
+        val to = transfer.toAccount.requireId()
+        for ((owned, inflow) in listOf(to to true, from to false)) {
+            val candidates =
+                reconcileCandidatesByAccountFlow[AccountFlowKey(owned, inflow, gross)]
+                    ?.filter { (id, _) ->
+                        id !in existingExcludedLegs && id !in claimedReconcileTargets
+                    }.orEmpty()
+            val matchId = selectNearestUnconsumedLeg(candidates, timestamp, window, consumedReconcileIds) ?: continue
+            consumedReconcileIds += matchId
+            val existingTransfer = candidates.first { it.first == matchId }.second
+            return Classified(
+                transfer.copy(
+                    relationships =
+                        transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId),
+                ),
+                ImportStatus.IMPORTED,
+                existing = null,
+                excludeExisting = ExcludeExistingLeg(existingTransfer, exclusionTypeId),
+            )
+        }
+        return null
     }
 
     /**

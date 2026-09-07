@@ -1275,6 +1275,12 @@ object BuiltInApiStrategies {
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                                         idField = "orderNo",
+                                        // `amount` is what left the account, NET of the charge: without this
+                                        // the withdrawal is under-reported by the fee, and the statement
+                                        // export - which records the gross - can never be reconciled against
+                                        // it. The deposit endpoint above needs no equivalent: Binance
+                                        // returns totalFee "0" on every fiat deposit.
+                                        feeAmountField = "totalFee",
                                         itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "Successful")),
                                     ),
                                 fixedDirection = TransferDirection.OUT,

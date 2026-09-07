@@ -23,6 +23,7 @@ fun CsvImportStrategyWriteQueries.insertStrategy(strategy: CsvImportStrategy) {
         file_name_pattern = strategy.fileNamePattern,
         cross_source_reconcile_window_seconds = strategy.crossSourceReconcileWindowSeconds,
         conversion_config_json = FieldMappingJsonCodec.encodeConversionConfig(strategy.conversionConfig),
+        trade_group_config_json = FieldMappingJsonCodec.encodeTradeGroupConfig(strategy.tradeGroupConfig),
         funding_attribute_match_json = FieldMappingJsonCodec.encodeAttributeAccountMatch(strategy.fundingAttributeMatch),
     )
     strategy.worksheetName?.let { worksheetName ->

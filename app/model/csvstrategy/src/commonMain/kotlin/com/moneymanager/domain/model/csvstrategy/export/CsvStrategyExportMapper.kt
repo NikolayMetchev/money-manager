@@ -52,6 +52,7 @@ object CsvStrategyExportMapper {
             conversionConfig = strategy.conversionConfig,
             fundingAttributeMatch = strategy.fundingAttributeMatch,
             worksheetName = strategy.worksheetName,
+            tradeGroupConfig = strategy.tradeGroupConfig,
         )
 
     private fun FieldMapping.toExport(

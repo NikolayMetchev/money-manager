@@ -1534,6 +1534,7 @@ suspend fun executeCsvReimport(
             onProgress = onProgress,
             attributeAccountMatchers = attributeAccountMatchers,
             engineBatchSize = REIMPORT_ENGINE_BATCH_SIZE,
+            tradeRepository = tradeRepository,
         )
 
     onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))

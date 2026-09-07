@@ -26,6 +26,7 @@ import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
+import com.moneymanager.domain.model.csvstrategy.TradeGroupConfig
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifColumns
 import kotlin.time.Instant
@@ -43,6 +44,7 @@ object BuiltInCsvStrategies {
     val cryptoComCryptoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
     val curveCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
     val cryptoComCardXlsxStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
+    val binanceCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000c")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -129,6 +131,97 @@ object BuiltInCsvStrategies {
     private const val CURVE_RECONCILE_WINDOW_SECONDS = 172_800L
 
     /**
+     * The single Binance Spot account, holding one balance per asset. Matches the Binance API
+     * strategy's synthetic account name, so a movement both sources record resolves to the same
+     * account on both sides and cross-source reconciliation links it instead of double-counting.
+     */
+    private const val BINANCE_ACCOUNT = "Binance"
+
+    /**
+     * Binance counterparty accounts the API strategy also creates (`ApiDataEndpoint`'s
+     * `counterpartyAccountName`). Naming them identically is what makes the CSV's and the API's
+     * versions of the same deposit/withdrawal/earn movement reconcilable.
+     */
+    private const val BINANCE_FEES_ACCOUNT = "Binance Fees"
+
+    /**
+     * Placeholder counterparty for a deposit or withdrawal. The export records that money arrived or
+     * left but never whose account it was, so this account is not an assertion — it is where an
+     * unidentified movement waits to be reconciled against a source that does name the counterparty
+     * (the API books a crypto deposit against the on-chain address, falling back to this same name).
+     */
+    private const val BINANCE_FUNDING_ACCOUNT = "Binance Funding"
+
+    /** Same placeholder role as [BINANCE_FUNDING_ACCOUNT], for the explicitly fiat operations. */
+    private const val BINANCE_BANK_ACCOUNT = "Binance Bank"
+    private const val BINANCE_EARN_ACCOUNT = "Binance Earn"
+    private const val BINANCE_EARN_REWARDS_ACCOUNT = "Binance Earn Rewards"
+    private const val BINANCE_DISTRIBUTION_ACCOUNT = "Binance Distribution"
+
+    /**
+     * Binance counterparty accounts with no API equivalent — Binance publishes no endpoint for staking,
+     * BNB Vault, Launchpool, Launchpad, commission, liquidity farming or dual savings, so these
+     * products exist only in the CSV export. Principal pools are kept apart from the income they throw
+     * off (and from [BINANCE_EARN_ACCOUNT]) so each balance answers one question: what is staked, and
+     * what has it paid out.
+     */
+    private const val BINANCE_STAKING_ACCOUNT = "Binance Staking"
+    private const val BINANCE_STAKING_REWARDS_ACCOUNT = "Binance Staking Rewards"
+    private const val BINANCE_VAULT_REWARDS_ACCOUNT = "Binance Vault Rewards"
+    private const val BINANCE_LAUNCHPOOL_ACCOUNT = "Binance Launchpool"
+    private const val BINANCE_LAUNCHPOOL_REWARDS_ACCOUNT = "Binance Launchpool Rewards"
+    private const val BINANCE_LAUNCHPAD_ACCOUNT = "Binance Launchpad"
+    private const val BINANCE_COMMISSION_ACCOUNT = "Binance Commission"
+    private const val BINANCE_LIQUID_SWAP_ACCOUNT = "Binance Liquid Swap"
+    private const val BINANCE_DUAL_SAVINGS_ACCOUNT = "Binance Dual Savings"
+
+    /**
+     * Counterparty for Binance's small-assets (dust) sweeps, which arrive as several debited rows and
+     * several credited BNB rows that no column attributes to each other. Routing every leg through one
+     * account keeps each asset balance exact and isolates the mixed-asset residual, exactly as
+     * [CRYPTO_COM_CONVERSIONS_ACCOUNT] does. See [ConversionConfig].
+     */
+    private const val BINANCE_CONVERSIONS_ACCOUNT = "Binance Conversions"
+
+    /**
+     * Suspense counterparty for a trade leg whose group did not resolve into a trade — a one-sided
+     * group, or one naming more than one asset on a side. Reached only in that case (an assembled
+     * group's legs become the trade and never a transfer), so a non-zero balance here is a visible
+     * signal that an export had a shape the strategy does not model, rather than a silent loss. The
+     * account itself is created whenever the file has any trade rows — accounts are resolved while the
+     * rows are mapped, before groups are assembled — so an empty one is the normal, healthy state.
+     */
+    private const val BINANCE_TRADING_ACCOUNT = "Binance Trading"
+
+    /**
+     * Cross-source reconciliation window for the Binance CSV strategy's **transfers**. Sized by fiat
+     * funding, which is the only thing the two sources disagree about by more than a moment: the API
+     * records when Binance credited the deposit, the export when the transfer was initiated, and in
+     * this user's data that gap runs from 1 second to about 7 minutes (an hour recovers 19 of 25 such
+     * rows; widening to a day recovers no more).
+     *
+     * It is not wider than that because Binance pays `Staking Rewards` in the same amount every day:
+     * at an hour, 65 of 9,303 reward rows have an identical-amount sibling in range, but at a day
+     * 4,088 do — a window that size would start pairing genuinely distinct rewards.
+     */
+    private const val BINANCE_RECONCILE_WINDOW_SECONDS = 3600L
+
+    /**
+     * Reconciliation window for Binance **trades and dust sweeps**, which is a different question from
+     * the transfer window above: the two sources agree about a conversion's instant to the second and
+     * differ only in sub-second rounding. It stays tight because trade reconciliation matches a group
+     * against the whole in-window candidate set — at an hour, a later order's fills would be dragged in
+     * and the sums would stop matching.
+     */
+    private const val BINANCE_TRADE_RECONCILE_WINDOW_SECONDS = 5L
+
+    /**
+     * Window for pairing a dust sweep's debit legs to its credit legs. Binance stamps a sweep's rows
+     * within the same second or the next one, while distinct sweeps are hours apart.
+     */
+    private const val BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS = 2L
+
+    /**
      * All built-in CSV import strategies seeded into a fresh database. [qifCurrencyId] is the fixed
      * currency the QIF strategies carry (the default the QIF import dialog pre-selects); it is resolved
      * to GBP at seed time. Defaults to the first currency for callers without a resolved id (e.g. tests).
@@ -147,6 +240,7 @@ object BuiltInCsvStrategies {
             buildCryptoComCryptoStrategy(now),
             buildCurveCsvStrategy(now),
             buildCryptoComCardXlsxStrategy(now),
+            buildBinanceCsvStrategy(now),
         )
 
     /**
@@ -1422,6 +1516,198 @@ object BuiltInCsvStrategies {
             fieldMappings = fieldMappings,
             attributeMappings = attributeMappings,
             crossSourceReconcileWindowSeconds = MONZO_RECONCILE_WINDOW_SECONDS,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in strategy for Binance's "transaction history" export — one signed row per movement:
+     * `User_ID, UTC_Time, Account, Operation, Coin, Change, Remark`.
+     *
+     * **Modern exports only.** Binance's pre-2022 exports carry the same columns minus `User_ID`, and
+     * an older `Operation` vocabulary (`Savings purchase` for `Simple Earn Flexible Subscription`,
+     * `POS savings interest` for `Staking Rewards`, `Super BNB Mining` for `BNB Vault Rewards`, …) plus
+     * `LD*` mirror rows the modern format dropped. Importing both would book the same event twice under
+     * two different descriptions, so [CsvImportStrategy.contentMatchRules] requires the `User_ID` column: a legacy file
+     * scores zero and, because this strategy carries content rules, is also excluded from the
+     * no-signals fallback, so it resolves to no strategy and is reported skipped rather than misread.
+     * Re-export the same period from Binance to import it.
+     *
+     * `Operation` drives everything. Deposits, withdrawals, Earn subscriptions and rewards route to the
+     * accounts the Binance API strategy also creates, so whichever source imports second reconciles
+     * against the first. Staking, BNB Vault, Launchpool, Launchpad, commission, liquidity farming and
+     * dual savings have no API endpoint at all and are the reason to import this file.
+     *
+     * Trades are split across rows: Binance stamps every partial fill of both legs with the same second
+     * (a single order can produce a dozen `Transaction Sold`/`Transaction Revenue` rows).
+     * [CsvImportStrategy.tradeGroupConfig]
+     * folds each such group into one `trade`. Fee rows stay out of the group on purpose — a `trade` row
+     * has no fee field — and route to [BINANCE_FEES_ACCOUNT] as their own transfers, as the API does.
+     *
+     * **Known limitation — withdrawals do not reconcile.** A `Withdraw` row remarked
+     * "Withdraw fee is included" is the **gross** amount, while the API records the withdrawal net and
+     * books the fee as its own transfer. Cross-source reconciliation matches on the amount, so the two
+     * never pair and such a withdrawal is counted twice if both sources are imported. The export gives
+     * no way to recover the fee, so nothing here can fix it; the affected rows are the ones carrying
+     * that remark, plus `Fiat Withdrawal`.
+     *
+     * Dust sweeps are the one conversion that cannot be assembled: a sweep debits several assets and
+     * credits several BNB amounts, and nothing in the file says which credit came from which debit
+     * (their order does not correspond, and the credited amount is net of Binance's service charge
+     * while the debited amount is gross). They go through [CsvImportStrategy.conversionConfig] instead,
+     * which keeps every
+     * balance exact without inventing a pairing. Both legs share one `Operation`, so
+     * [ConversionConfig.sideAmountColumn] classifies them by the sign of `Change`.
+     */
+    @Suppress("LongMethod")
+    fun buildBinanceCsvStrategy(now: Instant): CsvImportStrategy {
+        // Every pattern is anchored: RegexRule matching is containsMatchIn, so a bare "Deposit" would
+        // also claim "Fiat Deposit" and a bare "Buy" would claim "Transaction Buy".
+        val targetAccountRules =
+            listOf(
+                // The export says money arrived or left, never whose account it was: a deposit row names
+                // no bank and no wallet. The API does know — it books a crypto deposit against the
+                // on-chain address it came from ("ETH:0x9b4f…") and only falls back to Binance Funding
+                // when there is none. So the counterparty here is a *placeholder*: marking it
+                // unidentified lets the engine reconcile the row against the API's record of the same
+                // movement whatever counterparty that record names, instead of double-counting it.
+                RegexRule(
+                    pattern = "^(Fiat Deposit|Fiat Withdrawal)$",
+                    accountName = BINANCE_BANK_ACCOUNT,
+                    counterpartyIsUnidentified = true,
+                ),
+                RegexRule(
+                    pattern = "^(Deposit|Withdraw)$",
+                    accountName = BINANCE_FUNDING_ACCOUNT,
+                    counterpartyIsUnidentified = true,
+                ),
+                RegexRule(
+                    pattern = "^Simple Earn (Flexible|Locked) (Subscription|Redemption)$",
+                    accountName = BINANCE_EARN_ACCOUNT,
+                ),
+                RegexRule(
+                    pattern = "^Simple Earn (Flexible (Interest|Airdrop)|Locked Rewards)$",
+                    accountName = BINANCE_EARN_REWARDS_ACCOUNT,
+                ),
+                RegexRule(pattern = "^Staking (Purchase|Redemption)$", accountName = BINANCE_STAKING_ACCOUNT),
+                RegexRule(pattern = "^Staking Rewards$", accountName = BINANCE_STAKING_REWARDS_ACCOUNT),
+                RegexRule(pattern = "^BNB Vault Rewards$", accountName = BINANCE_VAULT_REWARDS_ACCOUNT),
+                RegexRule(
+                    pattern = "^Launchpool Subscription/Redemption$",
+                    accountName = BINANCE_LAUNCHPOOL_ACCOUNT,
+                ),
+                RegexRule(
+                    pattern = "^Launchpool (Interest|Earnings Withdrawal)$",
+                    accountName = BINANCE_LAUNCHPOOL_REWARDS_ACCOUNT,
+                ),
+                RegexRule(
+                    pattern = "^Launchpad (Subscribe|Token Distribution)$",
+                    accountName = BINANCE_LAUNCHPAD_ACCOUNT,
+                ),
+                RegexRule(
+                    pattern = "^(Distribution|Rewards Distribution)$",
+                    accountName = BINANCE_DISTRIBUTION_ACCOUNT,
+                ),
+                RegexRule(pattern = "^Commission (History|Rebate)$", accountName = BINANCE_COMMISSION_ACCOUNT),
+                RegexRule(
+                    pattern = "^(Liquid Swap Add|Liquidity Farming Remove)$",
+                    accountName = BINANCE_LIQUID_SWAP_ACCOUNT,
+                ),
+                RegexRule(
+                    pattern = "^Dual Savings (Purchase|Settlement)$",
+                    accountName = BINANCE_DUAL_SAVINGS_ACCOUNT,
+                ),
+                RegexRule(pattern = "^(Fee|Transaction Fee)$", accountName = BINANCE_FEES_ACCOUNT),
+                // Dust legs are re-routed to the conversion account by conversionConfig; this rule is
+                // the home for a leg that somehow escapes detection (a zero Change).
+                RegexRule(
+                    pattern = "^Small Assets Exchange BNB( \\(Spot\\))?$",
+                    accountName = BINANCE_CONVERSIONS_ACCOUNT,
+                ),
+                // Trade legs only reach here when their group did not resolve; and the trailing
+                // catch-all keeps a future unknown Operation from minting an account named after it.
+                RegexRule(pattern = "^", accountName = BINANCE_TRADING_ACCOUNT),
+            )
+        val fieldMappings =
+            mapOf(
+                // Account is "Spot" on every row; keying the rule off it rather than hard-coding an id
+                // keeps the mapping portable and leaves room for a future wallet column value.
+                TransferField.SOURCE_ACCOUNT to
+                    RegexAccountMapping(
+                        fieldType = TransferField.SOURCE_ACCOUNT,
+                        columnName = "Account",
+                        rules = listOf(RegexRule(pattern = "^", accountName = BINANCE_ACCOUNT)),
+                    ),
+                TransferField.TARGET_ACCOUNT to
+                    RegexAccountMapping(
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = "Operation",
+                        rules = targetAccountRules,
+                    ),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = "UTC_Time",
+                        dateFormat = "yyyy-MM-dd",
+                        dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, columnName = "Operation"),
+                // Change carries the direction: negative leaves the Binance account, positive arrives.
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "Change",
+                        flipAccountsOnPositive = true,
+                    ),
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(fieldType = TransferField.CURRENCY, columnName = "Coin"),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
+            )
+        val attributeMappings =
+            listOf(
+                AttributeColumnMapping("User_ID", "binance-user-id"),
+                AttributeColumnMapping("Operation", "binance-operation"),
+                AttributeColumnMapping("Remark", "binance-remark"),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(binanceCsvStrategyId),
+            name = "Binance CSV",
+            identificationColumns =
+                setOf("User_ID", "UTC_Time", "Account", "Operation", "Coin", "Change", "Remark"),
+            fieldMappings = fieldMappings,
+            attributeMappings = attributeMappings,
+            // Binance names its exports with bare UUIDs, so there is no filename signal to use - and a
+            // filename match would win outright over content scoring and let a legacy file through.
+            contentMatchRules = listOf(ContentMatchRule(columnName = "User_ID", pattern = "^\\s*\\d+\\s*$")),
+            crossSourceReconcileWindowSeconds = BINANCE_RECONCILE_WINDOW_SECONDS,
+            conversionConfig =
+                ConversionConfig(
+                    signalColumn = "Operation",
+                    debitPattern = "^Small Assets Exchange BNB( \\(Spot\\))?$",
+                    creditPattern = "^Small Assets Exchange BNB( \\(Spot\\))?$",
+                    sideAmountColumn = "Change",
+                    conversionAccountName = BINANCE_CONVERSIONS_ACCOUNT,
+                    pairingWindowSeconds = BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS,
+                    relationshipTypeName = "conversion",
+                    reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
+                ),
+            tradeGroupConfig =
+                TradeGroupConfig(
+                    signalColumn = "Operation",
+                    debitPattern = "^(Sell|Transaction (Spend|Sold))$",
+                    creditPattern = "^(Buy|Transaction (Buy|Revenue)|Binance Convert|Transaction Related)$",
+                    // "Transaction Related" is the older name for *either* leg of a fill, so the sign of
+                    // Change - not the operation name - has to decide which side each row is.
+                    sideAmountColumn = "Change",
+                    // groupingWindowSeconds and descriptionTemplate keep their defaults: every leg of
+                    // one fill carries the identical second so no jitter needs tolerating, and the
+                    // default "Buy {to}/{from}" already matches the API importer's wording.
+                    reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
+                ),
             createdAt = now,
             updatedAt = now,
         )

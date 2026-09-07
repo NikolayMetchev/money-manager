@@ -456,6 +456,18 @@ data class ImportTransfer(
     val apiId: String? = null,
     val excludedFromBalances: Boolean = false,
     val fee: ImportFee? = null,
+    /**
+     * The amount another source would record for this same movement, when that differs from [amount]
+     * because this source splits out a charge the other one folds in. A Binance withdrawal is the
+     * case: the API reports the net amount and books the fee as its own transfer, while the statement
+     * export reports one gross row. Amount-equality reconciliation can therefore never pair them, and
+     * both get counted.
+     *
+     * Setting this lets the gross-vs-net rule find that existing gross leg (see
+     * [DedupePolicy.ApiMultiKey]) and exclude it, keeping this source's more informative net + fee
+     * pair — whose total is exactly this value, so balances are unchanged.
+     */
+    val reconcileGrossAmount: Money? = null,
     /** An optional conduit pass-through (e.g. Curve), expanded by the engine into a linked spend leg. */
     val passThrough: ImportPassThrough? = null,
     /**
@@ -524,6 +536,7 @@ data class ImportBatch(
     val currencies: List<ImportCurrencyIntent> = emptyList(),
     val cryptoAssets: List<ImportCryptoIntent> = emptyList(),
     val trades: List<ImportTradeIntent> = emptyList(),
+    val tradeDedupePolicy: TradeDedupePolicy = TradeDedupePolicy.ExactTupleOnly,
     val orders: List<ImportOrderIntent> = emptyList(),
     val csvStrategyMutations: List<CsvStrategyMutation> = emptyList(),
     val apiStrategyMutations: List<ApiStrategyMutation> = emptyList(),

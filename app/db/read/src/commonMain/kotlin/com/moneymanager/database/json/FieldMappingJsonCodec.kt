@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
+import com.moneymanager.domain.model.csvstrategy.TradeGroupConfig
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.serialization.UuidSerializersModule
 import kotlinx.serialization.json.Json
@@ -51,6 +52,10 @@ object FieldMappingJsonCodec {
     fun encodeConversionConfig(config: ConversionConfig?): String? = config?.let { json.encodeToString(it) }
 
     fun decodeConversionConfig(jsonString: String?): ConversionConfig? = jsonString?.let { json.decodeFromString(it) }
+
+    fun encodeTradeGroupConfig(config: TradeGroupConfig?): String? = config?.let { json.encodeToString(it) }
+
+    fun decodeTradeGroupConfig(jsonString: String?): TradeGroupConfig? = jsonString?.let { json.decodeFromString(it) }
 
     fun encodeAttributeAccountMatch(match: AttributeAccountMatch?): String? = match?.let { json.encodeToString(it) }
 

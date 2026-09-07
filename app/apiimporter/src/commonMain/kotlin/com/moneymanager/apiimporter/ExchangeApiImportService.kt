@@ -45,6 +45,7 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalOrderKey
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
@@ -61,7 +62,10 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 import kotlin.time.Instant
 import kotlin.time.toDuration
@@ -86,6 +90,35 @@ private const val WALLET_ADDRESS_ATTR = "blockchain-wallet-address"
 
 /** Cross-source unique-id attribute holding a transfer's on-chain transaction id. */
 private const val BLOCKCHAIN_TXID_ATTR = "blockchain-txid"
+
+/**
+ * How far apart this exchange and another source may timestamp the same movement and still be
+ * reconciled as one. Cross-source reconciliation is unconditional here — an exchange's own statement
+ * export records the very movements its API returns, so *every* exchange strategy needs it, whether or
+ * not it also declares `internalTransferReconcile` bridges to an app account.
+ *
+ * Restricted to existing transfers this provider cannot identify by its own id, so a genuine repeat
+ * from the same exchange is never collapsed (see `DedupePolicy.ApiMultiKey`).
+ */
+private val RECONCILE_WINDOW = 5.minutes
+
+/**
+ * Window for superseding the placeholder counterparty another source left for a movement this feed
+ * identifies at both ends — a statement export says only "Deposit" where the API names the on-chain
+ * address it arrived from. All such a match has to go on is the account, direction and amount, and the
+ * two sources stamp the movement anything up to a day apart, so it is deliberately much wider than
+ * [RECONCILE_WINDOW]. Mirrors `ApiSessionImportService`'s window of the same name.
+ */
+private val UNIDENTIFIED_COUNTERPARTY_WINDOW = 3.days
+
+/**
+ * Trade reconciliation window. Far tighter than [RECONCILE_WINDOW]: two sources agree about a
+ * conversion's instant to the second and differ only in sub-second rounding (an export stamps the
+ * second, the API the millisecond), while matching aggregates against fill sets means a wide window
+ * would drag a later order's fills in and stop the sums agreeing at all. Matches the Binance CSV
+ * strategy's own trade window.
+ */
+private val TRADE_RECONCILE_WINDOW = 5.seconds
 
 /** Upper bound on exponential rate-limit backoff, so a misconfigured base delay can't stall for hours. */
 private const val MAX_RATE_LIMIT_BACKOFF_MILLIS = 60_000L
@@ -916,6 +949,8 @@ suspend fun importApiSessionExchange(
     val txnIdAttr = importEngine.getOrCreateAttributeType(EXCHANGE_TXN_ID_ATTR)
     val walletAddrAttr = importEngine.getOrCreateAttributeType(WALLET_ADDRESS_ATTR)
     val txidAttr = importEngine.getOrCreateAttributeType(BLOCKCHAIN_TXID_ATTR)
+    val unidentifiedCounterpartyAttr =
+        importEngine.getOrCreateAttributeType(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME)
 
     val syntheticKey = LocalAccountKey("exchange-synthetic")
     val feeKey = LocalAccountKey("exchange-fees")
@@ -1060,6 +1095,14 @@ suspend fun importApiSessionExchange(
                 )
         }
 
+    // A charge this feed splits out of a movement the other source folds in: the fee row `parseTransfers`
+    // emitted for "<id>" is keyed "<id>-fee", so the main row's gross total is its own amount plus that
+    // fee. Only a same-currency charge counts — a fee paid in another asset is a movement of that asset,
+    // not part of this one — and a refund (direction IN) is not a charge at all.
+    val feeByParentId =
+        transfers
+            .filter { it.isFeeOnly && it.direction == TransferDirection.OUT && it.id.endsWith("-fee") }
+            .groupBy({ it.id.removeSuffix("-fee") }, { it })
     val exchangeRef = AccountRef.Existing(syntheticId)
     for (tx in transfers) {
         val txAsset = asset(tx.currencyCode) ?: continue // single jump — allowed
@@ -1090,6 +1133,16 @@ suspend fun importApiSessionExchange(
                 val counterparty = counterpartyKey?.let { AccountRef.Local(it) } ?: AccountRef.Existing(fundingId)
                 if (tx.direction == TransferDirection.IN) counterparty to exchangeRef else exchangeRef to counterparty
             }
+        val grossMoney =
+            if (tx.isFeeOnly) {
+                null
+            } else {
+                feeByParentId[tx.id]
+                    ?.filter { it.currencyCode == tx.currencyCode }
+                    ?.fold(tx.amount) { total, fee -> total + fee.amount }
+                    ?.takeIf { it != tx.amount }
+                    ?.let { Money.fromDisplayValue(it, txAsset) }
+            }
         transferIntents +=
             exchangeTransfer(
                 id = tx.id,
@@ -1098,6 +1151,7 @@ suspend fun importApiSessionExchange(
                 fromAccount = from,
                 toAccount = to,
                 money = money,
+                grossMoney = grossMoney,
                 source = source,
                 requestId = tx.requestId,
                 jsonPath = tx.jsonPath,
@@ -1150,19 +1204,27 @@ suspend fun importApiSessionExchange(
                 accountsToCreate = counterpartyIntents,
                 dedupePolicy =
                     DedupePolicy.ApiMultiKey(
-                        // A configured reconcile window also enables plain cross-source reconciliation, so
-                        // an aliased internal transfer (booked directly against the App account) links to
-                        // the identical leg the CSV export produces, regardless of which imports first.
-                        reconcileWindow = reconcile?.windowSeconds?.toDuration(DurationUnit.SECONDS),
-                        reconciledExclusionAttributeTypeId =
-                            if (reconcile == null) null else AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
-                        reconciledRelationshipTypeId =
-                            if (reconcile == null) null else RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
+                        // Cross-source reconciliation is unconditional, NOT derived from
+                        // internalTransferReconcile: that config only says which app account this
+                        // exchange bridges to, while every exchange's statement export re-records the
+                        // movements its API returns. Tying the two together left Binance and Kraken —
+                        // which declare no bridge — importing every CSV-covered movement a second time.
+                        reconcileWindow = RECONCILE_WINDOW,
+                        reconciledExclusionAttributeTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
+                        reconciledRelationshipTypeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
+                        // The export cannot name the far end of a deposit or withdrawal, so it leaves a
+                        // placeholder leg; this feed knows the address and supersedes it.
+                        unidentifiedCounterpartyAttributeTypeId = unidentifiedCounterpartyAttr,
+                        unidentifiedCounterpartyWindow = UNIDENTIFIED_COUNTERPARTY_WINDOW,
                         internalTransferBridges = bridges,
                         internalTransferWindow = reconcile?.windowSeconds?.toDuration(DurationUnit.SECONDS),
                         internalTransferAmountTolerance =
                             reconcile?.amountTolerancePercent?.let { runCatching { BigDecimal(it) }.getOrNull() } ?: BigDecimal.ZERO,
                     ),
+                // An export folds an order's partial fills into one row; this feed reports them one by
+                // one. Without a fuzzy trade policy every fill of an already-imported order is booked
+                // again (see TradeReconciler's fan-in matching).
+                tradeDedupePolicy = TradeDedupePolicy.Fuzzy(window = TRADE_RECONCILE_WINDOW),
                 apiIdExtractor =
                     ExistingApiIdExtractor { transfer ->
                         transfer.attributes.firstOrNull { it.attributeType.id == txnIdAttr }?.value
@@ -1189,6 +1251,7 @@ private fun exchangeTransfer(
     txnIdAttr: AttributeTypeId,
     txid: String? = null,
     txidAttr: AttributeTypeId? = null,
+    grossMoney: Money? = null,
 ): ImportTransfer {
     val txidAttribute = if (txid != null && txidAttr != null) NewAttribute(txidAttr, txid) else null
     return ImportTransfer(
@@ -1204,6 +1267,7 @@ private fun exchangeTransfer(
         // opposite leg that shares the same txid.
         apiId = id,
         attributes = listOfNotNull(NewAttribute(txnIdAttr, id), txidAttribute),
+        reconcileGrossAmount = grossMoney,
     )
 }
 

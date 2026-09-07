@@ -322,6 +322,7 @@ fun CsvImportsScreen(
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,
+                    tradeRepository = tradeRepository,
                     personRepository = personRepository,
                     passThroughAccountRepository = passThroughAccountRepository,
                     csvImportRepository = csvImportRepository,
