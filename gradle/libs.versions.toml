@@ -4,7 +4,7 @@
 # compiling against API 37, which is only a compile-time floor and needs no emulator/runtime move.
 android-compileSdk = "37"
 develocity = "4.4.2"
-android-gradle-plugin = "9.3.2"
+android-gradle-plugin = "9.4.0"
 android-minSdk = "30"
 android-targetSdk = "36"
 play-services-auth = "21.6.0"
