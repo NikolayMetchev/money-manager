@@ -135,6 +135,18 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertNotNull(myTrades.endpoint.fanOut, "spot-trade fan-out persisted")
             val fiatOrders = binance.config.dataEndpoints.filter { it.endpoint.path == "sapi/v1/fiat/orders" }
             assertEquals(2, fiatOrders.size, "fiat deposit and withdrawal endpoints share a path, disambiguated by transactionType")
+
+            // Without these, a full first download fails endpoints with "-1021 Timestamp for this
+            // request is outside of the recvWindow": Binance's default tolerance is 5s, and an
+            // NTP-synced machine can still sit a second away from Binance's own clock.
+            assertEquals(
+                "60000",
+                signing.signedParams.single { it.name == "recvWindow" }.value,
+                "recvWindow is widened from Binance's 5s default to its 60s maximum",
+            )
+            val timeSync = assertNotNull(signing.serverTimeSync, "server-time sync persisted")
+            assertEquals("api/v3/time", timeSync.path)
+            assertEquals("serverTime", timeSync.field)
         }
 
     @Test
