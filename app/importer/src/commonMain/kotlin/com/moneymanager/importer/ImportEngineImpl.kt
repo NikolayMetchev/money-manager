@@ -1239,7 +1239,7 @@ class ImportEngineImpl(
         val minTs = creates.minOf { requireNotNull(it.timestamp) } - policy.window
         val maxTs = creates.maxOf { requireNotNull(it.timestamp) } + policy.window
         val existing = tradeRepository.getTradesByAccountsAndDateRange(accountIds, minTs, maxTs)
-        return if (existing.isEmpty()) null else TradeReconciler(policy, existing)
+        return if (existing.isEmpty()) null else TradeReconciler(policy, existing, creates)
     }
 
     private suspend fun loadExisting(
