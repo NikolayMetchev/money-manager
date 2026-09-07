@@ -96,6 +96,9 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/** Emit a delete-phase progress update every N rows rather than per row — one delete is cheap. */
+private const val DELETE_PROGRESS_EVERY_ROWS = 50
+
 /**
  * Attribute types that tie an account to a specific real bank account/counterparty identity. An
  * existing account carrying none of these is "unclaimed" — see [ImportEngineImpl.matchAccount].
@@ -336,8 +339,36 @@ class ImportEngineImpl(
 
         // ----- DELETE phase (dependents first) -----
         batch.ownerships.deletes().forEach { ownershipRepository.deleteOwnership(requireNotNull(it.existingId)) }
-        batch.transfers.deletes().forEach { transactionRepository.deleteTransaction(requireNotNull(it.existingId).id) }
-        batch.trades.deletes().forEach { tradeRepository.deleteTrade(requireNotNull(it.existingId)) }
+        // Transfers and trades are the only deletes a batch holds in bulk (a re-import removes every row
+        // its session created before re-running it), so they report progress like the write phase does —
+        // otherwise a caller's bar holds still through the slower half of a re-import.
+        val transferDeletes = batch.transfers.deletes()
+        val tradeDeletes = batch.trades.deletes()
+        val deleteTotal = transferDeletes.size + tradeDeletes.size
+        var deleted = 0
+
+        suspend fun reportDeleted() {
+            deleted++
+            if (onProgress != null && (deleted % DELETE_PROGRESS_EVERY_ROWS == 0 || deleted == deleteTotal)) {
+                onProgress(
+                    ImportProgress(
+                        detail = "Deleting transactions",
+                        fraction = deleted.toFloat() / deleteTotal,
+                        processed = deleted,
+                        total = deleteTotal,
+                    ),
+                )
+            }
+        }
+
+        transferDeletes.forEach {
+            transactionRepository.deleteTransaction(requireNotNull(it.existingId).id)
+            reportDeleted()
+        }
+        tradeDeletes.forEach {
+            tradeRepository.deleteTrade(requireNotNull(it.existingId))
+            reportDeleted()
+        }
         batch.accountsToCreate.deletes().forEach { accountRepository.deleteAccount(requireNotNull(it.existingId)) }
         batch.categories.deletes().forEach { categoryRepository.deleteCategory(requireNotNull(it.existingId)) }
         batch.currencies.deletes().forEach { currencyRepository.deleteCurrency(requireNotNull(it.existingId)) }

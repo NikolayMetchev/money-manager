@@ -73,7 +73,7 @@ class ApiBulkReimportResilienceTest {
                     sessions = (1L..4L).map { session(it) },
                     maintenance = maintenance,
                     onProgress = null,
-                ) { session ->
+                ) { session, _ ->
                     attempted += session.id.id
                     if (session.id.id == 2L) error("boom")
                 }
@@ -95,7 +95,7 @@ class ApiBulkReimportResilienceTest {
                     sessions = (1L..3L).map { session(it) },
                     maintenance = maintenance,
                     onProgress = null,
-                ) { session ->
+                ) { session, _ ->
                     if (session.id.id == 2L) throw CancellationException("cancelled")
                 }
             }
@@ -114,7 +114,7 @@ class ApiBulkReimportResilienceTest {
                         sessions = (1L..3L).map { session(it) },
                         maintenance = maintenance,
                         onProgress = null,
-                    ) { session ->
+                    ) { session, _ ->
                         if (session.id.id == 2L) throw CancellationException("cancelled")
                     }
                 }
@@ -130,7 +130,7 @@ class ApiBulkReimportResilienceTest {
 
             val thrown =
                 assertFailsWith<IllegalStateException> {
-                    reimportSessionsResiliently((1L..2L).map { session(it) }, maintenance, onProgress = null) { }
+                    reimportSessionsResiliently((1L..2L).map { session(it) }, maintenance, onProgress = null) { _, _ -> }
                 }
 
             assertEquals("refresh failed", thrown.message, "nothing else was in flight to mask it")
@@ -140,7 +140,7 @@ class ApiBulkReimportResilienceTest {
     fun `an empty run still refreshes once`() =
         runTest {
             val maintenance = CountingMaintenance()
-            val result = reimportSessionsResiliently(emptyList(), maintenance, onProgress = null) { }
+            val result = reimportSessionsResiliently(emptyList(), maintenance, onProgress = null) { _, _ -> }
             assertEquals(0, result.sessionsReimported)
             assertEquals(1, maintenance.refreshes)
         }

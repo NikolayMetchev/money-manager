@@ -9,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -169,22 +168,4 @@ fun ApiReimportDialog(
             TextButton(onClick = onDismiss, enabled = !isRunning) { Text("Cancel") }
         },
     )
-}
-
-@Composable
-private fun ApiReimportProgress(progress: ImportProgress) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "${progress.detail}…",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        val fraction = progress.fraction
-        if (fraction != null) {
-            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-        } else {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-    }
 }
