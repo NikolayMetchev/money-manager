@@ -58,6 +58,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -139,6 +140,45 @@ suspend fun downloadApiSessionExchange(
     // to lastNonce+1 guarantees both across a long multi-endpoint, multi-window download.
     var lastNonce = 0L
     var requestId = 1L
+    // Difference between the provider's clock and this machine's, measured once on first use. A signed
+    // request carries a nonce the provider checks against its OWN clock, and an NTP-synced machine can
+    // still sit a second or more from it; left uncorrected that gap is spent before the request is even
+    // sent, and a locally-fast clock cannot be compensated by widening the provider's tolerance at all.
+    // Null until measured; a failed probe records 0 so it is attempted only once per download.
+    var measuredClockOffsetMillis: Long? = null
+
+    suspend fun serverClockOffsetMillis(): Long {
+        measuredClockOffsetMillis?.let { return it }
+        val sync = strategy.config.requestSigning?.serverTimeSync
+        val offset =
+            if (sync == null) {
+                0L
+            } else {
+                runCatching {
+                    val url = buildExchangeEndpointUrl(strategy.config.baseUrl, sync.path)
+                    val body = apiClient.send(method = "GET", url = url, storeResponse = false).body
+                    val serverMillis =
+                        requireNotNull(
+                            Json
+                                .parseToJsonElement(body)
+                                .jsonObject
+                                .resolveJsonPath(sync.field)
+                                ?.toLongOrNull(),
+                        ) { "no numeric '${sync.field}' in the ${strategy.name} time response" }
+                    (serverMillis - Clock.System.now().toEpochMilliseconds()).also {
+                        logger.info { "Clock offset against '${strategy.name}': ${it}ms" }
+                    }
+                }.getOrElse {
+                    // The provider's own clock is unreachable; fall back to the local one rather than
+                    // failing the whole download, and say so, since it is a likely cause if signing fails.
+                    logger.warn { "Could not read '${strategy.name}' server time; signing with the local clock: ${it.message}" }
+                    0L
+                }
+            }
+        measuredClockOffsetMillis = offset
+        return offset
+    }
+
     val now = Clock.System.now()
     var earliestIncrementalStart: Instant? = null
     val endpointCount = strategy.config.dataEndpoints.size
@@ -168,14 +208,29 @@ suspend fun downloadApiSessionExchange(
                         storeResponse = endpoint.storeResponse,
                     )
                 } else {
-                    val nonce = nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds())
+                    val nonce =
+                        nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds() + serverClockOffsetMillis())
                     lastNonce = nonce
+                    // Parameters the signing scheme adds to every signed request (Binance's recvWindow).
+                    // They go in with the endpoint's own params so the signature covers them.
+                    val signedParams =
+                        strategy.config.requestSigning
+                            ?.signedParams
+                            .orEmpty()
+                    val paramsToSign =
+                        if (signedParams.isEmpty()) {
+                            params
+                        } else {
+                            LinkedHashMap(params).apply {
+                                signedParams.forEach { p -> p.value?.let { putIfAbsent(p.name, it) } }
+                            }
+                        }
                     val signed =
                         signer.sign(
                             endpointUrl = endpointUrl,
                             path = uriPathOf(endpointUrl),
                             methodName = endpoint.path,
-                            params = params,
+                            params = paramsToSign,
                             apiKey = apiKey,
                             apiSecret = apiSecret,
                             nonce = nonce,
