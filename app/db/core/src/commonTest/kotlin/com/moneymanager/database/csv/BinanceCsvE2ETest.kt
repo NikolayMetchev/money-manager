@@ -9,7 +9,6 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
@@ -97,9 +96,9 @@ class BinanceCsvE2ETest : DbTest() {
         )
 
     /**
-     * Stands in for the API's `asset/dribblet` import: one same-account trade per swept asset, with
-     * the policy that path uses - including the conversion type name that lets the engine see the
-     * transfer legs an export already booked.
+     * Stands in for the API's `asset/dribblet` import: one same-account trade per swept asset, under
+     * the same fuzzy trade policy that path uses - which is what lets the engine see the transfer legs
+     * an export already booked.
      */
     private suspend fun importDustTrades(sweep: List<Triple<String, String, String>>) {
         val binance = assertNotNull(accountByName("Binance"))
@@ -123,11 +122,7 @@ class BinanceCsvE2ETest : DbTest() {
                             toAmount = Money.fromDisplayValue(BigDecimal(to), assets.getValue("BNB")),
                         )
                     },
-                tradeDedupePolicy =
-                    TradeDedupePolicy.Fuzzy(
-                        window = 5.seconds,
-                        conversionRelationshipTypeName = WellKnownIds.CONVERSION_RELATIONSHIP_TYPE_NAME,
-                    ),
+                tradeDedupePolicy = TradeDedupePolicy.Fuzzy(window = 5.seconds),
             ),
         )
     }
