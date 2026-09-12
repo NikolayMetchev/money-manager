@@ -180,6 +180,7 @@ class ImportEngineImpl(
         }
         val createdTradeIds = mutableMapOf<LocalTradeKey, TradeId>()
         val dedupedTradeKeys = mutableSetOf<LocalTradeKey>()
+        val conversionReconciledTradeKeys = mutableSetOf<LocalTradeKey>()
 
         // Multiset idempotency (see TradeWriteRepository.createTrade): N intents sharing the exact same
         // field tuple (e.g. an exchange order split into several byte-identical fills) must book as N
@@ -204,11 +205,29 @@ class ImportEngineImpl(
         // memory. A hit suppresses the write and reports the existing trade, which is the only way a
         // trade can be linked to its duplicate (see TradeDedupePolicy).
         val tradeReconciler = buildTradeReconciler(batch)
+        // The same movement again, but recorded by the other source as *transfers*: a conversion whose
+        // credits it could not attribute to its debits. There is no trade id to report for such a
+        // match, so the order links resolved below would have nothing to point at - hence trades an
+        // order claims are never suppressed this way. A conversion is never part of an order.
+        val conversionReconciler = buildConversionTradeReconciler(batch)
+        val orderLinkedTradeKeys = batch.orders.flatMapTo(mutableSetOf()) { it.tradeKeys }
         for (intent in batch.trades.creates()) {
+            // Either kind of cross-source match suppresses the write; they differ only in what can be
+            // reported, so they are resolved together and the write is skipped once.
             val reconciledId = tradeReconciler?.match(intent)
-            if (reconciledId != null) {
-                createdTradeIds[intent.key] = reconciledId
-                dedupedTradeKeys += intent.key
+            val reconciledConversionLeg =
+                if (reconciledId == null && intent.key !in orderLinkedTradeKeys) {
+                    conversionReconciler?.match(intent)
+                } else {
+                    null
+                }
+            if (reconciledId != null || reconciledConversionLeg != null) {
+                if (reconciledId != null) {
+                    createdTradeIds[intent.key] = reconciledId
+                    dedupedTradeKeys += intent.key
+                } else {
+                    conversionReconciledTradeKeys += intent.key
+                }
                 continue
             }
             val tupleKey =
@@ -362,6 +381,7 @@ class ImportEngineImpl(
             createdCryptoIds = createdCryptoIds,
             createdTradeIds = createdTradeIds,
             dedupedTradeKeys = dedupedTradeKeys,
+            conversionReconciledTradeKeys = conversionReconciledTradeKeys,
             orderIds = orderIds,
             attributeTypeIds = attributeTypeIds,
             relationshipTypeIds = relationshipTypeIds,
@@ -1240,6 +1260,60 @@ class ImportEngineImpl(
         val maxTs = creates.maxOf { requireNotNull(it.timestamp) } + policy.window
         val existing = tradeRepository.getTradesByAccountsAndDateRange(accountIds, minTs, maxTs)
         return if (existing.isEmpty()) null else TradeReconciler(policy, existing, creates)
+    }
+
+    /**
+     * A [ConversionTradeReconciler] over the conversions another source already booked as transfers
+     * that the batch's own trades could be duplicating, or null when the batch does not name a
+     * conversion relationship type, has no trades, or nothing links up.
+     *
+     * Every step is a narrowing: the window is the policy's, the accounts are the ones the batch's
+     * trades debit, and only a transfer that leaves one of those accounts *and* is the `id1` of a
+     * relationship of the named type is a conversion debit leg. The paired credit legs are loaded
+     * only for the asset they received - their amount is not comparable (see
+     * [ConversionTradeReconciler]).
+     */
+    private suspend fun buildConversionTradeReconciler(batch: ImportBatch): ConversionTradeReconciler? {
+        val policy = batch.tradeDedupePolicy as? TradeDedupePolicy.Fuzzy ?: return null
+        val typeName = policy.conversionRelationshipTypeName ?: return null
+        val relationships = transferRelationshipRepository ?: return null
+        val creates = batch.trades.creates().filter { it.timestamp != null && it.fromAccountId != null }
+        if (creates.isEmpty()) return null
+        val accountIds = creates.mapNotNullTo(mutableSetOf()) { it.fromAccountId }
+        val minTs = creates.minOf { requireNotNull(it.timestamp) } - policy.window
+        val maxTs = creates.maxOf { requireNotNull(it.timestamp) } + policy.window
+        val typeId = relationshipTypeRepository.getByName(typeName).first()?.id ?: return null
+
+        val candidates =
+            accountIds
+                .flatMap { transactionRepository.getTransactionsByAccountAndDateRange(it, minTs, maxTs).first() }
+                .distinctBy { it.id }
+                // A conversion's debit leg is the one the asset LEFT the owner account on; the credit
+                // leg runs the other way and is matched through the relationship, never directly.
+                .filter { it.sourceAccountId in accountIds }
+        if (candidates.isEmpty()) return null
+
+        val creditIdByDebitId =
+            relationships
+                .getByTransfers(candidates.map { it.id })
+                .filter { it.relationshipType.id == typeId }
+                .associate { it.id1 to it.id2 }
+        if (creditIdByDebitId.isEmpty()) return null
+        val creditLegs = transactionRepository.getTransactionsByIds(creditIdByDebitId.values.toSet())
+
+        val legs =
+            candidates.mapNotNull { debit ->
+                val creditId = creditIdByDebitId[debit.id] ?: return@mapNotNull null
+                val credit = creditLegs[creditId] ?: return@mapNotNull null
+                ExistingConversionLeg(
+                    debitTransferId = debit.id,
+                    accountId = debit.sourceAccountId,
+                    amount = debit.amount,
+                    timestamp = debit.timestamp,
+                    creditAssetId = credit.amount.asset.id,
+                )
+            }
+        return if (legs.isEmpty()) null else ConversionTradeReconciler(policy.window, legs)
     }
 
     private suspend fun loadExisting(

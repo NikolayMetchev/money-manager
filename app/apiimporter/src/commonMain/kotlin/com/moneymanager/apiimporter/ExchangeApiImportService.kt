@@ -1224,7 +1224,15 @@ suspend fun importApiSessionExchange(
                 // An export folds an order's partial fills into one row; this feed reports them one by
                 // one. Without a fuzzy trade policy every fill of an already-imported order is booked
                 // again (see TradeReconciler's fan-in matching).
-                tradeDedupePolicy = TradeDedupePolicy.Fuzzy(window = TRADE_RECONCILE_WINDOW),
+                tradeDedupePolicy =
+                    TradeDedupePolicy.Fuzzy(
+                        window = TRADE_RECONCILE_WINDOW,
+                        // An export that cannot say which credit of a conversion came from which debit
+                        // books it as linked transfer legs where this feed books trades, so the trade
+                        // reconciler has to be allowed to match against those legs too - otherwise a
+                        // dust sweep already in the database from the export is booked a second time.
+                        conversionRelationshipTypeName = WellKnownIds.CONVERSION_RELATIONSHIP_TYPE_NAME,
+                    ),
                 apiIdExtractor =
                     ExistingApiIdExtractor { transfer ->
                         transfer.attributes.firstOrNull { it.attributeType.id == txnIdAttr }?.value

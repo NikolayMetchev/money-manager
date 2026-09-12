@@ -67,6 +67,13 @@ data class ImportResult(
      * (createTrade is idempotent). [createdTradeIds] still maps these keys to the existing trade's id.
      */
     val dedupedTradeKeys: Set<LocalTradeKey> = emptySet(),
+    /**
+     * Keys of trade intents suppressed because an existing **conversion transfer pair** already
+     * records the movement (see [TradeDedupePolicy.Fuzzy.conversionRelationshipTypeName]). Unlike
+     * [dedupedTradeKeys] these have no [createdTradeIds] entry: a conversion is booked as transfers,
+     * so there is no trade id to point at.
+     */
+    val conversionReconciledTradeKeys: Set<LocalTradeKey> = emptySet(),
     /** Ids of exchange orders upserted for each [LocalOrderKey] in [ImportBatch.orders] (all outcomes). */
     val orderIds: Map<LocalOrderKey, ExchangeOrderId> = emptyMap(),
     /** Resolved (get-or-create) attribute-type ids for each name in [ImportBatch.attributeTypeNames]. */
