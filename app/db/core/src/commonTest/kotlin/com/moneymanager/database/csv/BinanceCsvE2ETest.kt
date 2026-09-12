@@ -13,7 +13,10 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportRowKey
+import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.createTrade
@@ -27,6 +30,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -78,6 +82,49 @@ class BinanceCsvE2ETest : DbTest() {
                 fileLastModified = now,
             )
         return repositories.csvImportRepository.getImport(id).first()!!
+    }
+
+    /** A real sweep: three assets swept into BNB, with no file evidence of which credit is whose. */
+    private val dustSweepRows =
+        listOf(
+            row("2021-01-01 09:43:33", "Small Assets Exchange BNB (Spot)", "REEF", "-90.89657258"),
+            row("2021-01-01 09:43:33", "Small Assets Exchange BNB (Spot)", "BNB", "0.00062058"),
+            row("2021-01-01 09:43:33", "Small Assets Exchange BNB (Spot)", "BNB", "0.03251993"),
+            row("2021-01-01 09:43:33", "Small Assets Exchange BNB (Spot)", "BNB", "0.00050172"),
+            row("2021-01-01 09:43:33", "Small Assets Exchange BNB (Spot)", "PSG", "-0.00187671"),
+            row("2021-01-01 09:43:33", "Small Assets Exchange BNB (Spot)", "ASR", "-0.00294372"),
+        )
+
+    /**
+     * Stands in for the API's `asset/dribblet` import: one same-account trade per swept asset, under
+     * the same fuzzy trade policy that path uses - which is what lets the engine see the transfer legs
+     * an export already booked.
+     */
+    private suspend fun importDustTrades(sweep: List<Triple<String, String, String>>) {
+        val binance = assertNotNull(accountByName("Binance"))
+        val assets =
+            repositories.cryptoRepository
+                .getAllCryptoAssets()
+                .first()
+                .associateBy { it.code }
+        repositories.importEngine.import(
+            ImportBatch(
+                trades =
+                    sweep.map { (code, from, to) ->
+                        ImportTradeIntent(
+                            key = LocalTradeKey("dribblet-$code"),
+                            source = Source.Manual,
+                            timestamp = Instant.parse("2021-01-01T09:43:33Z"),
+                            description = "Buy BNB/$code",
+                            fromAccountId = binance.id,
+                            fromAmount = Money.fromDisplayValue(BigDecimal(from), assets.getValue(code)),
+                            toAccountId = binance.id,
+                            toAmount = Money.fromDisplayValue(BigDecimal(to), assets.getValue("BNB")),
+                        )
+                    },
+                tradeDedupePolicy = TradeDedupePolicy.Fuzzy(window = 5.seconds),
+            ),
+        )
     }
 
     private suspend fun applyAll(imports: List<CsvImport>) =
@@ -439,6 +486,58 @@ class BinanceCsvE2ETest : DbTest() {
             assertEquals(reefBefore, balanceOf("Binance", "REEF"), "the sweep was already recorded; nothing moved")
             assertNull(balanceOf("Binance Conversions", "REEF"), "and nothing was stranded in the conversion account")
             assertNull(balanceOf("Binance Conversions", "BNB"))
+        }
+
+    @Test
+    fun aDustSweepTheCsvImportAlreadyBookedIsNotBookedTwiceByTheApi() =
+        runTest {
+            // The mirror of the test above: the export lands first, so the sweep is already in the
+            // database as conversion transfer legs when the dust endpoint reports it as trades.
+            applyAll(listOf(stage("dust-first.csv", dustSweepRows)))
+            val reefBefore = balanceOf("Binance", "REEF")
+            val bnbBefore = balanceOf("Binance", "BNB")
+
+            importDustTrades(
+                listOf(
+                    // The debited amounts are the export's exactly; the BNB legs are the API's own,
+                    // which differ from the export's credits by the service charge.
+                    Triple("REEF", "90.89657258", "0.03318361"),
+                    Triple("PSG", "0.00187671", "0.00063325"),
+                    Triple("ASR", "0.00294372", "0.00051960"),
+                ),
+            )
+
+            val binance = assertNotNull(accountByName("Binance"))
+            assertEquals(
+                0,
+                repositories.tradeRepository
+                    .getTradesByAccount(binance.id)
+                    .first()
+                    .size,
+                "the sweep was already recorded as conversion legs; no trade was booked for it",
+            )
+            assertEquals(reefBefore, balanceOf("Binance", "REEF"), "nothing moved")
+            assertEquals(bnbBefore, balanceOf("Binance", "BNB"))
+        }
+
+    @Test
+    fun aDustSweepTheCsvImportDoesNotHaveIsStillBookedByTheApi() =
+        runTest {
+            // A near-miss must not suppress: the debited amount differs, so this is a genuinely
+            // different sweep the export never recorded and it has to book in full.
+            applyAll(listOf(stage("dust-first-near-miss.csv", dustSweepRows)))
+
+            importDustTrades(listOf(Triple("REEF", "11.0", "0.004")))
+
+            val binance = assertNotNull(accountByName("Binance"))
+            assertEquals(
+                1,
+                repositories.tradeRepository
+                    .getTradesByAccount(binance.id)
+                    .first()
+                    .size,
+                "the unmatched sweep imported in full",
+            )
         }
 
     @Test

@@ -1260,6 +1260,9 @@ suspend fun importApiSessionExchange(
                 // An export folds an order's partial fills into one row; this feed reports them one by
                 // one. Without a fuzzy trade policy every fill of an already-imported order is booked
                 // again (see TradeReconciler's fan-in matching).
+                // (Its conversionRelationshipTypeName default also lets a trade match the transfer
+                // legs an export books for a conversion it cannot attribute - a dust sweep this feed
+                // reports as trades would otherwise be booked a second time.)
                 tradeDedupePolicy = TradeDedupePolicy.Fuzzy(window = TRADE_RECONCILE_WINDOW),
                 apiIdExtractor =
                     ExistingApiIdExtractor { transfer ->

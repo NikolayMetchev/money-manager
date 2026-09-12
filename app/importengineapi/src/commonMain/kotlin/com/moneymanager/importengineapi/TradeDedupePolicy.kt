@@ -1,5 +1,6 @@
 package com.moneymanager.importengineapi
 
+import com.moneymanager.domain.model.WellKnownIds
 import kotlin.time.Duration
 
 /**
@@ -33,10 +34,22 @@ sealed interface TradeDedupePolicy {
      *                            the other source reports gross — Binance's dust sweeps, where the CSV
      *                            credit is exactly 98% of the API trade's. Never enable it where the
      *                            debited leg alone could describe two genuinely different trades.
+     * @property conversionRelationshipTypeName Also match an incoming trade against an existing
+     *                            **conversion transfer pair** carrying a relationship of this name —
+     *                            the legs a `ConversionConfig` source books when it cannot say which
+     *                            credit came from which debit. The other source describes the same
+     *                            movement as a trade, so without this the two book it twice. The
+     *                            debit leg (`id1`) is compared on account, asset, amount and window;
+     *                            the credit leg (`id2`) only on its asset, because the two sources
+     *                            disagree about the credited *amount* by the source's service charge.
+     *                            Defaults to the name every built-in `ConversionConfig` uses; name a
+     *                            different type for a source that links its legs with one, or null to
+     *                            match trades against trades only.
      */
     data class Fuzzy(
         val window: Duration,
         val allowAggregation: Boolean = true,
         val matchFromLegOnly: Boolean = false,
+        val conversionRelationshipTypeName: String? = WellKnownIds.CONVERSION_RELATIONSHIP_TYPE_NAME,
     ) : TradeDedupePolicy
 }
