@@ -208,19 +208,15 @@ class ImportEngineImpl(
         // The same movement again, but recorded by the other source as *transfers*: a conversion whose
         // credits it could not attribute to its debits. There is no trade id to report for such a
         // match, so the order links resolved below would have nothing to point at - hence trades an
-        // order claims are never suppressed this way. A conversion is never part of an order.
-        val conversionReconciler = buildConversionTradeReconciler(batch)
+        // order claims are held back from it. A conversion is never part of an order.
         val orderLinkedTradeKeys = batch.orders.flatMapTo(mutableSetOf()) { it.tradeKeys }
+        val conversionReconciler = buildConversionTradeReconciler(batch, orderLinkedTradeKeys)
         for (intent in batch.trades.creates()) {
             // Either kind of cross-source match suppresses the write; they differ only in what can be
             // reported, so they are resolved together and the write is skipped once.
             val reconciledId = tradeReconciler?.match(intent)
             val reconciledConversionLeg =
-                if (reconciledId == null && intent.key !in orderLinkedTradeKeys) {
-                    conversionReconciler?.match(intent)
-                } else {
-                    null
-                }
+                if (reconciledId == null) conversionReconciler?.match(intent) else null
             if (reconciledId != null || reconciledConversionLeg != null) {
                 if (reconciledId != null) {
                     createdTradeIds[intent.key] = reconciledId
@@ -1265,7 +1261,7 @@ class ImportEngineImpl(
     /**
      * A [ConversionTradeReconciler] over the conversions another source already booked as transfers
      * that the batch's own trades could be duplicating, or null when the batch does not name a
-     * conversion relationship type, has no trades, or nothing links up.
+     * conversion relationship type, has no trades an order does not claim, or nothing links up.
      *
      * Every step is a narrowing: the window is the policy's, the accounts are the ones the batch's
      * trades debit, and only a transfer that leaves one of those accounts *and* is the `id1` of a
@@ -1273,11 +1269,17 @@ class ImportEngineImpl(
      * only for the asset they received - their amount is not comparable (see
      * [ConversionTradeReconciler]).
      */
-    private suspend fun buildConversionTradeReconciler(batch: ImportBatch): ConversionTradeReconciler? {
+    private suspend fun buildConversionTradeReconciler(
+        batch: ImportBatch,
+        orderLinkedTradeKeys: Set<LocalTradeKey>,
+    ): ConversionTradeReconciler? {
         val policy = batch.tradeDedupePolicy as? TradeDedupePolicy.Fuzzy ?: return null
         val typeName = policy.conversionRelationshipTypeName ?: return null
         val relationships = transferRelationshipRepository ?: return null
-        val creates = batch.trades.creates().filter { it.timestamp != null && it.fromAccountId != null }
+        val creates =
+            batch.trades
+                .creates()
+                .filter { it.timestamp != null && it.fromAccountId != null && it.key !in orderLinkedTradeKeys }
         if (creates.isEmpty()) return null
         val accountIds = creates.mapNotNullTo(mutableSetOf()) { it.fromAccountId }
         val minTs = creates.minOf { requireNotNull(it.timestamp) } - policy.window
@@ -1313,7 +1315,7 @@ class ImportEngineImpl(
                     creditAssetId = credit.amount.asset.id,
                 )
             }
-        return if (legs.isEmpty()) null else ConversionTradeReconciler(policy.window, legs)
+        return if (legs.isEmpty()) null else ConversionTradeReconciler(policy.window, legs, creates)
     }
 
     private suspend fun loadExisting(
