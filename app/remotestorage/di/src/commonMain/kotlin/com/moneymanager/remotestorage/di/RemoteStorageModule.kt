@@ -9,13 +9,15 @@ import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.RemoteDatabaseSyncService
 import com.moneymanager.remotestorage.sync.StrategyRemoteConnectionStore
 import com.moneymanager.remotestorage.sync.StrategySyncController
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 
 /** Provides remote-storage (e.g. Google Drive) dependencies. */
 @ContributesTo(AppScope::class)
-interface RemoteStorageModule {
+@BindingContainer
+object RemoteStorageModule {
     @Provides
     @SingleIn(AppScope::class)
     fun provideRemoteStorageProviderFactory(

@@ -4,6 +4,7 @@ import com.moneymanager.di.scope.DatabaseScope
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.write.DeviceWriteRepository
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -20,7 +21,8 @@ import dev.zacsweers.metro.SingleIn
  * The arch check that forbids write-repo injection outside the engine whitelists this module.
  */
 @ContributesTo(DatabaseScope::class)
-interface DeviceIdModule {
+@BindingContainer
+object DeviceIdModule {
     @Provides
     @SingleIn(DatabaseScope::class)
     fun provideDeviceId(deviceRepository: DeviceWriteRepository): DeviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())

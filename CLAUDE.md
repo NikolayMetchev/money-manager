@@ -167,21 +167,26 @@ different databases can use different Google accounts.
 
 **Metro** provides compile-time DI. The graphs live in `app/di/core` (`AppComponent`,
 `@DependencyGraph(AppScope::class)`) and `app/db/di` (`DatabaseComponent`,
-`@DependencyGraph(DatabaseScope::class)`). Components must be `interface`, not `abstract class` or `object`.
+`@DependencyGraph(DatabaseScope::class)`). Graphs must be `interface`, not `abstract class` or `object`.
+
+**Binding containers, not module interfaces.** Every contributed DI module is a
+`@BindingContainer object` holding `@Provides` functions. Metro warns on a `@ContributesTo` *interface*
+with instance `@Provides` functions ("Consider making this a binding container with `@BindingContainer`
+instead"), and the build compiles with `-Werror`, so that warning is a hard failure.
 
 **DI modules live with the code they provide, not in a central hub.** `RemoteStorageModule` is in
 `app/remotestorage/di`, `LocalSettingsModule` in `utils/localsettings/di`, the repository bindings in
-`app/db/di`, and so on. Metro merges every `@ContributesTo(AppScope::class)` module it finds **on the
+`app/db/di`, and so on. Metro merges every `@ContributesTo(AppScope::class)` container it finds **on the
 graph module's compile classpath** — `AppComponent` names none of them.
 
-Two consequences worth knowing:
-- `app/di/core` depends on each feature DI module purely so Metro can *see* it. Nothing there imports
-  them. Drop one and the graph loses its bindings.
-- Those deps must be `api`, not `implementation`: Metro makes each contributed module a **supertype** of
-  the generated `AppComponent`, so anything touching `AppComponent` needs them on its compile classpath.
+The consequence worth knowing: `app/di/core` depends on each feature DI module purely so Metro can
+*see* it. Nothing there imports them. Drop one and the graph loses its bindings. Because a binding
+container is *merged* into the generated `AppComponent` rather than made a supertype of it, those deps
+are plain `implementation` — let `buildHealth` decide, it flags any that should be `api`.
 
-To add a binding: put a `@ContributesTo(AppScope::class)` interface in *your* module (apply
-`moneymanager.metro-convention`, depend on `app/di/scope`), then add that module to `app/di/core`.
+To add a binding: put a `@ContributesTo(AppScope::class) @BindingContainer object` in *your* module
+(apply `moneymanager.metro-convention`, depend on `app/di/scope`), then add that module to
+`app/di/core`.
 
 ## Packages
 
@@ -252,6 +257,6 @@ set of writes.
 ### Common Issues
 
 1. **Java**: Requires JDK 25 toolchain
-2. **Metro**: Keep Kotlin version aligned (2.2.21). Components/modules must be `interface`
+2. **Metro**: Keep Kotlin version aligned (2.2.21). Graphs must be `interface`; binding containers `object`
 3. **SQLDelight**: `execute()`/`update()`/`delete()` return `Long`, not `Unit`
 4. **Configuration Cache**: Enabled for faster builds; invalidates on build file changes
