@@ -20,6 +20,11 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
         // @ExperimentalMetroGradleApi. The kotlin-dsl type-safe accessor generated for that task
         // trips -Werror, so opt in here even though we don't call the task ourselves.
         optIn.add("dev.zacsweers.metro.gradle.ExperimentalMetroGradleApi")
+        // Gradle's `kotlin-dsl` plugin hardcodes `-Xuse-fir-lt=false` on every Kotlin compilation of
+        // this project (KotlinDslPluginSupport.kotlinCompilerArgs). Kotlin 2.4.20 deprecated that
+        // argument, and -Werror turns the deprecation into a build failure. Silence just that
+        // diagnostic until Gradle stops passing the flag.
+        freeCompilerArgs.add("-Xwarning-level=DEPRECATED_CLI_ARG:disabled")
     }
 }
 
