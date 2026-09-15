@@ -3,6 +3,7 @@ package com.moneymanager.localsettings.di
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.di.scope.AppScope
 import com.moneymanager.localsettings.LocalSettings
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -12,7 +13,8 @@ import dev.zacsweers.metro.SingleIn
  * since it must persist across database switches.
  */
 @ContributesTo(AppScope::class)
-interface LocalSettingsModule {
+@BindingContainer
+object LocalSettingsModule {
     @Provides
     @SingleIn(AppScope::class)
     fun provideLocalSettings(params: AppComponentParams): LocalSettings = createLocalSettings(params)

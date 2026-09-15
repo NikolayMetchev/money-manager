@@ -8,8 +8,9 @@ plugins {
 // them. Drop one and the graph quietly loses its bindings, so they stay listed even though nothing
 // imports them.
 //
-// They are `api` rather than `implementation` because Metro makes each contributed module a *supertype*
-// of the generated AppComponent: anything that touches AppComponent needs them on its compile classpath.
+// Since Metro 1.4.x these are `@BindingContainer` objects, which Metro *merges* into the generated
+// AppComponent rather than making them supertypes of it, so they no longer have to leak onto a
+// consumer's compile classpath -- `implementation` is enough for the ones a consumer never touches.
 kotlin {
     sourceSets {
         getByName("commonMain") {
@@ -29,23 +30,23 @@ kotlin {
         }
         getByName("androidMain") {
             dependencies {
-                api(projects.app.remotestorage.core)
+                implementation(projects.app.remotestorage.core)
             }
         }
         getByName("jvmMain") {
             dependencies {
                 api(projects.app.db.core)
-                api(projects.app.db.di)
                 api(projects.app.di.params)
                 api(projects.app.di.scope)
                 api(projects.app.model.core)
-                api(projects.app.remotestorage.core)
-                api(projects.app.remotestorage.di)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.strategycatalog)
-                api(projects.app.strategycatalog.di)
                 api(projects.utils.localsettings)
-                api(projects.utils.localsettings.di)
+                implementation(projects.app.db.di)
+                implementation(projects.app.remotestorage.core)
+                implementation(projects.app.remotestorage.di)
+                implementation(projects.app.strategycatalog.di)
+                implementation(projects.utils.localsettings.di)
             }
         }
     }

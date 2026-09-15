@@ -120,6 +120,7 @@ import com.moneymanager.domain.repository.write.TransferSourceWriteRepository
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importer.ImportEngineImpl
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -129,7 +130,8 @@ import dev.zacsweers.metro.SingleIn
  * its read methods to the (shared, singleton) read impl, so a single underlying instance backs both.
  */
 @ContributesTo(DatabaseScope::class)
-interface RepositoryModule {
+@BindingContainer
+object RepositoryModule {
     @Provides
     @SingleIn(DatabaseScope::class)
     fun provideAccountAttributeReadRepository(database: MoneyManagerDatabaseWrapper): AccountAttributeReadRepository =

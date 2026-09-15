@@ -3,6 +3,7 @@ package com.moneymanager.database.di
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.di.scope.AppScope
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -12,7 +13,8 @@ import dev.zacsweers.metro.SingleIn
  * Contributes to AppScope only.
  */
 @ContributesTo(AppScope::class)
-interface DatabaseManagerModule {
+@BindingContainer
+object DatabaseManagerModule {
     /**
      * Provides the platform-specific DatabaseManager.
      */
