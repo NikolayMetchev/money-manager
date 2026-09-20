@@ -251,7 +251,8 @@ set of writes.
 - Share test sources via `kotlin.srcDir("src/commonTest/kotlin")`
 - **Android Device Tests**: Use `:app:ui:core:pixel6api36AndroidDeviceTest` for UI tests on managed
   device emulator. **Android emulator API level sync**: change the level here and you must change it
-  in the Gradle managed device (`moneymanager.android-convention.gradle.kts`), the CI emulator
+  in `gradle/libs.versions.toml` (`android-targetSdk`), the Gradle managed device
+  (`moneymanager.android-convention.gradle.kts`), the CI emulator
   (`.github/workflows/build.yml`) and the IntelliJ run configuration
   (`.idea/runConfigurations/Android_Tests.xml`) too.
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
