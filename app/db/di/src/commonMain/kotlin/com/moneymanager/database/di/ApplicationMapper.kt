@@ -3,8 +3,6 @@ package com.moneymanager.database.di
 import com.moneymanager.database.Accounts
 import com.moneymanager.database.Application
 import com.moneymanager.database.Audit
-import com.moneymanager.database.DbCsvStrategyImportExport
-import com.moneymanager.database.DbMaintenance
 import com.moneymanager.database.Imports
 import com.moneymanager.database.People
 import com.moneymanager.database.Settings
@@ -27,15 +25,14 @@ fun DatabaseComponent.toApplication() =
                 accountMappingRepository = accountMappingRepository,
                 csvImportRepository = csvImportRepository,
                 csvImportStrategyRepository = csvImportStrategyRepository,
-                csvStrategyExportService = csvStrategyExportService,
-                csvStrategyImportExport = DbCsvStrategyImportExport(csvStrategyExportService),
+                csvStrategyImportExport = csvStrategyExportService,
                 accountMappingExportService = accountMappingExportService,
                 strategyLibrary = strategyLibrary,
                 qifImportRepository = qifImportRepository,
                 importDirectoryRepository = importDirectoryRepository,
                 importTimelineRepository = importTimelineRepository,
                 passThroughAccountRepository = passThroughAccountRepository,
-                maintenance = DbMaintenance(maintenanceService),
+                maintenance = maintenanceService,
             ),
         transactions =
             Transactions(

@@ -2,7 +2,6 @@ package com.moneymanager.ui
 
 import com.moneymanager.database.Application
 import com.moneymanager.database.service.AccountMappingExportService
-import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -65,7 +64,6 @@ data class ImportsDomain(
     val accountMappingRepository: AccountMappingReadRepository,
     val csvImportRepository: CsvImportReadRepository,
     val csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    val csvStrategyExportService: CsvStrategyExportService,
     val csvStrategyImportExport: CsvStrategyImportExport,
     val accountMappingExportService: AccountMappingExportService,
     val strategyLibrary: StrategyLibrary,
@@ -122,7 +120,6 @@ fun Application.toAppServices(importEngine: ImportEngine) =
                 accountMappingRepository = imports.accountMappingRepository,
                 csvImportRepository = imports.csvImportRepository,
                 csvImportStrategyRepository = imports.csvImportStrategyRepository,
-                csvStrategyExportService = imports.csvStrategyExportService,
                 csvStrategyImportExport = imports.csvStrategyImportExport,
                 accountMappingExportService = imports.accountMappingExportService,
                 strategyLibrary = imports.strategyLibrary,

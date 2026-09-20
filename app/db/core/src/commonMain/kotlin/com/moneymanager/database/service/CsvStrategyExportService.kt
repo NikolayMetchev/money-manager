@@ -48,6 +48,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.strategy.CsvImportParseResult
 import com.moneymanager.domain.strategy.CsvReferenceType
 import com.moneymanager.domain.strategy.CsvResolution
+import com.moneymanager.domain.strategy.CsvStrategyImportExport
 import com.moneymanager.domain.strategy.CsvStrategyImportResult
 import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.importengineapi.AccountMatchKey
@@ -86,7 +87,7 @@ class CsvStrategyExportService(
     private val categoryRepository: CategoryReadRepository,
     private val accountMappingRepository: AccountMappingReadRepository,
     private val importEngine: ImportEngine,
-) {
+) : CsvStrategyImportExport {
     // Entities created while importing a strategy are a manual user action on this device.
     private val source = Source.Manual
 
@@ -94,7 +95,7 @@ class CsvStrategyExportService(
      * Converts a CsvImportStrategy to its portable export format.
      * Resolves all database IDs to human-readable names/codes.
      */
-    suspend fun toExport(
+    override suspend fun toExport(
         strategy: CsvImportStrategy,
         appVersion: AppVersion,
     ): CsvStrategyExport {
@@ -131,7 +132,7 @@ class CsvStrategyExportService(
      * Parses an export and identifies any unresolved references.
      * Does not create the strategy yet - that happens after resolution.
      */
-    suspend fun parseExport(export: CsvStrategyExport): CsvImportParseResult {
+    override suspend fun parseExport(export: CsvStrategyExport): CsvImportParseResult {
         val referenceData = loadReferenceData()
 
         val unresolvedReferences = mutableListOf<CsvUnresolvedReference>()
@@ -243,7 +244,7 @@ class CsvStrategyExportService(
      * @param resolutions Map of unresolved references to their resolutions
      * @return The (not-yet-saved) strategy and its resolved per-strategy account mappings
      */
-    suspend fun createStrategyFromExport(
+    override suspend fun createStrategyFromExport(
         export: CsvStrategyExport,
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
     ): CsvStrategyImportResult {

@@ -21,7 +21,6 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.moneymanager.database.DbMaintenance
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.Maintenance
@@ -930,7 +929,7 @@ class AccountTransactionsScreenTest {
                                     personRepository = repositories.personRepository,
                                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                     exchangeOrderRepository = repositories.exchangeOrderRepository,
-                                    maintenance = createDbMaintenance(repositories),
+                                    maintenance = repositories.maintenanceService,
                                     onAccountIdChange = { currentAccountId = it },
                                     onCurrencyIdChange = {},
                                     onAuditClick = { auditTransferId = it },
@@ -1141,7 +1140,7 @@ class AccountTransactionsScreenTest {
                                     personRepository = repositories.personRepository,
                                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                     exchangeOrderRepository = repositories.exchangeOrderRepository,
-                                    maintenance = createDbMaintenance(repositories),
+                                    maintenance = repositories.maintenanceService,
                                     onAccountIdChange = { currentAccountId = it },
                                     onCurrencyIdChange = {},
                                     onAuditClick = { auditTransferId = it },
@@ -1322,7 +1321,7 @@ class AccountTransactionsScreenTest {
                                     personRepository = repositories.personRepository,
                                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                     exchangeOrderRepository = repositories.exchangeOrderRepository,
-                                    maintenance = createDbMaintenance(repositories),
+                                    maintenance = repositories.maintenanceService,
                                     onAccountIdChange = { currentAccountId = it },
                                     onCurrencyIdChange = {},
                                     onAuditClick = { auditTransferId = it },
@@ -1594,5 +1593,4 @@ class AccountTransactionsScreenTest {
             every { getFillTradesForOrder(any()) } returns flowOf(emptyList())
         }
 
-    private fun createDbMaintenance(repositories: DatabaseComponent): Maintenance = DbMaintenance(repositories.maintenanceService)
 }
