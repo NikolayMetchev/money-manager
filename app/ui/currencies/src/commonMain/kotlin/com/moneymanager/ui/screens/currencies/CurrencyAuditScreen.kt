@@ -14,11 +14,11 @@ import com.moneymanager.ui.audit.FlatEntityAuditDiffCard
 import com.moneymanager.ui.audit.computeFlatEntityAuditDiffs
 import kotlinx.coroutines.flow.first
 
-private val currencyAuditFields =
+private val currencyAuditFields: List<AuditField<CurrencyAuditEntry, Currency>> =
     listOf(
-        AuditField<CurrencyAuditEntry, Currency>("Code", fromEntry = { it.code }, fromCurrent = { it.code }),
-        AuditField<CurrencyAuditEntry, Currency>("Name", fromEntry = { it.name }, fromCurrent = { it.name }),
-        AuditField<CurrencyAuditEntry, Currency>(
+        AuditField("Code", fromEntry = { it.code }, fromCurrent = { it.code }),
+        AuditField("Name", fromEntry = { it.name }, fromCurrent = { it.name }),
+        AuditField(
             "Scale Factor",
             fromEntry = { it.scaleFactor.toString() },
             fromCurrent = { it.scaleFactor.toString() },

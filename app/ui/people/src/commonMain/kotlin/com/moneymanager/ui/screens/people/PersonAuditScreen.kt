@@ -32,20 +32,20 @@ import kotlinx.coroutines.flow.first
 
 private const val NO_VALUE = "(none)"
 
-private val personAuditFields =
+private val personAuditFields: List<AuditField<PersonAuditEntry, Person>> =
     listOf(
-        AuditField<PersonAuditEntry, Person>(
+        AuditField(
             "First Name",
             fromEntry = { it.firstName },
             fromCurrent = { it.firstName },
         ),
-        AuditField<PersonAuditEntry, Person>(
+        AuditField(
             "Middle Name",
             absent = NO_VALUE,
             fromEntry = { it.middleName },
             fromCurrent = { it.middleName },
         ),
-        AuditField<PersonAuditEntry, Person>(
+        AuditField(
             "Last Name",
             absent = NO_VALUE,
             fromEntry = { it.lastName },
