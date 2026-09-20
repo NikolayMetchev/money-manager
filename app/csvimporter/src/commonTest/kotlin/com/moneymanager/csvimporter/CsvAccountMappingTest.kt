@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
@@ -43,6 +44,7 @@ class CsvAccountMappingTest {
             id = testCurrencyId,
             code = "GBP",
             name = "British Pound",
+            scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR,
         )
 
     private val testSourceAccountId = AccountId(1)

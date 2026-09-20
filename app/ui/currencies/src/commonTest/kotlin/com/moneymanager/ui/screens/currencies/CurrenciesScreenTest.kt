@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
@@ -53,6 +54,7 @@ class CurrenciesScreenTest {
                     id = CurrencyId(1L),
                     code = "USD",
                     name = "US Dollar",
+                    scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR,
                 )
             val repository = createCurrencyRepository(listOf(testCurrency))
 
@@ -74,9 +76,19 @@ class CurrenciesScreenTest {
         runMoneyManagerComposeUiTest {
             val currencies =
                 listOf(
-                    Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar"),
-                    Currency(id = CurrencyId(2L), code = "EUR", name = "Euro"),
-                    Currency(id = CurrencyId(3L), code = "GBP", name = "British Pound"),
+                    Currency(
+                        id = CurrencyId(1L),
+                        code = "USD",
+                        name = "US Dollar",
+                        scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR,
+                    ),
+                    Currency(id = CurrencyId(2L), code = "EUR", name = "Euro", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR),
+                    Currency(
+                        id = CurrencyId(3L),
+                        code = "GBP",
+                        name = "British Pound",
+                        scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR,
+                    ),
                 )
             val repository = createCurrencyRepository(currencies)
 

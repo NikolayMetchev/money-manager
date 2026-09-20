@@ -97,6 +97,7 @@ class AccountTransactionsScreenTest {
                     id = CurrencyId(1L),
                     code = "USD",
                     name = "US Dollar",
+                    scaleFactor = 100,
                 )
             val accounts =
                 (1L..3000L).map { Account(id = AccountId(it), name = "Account $it", openingDate = now) }
@@ -136,6 +137,7 @@ class AccountTransactionsScreenTest {
                     id = CurrencyId(1L),
                     code = "USD",
                     name = "US Dollar",
+                    scaleFactor = 100,
                 )
 
             val checking =
@@ -231,6 +233,7 @@ class AccountTransactionsScreenTest {
                     id = CurrencyId(1L),
                     code = "USD",
                     name = "US Dollar",
+                    scaleFactor = 100,
                 )
 
             val checking =
@@ -315,7 +318,7 @@ class AccountTransactionsScreenTest {
         runMoneyManagerComposeUiTest {
             // Given: two accounts with a transfer between them
             val now = Clock.System.now()
-            val usdCurrency = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val usdCurrency = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
             val checking = Account(id = AccountId(1L), name = "Checking", openingDate = now)
             val savings = Account(id = AccountId(2L), name = "Savings", openingDate = now)
             val transfer =
@@ -376,7 +379,7 @@ class AccountTransactionsScreenTest {
             // Given: a long history where navigation lands on an old transfer, so the screen loads
             // a window centred on it with newer pages available above (hasPrevious = true).
             val now = Clock.System.now()
-            val usdCurrency = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val usdCurrency = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
             val checking = Account(id = AccountId(1L), name = "Checking", openingDate = now)
             val savings = Account(id = AccountId(2L), name = "Savings", openingDate = now)
             val transfers =
@@ -491,7 +494,7 @@ class AccountTransactionsScreenTest {
     fun feeBadges_distinguishMainAndFee_andEachLinksToTheOther() {
         runMoneyManagerComposeUiTest {
             val now = Clock.System.now()
-            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
             val own = Account(id = AccountId(1L), name = "Checking", openingDate = now)
             val feesAccount = Account(id = AccountId(2L), name = "Checking Fees", openingDate = now)
             val mainId = TransferId(10L)
@@ -566,7 +569,7 @@ class AccountTransactionsScreenTest {
             // A trade row filling an exchange order carries the order id from the AccountRow join and
             // renders a clickable "Order" badge; a trade with no order shows none.
             val now = Clock.System.now()
-            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
             val exchange = Account(id = AccountId(10L), name = "Exchange", openingDate = now)
             val orderId = ExchangeOrderId(77L)
             val linkedRow =
@@ -624,8 +627,8 @@ class AccountTransactionsScreenTest {
             // rows with the same transaction AND account ids, differing only in asset. The list key
             // must include the asset or LazyColumn throws "Key ... was already used".
             val now = Clock.System.now()
-            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
-            val btc = Currency(id = CurrencyId(2L), code = "BTC", name = "Bitcoin")
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
+            val btc = Currency(id = CurrencyId(2L), code = "BTC", name = "Bitcoin", scaleFactor = 100)
             val exchange = Account(id = AccountId(10L), name = "Exchange", openingDate = now)
             val tradeId = TransferId(19157L)
             val legs =
@@ -697,7 +700,7 @@ class AccountTransactionsScreenTest {
     fun passThroughBadges_distinguishFundingAndSpend_andEachLinksToTheOther() {
         runMoneyManagerComposeUiTest {
             val now = Clock.System.now()
-            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
             val card = Account(id = AccountId(1L), name = "Crypto.com", openingDate = now)
             val conduit = Account(id = AccountId(2L), name = "Curve", openingDate = now)
             val merchant = Account(id = AccountId(3L), name = "National Lottery", openingDate = now)
@@ -772,7 +775,7 @@ class AccountTransactionsScreenTest {
         runMoneyManagerComposeUiTest {
             // Given: an account showing both a transaction and its linked fee (both fit on screen).
             val now = Clock.System.now()
-            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
             val own = Account(id = AccountId(1L), name = "Checking", openingDate = now)
             val shop = Account(id = AccountId(2L), name = "Coffee Shop", openingDate = now)
             val feesAccount = Account(id = AccountId(3L), name = "Checking Fees", openingDate = now)

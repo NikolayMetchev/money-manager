@@ -14,8 +14,9 @@ sealed interface Asset {
     val name: String
 
     /**
-     * Stored amount = display amount × [scaleFactor]. 100 for 2-decimal fiat, 1 for 0-decimal
-     * fiat (JPY), 1e18 for crypto. Always a power of ten.
+     * Stored amount = display amount × [scaleFactor]. Always a power of ten. Crypto assets use
+     * [CryptoAsset.CRYPTO_SCALE_FACTOR] (1e18) and so, deliberately, do currencies — see
+     * [CurrencyScaleFactors]. A narrower scale only ever comes from data the app did not create.
      */
     val scaleFactor: Long
 }

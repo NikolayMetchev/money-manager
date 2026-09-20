@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -245,6 +246,7 @@ class ApplyStrategyDialogTest {
                                     id = CurrencyId(1),
                                     code = "GBP",
                                     name = "British Pound",
+                                    scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR,
                                 ),
                         ),
                 ),

@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -34,8 +35,9 @@ import kotlin.uuid.Uuid
 class ConversionConfigMapperTest {
     private val now = Clock.System.now()
 
-    private val usd = Currency(id = CurrencyId(1), code = "USD", name = "US Dollar")
-    private val eur = Currency(id = CurrencyId(2), code = "EUR", name = "Euro")
+    private val usd =
+        Currency(id = CurrencyId(1), code = "USD", name = "US Dollar", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
+    private val eur = Currency(id = CurrencyId(2), code = "EUR", name = "Euro", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
     private val wallet = Account(id = AccountId(1), name = "Wallet", openingDate = now)
 
     private val columns =

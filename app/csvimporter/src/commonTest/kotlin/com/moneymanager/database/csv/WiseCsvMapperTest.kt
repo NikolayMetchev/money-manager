@@ -33,9 +33,9 @@ import kotlin.uuid.Uuid
 class WiseCsvMapperTest {
     private val strategy = BuiltInCsvStrategies.buildWiseCsvStrategy(Clock.System.now())
 
-    private val eur = Currency(id = CurrencyId(1), code = "EUR", name = "Euro")
-    private val gbp = Currency(id = CurrencyId(2), code = "GBP", name = "British Pound")
-    private val bgn = Currency(id = CurrencyId(3), code = "BGN", name = "Bulgarian Lev")
+    private val eur = Currency(id = CurrencyId(1), code = "EUR", name = "Euro", scaleFactor = 100)
+    private val gbp = Currency(id = CurrencyId(2), code = "GBP", name = "British Pound", scaleFactor = 100)
+    private val bgn = Currency(id = CurrencyId(3), code = "BGN", name = "Bulgarian Lev", scaleFactor = 100)
     private val currencies = listOf(eur, gbp, bgn)
     private val currenciesById = currencies.associateBy { it.id }
     private val currenciesByCode = currencies.associateBy { it.code }

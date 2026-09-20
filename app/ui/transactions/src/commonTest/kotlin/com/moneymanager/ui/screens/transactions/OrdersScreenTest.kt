@@ -64,8 +64,8 @@ class OrdersScreenTest {
             createdAt = createdAt,
         )
 
-    private val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
-    private val btc = Currency(id = CurrencyId(2L), code = "BTC", name = "Bitcoin")
+    private val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
+    private val btc = Currency(id = CurrencyId(2L), code = "BTC", name = "Bitcoin", scaleFactor = 100)
 
     private val fillTrade =
         Trade(

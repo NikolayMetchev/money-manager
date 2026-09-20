@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.RelationshipType
 import com.moneymanager.domain.model.RelationshipTypeId
@@ -47,7 +48,8 @@ import kotlin.uuid.Uuid
  */
 class CsvReimportDetectionTest {
     private val currencyId = CurrencyId(1L)
-    private val currency = Currency(id = currencyId, code = "GBP", name = "British Pound")
+    private val currency =
+        Currency(id = currencyId, code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
     private val sourceAccountId = AccountId(1)
     private val strategyId = CsvImportStrategyId(Uuid.random())
 
@@ -616,7 +618,7 @@ class CsvReimportDetectionTest {
 
     // ============= Retroactive transfer→trade conversions =============
 
-    private val eur = Currency(id = CurrencyId(2), code = "EUR", name = "Euro")
+    private val eur = Currency(id = CurrencyId(2), code = "EUR", name = "Euro", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
     private val feeType = RelationshipType(RelationshipTypeId(2), "fee")
 
     private val tradeColumns =

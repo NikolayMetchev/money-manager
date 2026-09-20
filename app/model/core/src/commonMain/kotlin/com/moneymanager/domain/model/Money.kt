@@ -12,10 +12,10 @@ import com.moneymanager.bigdecimal.toBigIntegerExact
  * determines the conversion between stored amounts and display amounts. A [BigInteger] (rather than a
  * [Long]) is required because high-precision crypto scale factors would otherwise overflow.
  *
- * For example:
- * - £123.45 is stored as amount=12345 with GBP (scaleFactor=100)
- * - ¥1000 is stored as amount=1000 with JPY (scaleFactor=1)
- * - 0.5 BTC is stored as amount=5·10^17 with BTC (scaleFactor=10^18)
+ * Every asset the app creates — crypto and currency alike — carries scaleFactor=10^18 (see
+ * [CurrencyScaleFactors]), so £123.45 is stored as amount=12345·10^16 and 0.5 BTC as amount=5·10^17.
+ * A narrower scale is legal (e.g. scaleFactor=100 stores £123.45 as amount=12345) but is not what a
+ * real database holds.
  *
  * @property amount The amount in the asset's smallest unit (pence, satoshis, wei, …)
  * @property asset The asset this monetary amount is denominated in (fiat or crypto)

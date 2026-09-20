@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
@@ -28,7 +29,8 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 class ImportDeduperTest {
-    private val currency = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound")
+    private val currency =
+        Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
     private val source = AccountId(1)
     private val target = AccountId(2)
     private val baseTime = Instant.fromEpochMilliseconds(1_700_000_000_000)
