@@ -14,7 +14,6 @@ import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -77,7 +76,6 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalCryptoKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
-import com.moneymanager.importengineapi.LocalOrderKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PassThroughMutation
@@ -249,7 +247,6 @@ class ImportEngineImpl(
             createdTradeIds[intent.key] = tradeResult.id
             if (!tradeResult.created) dedupedTradeKeys += intent.key
         }
-        val orderIds = mutableMapOf<LocalOrderKey, ExchangeOrderId>()
         for (intent in batch.orders) {
             val orderResult =
                 exchangeOrderRepository.upsertOrder(
@@ -267,7 +264,6 @@ class ImportEngineImpl(
                     updatedAt = intent.updatedAt,
                     source = intent.source,
                 )
-            orderIds[intent.key] = orderResult.id
             for (tradeKey in intent.tradeKeys) {
                 // A dangling key means the producer's trade/order keys diverged — losing the link
                 // silently would be far worse than failing the import.
@@ -294,12 +290,11 @@ class ImportEngineImpl(
         val personResolution = resolvePeople(batch.copy(peopleToCreate = batch.peopleToCreate.creates()))
 
         onProgress?.invoke(ImportProgress("Linking ownerships"))
-        val ownershipsCreated =
-            createOwnerships(
-                batch.copy(ownerships = batch.ownerships.creates()),
-                personResolution,
-                accountResolution.keyToId,
-            )
+        createOwnerships(
+            batch.copy(ownerships = batch.ownerships.creates()),
+            personResolution,
+            accountResolution.keyToId,
+        )
 
         val transfers = importTransferCreates(batch.transfers.creates(), batch, accountResolution.keyToId, batchSize, onProgress)
 
@@ -389,7 +384,6 @@ class ImportEngineImpl(
         return ImportResult(
             accountsCreated = accountResolution.created,
             peopleCreated = personResolution.createdCount,
-            ownershipsCreated = ownershipsCreated,
             transfersImported = transfers.imported,
             duplicates = transfers.duplicates,
             updated = transfers.updated,
@@ -404,7 +398,6 @@ class ImportEngineImpl(
             createdCryptoIds = createdCryptoIds,
             createdTradeIds = createdTradeIds,
             dedupedTradeKeys = dedupedTradeKeys,
-            orderIds = orderIds,
             attributeTypeIds = attributeTypeIds,
             createdCsvStrategyIds = config.csvStrategyIds,
             createdApiStrategyIds = config.apiStrategyIds,
@@ -1214,15 +1207,13 @@ class ImportEngineImpl(
         batch: ImportBatch,
         personKeyToId: PersonResolution,
         accountKeyToId: Map<LocalAccountKey, AccountId>,
-    ): Int {
-        if (batch.ownerships.isEmpty()) return 0
-        var created = 0
+    ) {
+        if (batch.ownerships.isEmpty()) return
         // Track links created/known so duplicate intents in the same batch don't re-insert.
         val seen = mutableSetOf<Pair<PersonId, AccountId>>()
         for (intent in batch.ownerships) {
-            if (createOwnershipIfNew(intent, personKeyToId, accountKeyToId, seen)) created++
+            createOwnershipIfNew(intent, personKeyToId, accountKeyToId, seen)
         }
-        return created
     }
 
     private suspend fun createOwnershipIfNew(
@@ -1230,20 +1221,19 @@ class ImportEngineImpl(
         personKeyToId: PersonResolution,
         accountKeyToId: Map<LocalAccountKey, AccountId>,
         seen: MutableSet<Pair<PersonId, AccountId>>,
-    ): Boolean {
-        val personId = intent.existingPersonId ?: intent.personKey?.let { personKeyToId[it] } ?: return false
+    ) {
+        val personId = intent.existingPersonId ?: intent.personKey?.let { personKeyToId[it] } ?: return
         val accountId =
             when (val ref = intent.account) {
                 is AccountRef.Existing -> ref.id
-                is AccountRef.Local -> accountKeyToId[ref.key] ?: return false
-                null -> return false
+                is AccountRef.Local -> accountKeyToId[ref.key] ?: return
+                null -> return
             }
-        if (!seen.add(personId to accountId)) return false
+        if (!seen.add(personId to accountId)) return
         val alreadyLinked =
             ownershipRepository.getOwnershipsByAccount(accountId).first().any { it.personId == personId }
-        if (alreadyLinked) return false
+        if (alreadyLinked) return
         ownershipRepository.createOwnership(personId, accountId, intent.source)
-        return true
     }
 
     // endregion

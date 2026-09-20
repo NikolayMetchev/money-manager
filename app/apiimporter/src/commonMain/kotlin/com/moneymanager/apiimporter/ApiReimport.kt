@@ -81,7 +81,6 @@ suspend fun planApiReimport(
 
 /** Outcome of [executeApiReimport]. */
 data class ApiReimportResult(
-    val transfersDeleted: Int,
     val deletedEmptyAccounts: List<String>,
     val transactionsImported: Int,
     val tradesImported: Int,
@@ -254,7 +253,6 @@ suspend fun executeApiReimport(
     }
 
     return ApiReimportResult(
-        transfersDeleted = plan.transferIds.size,
         deletedEmptyAccounts = deletedEmptyAccounts,
         transactionsImported = rerun.transactions,
         tradesImported = rerun.trades,

@@ -124,7 +124,6 @@ data class ApiSessionImportResult(
     val personCount: Int = 0,
     val duplicateCount: Int = 0,
     val errorCount: Int = 0,
-    val excludedCount: Int = 0,
 )
 
 data class ApiSessionImportProgress(
@@ -744,7 +743,6 @@ suspend fun importApiSessionTransactions(
         personCount = importResult.peopleCreated,
         duplicateCount = importResult.duplicates,
         errorCount = preparedTransfers.errorCount,
-        excludedCount = importResult.excluded,
     )
 }
 

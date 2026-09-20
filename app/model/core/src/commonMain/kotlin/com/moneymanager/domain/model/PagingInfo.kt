@@ -13,13 +13,9 @@ data class PagingResult<T>(
     val pagingInfo: PagingInfo,
 )
 
-/**
- * Result of loading a page centered around a specific item.
- * Includes the index of the target item within the page.
- */
+/** Result of loading a page centered around a specific item. */
 data class PageWithTargetIndex<T>(
     val items: List<T>,
-    val targetIndex: Int,
     val pagingInfo: PagingInfo,
     /** True if there are items before this page (newer items with higher timestamps) */
     val hasPrevious: Boolean,

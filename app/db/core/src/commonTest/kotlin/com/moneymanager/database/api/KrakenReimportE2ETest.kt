@@ -173,9 +173,9 @@ class KrakenReimportE2ETest : DbTest() {
             val session = repositories.apiSessionRepository.getSessionById(sessionId)!!
             val plan = planApiReimport(sessionId, repositories.apiSessionRepository)
             assertTrue(plan.transferIds.contains(withdrawalBefore.id), "the plan should target the withdrawal this session created")
+            assertEquals(1, plan.transferIds.size, "the withdrawal created by this session should be deleted before re-run")
 
-            val result =
-                executeApiReimport(
+            executeApiReimport(
                     plan = plan,
                     session = session,
                     strategy = strategyWithBridge,
@@ -190,7 +190,6 @@ class KrakenReimportE2ETest : DbTest() {
                     maintenance = testMaintenance,
                     importEngine = repositories.importEngine,
                 )
-            assertEquals(1, result.transfersDeleted, "the withdrawal created by this session should be deleted before re-run")
 
             val withdrawalsAfter =
                 repositories.transactionRepository
@@ -224,8 +223,8 @@ class KrakenReimportE2ETest : DbTest() {
 
             // Re-importing again is idempotent: same shape, no crash on the second pass.
             val plan2 = planApiReimport(sessionId, repositories.apiSessionRepository)
-            val result2 =
-                executeApiReimport(
+            assertEquals(1, plan2.transferIds.size, "the second re-import should delete exactly the one leg it re-creates")
+            executeApiReimport(
                     plan = plan2,
                     session = session,
                     strategy = strategyWithBridge,
@@ -240,7 +239,6 @@ class KrakenReimportE2ETest : DbTest() {
                     maintenance = testMaintenance,
                     importEngine = repositories.importEngine,
                 )
-            assertEquals(1, result2.transfersDeleted, "the second re-import should delete exactly the one leg it re-creates")
             val withdrawalsFinal =
                 repositories.transactionRepository
                     .getTransactionsByDateRange(

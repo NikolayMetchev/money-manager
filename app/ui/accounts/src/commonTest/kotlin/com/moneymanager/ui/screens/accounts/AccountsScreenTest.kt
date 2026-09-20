@@ -752,7 +752,7 @@ class AccountsScreenTest {
             everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any(), any()) } returns
                 PagingResult(emptyList(), PagingInfo(null, null, false))
             everySuspend { getPageContainingTransaction(any(), any(), any(), any()) } returns
-                PageWithTargetIndex(emptyList(), -1, PagingInfo(null, null, false), false)
+                PageWithTargetIndex(emptyList(), PagingInfo(null, null, false), false)
         }
 
     private fun createCategoryRepository(): CategoryWriteRepository =

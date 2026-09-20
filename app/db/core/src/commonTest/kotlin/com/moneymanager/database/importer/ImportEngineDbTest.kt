@@ -710,7 +710,6 @@ class ImportEngineDbTest : DbTest() {
 
             val result = engine().import(batch)
             assertEquals(2, result.peopleCreated)
-            assertEquals(2, result.ownershipsCreated)
 
             val people = repositories.personRepository.getAllPeople().first()
             assertEquals(2, people.size)
@@ -1797,16 +1796,11 @@ class ImportEngineDbTest : DbTest() {
                     ),
                 )
 
-            val o1 = result.orderIds.getValue(LocalOrderKey("o1"))
-            val fills = repositories.exchangeOrderRepository.getFillTradesForOrder(o1).first()
+            val orders = repositories.exchangeOrderRepository.getOrdersByAccount(exchange).first()
+            assertEquals(2, orders.size)
+            val o1 = orders.single { it.orderRef == "ref-1" }
+            val fills = repositories.exchangeOrderRepository.getFillTradesForOrder(o1.id).first()
             assertEquals(listOf(result.createdTradeIds.getValue(tradeKey)), fills.map { it.id })
-            assertEquals(
-                2,
-                repositories.exchangeOrderRepository
-                    .getOrdersByAccount(exchange)
-                    .first()
-                    .size,
-            )
 
             // A tradeKey that resolves to nothing in the batch must fail loudly, not drop the link.
             assertFailsWith<IllegalArgumentException> {

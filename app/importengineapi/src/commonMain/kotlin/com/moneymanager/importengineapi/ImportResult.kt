@@ -11,7 +11,6 @@ import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.QifImportId
@@ -44,7 +43,6 @@ data class RowOutcome(
 data class ImportResult(
     val accountsCreated: Int = 0,
     val peopleCreated: Int = 0,
-    val ownershipsCreated: Int = 0,
     val transfersImported: Int = 0,
     val duplicates: Int = 0,
     val updated: Int = 0,
@@ -65,8 +63,6 @@ data class ImportResult(
      * (createTrade is idempotent). [createdTradeIds] still maps these keys to the existing trade's id.
      */
     val dedupedTradeKeys: Set<LocalTradeKey> = emptySet(),
-    /** Ids of exchange orders upserted for each [LocalOrderKey] in [ImportBatch.orders] (all outcomes). */
-    val orderIds: Map<LocalOrderKey, ExchangeOrderId> = emptyMap(),
     /** Resolved (get-or-create) attribute-type ids for each name in [ImportBatch.attributeTypeNames]. */
     val attributeTypeIds: Map<String, AttributeTypeId> = emptyMap(),
     // Generated ids for config/staging/session Create mutations, keyed by the mutation's `key`.
