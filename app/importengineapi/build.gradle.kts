@@ -16,12 +16,17 @@ kotlin {
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
+
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
         getByName("androidMain") {
             dependencies {
                 api(projects.utils.bigdecimal)
+
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
@@ -35,7 +40,10 @@ kotlin {
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
+                api(projects.app.model.repository.read)
                 api(projects.utils.bigdecimal)
+
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
     }

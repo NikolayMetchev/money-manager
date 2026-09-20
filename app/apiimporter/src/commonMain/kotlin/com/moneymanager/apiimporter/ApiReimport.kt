@@ -21,19 +21,17 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.DedupePolicy
-import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import com.moneymanager.importengineapi.markApiSessionImported
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -245,7 +243,12 @@ suspend fun executeApiReimport(
 
     bar.emit(base = CLEANUP_BASE, detail = "Cleaning up empty accounts")
     val deletedEmptyAccounts =
-        deleteEmptyAccountsCreatedBySession(session.id, plan.accountIds, accountRepository, tradeRepository, importEngine)
+        importEngine.deleteEmptyImportCreatedAccounts(
+            createdAccountIds = plan.accountIds,
+            source = Source.Api(session.id),
+            accountRepository = accountRepository,
+            tradeRepository = tradeRepository,
+        )
 
     if (refreshViews) {
         bar.emit(base = REFRESH_BASE, detail = "Refreshing views")
@@ -263,43 +266,6 @@ private data class RerunOutcome(
     val transactions: Int,
     val trades: Int,
 )
-
-/**
- * Deletes accounts this session created (per [accountIds]) that hold no transactions. Trades count
- * as activity: deleting an account cascades to its trades (`trade.from_account_id`/`to_account_id`
- * are `ON DELETE CASCADE`), so an account whose only movements are trades must survive.
- */
-private suspend fun deleteEmptyAccountsCreatedBySession(
-    sessionId: ApiSessionId,
-    accountIds: Set<AccountId>,
-    accountRepository: AccountReadRepository,
-    tradeRepository: TradeReadRepository,
-    importEngine: ImportEngine,
-): List<String> {
-    if (accountIds.isEmpty()) return emptyList()
-    val remainingById = accountRepository.getAllAccounts().first().associateBy { it.id }
-    val candidates = accountIds.mapNotNull { remainingById[it] }
-    if (candidates.isEmpty()) return emptyList()
-    val withTransfers = accountRepository.accountsWithTransfers(candidates.map { it.id })
-    val withTrades = tradeRepository.accountsWithTrades(candidates.map { it.id })
-    val emptyAccounts = candidates.filter { it.id !in withTransfers && it.id !in withTrades }
-    if (emptyAccounts.isEmpty()) return emptyList()
-
-    importEngine.import(
-        ImportBatch.manualEdits(
-            accounts =
-                emptyAccounts.map { account ->
-                    ImportAccountIntent(
-                        key = LocalAccountKey("reimport-delete-${account.id.id}"),
-                        source = Source.Api(sessionId),
-                        operation = ImportOperation.DELETE,
-                        existingId = account.id,
-                    )
-                },
-        ),
-    )
-    return emptyAccounts.map { it.name }
-}
 
 /** One session a bulk re-import could not complete; the run carried on with the rest. */
 data class ApiSessionReimportFailure(
