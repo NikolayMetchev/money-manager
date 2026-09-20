@@ -13,6 +13,7 @@ internal fun GeneralTab(
     state: ApiStrategyEditorState,
     enabled: Boolean,
 ) {
+    val config = state.config
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         TextFieldRow(
             label = "Strategy name",
@@ -23,64 +24,64 @@ internal fun GeneralTab(
         )
         TextFieldRow(
             label = "Base URL",
-            value = state.baseUrl,
-            onValueChange = { state.baseUrl = it },
+            value = config.baseUrl,
+            onValueChange = { value -> state.updateConfig { copy(baseUrl = value) } },
             enabled = enabled,
             placeholder = "https://api.example.com",
-            isError = state.baseUrl.isBlank(),
+            isError = config.baseUrl.isBlank(),
         )
         EnumDropdown(
             label = "Auth type",
             options = ApiAuthType.entries,
-            selected = state.authType,
-            onSelect = { state.authType = it },
+            selected = config.authType,
+            onSelect = { value -> state.updateConfig { copy(authType = value) } },
             optionLabel = { it.name },
             enabled = enabled,
         )
         TextFieldRow(
             label = "Person external-id attribute (optional)",
-            value = state.personExternalIdAttribute,
-            onValueChange = { state.personExternalIdAttribute = it },
+            value = config.personExternalIdAttribute.orEmpty(),
+            onValueChange = { value -> state.updateConfig { copy(personExternalIdAttribute = value) } },
             enabled = enabled,
             placeholder = "e.g. monzo-external-id",
         )
         TextFieldRow(
             label = "Token page URL (optional)",
-            value = state.tokenPageUrl,
-            onValueChange = { state.tokenPageUrl = it },
+            value = config.tokenPageUrl.orEmpty(),
+            onValueChange = { value -> state.updateConfig { copy(tokenPageUrl = value) } },
             enabled = enabled,
             placeholder = "https://provider.example.com/developer/tokens",
         )
         StringListEditor(
             label = "Connect instructions (shown as numbered steps)",
-            items = state.connectInstructions,
-            onChange = { state.connectInstructions = it },
+            items = config.connectInstructions,
+            onChange = { value -> state.updateConfig { copy(connectInstructions = value) } },
             enabled = enabled,
         )
         OptionalLongFieldRow(
             label = "Rate-limit delay per request (ms, optional)",
-            value = state.rateLimitMillis,
-            onValueChange = { state.rateLimitMillis = it },
+            value = config.rateLimitMillis,
+            onValueChange = { value -> state.updateConfig { copy(rateLimitMillis = value) } },
             enabled = enabled,
             placeholder = "blank uses the download engine's default",
         )
         StringListEditor(
             label = "Rate-limit error substrings (case-insensitive; a match triggers backoff + retry)",
-            items = state.rateLimitErrorSubstrings,
-            onChange = { state.rateLimitErrorSubstrings = it },
+            items = config.rateLimitErrorSubstrings,
+            onChange = { value -> state.updateConfig { copy(rateLimitErrorSubstrings = value) } },
             enabled = enabled,
         )
         LongFieldRow(
             label = "Rate-limit retry base backoff (ms)",
-            value = state.rateLimitBackoffMillis,
-            onValueChange = { state.rateLimitBackoffMillis = it },
+            value = config.rateLimitBackoffMillis,
+            onValueChange = { value -> state.updateConfig { copy(rateLimitBackoffMillis = value) } },
             enabled = enabled,
-            isError = state.rateLimitBackoffMillis <= 0,
+            isError = config.rateLimitBackoffMillis <= 0,
         )
         IntFieldRow(
             label = "Max rate-limit retries",
-            value = state.maxRateLimitRetries,
-            onValueChange = { state.maxRateLimitRetries = it },
+            value = config.maxRateLimitRetries,
+            onValueChange = { value -> state.updateConfig { copy(maxRateLimitRetries = value) } },
             enabled = enabled,
         )
     }

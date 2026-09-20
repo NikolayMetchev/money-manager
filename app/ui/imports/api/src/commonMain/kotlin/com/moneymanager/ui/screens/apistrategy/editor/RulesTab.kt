@@ -30,7 +30,7 @@ internal fun RulesTab(
     onRequestPick: PathPicker,
     enabled: Boolean,
 ) {
-    val rules = state.builtInCounterpartyRules
+    val rules = state.config.builtInCounterpartyRules
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             text =
@@ -44,12 +44,14 @@ internal fun RulesTab(
                 Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     EditorCardHeader(
                         title = rule.name.ifBlank { "Rule ${index + 1}" },
-                        onRemove = { state.builtInCounterpartyRules = rules.toMutableList().also { it.removeAt(index) } },
+                        onRemove = { state.updateConfig { copy(builtInCounterpartyRules = builtInCounterpartyRules.minusAt(index)) } },
                         enabled = enabled,
                     )
                     RuleEditor(
                         rule = rule,
-                        onChange = { updated -> state.builtInCounterpartyRules = rules.toMutableList().also { it[index] = updated } },
+                        onChange = { updated ->
+                            state.updateConfig { copy(builtInCounterpartyRules = builtInCounterpartyRules.replacingAt(index, updated)) }
+                        },
                         txJsonPaths = txJsonPaths,
                         onRequestPick = onRequestPick,
                         enabled = enabled,
@@ -57,7 +59,16 @@ internal fun RulesTab(
                 }
             }
         }
-        TextButton(onClick = { state.builtInCounterpartyRules = rules + BuiltInCounterpartyRule(name = "") }, enabled = enabled) {
+        TextButton(
+            onClick = {
+                state.updateConfig {
+                    copy(
+                        builtInCounterpartyRules = builtInCounterpartyRules + BuiltInCounterpartyRule(name = ""),
+                    )
+                }
+            },
+            enabled = enabled,
+        ) {
             Icon(Icons.Default.Add, contentDescription = null)
             Spacer(Modifier.width(4.dp))
             Text("Add rule")

@@ -12,8 +12,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
+import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
+
+/** Edits [ApiPeopleMappings] in place inside the strategy config. */
+private fun ApiStrategyEditorState.updatePeopleMappings(block: ApiPeopleMappings.() -> ApiPeopleMappings) =
+    updateConfig { copy(peopleMappings = peopleMappings.block()) }
 
 @Composable
 internal fun PeopleTab(
@@ -22,7 +27,7 @@ internal fun PeopleTab(
     onRequestPick: PathPicker,
     enabled: Boolean,
 ) {
-    val p = state.peopleMappings
+    val p = state.config.peopleMappings
 
     @Composable
     fun path(
@@ -33,40 +38,44 @@ internal fun PeopleTab(
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionHeader("Counterparty / people mappings")
-        path("Counterparty object field", p.counterpartyObjectField) { state.peopleMappings = p.copy(counterpartyObjectField = it) }
-        path("Beneficiary account-type field", p.beneficiaryAccountTypeField) {
-            state.peopleMappings = p.copy(beneficiaryAccountTypeField = it)
+        path("Counterparty object field", p.counterpartyObjectField) { v ->
+            state.updatePeopleMappings { copy(counterpartyObjectField = v) }
+        }
+        path("Beneficiary account-type field", p.beneficiaryAccountTypeField) { v ->
+            state.updatePeopleMappings { copy(beneficiaryAccountTypeField = v) }
         }
         TextFieldRow(
             label = "Personal beneficiary value",
             value = p.personalBeneficiaryAccountTypeValue,
-            onValueChange = { state.peopleMappings = p.copy(personalBeneficiaryAccountTypeValue = it) },
+            onValueChange = { v -> state.updatePeopleMappings { copy(personalBeneficiaryAccountTypeValue = v) } },
             enabled = enabled,
         )
         StringSetEditor(
             label = "Additional personal beneficiary values",
             values = p.personalBeneficiaryAccountTypeValues,
-            onChange = { state.peopleMappings = p.copy(personalBeneficiaryAccountTypeValues = it) },
+            onChange = { v -> state.updatePeopleMappings { copy(personalBeneficiaryAccountTypeValues = v) } },
             enabled = enabled,
         )
-        path("Counterparty name field", p.counterpartyNameField) { state.peopleMappings = p.copy(counterpartyNameField = it) }
-        path("Counterparty user-id field", p.counterpartyUserIdField) { state.peopleMappings = p.copy(counterpartyUserIdField = it) }
-        path("Counterparty sort code field", p.counterpartySortCodeField) {
-            state.peopleMappings = p.copy(counterpartySortCodeField = it)
+        path("Counterparty name field", p.counterpartyNameField) { v -> state.updatePeopleMappings { copy(counterpartyNameField = v) } }
+        path("Counterparty user-id field", p.counterpartyUserIdField) { v ->
+            state.updatePeopleMappings { copy(counterpartyUserIdField = v) }
         }
-        path("Counterparty account number field", p.counterpartyAccountNumberField) {
-            state.peopleMappings = p.copy(counterpartyAccountNumberField = it)
+        path("Counterparty sort code field", p.counterpartySortCodeField) { v ->
+            state.updatePeopleMappings { copy(counterpartySortCodeField = v) }
         }
-        path("Counterparty service-user-number field", p.counterpartyServiceUserNumberField) {
-            state.peopleMappings = p.copy(counterpartyServiceUserNumberField = it)
+        path("Counterparty account number field", p.counterpartyAccountNumberField) { v ->
+            state.updatePeopleMappings { copy(counterpartyAccountNumberField = v) }
         }
-        path("Counterparty account-id field", p.counterpartyAccountIdField) {
-            state.peopleMappings = p.copy(counterpartyAccountIdField = it)
+        path("Counterparty service-user-number field", p.counterpartyServiceUserNumberField) { v ->
+            state.updatePeopleMappings { copy(counterpartyServiceUserNumberField = v) }
+        }
+        path("Counterparty account-id field", p.counterpartyAccountIdField) { v ->
+            state.updatePeopleMappings { copy(counterpartyAccountIdField = v) }
         }
         ToggleRow(
             label = "Prefer bank identity (sort code + account number over counterparty id)",
             checked = p.preferBankIdentity,
-            onCheckedChange = { state.peopleMappings = p.copy(preferBankIdentity = it) },
+            onCheckedChange = { v -> state.updatePeopleMappings { copy(preferBankIdentity = v) } },
             enabled = enabled,
         )
 
@@ -80,24 +89,28 @@ internal fun PeopleTab(
         )
         ToggleRow(
             label = "Enable people download",
-            checked = state.peopleDownload != null,
+            checked = state.config.peopleDownload != null,
             onCheckedChange = { on ->
-                state.peopleDownload =
-                    if (on) {
-                        ApiPersonImportConfig(
-                            endpoint = ApiEndpointConfig(path = "", responseArrayKey = ""),
-                            firstNameField = "",
-                        )
-                    } else {
-                        null
-                    }
+                state.updateConfig {
+                    copy(
+                        peopleDownload =
+                            if (on) {
+                                ApiPersonImportConfig(
+                                    endpoint = ApiEndpointConfig(path = "", responseArrayKey = ""),
+                                    firstNameField = "",
+                                )
+                            } else {
+                                null
+                            },
+                    )
+                }
             },
             enabled = enabled,
         )
-        state.peopleDownload?.let { config ->
+        state.config.peopleDownload?.let { config ->
             PeopleDownloadEditor(
                 config = config,
-                onChange = { state.peopleDownload = it },
+                onChange = { v -> state.updateConfig { copy(peopleDownload = v) } },
                 enabled = enabled,
             )
         }

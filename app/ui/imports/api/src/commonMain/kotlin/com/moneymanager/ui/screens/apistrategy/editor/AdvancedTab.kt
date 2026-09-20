@@ -14,6 +14,10 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 
+/** Edits the challenge-response [ApiSigningConfig] in place; a no-op while signing is disabled. */
+private fun ApiStrategyEditorState.updateSigning(block: ApiSigningConfig.() -> ApiSigningConfig) =
+    updateConfig { copy(signing = signing?.block()) }
+
 @Composable
 internal fun AdvancedTab(
     state: ApiStrategyEditorState,
@@ -31,18 +35,18 @@ internal fun AdvancedTab(
         )
         ToggleRow(
             label = "Enable request signing",
-            checked = state.signing != null,
-            onCheckedChange = { on -> state.signing = if (on) ApiSigningConfig() else null },
+            checked = state.config.signing != null,
+            onCheckedChange = { on -> state.updateConfig { copy(signing = if (on) ApiSigningConfig() else null) } },
             enabled = enabled,
         )
-        state.signing?.let { signing ->
-            TextFieldRow("Challenge header", signing.challengeHeader, { state.signing = signing.copy(challengeHeader = it) }, enabled)
-            TextFieldRow("Signature header", signing.signatureHeader, { state.signing = signing.copy(signatureHeader = it) }, enabled)
-            IntFieldRow("Trigger status", signing.triggerStatus, { state.signing = signing.copy(triggerStatus = it) }, enabled)
+        state.config.signing?.let { signing ->
+            TextFieldRow("Challenge header", signing.challengeHeader, { v -> state.updateSigning { copy(challengeHeader = v) } }, enabled)
+            TextFieldRow("Signature header", signing.signatureHeader, { v -> state.updateSigning { copy(signatureHeader = v) } }, enabled)
+            IntFieldRow("Trigger status", signing.triggerStatus, { v -> state.updateSigning { copy(triggerStatus = v) } }, enabled)
             StringSetEditor(
                 label = "Statement countries (ISO 3166-1 alpha-2)",
                 values = signing.statementCountries,
-                onChange = { state.signing = signing.copy(statementCountries = it) },
+                onChange = { v -> state.updateSigning { copy(statementCountries = v) } },
                 enabled = enabled,
             )
         }
@@ -57,8 +61,8 @@ internal fun AdvancedTab(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         RequestSigningEditor(
-            config = state.requestSigning,
-            onChange = { state.requestSigning = it },
+            config = state.config.requestSigning,
+            onChange = { v -> state.updateConfig { copy(requestSigning = v) } },
             enabled = enabled,
         )
 
@@ -72,8 +76,8 @@ internal fun AdvancedTab(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         InternalTransferReconcileEditor(
-            config = state.internalTransferReconcile,
-            onChange = { state.internalTransferReconcile = it },
+            config = state.config.internalTransferReconcile,
+            onChange = { v -> state.updateConfig { copy(internalTransferReconcile = v) } },
             enabled = enabled,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
@@ -91,8 +95,8 @@ internal fun AdvancedTab(
         )
         StringMapEditor(
             label = "Aliases (raw code -> canonical code)",
-            entries = state.assetAliases,
-            onChange = { state.assetAliases = it },
+            entries = state.config.assetAliases,
+            onChange = { v -> state.updateConfig { copy(assetAliases = v) } },
             keyLabel = "Raw code",
             valueLabel = "Canonical code",
             enabled = enabled,
@@ -106,8 +110,8 @@ internal fun AdvancedTab(
         )
         StringSetEditor(
             label = "Suffixes to strip",
-            values = state.assetSuffixesToStrip,
-            onChange = { state.assetSuffixesToStrip = it },
+            values = state.config.assetSuffixesToStrip,
+            onChange = { v -> state.updateConfig { copy(assetSuffixesToStrip = v) } },
             enabled = enabled,
         )
 
@@ -123,8 +127,8 @@ internal fun AdvancedTab(
         )
         StringLongMapEditor(
             label = "Overrides (currency code -> divisor)",
-            entries = state.minorUnitDivisorOverrides,
-            onChange = { state.minorUnitDivisorOverrides = it },
+            entries = state.config.minorUnitDivisorOverrides,
+            onChange = { v -> state.updateConfig { copy(minorUnitDivisorOverrides = v) } },
             keyLabel = "Currency code",
             valueLabel = "Divisor",
             enabled = enabled,
