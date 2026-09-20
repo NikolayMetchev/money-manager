@@ -40,6 +40,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CryptoCatalogRefresher
@@ -374,6 +375,23 @@ fun MoneyManagerApp(
                                     currentlyViewedCurrencyId = null
                                 }
                             }
+                            // Every audit screen links back to the same three source views; hoisted so the
+                            // entries below share one instance instead of repeating the navigation call.
+                            val onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { sessionId, requestId, jsonPath ->
+                                navigationHistory.navigateTo(
+                                    Screen.ApiSessionTraffic(
+                                        sessionId = sessionId,
+                                        highlightRequestId = requestId,
+                                        highlightJsonPath = jsonPath,
+                                    ),
+                                )
+                            }
+                            val onCsvSourceClick: (CsvImportId, Long) -> Unit = { importId, rowIndex ->
+                                navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
+                            }
+                            val onQifSourceClick: (QifImportId, Long?) -> Unit = { importId, recordIndex ->
+                                navigationHistory.navigateTo(Screen.QifImportDetail(importId, recordIndex))
+                            }
                             NavDisplay(
                                 backStack = navigationHistory.backStack,
                                 onBack = { navigationHistory.navigateBack() },
@@ -575,15 +593,7 @@ fun MoneyManagerApp(
                                             ExchangeOrderAuditScreen(
                                                 orderId = screen.orderId,
                                                 auditRepository = services.audit.auditRepository,
-                                                onApiSourceClick = { sessionId, requestId, jsonPath ->
-                                                    navigationHistory.navigateTo(
-                                                        Screen.ApiSessionTraffic(
-                                                            sessionId = sessionId,
-                                                            highlightRequestId = requestId,
-                                                            highlightJsonPath = jsonPath,
-                                                        ),
-                                                    )
-                                                },
+                                                onApiSourceClick = onApiSourceClick,
                                                 onBack = { navigationHistory.navigateBack() },
                                             )
                                         }
@@ -748,9 +758,7 @@ fun MoneyManagerApp(
                                                 onCreateStrategy = { importId ->
                                                     navigationHistory.navigateTo(Screen.CsvStrategyEditor(importId))
                                                 },
-                                                onCsvSourceClick = { importId, rowIndex ->
-                                                    navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
-                                                },
+                                                onCsvSourceClick = onCsvSourceClick,
                                                 onTransferClick = ::navigateToTransferAccount,
                                             )
                                         }
@@ -848,21 +856,9 @@ fun MoneyManagerApp(
                                                 accountRepository = services.accounts.accountRepository,
                                                 transactionRepository = services.transactions.transactionRepository,
                                                 currentDeviceId = services.deviceId,
-                                                onCsvSourceClick = { importId, rowIndex ->
-                                                    navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
-                                                },
-                                                onQifSourceClick = { importId, recordIndex ->
-                                                    navigationHistory.navigateTo(Screen.QifImportDetail(importId, recordIndex))
-                                                },
-                                                onApiSourceClick = { sessionId, requestId, jsonPath ->
-                                                    navigationHistory.navigateTo(
-                                                        Screen.ApiSessionTraffic(
-                                                            sessionId = sessionId,
-                                                            highlightRequestId = requestId,
-                                                            highlightJsonPath = jsonPath,
-                                                        ),
-                                                    )
-                                                },
+                                                onCsvSourceClick = onCsvSourceClick,
+                                                onQifSourceClick = onQifSourceClick,
+                                                onApiSourceClick = onApiSourceClick,
                                                 onAccountClick = { accountId ->
                                                     val account = accounts.find { it.id == accountId }
                                                     navigationHistory.navigateTo(
@@ -882,21 +878,9 @@ fun MoneyManagerApp(
                                                 accountRepository = services.accounts.accountRepository,
                                                 categoryRepository = services.accounts.categoryRepository,
                                                 maintenance = services.imports.maintenance,
-                                                onApiSourceClick = { sessionId, requestId, jsonPath ->
-                                                    navigationHistory.navigateTo(
-                                                        Screen.ApiSessionTraffic(
-                                                            sessionId = sessionId,
-                                                            highlightRequestId = requestId,
-                                                            highlightJsonPath = jsonPath,
-                                                        ),
-                                                    )
-                                                },
-                                                onCsvSourceClick = { importId, rowIndex ->
-                                                    navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
-                                                },
-                                                onQifSourceClick = { importId, recordIndex ->
-                                                    navigationHistory.navigateTo(Screen.QifImportDetail(importId, recordIndex))
-                                                },
+                                                onApiSourceClick = onApiSourceClick,
+                                                onCsvSourceClick = onCsvSourceClick,
+                                                onQifSourceClick = onQifSourceClick,
                                                 onOwnerClick = { personId ->
                                                     navigationHistory.navigateTo(
                                                         Screen.PeopleScroll(
@@ -912,21 +896,9 @@ fun MoneyManagerApp(
                                                 personId = screen.personId,
                                                 auditRepository = services.audit.auditRepository,
                                                 personRepository = services.people.personRepository,
-                                                onApiSourceClick = { sessionId, requestId, jsonPath ->
-                                                    navigationHistory.navigateTo(
-                                                        Screen.ApiSessionTraffic(
-                                                            sessionId = sessionId,
-                                                            highlightRequestId = requestId,
-                                                            highlightJsonPath = jsonPath,
-                                                        ),
-                                                    )
-                                                },
-                                                onCsvSourceClick = { importId, rowIndex ->
-                                                    navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
-                                                },
-                                                onQifSourceClick = { importId, recordIndex ->
-                                                    navigationHistory.navigateTo(Screen.QifImportDetail(importId, recordIndex))
-                                                },
+                                                onApiSourceClick = onApiSourceClick,
+                                                onCsvSourceClick = onCsvSourceClick,
+                                                onQifSourceClick = onQifSourceClick,
                                                 onBack = { navigationHistory.navigateBack() },
                                             )
                                         }
