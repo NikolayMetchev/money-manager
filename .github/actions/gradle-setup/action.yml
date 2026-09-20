@@ -26,7 +26,7 @@ runs:
       uses: actions/setup-java@v6
       with:
         # JVM version sync: keep this aligned with gradle/libs.versions.toml,
-        # .github/workflows/build.yml, and AGENTS.md.
+        # .github/workflows/build.yml, and CLAUDE.md.
         java-version: '25'
         distribution: 'corretto'  # Corretto includes jmod files required by ProGuard (Temurin removed them in JDK 24+ per JEP 493)
 

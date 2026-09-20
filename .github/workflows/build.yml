@@ -131,7 +131,7 @@ jobs:
             ~/.android/avd/*
             ~/.android/adb*
           # Android emulator API level sync: update with the Gradle managed device,
-          # .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
+          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
           key: avd-pixel6-api36-aosp-atd-${{ runner.os }}
 
       - name: Create AVD and generate snapshot for caching
@@ -139,7 +139,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           # Android emulator API level sync: update with the Gradle managed device,
-          # .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
+          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
           # aosp_atd is the headless test-optimized image — same source as the local
           # Gradle managed device (systemImageSource = "aosp-atd").
           api-level: 36
@@ -158,7 +158,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           # Android emulator API level sync: update with the Gradle managed device,
-          # .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
+          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
           api-level: 36
           arch: x86_64
           profile: pixel_6
@@ -335,7 +335,7 @@ jobs:
         uses: actions/setup-java@v6
         with:
           # JVM version sync: keep this aligned with gradle/libs.versions.toml,
-          # .github/actions/gradle-setup/action.yml, and AGENTS.md.
+          # .github/actions/gradle-setup/action.yml, and CLAUDE.md.
           java-version: '25'
           distribution: 'corretto'
 

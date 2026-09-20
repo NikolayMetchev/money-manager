@@ -15,7 +15,9 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 
 ## Build Commands
 
-**Important**: Always use `--console=plain`. Don't use `--no-daemon`. On Windows, use `./gradlew.bat` directly.
+**Important**: Always use `--console=plain`. Don't use `--no-daemon`. On Windows, use `./gradlew.bat`
+directly. A full `./gradlew build` always takes longer than 2 minutes, so never run it with a short
+timeout; use at least 20 minutes.
 
 | Command | Description |
 |---------|-------------|
@@ -247,7 +249,11 @@ set of writes.
 - Use `runComposeUiTest` for UI tests
 - Android tests require manifest with `ComponentActivity` declaration
 - Share test sources via `kotlin.srcDir("src/commonTest/kotlin")`
-- **Android Device Tests**: Use `:app:ui:core:pixel6api36AndroidDeviceTest` for UI tests on managed device emulator
+- **Android Device Tests**: Use `:app:ui:core:pixel6api36AndroidDeviceTest` for UI tests on managed
+  device emulator. **Android emulator API level sync**: change the level here and you must change it
+  in the Gradle managed device (`moneymanager.android-convention.gradle.kts`), the CI emulator
+  (`.github/workflows/build.yml`) and the IntelliJ run configuration
+  (`.idea/runConfigurations/Android_Tests.xml`) too.
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
 
 ### Platform Support
@@ -256,7 +262,10 @@ set of writes.
 
 ### Common Issues
 
-1. **Java**: Requires JDK 25 toolchain
+1. **Java**: Requires JDK 25 toolchain. **JVM version sync**: the version is pinned in four places
+   that must move together — `gradle/libs.versions.toml` (`jvm-target`/`jvm-toolchain`),
+   `.github/actions/gradle-setup/action.yml`, `.github/workflows/build.yml` and
+   `.github/workflows/lint-format.yml`
 2. **Metro**: Keep Kotlin version aligned (2.2.21). Graphs must be `interface`; binding containers `object`
 3. **SQLDelight**: `execute()`/`update()`/`delete()` return `Long`, not `Unit`
 4. **Configuration Cache**: Enabled for faster builds; invalidates on build file changes

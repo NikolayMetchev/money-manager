@@ -8,7 +8,7 @@ plugins {
 }
 
 // Android emulator API level sync: update with .github/workflows/build.yml,
-// .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
+// .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
 val androidTestManagedDeviceNames = listOf("pixel6api36")
 
 fun KotlinMultiplatformExtension.configureAndroidTarget() {

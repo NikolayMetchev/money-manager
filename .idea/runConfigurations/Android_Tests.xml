@@ -10,7 +10,7 @@
       </option>
       <option name="taskNames">
         <list>
-          <!-- Android emulator API level sync: update with the Gradle managed device, CI emulator, and AGENTS.md. -->
+          <!-- Android emulator API level sync: update with the Gradle managed device, CI emulator, and CLAUDE.md. -->
           <option value="pixel6api36AndroidDeviceTest" />
         </list>
       </option>
