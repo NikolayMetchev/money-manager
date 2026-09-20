@@ -39,10 +39,10 @@ import com.moneymanager.qifimporter.bulkReimportQif
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
+import com.moneymanager.ui.components.imports.BulkMergeReport
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.csv.BulkImportProgressIndicator
-import com.moneymanager.ui.screens.csv.BulkMergeReport
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 

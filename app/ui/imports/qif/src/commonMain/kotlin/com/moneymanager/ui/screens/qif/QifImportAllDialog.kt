@@ -35,9 +35,9 @@ import com.moneymanager.importengineapi.setLastQifAccount
 import com.moneymanager.qifimporter.bulkApplyQif
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.csv.BulkImportProgressIndicator
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 

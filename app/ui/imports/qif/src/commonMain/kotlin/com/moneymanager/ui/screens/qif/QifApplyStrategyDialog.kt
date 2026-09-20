@@ -51,11 +51,11 @@ import com.moneymanager.qifimporter.withQifCurrency
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.ImportPreviewSection
+import com.moneymanager.ui.components.imports.NewAccountResolutionSection
+import com.moneymanager.ui.components.imports.StrategySelector
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.csv.ImportPreviewSection
-import com.moneymanager.ui.screens.csv.NewAccountResolutionSection
-import com.moneymanager.ui.screens.csv.StrategySelector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

@@ -1,4 +1,4 @@
-package com.moneymanager.ui.screens.csv
+package com.moneymanager.ui.components.imports
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -15,8 +15,8 @@ import com.moneymanager.csvimporter.ReimportSkippedAccount
 /**
  * Lists the duplicate-account merges a bulk re-import performed, the prior merges it reversed (split
  * back out), and anything it could not act on, so the bulk "Re-import all" flow shows WHICH accounts
- * changed — the per-file preview's key detail. Shared by the CSV and QIF re-import-all dialogs (the QIF
- * UI depends on the CSV UI). Renders nothing when all three lists are empty.
+ * changed — the per-file preview's key detail. Shared by the CSV and QIF re-import-all dialogs.
+ * Renders nothing when all three lists are empty.
  */
 @Composable
 fun BulkMergeReport(

@@ -15,6 +15,8 @@ kotlin {
                 api(projects.app.model.timeline)
                 api(projects.app.ui.foundation)
 
+                implementation(projects.app.csvimporter)
+                implementation(projects.app.model.csv)
                 implementation(projects.utils.currency)
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)
