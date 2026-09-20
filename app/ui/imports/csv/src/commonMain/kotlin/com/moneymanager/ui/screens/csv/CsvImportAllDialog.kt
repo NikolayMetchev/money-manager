@@ -1,13 +1,9 @@
 package com.moneymanager.ui.screens.csv
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,7 +37,7 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
-import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -56,7 +52,6 @@ import kotlinx.coroutines.launch
  * Mirrors QifImportAllDialog by design (CSV has no currency choice — currency comes from the strategy).
  */
 @Composable
-@Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
 fun CsvImportAllDialog(
     unimported: List<CsvImport>,
     importDirectoryRepository: ImportDirectoryReadRepository,
@@ -131,88 +126,70 @@ fun CsvImportAllDialog(
             }
         } ?: false
 
-    AlertDialog(
-        onDismissRequest = { if (!isImporting) onDismiss() },
-        title = { Text(if (summary != null) "Import complete" else "Import all unimported files") },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                val currentSummary = summary
-                if (currentSummary != null) {
-                    Text(currentSummary, style = MaterialTheme.typography.bodyMedium)
-                } else {
-                    if (needsSourceAccount) {
-                        AccountPicker(
-                            selectedAccountId = sourceAccountId,
-                            onAccountSelected = { sourceAccountId = it },
-                            label = "Source account (for files whose strategy needs one)",
+    BulkImportDialogScaffold(
+        pendingTitle = "Import all unimported files",
+        completeTitle = "Import complete",
+        result = summary,
+        isRunning = isImporting,
+        confirmLabel = "Import ${unimported.size} files",
+        confirmEnabled = !needsSourceAccount || sourceAccountId != null,
+        onRun = {
+            isImporting = true
+            scope.launch {
+                try {
+                    val result =
+                        bulkApplyCsv(
+                            imports = unimported,
+                            sourceAccountOverride = sourceAccountId,
+                            strategies = strategies,
+                            currencies = currencies,
+                            accountMappingRepository = accountMappingRepository,
                             accountRepository = accountRepository,
-                            categoryRepository = categoryRepository,
-                            personRepository = personRepository,
-                            enabled = !isImporting,
-                            isError = sourceAccountId == null,
+                            csvImportRepository = csvImportRepository,
+                            maintenance = maintenance,
+                            importEngine = importEngine,
+                            onProgress = { progress = it },
+                            passThroughAccounts = passThroughAccounts,
+                            cryptoRepository = cryptoRepository,
+                            tradeRepository = tradeRepository,
+                            attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
+                            directoryAccounts = directoryAccounts,
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                    if (skippedNoStrategyCount > 0) {
-                        Text(
-                            text =
-                                "$skippedNoStrategyCount file${if (skippedNoStrategyCount == 1) "" else "s"} " +
-                                    "have no matching strategy and will be skipped.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    progress?.let {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        BulkImportProgressIndicator(it)
-                    }
+                    summary = result.toSummary()
+                } finally {
+                    isImporting = false
                 }
             }
         },
-        confirmButton = {
-            if (summary != null) {
-                TextButton(onClick = onComplete) { Text("Done") }
-            } else {
-                LoadingTextButton(
-                    onClick = {
-                        if (needsSourceAccount && sourceAccountId == null) return@LoadingTextButton
-                        isImporting = true
-                        scope.launch {
-                            try {
-                                val result =
-                                    bulkApplyCsv(
-                                        imports = unimported,
-                                        sourceAccountOverride = sourceAccountId,
-                                        strategies = strategies,
-                                        currencies = currencies,
-                                        accountMappingRepository = accountMappingRepository,
-                                        accountRepository = accountRepository,
-                                        csvImportRepository = csvImportRepository,
-                                        maintenance = maintenance,
-                                        importEngine = importEngine,
-                                        onProgress = { progress = it },
-                                        passThroughAccounts = passThroughAccounts,
-                                        cryptoRepository = cryptoRepository,
-                                        tradeRepository = tradeRepository,
-                                        attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
-                                        directoryAccounts = directoryAccounts,
-                                    )
-                                summary = result.toSummary()
-                            } finally {
-                                isImporting = false
-                            }
-                        }
-                    },
-                    enabled = !isImporting && (!needsSourceAccount || sourceAccountId != null),
-                    loading = isImporting,
-                    label = "Import ${unimported.size} files",
-                )
-            }
-        },
-        dismissButton = {
-            if (summary == null) {
-                TextButton(onClick = onDismiss, enabled = !isImporting) { Text("Cancel") }
-            }
-        },
-    )
+        onDismiss = onDismiss,
+        onComplete = onComplete,
+        report = { Text(it, style = MaterialTheme.typography.bodyMedium) },
+    ) {
+        if (needsSourceAccount) {
+            AccountPicker(
+                selectedAccountId = sourceAccountId,
+                onAccountSelected = { sourceAccountId = it },
+                label = "Source account (for files whose strategy needs one)",
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                personRepository = personRepository,
+                enabled = !isImporting,
+                isError = sourceAccountId == null,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+        if (skippedNoStrategyCount > 0) {
+            Text(
+                text =
+                    "$skippedNoStrategyCount file${if (skippedNoStrategyCount == 1) "" else "s"} " +
+                        "have no matching strategy and will be skipped.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        progress?.let {
+            Spacer(modifier = Modifier.height(12.dp))
+            BulkImportProgressIndicator(it)
+        }
+    }
 }
