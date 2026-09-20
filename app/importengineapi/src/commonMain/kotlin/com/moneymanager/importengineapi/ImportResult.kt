@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
-import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CryptoId
@@ -16,7 +15,6 @@ import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.QifImportId
-import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -67,19 +65,10 @@ data class ImportResult(
      * (createTrade is idempotent). [createdTradeIds] still maps these keys to the existing trade's id.
      */
     val dedupedTradeKeys: Set<LocalTradeKey> = emptySet(),
-    /**
-     * Keys of trade intents suppressed because an existing **conversion transfer pair** already
-     * records the movement (see [TradeDedupePolicy.Fuzzy.conversionRelationshipTypeName]). Unlike
-     * [dedupedTradeKeys] these have no [createdTradeIds] entry: a conversion is booked as transfers,
-     * so there is no trade id to point at.
-     */
-    val conversionReconciledTradeKeys: Set<LocalTradeKey> = emptySet(),
     /** Ids of exchange orders upserted for each [LocalOrderKey] in [ImportBatch.orders] (all outcomes). */
     val orderIds: Map<LocalOrderKey, ExchangeOrderId> = emptyMap(),
     /** Resolved (get-or-create) attribute-type ids for each name in [ImportBatch.attributeTypeNames]. */
     val attributeTypeIds: Map<String, AttributeTypeId> = emptyMap(),
-    /** Resolved (get-or-create) relationship-type ids for each name in [ImportBatch.relationshipTypeNames]. */
-    val relationshipTypeIds: Map<String, RelationshipTypeId> = emptyMap(),
     // Generated ids for config/staging/session Create mutations, keyed by the mutation's `key`.
     val createdCsvStrategyIds: Map<String, CsvImportStrategyId> = emptyMap(),
     val createdApiStrategyIds: Map<String, ApiImportStrategyId> = emptyMap(),
@@ -91,7 +80,6 @@ data class ImportResult(
     val apiSessionIds: Map<String, ApiSessionId> = emptyMap(),
     val apiRequestIds: Map<String, ApiRequestId> = emptyMap(),
     val apiResponseIds: Map<String, ApiResponseId> = emptyMap(),
-    val apiResponseTransactionIds: Map<String, ApiResponseTransactionId> = emptyMap(),
 )
 
 /**

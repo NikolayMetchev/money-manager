@@ -1593,7 +1593,6 @@ private data class ResponseTransactionImportRecord(
     val state: ApiResponseTransactionState,
     val transactionId: TransferId?,
     val errorMessage: String?,
-    val excludedFromBalances: Boolean = false,
 ) {
     fun toInsert(): ApiResponseTransactionInsert =
         ApiResponseTransactionInsert(
@@ -1777,8 +1776,6 @@ private suspend fun runImportEngine(
             p.responseRecord(
                 state = state,
                 transactionId = outcome.transferId,
-                excludedFromBalances =
-                    state == ApiResponseTransactionState.IMPORTED && !p.item.declineReason.isNullOrBlank(),
             )
     }
 
@@ -2082,7 +2079,6 @@ private suspend fun buildApiTransferAttributes(
 private fun PreparedApiTransaction.responseRecord(
     state: ApiResponseTransactionState,
     transactionId: TransferId?,
-    excludedFromBalances: Boolean = false,
 ): ResponseTransactionImportRecord =
     ResponseTransactionImportRecord(
         pageIndex = pageIndex,
@@ -2092,7 +2088,6 @@ private fun PreparedApiTransaction.responseRecord(
         state = state,
         transactionId = transactionId,
         errorMessage = null,
-        excludedFromBalances = excludedFromBalances,
     )
 
 private fun ApiTransactionPageItem.errorRecord(

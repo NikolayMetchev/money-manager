@@ -7,7 +7,6 @@ import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
-import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
@@ -161,7 +160,7 @@ class ImportEngineImpl(
 
         // ----- Lookup-table resolution (first: ids feed attributes/relationships built by callers) -----
         val attributeTypeIds = batch.attributeTypeNames.associateWith { attributeTypeRepository.getOrCreate(it) }
-        val relationshipTypeIds = batch.relationshipTypeNames.associateWith { relationshipTypeRepository.getOrCreate(it) }
+        batch.relationshipTypeNames.forEach { relationshipTypeRepository.getOrCreate(it) }
 
         // ----- Config / staging / session / settings / device mutations -----
         val config = applyConfigMutations(batch)
@@ -183,7 +182,6 @@ class ImportEngineImpl(
         }
         val createdTradeIds = mutableMapOf<LocalTradeKey, TradeId>()
         val dedupedTradeKeys = mutableSetOf<LocalTradeKey>()
-        val conversionReconciledTradeKeys = mutableSetOf<LocalTradeKey>()
 
         // Multiset idempotency (see TradeWriteRepository.createTrade): N intents sharing the exact same
         // field tuple (e.g. an exchange order split into several byte-identical fills) must book as N
@@ -224,8 +222,6 @@ class ImportEngineImpl(
                 if (reconciledId != null) {
                     createdTradeIds[intent.key] = reconciledId
                     dedupedTradeKeys += intent.key
-                } else {
-                    conversionReconciledTradeKeys += intent.key
                 }
                 continue
             }
@@ -408,10 +404,8 @@ class ImportEngineImpl(
             createdCryptoIds = createdCryptoIds,
             createdTradeIds = createdTradeIds,
             dedupedTradeKeys = dedupedTradeKeys,
-            conversionReconciledTradeKeys = conversionReconciledTradeKeys,
             orderIds = orderIds,
             attributeTypeIds = attributeTypeIds,
-            relationshipTypeIds = relationshipTypeIds,
             createdCsvStrategyIds = config.csvStrategyIds,
             createdApiStrategyIds = config.apiStrategyIds,
             createdAccountMappingIds = config.accountMappingIds,
@@ -422,7 +416,6 @@ class ImportEngineImpl(
             apiSessionIds = config.apiSessionIds,
             apiRequestIds = config.apiRequestIds,
             apiResponseIds = config.apiResponseIds,
-            apiResponseTransactionIds = config.apiResponseTransactionIds,
         )
     }
 
@@ -1780,7 +1773,6 @@ class ImportEngineImpl(
         val apiSessionIds: Map<String, ApiSessionId>,
         val apiRequestIds: Map<String, ApiRequestId>,
         val apiResponseIds: Map<String, ApiResponseId>,
-        val apiResponseTransactionIds: Map<String, ApiResponseTransactionId>,
     )
 
     // Fail fast rather than silently overwrite a generated id when two create mutations share a read-back
@@ -1934,7 +1926,6 @@ class ImportEngineImpl(
         val apiSessionIds = mutableMapOf<String, ApiSessionId>()
         val apiRequestIds = mutableMapOf<String, ApiRequestId>()
         val apiResponseIds = mutableMapOf<String, ApiResponseId>()
-        val apiResponseTransactionIds = mutableMapOf<String, ApiResponseTransactionId>()
         for (m in batch.apiSessionMutations) {
             when (m) {
                 is ApiSessionMutation.CreateCredential ->
@@ -1989,11 +1980,7 @@ class ImportEngineImpl(
                     )
                 is ApiSessionMutation.DeleteSession -> apiSessionRepository.deleteSession(m.id)
                 is ApiSessionMutation.InsertResponseTransaction ->
-                    apiResponseTransactionIds.putUnique(
-                        m.key,
-                        apiSessionRepository.insertResponseTransaction(m.responseId, m.jsonPath, m.state, m.transactionId, m.errorMessage),
-                        "ApiResponseTransaction",
-                    )
+                    apiSessionRepository.insertResponseTransaction(m.responseId, m.jsonPath, m.state, m.transactionId, m.errorMessage)
                 is ApiSessionMutation.InsertResponseTransactions -> apiSessionRepository.insertResponseTransactions(m.transactions)
                 is ApiSessionMutation.DeleteResponseTransactionsBySession ->
                     apiSessionRepository.deleteResponseTransactionsBySession(m.sessionId)
@@ -2019,7 +2006,6 @@ class ImportEngineImpl(
             apiSessionIds = apiSessionIds,
             apiRequestIds = apiRequestIds,
             apiResponseIds = apiResponseIds,
-            apiResponseTransactionIds = apiResponseTransactionIds,
         )
     }
 
