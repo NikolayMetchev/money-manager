@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingsExport
 import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.strategy.CsvResolution
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
@@ -81,18 +82,18 @@ class AccountMappingExportService(
      */
     suspend fun importMappings(
         export: AccountMappingsExport,
-        resolutions: Map<String, Resolution>,
+        resolutions: Map<String, CsvResolution>,
     ): Int {
         // Create any new accounts the user requested, in one engine batch (the sole writer).
         val accountIntents =
             resolutions
-                .filterValues { it is Resolution.CreateNew }
+                .filterValues { it is CsvResolution.CreateNew }
                 .map { (name, resolution) ->
                     ImportAccountIntent(
                         key = LocalAccountKey(name),
                         source = source,
                         match = AccountMatchKey.AlwaysCreate,
-                        name = (resolution as Resolution.CreateNew).name,
+                        name = (resolution as CsvResolution.CreateNew).name,
                         openingDate = Clock.System.now(),
                     )
                 }
@@ -108,7 +109,7 @@ class AccountMappingExportService(
                 .associateBy { it.name }
                 .toMutableMap()
         for ((name, resolution) in resolutions) {
-            if (resolution is Resolution.MapToExisting) {
+            if (resolution is CsvResolution.MapToExisting) {
                 accountsByName.values.find { it.id.id == resolution.id }?.let { accountsByName[name] = it }
             }
         }
