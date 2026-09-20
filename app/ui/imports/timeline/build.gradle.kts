@@ -11,6 +11,7 @@ kotlin {
                 api(projects.app.model.timeline)
                 api(libs.kotlinx.datetime)
 
+                implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
             }
         }

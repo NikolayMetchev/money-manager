@@ -39,6 +39,7 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.components.EditAccountDialog
+import com.moneymanager.ui.components.MultiSelectFilterDropdown
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -178,19 +179,27 @@ fun AccountsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             if (people.isNotEmpty()) {
-                OwnerFilterDropdown(
-                    people = people,
-                    selectedOwnerIds = selectedOwnerIds,
+                MultiSelectFilterDropdown(
+                    items = people,
+                    selectedKeys = selectedOwnerIds,
+                    itemKey = { it.id.id },
+                    itemLabel = { it.fullName },
+                    itemNoun = "owner",
                     onSelectionChange = { selectedOwnerIds = it },
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
             if (availableAssets.isNotEmpty()) {
-                AssetFilterDropdown(
-                    assets = availableAssets,
-                    selectedAssetIds = selectedAssetIds,
+                MultiSelectFilterDropdown(
+                    items = availableAssets,
+                    selectedKeys = selectedAssetIds,
+                    itemKey = { it.id },
+                    itemLabel = { "${it.code} — ${it.name}" },
+                    itemNoun = "asset",
                     onSelectionChange = { selectedAssetIds = it },
+                    selectedLabel = { it.code },
+                    searchText = { "${it.code} ${it.name}" },
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -269,165 +278,6 @@ fun AccountsScreen(
             onDismiss = { accountToEdit = null },
             existingNames = accounts.filter { it.id != currentAccountToEdit.id }.map { it.name }.toSet(),
         )
-    }
-}
-
-@Composable
-private fun OwnerFilterDropdown(
-    people: List<Person>,
-    selectedOwnerIds: Set<Long>,
-    onSelectionChange: (Set<Long>) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-
-    val selectionLabel =
-        when (selectedOwnerIds.size) {
-            0 -> "All owners"
-            1 -> people.find { it.id.id in selectedOwnerIds }?.fullName ?: "1 owner"
-            else -> "${selectedOwnerIds.size} owners"
-        }
-
-    val filteredPeople =
-        remember(people, searchQuery) {
-            if (searchQuery.isBlank()) {
-                people
-            } else {
-                people.filter { it.fullName.contains(searchQuery, ignoreCase = true) }
-            }
-        }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-    ) {
-        OutlinedTextField(
-            // Editable while expanded so the user can type to filter (like the account/currency pickers);
-            // shows the current selection summary when collapsed.
-            value = if (expanded) searchQuery else selectionLabel,
-            onValueChange = { searchQuery = it },
-            label = { Text("Filter by owner") },
-            placeholder = { Text("Type to search...") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-            singleLine = true,
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = {
-                expanded = false
-                searchQuery = ""
-            },
-        ) {
-            DropdownMenuItem(
-                text = { Text("All owners") },
-                onClick = { onSelectionChange(emptySet()) },
-            )
-            filteredPeople.forEach { person ->
-                DropdownMenuItem(
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(
-                                checked = selectedOwnerIds.contains(person.id.id),
-                                onCheckedChange = null,
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(person.fullName)
-                        }
-                    },
-                    onClick = {
-                        onSelectionChange(
-                            if (selectedOwnerIds.contains(person.id.id)) {
-                                selectedOwnerIds - person.id.id
-                            } else {
-                                selectedOwnerIds + person.id.id
-                            },
-                        )
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AssetFilterDropdown(
-    assets: List<Asset>,
-    selectedAssetIds: Set<AssetId>,
-    onSelectionChange: (Set<AssetId>) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-
-    val selectionLabel =
-        when (selectedAssetIds.size) {
-            0 -> "All assets"
-            1 -> assets.find { it.id in selectedAssetIds }?.code ?: "1 asset"
-            else -> "${selectedAssetIds.size} assets"
-        }
-
-    val filteredAssets =
-        remember(assets, searchQuery) {
-            if (searchQuery.isBlank()) {
-                assets
-            } else {
-                assets.filter {
-                    it.code.contains(searchQuery, ignoreCase = true) ||
-                        it.name.contains(searchQuery, ignoreCase = true)
-                }
-            }
-        }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-    ) {
-        OutlinedTextField(
-            // Editable while expanded so the user can type to filter assets;
-            // shows the current selection summary when collapsed.
-            value = if (expanded) searchQuery else selectionLabel,
-            onValueChange = { searchQuery = it },
-            label = { Text("Filter by asset") },
-            placeholder = { Text("Type to search...") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-            singleLine = true,
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = {
-                expanded = false
-                searchQuery = ""
-            },
-        ) {
-            DropdownMenuItem(
-                text = { Text("All assets") },
-                onClick = { onSelectionChange(emptySet()) },
-            )
-            filteredAssets.forEach { asset ->
-                DropdownMenuItem(
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(
-                                checked = selectedAssetIds.contains(asset.id),
-                                onCheckedChange = null,
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("${asset.code} — ${asset.name}")
-                        }
-                    },
-                    onClick = {
-                        onSelectionChange(
-                            if (selectedAssetIds.contains(asset.id)) {
-                                selectedAssetIds - asset.id
-                            } else {
-                                selectedAssetIds + asset.id
-                            },
-                        )
-                    },
-                )
-            }
-        }
     }
 }
 
