@@ -9,7 +9,6 @@ import com.moneymanager.csvimporter.CsvReimportResult
 import com.moneymanager.csvimporter.ReimportMerge
 import com.moneymanager.csvimporter.ReimportPlan
 import com.moneymanager.csvimporter.ReimportReversal
-import com.moneymanager.csvimporter.ReimportSkipReason
 import com.moneymanager.csvimporter.ReimportSkippedAccount
 import com.moneymanager.csvimporter.ReimportValueUpdate
 import com.moneymanager.csvimporter.applyReimportReversals
@@ -17,6 +16,7 @@ import com.moneymanager.csvimporter.computeReimportMerges
 import com.moneymanager.csvimporter.computeReimportReversals
 import com.moneymanager.csvimporter.computeReimportValueUpdates
 import com.moneymanager.csvimporter.effectiveSourceFor
+import com.moneymanager.csvimporter.skipDetail
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -135,7 +135,6 @@ suspend fun planQifReimport(
             ReimportSkippedAccount(
                 accountId = duplicate,
                 accountName = nameOf(duplicate),
-                reason = ReimportSkipReason.CONFLICTING_TARGETS,
                 detail = "Records map it to different accounts: ${targets.joinToString { nameOf(it) }}",
             )
     }
@@ -146,7 +145,6 @@ suspend fun planQifReimport(
                 ReimportSkippedAccount(
                     accountId = duplicate,
                     accountName = nameOf(duplicate),
-                    reason = ReimportSkipReason.TRANSFERS_BETWEEN,
                     detail = "${between.size} transaction(s) between '${nameOf(duplicate)}' and '${nameOf(target)}' — merge manually",
                 )
             continue
@@ -224,8 +222,7 @@ suspend fun executeQifReimport(
                 ReimportSkippedAccount(
                     accountId = merge.duplicateId,
                     accountName = merge.duplicateName,
-                    reason = ReimportSkipReason.MERGE_FAILED,
-                    detail = expected.message ?: "Merge failed",
+                    detail = skipDetail("Merge failed", expected.message),
                 )
         }
     }
@@ -332,8 +329,7 @@ private suspend fun applyQifValueUpdates(
                         ReimportSkippedAccount(
                             accountId = null,
                             accountName = update.description,
-                            reason = ReimportSkipReason.UPDATE_FAILED,
-                            detail = expectedRowError.message ?: "Update failed",
+                            detail = skipDetail("Update failed", expectedRowError.message),
                         )
                 }
             }
