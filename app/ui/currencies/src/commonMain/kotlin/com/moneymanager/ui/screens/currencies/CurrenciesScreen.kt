@@ -14,10 +14,9 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.deleteCurrency
 import com.moneymanager.ui.components.CreateCurrencyDialog
+import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
-import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
 private val logger = logging()
@@ -160,81 +159,16 @@ fun DeleteCurrencyDialog(
     onDismiss: () -> Unit,
 ) {
     val importEngine = LocalImportEngine.current
-    var isDeleting by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberSchemaAwareCoroutineScope()
 
-    AlertDialog(
-        onDismissRequest = { if (!isDeleting) onDismiss() },
-        icon = {
-            Text(
-                text = "⚠️",
-                style = MaterialTheme.typography.headlineMedium,
-            )
+    DestructiveConfirmDialog(
+        title = "Delete Currency?",
+        targetName = "${currency.code} - ${currency.name}",
+        consequence = "This action cannot be undone. All accounts using this currency will be affected.",
+        failureMessage = "Failed to delete currency",
+        onConfirm = {
+            importEngine.deleteCurrency(currency.id)
+            onDismiss()
         },
-        title = { Text("Delete Currency?") },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Are you sure you want to delete \"${currency.code} - ${currency.name}\"?",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    text = "This action cannot be undone. All accounts using this currency will be affected.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                errorMessage?.let { error ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    isDeleting = true
-                    errorMessage = null
-                    scope.launch {
-                        try {
-                            importEngine.deleteCurrency(currency.id)
-                            onDismiss()
-                        } catch (expected: Exception) {
-                            logger.error(expected) { "Failed to delete currency: ${expected.message}" }
-                            errorMessage = "Failed to delete currency: ${expected.message}"
-                            isDeleting = false
-                        }
-                    }
-                },
-                enabled = !isDeleting,
-                colors =
-                    ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ),
-            ) {
-                if (isDeleting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Delete")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isDeleting,
-            ) {
-                Text("Cancel")
-            }
-        },
+        onDismiss = onDismiss,
     )
 }

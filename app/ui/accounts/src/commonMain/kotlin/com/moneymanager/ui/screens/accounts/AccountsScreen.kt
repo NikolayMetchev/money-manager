@@ -38,6 +38,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.ui.components.CreateAccountDialog
+import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.components.MultiSelectFilterDropdown
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -416,14 +417,11 @@ fun DeleteAccountDialog(
     maintenance: Maintenance,
     onDismiss: () -> Unit,
 ) {
-    var isDeleting by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
     var transferCount by remember { mutableStateOf<Long?>(null) }
     var conflictingTransfers by remember { mutableStateOf(emptyList<Transfer>()) }
     var selectedTargetAccount by remember { mutableStateOf<Account?>(null) }
     var dropdownExpanded by remember { mutableStateOf(false) }
     var targetSearchQuery by remember { mutableStateOf("") }
-    val scope = rememberSchemaAwareCoroutineScope()
     val importEngine = LocalImportEngine.current
 
     val allAccounts by accountRepository
@@ -456,183 +454,129 @@ fun DeleteAccountDialog(
     val canDelete = !hasTransactions || (selectedTargetAccount != null && !hasConflicts)
     val noOtherAccounts = hasTransactions && otherAccounts.isEmpty()
 
-    AlertDialog(
-        onDismissRequest = { if (!isDeleting) onDismiss() },
-        icon = {
-            Text(
-                text = "⚠️",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-        },
-        title = { Text(if (hasTransactions) "Merge Account?" else "Delete Account?") },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Are you sure you want to delete \"${account.name}\"?",
-                    style = MaterialTheme.typography.bodyLarge,
+    DestructiveConfirmDialog(
+        title = if (hasTransactions) "Merge Account?" else "Delete Account?",
+        targetName = account.name,
+        confirmLabel = if (hasTransactions) "Merge" else "Delete",
+        confirmEnabled = canDelete && !noOtherAccounts && transferCount != null,
+        failureMessage = "Failed to remove account",
+        body = { isBusy ->
+            if (transferCount == null) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp).align(Alignment.CenterHorizontally),
+                    strokeWidth = 2.dp,
                 )
-                if (transferCount == null) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp).align(Alignment.CenterHorizontally),
-                        strokeWidth = 2.dp,
-                    )
-                } else if (hasTransactions) {
+            } else if (hasTransactions) {
+                Text(
+                    text =
+                        "\"${account.name}\" will be deleted and its $transferCount transaction(s) merged into the " +
+                            "surviving account you choose below. You can undo this later from the surviving account.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (noOtherAccounts) {
                     Text(
-                        text =
-                            "\"${account.name}\" will be deleted and its $transferCount transaction(s) merged into the " +
-                                "surviving account you choose below. You can undo this later from the surviving account.",
+                        text = "No other accounts available. Create another account first.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.error,
                     )
-                    if (noOtherAccounts) {
+                } else {
+                    ExposedDropdownMenuBox(
+                        expanded = dropdownExpanded,
+                        onExpandedChange = { if (!isBusy) dropdownExpanded = !dropdownExpanded },
+                    ) {
+                        OutlinedTextField(
+                            // Editable while expanded so the user can type to filter; shows the
+                            // selected account name when collapsed.
+                            value = if (dropdownExpanded) targetSearchQuery else (selectedTargetAccount?.name ?: ""),
+                            onValueChange = {
+                                targetSearchQuery = it
+                                dropdownExpanded = true
+                            },
+                            label = { Text("Merge into (surviving account)") },
+                            placeholder = { Text("Type to search...") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+                            enabled = !isBusy,
+                            singleLine = true,
+                        )
+                        ExposedDropdownMenu(
+                            expanded = dropdownExpanded,
+                            onDismissRequest = {
+                                dropdownExpanded = false
+                                targetSearchQuery = ""
+                            },
+                        ) {
+                            filteredTargetAccounts.forEach { targetAccount ->
+                                DropdownMenuItem(
+                                    text = { Text(targetAccount.name) },
+                                    onClick = {
+                                        selectedTargetAccount = targetAccount
+                                        dropdownExpanded = false
+                                        targetSearchQuery = ""
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    if (hasConflicts) {
                         Text(
-                            text = "No other accounts available. Create another account first.",
+                            text =
+                                "Cannot merge into \"${selectedTargetAccount?.name}\": " +
+                                    "${conflictingTransfers.size} transaction(s) between these accounts " +
+                                    "would become invalid. Choose a different account.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
                         )
-                    } else {
-                        ExposedDropdownMenuBox(
-                            expanded = dropdownExpanded,
-                            onExpandedChange = { if (!isDeleting) dropdownExpanded = !dropdownExpanded },
-                        ) {
-                            OutlinedTextField(
-                                // Editable while expanded so the user can type to filter; shows the
-                                // selected account name when collapsed.
-                                value = if (dropdownExpanded) targetSearchQuery else (selectedTargetAccount?.name ?: ""),
-                                onValueChange = {
-                                    targetSearchQuery = it
-                                    dropdownExpanded = true
-                                },
-                                label = { Text("Merge into (surviving account)") },
-                                placeholder = { Text("Type to search...") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-                                enabled = !isDeleting,
-                                singleLine = true,
-                            )
-                            ExposedDropdownMenu(
-                                expanded = dropdownExpanded,
-                                onDismissRequest = {
-                                    dropdownExpanded = false
-                                    targetSearchQuery = ""
-                                },
-                            ) {
-                                filteredTargetAccounts.forEach { targetAccount ->
-                                    DropdownMenuItem(
-                                        text = { Text(targetAccount.name) },
-                                        onClick = {
-                                            selectedTargetAccount = targetAccount
-                                            dropdownExpanded = false
-                                            targetSearchQuery = ""
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                        if (hasConflicts) {
+                        conflictingTransfers.forEach { transfer ->
                             Text(
-                                text =
-                                    "Cannot merge into \"${selectedTargetAccount?.name}\": " +
-                                        "${conflictingTransfers.size} transaction(s) between these accounts " +
-                                        "would become invalid. Choose a different account.",
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = "${transfer.description} - ${formatAmount(transfer.amount)}",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
-                            conflictingTransfers.forEach { transfer ->
-                                Text(
-                                    text = "${transfer.description} - ${formatAmount(transfer.amount)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                )
-                            }
                         }
                     }
-                } else {
-                    Text(
-                        text = "This action cannot be undone.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
-                errorMessage?.let { error ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+            } else {
+                Text(
+                    text = "This action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    isDeleting = true
-                    errorMessage = null
-                    scope.launch {
-                        try {
-                            if (hasTransactions) {
-                                importEngine.import(
-                                    ImportBatch.manualEdits(
-                                        accountMerges =
-                                            listOf(
-                                                AccountMergeRequest(
-                                                    deletedId = account.id,
-                                                    survivingId = selectedTargetAccount!!.id,
-                                                ),
-                                            ),
-                                    ),
-                                )
-                                maintenance.fullRefreshMaterializedViews()
-                            } else {
-                                importEngine.import(
-                                    ImportBatch.manualEdits(
-                                        accounts =
-                                            listOf(
-                                                ImportAccountIntent(
-                                                    key = LocalAccountKey("delete"),
-                                                    source = Source.Manual,
-                                                    operation = ImportOperation.DELETE,
-                                                    existingId = account.id,
-                                                ),
-                                            ),
-                                    ),
-                                )
-                            }
-                            onDismiss()
-                        } catch (expected: Exception) {
-                            logger.error(expected) { "Failed to remove account: ${expected.message}" }
-                            errorMessage = "Failed to remove account: ${expected.message}"
-                            isDeleting = false
-                        }
-                    }
-                },
-                enabled = !isDeleting && canDelete && !noOtherAccounts && transferCount != null,
-                colors =
-                    ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
+        onConfirm = {
+            if (hasTransactions) {
+                importEngine.import(
+                    ImportBatch.manualEdits(
+                        accountMerges =
+                            listOf(
+                                AccountMergeRequest(
+                                    deletedId = account.id,
+                                    survivingId = selectedTargetAccount!!.id,
+                                ),
+                            ),
                     ),
-            ) {
-                if (isDeleting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text(if (hasTransactions) "Merge" else "Delete")
-                }
+                )
+                maintenance.fullRefreshMaterializedViews()
+            } else {
+                importEngine.import(
+                    ImportBatch.manualEdits(
+                        accounts =
+                            listOf(
+                                ImportAccountIntent(
+                                    key = LocalAccountKey("delete"),
+                                    source = Source.Manual,
+                                    operation = ImportOperation.DELETE,
+                                    existingId = account.id,
+                                ),
+                            ),
+                    ),
+                )
             }
+            onDismiss()
         },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isDeleting,
-            ) {
-                Text("Cancel")
-            }
-        },
+        onDismiss = onDismiss,
     )
 }
 
