@@ -14,26 +14,44 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.QifImportId
-import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.ui.audit.AuditDiffCard
+import com.moneymanager.ui.audit.AuditField
+import com.moneymanager.ui.audit.AuditRevisionMeta
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
-import com.moneymanager.ui.audit.FieldChange
-import com.moneymanager.ui.audit.FieldChangeRow
-import com.moneymanager.ui.audit.FieldValueRow
-import com.moneymanager.ui.audit.SourceInfoSection
-import com.moneymanager.ui.audit.resolveUpdateChange
+import com.moneymanager.ui.audit.FlatEntityAuditDiffCard
+import com.moneymanager.ui.audit.computeFlatEntityAuditDiffs
 import kotlinx.coroutines.flow.first
-import kotlin.time.Instant
+
+private const val NO_VALUE = "(none)"
+
+private val personAuditFields =
+    listOf(
+        AuditField<PersonAuditEntry, Person>(
+            "First Name",
+            fromEntry = { it.firstName },
+            fromCurrent = { it.firstName },
+        ),
+        AuditField<PersonAuditEntry, Person>(
+            "Middle Name",
+            absent = NO_VALUE,
+            fromEntry = { it.middleName },
+            fromCurrent = { it.middleName },
+        ),
+        AuditField<PersonAuditEntry, Person>(
+            "Last Name",
+            absent = NO_VALUE,
+            fromEntry = { it.lastName },
+            fromCurrent = { it.lastName },
+        ),
+    )
 
 @Composable
 fun PersonAuditScreen(
@@ -52,7 +70,15 @@ fun PersonAuditScreen(
         loadData = {
             val entries = auditRepository.getAuditHistoryForPerson(personId)
             val currentPerson = personRepository.getPersonById(personId).first()
-            val diffs = computePersonAuditDiffs(entries, currentPerson)
+            val diffs =
+                computeFlatEntityAuditDiffs(
+                    entries = entries,
+                    current = currentPerson,
+                    fields = personAuditFields,
+                    hasExtraChanges = { it.attributeChanges.isNotEmpty() },
+                ) { entry ->
+                    AuditRevisionMeta(entry.id, entry.auditTimestamp, entry.auditType, entry.revisionId, entry.source)
+                }
             AuditScreenData(
                 title = "Person Audit: ${currentPerson?.fullName ?: personId}",
                 diffs = diffs,
@@ -60,191 +86,17 @@ fun PersonAuditScreen(
         },
         diffKey = { it.id },
         onBack = onBack,
-        diffCard = { diff -> PersonAuditDiffCard(diff, onApiSourceClick, onCsvSourceClick, onQifSourceClick) },
+        diffCard = { diff ->
+            FlatEntityAuditDiffCard(
+                diff = diff,
+                onApiSourceClick = onApiSourceClick,
+                onCsvSourceClick = onCsvSourceClick,
+                onQifSourceClick = onQifSourceClick,
+            ) { entry, valueColor ->
+                PersonAttributeChangesSection(entry.attributeChanges, valueColor)
+            }
+        },
     )
-}
-
-private data class PersonAuditDiff(
-    val id: Long,
-    val auditTimestamp: Instant,
-    val auditType: AuditType,
-    val revisionId: Long,
-    val firstName: FieldChange<String>,
-    val middleName: FieldChange<String?>,
-    val lastName: FieldChange<String?>,
-    val attributeChanges: List<PersonAttributeAuditEntry>,
-    val source: SourceRecord?,
-) {
-    val hasChanges: Boolean
-        get() = listOf(firstName, middleName, lastName).any { it is FieldChange.Changed } || attributeChanges.isNotEmpty()
-}
-
-private fun computePersonAuditDiffs(
-    entries: List<PersonAuditEntry>,
-    currentPerson: Person?,
-): List<PersonAuditDiff> =
-    entries.mapIndexed { index, entry ->
-        val revisionAttributes = entry.attributeChanges
-        when (entry.auditType) {
-            AuditType.INSERT ->
-                PersonAuditDiff(
-                    id = entry.id,
-                    auditTimestamp = entry.auditTimestamp,
-                    auditType = entry.auditType,
-                    revisionId = entry.revisionId,
-                    firstName = FieldChange.Created(entry.firstName),
-                    middleName = FieldChange.Created(entry.middleName),
-                    lastName = FieldChange.Created(entry.lastName),
-                    attributeChanges = revisionAttributes,
-                    source = entry.source,
-                )
-            AuditType.DELETE ->
-                PersonAuditDiff(
-                    id = entry.id,
-                    auditTimestamp = entry.auditTimestamp,
-                    auditType = entry.auditType,
-                    revisionId = entry.revisionId,
-                    firstName = FieldChange.Deleted(entry.firstName),
-                    middleName = FieldChange.Deleted(entry.middleName),
-                    lastName = FieldChange.Deleted(entry.lastName),
-                    attributeChanges = revisionAttributes,
-                    source = entry.source,
-                )
-            AuditType.UPDATE -> {
-                val previousEntry = entries.getOrNull(index - 1)
-
-                PersonAuditDiff(
-                    id = entry.id,
-                    auditTimestamp = entry.auditTimestamp,
-                    auditType = entry.auditType,
-                    revisionId = entry.revisionId,
-                    firstName =
-                        resolveUpdateChange(
-                            index = index,
-                            currentEntry = currentPerson,
-                            previousEntry = previousEntry,
-                            entryValue = entry.firstName,
-                            currentValue = { it.firstName },
-                            previousValue = { it.firstName },
-                        ),
-                    middleName =
-                        resolveUpdateChange(
-                            index = index,
-                            currentEntry = currentPerson,
-                            previousEntry = previousEntry,
-                            entryValue = entry.middleName,
-                            currentValue = { it.middleName },
-                            previousValue = { it.middleName },
-                        ),
-                    lastName =
-                        resolveUpdateChange(
-                            index = index,
-                            currentEntry = currentPerson,
-                            previousEntry = previousEntry,
-                            entryValue = entry.lastName,
-                            currentValue = { it.lastName },
-                            previousValue = { it.lastName },
-                        ),
-                    attributeChanges = revisionAttributes,
-                    source = entry.source,
-                )
-            }
-        }
-    }
-
-@Composable
-private fun PersonAuditDiffCard(
-    diff: PersonAuditDiff,
-    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
-    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
-) {
-    AuditDiffCard(
-        auditType = diff.auditType,
-        auditTimestamp = diff.auditTimestamp,
-        revisionId = diff.revisionId,
-    ) {
-        when (diff.auditType) {
-            AuditType.INSERT -> {
-                Text(
-                    text = "Created with:",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                FieldValueRow("First Name", diff.firstName.value())
-                FieldValueRow("Middle Name", diff.middleName.value() ?: "(none)")
-                FieldValueRow("Last Name", diff.lastName.value() ?: "(none)")
-                PersonAttributeChangesSection(diff.attributeChanges)
-                SourceInfoSection(
-                    diff.source,
-                    onApiSourceClick = onApiSourceClick,
-                    onCsvSourceClick = onCsvSourceClick,
-                    onQifSourceClick = onQifSourceClick,
-                )
-            }
-            AuditType.UPDATE -> {
-                if (!diff.hasChanges) {
-                    Text(
-                        text = "No visible changes recorded",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Text(
-                        text = "Changed:",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    val firstNameChange = diff.firstName
-                    if (firstNameChange is FieldChange.Changed) {
-                        FieldChangeRow("First Name", firstNameChange.oldValue, firstNameChange.newValue)
-                    }
-                    val middleNameChange = diff.middleName
-                    if (middleNameChange is FieldChange.Changed) {
-                        FieldChangeRow(
-                            "Middle Name",
-                            middleNameChange.oldValue ?: "(none)",
-                            middleNameChange.newValue ?: "(none)",
-                        )
-                    }
-                    val lastNameChange = diff.lastName
-                    if (lastNameChange is FieldChange.Changed) {
-                        FieldChangeRow(
-                            "Last Name",
-                            lastNameChange.oldValue ?: "(none)",
-                            lastNameChange.newValue ?: "(none)",
-                        )
-                    }
-                    PersonAttributeChangesSection(diff.attributeChanges)
-                }
-                SourceInfoSection(
-                    diff.source,
-                    onApiSourceClick = onApiSourceClick,
-                    onCsvSourceClick = onCsvSourceClick,
-                    onQifSourceClick = onQifSourceClick,
-                )
-            }
-            AuditType.DELETE -> {
-                val errorColor = MaterialTheme.colorScheme.error
-                Text(
-                    text = "Deleted (final values):",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = errorColor.copy(alpha = 0.8f),
-                )
-                FieldValueRow("First Name", diff.firstName.value(), errorColor)
-                FieldValueRow("Middle Name", diff.middleName.value() ?: "(none)", errorColor)
-                FieldValueRow("Last Name", diff.lastName.value() ?: "(none)", errorColor)
-                PersonAttributeChangesSection(diff.attributeChanges, errorColor)
-                SourceInfoSection(
-                    diff.source,
-                    labelColor = errorColor.copy(alpha = 0.8f),
-                    onApiSourceClick = onApiSourceClick,
-                    onCsvSourceClick = onCsvSourceClick,
-                    onQifSourceClick = onQifSourceClick,
-                )
-            }
-        }
-    }
 }
 
 @Composable
