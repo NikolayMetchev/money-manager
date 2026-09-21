@@ -2,14 +2,11 @@ package com.moneymanager.ui.screens.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -43,6 +40,7 @@ import com.moneymanager.remotestorage.sync.SyncProgress
 import com.moneymanager.remotestorage.sync.SyncResult
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
+import com.moneymanager.ui.components.SettingsSectionCard
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.delay
@@ -107,141 +105,134 @@ fun CloudStorageCard(
         if (sessionActive) runCatching { controller.checkRemote(database) }
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(text = "Cloud storage", style = MaterialTheme.typography.titleMedium)
-
-            val currentBinding = binding
-            if (currentBinding == null) {
-                Text(
-                    text = "This database is stored locally. Back it up to a provider to keep it encrypted off-device.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                controller.providerFactory.types().forEach { type ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        OutlinedButton(onClick = { createType = type }, modifier = Modifier.weight(1f)) {
-                            Text("Store in ${type.displayName}…")
-                        }
-                        OutlinedButton(onClick = { openType = type }, modifier = Modifier.weight(1f)) {
-                            Text("Open from ${type.displayName}…")
-                        }
+    SettingsSectionCard(title = "Cloud storage") {
+        val currentBinding = binding
+        if (currentBinding == null) {
+            Text(
+                text = "This database is stored locally. Back it up to a provider to keep it encrypted off-device.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            controller.providerFactory.types().forEach { type ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(onClick = { createType = type }, modifier = Modifier.weight(1f)) {
+                        Text("Store in ${type.displayName}…")
+                    }
+                    OutlinedButton(onClick = { openType = type }, modifier = Modifier.weight(1f)) {
+                        Text("Open from ${type.displayName}…")
                     }
                 }
-            } else {
-                val type = controller.providerFactory.types().firstOrNull { it.id == currentBinding.providerId }
-                val providerLabel = type?.displayName ?: currentBinding.providerId
-                val isGoogleDrive = currentBinding.providerId == GOOGLE_DRIVE_PROVIDER_ID
-                val locationPath =
-                    if (isGoogleDrive) {
-                        "$GOOGLE_DRIVE_FOLDER_NAME/${currentBinding.remoteName}"
-                    } else {
-                        currentBinding.remoteName
-                    }
-                val onOpenRemote: (() -> Unit)? =
-                    if (isGoogleDrive) {
-                        { uriHandler.openUri("https://drive.google.com/file/d/${currentBinding.remoteFileId}/view") }
-                    } else {
-                        null
-                    }
+            }
+        } else {
+            val type = controller.providerFactory.types().firstOrNull { it.id == currentBinding.providerId }
+            val providerLabel = type?.displayName ?: currentBinding.providerId
+            val isGoogleDrive = currentBinding.providerId == GOOGLE_DRIVE_PROVIDER_ID
+            val locationPath =
+                if (isGoogleDrive) {
+                    "$GOOGLE_DRIVE_FOLDER_NAME/${currentBinding.remoteName}"
+                } else {
+                    currentBinding.remoteName
+                }
+            val onOpenRemote: (() -> Unit)? =
+                if (isGoogleDrive) {
+                    { uriHandler.openUri("https://drive.google.com/file/d/${currentBinding.remoteFileId}/view") }
+                } else {
+                    null
+                }
 
-                fun upload(force: Boolean) {
+            fun upload(force: Boolean) {
+                busy = true
+                scope.launch {
+                    runCatching { controller.syncNow(database, force = force) { syncProgress = it } }
+                        .onSuccess { result ->
+                            message =
+                                when (result) {
+                                    SyncResult.UPLOADED -> "Uploaded to ${currentBinding.remoteName}"
+                                    SyncResult.BLOCKED ->
+                                        "The remote changed since your last sync — download first, or overwrite it."
+                                    SyncResult.NO_SESSION -> "No active cloud session"
+                                }
+                            refreshTick++
+                        }.onFailure { message = "Upload failed: ${it.message}" }
+                    syncProgress = null
+                    busy = false
+                }
+            }
+
+            // Re-hydrating overwrites the *currently open* working copy, so the live database must be
+            // closed before restore (or SQLite reports it busy, notably on Android). The app root owns
+            // the database lifecycle, so it performs the close → download → reopen as one operation.
+            fun download() = onReloadFromRemote()
+
+            BoundState(
+                providerLabel = providerLabel,
+                locationPath = locationPath,
+                onOpenRemote = onOpenRemote,
+                sessionActive = sessionActive,
+                busy = busy,
+                syncState = syncState,
+                onCheckRemote = {
                     busy = true
                     scope.launch {
-                        runCatching { controller.syncNow(database, force = force) { syncProgress = it } }
-                            .onSuccess { result ->
-                                message =
-                                    when (result) {
-                                        SyncResult.UPLOADED -> "Uploaded to ${currentBinding.remoteName}"
-                                        SyncResult.BLOCKED ->
-                                            "The remote changed since your last sync — download first, or overwrite it."
-                                        SyncResult.NO_SESSION -> "No active cloud session"
-                                    }
-                                refreshTick++
-                            }.onFailure { message = "Upload failed: ${it.message}" }
-                        syncProgress = null
+                        runCatching { controller.checkRemote(database) }
+                            .onSuccess { message = null }
+                            .onFailure { message = "Check failed: ${it.message}" }
                         busy = false
                     }
-                }
+                },
+                onUpload = {
+                    if (syncState.status == SyncStatus.CONFLICT) {
+                        confirmAction = ConflictAction.UploadOverwrite
+                    } else {
+                        upload(force = false)
+                    }
+                },
+                onDownload = {
+                    if (syncState.status == SyncStatus.CONFLICT) {
+                        confirmAction = ConflictAction.DownloadDiscard
+                    } else {
+                        download()
+                    }
+                },
+                onResume = { showResume = true },
+                onDisconnect = {
+                    controller.unbind()
+                    binding = null
+                    sessionActive = false
+                    message = "Disconnected from cloud storage (local copy kept)"
+                },
+            )
 
-                // Re-hydrating overwrites the *currently open* working copy, so the live database must be
-                // closed before restore (or SQLite reports it busy, notably on Android). The app root owns
-                // the database lifecycle, so it performs the close → download → reopen as one operation.
-                fun download() = onReloadFromRemote()
-
-                BoundState(
-                    providerLabel = providerLabel,
-                    locationPath = locationPath,
-                    onOpenRemote = onOpenRemote,
-                    sessionActive = sessionActive,
-                    busy = busy,
-                    syncState = syncState,
-                    onCheckRemote = {
-                        busy = true
-                        scope.launch {
-                            runCatching { controller.checkRemote(database) }
-                                .onSuccess { message = null }
-                                .onFailure { message = "Check failed: ${it.message}" }
-                            busy = false
+            confirmAction?.let { action ->
+                ConflictConfirmDialog(
+                    action = action,
+                    onConfirm = {
+                        confirmAction = null
+                        when (action) {
+                            ConflictAction.UploadOverwrite -> upload(force = true)
+                            ConflictAction.DownloadDiscard -> download()
                         }
                     },
-                    onUpload = {
-                        if (syncState.status == SyncStatus.CONFLICT) {
-                            confirmAction = ConflictAction.UploadOverwrite
-                        } else {
-                            upload(force = false)
-                        }
-                    },
-                    onDownload = {
-                        if (syncState.status == SyncStatus.CONFLICT) {
-                            confirmAction = ConflictAction.DownloadDiscard
-                        } else {
-                            download()
-                        }
-                    },
-                    onResume = { showResume = true },
-                    onDisconnect = {
-                        controller.unbind()
-                        binding = null
-                        sessionActive = false
-                        message = "Disconnected from cloud storage (local copy kept)"
-                    },
-                )
-
-                confirmAction?.let { action ->
-                    ConflictConfirmDialog(
-                        action = action,
-                        onConfirm = {
-                            confirmAction = null
-                            when (action) {
-                                ConflictAction.UploadOverwrite -> upload(force = true)
-                                ConflictAction.DownloadDiscard -> download()
-                            }
-                        },
-                        onDismiss = { confirmAction = null },
-                    )
-                }
-            }
-
-            StorageSizes(localSize = localSize, remoteSize = remoteSize)
-
-            tokenStatus?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
-
-            syncProgress?.let { progress ->
-                Text(text = progress.message, style = MaterialTheme.typography.bodySmall)
-                LinearProgressIndicator(
-                    progress = { progress.fraction },
-                    modifier = Modifier.fillMaxWidth(),
+                    onDismiss = { confirmAction = null },
                 )
             }
-
-            message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
         }
+
+        StorageSizes(localSize = localSize, remoteSize = remoteSize)
+
+        tokenStatus?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
+
+        syncProgress?.let { progress ->
+            Text(text = progress.message, style = MaterialTheme.typography.bodySmall)
+            LinearProgressIndicator(
+                progress = { progress.fraction },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
     }
 
     val defaultArchiveName =
