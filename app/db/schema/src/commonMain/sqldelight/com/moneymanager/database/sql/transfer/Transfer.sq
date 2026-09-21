@@ -78,3 +78,87 @@ CREATE INDEX IF NOT EXISTS idx_pending_changes_timestamp ON pending_materialized
 
 -- NOTE: Triggers are created at runtime via DatabaseConfig.createIncrementalRefreshTriggers()
 -- SQLDelight 2.2.1 has limited trigger support, so we create them dynamically
+
+-- transfer_with_asset: the transfer row with its asset resolved through `asset_details`, i.e. the
+-- projection every transfer read query needs in order to build a domain `Transfer` (the amount is a
+-- bare minor-unit string, meaningless without the asset's code/scale). Declared once here so the
+-- select queries in :app:db:read carry only their WHERE/ORDER BY.
+CREATE VIEW transfer_with_asset AS
+SELECT
+    transfer.id,
+    transfer.revision_id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    transfer.amount,
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind
+FROM transfer
+JOIN asset_details ON transfer.asset_id = asset_details.id;
+
+-- account_row_source: one row per account-transaction line as the transactions list renders it —
+-- the running-balance materialized row, its asset, the transfer/trade endpoints, and the relationship
+-- links (reconciled / fee / pass-through / exchange order) the row's badges are drawn from. It carries
+-- no account or ordering predicate: callers add their own WHERE/ORDER BY, and SQLite flattens the view
+-- into the outer query so the (account_id, timestamp) index is still used.
+CREATE VIEW account_row_source AS
+SELECT
+    running_balance_materialized_view.id,
+    running_balance_materialized_view.timestamp,
+    running_balance_materialized_view.description,
+    running_balance_materialized_view.account_id,
+    running_balance_materialized_view.transaction_amount,
+    running_balance_materialized_view.running_balance,
+    asset_details.id AS asset_id,
+    asset_details.code AS asset_code,
+    asset_details.name AS asset_name,
+    asset_details.scale_factor AS asset_scale_factor,
+    asset_details.kind AS asset_kind,
+    COALESCE(transfer.source_account_id, trade.from_account_id) AS source_account_id,
+    COALESCE(transfer.target_account_id, trade.to_account_id) AS target_account_id,
+    running_balance_materialized_view.is_excluded,
+    -- A pass-through (conduit) leg reads as reconciled when its chain counterpart is: a funding-card
+    -- reconcile links the conduit spend to the FUNDING leg, so the sibling SPEND leg (the "Via conduit"
+    -- row) — and vice versa — must show reconciled too, since the whole chain is reconciled.
+    -- pass_through_as_funding.id2 is this row's spend leg (when this row is the funding leg);
+    -- pass_through_as_spend.id1 is this row's funding leg (when this row is the spend leg); both are NULL
+    -- for non-conduit rows, so the extra checks are no-ops there.
+    CASE WHEN EXISTS (
+        SELECT 1 FROM transfer_relationship tr
+        WHERE tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+          AND (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id
+               OR tr.id1 = pass_through_as_funding.id2 OR tr.id2 = pass_through_as_funding.id2
+               OR tr.id1 = pass_through_as_spend.id1 OR tr.id2 = pass_through_as_spend.id1)
+    ) THEN 1 ELSE 0 END AS is_reconciled,
+    -- Linked fee transfer when this row is the main transaction (fee_as_main.id2), and the linked main
+    -- transaction when this row is the fee transfer (fee_as_child.id1). LEFT JOINs (rather than scalar
+    -- subqueries) so SQLDelight infers these as NULLABLE; there is at most one fee link per side, so the
+    -- joins never multiply rows. FEE_RELATIONSHIP_TYPE_ID = 2.
+    fee_as_main.id2 AS fee_transfer_id,
+    fee_as_child.id1 AS fee_parent_id,
+    -- Pass-through (conduit) link, e.g. Curve: the spend leg when this row is the funding leg (id1),
+    -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
+    pass_through_as_funding.id2 AS pass_through_spend_id,
+    pass_through_as_spend.id1 AS pass_through_funding_id,
+    -- The exchange order this trade fills, when any (exchange_order_trade.trade_id is UNIQUE, so
+    -- the join never multiplies rows and is a point index lookup).
+    order_link.order_id AS exchange_order_id,
+    -- Whether this row is a trade (same-transaction asset conversion) or a plain transfer.
+    CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
+FROM running_balance_materialized_view
+JOIN asset_details ON running_balance_materialized_view.asset_id = asset_details.id
+LEFT JOIN transfer ON running_balance_materialized_view.id = transfer.id
+LEFT JOIN trade ON running_balance_materialized_view.id = trade.id
+LEFT JOIN transfer_relationship fee_as_main
+    ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
+LEFT JOIN transfer_relationship fee_as_child
+    ON fee_as_child.id2 = running_balance_materialized_view.id AND fee_as_child.relationship_type_id = 2
+LEFT JOIN transfer_relationship pass_through_as_funding
+    ON pass_through_as_funding.id1 = running_balance_materialized_view.id AND pass_through_as_funding.relationship_type_id = 3
+LEFT JOIN transfer_relationship pass_through_as_spend
+    ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
+LEFT JOIN exchange_order_trade order_link ON order_link.trade_id = running_balance_materialized_view.id;
