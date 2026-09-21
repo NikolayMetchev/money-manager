@@ -255,5 +255,4 @@ class StrategyLibraryService(
             relationshipTypeId = relationshipTypeId,
             rules = rules,
         )
-
 }

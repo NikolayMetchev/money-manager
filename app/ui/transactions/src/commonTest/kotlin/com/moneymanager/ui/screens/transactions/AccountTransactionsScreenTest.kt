@@ -1592,5 +1592,4 @@ class AccountTransactionsScreenTest {
             every { getOrderById(any()) } returns flowOf(null)
             every { getFillTradesForOrder(any()) } returns flowOf(emptyList())
         }
-
 }
