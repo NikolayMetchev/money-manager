@@ -880,7 +880,7 @@ private suspend fun setupImportSession(
     // no two coroutines race to write the same type, which causes SQLITE_BUSY.
     for (fieldName in customTxFields.keys) attributeTypeCache.getOrCreate(fieldName)
 
-    onProgress(ApiSessionImportProgress(detail = "Reading downloaded API responses...", progress = null))
+    onProgress(ApiSessionImportProgress(detail = "Reading downloaded API responses..."))
 
     return ImportSetup(
         strategy = strategy,
