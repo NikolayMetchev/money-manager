@@ -79,7 +79,10 @@ device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compil
 - **ALWAYS** use `BigDecimal` for decimal parsing and arithmetic
 - Use `BigDecimal(String)` constructor for perfect precision
 
-**Storage**: Amounts stored as `INTEGER` in database (value × scale_factor). Most currencies use scale factor 100 (2 decimals).
+**Storage**: Amounts stored as `INTEGER` in database (value × scale_factor). **Every** asset — crypto
+*and* currency — is created at scale factor 1e18, not at the currency's ISO 4217 decimal-place count;
+`CurrencyScaleFactors` (in `app/model/core`) documents why. Assuming 100 is how you get spurious
+"Rounding necessary" failures, so `Currency.scaleFactor` has no default — always pass it explicitly.
 
 **Key Classes**:
 - `Money`: Value class storing amount as `Long` with associated `Currency`

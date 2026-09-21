@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
@@ -34,7 +35,8 @@ class CryptoComCardXlsxMapperTest {
     private val now = Clock.System.now()
     private val strategy = BuiltInCsvStrategies.buildCryptoComCardXlsxStrategy(now)
 
-    private val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound")
+    private val gbp =
+        Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
     private val card = Account(id = AccountId(1), name = "Crypto.com Card", openingDate = now)
     private val cash = Account(id = AccountId(2), name = "Crypto.com Cash", openingDate = now)
 

@@ -609,7 +609,7 @@ class AccountsScreenTest {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
-            val gbp = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound")
+            val gbp = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound", scaleFactor = 100)
             val account = Account(id = AccountId(1L), name = "Checking Account", openingDate = now)
             val balances = listOf(AccountBalance(accountId = AccountId(1L), balance = Money(10000L, gbp)))
             val repository = createAccountRepository(listOf(account))
@@ -642,8 +642,8 @@ class AccountsScreenTest {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
-            val gbp = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound")
-            val usd = Currency(id = CurrencyId(2L), code = "USD", name = "US Dollar")
+            val gbp = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound", scaleFactor = 100)
+            val usd = Currency(id = CurrencyId(2L), code = "USD", name = "US Dollar", scaleFactor = 100)
             val gbpAccount = Account(id = AccountId(1L), name = "GBP Checking", openingDate = now)
             val usdAccount = Account(id = AccountId(2L), name = "USD Savings", openingDate = now)
             val balances =
@@ -686,8 +686,8 @@ class AccountsScreenTest {
         runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
-            val gbp = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound")
-            val usd = Currency(id = CurrencyId(2L), code = "USD", name = "US Dollar")
+            val gbp = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound", scaleFactor = 100)
+            val usd = Currency(id = CurrencyId(2L), code = "USD", name = "US Dollar", scaleFactor = 100)
             val accounts =
                 listOf(
                     Account(id = AccountId(1L), name = "GBP Account", openingDate = now),

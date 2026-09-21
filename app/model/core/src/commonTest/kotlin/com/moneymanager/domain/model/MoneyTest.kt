@@ -14,6 +14,7 @@ class MoneyTest {
             id = CurrencyId(1L),
             code = "USD",
             name = "US Dollar",
+            scaleFactor = 100,
         )
 
     private val jpy =
