@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * The frame every Settings section shares: a full-width [Card] wrapping a padded, 12dp-spaced
+ * The frame every Settings section shares: a full-width `Card` wrapping a padded, 12dp-spaced
  * [Column] headed by [title]. Sections declare only their own content.
  */
 @Composable
