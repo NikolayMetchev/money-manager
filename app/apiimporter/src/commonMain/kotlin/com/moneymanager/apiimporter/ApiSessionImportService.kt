@@ -790,42 +790,6 @@ private fun ApiImportAccount.bankDetails(): Pair<String?, String?> {
         (ownAccountNumber ?: owners.firstOrNull { !it.accountNumber.isNullOrBlank() }?.accountNumber)
 }
 
-/** Mutable progress counters shared between the setup, parallel import, and progress callback. */
-private class ImportCounts(
-    val totalResponses: Int,
-) {
-    var completedCount = 0
-    var totalImported = 0
-    var totalDuplicates = 0
-    var totalErrors = 0
-    var sourceAccountsCreated = 0
-    var counterpartyAccountsCreated = 0
-
-    fun detailMessage() =
-        buildString {
-            if (totalResponses > 0) {
-                append("Importing transaction responses: $completedCount/$totalResponses")
-            } else {
-                append("Importing accounts and related data")
-            }
-            if (totalImported > 0) append(". $totalImported imported")
-            if (totalDuplicates > 0) append(". $totalDuplicates duplicate(s)")
-            if (totalErrors > 0) append(". $totalErrors error(s)")
-            if (sourceAccountsCreated > 0) append(". $sourceAccountsCreated source account(s) created")
-            if (counterpartyAccountsCreated > 0) append(". $counterpartyAccountsCreated counterparty account(s) created")
-            append(".")
-        }
-
-    fun progressFraction(): Float? =
-        if (totalResponses <= 0) {
-            null
-        } else {
-            // Keep most of the bar for transaction-page import itself.
-            val responseFraction = completedCount.toFloat() / totalResponses.toFloat()
-            0.2f + (responseFraction * 0.6f)
-        }
-}
-
 /** All state created during setup that is shared across the import steps. */
 private data class ImportSetup(
     val strategy: ApiImportStrategy,
@@ -842,8 +806,6 @@ private data class ImportSetup(
     val peopleResolver: BatchPeopleResolver,
     val currencyCache: CurrencyCache,
     val attributeTypeCache: AttributeTypeCache,
-    val counts: ImportCounts,
-    val progressMutex: Mutex,
     val onProgress: (ApiSessionImportProgress) -> Unit,
     val apiSessionRepository: ApiSessionReadRepository,
     val importEngine: ImportEngine,
@@ -918,10 +880,7 @@ private suspend fun setupImportSession(
     // no two coroutines race to write the same type, which causes SQLITE_BUSY.
     for (fieldName in customTxFields.keys) attributeTypeCache.getOrCreate(fieldName)
 
-    val counts = ImportCounts(transactionResponses.size)
-    val progressMutex = Mutex()
-
-    onProgress(ApiSessionImportProgress(detail = counts.detailMessage(), progress = counts.progressFraction()))
+    onProgress(ApiSessionImportProgress(detail = "Reading downloaded API responses..."))
 
     return ImportSetup(
         strategy = strategy,
@@ -938,8 +897,6 @@ private suspend fun setupImportSession(
         peopleResolver = BatchPeopleResolver(),
         currencyCache = currencyCache,
         attributeTypeCache = attributeTypeCache,
-        counts = counts,
-        progressMutex = progressMutex,
         onProgress = onProgress,
         apiSessionRepository = apiSessionRepository,
         importEngine = importEngine,
