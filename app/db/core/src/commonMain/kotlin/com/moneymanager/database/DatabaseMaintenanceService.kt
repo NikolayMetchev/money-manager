@@ -1,19 +1,20 @@
 package com.moneymanager.database
 
+import com.moneymanager.domain.Maintenance
 import kotlin.time.Duration
 
 /**
  * Service for performing database maintenance operations.
  * These operations help optimize database performance and reclaim storage space.
  */
-interface DatabaseMaintenanceService {
+interface DatabaseMaintenanceService : Maintenance {
     /**
      * Rebuilds all indices in the database.
      * This can help improve query performance if indices have become fragmented.
      *
      * @return The duration the operation took to complete
      */
-    suspend fun reindex(): Duration
+    override suspend fun reindex(): Duration
 
     /**
      * Rebuilds the entire database file, repacking it into a minimal amount of disk space.
@@ -24,7 +25,7 @@ interface DatabaseMaintenanceService {
      *
      * @return The duration the operation took to complete
      */
-    suspend fun vacuum(): Duration
+    override suspend fun vacuum(): Duration
 
     /**
      * Gathers statistics about indices and stores them in the database.
@@ -32,7 +33,7 @@ interface DatabaseMaintenanceService {
      *
      * @return The duration the operation took to complete
      */
-    suspend fun analyze(): Duration
+    override suspend fun analyze(): Duration
 
     /**
      * Refreshes all materialized views in the database incrementally.
@@ -43,7 +44,7 @@ interface DatabaseMaintenanceService {
      *
      * @return The duration the operation took to complete
      */
-    suspend fun refreshMaterializedViews(): Duration
+    override suspend fun refreshMaterializedViews(): Duration
 
     /**
      * Empties all materialized-view tables (AccountBalanceMaterializedView,
@@ -67,5 +68,5 @@ interface DatabaseMaintenanceService {
      *
      * @return The duration the operation took to complete
      */
-    suspend fun fullRefreshMaterializedViews(): Duration
+    override suspend fun fullRefreshMaterializedViews(): Duration
 }

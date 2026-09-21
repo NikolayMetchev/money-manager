@@ -45,7 +45,12 @@ import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.strategy.CsvImportParseResult
+import com.moneymanager.domain.strategy.CsvReferenceType
+import com.moneymanager.domain.strategy.CsvResolution
+import com.moneymanager.domain.strategy.CsvStrategyImportExport
 import com.moneymanager.domain.strategy.CsvStrategyImportResult
+import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
@@ -59,67 +64,6 @@ import com.moneymanager.importengineapi.LocalCurrencyKey
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
-
-/**
- * Type of reference that needs to be resolved during import.
- */
-enum class ReferenceType {
-    ACCOUNT,
-    CURRENCY,
-    CATEGORY,
-}
-
-/**
- * An unresolved reference found during import.
- *
- * @property type The type of reference (account, currency, category)
- * @property name The name/code from the export that couldn't be resolved
- * @property fieldType Which transfer field this reference belongs to, or null for references that are not field-scoped
- */
-data class UnresolvedReference(
-    val type: ReferenceType,
-    val name: String,
-    val fieldType: TransferField?,
-)
-
-/**
- * How to resolve a missing reference during import.
- */
-sealed interface Resolution {
-    /**
-     * Map to an existing entity by ID.
-     */
-    data class MapToExisting(
-        val id: Long,
-    ) : Resolution
-
-    /**
-     * Map currency reference to an existing currency by UUID string.
-     */
-    data class MapToExistingCurrency(
-        val id: String,
-    ) : Resolution
-
-    /**
-     * Create a new entity with the given name.
-     */
-    data class CreateNew(
-        val name: String,
-    ) : Resolution
-}
-
-/**
- * Result of parsing an export file, before resolution.
- *
- * @property strategyName Name of the strategy being imported
- * @property export The parsed export data
- * @property unresolvedReferences List of references that need resolution
- */
-data class ImportParseResult(
-    val strategyName: String,
-    val export: CsvStrategyExport,
-    val unresolvedReferences: List<UnresolvedReference>,
-)
 
 private data class StrategyReferenceData(
     val accounts: List<Account>,
@@ -143,7 +87,7 @@ class CsvStrategyExportService(
     private val categoryRepository: CategoryReadRepository,
     private val accountMappingRepository: AccountMappingReadRepository,
     private val importEngine: ImportEngine,
-) {
+) : CsvStrategyImportExport {
     // Entities created while importing a strategy are a manual user action on this device.
     private val source = Source.Manual
 
@@ -151,7 +95,7 @@ class CsvStrategyExportService(
      * Converts a CsvImportStrategy to its portable export format.
      * Resolves all database IDs to human-readable names/codes.
      */
-    suspend fun toExport(
+    override suspend fun toExport(
         strategy: CsvImportStrategy,
         appVersion: AppVersion,
     ): CsvStrategyExport {
@@ -188,10 +132,10 @@ class CsvStrategyExportService(
      * Parses an export and identifies any unresolved references.
      * Does not create the strategy yet - that happens after resolution.
      */
-    suspend fun parseExport(export: CsvStrategyExport): ImportParseResult {
+    override suspend fun parseExport(export: CsvStrategyExport): CsvImportParseResult {
         val referenceData = loadReferenceData()
 
-        val unresolvedReferences = mutableListOf<UnresolvedReference>()
+        val unresolvedReferences = mutableListOf<CsvUnresolvedReference>()
 
         for ((fieldType, mappingExport) in export.fieldMappings) {
             collectUnresolvedReferences(mappingExport, fieldType, referenceData, unresolvedReferences)
@@ -202,12 +146,12 @@ class CsvStrategyExportService(
         for (mapping in export.accountMappings) {
             if (referenceData.accountsByName[mapping.accountName] == null) {
                 unresolvedReferences.add(
-                    UnresolvedReference(type = ReferenceType.ACCOUNT, name = mapping.accountName, fieldType = null),
+                    CsvUnresolvedReference(type = CsvReferenceType.ACCOUNT, name = mapping.accountName, fieldType = null),
                 )
             }
         }
 
-        return ImportParseResult(
+        return CsvImportParseResult(
             strategyName = export.name,
             export = export,
             unresolvedReferences = unresolvedReferences.distinct(),
@@ -218,14 +162,14 @@ class CsvStrategyExportService(
         mappingExport: FieldMappingExport,
         fieldType: TransferField,
         referenceData: StrategyReferenceData,
-        unresolvedReferences: MutableList<UnresolvedReference>,
+        unresolvedReferences: MutableList<CsvUnresolvedReference>,
     ) {
         when (mappingExport) {
             is HardCodedAccountExport -> {
                 if (referenceData.accountsByName[mappingExport.accountName] == null) {
                     unresolvedReferences.add(
-                        UnresolvedReference(
-                            type = ReferenceType.ACCOUNT,
+                        CsvUnresolvedReference(
+                            type = CsvReferenceType.ACCOUNT,
                             name = mappingExport.accountName,
                             fieldType = fieldType,
                         ),
@@ -247,8 +191,8 @@ class CsvStrategyExportService(
             is HardCodedCurrencyExport -> {
                 if (referenceData.currenciesByCode[mappingExport.currencyCode] == null) {
                     unresolvedReferences.add(
-                        UnresolvedReference(
-                            type = ReferenceType.CURRENCY,
+                        CsvUnresolvedReference(
+                            type = CsvReferenceType.CURRENCY,
                             name = mappingExport.currencyCode,
                             fieldType = fieldType,
                         ),
@@ -270,14 +214,14 @@ class CsvStrategyExportService(
         defaultCategoryName: String,
         fieldType: TransferField,
         referenceData: StrategyReferenceData,
-        unresolvedReferences: MutableList<UnresolvedReference>,
+        unresolvedReferences: MutableList<CsvUnresolvedReference>,
     ) {
         if (defaultCategoryName != Category.UNCATEGORIZED_NAME &&
             referenceData.categoriesByName[defaultCategoryName] == null
         ) {
             unresolvedReferences.add(
-                UnresolvedReference(
-                    type = ReferenceType.CATEGORY,
+                CsvUnresolvedReference(
+                    type = CsvReferenceType.CATEGORY,
                     name = defaultCategoryName,
                     fieldType = fieldType,
                 ),
@@ -300,9 +244,9 @@ class CsvStrategyExportService(
      * @param resolutions Map of unresolved references to their resolutions
      * @return The (not-yet-saved) strategy and its resolved per-strategy account mappings
      */
-    suspend fun createStrategyFromExport(
+    override suspend fun createStrategyFromExport(
         export: CsvStrategyExport,
-        resolutions: Map<UnresolvedReference, Resolution>,
+        resolutions: Map<CsvUnresolvedReference, CsvResolution>,
     ): CsvStrategyImportResult {
         // First, create any new entities that were requested — in one engine batch (the sole writer).
         val accountIntents = mutableMapOf<String, ImportAccountIntent>()
@@ -310,9 +254,9 @@ class CsvStrategyExportService(
         val currencyIntents = mutableMapOf<String, ImportCurrencyIntent>()
 
         for ((ref, resolution) in resolutions) {
-            if (resolution is Resolution.CreateNew) {
+            if (resolution is CsvResolution.CreateNew) {
                 when (ref.type) {
-                    ReferenceType.ACCOUNT ->
+                    CsvReferenceType.ACCOUNT ->
                         accountIntents[ref.name] =
                             ImportAccountIntent(
                                 key = LocalAccountKey(ref.name),
@@ -321,10 +265,10 @@ class CsvStrategyExportService(
                                 name = resolution.name,
                                 openingDate = Instant.fromEpochMilliseconds(System.currentTimeMillis()),
                             )
-                    ReferenceType.CATEGORY ->
+                    CsvReferenceType.CATEGORY ->
                         categoryIntents[ref.name] =
                             ImportCategoryIntent(key = LocalCategoryKey(ref.name), source = source, name = resolution.name)
-                    ReferenceType.CURRENCY ->
+                    CsvReferenceType.CURRENCY ->
                         currencyIntents[ref.name] =
                             ImportCurrencyIntent(
                                 key = LocalCurrencyKey(ref.name),
@@ -359,32 +303,32 @@ class CsvStrategyExportService(
         // Add resolution mappings for MapToExisting
         for ((ref, resolution) in resolutions) {
             when (resolution) {
-                is Resolution.MapToExisting -> {
+                is CsvResolution.MapToExisting -> {
                     when (ref.type) {
-                        ReferenceType.ACCOUNT -> {
+                        CsvReferenceType.ACCOUNT -> {
                             val account = accounts.find { it.id.id == resolution.id }
                             if (account != null) {
                                 accountsByName[ref.name] = account
                             }
                         }
-                        ReferenceType.CATEGORY -> {
+                        CsvReferenceType.CATEGORY -> {
                             val category = categories.find { it.id == resolution.id }
                             if (category != null) {
                                 categoriesByName[ref.name] = category
                             }
                         }
-                        ReferenceType.CURRENCY -> Unit
+                        CsvReferenceType.CURRENCY -> Unit
                     }
                 }
-                is Resolution.MapToExistingCurrency -> {
-                    if (ref.type == ReferenceType.CURRENCY) {
+                is CsvResolution.MapToExistingCurrency -> {
+                    if (ref.type == CsvReferenceType.CURRENCY) {
                         val currency = currencies.find { it.id.id.toString() == resolution.id }
                         if (currency != null) {
                             currenciesByCode[ref.name] = currency
                         }
                     }
                 }
-                is Resolution.CreateNew ->
+                is CsvResolution.CreateNew ->
                     aliasCreatedEntity(
                         ref,
                         importResult,
@@ -454,7 +398,7 @@ class CsvStrategyExportService(
     // (looked up by the engine-returned id) so toDomain resolves it instead of failing/UNCATEGORIZED.
     @Suppress("LongParameterList")
     private fun aliasCreatedEntity(
-        ref: UnresolvedReference,
+        ref: CsvUnresolvedReference,
         importResult: ImportResult,
         accounts: List<Account>,
         categories: List<Category>,
@@ -464,15 +408,15 @@ class CsvStrategyExportService(
         currenciesByCode: MutableMap<String, Currency>,
     ) {
         when (ref.type) {
-            ReferenceType.ACCOUNT -> {
+            CsvReferenceType.ACCOUNT -> {
                 val id = importResult.createdAccountIds[LocalAccountKey(ref.name)] ?: return
                 accounts.find { it.id == id }?.let { accountsByName[ref.name] = it }
             }
-            ReferenceType.CATEGORY -> {
+            CsvReferenceType.CATEGORY -> {
                 val id = importResult.createdCategoryIds[LocalCategoryKey(ref.name)] ?: return
                 categories.find { it.id == id }?.let { categoriesByName[ref.name] = it }
             }
-            ReferenceType.CURRENCY -> {
+            CsvReferenceType.CURRENCY -> {
                 val id = importResult.createdCurrencyIds[LocalCurrencyKey(ref.name)] ?: return
                 currencies.find { it.id == id }?.let { currenciesByCode[ref.name] = it }
             }

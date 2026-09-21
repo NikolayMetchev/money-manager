@@ -1,7 +1,6 @@
 package com.moneymanager.database
 
 import com.moneymanager.database.service.AccountMappingExportService
-import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AuditReadRepository
@@ -58,7 +57,6 @@ data class Imports(
     val accountMappingRepository: AccountMappingWriteRepository,
     val csvImportRepository: CsvImportWriteRepository,
     val csvImportStrategyRepository: CsvImportStrategyWriteRepository,
-    val csvStrategyExportService: CsvStrategyExportService,
     val csvStrategyImportExport: CsvStrategyImportExport,
     val accountMappingExportService: AccountMappingExportService,
     val strategyLibrary: StrategyLibrary,

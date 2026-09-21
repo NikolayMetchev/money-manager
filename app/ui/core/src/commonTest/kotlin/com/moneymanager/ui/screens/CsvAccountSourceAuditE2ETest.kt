@@ -10,7 +10,6 @@ import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.DbMaintenance
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -129,7 +128,7 @@ class CsvAccountSourceAuditE2ETest {
                     currencies = currencies,
                     accountMappingRepository = dc.accountMappingRepository,
                     accountRepository = dc.accountRepository,
-                    maintenance = DbMaintenance(dc.maintenanceService),
+                    maintenance = dc.maintenanceService,
                     importEngine =
                         ImportEngineImpl(
                             transactionRepository = dc.transactionRepository,
