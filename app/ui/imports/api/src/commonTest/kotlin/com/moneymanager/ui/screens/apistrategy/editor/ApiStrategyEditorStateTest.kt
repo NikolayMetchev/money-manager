@@ -215,16 +215,13 @@ class ApiStrategyEditorStateTest {
         )
 
     @Test
-    fun `round-trips every nested config field through extract then state then build`() {
+    fun `round-trips every nested config field through editor state then build`() {
         val strategy = fullStrategy()
 
-        val extracted = extractFormStateFromStrategy(strategy)
-        val state = ApiStrategyEditorState(extracted)
-        assertEquals(extracted, state.toFormState())
+        val state = ApiStrategyEditorState(strategy)
 
         val rebuilt =
-            buildStrategyFromApiFormState(
-                state = state.toFormState(),
+            state.buildStrategy(
                 id = strategy.id,
                 createdAt = strategy.createdAt,
                 updatedAt = strategy.updatedAt,
@@ -235,38 +232,44 @@ class ApiStrategyEditorStateTest {
 
     @Test
     fun `create-mode state is valid with defaults plus name and base url`() {
-        val state = ApiStrategyEditorState(initial = null)
+        val state = ApiStrategyEditorState(strategy = null)
         assertFalse(state.isValid)
         state.name = "My API"
-        state.baseUrl = "https://api.example.com"
+        state.updateConfig { copy(baseUrl = "https://api.example.com") }
         assertTrue(state.isValid)
     }
 
     @Test
     fun `sign field is required when sign source is FIELD`() {
-        val state = ApiStrategyEditorState(initial = null)
+        val state = ApiStrategyEditorState(strategy = null)
         state.name = "My API"
-        state.baseUrl = "https://api.example.com"
-        state.transactionMappings = state.transactionMappings.copy(signSource = ApiSignSource.FIELD, signField = null)
+        state.updateConfig { copy(baseUrl = "https://api.example.com") }
+        state.updateConfig {
+            copy(transactionMappings = transactionMappings.copy(signSource = ApiSignSource.FIELD, signField = null))
+        }
         assertTrue(state.transactionMappingsHasError)
-        state.transactionMappings = state.transactionMappings.copy(signField = "direction")
+        state.updateConfig { copy(transactionMappings = transactionMappings.copy(signField = "direction")) }
         assertFalse(state.transactionMappingsHasError)
     }
 
     @Test
     fun `people download forbids owns-all-accounts together with ancestor expression`() {
-        val state = ApiStrategyEditorState(initial = null)
+        val state = ApiStrategyEditorState(strategy = null)
         state.name = "My API"
-        state.baseUrl = "https://api.example.com"
-        state.peopleDownload =
-            ApiPersonImportConfig(
-                endpoint = ApiEndpointConfig(path = "/profiles", responseArrayKey = ""),
-                firstNameField = "firstName",
-                ownsAllAccounts = true,
-                accountOwnerAncestorExpr = "ancestor[0].id",
+        state.updateConfig { copy(baseUrl = "https://api.example.com") }
+        state.updateConfig {
+            copy(
+                peopleDownload =
+                    ApiPersonImportConfig(
+                        endpoint = ApiEndpointConfig(path = "/profiles", responseArrayKey = ""),
+                        firstNameField = "firstName",
+                        ownsAllAccounts = true,
+                        accountOwnerAncestorExpr = "ancestor[0].id",
+                    ),
             )
+        }
         assertTrue(state.peopleHasError)
-        state.peopleDownload = state.peopleDownload?.copy(accountOwnerAncestorExpr = null)
+        state.updateConfig { copy(peopleDownload = peopleDownload?.copy(accountOwnerAncestorExpr = null)) }
         assertFalse(state.peopleHasError)
     }
 }

@@ -35,8 +35,8 @@ internal fun EndpointsTab(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         SyntheticAccountEditor(
-            account = state.syntheticAccount,
-            onChange = { state.syntheticAccount = it },
+            account = state.config.syntheticAccount,
+            onChange = { v -> state.updateConfig { copy(syntheticAccount = v) } },
             enabled = enabled,
         )
 
@@ -44,8 +44,8 @@ internal fun EndpointsTab(
         HorizontalDivider()
         SectionHeader("Accounts endpoint")
         EndpointEditor(
-            endpoint = state.accountsEndpoint,
-            onChange = { state.accountsEndpoint = it },
+            endpoint = state.config.accountsEndpoint,
+            onChange = { v -> state.updateConfig { copy(accountsEndpoint = v) } },
             enabled = enabled,
         )
 
@@ -53,8 +53,8 @@ internal fun EndpointsTab(
         HorizontalDivider()
         SectionHeader("Transactions endpoint")
         EndpointEditor(
-            endpoint = state.transactionsEndpoint,
-            onChange = { state.transactionsEndpoint = it },
+            endpoint = state.config.transactionsEndpoint,
+            onChange = { v -> state.updateConfig { copy(transactionsEndpoint = v) } },
             enabled = enabled,
         )
 
@@ -70,21 +70,25 @@ internal fun EndpointsTab(
         )
         ToggleRow(
             label = "Enable account-identifiers endpoint",
-            checked = state.accountIdentifiersEndpoint != null,
+            checked = state.config.accountIdentifiersEndpoint != null,
             onCheckedChange = { on ->
-                state.accountIdentifiersEndpoint =
-                    if (on) {
-                        ApiEndpointConfig(path = "/accounts/{account.id}/identifiers", responseArrayKey = "")
-                    } else {
-                        null
-                    }
+                state.updateConfig {
+                    copy(
+                        accountIdentifiersEndpoint =
+                            if (on) {
+                                ApiEndpointConfig(path = "/accounts/{account.id}/identifiers", responseArrayKey = "")
+                            } else {
+                                null
+                            },
+                    )
+                }
             },
             enabled = enabled,
         )
-        state.accountIdentifiersEndpoint?.let { endpoint ->
+        state.config.accountIdentifiersEndpoint?.let { endpoint ->
             EndpointEditor(
                 endpoint = endpoint,
-                onChange = { state.accountIdentifiersEndpoint = it },
+                onChange = { v -> state.updateConfig { copy(accountIdentifiersEndpoint = v) } },
                 enabled = enabled,
             )
         }
@@ -99,18 +103,18 @@ internal fun EndpointsTab(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        state.ancestorEndpoints.forEachIndexed { index, endpoint ->
+        state.config.ancestorEndpoints.forEachIndexed { index, endpoint ->
             Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors()) {
                 Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     EditorCardHeader(
                         title = "ancestor[$index]",
-                        onRemove = { state.ancestorEndpoints = state.ancestorEndpoints.toMutableList().also { it.removeAt(index) } },
+                        onRemove = { state.updateConfig { copy(ancestorEndpoints = ancestorEndpoints.minusAt(index)) } },
                         enabled = enabled,
                     )
                     EndpointEditor(
                         endpoint = endpoint,
                         onChange = { updated ->
-                            state.ancestorEndpoints = state.ancestorEndpoints.toMutableList().also { it[index] = updated }
+                            state.updateConfig { copy(ancestorEndpoints = ancestorEndpoints.replacingAt(index, updated)) }
                         },
                         enabled = enabled,
                     )
@@ -119,7 +123,7 @@ internal fun EndpointsTab(
         }
         TextButton(
             onClick = {
-                state.ancestorEndpoints += ApiEndpointConfig(path = "", responseArrayKey = "")
+                state.updateConfig { copy(ancestorEndpoints = ancestorEndpoints + ApiEndpointConfig(path = "", responseArrayKey = "")) }
             },
             enabled = enabled,
         ) {
@@ -139,8 +143,8 @@ internal fun EndpointsTab(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         DataEndpointsEditor(
-            endpoints = state.dataEndpoints,
-            onChange = { state.dataEndpoints = it },
+            endpoints = state.config.dataEndpoints,
+            onChange = { v -> state.updateConfig { copy(dataEndpoints = v) } },
             enabled = enabled,
         )
     }
