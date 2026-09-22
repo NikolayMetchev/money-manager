@@ -31,7 +31,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -71,6 +70,7 @@ import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.ui.components.CreateCategoryDialog
+import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.components.ErrorMessageText
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.components.ParentCategorySelector
@@ -785,92 +785,31 @@ fun DeleteCategoryDialog(
     onDismiss: () -> Unit,
     onDeleted: () -> Unit,
 ) {
-    var isDeleting by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberSchemaAwareCoroutineScope()
     val importEngine = LocalImportEngine.current
 
-    AlertDialog(
-        onDismissRequest = { if (!isDeleting) onDismiss() },
-        icon = {
-            Text(
-                text = "⚠️",
-                style = MaterialTheme.typography.headlineMedium,
+    DestructiveConfirmDialog(
+        title = "Delete Category?",
+        targetName = category.name,
+        consequence =
+            "Child categories will be moved to the parent of this category. " +
+                "Transactions using this category will become uncategorized.",
+        failureMessage = "Failed to delete category",
+        onConfirm = {
+            importEngine.import(
+                ImportBatch.manualEdits(
+                    categories =
+                        listOf(
+                            ImportCategoryIntent(
+                                key = LocalCategoryKey("delete"),
+                                source = Source.Manual,
+                                operation = ImportOperation.DELETE,
+                                existingId = category.id,
+                            ),
+                        ),
+                ),
             )
+            onDeleted()
         },
-        title = { Text("Delete Category?") },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Are you sure you want to delete \"${category.name}\"?",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    text =
-                        "Child categories will be moved to the parent of this category. " +
-                            "Transactions using this category will become uncategorized.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                errorMessage?.let { error ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    ErrorMessageText(error)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    isDeleting = true
-                    errorMessage = null
-                    scope.launch {
-                        try {
-                            importEngine.import(
-                                ImportBatch.manualEdits(
-                                    categories =
-                                        listOf(
-                                            ImportCategoryIntent(
-                                                key = LocalCategoryKey("delete"),
-                                                source = Source.Manual,
-                                                operation = ImportOperation.DELETE,
-                                                existingId = category.id,
-                                            ),
-                                        ),
-                                ),
-                            )
-                            onDeleted()
-                        } catch (expected: Exception) {
-                            logger.error(expected) { "Failed to delete category: ${expected.message}" }
-                            errorMessage = "Failed to delete category: ${expected.message}"
-                            isDeleting = false
-                        }
-                    }
-                },
-                enabled = !isDeleting,
-                colors =
-                    ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ),
-            ) {
-                if (isDeleting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Delete")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isDeleting,
-            ) {
-                Text("Cancel")
-            }
-        },
+        onDismiss = onDismiss,
     )
 }

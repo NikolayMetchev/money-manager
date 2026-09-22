@@ -16,7 +16,6 @@ kotlin {
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
                 implementation(projects.utils.compose.scrollbar)
-                implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }
@@ -39,7 +38,6 @@ kotlin {
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.androidx.compose.ui.unit)
-                implementation(libs.diamondedge.logging)
             }
         }
         getByName("jvmMain") {
@@ -47,15 +45,14 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
                 api(libs.androidx.compose.runtime.desktop)
-                api(libs.compose.foundation.layout.desktop)
 
                 implementation(libs.compose.foundation.desktop)
+                implementation(libs.compose.foundation.layout.desktop)
                 implementation(libs.compose.material3.desktop)
                 implementation(libs.compose.ui.desktop)
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.compose.ui.unit.desktop)
-                implementation(libs.diamondedge.logging)
             }
         }
         getByName("jvmTest") {
