@@ -57,41 +57,14 @@ private const val REIMPORT_ENGINE_BATCH_SIZE = 250
 /** Default number of in-place transfer updates applied per engine batch. */
 internal const val REIMPORT_VALUE_UPDATE_CHUNK = 100
 
-/** Why a duplicate account detected during re-import was not merged. */
-enum class ReimportSkipReason {
-    /** Different rows of the import resolve the duplicate to different target accounts. */
-    CONFLICTING_TARGETS,
-
-    /** Transfers exist between the duplicate and its target, which a merge cannot represent. */
-    TRANSFERS_BETWEEN,
-
-    /** The merge itself failed when executed (e.g. a concurrent write changed the accounts). */
-    MERGE_FAILED,
-
-    /** Deleting a row's old transfers for a pass-through rewrite failed; the row was left as-is. */
-    REWRITE_FAILED,
-
-    /** Updating a row's transfer to its recomputed values failed; the transfer was left as-is. */
-    UPDATE_FAILED,
-
-    /** Reversing a merge whose accounts no longer consolidate failed; the merge was left as-is. */
-    REVERSAL_FAILED,
-
-    /** Deleting a row's old transfer for a transfer→trade conversion failed; the row was left as-is. */
-    TRADE_CONVERSION_FAILED,
-
-    /** Deleting a row's old transfer for an unidentified-counterparty re-run failed; row left as-is. */
-    COUNTERPARTY_RECONCILE_FAILED,
-
-    /** Deleting a row's duplicate trade failed; the duplicate was left in place. */
-    DUPLICATE_TRADE_FAILED,
-
-    /** Resetting a row wrongly marked a duplicate failed; the row stays unimported. */
-    STALE_DUPLICATE_FAILED,
-
-    /** Deleting a row's old transfer for a funding-card reconcile failed; the row was left as-is. */
-    FUNDING_RECONCILE_FAILED,
-}
+/**
+ * A skip [ReimportSkippedAccount.detail] that always names the phase that failed, so the phase is not
+ * lost when the underlying exception carries its own message.
+ */
+fun skipDetail(
+    phase: String,
+    message: String?,
+): String = if (message.isNullOrBlank()) phase else "$phase: $message"
 
 /** One duplicate-account merge the re-import will perform (or performed). */
 data class ReimportMerge(
@@ -111,7 +84,6 @@ data class ReimportMerge(
 data class ReimportSkippedAccount(
     val accountId: AccountId?,
     val accountName: String,
-    val reason: ReimportSkipReason,
     val detail: String,
 )
 
@@ -591,7 +563,6 @@ suspend fun planCsvReimport(
             ReimportSkippedAccount(
                 accountId = duplicate,
                 accountName = nameOf(duplicate),
-                reason = ReimportSkipReason.CONFLICTING_TARGETS,
                 detail = "Rows map it to different accounts: ${targets.joinToString { nameOf(it) }}",
             )
     }
@@ -602,7 +573,6 @@ suspend fun planCsvReimport(
                 ReimportSkippedAccount(
                     accountId = duplicate,
                     accountName = nameOf(duplicate),
-                    reason = ReimportSkipReason.TRANSFERS_BETWEEN,
                     detail = "${between.size} transaction(s) between '${nameOf(duplicate)}' and '${nameOf(target)}' — merge manually",
                 )
             continue
@@ -1283,8 +1253,7 @@ suspend fun executeCsvReimport(
                 ReimportSkippedAccount(
                     accountId = merge.duplicateId,
                     accountName = merge.duplicateName,
-                    reason = ReimportSkipReason.MERGE_FAILED,
-                    detail = expected.message ?: "Merge failed",
+                    detail = skipDetail("Merge failed", expected.message),
                 )
         }
     }
@@ -1323,8 +1292,7 @@ suspend fun executeCsvReimport(
                 ReimportSkippedAccount(
                     accountId = null,
                     accountName = rewrite.description,
-                    reason = ReimportSkipReason.REWRITE_FAILED,
-                    detail = expected.message ?: "Rewrite failed",
+                    detail = skipDetail("Rewrite failed", expected.message),
                 )
         }
     }
@@ -1363,8 +1331,7 @@ suspend fun executeCsvReimport(
                 ReimportSkippedAccount(
                     accountId = null,
                     accountName = conversion.description,
-                    reason = ReimportSkipReason.TRADE_CONVERSION_FAILED,
-                    detail = expected.message ?: "Trade conversion failed",
+                    detail = skipDetail("Trade conversion failed", expected.message),
                 )
         }
     }
@@ -1389,8 +1356,7 @@ suspend fun executeCsvReimport(
                 ReimportSkippedAccount(
                     accountId = null,
                     accountName = "${plan.staleDuplicates.size} row(s) matched as duplicates",
-                    reason = ReimportSkipReason.STALE_DUPLICATE_FAILED,
-                    detail = expected.message ?: "Reset failed",
+                    detail = skipDetail("Reset failed", expected.message),
                 )
         }
     }
@@ -1431,8 +1397,7 @@ suspend fun executeCsvReimport(
                 ReimportSkippedAccount(
                     accountId = null,
                     accountName = duplicate.description,
-                    reason = ReimportSkipReason.DUPLICATE_TRADE_FAILED,
-                    detail = expected.message ?: "Duplicate conversion removal failed",
+                    detail = skipDetail("Duplicate conversion removal failed", expected.message),
                 )
         }
     }
@@ -1472,8 +1437,7 @@ suspend fun executeCsvReimport(
                 ReimportSkippedAccount(
                     accountId = null,
                     accountName = reconcile.description,
-                    reason = ReimportSkipReason.COUNTERPARTY_RECONCILE_FAILED,
-                    detail = expected.message ?: "Counterparty re-run failed",
+                    detail = skipDetail("Counterparty re-run failed", expected.message),
                 )
         }
     }
@@ -1511,8 +1475,7 @@ suspend fun executeCsvReimport(
                 ReimportSkippedAccount(
                     accountId = null,
                     accountName = reconcile.description,
-                    reason = ReimportSkipReason.FUNDING_RECONCILE_FAILED,
-                    detail = expected.message ?: "Funding reconcile failed",
+                    detail = skipDetail("Funding reconcile failed", expected.message),
                 )
         }
     }
@@ -1592,8 +1555,7 @@ suspend fun applyReimportReversals(
                 ReimportSkippedAccount(
                     accountId = null,
                     accountName = reversal.deletedAccountName,
-                    reason = ReimportSkipReason.REVERSAL_FAILED,
-                    detail = expected.message ?: "Reversal failed",
+                    detail = skipDetail("Reversal failed", expected.message),
                 )
         }
     }
@@ -1667,8 +1629,7 @@ private suspend fun applyValueUpdates(
                         ReimportSkippedAccount(
                             accountId = null,
                             accountName = update.description,
-                            reason = ReimportSkipReason.UPDATE_FAILED,
-                            detail = expectedRowError.message ?: "Update failed",
+                            detail = skipDetail("Update failed", expectedRowError.message),
                         )
                 }
             }

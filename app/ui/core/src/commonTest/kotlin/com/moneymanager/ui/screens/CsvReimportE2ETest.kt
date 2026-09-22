@@ -1,7 +1,6 @@
 package com.moneymanager.ui.screens
 
 import com.moneymanager.csvimporter.CsvTransferMapper
-import com.moneymanager.csvimporter.ReimportSkipReason
 import com.moneymanager.csvimporter.executeCsvReimport
 import com.moneymanager.csvimporter.planCsvReimport
 import com.moneymanager.csvimporter.runCsvImport
@@ -261,7 +260,12 @@ class CsvReimportE2ETest {
                 )
             assertTrue(plan.merges.isEmpty())
             assertEquals(1, plan.skipped.size)
-            assertEquals(ReimportSkipReason.TRANSFERS_BETWEEN, plan.skipped.single().reason)
+            assertTrue(
+                plan.skipped
+                    .single()
+                    .detail
+                    .contains("transaction(s) between"),
+            )
 
             val result =
                 executeCsvReimport(
