@@ -176,20 +176,20 @@ class KrakenReimportE2ETest : DbTest() {
             assertEquals(1, plan.transferIds.size, "the withdrawal created by this session should be deleted before re-run")
 
             executeApiReimport(
-                    plan = plan,
-                    session = session,
-                    strategy = strategyWithBridge,
-                    apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
-                    currencyRepository = repositories.currencyRepository,
-                    cryptoRepository = repositories.cryptoRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    transferRelationshipRepository = repositories.transferRelationshipRepository,
-                    tradeRepository = repositories.tradeRepository,
-                    maintenance = testMaintenance,
-                    importEngine = repositories.importEngine,
-                )
+                plan = plan,
+                session = session,
+                strategy = strategyWithBridge,
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                cryptoRepository = repositories.cryptoRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                transactionRepository = repositories.transactionRepository,
+                transferRelationshipRepository = repositories.transferRelationshipRepository,
+                tradeRepository = repositories.tradeRepository,
+                maintenance = testMaintenance,
+                importEngine = repositories.importEngine,
+            )
 
             val withdrawalsAfter =
                 repositories.transactionRepository
@@ -200,6 +200,18 @@ class KrakenReimportE2ETest : DbTest() {
                     .filter { it.amount.asset.code == "GBP" }
             val rewritten = withdrawalsAfter.first { it.id != monzoCredit && it.sourceAccountId != it.targetAccountId }
             assertEquals(monzoId, rewritten.targetAccountId, "the withdrawal should now be rewritten onto Monzo")
+
+            // The planned deletion really executed: the original withdrawal row is gone from the
+            // database, and the only GBP legs left are the seeded credit plus the one rewrite.
+            assertEquals(
+                setOf(monzoCredit, rewritten.id),
+                withdrawalsAfter.map { it.id }.toSet(),
+                "after the re-import only the seeded credit and the rewritten withdrawal should be persisted",
+            )
+            assertTrue(
+                repositories.transactionRepository.getTransactionsByIds(setOf(withdrawalBefore.id)).isEmpty(),
+                "executeApiReimport should have deleted the original withdrawal, not merely planned its deletion",
+            )
 
             val monzoCreditAfter = repositories.transactionRepository.getTransactionsByIds(setOf(monzoCredit))[monzoCredit]
             assertNotNull(monzoCreditAfter, "the seeded Monzo credit should still exist")
@@ -225,20 +237,20 @@ class KrakenReimportE2ETest : DbTest() {
             val plan2 = planApiReimport(sessionId, repositories.apiSessionRepository)
             assertEquals(1, plan2.transferIds.size, "the second re-import should delete exactly the one leg it re-creates")
             executeApiReimport(
-                    plan = plan2,
-                    session = session,
-                    strategy = strategyWithBridge,
-                    apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
-                    currencyRepository = repositories.currencyRepository,
-                    cryptoRepository = repositories.cryptoRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    transferRelationshipRepository = repositories.transferRelationshipRepository,
-                    tradeRepository = repositories.tradeRepository,
-                    maintenance = testMaintenance,
-                    importEngine = repositories.importEngine,
-                )
+                plan = plan2,
+                session = session,
+                strategy = strategyWithBridge,
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                cryptoRepository = repositories.cryptoRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                transactionRepository = repositories.transactionRepository,
+                transferRelationshipRepository = repositories.transferRelationshipRepository,
+                tradeRepository = repositories.tradeRepository,
+                maintenance = testMaintenance,
+                importEngine = repositories.importEngine,
+            )
             val withdrawalsFinal =
                 repositories.transactionRepository
                     .getTransactionsByDateRange(
