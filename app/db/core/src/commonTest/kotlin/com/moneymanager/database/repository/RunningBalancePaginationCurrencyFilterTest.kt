@@ -109,7 +109,7 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
                 repositories.transactionRepository
                     .getPageContainingTransaction(card, TransferId(usdTransferId.id), pageSize = 5, currencyId = usd.id)
             assertEquals(2, page.items.size)
-            assertTrue(page.targetIndex >= 0)
+            assertTrue(page.items.any { it.transactionId.id == usdTransferId.id })
             assertTrue(page.items.all { it.transactionAmount.asset.code == "USD" })
 
             // Backward pagination from the older USD row: only the newer USD row is returned —

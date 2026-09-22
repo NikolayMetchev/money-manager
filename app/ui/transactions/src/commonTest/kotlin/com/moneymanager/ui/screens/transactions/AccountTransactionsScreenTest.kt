@@ -411,7 +411,6 @@ class AccountTransactionsScreenTest {
                             val window = rows.subList(160, 200)
                             PageWithTargetIndex(
                                 items = window,
-                                targetIndex = window.indexOfFirst { it.transactionId.id == anchor.id.id },
                                 pagingInfo =
                                     PagingInfo(
                                         lastTimestamp = window.last().timestamp,
@@ -1457,15 +1456,12 @@ class AccountTransactionsScreenTest {
             everySuspend { getPageContainingTransaction(any(), any(), any(), any()) } calls
                 { args ->
                     val accountId = args.arg<AccountId>(0)
-                    val transactionId = args.arg<TransferId>(1)
                     val pageSize = args.arg<Int>(2)
                     val currencyId = args.arg<CurrencyId?>(3)
                     val allRows = buildAccountRows(transfers, accountId, feeLinks).filterByCurrency(currencyId)
-                    val targetIndex = allRows.indexOfFirst { it.transactionId.id == transactionId.id }
                     val items = allRows.take(pageSize)
                     PageWithTargetIndex(
                         items = items,
-                        targetIndex = targetIndex,
                         pagingInfo =
                             PagingInfo(
                                 lastTimestamp = items.lastOrNull()?.timestamp,

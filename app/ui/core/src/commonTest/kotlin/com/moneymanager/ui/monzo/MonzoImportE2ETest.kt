@@ -815,7 +815,6 @@ class MonzoImportE2ETest : DbTest() {
 
             // THEN — import counts (declined tx5 is stored but marked excluded)
             assertEquals(5, importResult.transactionCount, "Should have imported 5 transactions (declined tx stored as excluded)")
-            assertEquals(1, importResult.excludedCount, "Declined tx5 should be counted as excluded")
             assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             // --- Account audit ---
@@ -844,6 +843,11 @@ class MonzoImportE2ETest : DbTest() {
                     .getTransactionsByAccount(monzoAccount.id)
                     .first()
             assertEquals(5, transfers.size, "Should have 5 transfers for the Monzo account (including declined tx stored as excluded)")
+            assertEquals(
+                1,
+                transfers.count { transfer -> transfer.attributes.any { it.attributeType.name == "excluded" } },
+                "Declined tx5 should be stored carrying the \"excluded\" attribute",
+            )
 
             // Zero-amount transaction should use the Void counterparty account
             val voidAccount = allAccounts.find { it.name == "Void" }
@@ -1000,7 +1004,6 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals(3, transactionRequestCount, "Should have fetched 3 transaction pages (declined, settled, empty)")
             // 2 declined + 1 settled = 3 total imported; declined ones carry the "excluded" attribute
             assertEquals(3, importResult.transactionCount, "All 3 transactions should be imported (2 declined as excluded + 1 settled)")
-            assertEquals(2, importResult.excludedCount, "The 2 declined transactions should be marked excluded")
             assertEquals(0, importResult.errorCount)
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()

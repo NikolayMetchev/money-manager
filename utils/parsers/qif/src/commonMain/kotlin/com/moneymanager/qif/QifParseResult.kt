@@ -4,12 +4,9 @@ package com.moneymanager.qif
  * Result of parsing a QIF file.
  *
  * @property sections The parsed sections, in file order.
- * @property unsupportedRecordCount Number of records that cannot be imported in v1
- *   (investment and unknown-section records).
  */
 data class QifParseResult(
     val sections: List<QifSection>,
-    val unsupportedRecordCount: Int,
 ) {
     /** All records across every section, in file order. */
     val records: List<QifRecord>
@@ -61,10 +58,8 @@ data class QifRecord(
  * @property transferAccount `L` field when it is a `[bracketed]` transfer account (brackets stripped).
  * @property checkNumber `N` field (a check/reference number in banking sections).
  * @property clearedStatus `C` field.
- * @property investmentAction `N` field within an investment section (display only).
  * @property address `A` fields, in order (repeatable).
  * @property splits Split sub-records (`S`/`E`/`$`).
- * @property unknownFields Any field codes not otherwise recognised, preserved verbatim.
  */
 data class QifFields(
     val date: String? = null,
@@ -75,10 +70,8 @@ data class QifFields(
     val transferAccount: String? = null,
     val checkNumber: String? = null,
     val clearedStatus: String? = null,
-    val investmentAction: String? = null,
     val address: List<String> = emptyList(),
     val splits: List<QifSplit> = emptyList(),
-    val unknownFields: List<Pair<Char, String>> = emptyList(),
 )
 
 /**

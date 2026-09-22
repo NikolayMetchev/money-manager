@@ -14,7 +14,6 @@ class QifParserTest {
         val result = parser.parse("")
 
         assertEquals(emptyList(), result.sections)
-        assertEquals(0, result.unsupportedRecordCount)
     }
 
     @Test
@@ -255,9 +254,8 @@ class QifParserTest {
                 .single()
         assertEquals(QifSectionType.INVESTMENT, record.sectionType)
         assertFalse(record.supported)
-        assertEquals("Buy", record.fields.investmentAction)
+        // `N` in an investment section is the action, not a check number.
         assertNull(record.fields.checkNumber)
-        assertEquals(1, result.unsupportedRecordCount)
     }
 
     @Test
@@ -281,22 +279,6 @@ class QifParserTest {
                 .single()
                 .supported,
         )
-        assertEquals(1, result.unsupportedRecordCount)
-    }
-
-    @Test
-    fun parse_unknownFieldCodes_arePreserved() {
-        val qif =
-            """
-            !Type:Bank
-            T-5.00
-            ZCustomValue
-            ^
-            """.trimIndent()
-
-        val record = parser.parse(qif).records.single()
-
-        assertEquals(listOf('Z' to "CustomValue"), record.fields.unknownFields)
     }
 
     @Test
