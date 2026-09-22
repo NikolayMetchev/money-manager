@@ -37,9 +37,6 @@ import com.moneymanager.ui.components.CreateCryptoDialog
 import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.foundation.LocalImportEngine
-import org.lighthousegames.logging.logging
-
-private val assetsLogger = logging()
 
 /**
  * The Assets screen: two tabs, Currencies (fiat) and Crypto, each listing the relevant assets and

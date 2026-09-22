@@ -17,9 +17,6 @@ import com.moneymanager.ui.components.CreateCurrencyDialog
 import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.foundation.LocalImportEngine
-import org.lighthousegames.logging.logging
-
-private val logger = logging()
 
 @Composable
 fun CurrenciesScreen(
