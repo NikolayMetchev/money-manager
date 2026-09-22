@@ -26,7 +26,7 @@ private val logger = logging()
 /**
  * Shared confirmation dialog for destructive actions.
  *
- * Owns the in-flight ([isBusy]) and failure state so call sites only supply the wording and the
+ * Owns the in-flight (`isBusy`) and failure state so call sites only supply the wording and the
  * suspending action: a failure is logged and surfaced inline, leaving the dialog open so the user
  * can retry or cancel. [onConfirm] is responsible for dismissing on success (usually by calling the
  * same callback the screen passes as [onDismiss]).

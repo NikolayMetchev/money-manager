@@ -47,9 +47,9 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
                 api(libs.androidx.compose.runtime.desktop)
-                api(libs.compose.foundation.layout.desktop)
 
                 implementation(libs.compose.foundation.desktop)
+                implementation(libs.compose.foundation.layout.desktop)
                 implementation(libs.compose.material3.desktop)
                 implementation(libs.compose.ui.desktop)
                 implementation(libs.compose.ui.graphics.desktop)
