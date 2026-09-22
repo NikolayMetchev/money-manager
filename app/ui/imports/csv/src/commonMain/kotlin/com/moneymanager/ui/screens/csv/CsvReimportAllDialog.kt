@@ -1,15 +1,9 @@
 package com.moneymanager.ui.screens.csv
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,7 +34,9 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
+import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
+import com.moneymanager.ui.components.imports.BulkMergeReport
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
@@ -55,10 +51,9 @@ import kotlinx.coroutines.launch
  * own import history ([CsvImportReadRepository.historicalSourceAccounts]) rather than a shared,
  * dialog-level pick — different files can (and do) belong to different accounts, so one shared choice
  * across the whole batch never made sense here. Single confirm + aggregated summary — no per-file
- * preview. Mirrors [CsvImportAllDialog] by design.
+ * preview.
  */
 @Composable
-@Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
 fun CsvReimportAllDialog(
     imported: List<CsvImport>,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
@@ -110,89 +105,69 @@ fun CsvReimportAllDialog(
     val matches = matchedStrategies
     val skippedNoStrategyCount = if (matches == null) 0 else imported.size - matches.count { it != null }
 
-    AlertDialog(
-        onDismissRequest = { if (!isRunning) onDismiss() },
-        title = { Text(if (result != null) "Re-import complete" else "Re-import all imported files") },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-            ) {
-                val currentResult = result
-                if (currentResult != null) {
-                    Text(currentResult.toSummary(), style = MaterialTheme.typography.bodyMedium)
-                    BulkMergeReport(currentResult.merges, currentResult.reversals, currentResult.skipped)
-                } else {
-                    Text(
-                        text =
-                            "Applies the current strategy and account mappings to all ${imported.size} " +
-                                "imported file${if (imported.size == 1) "" else "s"} retroactively.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    if (skippedNoStrategyCount > 0) {
-                        Text(
-                            text =
-                                "$skippedNoStrategyCount file${if (skippedNoStrategyCount == 1) "" else "s"} " +
-                                    "have no matching strategy and will be skipped.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+    BulkImportDialogScaffold(
+        pendingTitle = "Re-import all imported files",
+        completeTitle = "Re-import complete",
+        result = result,
+        isRunning = isRunning,
+        confirmLabel = "Re-import ${imported.size} files",
+        confirmEnabled = matches != null,
+        onRun = {
+            isRunning = true
+            scope.launch {
+                try {
+                    result =
+                        bulkReimportCsv(
+                            imports = imported,
+                            sourceAccountOverride = null,
+                            strategies = strategies,
+                            currencies = currencies,
+                            accountMappingRepository = accountMappingRepository,
+                            accountRepository = accountRepository,
+                            csvImportRepository = csvImportRepository,
+                            transactionRepository = transactionRepository,
+                            relationshipRepository = transferRelationshipRepository,
+                            transferSourceRepository = transferSourceRepository,
+                            maintenance = maintenance,
+                            importEngine = importEngine,
+                            onProgress = { progress = it },
+                            passThroughAccounts = passThroughAccounts,
+                            cryptoRepository = cryptoRepository,
+                            tradeRepository = tradeRepository,
+                            attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
                         )
-                    }
-                    progress?.let {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        BulkImportProgressIndicator(it)
-                    }
+                } finally {
+                    isRunning = false
                 }
             }
         },
-        confirmButton = {
-            if (result != null) {
-                TextButton(onClick = onComplete) { Text("Done") }
-            } else {
-                LoadingTextButton(
-                    onClick = {
-                        isRunning = true
-                        scope.launch {
-                            try {
-                                result =
-                                    bulkReimportCsv(
-                                        imports = imported,
-                                        sourceAccountOverride = null,
-                                        strategies = strategies,
-                                        currencies = currencies,
-                                        accountMappingRepository = accountMappingRepository,
-                                        accountRepository = accountRepository,
-                                        csvImportRepository = csvImportRepository,
-                                        transactionRepository = transactionRepository,
-                                        relationshipRepository = transferRelationshipRepository,
-                                        transferSourceRepository = transferSourceRepository,
-                                        maintenance = maintenance,
-                                        importEngine = importEngine,
-                                        onProgress = { progress = it },
-                                        passThroughAccounts = passThroughAccounts,
-                                        cryptoRepository = cryptoRepository,
-                                        tradeRepository = tradeRepository,
-                                        attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
-                                    )
-                            } finally {
-                                isRunning = false
-                            }
-                        }
-                    },
-                    enabled = !isRunning && matches != null,
-                    loading = isRunning,
-                    label = "Re-import ${imported.size} files",
-                )
-            }
+        onDismiss = onDismiss,
+        onComplete = onComplete,
+        report = { finished ->
+            Text(finished.toSummary(), style = MaterialTheme.typography.bodyMedium)
+            BulkMergeReport(finished.merges, finished.reversals, finished.skipped)
         },
-        dismissButton = {
-            if (result == null) {
-                TextButton(onClick = onDismiss, enabled = !isRunning) { Text("Cancel") }
-            }
-        },
-    )
+    ) {
+        Text(
+            text =
+                "Applies the current strategy and account mappings to all ${imported.size} " +
+                    "imported file${if (imported.size == 1) "" else "s"} retroactively.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        if (skippedNoStrategyCount > 0) {
+            Text(
+                text =
+                    "$skippedNoStrategyCount file${if (skippedNoStrategyCount == 1) "" else "s"} " +
+                        "have no matching strategy and will be skipped.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        progress?.let {
+            Spacer(modifier = Modifier.height(12.dp))
+            BulkImportProgressIndicator(it)
+        }
+    }
 }

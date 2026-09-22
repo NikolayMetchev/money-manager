@@ -1,15 +1,9 @@
 package com.moneymanager.ui.screens.apistrategy
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,7 +26,7 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportProgress
-import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -46,7 +40,6 @@ private val logger = logging()
  * no per-session preview. Mirrors [ApiReimportDialog] by design (see [bulkReimportApiSessions]).
  */
 @Composable
-@Suppress("LongParameterList")
 fun ApiReimportAllDialog(
     credentialId: ApiCredentialId,
     importedSessionCount: Int,
@@ -70,106 +63,86 @@ fun ApiReimportAllDialog(
     var result by remember { mutableStateOf<ApiBulkReimportResult?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = { if (!isRunning) onDismiss() },
-        title = { Text(if (result != null) "Re-import complete" else "Re-import all sessions") },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-            ) {
-                val currentResult = result
-                if (currentResult != null) {
-                    Text(
-                        text = "Re-imported ${currentResult.sessionsReimported} session(s) under \"${strategy.name}\".",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    if (currentResult.failures.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text =
-                                "${currentResult.failures.size} session(s) failed. Their data may be partially " +
-                                    "changed — re-run once the cause is fixed:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
+    BulkImportDialogScaffold(
+        pendingTitle = "Re-import all sessions",
+        completeTitle = "Re-import complete",
+        result = result,
+        isRunning = isRunning,
+        confirmLabel = "Re-import $importedSessionCount session${if (importedSessionCount == 1) "" else "s"}",
+        confirmEnabled = true,
+        onRun = {
+            isRunning = true
+            errorMessage = null
+            scope.launch {
+                try {
+                    result =
+                        bulkReimportApiSessions(
+                            credentialId = credentialId,
+                            strategy = strategy,
+                            apiSessionRepository = apiSessionRepository,
+                            accountRepository = accountRepository,
+                            currencyRepository = currencyRepository,
+                            cryptoRepository = cryptoRepository,
+                            accountAttributeRepository = accountAttributeRepository,
+                            transactionRepository = transactionRepository,
+                            transferRelationshipRepository = transferRelationshipRepository,
+                            tradeRepository = tradeRepository,
+                            maintenance = maintenance,
+                            importEngine = importEngine,
+                            onProgress = { progress = it },
                         )
-                        currentResult.failures.forEach { failure ->
-                            Text(
-                                text = "Session #${failure.sessionId.id}: ${failure.message}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                } else {
-                    Text(
-                        text =
-                            "Applies the current strategy configuration to all $importedSessionCount " +
-                                "already-imported session${if (importedSessionCount == 1) "" else "s"} retroactively, " +
-                                "oldest first.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (isRunning) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        ApiReimportProgress(progress ?: ImportProgress("Starting re-import"))
-                    }
-                }
-                errorMessage?.let {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                } catch (expected: CancellationException) {
+                    throw expected
+                } catch (expected: Exception) {
+                    logger.error(expected) { "Bulk re-import failed: ${expected.message}" }
+                    errorMessage = "Re-import failed: ${expected.message}"
+                } finally {
+                    isRunning = false
+                    progress = null
                 }
             }
         },
-        confirmButton = {
-            if (result != null) {
-                TextButton(onClick = onComplete) { Text("Done") }
-            } else {
-                LoadingTextButton(
-                    onClick = {
-                        isRunning = true
-                        errorMessage = null
-                        scope.launch {
-                            try {
-                                result =
-                                    bulkReimportApiSessions(
-                                        credentialId = credentialId,
-                                        strategy = strategy,
-                                        apiSessionRepository = apiSessionRepository,
-                                        accountRepository = accountRepository,
-                                        currencyRepository = currencyRepository,
-                                        cryptoRepository = cryptoRepository,
-                                        accountAttributeRepository = accountAttributeRepository,
-                                        transactionRepository = transactionRepository,
-                                        transferRelationshipRepository = transferRelationshipRepository,
-                                        tradeRepository = tradeRepository,
-                                        maintenance = maintenance,
-                                        importEngine = importEngine,
-                                        onProgress = { progress = it },
-                                    )
-                            } catch (expected: CancellationException) {
-                                throw expected
-                            } catch (expected: Exception) {
-                                logger.error(expected) { "Bulk re-import failed: ${expected.message}" }
-                                errorMessage = "Re-import failed: ${expected.message}"
-                            } finally {
-                                isRunning = false
-                                progress = null
-                            }
-                        }
-                    },
-                    enabled = !isRunning,
-                    loading = isRunning,
-                    label = "Re-import $importedSessionCount session${if (importedSessionCount == 1) "" else "s"}",
+        onDismiss = onDismiss,
+        onComplete = onComplete,
+        report = { finished ->
+            Text(
+                text = "Re-imported ${finished.sessionsReimported} session(s) under \"${strategy.name}\".",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (finished.failures.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text =
+                        "${finished.failures.size} session(s) failed. Their data may be partially " +
+                            "changed — re-run once the cause is fixed:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
                 )
+                finished.failures.forEach { failure ->
+                    Text(
+                        text = "Session #${failure.sessionId.id}: ${failure.message}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         },
-        dismissButton = {
-            if (result == null) {
-                TextButton(onClick = onDismiss, enabled = !isRunning) { Text("Cancel") }
-            }
-        },
-    )
+    ) {
+        Text(
+            text =
+                "Applies the current strategy configuration to all $importedSessionCount " +
+                    "already-imported session${if (importedSessionCount == 1) "" else "s"} retroactively, " +
+                    "oldest first.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (isRunning) {
+            Spacer(modifier = Modifier.height(12.dp))
+            ApiReimportProgress(progress ?: ImportProgress("Starting re-import"))
+        }
+        errorMessage?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+    }
 }

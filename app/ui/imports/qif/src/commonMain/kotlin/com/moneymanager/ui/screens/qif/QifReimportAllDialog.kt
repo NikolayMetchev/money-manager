@@ -1,15 +1,9 @@
 package com.moneymanager.ui.screens.qif
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,11 +32,11 @@ import com.moneymanager.qifimporter.QifBulkReimportResult
 import com.moneymanager.qifimporter.bulkReimportQif
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
-import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
+import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
+import com.moneymanager.ui.components.imports.BulkMergeReport
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.csv.BulkImportProgressIndicator
-import com.moneymanager.ui.screens.csv.BulkMergeReport
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -53,10 +47,9 @@ import kotlinx.coroutines.launch
  * imported with, falling back to content-aware auto-selection (files with no match are skipped). QIF
  * carries no currency, so the one used at import time is chosen here (default preselected) — the same
  * one avoids spurious value updates. The optional source account is used only when re-running a file's
- * not-yet-imported/errored records. Single confirm + aggregated summary. Mirrors [QifImportAllDialog].
+ * not-yet-imported/errored records. Single confirm + aggregated summary.
  */
 @Composable
-@Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
 fun QifReimportAllDialog(
     imported: List<QifImport>,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
@@ -98,95 +91,74 @@ fun QifReimportAllDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = { if (!isRunning) onDismiss() },
-        title = { Text(if (result != null) "Re-import complete" else "Re-import all imported files") },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-            ) {
-                val currentResult = result
-                if (currentResult != null) {
-                    Text(currentResult.toSummary(), style = MaterialTheme.typography.bodyMedium)
-                    BulkMergeReport(currentResult.merges, currentResult.reversals, currentResult.skipped)
-                } else {
-                    Text(
-                        text =
-                            "Applies the current strategy and account mappings to all ${imported.size} " +
-                                "imported file${if (imported.size == 1) "" else "s"} retroactively.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    CurrencyPicker(
-                        selectedCurrencyId = selectedCurrencyId,
-                        onCurrencySelected = { selectedCurrencyId = it },
-                        label = "Currency (as used at import time)",
-                        currencyRepository = currencyRepository,
-                        enabled = !isRunning,
-                        isError = selectedCurrencyId == null,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    AccountPicker(
-                        selectedAccountId = sourceAccountId,
-                        onAccountSelected = { sourceAccountId = it },
-                        label = "Source account (for not-yet-imported records)",
-                        accountRepository = accountRepository,
-                        categoryRepository = categoryRepository,
-                        personRepository = personRepository,
-                        enabled = !isRunning,
-                    )
-                    progress?.let {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        BulkImportProgressIndicator(it)
-                    }
+    BulkImportDialogScaffold(
+        pendingTitle = "Re-import all imported files",
+        completeTitle = "Re-import complete",
+        result = result,
+        isRunning = isRunning,
+        confirmLabel = "Re-import ${imported.size} files",
+        confirmEnabled = selectedCurrencyId != null,
+        onRun = {
+            isRunning = true
+            scope.launch {
+                try {
+                    result =
+                        bulkReimportQif(
+                            imports = imported,
+                            sourceAccountOverride = sourceAccountId,
+                            currencyId = selectedCurrencyId,
+                            strategies = strategies,
+                            currencies = currencies,
+                            accountMappingRepository = accountMappingRepository,
+                            accountRepository = accountRepository,
+                            qifImportRepository = qifImportRepository,
+                            transactionRepository = transactionRepository,
+                            transferSourceRepository = transferSourceRepository,
+                            maintenance = maintenance,
+                            importEngine = importEngine,
+                            onProgress = { progress = it },
+                        )
+                } finally {
+                    isRunning = false
                 }
             }
         },
-        confirmButton = {
-            if (result != null) {
-                TextButton(onClick = onComplete) { Text("Done") }
-            } else {
-                LoadingTextButton(
-                    onClick = {
-                        if (selectedCurrencyId == null) return@LoadingTextButton
-                        isRunning = true
-                        scope.launch {
-                            try {
-                                result =
-                                    bulkReimportQif(
-                                        imports = imported,
-                                        sourceAccountOverride = sourceAccountId,
-                                        currencyId = selectedCurrencyId,
-                                        strategies = strategies,
-                                        currencies = currencies,
-                                        accountMappingRepository = accountMappingRepository,
-                                        accountRepository = accountRepository,
-                                        qifImportRepository = qifImportRepository,
-                                        transactionRepository = transactionRepository,
-                                        transferSourceRepository = transferSourceRepository,
-                                        maintenance = maintenance,
-                                        importEngine = importEngine,
-                                        onProgress = { progress = it },
-                                    )
-                            } finally {
-                                isRunning = false
-                            }
-                        }
-                    },
-                    enabled = !isRunning && selectedCurrencyId != null,
-                    loading = isRunning,
-                    label = "Re-import ${imported.size} files",
-                )
-            }
+        onDismiss = onDismiss,
+        onComplete = onComplete,
+        report = { finished ->
+            Text(finished.toSummary(), style = MaterialTheme.typography.bodyMedium)
+            BulkMergeReport(finished.merges, finished.reversals, finished.skipped)
         },
-        dismissButton = {
-            if (result == null) {
-                TextButton(onClick = onDismiss, enabled = !isRunning) { Text("Cancel") }
-            }
-        },
-    )
+    ) {
+        Text(
+            text =
+                "Applies the current strategy and account mappings to all ${imported.size} " +
+                    "imported file${if (imported.size == 1) "" else "s"} retroactively.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        CurrencyPicker(
+            selectedCurrencyId = selectedCurrencyId,
+            onCurrencySelected = { selectedCurrencyId = it },
+            label = "Currency (as used at import time)",
+            currencyRepository = currencyRepository,
+            enabled = !isRunning,
+            isError = selectedCurrencyId == null,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        AccountPicker(
+            selectedAccountId = sourceAccountId,
+            onAccountSelected = { sourceAccountId = it },
+            label = "Source account (for not-yet-imported records)",
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
+            enabled = !isRunning,
+        )
+        progress?.let {
+            Spacer(modifier = Modifier.height(12.dp))
+            BulkImportProgressIndicator(it)
+        }
+    }
 }

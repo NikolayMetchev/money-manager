@@ -7,9 +7,11 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                api(projects.app.csvimporter)
                 api(projects.app.db.core)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
@@ -27,6 +29,7 @@ kotlin {
                 api(libs.androidx.compose.ui)
                 api(libs.androidx.compose.ui.graphics)
 
+                implementation(projects.utils.bigdecimal)
                 implementation(libs.androidx.compose.foundation)
                 implementation(libs.androidx.compose.material.icons.core)
                 implementation(libs.androidx.compose.material3)
@@ -38,8 +41,11 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.csvimporter)
                 api(projects.app.db.core)
+                api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
@@ -48,6 +54,7 @@ kotlin {
                 api(libs.compose.ui.desktop)
                 api(libs.compose.ui.graphics.desktop)
 
+                implementation(projects.utils.bigdecimal)
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material.icons.core.desktop)
                 implementation(libs.compose.material3.desktop)
