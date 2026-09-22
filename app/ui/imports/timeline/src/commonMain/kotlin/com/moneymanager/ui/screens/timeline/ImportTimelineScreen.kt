@@ -20,12 +20,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
@@ -53,13 +49,13 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
-import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.ui.components.MultiSelectFilterDropdown
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.displayDate
 import kotlinx.datetime.LocalDate
@@ -164,9 +160,12 @@ fun ImportTimelineScreen(
                 )
                 if (people.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    OwnerFilterDropdown(
-                        people = people,
-                        selectedOwnerIds = selectedOwnerIds,
+                    MultiSelectFilterDropdown(
+                        items = people,
+                        selectedKeys = selectedOwnerIds,
+                        itemKey = { it.id.id },
+                        itemLabel = { it.fullName },
+                        itemNoun = "owner",
                         onSelectionChange = { selectedOwnerIds = it },
                     )
                 }
@@ -520,79 +519,6 @@ private fun TimelineAxis(
                         maxLines = 1,
                     )
                 }
-            }
-        }
-    }
-}
-
-/** Multi-select owner filter, matching the one on the Accounts screen. */
-@Composable
-private fun OwnerFilterDropdown(
-    people: List<Person>,
-    selectedOwnerIds: Set<Long>,
-    onSelectionChange: (Set<Long>) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-
-    val selectionLabel =
-        when (selectedOwnerIds.size) {
-            0 -> "All owners"
-            1 -> people.find { it.id.id in selectedOwnerIds }?.fullName ?: "1 owner"
-            else -> "${selectedOwnerIds.size} owners"
-        }
-
-    val filteredPeople =
-        remember(people, searchQuery) {
-            if (searchQuery.isBlank()) people else people.filter { it.fullName.contains(searchQuery, ignoreCase = true) }
-        }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-    ) {
-        OutlinedTextField(
-            value = if (expanded) searchQuery else selectionLabel,
-            onValueChange = { searchQuery = it },
-            label = { Text("Filter by owner") },
-            placeholder = { Text("Type to search...") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-            singleLine = true,
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = {
-                expanded = false
-                searchQuery = ""
-            },
-        ) {
-            DropdownMenuItem(
-                text = { Text("All owners") },
-                onClick = { onSelectionChange(emptySet()) },
-            )
-            filteredPeople.forEach { person ->
-                DropdownMenuItem(
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(
-                                checked = selectedOwnerIds.contains(person.id.id),
-                                onCheckedChange = null,
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(person.fullName)
-                        }
-                    },
-                    onClick = {
-                        onSelectionChange(
-                            if (selectedOwnerIds.contains(person.id.id)) {
-                                selectedOwnerIds - person.id.id
-                            } else {
-                                selectedOwnerIds + person.id.id
-                            },
-                        )
-                    },
-                )
             }
         }
     }
