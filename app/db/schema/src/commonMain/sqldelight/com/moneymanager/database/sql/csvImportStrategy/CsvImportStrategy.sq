@@ -1,19 +1,10 @@
--- Stores reusable CSV import strategies for mapping CSV columns to transfer fields
+-- Stores reusable CSV import strategies for mapping CSV columns to transfer fields. The full strategy
+-- configuration (CsvStrategyConfig) is stored as JSON.
 CREATE TABLE csv_import_strategy (
     id TEXT PRIMARY KEY NOT NULL,
     revision_id INTEGER NOT NULL DEFAULT 1,
     name TEXT NOT NULL UNIQUE,
-    identification_columns_json TEXT NOT NULL,
-    field_mappings_json TEXT NOT NULL,
-    attribute_mappings_json TEXT NOT NULL,
-    row_rules_json TEXT NOT NULL DEFAULT '[]',
-    companion_rules_json TEXT NOT NULL DEFAULT '[]',
-    content_match_rules_json TEXT NOT NULL DEFAULT '[]',
-    file_name_pattern TEXT,
-    cross_source_reconcile_window_seconds INTEGER,
-    conversion_config_json TEXT,
-    trade_group_config_json TEXT,
-    funding_attribute_match_json TEXT,
+    config_json TEXT NOT NULL,
     created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
     updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000)
 );
@@ -22,14 +13,21 @@ CREATE INDEX idx_csv_import_strategy_name ON csv_import_strategy(name);
 
 -- Marks a csv_import_strategy as targeting an Excel worksheet rather than a CSV file (like QIF, an
 -- XLSX strategy is an ordinary csv_import_strategy row that rides the CSV engine). Split into its own
--- table rather than a nullable column: unlike the optional per-strategy features above (file name
--- pattern, conversion config, funding match), worksheet_name is a kind discriminator, not a feature
--- any strategy may opt into.
+-- table rather than a field of config_json: unlike the optional per-strategy features in the config
+-- (file name pattern, conversion config, funding match), worksheet_name is a kind discriminator, not a
+-- feature any strategy may opt into.
 CREATE TABLE xlsx_import_strategy (
     csv_import_strategy_id TEXT PRIMARY KEY NOT NULL,
     worksheet_name TEXT NOT NULL,
     FOREIGN KEY (csv_import_strategy_id) REFERENCES csv_import_strategy(id) ON DELETE CASCADE
 );
+
+-- A strategy together with its worksheet name (null unless it is an XLSX strategy), the shape every
+-- strategy read wants.
+CREATE VIEW csv_import_strategy_with_worksheet AS
+SELECT csv_import_strategy.*, xlsx_import_strategy.worksheet_name AS worksheet_name
+FROM csv_import_strategy
+LEFT JOIN xlsx_import_strategy ON xlsx_import_strategy.csv_import_strategy_id = csv_import_strategy.id;
 
 -- Source attribution for csv_import_strategy revisions.
 -- Uses TEXT strategy_id because csv_import_strategy.id is a UUID, unlike the INTEGER entity_id

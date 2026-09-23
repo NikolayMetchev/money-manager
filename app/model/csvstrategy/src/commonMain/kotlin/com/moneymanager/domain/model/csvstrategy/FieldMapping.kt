@@ -91,7 +91,7 @@ data class RegexRule(
     // Omitted from JSON when false (the strategy codecs encode defaults) so ADDING this field does not
     // change the canonical hash of every strategy that has regex rules — only a rule that actually sets
     // it rehashes, avoiding a spurious "all strategies changed" on catalog/Drive sync. Same rationale as
-    // CsvStrategyExport.fundingAttributeMatch.
+    // CsvStrategyConfig.fundingAttributeMatch.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val counterpartyIsUnidentified: Boolean = false,
 )

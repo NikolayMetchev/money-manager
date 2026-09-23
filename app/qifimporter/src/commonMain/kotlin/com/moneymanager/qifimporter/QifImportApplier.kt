@@ -27,6 +27,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.isQifStrategy
@@ -73,7 +74,7 @@ data class QifBulkResult(
 fun List<CsvImportStrategy>.qifCompatible(): List<CsvImportStrategy> = filter { it.isQifStrategy() }
 
 /**
- * Picks the QIF strategy whose [CsvImportStrategy.contentMatchRules] best fit the given [rows], so a
+ * Picks the QIF strategy whose [CsvStrategyConfig.contentMatchRules] best fit the given [rows], so a
  * bank-specific strategy is auto-detected from the data (QIF's fixed columns can't distinguish banks).
  * A strategy with no content rules acts as the fallback: when nothing positively matches, the
  * rule-less strategy is returned. Ties are broken deterministically by score, then name, then id.
@@ -94,7 +95,7 @@ fun List<CsvImportStrategy>.selectForQifContent(
             .minWithOrNull(byContentScoreThenNameThenId)
     if (best != null) return best.first
 
-    return filter { it.contentMatchRules.isEmpty() }
+    return filter { it.config.contentMatchRules.isEmpty() }
         .minWithOrNull(compareBy({ it.name }, { it.id.toString() }))
         ?: first()
 }
@@ -151,7 +152,7 @@ suspend fun bulkApplyQif(
             // The strategy's own (configured) currency is used — no per-import override.
             val strategy = matched
             val effectiveSourceAccountId = directoryAccounts[qifImport.id] ?: sourceAccountId
-            if (effectiveSourceAccountId == null && strategy.fieldMappings[TransferField.SOURCE_ACCOUNT] == null) {
+            if (effectiveSourceAccountId == null && strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null) {
                 skippedNoStrategy++
                 return@forEachIndexed
             }
@@ -215,17 +216,8 @@ suspend fun bulkApplyQif(
  */
 fun CsvImportStrategy.withQifCurrency(currencyId: CurrencyId?): CsvImportStrategy {
     if (currencyId == null) return this
-    return copy(
-        fieldMappings =
-            fieldMappings +
-                (
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(
-                            fieldType = TransferField.CURRENCY,
-                            currencyId = currencyId,
-                        )
-                ),
-    )
+    val currencyMapping = HardCodedCurrencyMapping(fieldType = TransferField.CURRENCY, currencyId = currencyId)
+    return copy(config = config.copy(fieldMappings = config.fieldMappings + (TransferField.CURRENCY to currencyMapping)))
 }
 
 fun buildMapper(

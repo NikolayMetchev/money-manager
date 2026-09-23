@@ -55,11 +55,13 @@ internal class CsvStrategyEditorState(
     var isSaving by mutableStateOf(false)
     var errorMessage by mutableStateOf<String?>(null)
 
+    private val config = strategy?.config
+
     var name by mutableStateOf(strategy?.name.orEmpty())
     var identificationColumns by
-        mutableStateOf(strategy?.identificationColumns?.filter { it in availableColumnNames }?.toSet() ?: availableColumnNames)
+        mutableStateOf(config?.identificationColumns?.filter { it in availableColumnNames }?.toSet() ?: availableColumnNames)
 
-    private val timestampMapping = strategy?.fieldMappings?.get(TransferField.TIMESTAMP) as? DateTimeParsingMapping
+    private val timestampMapping = config?.fieldMappings?.get(TransferField.TIMESTAMP) as? DateTimeParsingMapping
     var dateColumnName by mutableStateOf(timestampMapping?.dateColumnName.takeIfPresentIn(availableColumnNames))
     var dateFormat by mutableStateOf(timestampMapping?.dateFormat ?: "dd/MM/yyyy")
     var timeColumnName by mutableStateOf(timestampMapping?.timeColumnName.takeIfPresentIn(availableColumnNames))
@@ -88,13 +90,13 @@ internal class CsvStrategyEditorState(
 
     // The description's cleanup regex has no widget yet, so it is carried verbatim rather than
     // reconstructed — dropping it would silently import raw, untrimmed descriptions.
-    private val descriptionMapping = strategy?.fieldMappings?.get(TransferField.DESCRIPTION) as? DirectColumnMapping
+    private val descriptionMapping = config?.fieldMappings?.get(TransferField.DESCRIPTION) as? DirectColumnMapping
     var descriptionColumnName by mutableStateOf(descriptionMapping?.columnName.takeIfPresentIn(availableColumnNames))
     var descriptionFallbackColumns by
         mutableStateOf(descriptionMapping?.fallbackColumns.orEmpty().mapNotNull { it.takeIfPresentIn(availableColumnNames) })
     var descriptionExtraction by mutableStateOf(descriptionMapping?.extraction)
 
-    private val amountMapping = strategy?.fieldMappings?.get(TransferField.AMOUNT) as? AmountParsingMapping
+    private val amountMapping = config?.fieldMappings?.get(TransferField.AMOUNT) as? AmountParsingMapping
     var amountMode by mutableStateOf(amountMapping?.mode ?: AmountMode.SINGLE_COLUMN)
     var amountColumnName by mutableStateOf(amountMapping?.amountColumnName.takeIfPresentIn(availableColumnNames))
     var creditColumnName by mutableStateOf(amountMapping?.creditColumnName.takeIfPresentIn(availableColumnNames))
@@ -105,7 +107,7 @@ internal class CsvStrategyEditorState(
     var feeConditions by
         mutableStateOf(if (feeColumnName == null) emptyList() else amountMapping?.feeConditions.keepPresentIn(availableColumnNames))
 
-    private val sourceMapping = strategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+    private val sourceMapping = config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
     private val sourceTemplate = sourceMapping as? TemplateAccountMapping
     var sourceAccountMode by
         mutableStateOf(if (sourceTemplate != null) SourceAccountMode.TEMPLATE else SourceAccountMode.FIXED_ACCOUNT)
@@ -119,7 +121,7 @@ internal class CsvStrategyEditorState(
     // creates. One field per side: all four target modes store it, so the value follows a mode switch.
     var sourceDefaultCategoryId by mutableStateOf(sourceTemplate?.defaultCategoryId ?: Category.UNCATEGORIZED_ID)
 
-    private val targetMapping = strategy?.fieldMappings?.get(TransferField.TARGET_ACCOUNT)
+    private val targetMapping = config?.fieldMappings?.get(TransferField.TARGET_ACCOUNT)
     private val targetTemplate = targetMapping as? TemplateAccountMapping
     private val targetConditional = targetMapping as? ConditionalAccountMapping
     var targetAccountMode by
@@ -178,25 +180,25 @@ internal class CsvStrategyEditorState(
     var targetWhenFalse: FieldMapping by
         mutableStateOf(targetConditional?.whenFalse?.withColumnsPresentIn(availableColumnNames) ?: emptyTargetAccountMapping())
 
-    private val currencyMapping = strategy?.fieldMappings?.get(TransferField.CURRENCY)
+    private val currencyMapping = config?.fieldMappings?.get(TransferField.CURRENCY)
     var currencyMode by
         mutableStateOf(if (currencyMapping is CurrencyLookupMapping) CurrencyMode.FROM_COLUMN else CurrencyMode.HARDCODED)
     var selectedCurrencyId by mutableStateOf((currencyMapping as? HardCodedCurrencyMapping)?.currencyId)
     var currencyColumnName by mutableStateOf((currencyMapping as? CurrencyLookupMapping)?.columnName.takeIfPresentIn(availableColumnNames))
 
-    private val timezoneMapping = strategy?.fieldMappings?.get(TransferField.TIMEZONE)
+    private val timezoneMapping = config?.fieldMappings?.get(TransferField.TIMEZONE)
     var timezoneMode by
         mutableStateOf(if (timezoneMapping is TimezoneLookupMapping) TimezoneMode.FROM_COLUMN else TimezoneMode.HARDCODED)
     var selectedTimezone by
         mutableStateOf((timezoneMapping as? HardCodedTimezoneMapping)?.timezoneId ?: TimeZone.currentSystemDefault().id)
     var timezoneColumnName by mutableStateOf((timezoneMapping as? TimezoneLookupMapping)?.columnName.takeIfPresentIn(availableColumnNames))
 
-    var attributeMappings by mutableStateOf(strategy?.attributeMappings.orEmpty().filter { it.columnName in availableColumnNames })
+    var attributeMappings by mutableStateOf(config?.attributeMappings.orEmpty().filter { it.columnName in availableColumnNames })
 
     // Keep only preprocessing rules whose referenced columns all still exist.
     var rowPreprocessingRules by
         mutableStateOf(
-            strategy?.rowPreprocessingRules.orEmpty().mapNotNull { rule ->
+            config?.rowPreprocessingRules.orEmpty().mapNotNull { rule ->
                 val swaps =
                     rule.columnSwaps.filter {
                         it.firstColumn in availableColumnNames && it.secondColumn in availableColumnNames
@@ -208,8 +210,8 @@ internal class CsvStrategyEditorState(
             },
         )
 
-    var companionTransactionRules by mutableStateOf(strategy?.companionTransactionRules.orEmpty())
-    var fileNamePattern by mutableStateOf(strategy?.fileNamePattern.orEmpty())
+    var companionTransactionRules by mutableStateOf(config?.companionTransactionRules.orEmpty())
+    var fileNamePattern by mutableStateOf(config?.fileNamePattern.orEmpty())
 
     // Set only on Excel strategies, which target a worksheet instead of a file. Carried verbatim:
     // clearing it would turn an .xlsx strategy into a plain-CSV one that no longer matches anything.
@@ -219,22 +221,22 @@ internal class CsvStrategyEditorState(
     // resolve the hidden funding account (e.g. Curve's last-4 -> the underlying card). Edited as two
     // fields and reassembled into an [AttributeAccountMatch] on save; the attribute type defaults to
     // `card-last4` but a match is only saved when a column is chosen.
-    var fundingMatchColumn by mutableStateOf(strategy?.fundingAttributeMatch?.column)
+    var fundingMatchColumn by mutableStateOf(config?.fundingAttributeMatch?.column)
     var fundingMatchAttributeTypeName by
-        mutableStateOf(strategy?.fundingAttributeMatch?.attributeTypeName ?: WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME)
+        mutableStateOf(config?.fundingAttributeMatch?.attributeTypeName ?: WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME)
 
-    var contentMatchRules by mutableStateOf(strategy?.contentMatchRules.orEmpty())
-    var crossSourceReconcileWindowSeconds by mutableStateOf(strategy?.crossSourceReconcileWindowSeconds)
+    var contentMatchRules by mutableStateOf(config?.contentMatchRules.orEmpty())
+    var crossSourceReconcileWindowSeconds by mutableStateOf(config?.crossSourceReconcileWindowSeconds)
 
     // Carried through verbatim (like content-match/companion rules): its column references may name
     // columns absent from the uploaded sample, but dropping them would corrupt the strategy.
     // Edited via ConversionConfigEditor (Advanced tab); null when the source has no such conversions.
-    var conversionConfig by mutableStateOf(strategy?.conversionConfig)
+    var conversionConfig by mutableStateOf(config?.conversionConfig)
 
     // Carried through verbatim, like conversionConfig above, but with no editor of its own yet: row-group
     // trade assembly is configured only by built-in strategies. Held here so editing such a strategy in
     // the UI round-trips it instead of silently dropping the trades it assembles.
-    val tradeGroupConfig = strategy?.tradeGroupConfig
+    val tradeGroupConfig = config?.tradeGroupConfig
 
     // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialTargetAccountColumnName: String? = targetAccountColumnName

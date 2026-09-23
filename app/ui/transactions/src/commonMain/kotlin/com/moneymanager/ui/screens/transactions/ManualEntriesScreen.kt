@@ -82,7 +82,7 @@ fun ManualEntriesScreen(
             csvImportStrategyRepository.getAllStrategies().flatMapLatest { strategies ->
                 val ruleFlows =
                     strategies.flatMap { strategy ->
-                        strategy.companionTransactionRules.map { rule ->
+                        strategy.config.companionTransactionRules.map { rule ->
                             transactionRepository
                                 .getTransfersMissingCompanion(
                                     matchAttributeName = rule.matchAttributeName,

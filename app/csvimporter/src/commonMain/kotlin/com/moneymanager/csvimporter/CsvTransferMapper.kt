@@ -28,6 +28,7 @@ import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ConversionAccountRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -99,7 +100,7 @@ sealed interface MappingResult {
         val conversionLeg: ConversionLegInfo? = null,
         /** Set when the row is one leg of a row-group trade (see `TradeGroupConfig`); null otherwise. */
         val tradeLeg: TradeLegInfo? = null,
-        /** Raw funding value from [CsvImportStrategy.fundingAttributeMatch]'s column; null when unset/blank. */
+        /** Raw funding value from [CsvStrategyConfig.fundingAttributeMatch]'s column; null when unset/blank. */
         val fundingMatchValue: String? = null,
         /**
          * The counterparty account when the strategy could not identify it and simply named it after the
@@ -223,7 +224,7 @@ data class CsvTransferWithAttributes(
     /** Set when the row is one leg of a row-group trade (see `TradeGroupConfig`); null otherwise. */
     val tradeLeg: TradeLegInfo? = null,
     /**
-     * Raw value of the strategy's [CsvImportStrategy.fundingAttributeMatch] column for this row (e.g. a
+     * Raw value of the strategy's [CsvStrategyConfig.fundingAttributeMatch] column for this row (e.g. a
      * card's last-4 like "7721"); null when the strategy declares no funding match or the cell is blank.
      * The applier matches it against the funding attribute type to resolve the funding account.
      */
@@ -346,26 +347,30 @@ class CsvTransferMapper(
     // Precompiled conversion detection (null when the strategy declares no conversionConfig). Regexes
     // are case-insensitive, matching the file's existing account/content-rule matching convention.
     private val conversionDebitRegex: Regex? =
-        strategy.conversionConfig?.let { Regex(it.debitPattern, RegexOption.IGNORE_CASE) }
+        strategy.config.conversionConfig?.let { Regex(it.debitPattern, RegexOption.IGNORE_CASE) }
     private val conversionCreditRegex: Regex? =
-        strategy.conversionConfig?.let { Regex(it.creditPattern, RegexOption.IGNORE_CASE) }
+        strategy.config.conversionConfig?.let { Regex(it.creditPattern, RegexOption.IGNORE_CASE) }
     private val conversionPairingKeyRegex: Regex? =
-        strategy.conversionConfig?.pairingKeyPattern?.let { Regex(it, RegexOption.IGNORE_CASE) }
+        strategy.config.conversionConfig
+            ?.pairingKeyPattern
+            ?.let { Regex(it, RegexOption.IGNORE_CASE) }
     private val conversionAccountRuleRegexes: List<Pair<Regex, ConversionAccountRule>> =
-        strategy.conversionConfig
+        strategy.config.conversionConfig
             ?.conversionAccountRules
             .orEmpty()
             .map { Regex(it.pattern, RegexOption.IGNORE_CASE) to it }
 
     // Precompiled row-group trade detection (null when the strategy declares no tradeGroupConfig).
     private val tradeDebitRegex: Regex? =
-        strategy.tradeGroupConfig?.let { Regex(it.debitPattern, RegexOption.IGNORE_CASE) }
+        strategy.config.tradeGroupConfig?.let { Regex(it.debitPattern, RegexOption.IGNORE_CASE) }
     private val tradeCreditRegex: Regex? =
-        strategy.tradeGroupConfig?.let { Regex(it.creditPattern, RegexOption.IGNORE_CASE) }
+        strategy.config.tradeGroupConfig?.let { Regex(it.creditPattern, RegexOption.IGNORE_CASE) }
 
     // Extract unique identifier column names from strategy
     private val uniqueIdentifierColumns: List<String> =
-        strategy.attributeMappings.filter { it.isUniqueIdentifier }.map { it.columnName }
+        strategy.config.attributeMappings
+            .filter { it.isUniqueIdentifier }
+            .map { it.columnName }
 
     // Index existing transfers by their unique identifier values for fast lookup
     private val existingTransfersByUniqueId: Map<Map<String, String>, ExistingTransferInfo> =
@@ -450,19 +455,19 @@ class CsvTransferMapper(
             val originalValues = row.values
             val (values, rulesFlip) = applyRowPreprocessing(originalValues)
             val targetMapping =
-                strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
+                strategy.config.fieldMappings[TransferField.TARGET_ACCOUNT]
                     ?: return MappingResult.Error(row.rowIndex, "Missing TARGET_ACCOUNT mapping")
             val timestampMapping =
-                strategy.fieldMappings[TransferField.TIMESTAMP]
+                strategy.config.fieldMappings[TransferField.TIMESTAMP]
                     ?: return MappingResult.Error(row.rowIndex, "Missing TIMESTAMP mapping")
             val descriptionMapping =
-                strategy.fieldMappings[TransferField.DESCRIPTION]
+                strategy.config.fieldMappings[TransferField.DESCRIPTION]
                     ?: return MappingResult.Error(row.rowIndex, "Missing DESCRIPTION mapping")
             val amountMapping =
-                strategy.fieldMappings[TransferField.AMOUNT]
+                strategy.config.fieldMappings[TransferField.AMOUNT]
                     ?: return MappingResult.Error(row.rowIndex, "Missing AMOUNT mapping")
             val currencyMapping =
-                strategy.fieldMappings[TransferField.CURRENCY]
+                strategy.config.fieldMappings[TransferField.CURRENCY]
                     ?: return MappingResult.Error(row.rowIndex, "Missing CURRENCY mapping")
 
             // Parse amount first (needed for account flipping)
@@ -481,8 +486,8 @@ class CsvTransferMapper(
             // which the same-account checks below must not treat as a collision.
             val tradeTo: Money? =
                 run {
-                    val toCurrencyMapping = strategy.fieldMappings[TransferField.TO_CURRENCY] ?: return@run null
-                    val toAmountMapping = strategy.fieldMappings[TransferField.TO_AMOUNT] ?: return@run null
+                    val toCurrencyMapping = strategy.config.fieldMappings[TransferField.TO_CURRENCY] ?: return@run null
+                    val toAmountMapping = strategy.config.fieldMappings[TransferField.TO_AMOUNT] ?: return@run null
                     val toAsset = parseCurrency(toCurrencyMapping, values) ?: return@run null
                     if (toAsset.id == currency.id) return@run null
                     val toRaw = parseAmount(toAmountMapping, values).abs()
@@ -504,7 +509,7 @@ class CsvTransferMapper(
                     sourceAccountOverride
                 } else {
                     val sourceMapping =
-                        strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]
+                        strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]
                             ?: return MappingResult.Error(
                                 row.rowIndex,
                                 "No source account selected. Please choose a source account before importing.",
@@ -539,7 +544,7 @@ class CsvTransferMapper(
                 sourceAccountId == targetAccountId &&
                 sourceAccountId != UNRESOLVED_ACCOUNT_ID
             ) {
-                strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
+                strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
                     sourceAccountId = parseAccount(it, values, applyPersistedMappings = false)
                     sourceUsedPersistedMappings = false
                 }
@@ -556,7 +561,7 @@ class CsvTransferMapper(
             }
 
             // Parse timezone (optional - defaults to system timezone)
-            val timezoneMapping = strategy.fieldMappings[TransferField.TIMEZONE]
+            val timezoneMapping = strategy.config.fieldMappings[TransferField.TIMEZONE]
             val timezone = parseTimezone(timezoneMapping, values)
 
             // Parse timestamp
@@ -694,7 +699,7 @@ class CsvTransferMapper(
                         // if the source leg was re-resolved without persisted mappings (collision above), a
                         // genuinely new source account must still be discovered/created rather than suppressed
                         // by a persisted mapping — otherwise it would dangle unresolved.
-                        strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
+                        strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
                             add(discoverNewAccount(it, values, applyPersistedMappings = sourceUsedPersistedMappings))
                         }
                     }
@@ -740,7 +745,7 @@ class CsvTransferMapper(
                     conversionDetection?.let { ConversionLegInfo(side = it.side, pairingKey = it.pairingKey) },
                 tradeLeg = detectTradeLeg(originalValues),
                 fundingMatchValue =
-                    strategy.fundingAttributeMatch?.let {
+                    strategy.config.fundingAttributeMatch?.let {
                         getColumnValueOrNull(it.column, originalValues)?.trim()?.takeIf { v -> v.isNotBlank() }
                     },
                 unidentifiedCounterpartyAccountId = unidentifiedCounterpartyAccountId,
@@ -751,11 +756,11 @@ class CsvTransferMapper(
     }
 
     /**
-     * Extracts attribute values from CSV row based on strategy.attributeMappings.
+     * Extracts attribute values from CSV row based on strategy.config.attributeMappings.
      * Skips attributes with blank values.
      */
     private fun extractAttributes(values: List<String>): List<Pair<String, String>> =
-        strategy.attributeMappings.mapNotNull { mapping ->
+        strategy.config.attributeMappings.mapNotNull { mapping ->
             val value = getColumnValueOrNull(mapping.columnName, values)?.trim()
             if (value.isNullOrBlank()) {
                 return@mapNotNull null
@@ -790,12 +795,12 @@ class CsvTransferMapper(
     )
 
     /**
-     * Detects whether [values] is a leg of an asset conversion per [CsvImportStrategy.conversionConfig].
+     * Detects whether [values] is a leg of an asset conversion per [CsvStrategyConfig.conversionConfig].
      * Returns null when the strategy has no conversion config, the signal column doesn't match a
      * debit/credit pattern, or no counterparty account can be resolved.
      */
     private fun detectConversionLeg(values: List<String>): ConversionDetection? {
-        val config = strategy.conversionConfig ?: return null
+        val config = strategy.config.conversionConfig ?: return null
         val signal = getColumnValueOrNull(config.signalColumn, values)?.trim().orEmpty()
         if (signal.isEmpty()) return null
         val matchesFamily =
@@ -843,13 +848,13 @@ class CsvTransferMapper(
     }
 
     /**
-     * Detects whether [values] is a leg of a row-group trade per [CsvImportStrategy.tradeGroupConfig].
+     * Detects whether [values] is a leg of a row-group trade per [CsvStrategyConfig.tradeGroupConfig].
      * Returns null when the strategy declares no trade-group config or the signal column matches
      * neither the debit nor the credit pattern — including for a fee row, which the config leaves out
      * on purpose so it imports as its own transfer.
      */
     private fun detectTradeLeg(values: List<String>): TradeLegInfo? {
-        val config = strategy.tradeGroupConfig ?: return null
+        val config = strategy.config.tradeGroupConfig ?: return null
         val signal = getColumnValueOrNull(config.signalColumn, values)?.trim().orEmpty()
         if (signal.isEmpty()) return null
         val isDebitPattern = tradeDebitRegex?.containsMatchIn(signal) == true
@@ -922,7 +927,7 @@ class CsvTransferMapper(
     private fun applyRowPreprocessing(values: List<String>): Pair<List<String>, Boolean> {
         var effective = values
         var flip = false
-        for (rule in strategy.rowPreprocessingRules) {
+        for (rule in strategy.config.rowPreprocessingRules) {
             if (rule.conditions.all { evaluateCondition(it, effective) }) {
                 effective = applyColumnSwaps(rule.columnSwaps, effective)
                 if (rule.flipSourceAndTarget) flip = !flip

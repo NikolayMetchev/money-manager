@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -78,42 +79,45 @@ class CsvTransferMapperTest {
         return CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Test Strategy",
-            identificationColumns = setOf("Date", "Description", "Amount"),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(
-                            fieldType = TransferField.SOURCE_ACCOUNT,
-                            accountId = testSourceAccountId,
-                        ),
-                    TransferField.TARGET_ACCOUNT to
-                        AccountLookupMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            columnName = "Payee",
-                        ),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = "Date",
-                            dateFormat = "dd/MM/yyyy",
-                        ),
-                    TransferField.DESCRIPTION to
-                        DirectColumnMapping(
-                            fieldType = TransferField.DESCRIPTION,
-                            columnName = "Description",
-                        ),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Amount",
-                            flipAccountsOnPositive = flipAccountsOnPositive,
-                            negateValues = negateValues,
-                        ),
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(
-                            fieldType = TransferField.CURRENCY,
-                            currencyId = testCurrencyId,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Date", "Description", "Amount"),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                    accountId = testSourceAccountId,
+                                ),
+                            TransferField.TARGET_ACCOUNT to
+                                AccountLookupMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    columnName = "Payee",
+                                ),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Date",
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(
+                                    fieldType = TransferField.DESCRIPTION,
+                                    columnName = "Description",
+                                ),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Amount",
+                                    flipAccountsOnPositive = flipAccountsOnPositive,
+                                    negateValues = negateValues,
+                                ),
+                            TransferField.CURRENCY to
+                                HardCodedCurrencyMapping(
+                                    fieldType = TransferField.CURRENCY,
+                                    currencyId = testCurrencyId,
+                                ),
                         ),
                 ),
             createdAt = now,
@@ -551,40 +555,43 @@ class CsvTransferMapperTest {
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
                 name = "Test Strategy With Currency Column",
-                identificationColumns = setOf("Date", "Description", "Amount", "Currency"),
-                fieldMappings =
-                    mapOf(
-                        TransferField.SOURCE_ACCOUNT to
-                            HardCodedAccountMapping(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                accountId = testSourceAccountId,
-                            ),
-                        TransferField.TARGET_ACCOUNT to
-                            AccountLookupMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Payee",
-                            ),
-                        TransferField.TIMESTAMP to
-                            DateTimeParsingMapping(
-                                fieldType = TransferField.TIMESTAMP,
-                                dateColumnName = "Date",
-                                dateFormat = "dd/MM/yyyy",
-                            ),
-                        TransferField.DESCRIPTION to
-                            DirectColumnMapping(
-                                fieldType = TransferField.DESCRIPTION,
-                                columnName = "Description",
-                            ),
-                        TransferField.AMOUNT to
-                            AmountParsingMapping(
-                                fieldType = TransferField.AMOUNT,
-                                mode = AmountMode.SINGLE_COLUMN,
-                                amountColumnName = "Amount",
-                            ),
-                        TransferField.CURRENCY to
-                            CurrencyLookupMapping(
-                                fieldType = TransferField.CURRENCY,
-                                columnName = "Currency",
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date", "Description", "Amount", "Currency"),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.SOURCE_ACCOUNT to
+                                    HardCodedAccountMapping(
+                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                        accountId = testSourceAccountId,
+                                    ),
+                                TransferField.TARGET_ACCOUNT to
+                                    AccountLookupMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Payee",
+                                    ),
+                                TransferField.TIMESTAMP to
+                                    DateTimeParsingMapping(
+                                        fieldType = TransferField.TIMESTAMP,
+                                        dateColumnName = "Date",
+                                        dateFormat = "dd/MM/yyyy",
+                                    ),
+                                TransferField.DESCRIPTION to
+                                    DirectColumnMapping(
+                                        fieldType = TransferField.DESCRIPTION,
+                                        columnName = "Description",
+                                    ),
+                                TransferField.AMOUNT to
+                                    AmountParsingMapping(
+                                        fieldType = TransferField.AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "Amount",
+                                    ),
+                                TransferField.CURRENCY to
+                                    CurrencyLookupMapping(
+                                        fieldType = TransferField.CURRENCY,
+                                        columnName = "Currency",
+                                    ),
                             ),
                     ),
                 createdAt = now,
@@ -626,40 +633,43 @@ class CsvTransferMapperTest {
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
                 name = "Test Strategy With Currency Column",
-                identificationColumns = setOf("Date", "Description", "Amount", "Currency"),
-                fieldMappings =
-                    mapOf(
-                        TransferField.SOURCE_ACCOUNT to
-                            HardCodedAccountMapping(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                accountId = testSourceAccountId,
-                            ),
-                        TransferField.TARGET_ACCOUNT to
-                            AccountLookupMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Payee",
-                            ),
-                        TransferField.TIMESTAMP to
-                            DateTimeParsingMapping(
-                                fieldType = TransferField.TIMESTAMP,
-                                dateColumnName = "Date",
-                                dateFormat = "dd/MM/yyyy",
-                            ),
-                        TransferField.DESCRIPTION to
-                            DirectColumnMapping(
-                                fieldType = TransferField.DESCRIPTION,
-                                columnName = "Description",
-                            ),
-                        TransferField.AMOUNT to
-                            AmountParsingMapping(
-                                fieldType = TransferField.AMOUNT,
-                                mode = AmountMode.SINGLE_COLUMN,
-                                amountColumnName = "Amount",
-                            ),
-                        TransferField.CURRENCY to
-                            CurrencyLookupMapping(
-                                fieldType = TransferField.CURRENCY,
-                                columnName = "Currency",
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date", "Description", "Amount", "Currency"),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.SOURCE_ACCOUNT to
+                                    HardCodedAccountMapping(
+                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                        accountId = testSourceAccountId,
+                                    ),
+                                TransferField.TARGET_ACCOUNT to
+                                    AccountLookupMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Payee",
+                                    ),
+                                TransferField.TIMESTAMP to
+                                    DateTimeParsingMapping(
+                                        fieldType = TransferField.TIMESTAMP,
+                                        dateColumnName = "Date",
+                                        dateFormat = "dd/MM/yyyy",
+                                    ),
+                                TransferField.DESCRIPTION to
+                                    DirectColumnMapping(
+                                        fieldType = TransferField.DESCRIPTION,
+                                        columnName = "Description",
+                                    ),
+                                TransferField.AMOUNT to
+                                    AmountParsingMapping(
+                                        fieldType = TransferField.AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "Amount",
+                                    ),
+                                TransferField.CURRENCY to
+                                    CurrencyLookupMapping(
+                                        fieldType = TransferField.CURRENCY,
+                                        columnName = "Currency",
+                                    ),
                             ),
                     ),
                 createdAt = now,
@@ -691,45 +701,48 @@ class CsvTransferMapperTest {
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
                 name = "Test Strategy With Timezone",
-                identificationColumns = setOf("Date", "Description", "Amount"),
-                fieldMappings =
-                    mapOf(
-                        TransferField.SOURCE_ACCOUNT to
-                            HardCodedAccountMapping(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                accountId = testSourceAccountId,
-                            ),
-                        TransferField.TARGET_ACCOUNT to
-                            AccountLookupMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Payee",
-                            ),
-                        TransferField.TIMESTAMP to
-                            DateTimeParsingMapping(
-                                fieldType = TransferField.TIMESTAMP,
-                                dateColumnName = "Date",
-                                dateFormat = "dd/MM/yyyy",
-                            ),
-                        TransferField.DESCRIPTION to
-                            DirectColumnMapping(
-                                fieldType = TransferField.DESCRIPTION,
-                                columnName = "Description",
-                            ),
-                        TransferField.AMOUNT to
-                            AmountParsingMapping(
-                                fieldType = TransferField.AMOUNT,
-                                mode = AmountMode.SINGLE_COLUMN,
-                                amountColumnName = "Amount",
-                            ),
-                        TransferField.CURRENCY to
-                            HardCodedCurrencyMapping(
-                                fieldType = TransferField.CURRENCY,
-                                currencyId = testCurrencyId,
-                            ),
-                        TransferField.TIMEZONE to
-                            HardCodedTimezoneMapping(
-                                fieldType = TransferField.TIMEZONE,
-                                timezoneId = "UTC",
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date", "Description", "Amount"),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.SOURCE_ACCOUNT to
+                                    HardCodedAccountMapping(
+                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                        accountId = testSourceAccountId,
+                                    ),
+                                TransferField.TARGET_ACCOUNT to
+                                    AccountLookupMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Payee",
+                                    ),
+                                TransferField.TIMESTAMP to
+                                    DateTimeParsingMapping(
+                                        fieldType = TransferField.TIMESTAMP,
+                                        dateColumnName = "Date",
+                                        dateFormat = "dd/MM/yyyy",
+                                    ),
+                                TransferField.DESCRIPTION to
+                                    DirectColumnMapping(
+                                        fieldType = TransferField.DESCRIPTION,
+                                        columnName = "Description",
+                                    ),
+                                TransferField.AMOUNT to
+                                    AmountParsingMapping(
+                                        fieldType = TransferField.AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "Amount",
+                                    ),
+                                TransferField.CURRENCY to
+                                    HardCodedCurrencyMapping(
+                                        fieldType = TransferField.CURRENCY,
+                                        currencyId = testCurrencyId,
+                                    ),
+                                TransferField.TIMEZONE to
+                                    HardCodedTimezoneMapping(
+                                        fieldType = TransferField.TIMEZONE,
+                                        timezoneId = "UTC",
+                                    ),
                             ),
                     ),
                 createdAt = now,
@@ -772,45 +785,48 @@ class CsvTransferMapperTest {
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
                 name = "Test Strategy With Timezone Column",
-                identificationColumns = setOf("Date", "Description", "Amount", "Timezone"),
-                fieldMappings =
-                    mapOf(
-                        TransferField.SOURCE_ACCOUNT to
-                            HardCodedAccountMapping(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                accountId = testSourceAccountId,
-                            ),
-                        TransferField.TARGET_ACCOUNT to
-                            AccountLookupMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Payee",
-                            ),
-                        TransferField.TIMESTAMP to
-                            DateTimeParsingMapping(
-                                fieldType = TransferField.TIMESTAMP,
-                                dateColumnName = "Date",
-                                dateFormat = "dd/MM/yyyy",
-                            ),
-                        TransferField.DESCRIPTION to
-                            DirectColumnMapping(
-                                fieldType = TransferField.DESCRIPTION,
-                                columnName = "Description",
-                            ),
-                        TransferField.AMOUNT to
-                            AmountParsingMapping(
-                                fieldType = TransferField.AMOUNT,
-                                mode = AmountMode.SINGLE_COLUMN,
-                                amountColumnName = "Amount",
-                            ),
-                        TransferField.CURRENCY to
-                            HardCodedCurrencyMapping(
-                                fieldType = TransferField.CURRENCY,
-                                currencyId = testCurrencyId,
-                            ),
-                        TransferField.TIMEZONE to
-                            TimezoneLookupMapping(
-                                fieldType = TransferField.TIMEZONE,
-                                columnName = "Timezone",
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date", "Description", "Amount", "Timezone"),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.SOURCE_ACCOUNT to
+                                    HardCodedAccountMapping(
+                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                        accountId = testSourceAccountId,
+                                    ),
+                                TransferField.TARGET_ACCOUNT to
+                                    AccountLookupMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Payee",
+                                    ),
+                                TransferField.TIMESTAMP to
+                                    DateTimeParsingMapping(
+                                        fieldType = TransferField.TIMESTAMP,
+                                        dateColumnName = "Date",
+                                        dateFormat = "dd/MM/yyyy",
+                                    ),
+                                TransferField.DESCRIPTION to
+                                    DirectColumnMapping(
+                                        fieldType = TransferField.DESCRIPTION,
+                                        columnName = "Description",
+                                    ),
+                                TransferField.AMOUNT to
+                                    AmountParsingMapping(
+                                        fieldType = TransferField.AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "Amount",
+                                    ),
+                                TransferField.CURRENCY to
+                                    HardCodedCurrencyMapping(
+                                        fieldType = TransferField.CURRENCY,
+                                        currencyId = testCurrencyId,
+                                    ),
+                                TransferField.TIMEZONE to
+                                    TimezoneLookupMapping(
+                                        fieldType = TransferField.TIMEZONE,
+                                        columnName = "Timezone",
+                                    ),
                             ),
                     ),
                 createdAt = now,
@@ -849,45 +865,48 @@ class CsvTransferMapperTest {
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
                 name = "Test Strategy With $timezoneId",
-                identificationColumns = setOf("Date", "Description", "Amount"),
-                fieldMappings =
-                    mapOf(
-                        TransferField.SOURCE_ACCOUNT to
-                            HardCodedAccountMapping(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                accountId = testSourceAccountId,
-                            ),
-                        TransferField.TARGET_ACCOUNT to
-                            AccountLookupMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Payee",
-                            ),
-                        TransferField.TIMESTAMP to
-                            DateTimeParsingMapping(
-                                fieldType = TransferField.TIMESTAMP,
-                                dateColumnName = "Date",
-                                dateFormat = "dd/MM/yyyy",
-                            ),
-                        TransferField.DESCRIPTION to
-                            DirectColumnMapping(
-                                fieldType = TransferField.DESCRIPTION,
-                                columnName = "Description",
-                            ),
-                        TransferField.AMOUNT to
-                            AmountParsingMapping(
-                                fieldType = TransferField.AMOUNT,
-                                mode = AmountMode.SINGLE_COLUMN,
-                                amountColumnName = "Amount",
-                            ),
-                        TransferField.CURRENCY to
-                            HardCodedCurrencyMapping(
-                                fieldType = TransferField.CURRENCY,
-                                currencyId = testCurrencyId,
-                            ),
-                        TransferField.TIMEZONE to
-                            HardCodedTimezoneMapping(
-                                fieldType = TransferField.TIMEZONE,
-                                timezoneId = timezoneId,
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date", "Description", "Amount"),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.SOURCE_ACCOUNT to
+                                    HardCodedAccountMapping(
+                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                        accountId = testSourceAccountId,
+                                    ),
+                                TransferField.TARGET_ACCOUNT to
+                                    AccountLookupMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Payee",
+                                    ),
+                                TransferField.TIMESTAMP to
+                                    DateTimeParsingMapping(
+                                        fieldType = TransferField.TIMESTAMP,
+                                        dateColumnName = "Date",
+                                        dateFormat = "dd/MM/yyyy",
+                                    ),
+                                TransferField.DESCRIPTION to
+                                    DirectColumnMapping(
+                                        fieldType = TransferField.DESCRIPTION,
+                                        columnName = "Description",
+                                    ),
+                                TransferField.AMOUNT to
+                                    AmountParsingMapping(
+                                        fieldType = TransferField.AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "Amount",
+                                    ),
+                                TransferField.CURRENCY to
+                                    HardCodedCurrencyMapping(
+                                        fieldType = TransferField.CURRENCY,
+                                        currencyId = testCurrencyId,
+                                    ),
+                                TransferField.TIMEZONE to
+                                    HardCodedTimezoneMapping(
+                                        fieldType = TransferField.TIMEZONE,
+                                        timezoneId = timezoneId,
+                                    ),
                             ),
                     ),
                 createdAt = now,
@@ -960,41 +979,44 @@ class CsvTransferMapperTest {
         return CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Strategy With Fallback",
-            identificationColumns = setOf("Date", "Description", "Amount", "Name", "Type"),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(
-                            fieldType = TransferField.SOURCE_ACCOUNT,
-                            accountId = testSourceAccountId,
-                        ),
-                    TransferField.TARGET_ACCOUNT to
-                        AccountLookupMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            columnName = primaryColumn,
-                            fallbackColumns = fallbackColumns,
-                        ),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = "Date",
-                            dateFormat = "dd/MM/yyyy",
-                        ),
-                    TransferField.DESCRIPTION to
-                        DirectColumnMapping(
-                            fieldType = TransferField.DESCRIPTION,
-                            columnName = "Description",
-                        ),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Amount",
-                        ),
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(
-                            fieldType = TransferField.CURRENCY,
-                            currencyId = testCurrencyId,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Date", "Description", "Amount", "Name", "Type"),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                    accountId = testSourceAccountId,
+                                ),
+                            TransferField.TARGET_ACCOUNT to
+                                AccountLookupMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    columnName = primaryColumn,
+                                    fallbackColumns = fallbackColumns,
+                                ),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Date",
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(
+                                    fieldType = TransferField.DESCRIPTION,
+                                    columnName = "Description",
+                                ),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Amount",
+                                ),
+                            TransferField.CURRENCY to
+                                HardCodedCurrencyMapping(
+                                    fieldType = TransferField.CURRENCY,
+                                    currencyId = testCurrencyId,
+                                ),
                         ),
                 ),
             createdAt = now,
@@ -1166,42 +1188,45 @@ class CsvTransferMapperTest {
         return CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Strategy With Regex",
-            identificationColumns = setOf("Date", "Description", "Amount", "Name", "Type"),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(
-                            fieldType = TransferField.SOURCE_ACCOUNT,
-                            accountId = testSourceAccountId,
-                        ),
-                    TransferField.TARGET_ACCOUNT to
-                        RegexAccountMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            columnName = "Name",
-                            rules = rules,
-                            fallbackColumns = fallbackColumns,
-                        ),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = "Date",
-                            dateFormat = "dd/MM/yyyy",
-                        ),
-                    TransferField.DESCRIPTION to
-                        DirectColumnMapping(
-                            fieldType = TransferField.DESCRIPTION,
-                            columnName = "Description",
-                        ),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Amount",
-                        ),
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(
-                            fieldType = TransferField.CURRENCY,
-                            currencyId = testCurrencyId,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Date", "Description", "Amount", "Name", "Type"),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                    accountId = testSourceAccountId,
+                                ),
+                            TransferField.TARGET_ACCOUNT to
+                                RegexAccountMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    columnName = "Name",
+                                    rules = rules,
+                                    fallbackColumns = fallbackColumns,
+                                ),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Date",
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(
+                                    fieldType = TransferField.DESCRIPTION,
+                                    columnName = "Description",
+                                ),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Amount",
+                                ),
+                            TransferField.CURRENCY to
+                                HardCodedCurrencyMapping(
+                                    fieldType = TransferField.CURRENCY,
+                                    currencyId = testCurrencyId,
+                                ),
                         ),
                 ),
             createdAt = now,
@@ -1550,16 +1575,19 @@ class CsvTransferMapperTest {
     private fun attributeMatchStrategy(): CsvImportStrategy {
         val base = createStrategy()
         return base.copy(
-            fieldMappings =
-                base.fieldMappings +
-                    (
-                        TransferField.TARGET_ACCOUNT to
-                            AttributeMatchAccountMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Payee",
-                                attributeTypeName = "card-last4",
-                            )
-                    ),
+            config =
+                base.config.copy(
+                    fieldMappings =
+                        base.config.fieldMappings +
+                            (
+                                TransferField.TARGET_ACCOUNT to
+                                    AttributeMatchAccountMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Payee",
+                                        attributeTypeName = "card-last4",
+                                    )
+                            ),
+                ),
         )
     }
 

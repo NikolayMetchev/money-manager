@@ -1,6 +1,6 @@
 package com.moneymanager.database.mapper
 
-import com.moneymanager.database.json.FieldMappingJsonCodec
+import com.moneymanager.database.json.CsvStrategyJsonCodec
 import com.moneymanager.database.sql.audit.SelectAuditHistoryForCsvImportStrategy
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -37,11 +37,7 @@ object CsvImportStrategyAuditEntryMapper {
             strategyId = CsvImportStrategyId(Uuid.parse(from.csv_import_strategy_id)),
             revisionId = from.revision_id,
             name = from.name,
-            identificationColumns = FieldMappingJsonCodec.decodeColumns(from.identification_columns_json),
-            fieldMappings = FieldMappingJsonCodec.decode(from.field_mappings_json),
-            attributeMappings = FieldMappingJsonCodec.decodeAttributeMappings(from.attribute_mappings_json),
-            rowPreprocessingRules = FieldMappingJsonCodec.decodeRowRules(from.row_rules_json),
-            companionTransactionRules = FieldMappingJsonCodec.decodeCompanionRules(from.companion_rules_json),
+            config = CsvStrategyJsonCodec.decode(from.config_json),
             createdAt = Instant.fromEpochMilliseconds(from.created_at),
             updatedAt = Instant.fromEpochMilliseconds(from.updated_at),
             source = source,

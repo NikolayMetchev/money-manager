@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
@@ -59,49 +60,52 @@ class CsvDuplicateDetectionTest {
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Test Strategy",
-            identificationColumns = setOf("Date", "Description", "Amount"),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(
-                            fieldType = TransferField.SOURCE_ACCOUNT,
-                            accountId = testSourceAccountId,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Date", "Description", "Amount"),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                    accountId = testSourceAccountId,
+                                ),
+                            TransferField.TARGET_ACCOUNT to
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    accountId = testTargetAccountId,
+                                ),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Date",
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(
+                                    fieldType = TransferField.DESCRIPTION,
+                                    columnName = "Description",
+                                ),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Amount",
+                                    negateValues = true,
+                                ),
+                            TransferField.CURRENCY to
+                                HardCodedCurrencyMapping(
+                                    fieldType = TransferField.CURRENCY,
+                                    currencyId = testCurrencyId,
+                                ),
+                            TransferField.TIMEZONE to
+                                HardCodedTimezoneMapping(
+                                    fieldType = TransferField.TIMEZONE,
+                                    timezoneId = "UTC",
+                                ),
                         ),
-                    TransferField.TARGET_ACCOUNT to
-                        HardCodedAccountMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            accountId = testTargetAccountId,
-                        ),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = "Date",
-                            dateFormat = "dd/MM/yyyy",
-                        ),
-                    TransferField.DESCRIPTION to
-                        DirectColumnMapping(
-                            fieldType = TransferField.DESCRIPTION,
-                            columnName = "Description",
-                        ),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Amount",
-                            negateValues = true,
-                        ),
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(
-                            fieldType = TransferField.CURRENCY,
-                            currencyId = testCurrencyId,
-                        ),
-                    TransferField.TIMEZONE to
-                        HardCodedTimezoneMapping(
-                            fieldType = TransferField.TIMEZONE,
-                            timezoneId = "UTC",
-                        ),
+                    attributeMappings = attributeMappings,
                 ),
-            attributeMappings = attributeMappings,
             createdAt = Clock.System.now(),
             updatedAt = Clock.System.now(),
         )
@@ -491,60 +495,63 @@ class CsvDuplicateDetectionTest {
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
                 name = "Test Strategy",
-                identificationColumns = setOf("Date", "Description", "Amount"),
-                fieldMappings =
-                    mapOf(
-                        TransferField.SOURCE_ACCOUNT to
-                            HardCodedAccountMapping(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                accountId = testSourceAccountId,
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date", "Description", "Amount"),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.SOURCE_ACCOUNT to
+                                    HardCodedAccountMapping(
+                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                        accountId = testSourceAccountId,
+                                    ),
+                                TransferField.TARGET_ACCOUNT to
+                                    HardCodedAccountMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        accountId = testTargetAccountId,
+                                    ),
+                                TransferField.TIMESTAMP to
+                                    DateTimeParsingMapping(
+                                        fieldType = TransferField.TIMESTAMP,
+                                        dateColumnName = "Date",
+                                        dateFormat = "dd/MM/yyyy",
+                                    ),
+                                TransferField.DESCRIPTION to
+                                    DirectColumnMapping(
+                                        fieldType = TransferField.DESCRIPTION,
+                                        columnName = "Description",
+                                    ),
+                                TransferField.AMOUNT to
+                                    AmountParsingMapping(
+                                        fieldType = TransferField.AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "Amount",
+                                        negateValues = true,
+                                    ),
+                                TransferField.CURRENCY to
+                                    HardCodedCurrencyMapping(
+                                        fieldType = TransferField.CURRENCY,
+                                        currencyId = testCurrencyId,
+                                    ),
+                                TransferField.TIMEZONE to
+                                    HardCodedTimezoneMapping(
+                                        fieldType = TransferField.TIMEZONE,
+                                        timezoneId = "UTC",
+                                    ),
                             ),
-                        TransferField.TARGET_ACCOUNT to
-                            HardCodedAccountMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                accountId = testTargetAccountId,
+                        attributeMappings =
+                            listOf(
+                                AttributeColumnMapping(
+                                    columnName = "Transaction ID",
+                                    attributeTypeName = "Transaction ID",
+                                    isUniqueIdentifier = true,
+                                ),
+                                AttributeColumnMapping(
+                                    columnName = "External ID",
+                                    attributeTypeName = "External ID",
+                                    isUniqueIdentifier = true,
+                                ),
                             ),
-                        TransferField.TIMESTAMP to
-                            DateTimeParsingMapping(
-                                fieldType = TransferField.TIMESTAMP,
-                                dateColumnName = "Date",
-                                dateFormat = "dd/MM/yyyy",
-                            ),
-                        TransferField.DESCRIPTION to
-                            DirectColumnMapping(
-                                fieldType = TransferField.DESCRIPTION,
-                                columnName = "Description",
-                            ),
-                        TransferField.AMOUNT to
-                            AmountParsingMapping(
-                                fieldType = TransferField.AMOUNT,
-                                mode = AmountMode.SINGLE_COLUMN,
-                                amountColumnName = "Amount",
-                                negateValues = true,
-                            ),
-                        TransferField.CURRENCY to
-                            HardCodedCurrencyMapping(
-                                fieldType = TransferField.CURRENCY,
-                                currencyId = testCurrencyId,
-                            ),
-                        TransferField.TIMEZONE to
-                            HardCodedTimezoneMapping(
-                                fieldType = TransferField.TIMEZONE,
-                                timezoneId = "UTC",
-                            ),
-                    ),
-                attributeMappings =
-                    listOf(
-                        AttributeColumnMapping(
-                            columnName = "Transaction ID",
-                            attributeTypeName = "Transaction ID",
-                            isUniqueIdentifier = true,
-                        ),
-                        AttributeColumnMapping(
-                            columnName = "External ID",
-                            attributeTypeName = "External ID",
-                            isUniqueIdentifier = true,
-                        ),
                     ),
                 createdAt = Clock.System.now(),
                 updatedAt = Clock.System.now(),

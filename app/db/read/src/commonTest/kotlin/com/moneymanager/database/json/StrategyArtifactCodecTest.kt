@@ -3,6 +3,7 @@ package com.moneymanager.database.json
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingsExport
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
@@ -47,9 +48,12 @@ class StrategyArtifactCodecTest {
     ) = CsvStrategyExport(
         version = version,
         name = "Test Strategy",
-        identificationColumns = identificationColumns,
-        fieldMappings = fieldMappings,
-        attributeMappings = attributeMappings,
+        config =
+            CsvStrategyConfig(
+                identificationColumns = identificationColumns,
+                fieldMappings = fieldMappings,
+                attributeMappings = attributeMappings,
+            ),
         accountMappings = accountMappings,
     )
 
@@ -63,7 +67,7 @@ class StrategyArtifactCodecTest {
             csvExport(
                 identificationColumns = setOf("Date", "Amount"),
                 fieldMappings = mapOf(TransferField.TARGET_ACCOUNT to targetMapping, TransferField.SOURCE_ACCOUNT to sourceMapping),
-                attributeMappings = csvExport().attributeMappings.reversed(),
+                attributeMappings = csvExport().config.attributeMappings.reversed(),
                 accountMappings = csvExport().accountMappings.reversed(),
             )
 
@@ -113,10 +117,12 @@ class StrategyArtifactCodecTest {
 
         val decoded = CsvStrategyExportCodec.decode(CsvStrategyExportCodec.encode(reordered))
 
-        assertEquals(listOf("Amount", "Date"), decoded.identificationColumns.toList())
-        val decodedFieldOrder = decoded.fieldMappings.keys.map { it.name }
+        assertEquals(listOf("Amount", "Date"), decoded.config.identificationColumns.toList())
+        val decodedFieldOrder =
+            decoded.config.fieldMappings.keys
+                .map { it.name }
         assertEquals(decodedFieldOrder.sorted(), decodedFieldOrder)
-        assertEquals(decoded.attributeMappings, decoded.attributeMappings.sorted())
+        assertEquals(decoded.config.attributeMappings, decoded.config.attributeMappings.sorted())
         assertEquals(decoded.accountMappings, decoded.accountMappings.sorted())
     }
 }

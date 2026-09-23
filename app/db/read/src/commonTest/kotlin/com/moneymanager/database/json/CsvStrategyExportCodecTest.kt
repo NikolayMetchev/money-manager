@@ -2,6 +2,7 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
@@ -25,13 +26,16 @@ class CsvStrategyExportCodecTest {
             CsvStrategyExport(
                 version = "1.0.0",
                 name = "Test Strategy",
-                identificationColumns = setOf("Date", "Amount"),
-                fieldMappings =
-                    mapOf(
-                        TransferField.SOURCE_ACCOUNT to
-                            HardCodedAccountExport(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                accountName = "My Account",
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date", "Amount"),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.SOURCE_ACCOUNT to
+                                    HardCodedAccountExport(
+                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                        accountName = "My Account",
+                                    ),
                             ),
                     ),
             )
@@ -41,10 +45,10 @@ class CsvStrategyExportCodecTest {
 
         assertEquals(export.version, decoded.version)
         assertEquals(export.name, decoded.name)
-        assertEquals(export.identificationColumns, decoded.identificationColumns)
-        assertEquals(1, decoded.fieldMappings.size)
+        assertEquals(export.config.identificationColumns, decoded.config.identificationColumns)
+        assertEquals(1, decoded.config.fieldMappings.size)
 
-        val mapping = decoded.fieldMappings[TransferField.SOURCE_ACCOUNT]
+        val mapping = decoded.config.fieldMappings[TransferField.SOURCE_ACCOUNT]
         assertIs<HardCodedAccountExport>(mapping)
         assertEquals("My Account", mapping.accountName)
     }
@@ -55,50 +59,53 @@ class CsvStrategyExportCodecTest {
             CsvStrategyExport(
                 version = "2.0.0",
                 name = "Full Strategy",
-                identificationColumns = setOf("Date", "Description", "Amount"),
-                fieldMappings =
-                    mapOf(
-                        TransferField.SOURCE_ACCOUNT to
-                            HardCodedAccountExport(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                accountName = "Source Account",
-                            ),
-                        TransferField.TARGET_ACCOUNT to
-                            AccountLookupExport(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Payee",
-                                fallbackColumns = listOf("Type"),
-                                defaultCategoryName = "Uncategorized",
-                            ),
-                        TransferField.TIMESTAMP to
-                            DateTimeParsingExport(
-                                fieldType = TransferField.TIMESTAMP,
-                                dateColumnName = "Date",
-                                dateFormat = "dd/MM/yyyy",
-                                timeColumnName = "Time",
-                                timeFormat = "HH:mm",
-                            ),
-                        TransferField.DESCRIPTION to
-                            DirectColumnExport(
-                                fieldType = TransferField.DESCRIPTION,
-                                columnName = "Description",
-                            ),
-                        TransferField.AMOUNT to
-                            AmountParsingExport(
-                                fieldType = TransferField.AMOUNT,
-                                mode = AmountMode.SINGLE_COLUMN,
-                                amountColumnName = "Amount",
-                                negateValues = true,
-                            ),
-                        TransferField.CURRENCY to
-                            HardCodedCurrencyExport(
-                                fieldType = TransferField.CURRENCY,
-                                currencyCode = "GBP",
-                            ),
-                        TransferField.TIMEZONE to
-                            HardCodedTimezoneExport(
-                                fieldType = TransferField.TIMEZONE,
-                                timezoneId = "Europe/London",
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date", "Description", "Amount"),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.SOURCE_ACCOUNT to
+                                    HardCodedAccountExport(
+                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                        accountName = "Source Account",
+                                    ),
+                                TransferField.TARGET_ACCOUNT to
+                                    AccountLookupExport(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Payee",
+                                        fallbackColumns = listOf("Type"),
+                                        defaultCategoryName = "Uncategorized",
+                                    ),
+                                TransferField.TIMESTAMP to
+                                    DateTimeParsingExport(
+                                        fieldType = TransferField.TIMESTAMP,
+                                        dateColumnName = "Date",
+                                        dateFormat = "dd/MM/yyyy",
+                                        timeColumnName = "Time",
+                                        timeFormat = "HH:mm",
+                                    ),
+                                TransferField.DESCRIPTION to
+                                    DirectColumnExport(
+                                        fieldType = TransferField.DESCRIPTION,
+                                        columnName = "Description",
+                                    ),
+                                TransferField.AMOUNT to
+                                    AmountParsingExport(
+                                        fieldType = TransferField.AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "Amount",
+                                        negateValues = true,
+                                    ),
+                                TransferField.CURRENCY to
+                                    HardCodedCurrencyExport(
+                                        fieldType = TransferField.CURRENCY,
+                                        currencyCode = "GBP",
+                                    ),
+                                TransferField.TIMEZONE to
+                                    HardCodedTimezoneExport(
+                                        fieldType = TransferField.TIMEZONE,
+                                        timezoneId = "Europe/London",
+                                    ),
                             ),
                     ),
             )
@@ -108,15 +115,15 @@ class CsvStrategyExportCodecTest {
 
         assertEquals(export.version, decoded.version)
         assertEquals(export.name, decoded.name)
-        assertEquals(7, decoded.fieldMappings.size)
+        assertEquals(7, decoded.config.fieldMappings.size)
 
-        assertIs<HardCodedAccountExport>(decoded.fieldMappings[TransferField.SOURCE_ACCOUNT])
-        assertIs<AccountLookupExport>(decoded.fieldMappings[TransferField.TARGET_ACCOUNT])
-        assertIs<DateTimeParsingExport>(decoded.fieldMappings[TransferField.TIMESTAMP])
-        assertIs<DirectColumnExport>(decoded.fieldMappings[TransferField.DESCRIPTION])
-        assertIs<AmountParsingExport>(decoded.fieldMappings[TransferField.AMOUNT])
-        assertIs<HardCodedCurrencyExport>(decoded.fieldMappings[TransferField.CURRENCY])
-        assertIs<HardCodedTimezoneExport>(decoded.fieldMappings[TransferField.TIMEZONE])
+        assertIs<HardCodedAccountExport>(decoded.config.fieldMappings[TransferField.SOURCE_ACCOUNT])
+        assertIs<AccountLookupExport>(decoded.config.fieldMappings[TransferField.TARGET_ACCOUNT])
+        assertIs<DateTimeParsingExport>(decoded.config.fieldMappings[TransferField.TIMESTAMP])
+        assertIs<DirectColumnExport>(decoded.config.fieldMappings[TransferField.DESCRIPTION])
+        assertIs<AmountParsingExport>(decoded.config.fieldMappings[TransferField.AMOUNT])
+        assertIs<HardCodedCurrencyExport>(decoded.config.fieldMappings[TransferField.CURRENCY])
+        assertIs<HardCodedTimezoneExport>(decoded.config.fieldMappings[TransferField.TIMEZONE])
     }
 
     @Test
@@ -125,20 +132,23 @@ class CsvStrategyExportCodecTest {
             CsvStrategyExport(
                 version = "1.0.0",
                 name = "Regex Strategy",
-                identificationColumns = emptySet(),
-                fieldMappings =
-                    mapOf(
-                        TransferField.TARGET_ACCOUNT to
-                            RegexAccountExport(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Description",
-                                rules =
-                                    listOf(
-                                        RegexRule(pattern = ".*Grocery.*", accountName = "Food"),
-                                        RegexRule(pattern = ".*Amazon.*", accountName = "Shopping"),
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = emptySet(),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.TARGET_ACCOUNT to
+                                    RegexAccountExport(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Description",
+                                        rules =
+                                            listOf(
+                                                RegexRule(pattern = ".*Grocery.*", accountName = "Food"),
+                                                RegexRule(pattern = ".*Amazon.*", accountName = "Shopping"),
+                                            ),
+                                        fallbackColumns = listOf("Name"),
+                                        defaultCategoryName = "Other",
                                     ),
-                                fallbackColumns = listOf("Name"),
-                                defaultCategoryName = "Other",
                             ),
                     ),
             )
@@ -146,7 +156,7 @@ class CsvStrategyExportCodecTest {
         val json = CsvStrategyExportCodec.encode(export)
         val decoded = CsvStrategyExportCodec.decode(json)
 
-        val mapping = decoded.fieldMappings[TransferField.TARGET_ACCOUNT]
+        val mapping = decoded.config.fieldMappings[TransferField.TARGET_ACCOUNT]
         assertIs<RegexAccountExport>(mapping)
         assertEquals("Description", mapping.columnName)
         assertEquals(2, mapping.rules.size)
@@ -162,8 +172,11 @@ class CsvStrategyExportCodecTest {
             CsvStrategyExport(
                 version = "1.0.0",
                 name = "Test",
-                identificationColumns = setOf("A"),
-                fieldMappings = emptyMap(),
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("A"),
+                        fieldMappings = emptyMap(),
+                    ),
             )
 
         val json = CsvStrategyExportCodec.encode(export)
@@ -178,8 +191,11 @@ class CsvStrategyExportCodecTest {
             CsvStrategyExport(
                 version = "1.0.0",
                 name = "My Bank Strategy",
-                identificationColumns = setOf("Date", "Amount"),
-                fieldMappings = emptyMap(),
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date", "Amount"),
+                        fieldMappings = emptyMap(),
+                    ),
             )
 
         val json = CsvStrategyExportCodec.encode(export)
@@ -217,24 +233,27 @@ class CsvStrategyExportCodecTest {
             CsvStrategyExport(
                 version = "1.0.0",
                 name = "With companion rules",
-                identificationColumns = setOf("ID"),
-                fieldMappings = emptyMap(),
-                companionTransactionRules =
-                    listOf(
-                        CompanionTransactionRule(
-                            name = "Interest earned",
-                            matchAttributeName = "wise-id",
-                            matchValuePattern = "ACCRUAL_CHARGE-%",
-                            linkAttributeName = "wise-interest-for",
-                            companionDescription = "Interest earned",
-                        ),
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("ID"),
+                        fieldMappings = emptyMap(),
+                        companionTransactionRules =
+                            listOf(
+                                CompanionTransactionRule(
+                                    name = "Interest earned",
+                                    matchAttributeName = "wise-id",
+                                    matchValuePattern = "ACCRUAL_CHARGE-%",
+                                    linkAttributeName = "wise-interest-for",
+                                    companionDescription = "Interest earned",
+                                ),
+                            ),
                     ),
             )
 
         val json = CsvStrategyExportCodec.encode(export)
         val decoded = CsvStrategyExportCodec.decode(json)
 
-        val rule = decoded.companionTransactionRules.single()
+        val rule = decoded.config.companionTransactionRules.single()
         assertEquals("Interest earned", rule.name)
         assertEquals("wise-id", rule.matchAttributeName)
         assertEquals("ACCRUAL_CHARGE-%", rule.matchValuePattern)
@@ -256,6 +275,6 @@ class CsvStrategyExportCodecTest {
 
         val decoded = CsvStrategyExportCodec.decode(legacyJson)
 
-        assertTrue(decoded.companionTransactionRules.isEmpty())
+        assertTrue(decoded.config.companionTransactionRules.isEmpty())
     }
 }

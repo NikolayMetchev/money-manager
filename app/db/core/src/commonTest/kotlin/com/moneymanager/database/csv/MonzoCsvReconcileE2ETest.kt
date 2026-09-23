@@ -27,7 +27,7 @@ import kotlin.time.Duration
  * End-to-end test for cross-source reconciliation between two Monzo CSV exports of the same account
  * pair (e.g. the personal account's export and the joint account's own export). Monzo issues a
  * separate `Transaction ID` per account side of one transfer, so the two rows can never share a
- * unique key — only the [com.moneymanager.domain.model.csvstrategy.CsvImportStrategy.crossSourceReconcileWindowSeconds]
+ * unique key — only the [com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig.crossSourceReconcileWindowSeconds]
  * fallback (same accounts+amount within the window) pairs them, keeping the movement counted once.
  */
 class MonzoCsvReconcileE2ETest : DbTest() {

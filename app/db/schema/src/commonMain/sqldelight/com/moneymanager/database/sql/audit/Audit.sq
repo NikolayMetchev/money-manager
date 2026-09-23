@@ -233,11 +233,7 @@ CREATE TABLE csv_import_strategy_audit (
     csv_import_strategy_id TEXT NOT NULL,
     revision_id INTEGER NOT NULL,
     name TEXT NOT NULL,
-    identification_columns_json TEXT NOT NULL,
-    field_mappings_json TEXT NOT NULL,
-    attribute_mappings_json TEXT NOT NULL,
-    row_rules_json TEXT NOT NULL,
-    companion_rules_json TEXT NOT NULL,
+    config_json TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)

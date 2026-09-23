@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
@@ -18,6 +19,9 @@ import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
 import kotlinx.serialization.Serializable
 import kotlin.reflect.KClass
+import kotlin.reflect.KClassifier
+import kotlin.reflect.KType
+import kotlin.reflect.KTypeProjection
 import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.primaryConstructor
@@ -57,7 +61,7 @@ class StrategyExportUnsortedCollectionGuardTest {
             ApiTradeMappings::class to "compositeIdFields",
             ApiTransactionMappings::class to "compositeIdFields",
             ApiValueSet.Union::class to "sets",
-            CsvStrategyExport::class to "rowPreprocessingRules",
+            CsvStrategyConfig::class to "rowPreprocessingRules",
             RegexAccountExport::class to "rules",
             RegexAccountExport::class to "fallbackColumns",
             AccountLookupExport::class to "fallbackColumns",
@@ -79,7 +83,7 @@ class StrategyExportUnsortedCollectionGuardTest {
             )
         val visited = mutableSetOf<KClass<*>>()
         val offenders = mutableListOf<String>()
-        roots.forEach { visit(it, visited, offenders) }
+        roots.forEach { visit(it, emptyList(), visited, offenders) }
 
         if (offenders.isNotEmpty()) {
             fail(
@@ -91,16 +95,20 @@ class StrategyExportUnsortedCollectionGuardTest {
         }
     }
 
+    // typeArguments are the arguments klass is used with, so a field typed by one of klass's type
+    // parameters (CsvStrategyConfig's field-mapping type) is followed into the actual type it holds.
     private fun visit(
         klass: KClass<*>,
+        typeArguments: List<KTypeProjection>,
         visited: MutableSet<KClass<*>>,
         offenders: MutableList<String>,
     ) {
         if (!visited.add(klass)) return
         if (klass.isSealed) {
-            klass.sealedSubclasses.forEach { visit(it, visited, offenders) }
+            klass.sealedSubclasses.forEach { visit(it, emptyList(), visited, offenders) }
             return
         }
+        val substitutions: Map<KClassifier, KType?> = klass.typeParameters.zip(typeArguments.map { it.type }).toMap()
         val ctor = klass.primaryConstructor ?: return
         val propertiesByName = klass.memberProperties.associateBy { it.name }
 
@@ -119,10 +127,10 @@ class StrategyExportUnsortedCollectionGuardTest {
             }
 
             val nestedTypes = if (isCollection) param.type.arguments.mapNotNull { it.type } else listOf(param.type)
-            nestedTypes.forEach { type ->
+            nestedTypes.map { substitutions[it.classifier] ?: it }.forEach { type ->
                 val nestedErasure = type.jvmErasure
                 if (nestedErasure.qualifiedName?.startsWith(modelPackagePrefix) == true) {
-                    visit(nestedErasure, visited, offenders)
+                    visit(nestedErasure, type.arguments, visited, offenders)
                 }
             }
         }

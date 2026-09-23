@@ -352,12 +352,12 @@ fun CsvStrategyCard(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = "${strategy.identificationColumns.size} identification columns",
+                    text = "${strategy.config.identificationColumns.size} identification columns",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "${strategy.fieldMappings.size} field mappings",
+                    text = "${strategy.config.fieldMappings.size} field mappings",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

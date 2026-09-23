@@ -186,7 +186,7 @@ private fun collectCryptoCodes(
 
     val currencyColumns =
         listOf(TransferField.CURRENCY, TransferField.TO_CURRENCY).mapNotNull { field ->
-            (strategy.fieldMappings[field] as? CurrencyLookupMapping)?.columnName?.let(::columnIndex)
+            (strategy.config.fieldMappings[field] as? CurrencyLookupMapping)?.columnName?.let(::columnIndex)
         }
     if (currencyColumns.isEmpty()) return emptySet()
 
@@ -357,7 +357,7 @@ suspend fun applyStagedCsv(
     // trade's exact-tuple idempotency makes re-emitting the group a no-op that resolves to DUPLICATE.
     // Transfers are still emitted only for the unprocessed rows (see [unprocessedRowIndexes] below), so
     // widening the mapped set changes what groups see and nothing else.
-    val rows = if (strategy.tradeGroupConfig != null) allRows else unprocessedRows
+    val rows = if (strategy.config.tradeGroupConfig != null) allRows else unprocessedRows
     val unprocessedRowIndexes: Set<Long> = unprocessedRows.mapTo(mutableSetOf()) { it.rowIndex }
     if (unprocessedRows.isEmpty()) {
         // A genuinely empty file (a header-only export with no data rows) has nothing to import, but
@@ -485,14 +485,14 @@ fun effectiveSourceFor(
     strategy: CsvImportStrategy,
     override: AccountId?,
 ): AccountId? =
-    when (val mapping = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]) {
+    when (val mapping = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]) {
         is HardCodedAccountMapping -> mapping.accountId
         null -> override
         else -> null
     }
 
 /** True when `strategy` needs a user-chosen source account (no SOURCE_ACCOUNT mapping of its own). */
-fun CsvImportStrategy.needsSourceAccountOverride(): Boolean = fieldMappings[TransferField.SOURCE_ACCOUNT] == null
+fun CsvImportStrategy.needsSourceAccountOverride(): Boolean = config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null
 
 fun buildCsvMapper(
     strategy: CsvImportStrategy,
@@ -792,7 +792,7 @@ suspend fun runCsvImport(
     // above, so transfers carry Existing refs and the central engine only
     // dedupes, writes transfers, applies updates and records sources.
     val uniqueIdTypeNames =
-        strategy.attributeMappings
+        strategy.config.attributeMappings
             .filter { it.isUniqueIdentifier }
             .map { it.attributeTypeName }
             .toSet()
@@ -820,7 +820,7 @@ suspend fun runCsvImport(
     // drop out of the transfer list. A group that does not resolve assembles to null and its rows stay
     // ordinary transfers, so nothing is ever dropped for want of a clean pairing.
     val assembledTrades =
-        strategy.tradeGroupConfig
+        strategy.config.tradeGroupConfig
             ?.let { config ->
                 groupTradeLegs(finalPrep.validTransfers, config).mapNotNull { it.assemble(config) }
             }.orEmpty()
@@ -888,7 +888,7 @@ suspend fun runCsvImport(
     // timestamp within the configured window) so the engine links them with the conversion
     // relationship. Handles both 1:1 swaps and N-debits -> 1-credit dust events (many debits share the
     // one credit). Debits with no in-window credit are left unlinked (still valid, balance-correct).
-    val conversionConfig = strategy.conversionConfig
+    val conversionConfig = strategy.config.conversionConfig
     val conversionLinkByRow: Map<Long, BatchRelationship> =
         if (conversionConfig == null) {
             emptyMap()
@@ -969,7 +969,7 @@ suspend fun runCsvImport(
                 // attribute type to find the account that must hold the matching funding leg (e.g. Curve's
                 // "7721" -> the Crypto.com Card account, via the `card-last4` attribute regexes). Never point
                 // at the row's own source conduit (a self-reconcile makes no sense).
-                val fundingMatcher = strategy.fundingAttributeMatch?.let { attributeAccountMatchers[it.attributeTypeName] }
+                val fundingMatcher = strategy.config.fundingAttributeMatch?.let { attributeAccountMatchers[it.attributeTypeName] }
                 val fundingAccountId =
                     row.fundingMatchValue
                         ?.let { fundingMatcher?.match(it) }
@@ -1053,7 +1053,7 @@ suspend fun runCsvImport(
             // matches a group against the WHOLE in-window candidate set, so a wide window would drag a
             // later order's fills in and stop the sums matching at all.
             tradeDedupePolicy =
-                strategy.tradeGroupConfig
+                strategy.config.tradeGroupConfig
                     ?.reconcileWindowSeconds
                     ?.let { TradeDedupePolicy.Fuzzy(window = it.seconds) }
                     ?: TradeDedupePolicy.ExactTupleOnly,
@@ -1062,7 +1062,7 @@ suspend fun runCsvImport(
                     // Cross-source reconciliation is opt-in per strategy: rows recording a movement
                     // another export already imported (same accounts+amount within the window) are
                     // kept but excluded+linked instead of double-counting. Mirrors the API importer.
-                    val reconcileWindow = strategy.crossSourceReconcileWindowSeconds?.seconds
+                    val reconcileWindow = strategy.config.crossSourceReconcileWindowSeconds?.seconds
                     DedupePolicy.FuzzyAllFields(
                         reconcileWindow = reconcileWindow,
                         reconciledExclusionAttributeTypeId =
@@ -1076,7 +1076,7 @@ suspend fun runCsvImport(
                     // Cross-source reconciliation for unique-id strategies whose sources issue a
                     // different id per side of the same movement (e.g. Monzo's own- and joint-account
                     // exports each carry their own Transaction ID for one transfer).
-                    val reconcileWindow = strategy.crossSourceReconcileWindowSeconds?.seconds
+                    val reconcileWindow = strategy.config.crossSourceReconcileWindowSeconds?.seconds
                     DedupePolicy.UniqueIdentifier(
                         reconcileWindow = reconcileWindow,
                         reconciledExclusionAttributeTypeId =

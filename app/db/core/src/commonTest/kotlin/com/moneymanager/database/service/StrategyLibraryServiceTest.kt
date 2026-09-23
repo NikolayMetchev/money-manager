@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.domain.strategy.StrategyFileNaming
 import com.moneymanager.domain.strategy.StrategyKey
@@ -52,8 +53,11 @@ class StrategyLibraryServiceTest : DbTest() {
                 CsvImportStrategy(
                     id = CsvImportStrategyId(Uuid.random()),
                     name = "WiseTest",
-                    identificationColumns = setOf("Amount", "Description"),
-                    fieldMappings = emptyMap(),
+                    config =
+                        CsvStrategyConfig(
+                            identificationColumns = setOf("Amount", "Description"),
+                            fieldMappings = emptyMap(),
+                        ),
                     createdAt = now,
                     updatedAt = now,
                 )
@@ -91,8 +95,11 @@ class StrategyLibraryServiceTest : DbTest() {
                 CsvImportStrategy(
                     id = CsvImportStrategyId(Uuid.random()),
                     name = "MyQif",
-                    identificationColumns = QifColumns.headers.toSet(),
-                    fieldMappings = emptyMap(),
+                    config =
+                        CsvStrategyConfig(
+                            identificationColumns = QifColumns.headers.toSet(),
+                            fieldMappings = emptyMap(),
+                        ),
                     createdAt = now,
                     updatedAt = now,
                 ),

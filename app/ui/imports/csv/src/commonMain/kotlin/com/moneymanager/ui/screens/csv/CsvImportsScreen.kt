@@ -568,7 +568,8 @@ private fun resolveSourceAccountName(
     accounts: List<Account>,
 ): String? {
     val appliedStrategy = import.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
-    val hardCodedAccountId = (appliedStrategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT) as? HardCodedAccountMapping)?.accountId
+    val sourceMapping = appliedStrategy?.config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+    val hardCodedAccountId = (sourceMapping as? HardCodedAccountMapping)?.accountId
     val accountId = hardCodedAccountId ?: directoryAccounts[import.id]
     return accountId?.let { id -> accounts.firstOrNull { it.id == id }?.name }
 }

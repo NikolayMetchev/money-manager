@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
@@ -89,55 +90,58 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Test Strategy",
-            identificationColumns = setOf("Date", "Description", "Amount"),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(
-                            fieldType = TransferField.SOURCE_ACCOUNT,
-                            accountId = sourceAccount.id,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Date", "Description", "Amount"),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                    accountId = sourceAccount.id,
+                                ),
+                            TransferField.TARGET_ACCOUNT to
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    accountId = targetAccount.id,
+                                ),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Date",
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(
+                                    fieldType = TransferField.DESCRIPTION,
+                                    columnName = "Description",
+                                ),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Amount",
+                                    negateValues = true,
+                                ),
+                            TransferField.CURRENCY to
+                                HardCodedCurrencyMapping(
+                                    fieldType = TransferField.CURRENCY,
+                                    currencyId = testCurrency.id,
+                                ),
+                            TransferField.TIMEZONE to
+                                HardCodedTimezoneMapping(
+                                    fieldType = TransferField.TIMEZONE,
+                                    timezoneId = "UTC",
+                                ),
                         ),
-                    TransferField.TARGET_ACCOUNT to
-                        HardCodedAccountMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            accountId = targetAccount.id,
+                    attributeMappings =
+                        listOf(
+                            AttributeColumnMapping(
+                                columnName = "Transaction ID",
+                                attributeTypeName = "Transaction ID",
+                                isUniqueIdentifier = true,
+                            ),
                         ),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = "Date",
-                            dateFormat = "dd/MM/yyyy",
-                        ),
-                    TransferField.DESCRIPTION to
-                        DirectColumnMapping(
-                            fieldType = TransferField.DESCRIPTION,
-                            columnName = "Description",
-                        ),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Amount",
-                            negateValues = true,
-                        ),
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(
-                            fieldType = TransferField.CURRENCY,
-                            currencyId = testCurrency.id,
-                        ),
-                    TransferField.TIMEZONE to
-                        HardCodedTimezoneMapping(
-                            fieldType = TransferField.TIMEZONE,
-                            timezoneId = "UTC",
-                        ),
-                ),
-            attributeMappings =
-                listOf(
-                    AttributeColumnMapping(
-                        columnName = "Transaction ID",
-                        attributeTypeName = "Transaction ID",
-                        isUniqueIdentifier = true,
-                    ),
                 ),
             createdAt = Clock.System.now(),
             updatedAt = Clock.System.now(),
@@ -225,7 +229,7 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                         }
 
                     val uniqueIdValues =
-                        strategy.attributeMappings
+                        strategy.config.attributeMappings
                             .filter { it.isUniqueIdentifier }
                             .associate { mapping ->
                                 val attributeValue =
@@ -336,9 +340,12 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                 CsvImportStrategy(
                     id = CsvImportStrategyId(Uuid.random()),
                     name = "Test Strategy No Unique ID",
-                    identificationColumns = setOf("Date", "Description", "Amount"),
-                    fieldMappings = createTestStrategy().fieldMappings,
-                    attributeMappings = emptyList(),
+                    config =
+                        CsvStrategyConfig(
+                            identificationColumns = setOf("Date", "Description", "Amount"),
+                            fieldMappings = createTestStrategy().config.fieldMappings,
+                            attributeMappings = emptyList(),
+                        ),
                     createdAt = Clock.System.now(),
                     updatedAt = Clock.System.now(),
                 )

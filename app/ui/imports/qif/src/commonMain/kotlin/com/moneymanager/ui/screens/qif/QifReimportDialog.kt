@@ -131,7 +131,7 @@ fun QifReimportDialog(
     }
 
     val currencyStrategy = baseStrategy?.withQifCurrency(selectedCurrencyId)
-    val sourceMapping = currencyStrategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+    val sourceMapping = currencyStrategy?.config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
     val hasHardcodedSource = sourceMapping is HardCodedAccountMapping
     val hasPendingRecords = records.any { it.supported && (it.importStatus == null || it.importStatus == ImportStatus.ERROR) }
     val needsSourcePicker = currencyStrategy?.needsSourceAccountOverride() == true && hasPendingRecords && !hasHardcodedSource

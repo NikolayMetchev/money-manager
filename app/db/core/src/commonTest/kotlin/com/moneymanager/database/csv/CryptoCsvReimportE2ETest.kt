@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -60,18 +61,21 @@ class CryptoCsvReimportE2ETest : DbTest() {
     ) = CsvImportStrategy(
         id = CsvImportStrategyId(Uuid.random()),
         name = "Crypto rewards",
-        identificationColumns = headers.toSet(),
-        fieldMappings =
-            mapOf(
-                TransferField.TIMESTAMP to
-                    DateTimeParsingMapping(TransferField.TIMESTAMP, dateColumnName = "Date", dateFormat = "yyyy-MM-dd"),
-                TransferField.SOURCE_ACCOUNT to HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, income),
-                TransferField.TARGET_ACCOUNT to HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, wallet),
-                TransferField.DESCRIPTION to DirectColumnMapping(TransferField.DESCRIPTION, columnName = "Description"),
-                TransferField.AMOUNT to
-                    AmountParsingMapping(TransferField.AMOUNT, mode = AmountMode.SINGLE_COLUMN, amountColumnName = "Amount"),
-                TransferField.CURRENCY to CurrencyLookupMapping(TransferField.CURRENCY, columnName = "Currency"),
-                TransferField.TIMEZONE to HardCodedTimezoneMapping(TransferField.TIMEZONE, "UTC"),
+        config =
+            CsvStrategyConfig(
+                identificationColumns = headers.toSet(),
+                fieldMappings =
+                    mapOf(
+                        TransferField.TIMESTAMP to
+                            DateTimeParsingMapping(TransferField.TIMESTAMP, dateColumnName = "Date", dateFormat = "yyyy-MM-dd"),
+                        TransferField.SOURCE_ACCOUNT to HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, income),
+                        TransferField.TARGET_ACCOUNT to HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, wallet),
+                        TransferField.DESCRIPTION to DirectColumnMapping(TransferField.DESCRIPTION, columnName = "Description"),
+                        TransferField.AMOUNT to
+                            AmountParsingMapping(TransferField.AMOUNT, mode = AmountMode.SINGLE_COLUMN, amountColumnName = "Amount"),
+                        TransferField.CURRENCY to CurrencyLookupMapping(TransferField.CURRENCY, columnName = "Currency"),
+                        TransferField.TIMEZONE to HardCodedTimezoneMapping(TransferField.TIMEZONE, "UTC"),
+                    ),
             ),
         createdAt = now,
         updatedAt = now,

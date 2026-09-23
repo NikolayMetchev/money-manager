@@ -267,8 +267,8 @@ CREATE TRIGGER trigger_csv_import_strategy_delete_audit
 AFTER DELETE ON csv_import_strategy
 FOR EACH ROW
 BEGIN
-    INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, csv_import_strategy_id, revision_id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, row_rules_json, companion_rules_json, created_at, updated_at)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.name, old.identification_columns_json, old.field_mappings_json, old.attribute_mappings_json, old.row_rules_json, old.companion_rules_json, old.created_at, old.updated_at);
+    INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, csv_import_strategy_id, revision_id, name, config_json, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.name, old.config_json, old.created_at, old.updated_at);
 END;
 
 -- trigger_csv_import_strategy_insert_audit
@@ -276,8 +276,8 @@ CREATE TRIGGER trigger_csv_import_strategy_insert_audit
 AFTER INSERT ON csv_import_strategy
 FOR EACH ROW
 BEGIN
-    INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, csv_import_strategy_id, revision_id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, row_rules_json, companion_rules_json, created_at, updated_at)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.name, new.identification_columns_json, new.field_mappings_json, new.attribute_mappings_json, new.row_rules_json, new.companion_rules_json, new.created_at, new.updated_at);
+    INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, csv_import_strategy_id, revision_id, name, config_json, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.name, new.config_json, new.created_at, new.updated_at);
 END;
 
 -- trigger_csv_import_strategy_update_audit
@@ -285,8 +285,8 @@ CREATE TRIGGER trigger_csv_import_strategy_update_audit
 AFTER UPDATE ON csv_import_strategy
 FOR EACH ROW
 BEGIN
-    INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, csv_import_strategy_id, revision_id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, row_rules_json, companion_rules_json, created_at, updated_at)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.name, old.identification_columns_json, old.field_mappings_json, old.attribute_mappings_json, old.row_rules_json, old.companion_rules_json, old.created_at, old.updated_at);
+    INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, csv_import_strategy_id, revision_id, name, config_json, created_at, updated_at)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.name, old.config_json, old.created_at, old.updated_at);
 END;
 
 -- trigger_currency_delete_audit

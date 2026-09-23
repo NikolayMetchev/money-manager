@@ -331,20 +331,23 @@ class CryptoComCryptoE2ETest : DbTest() {
             val current = strategies.first { it.name == "Crypto.com Crypto" }
             val old =
                 current.copy(
-                    fieldMappings =
-                        current.fieldMappings
-                            .filterKeys { it != TransferField.TO_CURRENCY && it != TransferField.TO_AMOUNT }
-                            .mapValues { (field, mapping) ->
-                                if (field == TransferField.TARGET_ACCOUNT) {
-                                    RegexAccountMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        columnName = "Transaction Description",
-                                        rules = listOf(RegexRule(pattern = "App wallet", accountName = "Crypto.com Exchange")),
-                                    )
-                                } else {
-                                    mapping
-                                }
-                            },
+                    config =
+                        current.config.copy(
+                            fieldMappings =
+                                current.config.fieldMappings
+                                    .filterKeys { it != TransferField.TO_CURRENCY && it != TransferField.TO_AMOUNT }
+                                    .mapValues { (field, mapping) ->
+                                        if (field == TransferField.TARGET_ACCOUNT) {
+                                            RegexAccountMapping(
+                                                fieldType = TransferField.TARGET_ACCOUNT,
+                                                columnName = "Transaction Description",
+                                                rules = listOf(RegexRule(pattern = "App wallet", accountName = "Crypto.com Exchange")),
+                                            )
+                                        } else {
+                                            mapping
+                                        }
+                                    },
+                        ),
                 )
             repositories.importEngine.updateCsvStrategy(old)
 

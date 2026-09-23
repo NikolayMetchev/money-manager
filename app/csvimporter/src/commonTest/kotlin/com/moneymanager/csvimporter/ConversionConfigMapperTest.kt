@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -48,39 +49,42 @@ class ConversionConfigMapperTest {
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Synthetic",
-            identificationColumns = setOf("Kind", "Amount", "Asset", "Date", "Memo"),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        RegexAccountMapping(TransferField.SOURCE_ACCOUNT, "Memo", listOf(RegexRule("^", "Wallet"))),
-                    TransferField.TARGET_ACCOUNT to
-                        RegexAccountMapping(TransferField.TARGET_ACCOUNT, "Memo", listOf(RegexRule("^", "Counterparty"))),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Amount",
-                            flipAccountsOnPositive = true,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Kind", "Amount", "Asset", "Date", "Memo"),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                RegexAccountMapping(TransferField.SOURCE_ACCOUNT, "Memo", listOf(RegexRule("^", "Wallet"))),
+                            TransferField.TARGET_ACCOUNT to
+                                RegexAccountMapping(TransferField.TARGET_ACCOUNT, "Memo", listOf(RegexRule("^", "Counterparty"))),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Amount",
+                                    flipAccountsOnPositive = true,
+                                ),
+                            TransferField.CURRENCY to CurrencyLookupMapping(TransferField.CURRENCY, "Asset"),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    TransferField.TIMESTAMP,
+                                    dateColumnName = "Date",
+                                    dateFormat = "yyyy-MM-dd",
+                                    dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+                                ),
+                            TransferField.DESCRIPTION to DirectColumnMapping(TransferField.DESCRIPTION, "Memo"),
                         ),
-                    TransferField.CURRENCY to CurrencyLookupMapping(TransferField.CURRENCY, "Asset"),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            TransferField.TIMESTAMP,
-                            dateColumnName = "Date",
-                            dateFormat = "yyyy-MM-dd",
-                            dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+                    conversionConfig =
+                        ConversionConfig(
+                            signalColumn = "Kind",
+                            debitPattern = "^swap_out$",
+                            creditPattern = "^swap_in$",
+                            conversionAccountName = "Conversions",
+                            pairingKeyPattern = "^(swap)_",
+                            pairingWindowSeconds = 5,
+                            relationshipTypeName = "conversion",
                         ),
-                    TransferField.DESCRIPTION to DirectColumnMapping(TransferField.DESCRIPTION, "Memo"),
-                ),
-            conversionConfig =
-                ConversionConfig(
-                    signalColumn = "Kind",
-                    debitPattern = "^swap_out$",
-                    creditPattern = "^swap_in$",
-                    conversionAccountName = "Conversions",
-                    pairingKeyPattern = "^(swap)_",
-                    pairingWindowSeconds = 5,
-                    relationshipTypeName = "conversion",
                 ),
             createdAt = now,
             updatedAt = now,

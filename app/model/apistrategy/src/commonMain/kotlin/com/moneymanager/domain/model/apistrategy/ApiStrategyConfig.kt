@@ -189,7 +189,7 @@ data class ApiPaginationConfig(
      * engine skips just that window and carries on to the newer ones instead of abandoning the whole
      * endpoint. The default covers the Binance phrasings; other providers can override.
      *
-     * Never encoded when left at the default (the same trick CsvStrategyExport.fundingAttributeMatch
+     * Never encoded when left at the default (the same trick CsvStrategyConfig.fundingAttributeMatch
      * uses) so adding the field doesn't rehash every existing strategy on catalog/Drive sync; a config
      * carrying the default still gets it applied on decode, so the fix reaches strategies already
      * installed.

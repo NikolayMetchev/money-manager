@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
@@ -63,40 +64,43 @@ class CsvAccountMappingTest {
         return CsvImportStrategy(
             id = strategyId,
             name = "Test Strategy",
-            identificationColumns = setOf("Date", "Description", "Amount"),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(
-                            fieldType = TransferField.SOURCE_ACCOUNT,
-                            accountId = testSourceAccountId,
-                        ),
-                    TransferField.TARGET_ACCOUNT to
-                        AccountLookupMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            columnName = "Payee",
-                        ),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = "Date",
-                            dateFormat = "dd/MM/yyyy",
-                        ),
-                    TransferField.DESCRIPTION to
-                        DirectColumnMapping(
-                            fieldType = TransferField.DESCRIPTION,
-                            columnName = "Description",
-                        ),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Amount",
-                        ),
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(
-                            fieldType = TransferField.CURRENCY,
-                            currencyId = testCurrencyId,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Date", "Description", "Amount"),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                    accountId = testSourceAccountId,
+                                ),
+                            TransferField.TARGET_ACCOUNT to
+                                AccountLookupMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    columnName = "Payee",
+                                ),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Date",
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(
+                                    fieldType = TransferField.DESCRIPTION,
+                                    columnName = "Description",
+                                ),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Amount",
+                                ),
+                            TransferField.CURRENCY to
+                                HardCodedCurrencyMapping(
+                                    fieldType = TransferField.CURRENCY,
+                                    currencyId = testCurrencyId,
+                                ),
                         ),
                 ),
             createdAt = now,
@@ -603,45 +607,48 @@ class CsvAccountMappingTest {
         return CsvImportStrategy(
             id = strategyId,
             name = "Strategy With Regex",
-            identificationColumns = setOf("Date", "Description", "Amount", "Name", "Type"),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(
-                            fieldType = TransferField.SOURCE_ACCOUNT,
-                            accountId = testSourceAccountId,
-                        ),
-                    TransferField.TARGET_ACCOUNT to
-                        RegexAccountMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            columnName = "Name",
-                            rules =
-                                listOf(
-                                    RegexRule(pattern = ".*generic.*", accountName = "Generic"),
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Date", "Description", "Amount", "Name", "Type"),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                    accountId = testSourceAccountId,
                                 ),
-                            fallbackColumns = listOf("Type"),
-                        ),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = "Date",
-                            dateFormat = "dd/MM/yyyy",
-                        ),
-                    TransferField.DESCRIPTION to
-                        DirectColumnMapping(
-                            fieldType = TransferField.DESCRIPTION,
-                            columnName = "Description",
-                        ),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Amount",
-                        ),
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(
-                            fieldType = TransferField.CURRENCY,
-                            currencyId = testCurrencyId,
+                            TransferField.TARGET_ACCOUNT to
+                                RegexAccountMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    columnName = "Name",
+                                    rules =
+                                        listOf(
+                                            RegexRule(pattern = ".*generic.*", accountName = "Generic"),
+                                        ),
+                                    fallbackColumns = listOf("Type"),
+                                ),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Date",
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(
+                                    fieldType = TransferField.DESCRIPTION,
+                                    columnName = "Description",
+                                ),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Amount",
+                                ),
+                            TransferField.CURRENCY to
+                                HardCodedCurrencyMapping(
+                                    fieldType = TransferField.CURRENCY,
+                                    currencyId = testCurrencyId,
+                                ),
                         ),
                 ),
             createdAt = now,
@@ -696,22 +703,25 @@ class CsvAccountMappingTest {
         val now = Clock.System.now()
         val base = createStrategyWithRegex()
         return base.copy(
-            fieldMappings =
-                base.fieldMappings +
-                    mapOf(
-                        TransferField.SOURCE_ACCOUNT to
-                            RegexAccountMapping(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                columnName = "Description",
-                                rules = listOf(RegexRule(pattern = "^", accountName = "My Card")),
+            config =
+                base.config.copy(
+                    fieldMappings =
+                        base.config.fieldMappings +
+                            mapOf(
+                                TransferField.SOURCE_ACCOUNT to
+                                    RegexAccountMapping(
+                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                        columnName = "Description",
+                                        rules = listOf(RegexRule(pattern = "^", accountName = "My Card")),
+                                    ),
+                                TransferField.TARGET_ACCOUNT to
+                                    RegexAccountMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Description",
+                                        rules = emptyList(),
+                                    ),
                             ),
-                        TransferField.TARGET_ACCOUNT to
-                            RegexAccountMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Description",
-                                rules = emptyList(),
-                            ),
-                    ),
+                ),
             updatedAt = now,
         )
     }

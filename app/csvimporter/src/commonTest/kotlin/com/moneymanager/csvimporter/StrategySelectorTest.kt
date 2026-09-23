@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
@@ -40,30 +41,33 @@ class StrategySelectorTest {
         return CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = name,
-            identificationColumns = identificationColumns,
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, AccountId(1)),
-                    TransferField.TARGET_ACCOUNT to
-                        HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, AccountId(2)),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = "Date",
-                            dateFormat = "dd/MM/yyyy",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = identificationColumns,
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, AccountId(1)),
+                            TransferField.TARGET_ACCOUNT to
+                                HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, AccountId(2)),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Date",
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Amount",
+                                ),
+                            TransferField.CURRENCY to
+                                HardCodedCurrencyMapping(TransferField.CURRENCY, CurrencyId(1L)),
                         ),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Amount",
-                        ),
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(TransferField.CURRENCY, CurrencyId(1L)),
+                    contentMatchRules = contentMatchRules,
+                    fileNamePattern = fileNamePattern,
                 ),
-            contentMatchRules = contentMatchRules,
-            fileNamePattern = fileNamePattern,
             createdAt = now,
             updatedAt = now,
         )
@@ -325,8 +329,10 @@ class StrategySelectorTest {
         val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
         val monzo = builtIns.single { it.name == "Monzo CSV" }
         val monzoColumns =
-            monzo.identificationColumns.toList().mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
-        val monzoRow = CsvRow(rowIndex = 1L, values = monzo.identificationColumns.map { "" })
+            monzo.config.identificationColumns
+                .toList()
+                .mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+        val monzoRow = CsvRow(rowIndex = 1L, values = monzo.config.identificationColumns.map { "" })
         assertEquals("Monzo CSV", builtIns.selectForCsv("monzo.csv", monzoColumns, listOf(monzoRow))?.name)
     }
 }
