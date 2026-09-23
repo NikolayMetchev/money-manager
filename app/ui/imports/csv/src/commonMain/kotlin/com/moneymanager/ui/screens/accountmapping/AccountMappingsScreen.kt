@@ -45,7 +45,6 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.database.json.AccountMappingExportCodec
 import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.database.service.AccountMappingParseResult
-import com.moneymanager.database.service.Resolution
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.accountmapping.AccountMapping
@@ -53,6 +52,7 @@ import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.strategy.CsvResolution
 import com.moneymanager.importengineapi.deleteAccountMapping
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -265,13 +265,13 @@ private fun ImportAccountMappingsDialog(
     parseResult: AccountMappingParseResult,
     accounts: List<Account>,
     onDismiss: () -> Unit,
-    onImport: (Map<String, Resolution>) -> Unit,
+    onImport: (Map<String, CsvResolution>) -> Unit,
 ) {
     // Default every unresolved name to "create a new account with that name".
     val resolutions =
         remember(parseResult) {
-            mutableStateMapOf<String, Resolution>().apply {
-                parseResult.unresolvedAccountNames.forEach { name -> put(name, Resolution.CreateNew(name)) }
+            mutableStateMapOf<String, CsvResolution>().apply {
+                parseResult.unresolvedAccountNames.forEach { name -> put(name, CsvResolution.CreateNew(name)) }
             }
         }
 
@@ -312,13 +312,13 @@ private fun ImportAccountMappingsDialog(
 private fun AccountResolutionDropdown(
     accountName: String,
     accounts: List<Account>,
-    resolution: Resolution?,
-    onResolutionChanged: (Resolution) -> Unit,
+    resolution: CsvResolution?,
+    onResolutionChanged: (CsvResolution) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val label =
         when (resolution) {
-            is Resolution.MapToExisting -> accounts.find { it.id.id == resolution.id }?.name ?: "Select..."
+            is CsvResolution.MapToExisting -> accounts.find { it.id.id == resolution.id }?.name ?: "Select..."
             else -> "Create new account \"$accountName\""
         }
 
@@ -338,7 +338,7 @@ private fun AccountResolutionDropdown(
             DropdownMenuItem(
                 text = { Text("Create new account \"$accountName\"") },
                 onClick = {
-                    onResolutionChanged(Resolution.CreateNew(accountName))
+                    onResolutionChanged(CsvResolution.CreateNew(accountName))
                     expanded = false
                 },
             )
@@ -346,7 +346,7 @@ private fun AccountResolutionDropdown(
                 DropdownMenuItem(
                     text = { Text("Map to: ${account.name}") },
                     onClick = {
-                        onResolutionChanged(Resolution.MapToExisting(account.id.id))
+                        onResolutionChanged(CsvResolution.MapToExisting(account.id.id))
                         expanded = false
                     },
                 )

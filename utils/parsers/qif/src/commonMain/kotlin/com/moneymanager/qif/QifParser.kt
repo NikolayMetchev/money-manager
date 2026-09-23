@@ -31,7 +31,6 @@ class QifParser {
         state.finish()
         return QifParseResult(
             sections = state.sections,
-            unsupportedRecordCount = state.sections.sumOf { section -> section.records.count { !it.supported } },
         )
     }
 
@@ -129,7 +128,6 @@ class QifParser {
         var numberField: String? = null
         val address = mutableListOf<String>()
         val splits = mutableListOf<QifSplit>()
-        val unknownFields = mutableListOf<Pair<Char, String>>()
 
         /**
          * Account name from an `!Account` block record. The name is the `N` field, falling
@@ -155,7 +153,8 @@ class QifParser {
                 'S' -> splits.add(QifSplit().withCategoryOrTransfer(value))
                 'E' -> updateLastSplit { it.copy(memo = value) }
                 '$' -> updateLastSplit { it.copy(amount = value) }
-                else -> unknownFields.add(code to value)
+                // Unrecognised codes are ignored; QifRecord.rawLines keeps the record verbatim.
+                else -> Unit
             }
         }
 
@@ -170,10 +169,8 @@ class QifParser {
                 transferAccount = transferAccount,
                 checkNumber = if (isInvestment) null else numberField,
                 clearedStatus = clearedStatus,
-                investmentAction = if (isInvestment) numberField else null,
                 address = address.toList(),
                 splits = splits.toList(),
-                unknownFields = unknownFields.toList(),
             )
         }
 

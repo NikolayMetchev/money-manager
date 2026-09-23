@@ -185,6 +185,14 @@ exclude:
       - app/strategycatalog/src/commonTest/kotlin/com/moneymanager/strategycatalog/StrategyCatalogControllerTest.kt
       - app/ui/foundation/src/androidMain
       - app/ui/foundation/src/jvmMain
+      # These five `block` parameters ARE used: each is invoked with receiver syntax
+      # (`config.block()`, `accountMappings.block()`, ...), which this inspection does not
+      # recognise, so it reports "Parameter 'block' is not used".
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/editor/AccountMappingsTab.kt
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/editor/AdvancedTab.kt
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/editor/ApiStrategyEditorState.kt
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/editor/PeopleTab.kt
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/editor/TransactionMappingsTab.kt
       - app/ui/imports/timeline/src/commonTest/kotlin/com/moneymanager/ui/screens/timeline/ImportTimelineScreenTest.kt
       - test/app/db/src
       - utils/compose/scrollbar/src/androidMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt

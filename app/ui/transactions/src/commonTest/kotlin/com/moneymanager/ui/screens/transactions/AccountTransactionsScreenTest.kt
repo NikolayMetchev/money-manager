@@ -21,7 +21,6 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.moneymanager.database.DbMaintenance
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.Maintenance
@@ -412,7 +411,6 @@ class AccountTransactionsScreenTest {
                             val window = rows.subList(160, 200)
                             PageWithTargetIndex(
                                 items = window,
-                                targetIndex = window.indexOfFirst { it.transactionId.id == anchor.id.id },
                                 pagingInfo =
                                     PagingInfo(
                                         lastTimestamp = window.last().timestamp,
@@ -930,7 +928,7 @@ class AccountTransactionsScreenTest {
                                     personRepository = repositories.personRepository,
                                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                     exchangeOrderRepository = repositories.exchangeOrderRepository,
-                                    maintenance = createDbMaintenance(repositories),
+                                    maintenance = repositories.maintenanceService,
                                     onAccountIdChange = { currentAccountId = it },
                                     onCurrencyIdChange = {},
                                     onAuditClick = { auditTransferId = it },
@@ -1141,7 +1139,7 @@ class AccountTransactionsScreenTest {
                                     personRepository = repositories.personRepository,
                                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                     exchangeOrderRepository = repositories.exchangeOrderRepository,
-                                    maintenance = createDbMaintenance(repositories),
+                                    maintenance = repositories.maintenanceService,
                                     onAccountIdChange = { currentAccountId = it },
                                     onCurrencyIdChange = {},
                                     onAuditClick = { auditTransferId = it },
@@ -1322,7 +1320,7 @@ class AccountTransactionsScreenTest {
                                     personRepository = repositories.personRepository,
                                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                     exchangeOrderRepository = repositories.exchangeOrderRepository,
-                                    maintenance = createDbMaintenance(repositories),
+                                    maintenance = repositories.maintenanceService,
                                     onAccountIdChange = { currentAccountId = it },
                                     onCurrencyIdChange = {},
                                     onAuditClick = { auditTransferId = it },
@@ -1458,15 +1456,12 @@ class AccountTransactionsScreenTest {
             everySuspend { getPageContainingTransaction(any(), any(), any(), any()) } calls
                 { args ->
                     val accountId = args.arg<AccountId>(0)
-                    val transactionId = args.arg<TransferId>(1)
                     val pageSize = args.arg<Int>(2)
                     val currencyId = args.arg<CurrencyId?>(3)
                     val allRows = buildAccountRows(transfers, accountId, feeLinks).filterByCurrency(currencyId)
-                    val targetIndex = allRows.indexOfFirst { it.transactionId.id == transactionId.id }
                     val items = allRows.take(pageSize)
                     PageWithTargetIndex(
                         items = items,
-                        targetIndex = targetIndex,
                         pagingInfo =
                             PagingInfo(
                                 lastTimestamp = items.lastOrNull()?.timestamp,
@@ -1593,6 +1588,4 @@ class AccountTransactionsScreenTest {
             every { getOrderById(any()) } returns flowOf(null)
             every { getFillTradesForOrder(any()) } returns flowOf(emptyList())
         }
-
-    private fun createDbMaintenance(repositories: DatabaseComponent): Maintenance = DbMaintenance(repositories.maintenanceService)
 }

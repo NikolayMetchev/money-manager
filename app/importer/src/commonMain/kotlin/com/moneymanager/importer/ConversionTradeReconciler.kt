@@ -45,8 +45,7 @@ data class ExistingConversionLeg(
  *
  * A match **suppresses the write**, which is the only outcome available: a trade can carry neither an
  * `excluded` attribute nor a `reconciled` relationship, since both tables reference `transfer(id)`.
- * Unlike the trade-against-trade case there is not even an existing trade id to report, so the
- * suppressed key surfaces via `ImportResult.conversionReconciledTradeKeys` instead.
+ * Unlike the trade-against-trade case there is not even an existing trade id to report.
  *
  * The whole batch is assigned **up front**, which is why [incoming] is handed over to the constructor
  * rather than resolved a trade at a time. Taking each trade's nearest free leg as it arrives would

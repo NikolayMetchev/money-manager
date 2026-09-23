@@ -92,9 +92,8 @@ fun ApiStrategyEditorScreen(
         return
     }
 
-    val initial = remember(existingStrategy) { existingStrategy?.let { extractFormStateFromStrategy(it) } }
     val editKey = strategyId?.toString() ?: "create"
-    val state = rememberApiStrategyEditorState(editKey, initial)
+    val state = rememberApiStrategyEditorState(editKey, existingStrategy)
 
     // Sample JSON items loaded from past sessions — null = not searched yet, "" = searched, none found.
     var accountSampleItem by remember { mutableStateOf<String?>(null) }
@@ -102,8 +101,8 @@ fun ApiStrategyEditorScreen(
     val accountJsonPaths = remember(accountSampleItem) { accountSampleItem?.let { extractJsonPaths(it) } ?: emptyList() }
     val txJsonPaths = remember(txSampleItem) { txSampleItem?.let { extractJsonPaths(it) } ?: emptyList() }
 
-    val accountsArrayKey = state.accountsEndpoint.responseArrayKey
-    val transactionsArrayKey = state.transactionsEndpoint.responseArrayKey
+    val accountsArrayKey = state.config.accountsEndpoint.responseArrayKey
+    val transactionsArrayKey = state.config.transactionsEndpoint.responseArrayKey
 
     // Load sample JSON from the most recent session responses. Prefer credentials linked to this
     // strategy; fall back to all credentials so credentials created before linking still work.
@@ -156,8 +155,7 @@ fun ApiStrategyEditorScreen(
             try {
                 val now = Clock.System.now()
                 val strategy =
-                    buildStrategyFromApiFormState(
-                        state = state.toFormState(),
+                    state.buildStrategy(
                         id = existingStrategy?.id ?: ApiImportStrategyId(Uuid.random()),
                         createdAt = existingStrategy?.createdAt ?: now,
                         updatedAt = now,

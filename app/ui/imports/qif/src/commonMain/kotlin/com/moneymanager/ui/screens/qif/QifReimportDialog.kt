@@ -52,10 +52,10 @@ import com.moneymanager.qifimporter.withQifCurrency
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.ReimportPlanPreview
+import com.moneymanager.ui.components.imports.ReimportProgressIndicator
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.csv.ReimportPlanPreview
-import com.moneymanager.ui.screens.csv.ReimportProgressIndicator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging

@@ -303,10 +303,6 @@ class TransactionReadRepositoryImpl(
                         mapper = AccountRowMapper::mapRaw,
                     ).executeAsList()
 
-            // Find the target transaction's index within the loaded page
-            val targetIndex =
-                items.indexOfFirst { it.transactionId.id == transactionId.id }
-
             // Calculate if there are more items after this page
             val hasMore = (offset + items.size) < totalCount
 
@@ -328,7 +324,6 @@ class TransactionReadRepositoryImpl(
 
             PageWithTargetIndex(
                 items = items,
-                targetIndex = targetIndex,
                 pagingInfo = pagingInfo,
                 hasPrevious = offset > 0,
             )

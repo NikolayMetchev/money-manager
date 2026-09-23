@@ -555,7 +555,7 @@ data class ImportBatch(
      * holding an `AttributeTypeWriteRepository` — they issue a resolve-only batch first.
      */
     val attributeTypeNames: List<String> = emptyList(),
-    /** Relationship-type names to resolve (get-or-create); ids returned in [ImportResult.relationshipTypeIds]. */
+    /** Relationship-type names to resolve (get-or-create) before the batch's relationships are written. */
     val relationshipTypeNames: List<String> = emptyList(),
     /** Required when [dedupePolicy] is [DedupePolicy.UniqueIdentifier] or [DedupePolicy.ApiMultiKey]. */
     val uniqueKeyExtractor: ExistingUniqueKeyExtractor? = null,

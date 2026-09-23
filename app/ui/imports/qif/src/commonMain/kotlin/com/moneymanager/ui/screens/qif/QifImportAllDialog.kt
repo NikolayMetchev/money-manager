@@ -1,13 +1,9 @@
 package com.moneymanager.ui.screens.qif
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,10 +30,10 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setLastQifAccount
 import com.moneymanager.qifimporter.bulkApplyQif
 import com.moneymanager.ui.components.AccountPicker
-import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
+import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.csv.BulkImportProgressIndicator
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -48,7 +44,6 @@ import kotlinx.coroutines.launch
  * Payee accounts auto-create with their detected names.
  */
 @Composable
-@Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
 fun QifImportAllDialog(
     unimported: List<QifImport>,
     importDirectoryRepository: ImportDirectoryReadRepository,
@@ -91,76 +86,58 @@ fun QifImportAllDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = { if (!isImporting) onDismiss() },
-        title = { Text(if (summary != null) "Import complete" else "Import all unimported files") },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                val currentSummary = summary
-                if (currentSummary != null) {
-                    Text(currentSummary, style = MaterialTheme.typography.bodyMedium)
-                } else {
-                    if (needsSourceAccount) {
-                        AccountPicker(
-                            selectedAccountId = sourceAccountId,
-                            onAccountSelected = { sourceAccountId = it },
-                            label = "Source account (for files whose folder has none set)",
+    BulkImportDialogScaffold(
+        pendingTitle = "Import all unimported files",
+        completeTitle = "Import complete",
+        result = summary,
+        isRunning = isImporting,
+        confirmLabel = "Import ${unimported.size} files",
+        confirmEnabled = !needsSourceAccount || sourceAccountId != null,
+        onRun = {
+            isImporting = true
+            scope.launch {
+                try {
+                    val result =
+                        bulkApplyQif(
+                            imports = unimported,
+                            sourceAccountId = sourceAccountId,
+                            strategies = strategies,
+                            currencies = currencies,
+                            accountMappingRepository = accountMappingRepository,
                             accountRepository = accountRepository,
-                            categoryRepository = categoryRepository,
-                            personRepository = personRepository,
-                            enabled = !isImporting,
-                            isError = sourceAccountId == null,
+                            qifImportRepository = qifImportRepository,
+                            maintenance = maintenance,
+                            importEngine = importEngine,
+                            onProgress = { progress = it },
+                            directoryAccounts = directoryAccounts,
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                    progress?.let {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        BulkImportProgressIndicator(it)
-                    }
+                    sourceAccountId?.let { importEngine.setLastQifAccount(it) }
+                    summary = result.toSummary()
+                } finally {
+                    isImporting = false
                 }
             }
         },
-        confirmButton = {
-            if (summary != null) {
-                TextButton(onClick = onComplete) { Text("Done") }
-            } else {
-                LoadingTextButton(
-                    onClick = {
-                        if (needsSourceAccount && sourceAccountId == null) return@LoadingTextButton
-                        isImporting = true
-                        scope.launch {
-                            try {
-                                val result =
-                                    bulkApplyQif(
-                                        imports = unimported,
-                                        sourceAccountId = sourceAccountId,
-                                        strategies = strategies,
-                                        currencies = currencies,
-                                        accountMappingRepository = accountMappingRepository,
-                                        accountRepository = accountRepository,
-                                        qifImportRepository = qifImportRepository,
-                                        maintenance = maintenance,
-                                        importEngine = importEngine,
-                                        onProgress = { progress = it },
-                                        directoryAccounts = directoryAccounts,
-                                    )
-                                sourceAccountId?.let { importEngine.setLastQifAccount(it) }
-                                summary = result.toSummary()
-                            } finally {
-                                isImporting = false
-                            }
-                        }
-                    },
-                    enabled = !isImporting && (!needsSourceAccount || sourceAccountId != null),
-                    loading = isImporting,
-                    label = "Import ${unimported.size} files",
-                )
-            }
-        },
-        dismissButton = {
-            if (summary == null) {
-                TextButton(onClick = onDismiss, enabled = !isImporting) { Text("Cancel") }
-            }
-        },
-    )
+        onDismiss = onDismiss,
+        onComplete = onComplete,
+        report = { Text(it, style = MaterialTheme.typography.bodyMedium) },
+    ) {
+        if (needsSourceAccount) {
+            AccountPicker(
+                selectedAccountId = sourceAccountId,
+                onAccountSelected = { sourceAccountId = it },
+                label = "Source account (for files whose folder has none set)",
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                personRepository = personRepository,
+                enabled = !isImporting,
+                isError = sourceAccountId == null,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+        progress?.let {
+            Spacer(modifier = Modifier.height(12.dp))
+            BulkImportProgressIndicator(it)
+        }
+    }
 }

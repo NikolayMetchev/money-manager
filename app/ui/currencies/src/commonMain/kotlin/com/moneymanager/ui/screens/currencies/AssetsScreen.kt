@@ -8,22 +8,17 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,13 +34,9 @@ import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.deleteCrypto
 import com.moneymanager.ui.components.CreateCryptoDialog
+import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
-import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
-
-private val assetsLogger = logging()
 
 /**
  * The Assets screen: two tabs, Currencies (fiat) and Crypto, each listing the relevant assets and
@@ -183,62 +174,16 @@ private fun DeleteCryptoDialog(
     onDismiss: () -> Unit,
 ) {
     val importEngine = LocalImportEngine.current
-    var isDeleting by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberSchemaAwareCoroutineScope()
 
-    AlertDialog(
-        onDismissRequest = { if (!isDeleting) onDismiss() },
-        icon = { Text(text = "⚠️", style = MaterialTheme.typography.headlineMedium) },
-        title = { Text("Delete Crypto Asset?") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Are you sure you want to delete \"${crypto.code} - ${crypto.name}\"?",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    text = "This action cannot be undone. All accounts holding this asset will be affected.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
+    DestructiveConfirmDialog(
+        title = "Delete Crypto Asset?",
+        targetName = "${crypto.code} - ${crypto.name}",
+        consequence = "This action cannot be undone. All accounts holding this asset will be affected.",
+        failureMessage = "Failed to delete crypto asset",
+        onConfirm = {
+            importEngine.deleteCrypto(crypto.id)
+            onDismiss()
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    isDeleting = true
-                    errorMessage = null
-                    scope.launch {
-                        try {
-                            importEngine.deleteCrypto(crypto.id)
-                            onDismiss()
-                        } catch (expected: Exception) {
-                            assetsLogger.error(expected) { "Failed to delete crypto asset: ${expected.message}" }
-                            errorMessage = "Failed to delete crypto asset: ${expected.message}"
-                            isDeleting = false
-                        }
-                    }
-                },
-                enabled = !isDeleting,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) {
-                if (isDeleting) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Delete")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isDeleting) { Text("Cancel") }
-        },
+        onDismiss = onDismiss,
     )
 }

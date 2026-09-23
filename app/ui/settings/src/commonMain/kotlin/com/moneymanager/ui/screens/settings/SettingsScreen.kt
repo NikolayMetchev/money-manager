@@ -13,7 +13,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +48,7 @@ import com.moneymanager.importengineapi.setDefaultCurrency
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.ui.components.CurrencyPicker
+import com.moneymanager.ui.components.SettingsSectionCard
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.DatabasePickerMode
@@ -120,38 +120,26 @@ private fun DatabaseCard(
 ) {
     val databasePicker = rememberDatabaseLocationPicker { location -> location?.let(onRequestSwitchDatabase) }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    SettingsSectionCard(title = "Database") {
+        Text(
+            text = "Current: $currentDatabaseLocation",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = "Database",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = "Current: $currentDatabaseLocation",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            OutlinedButton(
+                onClick = { databasePicker.launch(DatabasePickerMode.OPEN) },
+                modifier = Modifier.weight(1f),
             ) {
-                OutlinedButton(
-                    onClick = { databasePicker.launch(DatabasePickerMode.OPEN) },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Open Database…")
-                }
-                OutlinedButton(
-                    onClick = { databasePicker.launch(DatabasePickerMode.CREATE) },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Create New Database…")
-                }
+                Text("Open Database…")
+            }
+            OutlinedButton(
+                onClick = { databasePicker.launch(DatabasePickerMode.CREATE) },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Create New Database…")
             }
         }
     }
@@ -208,42 +196,27 @@ fun SettingsScreen(
             .getDefaultCurrencyId()
             .collectAsStateWithSchemaErrorHandling(initial = null)
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = "Preferences",
-                    style = MaterialTheme.typography.titleMedium,
-                )
+        SettingsSectionCard(title = "Preferences") {
+            CurrencyPicker(
+                selectedCurrencyId = defaultCurrencyId,
+                onCurrencySelected = { currencyId ->
+                    scope.launch {
+                        importEngine.setDefaultCurrency(currencyId)
+                    }
+                },
+                label = "Default Currency",
+                currencyRepository = currencyRepository,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-                CurrencyPicker(
-                    selectedCurrencyId = defaultCurrencyId,
-                    onCurrencySelected = { currencyId ->
-                        scope.launch {
-                            importEngine.setDefaultCurrency(currencyId)
-                        }
-                    },
-                    label = "Default Currency",
-                    currencyRepository = currencyRepository,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                Text(
-                    text =
-                        "The setup wizard walks you through currencies, import strategies, strategy sync, " +
-                            "import folders and API connections.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedButton(onClick = onRunSetupWizard) { Text("Run setup wizard") }
-            }
+            Text(
+                text =
+                    "The setup wizard walks you through currencies, import strategies, strategy sync, " +
+                        "import folders and API connections.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(onClick = onRunSetupWizard) { Text("Run setup wizard") }
         }
 
         // Database Section
@@ -283,183 +256,168 @@ fun SettingsScreen(
         }
 
         // Maintenance Section
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+        SettingsSectionCard(title = "Maintenance") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = "Maintenance",
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                MaintenanceOperation.entries.forEach { operation ->
+                    MaintenanceButton(
+                        modifier = Modifier.weight(1f),
+                        operation = operation,
+                        isRunning = maintenanceState.runningOperation == operation,
+                        isDisabled = maintenanceState.runningOperation != null,
+                        lastDuration = maintenanceState.lastResults[operation],
+                        onClick = {
+                            maintenanceState =
+                                maintenanceState.copy(
+                                    runningOperation = operation,
+                                    error = null,
+                                )
+                            scope.launch {
+                                try {
+                                    val duration =
+                                        when (operation) {
+                                            MaintenanceOperation.REINDEX ->
+                                                maintenance.reindex()
 
+                                            MaintenanceOperation.VACUUM ->
+                                                maintenance.vacuum()
+
+                                            MaintenanceOperation.ANALYZE ->
+                                                maintenance.analyze()
+                                        }
+                                    maintenanceState =
+                                        maintenanceState.copy(
+                                            runningOperation = null,
+                                            lastResults = maintenanceState.lastResults + (operation to duration),
+                                        )
+                                } catch (expected: Exception) {
+                                    maintenanceState =
+                                        maintenanceState.copy(
+                                            runningOperation = null,
+                                            error = "${operation.name} failed: ${expected.message}",
+                                        )
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+
+            maintenanceState.error?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            // Refresh Materialized Views
+            var isRefreshingViews by remember { mutableStateOf(false) }
+            var isFullRefreshingViews by remember { mutableStateOf(false) }
+            var refreshViewsError by remember { mutableStateOf<String?>(null) }
+            var incrementalRefreshDuration by remember { mutableStateOf<Duration?>(null) }
+            var fullRefreshDuration by remember { mutableStateOf<Duration?>(null) }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    MaintenanceOperation.entries.forEach { operation ->
-                        MaintenanceButton(
-                            modifier = Modifier.weight(1f),
-                            operation = operation,
-                            isRunning = maintenanceState.runningOperation == operation,
-                            isDisabled = maintenanceState.runningOperation != null,
-                            lastDuration = maintenanceState.lastResults[operation],
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        OutlinedButton(
                             onClick = {
-                                maintenanceState =
-                                    maintenanceState.copy(
-                                        runningOperation = operation,
-                                        error = null,
-                                    )
+                                isRefreshingViews = true
+                                refreshViewsError = null
                                 scope.launch {
                                     try {
-                                        val duration =
-                                            when (operation) {
-                                                MaintenanceOperation.REINDEX ->
-                                                    maintenance.reindex()
-
-                                                MaintenanceOperation.VACUUM ->
-                                                    maintenance.vacuum()
-
-                                                MaintenanceOperation.ANALYZE ->
-                                                    maintenance.analyze()
-                                            }
-                                        maintenanceState =
-                                            maintenanceState.copy(
-                                                runningOperation = null,
-                                                lastResults = maintenanceState.lastResults + (operation to duration),
-                                            )
+                                        incrementalRefreshDuration = maintenance.refreshMaterializedViews()
                                     } catch (expected: Exception) {
-                                        maintenanceState =
-                                            maintenanceState.copy(
-                                                runningOperation = null,
-                                                error = "${operation.name} failed: ${expected.message}",
-                                            )
+                                        refreshViewsError = "Incremental refresh failed: ${expected.message}"
+                                    } finally {
+                                        isRefreshingViews = false
                                     }
                                 }
                             },
+                            enabled = !isRefreshingViews && !isFullRefreshingViews && maintenanceState.runningOperation == null,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (isRefreshingViews) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Text("Incremental Refresh")
+                            }
+                        }
+                        Text(
+                            text = incrementalRefreshDuration?.let { formatDuration(it) } ?: "-",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                isFullRefreshingViews = true
+                                refreshViewsError = null
+                                scope.launch {
+                                    try {
+                                        fullRefreshDuration = maintenance.fullRefreshMaterializedViews()
+                                    } catch (expected: Exception) {
+                                        refreshViewsError = "Full refresh failed: ${expected.message}"
+                                    } finally {
+                                        isFullRefreshingViews = false
+                                    }
+                                }
+                            },
+                            enabled = !isRefreshingViews && !isFullRefreshingViews && maintenanceState.runningOperation == null,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (isFullRefreshingViews) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Text("Full Refresh")
+                            }
+                        }
+                        Text(
+                            text = fullRefreshDuration?.let { formatDuration(it) } ?: "-",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
 
-                maintenanceState.error?.let { error ->
+                refreshViewsError?.let { error ->
                     Text(
                         text = error,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+            }
 
-                // Refresh Materialized Views
-                var isRefreshingViews by remember { mutableStateOf(false) }
-                var isFullRefreshingViews by remember { mutableStateOf(false) }
-                var refreshViewsError by remember { mutableStateOf<String?>(null) }
-                var incrementalRefreshDuration by remember { mutableStateOf<Duration?>(null) }
-                var fullRefreshDuration by remember { mutableStateOf<Duration?>(null) }
-
-                Column(
+            if (database != null) {
+                OutlinedButton(
+                    onClick = onShowDbSizeBreakdown,
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    isRefreshingViews = true
-                                    refreshViewsError = null
-                                    scope.launch {
-                                        try {
-                                            incrementalRefreshDuration = maintenance.refreshMaterializedViews()
-                                        } catch (expected: Exception) {
-                                            refreshViewsError = "Incremental refresh failed: ${expected.message}"
-                                        } finally {
-                                            isRefreshingViews = false
-                                        }
-                                    }
-                                },
-                                enabled = !isRefreshingViews && !isFullRefreshingViews && maintenanceState.runningOperation == null,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                if (isRefreshingViews) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                    )
-                                } else {
-                                    Text("Incremental Refresh")
-                                }
-                            }
-                            Text(
-                                text = incrementalRefreshDuration?.let { formatDuration(it) } ?: "-",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    isFullRefreshingViews = true
-                                    refreshViewsError = null
-                                    scope.launch {
-                                        try {
-                                            fullRefreshDuration = maintenance.fullRefreshMaterializedViews()
-                                        } catch (expected: Exception) {
-                                            refreshViewsError = "Full refresh failed: ${expected.message}"
-                                        } finally {
-                                            isFullRefreshingViews = false
-                                        }
-                                    }
-                                },
-                                enabled = !isRefreshingViews && !isFullRefreshingViews && maintenanceState.runningOperation == null,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                if (isFullRefreshingViews) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                    )
-                                } else {
-                                    Text("Full Refresh")
-                                }
-                            }
-                            Text(
-                                text = fullRefreshDuration?.let { formatDuration(it) } ?: "-",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-
-                    refreshViewsError?.let { error ->
-                        Text(
-                            text = error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-
-                if (database != null) {
-                    OutlinedButton(
-                        onClick = onShowDbSizeBreakdown,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Database size breakdown…")
-                    }
+                    Text("Database size breakdown…")
                 }
             }
         }
@@ -469,122 +427,93 @@ fun SettingsScreen(
             var isRefreshingCrypto by remember { mutableStateOf(false) }
             var cryptoMessage by remember { mutableStateOf<String?>(null) }
             var cryptoError by remember { mutableStateOf<String?>(null) }
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        text = "Crypto",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text =
-                            "Import creates crypto assets on demand and names them from a bundled catalog. " +
-                                "Update it to pick up newly listed coins.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    OutlinedButton(
-                        onClick = {
-                            isRefreshingCrypto = true
-                            cryptoMessage = null
-                            cryptoError = null
-                            scope.launch {
-                                try {
-                                    val count = cryptoCatalogRefresher.refresh()
-                                    cryptoMessage = "Updated crypto list ($count entries)."
-                                } catch (expected: Exception) {
-                                    cryptoError = "Failed to update crypto list: ${expected.message}"
-                                } finally {
-                                    isRefreshingCrypto = false
-                                }
-                            }
-                        },
-                        enabled = !isRefreshingCrypto,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (isRefreshingCrypto) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text("Update crypto list")
-                        }
-                    }
-                    cryptoError?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    cryptoMessage?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
-        }
-
-        // Developer Section
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            SettingsSectionCard(title = "Crypto") {
                 Text(
-                    text = "Developer",
-                    style = MaterialTheme.typography.titleMedium,
+                    text =
+                        "Import creates crypto assets on demand and names them from a bundled catalog. " +
+                            "Update it to pick up newly listed coins.",
+                    style = MaterialTheme.typography.bodySmall,
                 )
-
-                Button(
+                OutlinedButton(
                     onClick = {
-                        errorMessage = null
-                        successMessage = null
-                        showWarningDialog = true
+                        isRefreshingCrypto = true
+                        cryptoMessage = null
+                        cryptoError = null
+                        scope.launch {
+                            try {
+                                val count = cryptoCatalogRefresher.refresh()
+                                cryptoMessage = "Updated crypto list ($count entries)."
+                            } catch (expected: Exception) {
+                                cryptoError = "Failed to update crypto list: ${expected.message}"
+                            } finally {
+                                isRefreshingCrypto = false
+                            }
+                        }
                     },
-                    enabled = !isGenerating,
+                    enabled = !isRefreshingCrypto,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    if (isGenerating) {
+                    if (isRefreshingCrypto) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text("Generate Sample Data")
+                        Text("Update crypto list")
                     }
                 }
-
-                errorMessage?.let { error ->
+                cryptoError?.let {
                     Text(
-                        text = error,
+                        text = it,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-
-                successMessage?.let { success ->
+                cryptoMessage?.let {
                     Text(
-                        text = success,
+                        text = it,
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+            }
+        }
+
+        // Developer Section
+        SettingsSectionCard(title = "Developer") {
+            Button(
+                onClick = {
+                    errorMessage = null
+                    successMessage = null
+                    showWarningDialog = true
+                },
+                enabled = !isGenerating,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isGenerating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Generate Sample Data")
+                }
+            }
+
+            errorMessage?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            successMessage?.let { success ->
+                Text(
+                    text = success,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

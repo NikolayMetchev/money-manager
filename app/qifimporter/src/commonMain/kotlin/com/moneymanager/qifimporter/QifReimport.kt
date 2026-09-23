@@ -2,21 +2,23 @@ package com.moneymanager.qifimporter
 
 import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE
 import com.moneymanager.csvimporter.BulkImportProgress
-import com.moneymanager.csvimporter.BulkImportResult
-import com.moneymanager.csvimporter.BulkProgressTracker
+import com.moneymanager.csvimporter.BulkReimportFileOutcome
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.CsvImportResult
 import com.moneymanager.csvimporter.CsvReimportResult
+import com.moneymanager.csvimporter.REIMPORT_VALUE_UPDATE_CHUNK
 import com.moneymanager.csvimporter.ReimportMerge
 import com.moneymanager.csvimporter.ReimportPlan
-import com.moneymanager.csvimporter.ReimportReversal
-import com.moneymanager.csvimporter.ReimportSkipReason
 import com.moneymanager.csvimporter.ReimportSkippedAccount
 import com.moneymanager.csvimporter.ReimportValueUpdate
 import com.moneymanager.csvimporter.applyReimportReversals
+import com.moneymanager.csvimporter.applyReimportValueUpdates
 import com.moneymanager.csvimporter.computeReimportMerges
 import com.moneymanager.csvimporter.computeReimportReversals
 import com.moneymanager.csvimporter.computeReimportValueUpdates
 import com.moneymanager.csvimporter.effectiveSourceFor
+import com.moneymanager.csvimporter.runBulkReimport
+import com.moneymanager.csvimporter.skipDetail
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -32,23 +34,16 @@ import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.AccountMergeRequest
-import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
-import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportProgress
-import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.QifImportMutation
+import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 
 private val logger = logging()
-
-/** Number of in-place transfer updates applied per engine batch during QIF re-import. */
-private const val QIF_REIMPORT_VALUE_UPDATE_CHUNK = 100
 
 /**
  * Builds the read-only [ReimportPlan] for [qifImport] under [strategy]: which import-created accounts
@@ -135,7 +130,6 @@ suspend fun planQifReimport(
             ReimportSkippedAccount(
                 accountId = duplicate,
                 accountName = nameOf(duplicate),
-                reason = ReimportSkipReason.CONFLICTING_TARGETS,
                 detail = "Records map it to different accounts: ${targets.joinToString { nameOf(it) }}",
             )
     }
@@ -146,7 +140,6 @@ suspend fun planQifReimport(
                 ReimportSkippedAccount(
                     accountId = duplicate,
                     accountName = nameOf(duplicate),
-                    reason = ReimportSkipReason.TRANSFERS_BETWEEN,
                     detail = "${between.size} transaction(s) between '${nameOf(duplicate)}' and '${nameOf(target)}' — merge manually",
                 )
             continue
@@ -189,7 +182,7 @@ suspend fun executeQifReimport(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
-    valueUpdateChunkSize: Int = QIF_REIMPORT_VALUE_UPDATE_CHUNK,
+    valueUpdateChunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
     refreshViews: Boolean = true,
 ): CsvReimportResult {
     val merged = mutableListOf<ReimportMerge>()
@@ -224,8 +217,7 @@ suspend fun executeQifReimport(
                 ReimportSkippedAccount(
                     accountId = merge.duplicateId,
                     accountName = merge.duplicateName,
-                    reason = ReimportSkipReason.MERGE_FAILED,
-                    detail = expected.message ?: "Merge failed",
+                    detail = skipDetail("Merge failed", expected.message),
                 )
         }
     }
@@ -246,7 +238,15 @@ suspend fun executeQifReimport(
         )
 
     onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))
-    val deletedEmptyAccounts = deleteEmptyImportCreatedAccounts(qifImport, accountRepository, qifImportRepository, importEngine)
+    val deletedEmptyAccounts =
+        importEngine.deleteEmptyImportCreatedAccounts(
+            createdAccountIds = qifImportRepository.getAccountsCreatedByImport(qifImport.id),
+            source = Source.Qif(qifImport.id),
+            accountRepository = accountRepository,
+            // QIF import never creates trades, so there is no trade-only account to protect here.
+            tradeRepository = null,
+            keyPrefix = "qif-reimport-delete",
+        )
 
     if (refreshViews) {
         onProgress?.invoke(ImportProgress("Refreshing views"))
@@ -269,10 +269,9 @@ suspend fun executeQifReimport(
 }
 
 /**
- * Applies the planned in-place transfer updates in chunks, each an engine batch of UPDATE intents plus
- * the matching record-status writeback to UPDATED (which persists both the status and the transfer id).
- * A failing chunk falls back to per-record updates so one bad record downgrades to a skip. Returns the
- * updates that were applied; failures are appended to [skipped].
+ * Applies the planned in-place transfer updates through the shared [applyReimportValueUpdates], pairing
+ * each chunk's UPDATE intents with this import's record-status writeback to UPDATED (which persists both
+ * the status and the transfer id).
  */
 private suspend fun applyQifValueUpdates(
     valueUpdates: List<ReimportValueUpdate>,
@@ -280,71 +279,32 @@ private suspend fun applyQifValueUpdates(
     importEngine: ImportEngine,
     skipped: MutableList<ReimportSkippedAccount>,
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
-    chunkSize: Int = QIF_REIMPORT_VALUE_UPDATE_CHUNK,
-): List<ReimportValueUpdate> {
-    if (valueUpdates.isEmpty()) return emptyList()
-
-    fun batchFor(updates: List<ReimportValueUpdate>) =
-        ImportBatch(
-            transfers =
-                updates.map { update ->
-                    ImportTransfer(
-                        source = Source.Qif(qifImport.id, update.rowIndex),
-                        operation = ImportOperation.UPDATE,
-                        existingId = update.transferId,
-                        fromAccount = AccountRef.Existing(update.sourceAccountId),
-                        toAccount = AccountRef.Existing(update.targetAccountId),
-                        timestamp = update.newTimestamp,
-                        description = update.newDescription,
-                        amount = update.newAmount,
-                    )
-                },
-            dedupePolicy = DedupePolicy.None,
-            qifImportMutations =
-                listOf(
-                    QifImportMutation.UpdateRecordStatuses(
-                        id = qifImport.id,
-                        status = ImportStatus.UPDATED.name,
-                        recordTransferMap = updates.associate { it.rowIndex to it.transferId },
+    chunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
+): List<ReimportValueUpdate> =
+    applyReimportValueUpdates(
+        valueUpdates = valueUpdates,
+        importEngine = importEngine,
+        skipped = skipped,
+        sourceFor = { rowIndex -> Source.Qif(qifImport.id, rowIndex) },
+        batchFor = { transfers, recordTransferMap ->
+            ImportBatch(
+                transfers = transfers,
+                dedupePolicy = DedupePolicy.None,
+                qifImportMutations =
+                    listOf(
+                        QifImportMutation.UpdateRecordStatuses(
+                            id = qifImport.id,
+                            status = ImportStatus.UPDATED.name,
+                            recordTransferMap = recordTransferMap,
+                        ),
                     ),
-                ),
-        )
-
-    val total = valueUpdates.size
-    val updated = mutableListOf<ReimportValueUpdate>()
-    var done = 0
-    onProgress?.invoke(ImportProgress("Updating transactions", fraction = 0f, processed = 0, total = total))
-    for (chunk in valueUpdates.chunked(chunkSize.coerceAtLeast(1))) {
-        try {
-            importEngine.import(batchFor(chunk))
-            updated += chunk
-        } catch (expected: Exception) {
-            logger.warn(expected) { "QIF re-import value update chunk failed, falling back to per-record updates" }
-            for (update in chunk) {
-                try {
-                    importEngine.import(batchFor(listOf(update)))
-                    updated += update
-                } catch (expectedRowError: Exception) {
-                    logger.warn(expectedRowError) {
-                        "QIF re-import value update of record ${update.rowIndex} ('${update.description}') failed"
-                    }
-                    skipped +=
-                        ReimportSkippedAccount(
-                            accountId = null,
-                            accountName = update.description,
-                            reason = ReimportSkipReason.UPDATE_FAILED,
-                            detail = expectedRowError.message ?: "Update failed",
-                        )
-                }
-            }
-        }
-        done += chunk.size
-        onProgress?.invoke(
-            ImportProgress("Updating transactions", fraction = done.toFloat() / total, processed = done, total = total),
-        )
-    }
-    return updated
-}
+            )
+        },
+        logLabel = "QIF re-import",
+        rowLabel = "record",
+        onProgress = onProgress,
+        chunkSize = chunkSize,
+    )
 
 /**
  * Re-runs [strategy] over only the [qifImport] records that are not yet imported or errored (unlike
@@ -402,79 +362,13 @@ private suspend fun applyStagedQif(
 }
 
 /**
- * Deletes accounts this import created that hold no transfers (merged-away duplicates are already gone —
- * this catches ones emptied without being merge targets). Returns the deleted names.
- */
-private suspend fun deleteEmptyImportCreatedAccounts(
-    qifImport: QifImport,
-    accountRepository: AccountReadRepository,
-    qifImportRepository: QifImportReadRepository,
-    importEngine: ImportEngine,
-): List<String> {
-    val importCreated = qifImportRepository.getAccountsCreatedByImport(qifImport.id)
-    val remainingById = accountRepository.getAllAccounts().first().associateBy { it.id }
-    val candidates = importCreated.mapNotNull { remainingById[it] }
-    // One batched membership check instead of a COUNT query per candidate account.
-    val withTransfers = accountRepository.accountsWithTransfers(candidates.map { it.id })
-    val emptyAccounts = candidates.filter { it.id !in withTransfers }
-    if (emptyAccounts.isEmpty()) return emptyList()
-
-    importEngine.import(
-        ImportBatch.manualEdits(
-            accounts =
-                emptyAccounts.map { account ->
-                    ImportAccountIntent(
-                        key = LocalAccountKey("qif-reimport-delete-${account.id.id}"),
-                        source = Source.Qif(qifImport.id),
-                        operation = ImportOperation.DELETE,
-                        existingId = account.id,
-                    )
-                },
-        ),
-    )
-    return emptyAccounts.map { it.name }
-}
-
-/**
- * Summary of a bulk QIF re-import run across many already-imported files. [merges] and [skipped] carry
- * the actual duplicate-account consolidations performed (and the ones that could not be merged) across
- * all files, so the UI can show WHICH accounts merged — the detail the per-file preview shows.
- */
-data class QifBulkReimportResult(
-    override val filesImported: Int,
-    override val transfersCreated: Int,
-    override val duplicatesSkipped: Int,
-    override val filesSkippedNoStrategy: Int,
-    override val filesFailed: Int,
-    val merges: List<ReimportMerge>,
-    val reversals: List<ReimportReversal>,
-    val valueUpdates: Int,
-    val emptyAccountsDeleted: Int,
-    val skipped: List<ReimportSkippedAccount>,
-) : BulkImportResult {
-    override fun toSummary(): String =
-        buildString {
-            append("Re-imported $filesImported file${if (filesImported == 1) "" else "s"}")
-            append(" · $transfersCreated new")
-            if (valueUpdates > 0) append(" · $valueUpdates updated")
-            if (merges.isNotEmpty()) append(" · ${merges.size} account${if (merges.size == 1) "" else "s"} merged")
-            if (reversals.isNotEmpty()) append(" · ${reversals.size} merge${if (reversals.size == 1) "" else "s"} reversed")
-            if (emptyAccountsDeleted > 0) append(" · $emptyAccountsDeleted empty removed")
-            if (duplicatesSkipped > 0) append(" · $duplicatesSkipped duplicates skipped")
-            if (filesSkippedNoStrategy > 0) append(" · $filesSkippedNoStrategy skipped (no strategy)")
-            if (skipped.isNotEmpty()) append(" · ${skipped.size} not merged/updated")
-            if (filesFailed > 0) append(" · $filesFailed failed")
-        }
-}
-
-/**
  * Re-imports every already-imported [imports] QIF file in one go: for each, resolves the strategy it
  * was last imported with ([QifImport.lastAppliedStrategyId], falling back to content-aware
  * auto-selection), then plans and executes a re-import so current strategy/mapping changes apply
  * retroactively. Files with no resolvable strategy are skipped and counted. Refreshes materialized views
  * once at the end. Mirrors [bulkApplyQif]; reports row-weighted run-wide progress via [onProgress].
  */
-@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+@Suppress("LongParameterList")
 suspend fun bulkReimportQif(
     imports: List<QifImport>,
     sourceAccountOverride: AccountId?,
@@ -489,95 +383,66 @@ suspend fun bulkReimportQif(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onProgress: suspend (BulkImportProgress) -> Unit,
-): QifBulkReimportResult {
+): BulkReimportResult {
     val qifStrategies = strategies.qifCompatible()
-    var filesImported = 0
-    var transfers = 0
-    var duplicates = 0
-    var skippedNoStrategy = 0
-    var failed = 0
-    val merges = mutableListOf<ReimportMerge>()
-    val reversals = mutableListOf<ReimportReversal>()
-    var valueUpdates = 0
-    var emptyAccountsDeleted = 0
-    val skipped = mutableListOf<ReimportSkippedAccount>()
-
-    val tracker = BulkProgressTracker(imports.map { it.recordCount }, onProgress)
-    tracker.started()
-
-    imports.forEachIndexed { index, qifImport ->
-        tracker.fileStarted(index, qifImport.originalFileName)
-        try {
-            val count = qifImportRepository.countRecords(qifImport.id)
-            val records = qifImportRepository.getImportRecords(qifImport.id, count.coerceAtLeast(1), 0)
-            val rows = QifCsvAdapter.toRows(records)
-            if (rows.isEmpty()) return@forEachIndexed
-            // Prefer the strategy the file was last imported with; fall back to content-aware auto-selection.
-            // QIF data has no currency, so stamp the chosen one onto the strategy (as the import path does).
-            val matched =
+    return runBulkReimport(
+        imports = imports,
+        rowCount = { it.recordCount },
+        fileName = { it.originalFileName },
+        logLabel = "QIF",
+        maintenance = maintenance,
+        onProgress = onProgress,
+        prepare = {},
+    ) { _, qifImport, _, onFileProgress ->
+        val count = qifImportRepository.countRecords(qifImport.id)
+        val records = qifImportRepository.getImportRecords(qifImport.id, count.coerceAtLeast(1), 0)
+        val rows = QifCsvAdapter.toRows(records)
+        // Prefer the strategy the file was last imported with; fall back to content-aware auto-selection.
+        // QIF data has no currency, so stamp the chosen one onto the strategy (as the import path does).
+        val matched =
+            if (rows.isEmpty()) {
+                null
+            } else {
                 (
                     qifImport.lastAppliedStrategyId?.let { id -> qifStrategies.find { it.id == id } }
                         ?: qifStrategies.selectForQifContent(rows, QifCsvAdapter.columns)
                 )?.withQifCurrency(currencyId)
-            if (matched == null) {
-                skippedNoStrategy++
-                return@forEachIndexed
             }
-            val plan =
-                planQifReimport(
-                    qifImport = qifImport,
-                    strategy = matched,
-                    sourceAccountOverride = sourceAccountOverride,
-                    currencies = currencies,
-                    accountMappingRepository = accountMappingRepository,
-                    accountRepository = accountRepository,
-                    qifImportRepository = qifImportRepository,
-                    transactionRepository = transactionRepository,
-                    transferSourceRepository = transferSourceRepository,
-                    onProgress = { tracker.phase(index, qifImport.originalFileName, it) },
+        when {
+            // An empty file has nothing to re-import, and (unlike a missing strategy) is not counted.
+            rows.isEmpty() -> BulkReimportFileOutcome.NoWork
+            matched == null -> BulkReimportFileOutcome.NoStrategy
+            else -> {
+                val plan =
+                    planQifReimport(
+                        qifImport = qifImport,
+                        strategy = matched,
+                        sourceAccountOverride = sourceAccountOverride,
+                        currencies = currencies,
+                        accountMappingRepository = accountMappingRepository,
+                        accountRepository = accountRepository,
+                        qifImportRepository = qifImportRepository,
+                        transactionRepository = transactionRepository,
+                        transferSourceRepository = transferSourceRepository,
+                        onProgress = onFileProgress,
+                    )
+                BulkReimportFileOutcome.Reimported(
+                    executeQifReimport(
+                        plan = plan,
+                        qifImport = qifImport,
+                        strategy = matched,
+                        sourceAccountOverride = sourceAccountOverride,
+                        currencies = currencies,
+                        accountMappingRepository = accountMappingRepository,
+                        accountRepository = accountRepository,
+                        qifImportRepository = qifImportRepository,
+                        maintenance = maintenance,
+                        importEngine = importEngine,
+                        onProgress = onFileProgress,
+                        refreshViews = false,
+                    ),
                 )
-            val result =
-                executeQifReimport(
-                    plan = plan,
-                    qifImport = qifImport,
-                    strategy = matched,
-                    sourceAccountOverride = sourceAccountOverride,
-                    currencies = currencies,
-                    accountMappingRepository = accountMappingRepository,
-                    accountRepository = accountRepository,
-                    qifImportRepository = qifImportRepository,
-                    maintenance = maintenance,
-                    importEngine = importEngine,
-                    onProgress = { tracker.phase(index, qifImport.originalFileName, it) },
-                    refreshViews = false,
-                )
-            filesImported++
-            transfers += result.importResult?.successCount ?: 0
-            duplicates += result.importResult?.duplicateCount ?: 0
-            merges += result.mergedAccounts
-            reversals += result.reversedMerges
-            valueUpdates += result.updatedRows.size
-            emptyAccountsDeleted += result.deletedEmptyAccounts.size
-            skipped += result.skipped
-        } catch (expected: Exception) {
-            logger.error(expected) { "Bulk QIF re-import failed for ${qifImport.originalFileName}: ${expected.message}" }
-            failed++
+            }
         }
     }
-
-    tracker.done()
-    maintenance.refreshMaterializedViews()
-
-    return QifBulkReimportResult(
-        filesImported = filesImported,
-        transfersCreated = transfers,
-        duplicatesSkipped = duplicates,
-        filesSkippedNoStrategy = skippedNoStrategy,
-        filesFailed = failed,
-        merges = merges,
-        reversals = reversals,
-        valueUpdates = valueUpdates,
-        emptyAccountsDeleted = emptyAccountsDeleted,
-        skipped = skipped,
-    )
 }

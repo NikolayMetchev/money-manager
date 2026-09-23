@@ -6,7 +6,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
+
+/** Edits [ApiAccountMappings] in place inside the strategy config. */
+private fun ApiStrategyEditorState.updateAccountMappings(block: ApiAccountMappings.() -> ApiAccountMappings) =
+    updateConfig { copy(accountMappings = accountMappings.block()) }
 
 @Composable
 internal fun AccountMappingsTab(
@@ -16,14 +21,14 @@ internal fun AccountMappingsTab(
     onRequestPick: PathPicker,
     enabled: Boolean,
 ) {
-    val mappings = state.accountMappings
+    val mappings = state.config.accountMappings
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SessionDataStatus(paths = accountJsonPaths, loaded = accountSampleLoaded)
 
         PathFieldRow(
             "Account ID field",
             mappings.idField,
-            { state.accountMappings = mappings.copy(idField = it) },
+            { value -> state.updateAccountMappings { copy(idField = value) } },
             accountJsonPaths,
             onRequestPick,
             enabled,
@@ -31,7 +36,7 @@ internal fun AccountMappingsTab(
         PathFieldRow(
             "Description field",
             mappings.descriptionField,
-            { state.accountMappings = mappings.copy(descriptionField = it) },
+            { value -> state.updateAccountMappings { copy(descriptionField = value) } },
             accountJsonPaths,
             onRequestPick,
             enabled,
@@ -39,14 +44,14 @@ internal fun AccountMappingsTab(
         TextFieldRow(
             label = "Static account name (optional)",
             value = mappings.staticAccountName.orEmpty(),
-            onValueChange = { state.accountMappings = mappings.copy(staticAccountName = it.ifBlank { null }) },
+            onValueChange = { value -> state.updateAccountMappings { copy(staticAccountName = value.ifBlank { null }) } },
             enabled = enabled,
             placeholder = "Overrides the description field above (e.g. \"Monzo\") — \"Joint\" is appended for a joint account",
         )
         PathFieldRow(
             "Owner name field (optional)",
             mappings.ownerNameField.orEmpty(),
-            { state.accountMappings = mappings.copy(ownerNameField = it.ifBlank { null }) },
+            { value -> state.updateAccountMappings { copy(ownerNameField = value.ifBlank { null }) } },
             accountJsonPaths,
             onRequestPick,
             enabled,
@@ -54,7 +59,7 @@ internal fun AccountMappingsTab(
         PathFieldRow(
             "Owners array field (optional)",
             mappings.ownersArrayField.orEmpty(),
-            { state.accountMappings = mappings.copy(ownersArrayField = it.ifBlank { null }) },
+            { value -> state.updateAccountMappings { copy(ownersArrayField = value.ifBlank { null }) } },
             accountJsonPaths,
             onRequestPick,
             enabled,
@@ -62,7 +67,7 @@ internal fun AccountMappingsTab(
         PathFieldRow(
             "Owner user-id field",
             mappings.ownerUserIdField,
-            { state.accountMappings = mappings.copy(ownerUserIdField = it) },
+            { value -> state.updateAccountMappings { copy(ownerUserIdField = value) } },
             accountJsonPaths,
             onRequestPick,
             enabled,
@@ -70,7 +75,7 @@ internal fun AccountMappingsTab(
         PathFieldRow(
             "Owner name fallback field",
             mappings.ownerNameFallbackField,
-            { state.accountMappings = mappings.copy(ownerNameFallbackField = it) },
+            { value -> state.updateAccountMappings { copy(ownerNameFallbackField = value) } },
             accountJsonPaths,
             onRequestPick,
             enabled,
@@ -78,7 +83,7 @@ internal fun AccountMappingsTab(
         PathFieldRow(
             "Sort code field",
             mappings.sortCodeField,
-            { state.accountMappings = mappings.copy(sortCodeField = it) },
+            { value -> state.updateAccountMappings { copy(sortCodeField = value) } },
             accountJsonPaths,
             onRequestPick,
             enabled,
@@ -86,7 +91,7 @@ internal fun AccountMappingsTab(
         PathFieldRow(
             "Account number field",
             mappings.accountNumberField,
-            { state.accountMappings = mappings.copy(accountNumberField = it) },
+            { value -> state.updateAccountMappings { copy(accountNumberField = value) } },
             accountJsonPaths,
             onRequestPick,
             enabled,
@@ -94,7 +99,7 @@ internal fun AccountMappingsTab(
         PathFieldRow(
             "Currency field (optional)",
             mappings.currencyField.orEmpty(),
-            { state.accountMappings = mappings.copy(currencyField = it.ifBlank { null }) },
+            { value -> state.updateAccountMappings { copy(currencyField = value.ifBlank { null }) } },
             accountJsonPaths,
             onRequestPick,
             enabled,

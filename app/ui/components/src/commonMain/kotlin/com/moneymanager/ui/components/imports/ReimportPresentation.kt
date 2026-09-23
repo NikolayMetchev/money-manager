@@ -1,4 +1,4 @@
-package com.moneymanager.ui.screens.csv
+package com.moneymanager.ui.components.imports
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope

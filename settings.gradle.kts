@@ -59,7 +59,7 @@ buildscript {
 
 plugins {
     id("com.gradle.develocity") version "4.5.1"
-    id("com.autonomousapps.build-health") version "3.19.1"
+    id("com.autonomousapps.build-health") version "3.19.2"
 
     // Kotlin plugins declared here for classloader compatibility with DAGP
     id("org.jetbrains.kotlin.multiplatform") version "2.4.20" apply false

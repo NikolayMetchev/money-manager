@@ -5,9 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
@@ -43,6 +41,7 @@ import com.moneymanager.remotestorage.sync.StrategyItem
 import com.moneymanager.remotestorage.sync.StrategyItemStatus
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.remotestorage.sync.SyncProgress
+import com.moneymanager.ui.components.SettingsSectionCard
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 
@@ -141,158 +140,152 @@ fun StrategyCloudCard(
         }
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text("Strategies (Cloud)", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Share your import strategies across databases and devices — one file per strategy on Google Drive.",
-                style = MaterialTheme.typography.bodySmall,
-            )
+    SettingsSectionCard(title = "Strategies (Cloud)") {
+        Text(
+            "Share your import strategies across databases and devices — one file per strategy on Google Drive.",
+            style = MaterialTheme.typography.bodySmall,
+        )
 
-            if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 
-            if (!connected) {
-                controller.availableProviders().forEach { type ->
-                    OutlinedButton(
-                        onClick = {
-                            message = null
-                            needsReconnect = false
-                            controller.beginBusy()
-                            scope.launch {
-                                runCatching {
-                                    controller.connect(type.id, config = null)
-                                    connected = true
-                                    controller.refresh(library, appVersion)
-                                }.onFailure { fail("Could not connect:", it) }
-                            }
-                        },
-                        enabled = actionsEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Connect strategies to ${type.displayName}…")
-                    }
-                }
-            } else {
-                StatusSummary(state.toUpload, state.updatesAvailable, state.newOnRemote, state.conflicts)
-
-                StrategyItemList(
-                    items = state.items,
-                    selectedToPull = selectedToPull,
-                    conflictChoices = conflictChoices,
-                    onToggle = { key, checked -> if (checked) selectedToPull.add(key) else selectedToPull.remove(key) },
-                    onConflictChoice = { key, choice ->
-                        // Tapping the already-selected chip clears the choice (leave the conflict alone).
-                        if (conflictChoices[key] == choice) conflictChoices.remove(key) else conflictChoices[key] = choice
-                    },
-                )
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            message = null
-                            needsReconnect = false
-                            controller.beginBusy()
-                            scope.launch {
-                                runCatching { controller.refresh(library, appVersion) }
-                                    .onFailure { fail("Check failed:", it) }
-                            }
-                        },
-                        enabled = actionsEnabled,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Check remote")
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            message = null
-                            needsReconnect = false
-                            // Only choices for keys that are still conflicts apply (state may have moved on).
-                            val conflicts =
-                                state.items
-                                    .filter { it.status == StrategyItemStatus.CONFLICT }
-                                    .map { it.key }
-                                    .toSet()
-                            val pull = selectedToPull.toSet() + conflicts.filter { conflictChoices[it] == ConflictChoice.TAKE_DRIVE }
-                            val force = conflicts.filter { conflictChoices[it] == ConflictChoice.KEEP_MINE }.toSet()
-                            busyLocal = true
-                            scope.launch {
-                                runCatching {
-                                    // Any references the selected pulls can't resolve locally need the user first.
-                                    val unresolved = mutableMapOf<StrategyKey, List<CsvUnresolvedReference>>()
-                                    pull.forEachIndexed { index, key ->
-                                        syncProgress = SyncProgress("Checking ${key.displayLabel()}…", index.toFloat() / pull.size)
-                                        val references = controller.previewPull(library, key).unresolvedReferences
-                                        if (references.isNotEmpty()) unresolved[key] = references
-                                    }
-                                    syncProgress = null
-                                    busyLocal = false
-                                    if (unresolved.isEmpty()) {
-                                        performSync(pull, force, emptyMap())
-                                    } else {
-                                        pendingSync = PendingSync(pull, force, unresolved)
-                                    }
-                                }.onFailure {
-                                    fail("Sync failed:", it)
-                                    syncProgress = null
-                                    busyLocal = false
-                                }
-                            }
-                        },
-                        enabled = actionsEnabled,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Sync now")
-                    }
-                }
-
-                TextButton(onClick = {
-                    controller.disconnect()
-                    connected = false
-                    needsReconnect = false
-                    selectedToPull.clear()
-                    conflictChoices.clear()
-                }) {
-                    Text("Disconnect")
-                }
-            }
-
-            // A dead Drive connection (expired/revoked refresh token) can't be refreshed silently — the
-            // user must re-consent. Offer that here (only while connected), then re-read the library.
-            if (needsReconnect && connected) {
+        if (!connected) {
+            controller.availableProviders().forEach { type ->
                 OutlinedButton(
                     onClick = {
                         message = null
-                        busyLocal = true
+                        needsReconnect = false
+                        controller.beginBusy()
                         scope.launch {
                             runCatching {
-                                controller.reconnect()
-                                needsReconnect = false
+                                controller.connect(type.id, config = null)
+                                connected = true
                                 controller.refresh(library, appVersion)
-                            }.onFailure { fail("Reconnect failed:", it) }
-                            busyLocal = false
+                            }.onFailure { fail("Could not connect:", it) }
                         }
                     },
                     enabled = actionsEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Reconnect to Google Drive")
+                    Text("Connect strategies to ${type.displayName}…")
+                }
+            }
+        } else {
+            StatusSummary(state.toUpload, state.updatesAvailable, state.newOnRemote, state.conflicts)
+
+            StrategyItemList(
+                items = state.items,
+                selectedToPull = selectedToPull,
+                conflictChoices = conflictChoices,
+                onToggle = { key, checked -> if (checked) selectedToPull.add(key) else selectedToPull.remove(key) },
+                onConflictChoice = { key, choice ->
+                    // Tapping the already-selected chip clears the choice (leave the conflict alone).
+                    if (conflictChoices[key] == choice) conflictChoices.remove(key) else conflictChoices[key] = choice
+                },
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        message = null
+                        needsReconnect = false
+                        controller.beginBusy()
+                        scope.launch {
+                            runCatching { controller.refresh(library, appVersion) }
+                                .onFailure { fail("Check failed:", it) }
+                        }
+                    },
+                    enabled = actionsEnabled,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Check remote")
+                }
+                OutlinedButton(
+                    onClick = {
+                        message = null
+                        needsReconnect = false
+                        // Only choices for keys that are still conflicts apply (state may have moved on).
+                        val conflicts =
+                            state.items
+                                .filter { it.status == StrategyItemStatus.CONFLICT }
+                                .map { it.key }
+                                .toSet()
+                        val pull = selectedToPull.toSet() + conflicts.filter { conflictChoices[it] == ConflictChoice.TAKE_DRIVE }
+                        val force = conflicts.filter { conflictChoices[it] == ConflictChoice.KEEP_MINE }.toSet()
+                        busyLocal = true
+                        scope.launch {
+                            runCatching {
+                                // Any references the selected pulls can't resolve locally need the user first.
+                                val unresolved = mutableMapOf<StrategyKey, List<CsvUnresolvedReference>>()
+                                pull.forEachIndexed { index, key ->
+                                    syncProgress = SyncProgress("Checking ${key.displayLabel()}…", index.toFloat() / pull.size)
+                                    val references = controller.previewPull(library, key).unresolvedReferences
+                                    if (references.isNotEmpty()) unresolved[key] = references
+                                }
+                                syncProgress = null
+                                busyLocal = false
+                                if (unresolved.isEmpty()) {
+                                    performSync(pull, force, emptyMap())
+                                } else {
+                                    pendingSync = PendingSync(pull, force, unresolved)
+                                }
+                            }.onFailure {
+                                fail("Sync failed:", it)
+                                syncProgress = null
+                                busyLocal = false
+                            }
+                        }
+                    },
+                    enabled = actionsEnabled,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Sync now")
                 }
             }
 
-            syncProgress?.let { progress ->
-                Text(progress.message, style = MaterialTheme.typography.bodySmall)
-                LinearProgressIndicator(
-                    progress = { progress.fraction },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            TextButton(onClick = {
+                controller.disconnect()
+                connected = false
+                needsReconnect = false
+                selectedToPull.clear()
+                conflictChoices.clear()
+            }) {
+                Text("Disconnect")
             }
+        }
 
-            message?.let {
-                Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+        // A dead Drive connection (expired/revoked refresh token) can't be refreshed silently — the
+        // user must re-consent. Offer that here (only while connected), then re-read the library.
+        if (needsReconnect && connected) {
+            OutlinedButton(
+                onClick = {
+                    message = null
+                    busyLocal = true
+                    scope.launch {
+                        runCatching {
+                            controller.reconnect()
+                            needsReconnect = false
+                            controller.refresh(library, appVersion)
+                        }.onFailure { fail("Reconnect failed:", it) }
+                        busyLocal = false
+                    }
+                },
+                enabled = actionsEnabled,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Reconnect to Google Drive")
             }
+        }
+
+        syncProgress?.let { progress ->
+            Text(progress.message, style = MaterialTheme.typography.bodySmall)
+            LinearProgressIndicator(
+                progress = { progress.fraction },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        message?.let {
+            Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
         }
     }
 

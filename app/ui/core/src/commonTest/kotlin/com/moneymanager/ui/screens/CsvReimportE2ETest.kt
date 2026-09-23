@@ -1,11 +1,9 @@
 package com.moneymanager.ui.screens
 
 import com.moneymanager.csvimporter.CsvTransferMapper
-import com.moneymanager.csvimporter.ReimportSkipReason
 import com.moneymanager.csvimporter.executeCsvReimport
 import com.moneymanager.csvimporter.planCsvReimport
 import com.moneymanager.csvimporter.runCsvImport
-import com.moneymanager.database.DbMaintenance
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -135,7 +133,7 @@ class CsvReimportE2ETest {
             currencies = currencies,
             accountMappingRepository = dc.accountMappingRepository,
             accountRepository = dc.accountRepository,
-            maintenance = DbMaintenance(dc.maintenanceService),
+            maintenance = dc.maintenanceService,
             importEngine = importEngine,
         )
 
@@ -195,7 +193,7 @@ class CsvReimportE2ETest {
                     accountMappingRepository = dc.accountMappingRepository,
                     accountRepository = dc.accountRepository,
                     csvImportRepository = dc.csvImportRepository,
-                    maintenance = DbMaintenance(dc.maintenanceService),
+                    maintenance = dc.maintenanceService,
                     importEngine = fixture.importEngine,
                 )
 
@@ -262,7 +260,12 @@ class CsvReimportE2ETest {
                 )
             assertTrue(plan.merges.isEmpty())
             assertEquals(1, plan.skipped.size)
-            assertEquals(ReimportSkipReason.TRANSFERS_BETWEEN, plan.skipped.single().reason)
+            assertTrue(
+                plan.skipped
+                    .single()
+                    .detail
+                    .contains("transaction(s) between"),
+            )
 
             val result =
                 executeCsvReimport(
@@ -274,7 +277,7 @@ class CsvReimportE2ETest {
                     accountMappingRepository = dc.accountMappingRepository,
                     accountRepository = dc.accountRepository,
                     csvImportRepository = dc.csvImportRepository,
-                    maintenance = DbMaintenance(dc.maintenanceService),
+                    maintenance = dc.maintenanceService,
                     importEngine = fixture.importEngine,
                 )
 
@@ -354,7 +357,7 @@ class CsvReimportE2ETest {
                     accountMappingRepository = dc.accountMappingRepository,
                     accountRepository = dc.accountRepository,
                     csvImportRepository = dc.csvImportRepository,
-                    maintenance = DbMaintenance(dc.maintenanceService),
+                    maintenance = dc.maintenanceService,
                     importEngine = fixture.importEngine,
                     onProgress = { executeProgress += it },
                     // Force one chunk per update so per-chunk progress is exercised with 2 rows.

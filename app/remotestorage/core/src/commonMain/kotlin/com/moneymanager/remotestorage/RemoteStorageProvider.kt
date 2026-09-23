@@ -78,6 +78,4 @@ data class RemoteFile(
      * backend doesn't expose one.
      */
     val revisionId: String? = null,
-    /** Content checksum (e.g. Drive's `md5Checksum`), for content-equality fallback. Null if unknown. */
-    val md5: String? = null,
 )

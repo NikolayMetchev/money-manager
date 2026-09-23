@@ -55,6 +55,15 @@ import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 /** Requests the JSON-path picker dialog over `paths`, routing the chosen path to `setter`. */
 internal typealias PathPicker = (paths: List<JsonPathEntry>, setter: (String) -> Unit) -> Unit
 
+/** The list with the element at [index] removed; the receiver is left untouched. */
+internal fun <T> List<T>.minusAt(index: Int): List<T> = filterIndexed { i, _ -> i != index }
+
+/** The list with the element at [index] replaced by [value]; the receiver is left untouched. */
+internal fun <T> List<T>.replacingAt(
+    index: Int,
+    value: T,
+): List<T> = mapIndexed { i, existing -> if (i == index) value else existing }
+
 /** Holds the editable state for a single custom field mapping row. */
 data class CustomFieldState(
     val name: String,

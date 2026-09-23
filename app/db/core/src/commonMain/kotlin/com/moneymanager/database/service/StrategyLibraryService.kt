@@ -91,7 +91,7 @@ class StrategyLibraryService(
         when (key.kind) {
             StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX -> {
                 val export = CsvStrategyExportCodec.decode(json)
-                val refs = csvStrategyExportService.parseExport(export).unresolvedReferences.map { it.toDomain() }
+                val refs = csvStrategyExportService.parseExport(export).unresolvedReferences
                 StrategyParseResult(key, refs)
             }
             // API strategies and pass-through definitions carry no entity references to resolve.
@@ -209,8 +209,8 @@ class StrategyLibraryService(
         val export = AccountMappingExportCodec.decode(json)
         val serviceResolutions =
             accountMappingExportService.parseExport(export).unresolvedAccountNames.associateWith { name ->
-                resolutions[CsvUnresolvedReference(CsvReferenceType.ACCOUNT, name, null)]?.toService()
-                    ?: Resolution.CreateNew(name)
+                resolutions[CsvUnresolvedReference(CsvReferenceType.ACCOUNT, name, null)]
+                    ?: CsvResolution.CreateNew(name)
             }
         // Union semantics (keep-forever library): only import mappings not already present globally,
         // so re-importing never duplicates or trips the global-mapping unique index.
@@ -232,9 +232,9 @@ class StrategyLibraryService(
     private suspend fun csvServiceResolutions(
         export: CsvStrategyExport,
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
-    ): Map<UnresolvedReference, Resolution> =
+    ): Map<CsvUnresolvedReference, CsvResolution> =
         csvStrategyExportService.parseExport(export).unresolvedReferences.associateWith { ref ->
-            resolutions[ref.toDomain()]?.toService() ?: Resolution.CreateNew(ref.name)
+            resolutions[ref] ?: CsvResolution.CreateNew(ref.name)
         }
 
     override fun canonicalHash(
@@ -255,23 +255,4 @@ class StrategyLibraryService(
             relationshipTypeId = relationshipTypeId,
             rules = rules,
         )
-
-    private fun UnresolvedReference.toDomain(): CsvUnresolvedReference =
-        CsvUnresolvedReference(
-            type =
-                when (type) {
-                    ReferenceType.ACCOUNT -> CsvReferenceType.ACCOUNT
-                    ReferenceType.CURRENCY -> CsvReferenceType.CURRENCY
-                    ReferenceType.CATEGORY -> CsvReferenceType.CATEGORY
-                },
-            name = name,
-            fieldType = fieldType,
-        )
-
-    private fun CsvResolution.toService(): Resolution =
-        when (this) {
-            is CsvResolution.CreateNew -> Resolution.CreateNew(name)
-            is CsvResolution.MapToExisting -> Resolution.MapToExisting(id)
-            is CsvResolution.MapToExistingCurrency -> Resolution.MapToExistingCurrency(id)
-        }
 }
