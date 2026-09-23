@@ -69,7 +69,7 @@ turbine = "1.2.1"
 # Build-tool transitive-alignment versions: pin tooling transitives (Gradle plugins, annotation
 # processors, AGP test platform) to one version across all build classpaths. Consumed via the
 # build-tool-pins bundle in moneymanager.kotlin-convention and gradle/build-logic/build.gradle.kts.
-buildtool-animal-sniffer = "1.27"
+buildtool-animal-sniffer = "1.28"
 buildtool-asm = "9.10.1"
 buildtool-checker-qual = "4.2.3"
 buildtool-commons-io = "2.22.0"
