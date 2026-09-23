@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
+import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
@@ -451,8 +452,10 @@ class CsvStrategyJsonCodecTest {
 
     @Test
     fun `decoding a config without optional sections defaults them`() {
+        val expected = CsvStrategyConfig<FieldMapping>(identificationColumns = setOf("Date"), fieldMappings = emptyMap())
+
         val decoded = CsvStrategyJsonCodec.decode("""{"identificationColumns":["Date"],"fieldMappings":{}}""")
 
-        assertEquals(CsvStrategyConfig(setOf("Date"), emptyMap()), decoded)
+        assertEquals(expected, decoded)
     }
 }
