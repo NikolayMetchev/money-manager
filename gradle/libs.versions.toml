@@ -3,7 +3,7 @@
 # Android Tests run configuration aligned. Compile SDK runs ahead: androidx Compose 1.12 requires
 # compiling against API 37, which is only a compile-time floor and needs no emulator/runtime move.
 android-compileSdk = "37"
-develocity = "4.4.2"
+develocity = "4.5.1"
 android-gradle-plugin = "9.4.1"
 android-minSdk = "30"
 android-targetSdk = "36"
