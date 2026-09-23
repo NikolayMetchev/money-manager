@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
@@ -28,6 +29,7 @@ class CsvImportStrategyReadRepositoryImpl(
             .asFlow()
             .mapToList(coroutineContext)
             .map { rows -> rows.map(::toDomain) }
+            .flowOn(coroutineContext)
 
     override fun getStrategyById(id: CsvImportStrategyId): Flow<CsvImportStrategy?> =
         selectQueries
@@ -35,6 +37,7 @@ class CsvImportStrategyReadRepositoryImpl(
             .asFlow()
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }
+            .flowOn(coroutineContext)
 
     override fun getStrategyByName(name: String): Flow<CsvImportStrategy?> =
         selectQueries
@@ -42,7 +45,10 @@ class CsvImportStrategyReadRepositoryImpl(
             .asFlow()
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }
+            .flowOn(coroutineContext)
 
+    // Decoding config_json is real work, so each mapping above runs in coroutineContext via flowOn rather
+    // than in the collector's (often the UI's) context.
     private fun toDomain(entity: Csv_import_strategy_with_worksheet): CsvImportStrategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.parse(entity.id)),
