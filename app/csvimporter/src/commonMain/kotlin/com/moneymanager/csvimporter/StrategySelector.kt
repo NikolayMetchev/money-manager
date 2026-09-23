@@ -3,6 +3,7 @@ package com.moneymanager.csvimporter
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 
 /** Number of leading rows sampled when content-scoring a file against a strategy. */
 const val STRATEGY_CONTENT_SAMPLE_SIZE = 50
@@ -19,15 +20,15 @@ val byContentScoreThenNameThenId: Comparator<Pair<CsvImportStrategy, Int>> =
 
 /**
  * Counts sampled rows with a value matching any of this strategy's
- * [CsvImportStrategy.contentMatchRules] (case-insensitive regex per named column). Shared by the
+ * [CsvStrategyConfig.contentMatchRules] (case-insensitive regex per named column). Shared by the
  * CSV selector below and the QIF selector. A strategy with no content rules scores 0.
  */
 fun CsvImportStrategy.contentScore(
     sample: List<CsvRow>,
     columnIndexByName: Map<String, Int>,
 ): Int {
-    if (contentMatchRules.isEmpty()) return 0
-    val compiled = contentMatchRules.map { it.columnName to Regex(it.pattern, RegexOption.IGNORE_CASE) }
+    if (config.contentMatchRules.isEmpty()) return 0
+    val compiled = config.contentMatchRules.map { it.columnName to Regex(it.pattern, RegexOption.IGNORE_CASE) }
     return sample.count { row ->
         compiled.any { (columnName, regex) ->
             val idx = columnIndexByName[columnName] ?: return@any false
@@ -41,7 +42,7 @@ fun CsvImportStrategy.contentScore(
  * exports share one column set (e.g. crypto.com's card_/fiat_/crypto_ files), so candidates that
  * pass the exact column match are ranked by stronger signals:
  *
- * 1. **Filename**: candidates whose [CsvImportStrategy.fileNamePattern] matches [fileName] win
+ * 1. **Filename**: candidates whose [CsvStrategyConfig.fileNamePattern] matches [fileName] win
  *    outright (the export's own name is authoritative; content rules exist for renamed files).
  *    Among several, the best content score (then name, then id) breaks the tie.
  * 2. **Content**: candidates are scored via [contentScore] over the first
@@ -68,7 +69,7 @@ fun List<CsvImportStrategy>.selectForCsv(
     // file (disjoint or extra columns) still resolves to null rather than being misrouted.
     val candidates =
         filter { it.matchesColumns(headings) }
-            .ifEmpty { if (headings.isEmpty()) emptyList() else filter { it.identificationColumns.containsAll(headings) } }
+            .ifEmpty { if (headings.isEmpty()) emptyList() else filter { it.config.identificationColumns.containsAll(headings) } }
     if (candidates.isEmpty()) return null
 
     val indexByName = columns.associate { it.originalName to it.columnIndex }
@@ -91,12 +92,12 @@ fun List<CsvImportStrategy>.selectForCsv(
     if (contentMatch != null) return contentMatch.first
 
     return candidates
-        .filter { it.contentMatchRules.isEmpty() && it.fileNamePattern.isNullOrBlank() }
+        .filter { it.config.contentMatchRules.isEmpty() && it.config.fileNamePattern.isNullOrBlank() }
         .minWithOrNull(compareBy({ it.name }, { it.id.toString() }))
 }
 
 private fun CsvImportStrategy.matchesFileName(fileName: String): Boolean {
-    val pattern = fileNamePattern?.takeIf { it.isNotBlank() } ?: return false
+    val pattern = config.fileNamePattern?.takeIf { it.isNotBlank() } ?: return false
     // A malformed user-entered pattern must not break selection for every other strategy.
     return runCatching { Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(fileName) }
         .getOrDefault(false)

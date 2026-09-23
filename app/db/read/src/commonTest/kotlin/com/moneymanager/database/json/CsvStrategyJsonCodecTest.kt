@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -26,7 +27,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class FieldMappingJsonCodecTest {
+class CsvStrategyJsonCodecTest {
     @Test
     fun `encode and decode HardCodedAccountMapping`() {
         val mapping =
@@ -36,8 +37,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.SOURCE_ACCOUNT to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         assertEquals(1, decoded.size)
         val decodedMapping = decoded[TransferField.SOURCE_ACCOUNT]
@@ -55,8 +56,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
         assertIs<AccountLookupMapping>(decodedMapping)
@@ -78,8 +79,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
         assertIs<RegexAccountMapping>(decodedMapping)
@@ -104,8 +105,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.TIMESTAMP to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.TIMESTAMP]
         assertIs<DateTimeParsingMapping>(decodedMapping)
@@ -125,8 +126,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.DESCRIPTION to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.DESCRIPTION]
         assertIs<DirectColumnMapping>(decodedMapping)
@@ -145,8 +146,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.AMOUNT to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.AMOUNT]
         assertIs<AmountParsingMapping>(decodedMapping)
@@ -167,8 +168,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.AMOUNT to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.AMOUNT]
         assertIs<AmountParsingMapping>(decodedMapping)
@@ -187,8 +188,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.CURRENCY to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.CURRENCY]
         assertIs<HardCodedCurrencyMapping>(decodedMapping)
@@ -204,8 +205,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.CURRENCY to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.CURRENCY]
         assertIs<CurrencyLookupMapping>(decodedMapping)
@@ -251,8 +252,8 @@ class FieldMappingJsonCodecTest {
                     ),
             )
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         assertEquals(6, decoded.size)
         assertIs<HardCodedAccountMapping>(decoded[TransferField.SOURCE_ACCOUNT])
@@ -267,8 +268,8 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode identification columns`() {
         val columns = setOf("Date", "Description", "Amount", "Payee")
 
-        val json = FieldMappingJsonCodec.encodeColumns(columns)
-        val decoded = FieldMappingJsonCodec.decodeColumns(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(columns, emptyMap()))
+        val decoded = CsvStrategyJsonCodec.decode(json).identificationColumns
 
         assertEquals(columns, decoded)
     }
@@ -277,8 +278,8 @@ class FieldMappingJsonCodecTest {
     fun `encode and decode empty identification columns`() {
         val columns = emptySet<String>()
 
-        val json = FieldMappingJsonCodec.encodeColumns(columns)
-        val decoded = FieldMappingJsonCodec.decodeColumns(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(columns, emptyMap()))
+        val decoded = CsvStrategyJsonCodec.decode(json).identificationColumns
 
         assertEquals(columns, decoded)
     }
@@ -292,7 +293,7 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.SOURCE_ACCOUNT to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
 
         assertTrue(json.contains("SOURCE_ACCOUNT"))
         assertTrue(json.contains("HardCodedAccountMapping"))
@@ -308,8 +309,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.TIMEZONE to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.TIMEZONE]
         assertIs<HardCodedTimezoneMapping>(decodedMapping)
@@ -326,8 +327,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.TIMEZONE to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.TIMEZONE]
         assertIs<TimezoneLookupMapping>(decodedMapping)
@@ -345,8 +346,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.SOURCE_ACCOUNT to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.SOURCE_ACCOUNT]
         assertIs<TemplateAccountMapping>(decodedMapping)
@@ -380,8 +381,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
         assertIs<ConditionalAccountMapping>(decodedMapping)
@@ -402,8 +403,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.TIMESTAMP to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.TIMESTAMP]
         assertIs<DateTimeParsingMapping>(decodedMapping)
@@ -422,8 +423,8 @@ class FieldMappingJsonCodecTest {
             )
         val mappings = mapOf(TransferField.AMOUNT to mapping)
 
-        val json = FieldMappingJsonCodec.encode(mappings)
-        val decoded = FieldMappingJsonCodec.decode(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
+        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.AMOUNT]
         assertIs<AmountParsingMapping>(decodedMapping)
@@ -442,14 +443,16 @@ class FieldMappingJsonCodecTest {
                 ),
             )
 
-        val json = FieldMappingJsonCodec.encodeRowRules(rules)
-        val decoded = FieldMappingJsonCodec.decodeRowRules(json)
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), emptyMap(), rowPreprocessingRules = rules))
+        val decoded = CsvStrategyJsonCodec.decode(json).rowPreprocessingRules
 
         assertEquals(rules, decoded)
     }
 
     @Test
-    fun `decoding legacy row rules json defaults to empty list`() {
-        assertEquals(emptyList(), FieldMappingJsonCodec.decodeRowRules("[]"))
+    fun `decoding a config without optional sections defaults them`() {
+        val decoded = CsvStrategyJsonCodec.decode("""{"identificationColumns":["Date"],"fieldMappings":{}}""")
+
+        assertEquals(CsvStrategyConfig(setOf("Date"), emptyMap()), decoded)
     }
 }

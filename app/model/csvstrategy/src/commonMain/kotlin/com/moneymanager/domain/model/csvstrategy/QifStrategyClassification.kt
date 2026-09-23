@@ -12,4 +12,4 @@ import com.moneymanager.domain.model.qif.QifColumns
  * Centralized here so the DB, importer and UI layers all classify strategies identically.
  */
 fun CsvImportStrategy.isQifStrategy(): Boolean =
-    identificationColumns.isNotEmpty() && identificationColumns.all { it in QifColumns.headers }
+    config.identificationColumns.isNotEmpty() && config.identificationColumns.all { it in QifColumns.headers }

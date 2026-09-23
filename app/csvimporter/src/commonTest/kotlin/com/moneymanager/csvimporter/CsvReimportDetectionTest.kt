@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -66,41 +67,44 @@ class CsvReimportDetectionTest {
         return CsvImportStrategy(
             id = strategyId,
             name = "Test Strategy",
-            identificationColumns = setOf("Date", "Description", "Amount"),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(
-                            fieldType = TransferField.SOURCE_ACCOUNT,
-                            accountId = sourceAccountId,
-                        ),
-                    TransferField.TARGET_ACCOUNT to
-                        AccountLookupMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            columnName = "Payee",
-                        ),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = "Date",
-                            dateFormat = "dd/MM/yyyy",
-                        ),
-                    TransferField.DESCRIPTION to
-                        DirectColumnMapping(
-                            fieldType = TransferField.DESCRIPTION,
-                            columnName = "Description",
-                        ),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Amount",
-                            flipAccountsOnPositive = flipAccountsOnPositive,
-                        ),
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(
-                            fieldType = TransferField.CURRENCY,
-                            currencyId = currencyId,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Date", "Description", "Amount"),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                    accountId = sourceAccountId,
+                                ),
+                            TransferField.TARGET_ACCOUNT to
+                                AccountLookupMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    columnName = "Payee",
+                                ),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Date",
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(
+                                    fieldType = TransferField.DESCRIPTION,
+                                    columnName = "Description",
+                                ),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Amount",
+                                    flipAccountsOnPositive = flipAccountsOnPositive,
+                                ),
+                            TransferField.CURRENCY to
+                                HardCodedCurrencyMapping(
+                                    fieldType = TransferField.CURRENCY,
+                                    currencyId = currencyId,
+                                ),
                         ),
                 ),
             createdAt = now,
@@ -632,21 +636,24 @@ class CsvReimportDetectionTest {
     private fun tradeStrategy(): CsvImportStrategy {
         val base = strategy()
         return base.copy(
-            fieldMappings =
-                base.fieldMappings +
-                    mapOf(
-                        TransferField.TO_CURRENCY to
-                            CurrencyLookupMapping(
-                                fieldType = TransferField.TO_CURRENCY,
-                                columnName = "To Currency",
+            config =
+                base.config.copy(
+                    fieldMappings =
+                        base.config.fieldMappings +
+                            mapOf(
+                                TransferField.TO_CURRENCY to
+                                    CurrencyLookupMapping(
+                                        fieldType = TransferField.TO_CURRENCY,
+                                        columnName = "To Currency",
+                                    ),
+                                TransferField.TO_AMOUNT to
+                                    AmountParsingMapping(
+                                        fieldType = TransferField.TO_AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "To Amount",
+                                    ),
                             ),
-                        TransferField.TO_AMOUNT to
-                            AmountParsingMapping(
-                                fieldType = TransferField.TO_AMOUNT,
-                                mode = AmountMode.SINGLE_COLUMN,
-                                amountColumnName = "To Amount",
-                            ),
-                    ),
+                ),
         )
     }
 

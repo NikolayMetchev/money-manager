@@ -113,7 +113,7 @@ class CryptoComCardXlsxMapperTest {
 
     @Test
     fun `identification columns match the real workbook headers, including the trailing space`() {
-        assertEquals(columns.map { it.originalName }.toSet(), strategy.identificationColumns)
+        assertEquals(columns.map { it.originalName }.toSet(), strategy.config.identificationColumns)
     }
 
     @Test

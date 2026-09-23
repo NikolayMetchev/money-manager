@@ -118,7 +118,7 @@ fun ApplyStrategyDialog(
 
     // Strategies whose SOURCE_ACCOUNT mapping resolves per-row (e.g. by currency) need no
     // user-selected source account; the mapping decides the account for each row.
-    val sourceAccountMapping = selectedStrategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+    val sourceAccountMapping = selectedStrategy?.config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
     val strategyHasPerRowSource = sourceAccountMapping != null && sourceAccountMapping !is HardCodedAccountMapping
 
     // Load account mappings when strategy is selected and pre-populate source account from strategy
@@ -130,7 +130,7 @@ fun ApplyStrategyDialog(
             // Pre-populate source account from the strategy's SOURCE_ACCOUNT mapping if present.
             // This runs whenever the strategy changes, so switching strategies updates the
             // pre-selected source account to match the new strategy's default.
-            when (val strategySourceMapping = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]) {
+            when (val strategySourceMapping = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]) {
                 is HardCodedAccountMapping -> selectedSourceAccountId = strategySourceMapping.accountId
                 // Per-row mapping: clear any override left over from a previously selected strategy
                 null -> Unit

@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
@@ -41,8 +42,11 @@ class AccountMappingRepositoryImplTest : DbTest() {
             CsvImportStrategy(
                 id = id,
                 name = "Strategy ${Uuid.random()}",
-                identificationColumns = setOf("Date"),
-                fieldMappings = emptyMap(),
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date"),
+                        fieldMappings = emptyMap(),
+                    ),
                 createdAt = Clock.System.now(),
                 updatedAt = Clock.System.now(),
             ),

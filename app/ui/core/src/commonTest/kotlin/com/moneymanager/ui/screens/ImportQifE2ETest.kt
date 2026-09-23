@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
@@ -84,31 +85,34 @@ class ImportQifE2ETest {
             id = CsvImportStrategyId(Uuid.random()),
             // Sorts before the seeded "QIF" strategy so it is the one auto-selected.
             name = "AAA QIF Test",
-            identificationColumns = QifCsvAdapter.headers.toSet(),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, sourceId),
-                    TransferField.TARGET_ACCOUNT to
-                        HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, targetId),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = QifColumns.COL_DATE,
-                            dateFormat = "dd/MM/yyyy",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = QifCsvAdapter.headers.toSet(),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, sourceId),
+                            TransferField.TARGET_ACCOUNT to
+                                HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, targetId),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = QifColumns.COL_DATE,
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(TransferField.DESCRIPTION, QifColumns.COL_PAYEE),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = QifColumns.COL_AMOUNT,
+                                ),
+                            TransferField.CURRENCY to
+                                HardCodedCurrencyMapping(TransferField.CURRENCY, currencyId),
+                            TransferField.TIMEZONE to
+                                HardCodedTimezoneMapping(TransferField.TIMEZONE, "UTC"),
                         ),
-                    TransferField.DESCRIPTION to
-                        DirectColumnMapping(TransferField.DESCRIPTION, QifColumns.COL_PAYEE),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = QifColumns.COL_AMOUNT,
-                        ),
-                    TransferField.CURRENCY to
-                        HardCodedCurrencyMapping(TransferField.CURRENCY, currencyId),
-                    TransferField.TIMEZONE to
-                        HardCodedTimezoneMapping(TransferField.TIMEZONE, "UTC"),
                 ),
             createdAt = Instant.fromEpochMilliseconds(1700000000000L),
             updatedAt = Instant.fromEpochMilliseconds(1700000000000L),

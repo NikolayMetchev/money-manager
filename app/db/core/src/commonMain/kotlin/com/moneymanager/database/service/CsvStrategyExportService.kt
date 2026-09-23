@@ -137,7 +137,7 @@ class CsvStrategyExportService(
 
         val unresolvedReferences = mutableListOf<CsvUnresolvedReference>()
 
-        for ((fieldType, mappingExport) in export.fieldMappings) {
+        for ((fieldType, mappingExport) in export.config.fieldMappings) {
             collectUnresolvedReferences(mappingExport, fieldType, referenceData, unresolvedReferences)
         }
 
@@ -348,20 +348,7 @@ class CsvStrategyExportService(
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
                 name = export.name,
-                identificationColumns = export.identificationColumns,
-                fieldMappings =
-                    export.fieldMappings.mapValues { (_, mappingExport) ->
-                        mappingExport.toDomain(accountsByName, currenciesByCode, categoriesByName)
-                    },
-                attributeMappings = export.attributeMappings,
-                rowPreprocessingRules = export.rowPreprocessingRules,
-                companionTransactionRules = export.companionTransactionRules,
-                contentMatchRules = export.contentMatchRules,
-                fileNamePattern = export.fileNamePattern,
-                crossSourceReconcileWindowSeconds = export.crossSourceReconcileWindowSeconds,
-                conversionConfig = export.conversionConfig,
-                tradeGroupConfig = export.tradeGroupConfig,
-                fundingAttributeMatch = export.fundingAttributeMatch,
+                config = export.config.mapFieldMappings { it.toDomain(accountsByName, currenciesByCode, categoriesByName) },
                 worksheetName = export.worksheetName,
                 createdAt = now,
                 updatedAt = now,

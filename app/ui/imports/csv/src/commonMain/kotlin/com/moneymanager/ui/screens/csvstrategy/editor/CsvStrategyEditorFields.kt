@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -321,22 +322,25 @@ internal fun buildStrategyFromEditorState(
     return CsvImportStrategy(
         id = id,
         name = state.name,
-        identificationColumns = state.identificationColumns,
-        fieldMappings = fieldMappings,
-        attributeMappings = state.attributeMappings,
-        rowPreprocessingRules = state.rowPreprocessingRules,
-        companionTransactionRules = state.companionTransactionRules,
-        contentMatchRules = state.contentMatchRules,
-        fileNamePattern = state.fileNamePattern.takeIf { it.isNotBlank() },
+        config =
+            CsvStrategyConfig(
+                identificationColumns = state.identificationColumns,
+                fieldMappings = fieldMappings,
+                attributeMappings = state.attributeMappings,
+                rowPreprocessingRules = state.rowPreprocessingRules,
+                companionTransactionRules = state.companionTransactionRules,
+                contentMatchRules = state.contentMatchRules,
+                fileNamePattern = state.fileNamePattern.takeIf { it.isNotBlank() },
+                crossSourceReconcileWindowSeconds = state.crossSourceReconcileWindowSeconds,
+                // A funding match is saved only once a column is chosen; the attribute type always has a value.
+                fundingAttributeMatch =
+                    state.fundingMatchColumn
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { AttributeAccountMatch(column = it, attributeTypeName = state.fundingMatchAttributeTypeName) },
+                conversionConfig = state.conversionConfig,
+                tradeGroupConfig = state.tradeGroupConfig,
+            ),
         worksheetName = state.worksheetName,
-        crossSourceReconcileWindowSeconds = state.crossSourceReconcileWindowSeconds,
-        // A funding match is saved only once a column is chosen; the attribute type always has a value.
-        fundingAttributeMatch =
-            state.fundingMatchColumn
-                ?.takeIf { it.isNotBlank() }
-                ?.let { AttributeAccountMatch(column = it, attributeTypeName = state.fundingMatchAttributeTypeName) },
-        conversionConfig = state.conversionConfig,
-        tradeGroupConfig = state.tradeGroupConfig,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

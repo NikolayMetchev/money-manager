@@ -116,7 +116,7 @@ fun QifApplyStrategyDialog(
 
     val qifStrategies = remember(strategies) { strategies.filter { it.isQifStrategy() } }
 
-    val sourceAccountMapping = selectedStrategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+    val sourceAccountMapping = selectedStrategy?.config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
     val strategyHasPerRowSource = sourceAccountMapping != null && sourceAccountMapping !is HardCodedAccountMapping
 
     LaunchedEffect(selectedStrategy) {
@@ -124,7 +124,7 @@ fun QifApplyStrategyDialog(
             accountMappings = accountMappingRepository.getAllMappings().first()
             selectedExistingAccounts = emptyMap()
             selectedNewAccountNames = emptyMap()
-            when (val strategySourceMapping = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]) {
+            when (val strategySourceMapping = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]) {
                 is HardCodedAccountMapping -> selectedSourceAccountId = strategySourceMapping.accountId
                 null -> Unit
                 else -> selectedSourceAccountId = null
@@ -150,7 +150,7 @@ fun QifApplyStrategyDialog(
     // the source itself. Only applies a remembered account that still exists.
     LaunchedEffect(accounts, selectedStrategy) {
         val strategy = selectedStrategy ?: return@LaunchedEffect
-        val hasHardcodedSource = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT] is HardCodedAccountMapping
+        val hasHardcodedSource = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT] is HardCodedAccountMapping
         if (selectedSourceAccountId == null && !strategyHasPerRowSource && !hasHardcodedSource) {
             val last = settingsRepository.getLastQifAccountId().first()
             if (last != null && accounts.any { it.id == last }) {

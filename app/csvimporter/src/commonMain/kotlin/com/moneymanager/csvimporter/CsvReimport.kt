@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -803,7 +804,7 @@ suspend fun computeUnidentifiedCounterpartyReruns(
 ): List<ReimportCounterpartyReconcile> {
     // Reconciliation is opt-in per strategy (the same switch the engine reads), and the window is the
     // engine's own fuzzy date tolerance, so plan and re-run agree on what will reconcile.
-    if (strategy.crossSourceReconcileWindowSeconds == null) return emptyList()
+    if (strategy.config.crossSourceReconcileWindowSeconds == null) return emptyList()
     val window = DedupePolicy.FuzzyAllFields().dateTolerance
     val rowsByIndex = allRows.associateBy { it.rowIndex }
 
@@ -914,7 +915,7 @@ suspend fun computeUnidentifiedCounterpartyReruns(
  * Finds already-imported conduit-spend rows that were imported plain (unreconciled) but now — because
  * their funding card resolves to an account holding a matching funding leg — would reconcile if re-run.
  * Only rows for which an unconsumed funding leg actually exists (same funding account → conduit, same
- * amount+currency within [CsvImportStrategy.crossSourceReconcileWindowSeconds]) are returned, so rows
+ * amount+currency within [CsvStrategyConfig.crossSourceReconcileWindowSeconds]) are returned, so rows
  * whose funder was never imported don't get reset on every re-import. Consumes each funding leg once
  * (nearest timestamp), matching the engine's [com.moneymanager.importer] funding-reconcile so the
  * plan and the re-run agree on which rows will link.
@@ -933,9 +934,9 @@ suspend fun computeFundingReconcileReruns(
     loadTransfersTouchingAccount: suspend (AccountId, Instant, Instant) -> List<Transfer>,
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
 ): List<ReimportFundingReconcile> {
-    val window = strategy.crossSourceReconcileWindowSeconds?.seconds ?: return emptyList()
+    val window = strategy.config.crossSourceReconcileWindowSeconds?.seconds ?: return emptyList()
     val fundingMatcher =
-        strategy.fundingAttributeMatch?.let { attributeAccountMatchers[it.attributeTypeName] } ?: return emptyList()
+        strategy.config.fundingAttributeMatch?.let { attributeAccountMatchers[it.attributeTypeName] } ?: return emptyList()
     val rowsByIndex = allRows.associateBy { it.rowIndex }
 
     // Candidate rows: already IMPORTED conduit spends that resolve a funding account and are not yet

@@ -83,7 +83,7 @@ suspend fun reconcileConversionGroups(
     rows: List<CsvTransferWithAttributes>,
     tradeRepository: TradeReadRepository?,
 ): Map<Long, TradeId> {
-    val conversionConfig = strategy.conversionConfig ?: return emptyMap()
+    val conversionConfig = strategy.config.conversionConfig ?: return emptyMap()
     val window = conversionConfig.reconcileWindowSeconds?.seconds ?: return emptyMap()
     val repository = tradeRepository ?: return emptyMap()
 

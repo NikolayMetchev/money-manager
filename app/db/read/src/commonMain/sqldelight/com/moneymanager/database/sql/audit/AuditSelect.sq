@@ -277,11 +277,7 @@ SELECT
     csv_import_strategy_audit.csv_import_strategy_id,
     csv_import_strategy_audit.revision_id,
     csv_import_strategy_audit.name,
-    csv_import_strategy_audit.identification_columns_json,
-    csv_import_strategy_audit.field_mappings_json,
-    csv_import_strategy_audit.attribute_mappings_json,
-    csv_import_strategy_audit.row_rules_json,
-    csv_import_strategy_audit.companion_rules_json,
+    csv_import_strategy_audit.config_json,
     csv_import_strategy_audit.created_at,
     csv_import_strategy_audit.updated_at,
     -- Source information

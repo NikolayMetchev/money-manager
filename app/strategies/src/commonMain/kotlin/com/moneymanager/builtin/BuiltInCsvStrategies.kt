@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -246,7 +247,7 @@ object BuiltInCsvStrategies {
     /**
      * The column header shared by all three crypto.com exports (card_transactions_record_*,
      * fiat_transactions_record_* and crypto_transactions_record_*). Because the sets are identical,
-     * the crypto.com strategies rely on [CsvImportStrategy.fileNamePattern] and content rules over
+     * the crypto.com strategies rely on [CsvStrategyConfig.fileNamePattern] and content rules over
      * the Transaction Kind column to tell the three files apart.
      */
     private val cryptoComIdentificationColumns =
@@ -352,12 +353,15 @@ object BuiltInCsvStrategies {
         return CsvImportStrategy(
             id = CsvImportStrategyId(cryptoComCardStrategyId),
             name = "Crypto.com Card",
-            identificationColumns = cryptoComIdentificationColumns,
-            fieldMappings = fieldMappings,
-            attributeMappings = attributeMappings,
-            contentMatchRules = listOf(ContentMatchRule(columnName = "Transaction Kind", pattern = "^$")),
-            fileNamePattern = "^card_transactions_record_",
-            crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = cryptoComIdentificationColumns,
+                    fieldMappings = fieldMappings,
+                    attributeMappings = attributeMappings,
+                    contentMatchRules = listOf(ContentMatchRule(columnName = "Transaction Kind", pattern = "^$")),
+                    fileNamePattern = "^card_transactions_record_",
+                    crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -491,24 +495,27 @@ object BuiltInCsvStrategies {
         return CsvImportStrategy(
             id = CsvImportStrategyId(cryptoComCardXlsxStrategyId),
             name = "Crypto.com Card (Excel)",
-            identificationColumns =
-                setOf(
-                    "Transaction Date",
-                    "Transaction Time",
-                    "Service Abbreviation",
-                    "Card Acceptor Name",
-                    "Description",
-                    "Merchant Category Code",
-                    "Amount Processed",
-                    "Available Balance",
-                    "Currency ",
-                    "Amount Requested",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns =
+                        setOf(
+                            "Transaction Date",
+                            "Transaction Time",
+                            "Service Abbreviation",
+                            "Card Acceptor Name",
+                            "Description",
+                            "Merchant Category Code",
+                            "Amount Processed",
+                            "Available Balance",
+                            "Currency ",
+                            "Amount Requested",
+                        ),
+                    fieldMappings = fieldMappings,
+                    fileNamePattern = "Card Transaction History",
+                    // Same physical card as the CSV export above, so the two overlap wherever their date ranges do.
+                    crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
                 ),
-            fieldMappings = fieldMappings,
-            fileNamePattern = "Card Transaction History",
             worksheetName = "Sheet1",
-            // Same physical card as the CSV export above, so the two overlap wherever their date ranges do.
-            crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
             createdAt = now,
             updatedAt = now,
         )
@@ -659,13 +666,16 @@ object BuiltInCsvStrategies {
         return CsvImportStrategy(
             id = CsvImportStrategyId(cryptoComFiatStrategyId),
             name = "Crypto.com Fiat",
-            identificationColumns = cryptoComIdentificationColumns,
-            fieldMappings = fieldMappings,
-            attributeMappings = attributeMappings,
-            rowPreprocessingRules = rowRules,
-            contentMatchRules = listOf(ContentMatchRule(columnName = "Transaction Kind", pattern = "^(viban_|crypto_viban)")),
-            fileNamePattern = "^fiat_transactions_record_",
-            crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = cryptoComIdentificationColumns,
+                    fieldMappings = fieldMappings,
+                    attributeMappings = attributeMappings,
+                    rowPreprocessingRules = rowRules,
+                    contentMatchRules = listOf(ContentMatchRule(columnName = "Transaction Kind", pattern = "^(viban_|crypto_viban)")),
+                    fileNamePattern = "^fiat_transactions_record_",
+                    crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -808,28 +818,31 @@ object BuiltInCsvStrategies {
         return CsvImportStrategy(
             id = CsvImportStrategyId(cryptoComCryptoStrategyId),
             name = "Crypto.com Crypto",
-            identificationColumns = cryptoComIdentificationColumns,
-            fieldMappings = fieldMappings,
-            attributeMappings = attributeMappings,
-            fileNamePattern = "^crypto_transactions_record_",
-            crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
-            // Dust conversions ("Convert Dust") and wallet swaps ("Balance Conversion") arrive as
-            // separate *_debited/*_credited rows (only Currency/Amount populated, no To Currency). Route
-            // both legs through the Conversions account and link each debit to its credit. The signal
-            // patterns match ONLY these two families — one-sided *_credited kinds (supercharger/rewards/
-            // admin income) are deliberately excluded. Debit rows are negative and credit rows positive,
-            // so the AMOUNT flip-on-positive already places the Crypto.com wallet on the correct side.
-            conversionConfig =
-                ConversionConfig(
-                    signalColumn = "Transaction Kind",
-                    debitPattern = "^(dust_conversion|crypto_wallet_swap)_debited$",
-                    creditPattern = "^(dust_conversion|crypto_wallet_swap)_credited$",
-                    conversionAccountName = CRYPTO_COM_CONVERSIONS_ACCOUNT,
-                    // Group 1 (dust_conversion | crypto_wallet_swap) keeps the two families from pairing
-                    // across each other; the time window then separates individual events within a family.
-                    pairingKeyPattern = "^(dust_conversion|crypto_wallet_swap)_",
-                    pairingWindowSeconds = CRYPTO_COM_CONVERSION_PAIRING_WINDOW_SECONDS,
-                    relationshipTypeName = "conversion",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = cryptoComIdentificationColumns,
+                    fieldMappings = fieldMappings,
+                    attributeMappings = attributeMappings,
+                    fileNamePattern = "^crypto_transactions_record_",
+                    crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+                    // Dust conversions ("Convert Dust") and wallet swaps ("Balance Conversion") arrive as
+                    // separate *_debited/*_credited rows (only Currency/Amount populated, no To Currency). Route
+                    // both legs through the Conversions account and link each debit to its credit. The signal
+                    // patterns match ONLY these two families — one-sided *_credited kinds (supercharger/rewards/
+                    // admin income) are deliberately excluded. Debit rows are negative and credit rows positive,
+                    // so the AMOUNT flip-on-positive already places the Crypto.com wallet on the correct side.
+                    conversionConfig =
+                        ConversionConfig(
+                            signalColumn = "Transaction Kind",
+                            debitPattern = "^(dust_conversion|crypto_wallet_swap)_debited$",
+                            creditPattern = "^(dust_conversion|crypto_wallet_swap)_credited$",
+                            conversionAccountName = CRYPTO_COM_CONVERSIONS_ACCOUNT,
+                            // Group 1 (dust_conversion | crypto_wallet_swap) keeps the two families from pairing
+                            // across each other; the time window then separates individual events within a family.
+                            pairingKeyPattern = "^(dust_conversion|crypto_wallet_swap)_",
+                            pairingWindowSeconds = CRYPTO_COM_CONVERSION_PAIRING_WINDOW_SECONDS,
+                            relationshipTypeName = "conversion",
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -915,29 +928,32 @@ object BuiltInCsvStrategies {
         return CsvImportStrategy(
             id = CsvImportStrategyId(curveCsvStrategyId),
             name = "Curve CSV",
-            identificationColumns =
-                setOf(
-                    "",
-                    "Created Date",
-                    "Merchant Name",
-                    "Funding Card Last 4 Digits",
-                    "Merchant MCC Code",
-                    "Txn Currency",
-                    "Txn Amount",
-                ),
-            fieldMappings = fieldMappings,
-            attributeMappings = attributeMappings,
-            // Only a tiebreaker among column-matched candidates; Curve's column set is disjoint from
-            // Wise's transaction-history.csv, so the two never compete.
-            fileNamePattern = "^Transaction History",
-            crossSourceReconcileWindowSeconds = CURVE_RECONCILE_WINDOW_SECONDS,
-            // Reconcile each spend against the funding leg on the account whose card-last4 attribute
-            // matches this column, so a Curve charge isn't double-counted against the underlying card's
-            // own import.
-            fundingAttributeMatch =
-                AttributeAccountMatch(
-                    column = "Funding Card Last 4 Digits",
-                    attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns =
+                        setOf(
+                            "",
+                            "Created Date",
+                            "Merchant Name",
+                            "Funding Card Last 4 Digits",
+                            "Merchant MCC Code",
+                            "Txn Currency",
+                            "Txn Amount",
+                        ),
+                    fieldMappings = fieldMappings,
+                    attributeMappings = attributeMappings,
+                    // Only a tiebreaker among column-matched candidates; Curve's column set is disjoint from
+                    // Wise's transaction-history.csv, so the two never compete.
+                    fileNamePattern = "^Transaction History",
+                    crossSourceReconcileWindowSeconds = CURVE_RECONCILE_WINDOW_SECONDS,
+                    // Reconcile each spend against the funding leg on the account whose card-last4 attribute
+                    // matches this column, so a Curve charge isn't double-counted against the underlying card's
+                    // own import.
+                    fundingAttributeMatch =
+                        AttributeAccountMatch(
+                            column = "Funding Card Last 4 Digits",
+                            attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -1087,11 +1103,14 @@ object BuiltInCsvStrategies {
         return CsvImportStrategy(
             id = CsvImportStrategyId(wiseCsvStrategyId),
             name = "Wise CSV",
-            identificationColumns = identificationColumns,
-            fieldMappings = fieldMappings,
-            attributeMappings = attributeMappings,
-            rowPreprocessingRules = rowRules,
-            companionTransactionRules = companionRules,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = identificationColumns,
+                    fieldMappings = fieldMappings,
+                    attributeMappings = attributeMappings,
+                    rowPreprocessingRules = rowRules,
+                    companionTransactionRules = companionRules,
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -1153,8 +1172,11 @@ object BuiltInCsvStrategies {
         return CsvImportStrategy(
             id = CsvImportStrategyId(qifStrategyId),
             name = "QIF",
-            identificationColumns = QifColumns.headers.toSet(),
-            fieldMappings = fieldMappings,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = QifColumns.headers.toSet(),
+                    fieldMappings = fieldMappings,
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -1378,18 +1400,21 @@ object BuiltInCsvStrategies {
         return CsvImportStrategy(
             id = CsvImportStrategyId(santanderQifStrategyId),
             name = "Santander (QIF)",
-            identificationColumns = QifColumns.headers.toSet(),
-            fieldMappings = fieldMappings,
-            attributeMappings = attributeMappings,
-            contentMatchRules =
-                listOf(
-                    ContentMatchRule(
-                        columnName = QifColumns.COL_PAYEE,
-                        pattern =
-                            "^(CARD PAYMENT|DIRECT DEBIT|\\d+ DIRECT DEBIT|FASTER PAYMENTS RECEIPT|PAYM|BILL PAYMENT|" +
-                                "STANDING ORDER|Third party payment|CASH |CHEQUE|BANK GIRO CREDIT|MONTHLY ACCOUNT FEE|" +
-                                "INTEREST|MAINTAINING THE ACCOUNT|CREDIT FROM|TRANSFER)",
-                    ),
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = QifColumns.headers.toSet(),
+                    fieldMappings = fieldMappings,
+                    attributeMappings = attributeMappings,
+                    contentMatchRules =
+                        listOf(
+                            ContentMatchRule(
+                                columnName = QifColumns.COL_PAYEE,
+                                pattern =
+                                    "^(CARD PAYMENT|DIRECT DEBIT|\\d+ DIRECT DEBIT|FASTER PAYMENTS RECEIPT|PAYM|BILL PAYMENT|" +
+                                        "STANDING ORDER|Third party payment|CASH |CHEQUE|BANK GIRO CREDIT|MONTHLY ACCOUNT FEE|" +
+                                        "INTEREST|MAINTAINING THE ACCOUNT|CREDIT FROM|TRANSFER)",
+                            ),
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -1512,10 +1537,13 @@ object BuiltInCsvStrategies {
         return CsvImportStrategy(
             id = CsvImportStrategyId(monzoCsvStrategyId),
             name = "Monzo CSV",
-            identificationColumns = identificationColumns,
-            fieldMappings = fieldMappings,
-            attributeMappings = attributeMappings,
-            crossSourceReconcileWindowSeconds = MONZO_RECONCILE_WINDOW_SECONDS,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = identificationColumns,
+                    fieldMappings = fieldMappings,
+                    attributeMappings = attributeMappings,
+                    crossSourceReconcileWindowSeconds = MONZO_RECONCILE_WINDOW_SECONDS,
+                ),
             createdAt = now,
             updatedAt = now,
         )
@@ -1529,7 +1557,7 @@ object BuiltInCsvStrategies {
      * an older `Operation` vocabulary (`Savings purchase` for `Simple Earn Flexible Subscription`,
      * `POS savings interest` for `Staking Rewards`, `Super BNB Mining` for `BNB Vault Rewards`, …) plus
      * `LD*` mirror rows the modern format dropped. Importing both would book the same event twice under
-     * two different descriptions, so [CsvImportStrategy.contentMatchRules] requires the `User_ID` column: a legacy file
+     * two different descriptions, so [CsvStrategyConfig.contentMatchRules] requires the `User_ID` column: a legacy file
      * scores zero and, because this strategy carries content rules, is also excluded from the
      * no-signals fallback, so it resolves to no strategy and is reported skipped rather than misread.
      * Re-export the same period from Binance to import it.
@@ -1541,7 +1569,7 @@ object BuiltInCsvStrategies {
      *
      * Trades are split across rows: Binance stamps every partial fill of both legs with the same second
      * (a single order can produce a dozen `Transaction Sold`/`Transaction Revenue` rows).
-     * [CsvImportStrategy.tradeGroupConfig]
+     * [CsvStrategyConfig.tradeGroupConfig]
      * folds each such group into one `trade`. Fee rows stay out of the group on purpose — a `trade` row
      * has no fee field — and route to [BINANCE_FEES_ACCOUNT] as their own transfers, as the API does.
      *
@@ -1555,7 +1583,7 @@ object BuiltInCsvStrategies {
      * Dust sweeps are the one conversion that cannot be assembled: a sweep debits several assets and
      * credits several BNB amounts, and nothing in the file says which credit came from which debit
      * (their order does not correspond, and the credited amount is net of Binance's service charge
-     * while the debited amount is gross). They go through [CsvImportStrategy.conversionConfig] instead,
+     * while the debited amount is gross). They go through [CsvStrategyConfig.conversionConfig] instead,
      * which keeps every
      * balance exact without inventing a pairing. Both legs share one `Operation`, so
      * [ConversionConfig.sideAmountColumn] classifies them by the sign of `Change`.
@@ -1676,37 +1704,40 @@ object BuiltInCsvStrategies {
         return CsvImportStrategy(
             id = CsvImportStrategyId(binanceCsvStrategyId),
             name = "Binance CSV",
-            identificationColumns =
-                setOf("User_ID", "UTC_Time", "Account", "Operation", "Coin", "Change", "Remark"),
-            fieldMappings = fieldMappings,
-            attributeMappings = attributeMappings,
-            // Binance names its exports with bare UUIDs, so there is no filename signal to use - and a
-            // filename match would win outright over content scoring and let a legacy file through.
-            contentMatchRules = listOf(ContentMatchRule(columnName = "User_ID", pattern = "^\\s*\\d+\\s*$")),
-            crossSourceReconcileWindowSeconds = BINANCE_RECONCILE_WINDOW_SECONDS,
-            conversionConfig =
-                ConversionConfig(
-                    signalColumn = "Operation",
-                    debitPattern = "^Small Assets Exchange BNB( \\(Spot\\))?$",
-                    creditPattern = "^Small Assets Exchange BNB( \\(Spot\\))?$",
-                    sideAmountColumn = "Change",
-                    conversionAccountName = BINANCE_CONVERSIONS_ACCOUNT,
-                    pairingWindowSeconds = BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS,
-                    relationshipTypeName = "conversion",
-                    reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
-                ),
-            tradeGroupConfig =
-                TradeGroupConfig(
-                    signalColumn = "Operation",
-                    debitPattern = "^(Sell|Transaction (Spend|Sold))$",
-                    creditPattern = "^(Buy|Transaction (Buy|Revenue)|Binance Convert|Transaction Related)$",
-                    // "Transaction Related" is the older name for *either* leg of a fill, so the sign of
-                    // Change - not the operation name - has to decide which side each row is.
-                    sideAmountColumn = "Change",
-                    // groupingWindowSeconds and descriptionTemplate keep their defaults: every leg of
-                    // one fill carries the identical second so no jitter needs tolerating, and the
-                    // default "Buy {to}/{from}" already matches the API importer's wording.
-                    reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
+            config =
+                CsvStrategyConfig(
+                    identificationColumns =
+                        setOf("User_ID", "UTC_Time", "Account", "Operation", "Coin", "Change", "Remark"),
+                    fieldMappings = fieldMappings,
+                    attributeMappings = attributeMappings,
+                    // Binance names its exports with bare UUIDs, so there is no filename signal to use - and a
+                    // filename match would win outright over content scoring and let a legacy file through.
+                    contentMatchRules = listOf(ContentMatchRule(columnName = "User_ID", pattern = "^\\s*\\d+\\s*$")),
+                    crossSourceReconcileWindowSeconds = BINANCE_RECONCILE_WINDOW_SECONDS,
+                    conversionConfig =
+                        ConversionConfig(
+                            signalColumn = "Operation",
+                            debitPattern = "^Small Assets Exchange BNB( \\(Spot\\))?$",
+                            creditPattern = "^Small Assets Exchange BNB( \\(Spot\\))?$",
+                            sideAmountColumn = "Change",
+                            conversionAccountName = BINANCE_CONVERSIONS_ACCOUNT,
+                            pairingWindowSeconds = BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS,
+                            relationshipTypeName = "conversion",
+                            reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
+                        ),
+                    tradeGroupConfig =
+                        TradeGroupConfig(
+                            signalColumn = "Operation",
+                            debitPattern = "^(Sell|Transaction (Spend|Sold))$",
+                            creditPattern = "^(Buy|Transaction (Buy|Revenue)|Binance Convert|Transaction Related)$",
+                            // "Transaction Related" is the older name for *either* leg of a fill, so the sign of
+                            // Change - not the operation name - has to decide which side each row is.
+                            sideAmountColumn = "Change",
+                            // groupingWindowSeconds and descriptionTemplate keep their defaults: every leg of
+                            // one fill carries the identical second so no jitter needs tolerating, and the
+                            // default "Buy {to}/{from}" already matches the API importer's wording.
+                            reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,

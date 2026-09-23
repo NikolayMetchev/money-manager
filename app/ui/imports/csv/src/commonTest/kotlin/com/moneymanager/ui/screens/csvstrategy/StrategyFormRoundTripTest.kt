@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
 import com.moneymanager.domain.model.csvstrategy.ConversionAccountRule
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -66,77 +67,84 @@ class StrategyFormRoundTripTest {
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Advanced",
-            identificationColumns = setOf("Direction", "Created on"),
-            fieldMappings =
-                mapOf(
-                    TransferField.SOURCE_ACCOUNT to
-                        TemplateAccountMapping(TransferField.SOURCE_ACCOUNT, "Source currency", prefix = "Wise: "),
-                    TransferField.TARGET_ACCOUNT to
-                        ConditionalAccountMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            conditions =
-                                listOf(
-                                    RowCondition("Source name", RowConditionOperator.EQUALS_COLUMN, otherColumnName = "Target name"),
-                                    RowCondition("Source name", RowConditionOperator.IS_NOT_BLANK),
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Direction", "Created on"),
+                    fieldMappings =
+                        mapOf(
+                            TransferField.SOURCE_ACCOUNT to
+                                TemplateAccountMapping(TransferField.SOURCE_ACCOUNT, "Source currency", prefix = "Wise: "),
+                            TransferField.TARGET_ACCOUNT to
+                                ConditionalAccountMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    conditions =
+                                        listOf(
+                                            RowCondition(
+                                                "Source name",
+                                                RowConditionOperator.EQUALS_COLUMN,
+                                                otherColumnName = "Target name",
+                                            ),
+                                            RowCondition("Source name", RowConditionOperator.IS_NOT_BLANK),
+                                        ),
+                                    whenTrue =
+                                        TemplateAccountMapping(
+                                            TransferField.TARGET_ACCOUNT,
+                                            "Target currency",
+                                            prefix = "Wise: ",
+                                        ),
+                                    whenFalse =
+                                        AccountLookupMapping(
+                                            TransferField.TARGET_ACCOUNT,
+                                            "Target name",
+                                            fallbackColumns = listOf("Source name"),
+                                        ),
                                 ),
-                            whenTrue =
-                                TemplateAccountMapping(
-                                    TransferField.TARGET_ACCOUNT,
-                                    "Target currency",
-                                    prefix = "Wise: ",
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = "Created on",
+                                    dateFormat = "yyyy-MM-dd",
+                                    dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
                                 ),
-                            whenFalse =
-                                AccountLookupMapping(
-                                    TransferField.TARGET_ACCOUNT,
-                                    "Target name",
-                                    fallbackColumns = listOf("Source name"),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(TransferField.DESCRIPTION, "Reference"),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = "Source amount (after fees)",
+                                    feeColumnName = "Source fee amount",
+                                    feeConditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "OUT")),
                                 ),
+                            TransferField.CURRENCY to
+                                CurrencyLookupMapping(TransferField.CURRENCY, "Source currency"),
+                            TransferField.TIMEZONE to
+                                HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                         ),
-                    TransferField.TIMESTAMP to
-                        DateTimeParsingMapping(
-                            fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = "Created on",
-                            dateFormat = "yyyy-MM-dd",
-                            dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
-                        ),
-                    TransferField.DESCRIPTION to
-                        DirectColumnMapping(TransferField.DESCRIPTION, "Reference"),
-                    TransferField.AMOUNT to
-                        AmountParsingMapping(
-                            fieldType = TransferField.AMOUNT,
-                            mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = "Source amount (after fees)",
-                            feeColumnName = "Source fee amount",
-                            feeConditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "OUT")),
-                        ),
-                    TransferField.CURRENCY to
-                        CurrencyLookupMapping(TransferField.CURRENCY, "Source currency"),
-                    TransferField.TIMEZONE to
-                        HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
-                ),
-            attributeMappings =
-                listOf(AttributeColumnMapping(columnName = "ID", attributeTypeName = "wise-id", isUniqueIdentifier = true)),
-            rowPreprocessingRules =
-                listOf(
-                    RowPreprocessingRule(
-                        conditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "IN")),
-                        columnSwaps =
-                            listOf(
-                                ColumnPairSwap("Source name", "Target name"),
-                                ColumnPairSwap("Source currency", "Target currency"),
+                    attributeMappings =
+                        listOf(AttributeColumnMapping(columnName = "ID", attributeTypeName = "wise-id", isUniqueIdentifier = true)),
+                    rowPreprocessingRules =
+                        listOf(
+                            RowPreprocessingRule(
+                                conditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "IN")),
+                                columnSwaps =
+                                    listOf(
+                                        ColumnPairSwap("Source name", "Target name"),
+                                        ColumnPairSwap("Source currency", "Target currency"),
+                                    ),
+                                flipSourceAndTarget = true,
                             ),
-                        flipSourceAndTarget = true,
-                    ),
-                ),
-            companionTransactionRules =
-                listOf(
-                    CompanionTransactionRule(
-                        name = "Interest earned",
-                        matchAttributeName = "wise-id",
-                        matchValuePattern = "ACCRUAL_CHARGE-%",
-                        linkAttributeName = "wise-interest-for",
-                        companionDescription = "Interest earned",
-                    ),
+                        ),
+                    companionTransactionRules =
+                        listOf(
+                            CompanionTransactionRule(
+                                name = "Interest earned",
+                                matchAttributeName = "wise-id",
+                                matchValuePattern = "ACCRUAL_CHARGE-%",
+                                linkAttributeName = "wise-interest-for",
+                                companionDescription = "Interest earned",
+                            ),
+                        ),
                 ),
             createdAt = timestamp,
             updatedAt = timestamp,
@@ -150,14 +158,14 @@ class StrategyFormRoundTripTest {
         val state = CsvStrategyEditorState(original, availableColumns)
         val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
-        assertEquals(original.fieldMappings, rebuilt.fieldMappings)
-        assertEquals(original.identificationColumns, rebuilt.identificationColumns)
-        assertEquals(original.attributeMappings, rebuilt.attributeMappings)
-        assertEquals(original.rowPreprocessingRules, rebuilt.rowPreprocessingRules)
-        assertEquals(original.companionTransactionRules, rebuilt.companionTransactionRules)
+        assertEquals(original.config.fieldMappings, rebuilt.config.fieldMappings)
+        assertEquals(original.config.identificationColumns, rebuilt.config.identificationColumns)
+        assertEquals(original.config.attributeMappings, rebuilt.config.attributeMappings)
+        assertEquals(original.config.rowPreprocessingRules, rebuilt.config.rowPreprocessingRules)
+        assertEquals(original.config.companionTransactionRules, rebuilt.config.companionTransactionRules)
 
         // Spot-check the trickiest type survived the nested round trip.
-        val target = rebuilt.fieldMappings[TransferField.TARGET_ACCOUNT]
+        val target = rebuilt.config.fieldMappings[TransferField.TARGET_ACCOUNT]
         assertIs<ConditionalAccountMapping>(target)
         assertIs<TemplateAccountMapping>(target.whenTrue)
         assertIs<AccountLookupMapping>(target.whenFalse)
@@ -169,37 +177,40 @@ class StrategyFormRoundTripTest {
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
                 name = "Attr",
-                identificationColumns = setOf("Direction", "Created on"),
-                fieldMappings =
-                    mapOf(
-                        TransferField.SOURCE_ACCOUNT to
-                            TemplateAccountMapping(TransferField.SOURCE_ACCOUNT, "Source currency", prefix = "Wise: "),
-                        TransferField.TARGET_ACCOUNT to
-                            AttributeMatchAccountMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                columnName = "Target name",
-                                attributeTypeName = "card-last4",
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Direction", "Created on"),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.SOURCE_ACCOUNT to
+                                    TemplateAccountMapping(TransferField.SOURCE_ACCOUNT, "Source currency", prefix = "Wise: "),
+                                TransferField.TARGET_ACCOUNT to
+                                    AttributeMatchAccountMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        columnName = "Target name",
+                                        attributeTypeName = "card-last4",
+                                    ),
+                                TransferField.TIMESTAMP to
+                                    DateTimeParsingMapping(
+                                        fieldType = TransferField.TIMESTAMP,
+                                        dateColumnName = "Created on",
+                                        dateFormat = "yyyy-MM-dd",
+                                    ),
+                                TransferField.DESCRIPTION to
+                                    DirectColumnMapping(TransferField.DESCRIPTION, "Reference"),
+                                TransferField.AMOUNT to
+                                    AmountParsingMapping(
+                                        fieldType = TransferField.AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "Source amount (after fees)",
+                                    ),
+                                TransferField.CURRENCY to
+                                    CurrencyLookupMapping(TransferField.CURRENCY, "Source currency"),
+                                TransferField.TIMEZONE to
+                                    HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                             ),
-                        TransferField.TIMESTAMP to
-                            DateTimeParsingMapping(
-                                fieldType = TransferField.TIMESTAMP,
-                                dateColumnName = "Created on",
-                                dateFormat = "yyyy-MM-dd",
-                            ),
-                        TransferField.DESCRIPTION to
-                            DirectColumnMapping(TransferField.DESCRIPTION, "Reference"),
-                        TransferField.AMOUNT to
-                            AmountParsingMapping(
-                                fieldType = TransferField.AMOUNT,
-                                mode = AmountMode.SINGLE_COLUMN,
-                                amountColumnName = "Source amount (after fees)",
-                            ),
-                        TransferField.CURRENCY to
-                            CurrencyLookupMapping(TransferField.CURRENCY, "Source currency"),
-                        TransferField.TIMEZONE to
-                            HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
+                        fundingAttributeMatch = AttributeAccountMatch(column = "Reference", attributeTypeName = "card-last4"),
                     ),
-                fundingAttributeMatch = AttributeAccountMatch(column = "Reference", attributeTypeName = "card-last4"),
                 createdAt = timestamp,
                 updatedAt = timestamp,
             )
@@ -208,9 +219,9 @@ class StrategyFormRoundTripTest {
         val state = CsvStrategyEditorState(original, availableColumns)
         val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
-        assertEquals(original.fieldMappings, rebuilt.fieldMappings)
-        assertEquals(original.fundingAttributeMatch, rebuilt.fundingAttributeMatch)
-        val target = rebuilt.fieldMappings[TransferField.TARGET_ACCOUNT]
+        assertEquals(original.config.fieldMappings, rebuilt.config.fieldMappings)
+        assertEquals(original.config.fundingAttributeMatch, rebuilt.config.fundingAttributeMatch)
+        val target = rebuilt.config.fieldMappings[TransferField.TARGET_ACCOUNT]
         assertIs<AttributeMatchAccountMapping>(target)
         assertEquals("card-last4", target.attributeTypeName)
         assertEquals("Target name", target.columnName)
@@ -220,26 +231,29 @@ class StrategyFormRoundTripTest {
     fun `conversion config plus content-match rules and cross-source window round-trip`() {
         val original =
             advancedStrategy().copy(
-                contentMatchRules =
-                    listOf(
-                        ContentMatchRule(columnName = "Direction", pattern = "OUT"),
-                        ContentMatchRule(columnName = "Reference", pattern = "CRV\\*"),
-                    ),
-                crossSourceReconcileWindowSeconds = 120,
-                conversionConfig =
-                    ConversionConfig(
-                        signalColumn = "Direction",
-                        debitPattern = "(?i)_debited$",
-                        creditPattern = "(?i)_credited$",
-                        conversionAccountName = "Crypto.com Conversions",
-                        conversionAccountRules =
+                config =
+                    advancedStrategy().config.copy(
+                        contentMatchRules =
                             listOf(
-                                ConversionAccountRule(column = "Source currency", pattern = "(?i)^DUST$", accountName = "Dust"),
+                                ContentMatchRule(columnName = "Direction", pattern = "OUT"),
+                                ContentMatchRule(columnName = "Reference", pattern = "CRV\\*"),
                             ),
-                        pairingKeyPattern = "(?i)^(.*)_(?:debited|credited)$",
-                        pairingKeyColumns = listOf("Reference"),
-                        pairingWindowSeconds = 60,
-                        relationshipTypeName = "conversion",
+                        crossSourceReconcileWindowSeconds = 120,
+                        conversionConfig =
+                            ConversionConfig(
+                                signalColumn = "Direction",
+                                debitPattern = "(?i)_debited$",
+                                creditPattern = "(?i)_credited$",
+                                conversionAccountName = "Crypto.com Conversions",
+                                conversionAccountRules =
+                                    listOf(
+                                        ConversionAccountRule(column = "Source currency", pattern = "(?i)^DUST$", accountName = "Dust"),
+                                    ),
+                                pairingKeyPattern = "(?i)^(.*)_(?:debited|credited)$",
+                                pairingKeyColumns = listOf("Reference"),
+                                pairingWindowSeconds = 60,
+                                relationshipTypeName = "conversion",
+                            ),
                     ),
             )
         val availableColumns = columns.map { it.originalName }.toSet()
@@ -247,9 +261,9 @@ class StrategyFormRoundTripTest {
         val state = CsvStrategyEditorState(original, availableColumns)
         val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
-        assertEquals(original.contentMatchRules, rebuilt.contentMatchRules)
-        assertEquals(original.crossSourceReconcileWindowSeconds, rebuilt.crossSourceReconcileWindowSeconds)
-        assertEquals(original.conversionConfig, rebuilt.conversionConfig)
+        assertEquals(original.config.contentMatchRules, rebuilt.config.contentMatchRules)
+        assertEquals(original.config.crossSourceReconcileWindowSeconds, rebuilt.config.crossSourceReconcileWindowSeconds)
+        assertEquals(original.config.conversionConfig, rebuilt.config.conversionConfig)
     }
 
     /**
@@ -263,58 +277,61 @@ class StrategyFormRoundTripTest {
         val original =
             advancedStrategy().copy(
                 worksheetName = "Statement",
-                fieldMappings =
-                    advancedStrategy().fieldMappings +
-                        mapOf(
-                            TransferField.SOURCE_ACCOUNT to
-                                TemplateAccountMapping(
-                                    TransferField.SOURCE_ACCOUNT,
-                                    "Source currency",
-                                    prefix = "Wise: ",
-                                    defaultCategoryId = 41L,
+                config =
+                    advancedStrategy().config.copy(
+                        fieldMappings =
+                            advancedStrategy().config.fieldMappings +
+                                mapOf(
+                                    TransferField.SOURCE_ACCOUNT to
+                                        TemplateAccountMapping(
+                                            TransferField.SOURCE_ACCOUNT,
+                                            "Source currency",
+                                            prefix = "Wise: ",
+                                            defaultCategoryId = 41L,
+                                        ),
+                                    TransferField.TARGET_ACCOUNT to
+                                        AccountLookupMapping(
+                                            fieldType = TransferField.TARGET_ACCOUNT,
+                                            columnName = "Target name",
+                                            fallbackColumns = listOf("Source name"),
+                                            defaultCategoryId = 42L,
+                                        ),
+                                    TransferField.TIMESTAMP to
+                                        DateTimeParsingMapping(
+                                            fieldType = TransferField.TIMESTAMP,
+                                            dateColumnName = "Created on",
+                                            dateFormat = "yyyy-MM-dd",
+                                            defaultTime = "03:30:00",
+                                        ),
+                                    TransferField.DESCRIPTION to
+                                        DirectColumnMapping(
+                                            fieldType = TransferField.DESCRIPTION,
+                                            columnName = "Reference",
+                                            extraction = ColumnExtraction(pattern = "^(.*?),\\s*[0-9.]+$", outputTemplate = "$1"),
+                                        ),
+                                    TransferField.AMOUNT to
+                                        AmountParsingMapping(
+                                            fieldType = TransferField.AMOUNT,
+                                            mode = AmountMode.SINGLE_COLUMN,
+                                            amountColumnName = "Source amount (after fees)",
+                                            negateValues = true,
+                                            flipAccountsOnPositive = true,
+                                        ),
                                 ),
-                            TransferField.TARGET_ACCOUNT to
-                                AccountLookupMapping(
-                                    fieldType = TransferField.TARGET_ACCOUNT,
-                                    columnName = "Target name",
-                                    fallbackColumns = listOf("Source name"),
-                                    defaultCategoryId = 42L,
-                                ),
-                            TransferField.TIMESTAMP to
-                                DateTimeParsingMapping(
-                                    fieldType = TransferField.TIMESTAMP,
-                                    dateColumnName = "Created on",
-                                    dateFormat = "yyyy-MM-dd",
-                                    defaultTime = "03:30:00",
-                                ),
-                            TransferField.DESCRIPTION to
-                                DirectColumnMapping(
-                                    fieldType = TransferField.DESCRIPTION,
-                                    columnName = "Reference",
-                                    extraction = ColumnExtraction(pattern = "^(.*?),\\s*[0-9.]+$", outputTemplate = "$1"),
-                                ),
-                            TransferField.AMOUNT to
-                                AmountParsingMapping(
-                                    fieldType = TransferField.AMOUNT,
-                                    mode = AmountMode.SINGLE_COLUMN,
-                                    amountColumnName = "Source amount (after fees)",
-                                    negateValues = true,
-                                    flipAccountsOnPositive = true,
-                                ),
-                        ),
+                    ),
             )
         val availableColumns = columns.map { it.originalName }.toSet()
 
         val state = CsvStrategyEditorState(original, availableColumns)
         val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
-        assertEquals(original.fieldMappings, rebuilt.fieldMappings)
+        assertEquals(original.config.fieldMappings, rebuilt.config.fieldMappings)
         assertEquals(original.worksheetName, rebuilt.worksheetName)
 
         // Pin the extraction itself, not just that the mapping round-trips: a dropped extraction
         // would leave this null. `$1` needs no escaping — a `$` before a digit cannot start a
         // template, which is why the model's own `outputTemplate` default is written `"$0"`.
-        val description = rebuilt.fieldMappings[TransferField.DESCRIPTION]
+        val description = rebuilt.config.fieldMappings[TransferField.DESCRIPTION]
         assertIs<DirectColumnMapping>(description)
         assertEquals("$1", description.extraction?.outputTemplate)
     }
@@ -338,11 +355,17 @@ class StrategyFormRoundTripTest {
 
         for (target in targets) {
             val base = advancedStrategy()
-            val original = base.copy(fieldMappings = base.fieldMappings + (TransferField.TARGET_ACCOUNT to target))
+            val original =
+                base.copy(
+                    config =
+                        base.config.copy(
+                            fieldMappings = base.config.fieldMappings + (TransferField.TARGET_ACCOUNT to target),
+                        ),
+                )
             val state = CsvStrategyEditorState(original, availableColumns)
             val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
-            assertEquals(target, rebuilt.fieldMappings[TransferField.TARGET_ACCOUNT])
+            assertEquals(target, rebuilt.config.fieldMappings[TransferField.TARGET_ACCOUNT])
         }
     }
 
@@ -359,7 +382,13 @@ class StrategyFormRoundTripTest {
                 creditColumnName = "Source amount (after fees)",
                 debitColumnName = "Source fee amount",
             )
-        val original = advancedStrategy().copy(fieldMappings = advancedStrategy().fieldMappings + (TransferField.AMOUNT to amount))
+        val original =
+            advancedStrategy().copy(
+                config =
+                    advancedStrategy().config.copy(
+                        fieldMappings = advancedStrategy().config.fieldMappings + (TransferField.AMOUNT to amount),
+                    ),
+            )
         val availableColumns = columns.map { it.originalName }.toSet()
 
         val state = CsvStrategyEditorState(original, availableColumns)
@@ -368,7 +397,7 @@ class StrategyFormRoundTripTest {
         assertTrue(state.isValid, "a credit/debit strategy must be savable")
 
         val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
-        assertEquals(amount, rebuilt.fieldMappings[TransferField.AMOUNT])
+        assertEquals(amount, rebuilt.config.fieldMappings[TransferField.AMOUNT])
     }
 
     /**
@@ -390,7 +419,7 @@ class StrategyFormRoundTripTest {
         state.debitColumnName = "Source fee amount"
         val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
-        val amount = rebuilt.fieldMappings[TransferField.AMOUNT]
+        val amount = rebuilt.config.fieldMappings[TransferField.AMOUNT]
         assertIs<AmountParsingMapping>(amount)
         assertNull(amount.amountColumnName)
         assertEquals("Source amount (after fees)", amount.creditColumnName)
@@ -402,7 +431,7 @@ class StrategyFormRoundTripTest {
         val original = advancedStrategy()
         // A CSV missing "Target name" invalidates the EQUALS_COLUMN condition and a column swap.
         val availableColumns =
-            original.identificationColumns +
+            original.config.identificationColumns +
                 setOf(
                     "Reference",
                     "Source amount (after fees)",

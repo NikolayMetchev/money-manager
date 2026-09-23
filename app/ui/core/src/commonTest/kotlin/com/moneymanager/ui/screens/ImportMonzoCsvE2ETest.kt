@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
@@ -557,8 +558,11 @@ class ImportMonzoCsvE2ETest {
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Monzo",
-            identificationColumns = headers.toSet(),
-            fieldMappings = emptyMap(),
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = headers.toSet(),
+                    fieldMappings = emptyMap(),
+                ),
             createdAt = Clock.System.now(),
             updatedAt = Clock.System.now(),
         )

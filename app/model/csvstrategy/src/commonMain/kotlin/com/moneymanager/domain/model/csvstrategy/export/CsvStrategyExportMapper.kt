@@ -37,22 +37,9 @@ object CsvStrategyExportMapper {
         CsvStrategyExport(
             version = version,
             name = strategy.name,
-            identificationColumns = strategy.identificationColumns,
-            fieldMappings =
-                strategy.fieldMappings.mapValues { (_, mapping) ->
-                    mapping.toExport(accountNameById, currencyCodeById, categoryNameById)
-                },
-            attributeMappings = strategy.attributeMappings,
-            rowPreprocessingRules = strategy.rowPreprocessingRules,
-            companionTransactionRules = strategy.companionTransactionRules,
-            contentMatchRules = strategy.contentMatchRules,
+            config = strategy.config.mapFieldMappings { it.toExport(accountNameById, currencyCodeById, categoryNameById) },
             accountMappings = accountMappings,
-            fileNamePattern = strategy.fileNamePattern,
-            crossSourceReconcileWindowSeconds = strategy.crossSourceReconcileWindowSeconds,
-            conversionConfig = strategy.conversionConfig,
-            fundingAttributeMatch = strategy.fundingAttributeMatch,
             worksheetName = strategy.worksheetName,
-            tradeGroupConfig = strategy.tradeGroupConfig,
         )
 
     private fun FieldMapping.toExport(

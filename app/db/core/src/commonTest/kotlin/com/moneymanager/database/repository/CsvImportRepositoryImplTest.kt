@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -333,8 +334,11 @@ class CsvImportRepositoryImplTest : DbTest() {
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
                 name = name,
-                identificationColumns = headers.toSet(),
-                fieldMappings = emptyMap(),
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = headers.toSet(),
+                        fieldMappings = emptyMap(),
+                    ),
                 createdAt = Clock.System.now(),
                 updatedAt = Clock.System.now(),
             )

@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
@@ -27,27 +28,30 @@ class CsvStrategyEditorStateTest {
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
                 name = "Simple",
-                identificationColumns = setOf("Date", "Payee"),
-                fieldMappings =
-                    mapOf(
-                        TransferField.TARGET_ACCOUNT to
-                            AccountLookupMapping(TransferField.TARGET_ACCOUNT, "Payee"),
-                        TransferField.TIMESTAMP to
-                            DateTimeParsingMapping(
-                                fieldType = TransferField.TIMESTAMP,
-                                dateColumnName = "Date",
-                                dateFormat = "yyyy-MM-dd",
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date", "Payee"),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.TARGET_ACCOUNT to
+                                    AccountLookupMapping(TransferField.TARGET_ACCOUNT, "Payee"),
+                                TransferField.TIMESTAMP to
+                                    DateTimeParsingMapping(
+                                        fieldType = TransferField.TIMESTAMP,
+                                        dateColumnName = "Date",
+                                        dateFormat = "yyyy-MM-dd",
+                                    ),
+                                TransferField.DESCRIPTION to
+                                    DirectColumnMapping(TransferField.DESCRIPTION, "Memo"),
+                                TransferField.AMOUNT to
+                                    AmountParsingMapping(
+                                        fieldType = TransferField.AMOUNT,
+                                        mode = AmountMode.SINGLE_COLUMN,
+                                        amountColumnName = "Amount",
+                                    ),
+                                TransferField.TIMEZONE to
+                                    HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                             ),
-                        TransferField.DESCRIPTION to
-                            DirectColumnMapping(TransferField.DESCRIPTION, "Memo"),
-                        TransferField.AMOUNT to
-                            AmountParsingMapping(
-                                fieldType = TransferField.AMOUNT,
-                                mode = AmountMode.SINGLE_COLUMN,
-                                amountColumnName = "Amount",
-                            ),
-                        TransferField.TIMEZONE to
-                            HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                     ),
                 createdAt = now,
                 updatedAt = now,

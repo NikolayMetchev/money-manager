@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.importengineapi.createCrypto
@@ -251,8 +252,11 @@ class AuditSourceCoverageTest : DbTest() {
                     CsvImportStrategy(
                         id = CsvImportStrategyId(Uuid.random()),
                         name = "Coverage CSV Strategy",
-                        identificationColumns = setOf("Date", "Amount"),
-                        fieldMappings = emptyMap(),
+                        config =
+                            CsvStrategyConfig(
+                                identificationColumns = setOf("Date", "Amount"),
+                                fieldMappings = emptyMap(),
+                            ),
                         createdAt = now,
                         updatedAt = now,
                     ),

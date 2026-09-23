@@ -1,20 +1,14 @@
 -- Select all strategies ordered by name
 selectAll:
-SELECT csv_import_strategy.*, xlsx_import_strategy.worksheet_name AS worksheet_name
-FROM csv_import_strategy
-LEFT JOIN xlsx_import_strategy ON xlsx_import_strategy.csv_import_strategy_id = csv_import_strategy.id
-ORDER BY csv_import_strategy.name;
+SELECT * FROM csv_import_strategy_with_worksheet
+ORDER BY name;
 
 -- Select a strategy by ID
 selectById:
-SELECT csv_import_strategy.*, xlsx_import_strategy.worksheet_name AS worksheet_name
-FROM csv_import_strategy
-LEFT JOIN xlsx_import_strategy ON xlsx_import_strategy.csv_import_strategy_id = csv_import_strategy.id
-WHERE csv_import_strategy.id = ?;
+SELECT * FROM csv_import_strategy_with_worksheet
+WHERE id = ?;
 
 -- Select a strategy by name
 selectByName:
-SELECT csv_import_strategy.*, xlsx_import_strategy.worksheet_name AS worksheet_name
-FROM csv_import_strategy
-LEFT JOIN xlsx_import_strategy ON xlsx_import_strategy.csv_import_strategy_id = csv_import_strategy.id
-WHERE csv_import_strategy.name = ?;
+SELECT * FROM csv_import_strategy_with_worksheet
+WHERE name = ?;

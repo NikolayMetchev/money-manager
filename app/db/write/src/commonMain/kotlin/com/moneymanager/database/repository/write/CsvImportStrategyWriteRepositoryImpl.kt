@@ -1,6 +1,6 @@
 package com.moneymanager.database.repository.write
 
-import com.moneymanager.database.json.FieldMappingJsonCodec
+import com.moneymanager.database.json.CsvStrategyJsonCodec
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.insertStrategy
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -53,17 +53,7 @@ class CsvImportStrategyWriteRepositoryImpl(
             database.transaction {
                 writeQueries.update(
                     name = strategy.name,
-                    identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
-                    field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
-                    attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
-                    row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
-                    companion_rules_json = FieldMappingJsonCodec.encodeCompanionRules(strategy.companionTransactionRules),
-                    content_match_rules_json = FieldMappingJsonCodec.encodeContentRules(strategy.contentMatchRules),
-                    file_name_pattern = strategy.fileNamePattern,
-                    cross_source_reconcile_window_seconds = strategy.crossSourceReconcileWindowSeconds,
-                    conversion_config_json = FieldMappingJsonCodec.encodeConversionConfig(strategy.conversionConfig),
-                    trade_group_config_json = FieldMappingJsonCodec.encodeTradeGroupConfig(strategy.tradeGroupConfig),
-                    funding_attribute_match_json = FieldMappingJsonCodec.encodeAttributeAccountMatch(strategy.fundingAttributeMatch),
+                    config_json = CsvStrategyJsonCodec.encode(strategy.config),
                     updated_at = now.toEpochMilliseconds(),
                     id = strategy.id.id.toString(),
                 )
