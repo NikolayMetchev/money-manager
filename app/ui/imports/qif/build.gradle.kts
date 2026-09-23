@@ -7,6 +7,7 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                api(projects.app.csvimporter)
                 api(projects.app.importengineapi)
                 api(projects.app.model.accountmapping)
                 api(projects.app.model.core)
@@ -18,7 +19,6 @@ kotlin {
                 api(projects.app.qifimporter)
                 api(projects.utils.parsers.qif)
 
-                implementation(projects.app.csvimporter)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
                 implementation(projects.app.ui.imports.csv)
@@ -44,6 +44,7 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.csvimporter)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.app.model.qif)

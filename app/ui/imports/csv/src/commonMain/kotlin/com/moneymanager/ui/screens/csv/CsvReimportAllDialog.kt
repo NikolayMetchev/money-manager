@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkImportProgress
-import com.moneymanager.csvimporter.CsvBulkReimportResult
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.bulkReimportCsv
 import com.moneymanager.csvimporter.selectForCsv
@@ -83,7 +83,7 @@ fun CsvReimportAllDialog(
 
     var isRunning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<BulkImportProgress?>(null) }
-    var result by remember { mutableStateOf<CsvBulkReimportResult?>(null) }
+    var result by remember { mutableStateOf<BulkReimportResult?>(null) }
 
     // Resolve each file's strategy the same way the re-import will: the one it was last imported with,
     // falling back to content-aware auto-selection. Lets us report how many files will be skipped (no

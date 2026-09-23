@@ -4,6 +4,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CryptoAsset
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.Money
@@ -28,18 +29,16 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.AccountMergeRequest
-import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.DedupePolicy
-import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import com.moneymanager.importengineapi.selectNearestUnconsumedLeg
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
@@ -54,8 +53,8 @@ private const val PLAN_PROGRESS_EVERY_ROWS = 25
 /** Engine write-chunk size for the re-run of remaining rows, so it reports per-chunk progress. */
 private const val REIMPORT_ENGINE_BATCH_SIZE = 250
 
-/** Default number of in-place transfer updates applied per engine batch. */
-internal const val REIMPORT_VALUE_UPDATE_CHUNK = 100
+/** Default number of in-place transfer updates applied per engine batch (CSV and QIF alike). */
+const val REIMPORT_VALUE_UPDATE_CHUNK = 100
 
 /**
  * A skip [ReimportSkippedAccount.detail] that always names the phase that failed, so the phase is not
@@ -1502,7 +1501,12 @@ suspend fun executeCsvReimport(
 
     onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))
     val deletedEmptyAccounts =
-        deleteEmptyImportCreatedAccounts(csvImport, accountRepository, csvImportRepository, importEngine, tradeRepository)
+        importEngine.deleteEmptyImportCreatedAccounts(
+            createdAccountIds = csvImportRepository.getAccountsCreatedByImport(csvImport.id),
+            source = Source.Csv(csvImport.id),
+            accountRepository = accountRepository,
+            tradeRepository = tradeRepository,
+        )
 
     if (refreshViews) {
         onProgress?.invoke(ImportProgress("Refreshing views"))
@@ -1563,13 +1567,8 @@ suspend fun applyReimportReversals(
 }
 
 /**
- * Applies the planned in-place transfer updates in chunks of [chunkSize], each an engine batch of
- * UPDATE intents plus the matching row-status writeback to UPDATED. Chunking exists for progress
- * reporting and costs nothing in atomicity: the engine's UPDATE phase applies intents one repository
- * call at a time (it never wraps them in a single transaction), so even a single big batch was never
- * all-or-nothing. A failing chunk falls back to per-row updates so one bad row downgrades to a skip
- * instead of blocking the rest. Returns the updates that were applied; failures are appended to
- * [skipped].
+ * Applies the planned in-place transfer updates through the shared [applyReimportValueUpdates], pairing
+ * each chunk's UPDATE intents with this import's row-status writeback to UPDATED.
  */
 private suspend fun applyValueUpdates(
     valueUpdates: List<ReimportValueUpdate>,
@@ -1578,155 +1577,31 @@ private suspend fun applyValueUpdates(
     skipped: MutableList<ReimportSkippedAccount>,
     onProgress: (suspend (ImportProgress) -> Unit)? = null,
     chunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
-): List<ReimportValueUpdate> {
-    if (valueUpdates.isEmpty()) return emptyList()
-
-    fun batchFor(updates: List<ReimportValueUpdate>) =
-        ImportBatch(
-            transfers =
-                updates.map { update ->
-                    ImportTransfer(
-                        source = Source.Csv(csvImport.id, update.rowIndex),
-                        operation = ImportOperation.UPDATE,
-                        existingId = update.transferId,
-                        fromAccount = AccountRef.Existing(update.sourceAccountId),
-                        toAccount = AccountRef.Existing(update.targetAccountId),
-                        timestamp = update.newTimestamp,
-                        description = update.newDescription,
-                        amount = update.newAmount,
-                    )
-                },
-            dedupePolicy = DedupePolicy.None,
-            csvImportMutations =
-                listOf(
-                    CsvImportMutation.UpdateRowStatuses(
-                        id = csvImport.id,
-                        status = ImportStatus.UPDATED.name,
-                        rowTransferMap = updates.associate { it.rowIndex to it.transferId },
+): List<ReimportValueUpdate> =
+    applyReimportValueUpdates(
+        valueUpdates = valueUpdates,
+        importEngine = importEngine,
+        skipped = skipped,
+        sourceFor = { rowIndex -> Source.Csv(csvImport.id, rowIndex) },
+        batchFor = { transfers, rowTransferMap ->
+            ImportBatch(
+                transfers = transfers,
+                dedupePolicy = DedupePolicy.None,
+                csvImportMutations =
+                    listOf(
+                        CsvImportMutation.UpdateRowStatuses(
+                            id = csvImport.id,
+                            status = ImportStatus.UPDATED.name,
+                            rowTransferMap = rowTransferMap,
+                        ),
                     ),
-                ),
-        )
-
-    val total = valueUpdates.size
-    val updated = mutableListOf<ReimportValueUpdate>()
-    var done = 0
-    onProgress?.invoke(ImportProgress("Updating transactions", fraction = 0f, processed = 0, total = total))
-    for (chunk in valueUpdates.chunked(chunkSize.coerceAtLeast(1))) {
-        try {
-            importEngine.import(batchFor(chunk))
-            updated += chunk
-        } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import value update chunk failed, falling back to per-row updates" }
-            for (update in chunk) {
-                try {
-                    importEngine.import(batchFor(listOf(update)))
-                    updated += update
-                } catch (expectedRowError: Exception) {
-                    logger.warn(expectedRowError) {
-                        "Re-import value update of row ${update.rowIndex} ('${update.description}') failed"
-                    }
-                    skipped +=
-                        ReimportSkippedAccount(
-                            accountId = null,
-                            accountName = update.description,
-                            detail = skipDetail("Update failed", expectedRowError.message),
-                        )
-                }
-            }
-        }
-        done += chunk.size
-        onProgress?.invoke(
-            ImportProgress("Updating transactions", fraction = done.toFloat() / total, processed = done, total = total),
-        )
-    }
-    return updated
-}
-
-/**
- * Deletes accounts this import created that hold no transactions (merged-away duplicates are already
- * gone — this catches ones emptied without being merge targets). Returns the deleted names. Trades
- * count as activity: deleting an account cascades to its trades, so an account whose only movements
- * are trades (e.g. the wallet a transfer→trade conversion just re-imported into) must survive.
- */
-private suspend fun deleteEmptyImportCreatedAccounts(
-    csvImport: CsvImport,
-    accountRepository: AccountReadRepository,
-    csvImportRepository: CsvImportReadRepository,
-    importEngine: ImportEngine,
-    tradeRepository: TradeReadRepository?,
-): List<String> {
-    val importCreated = csvImportRepository.getAccountsCreatedByImport(csvImport.id)
-    val remainingById = accountRepository.getAllAccounts().first().associateBy { it.id }
-    val candidates = importCreated.mapNotNull { remainingById[it] }
-    // Two batched membership checks instead of two COUNT queries per candidate account.
-    val withTransfers = accountRepository.accountsWithTransfers(candidates.map { it.id })
-    val withTrades = tradeRepository?.accountsWithTrades(candidates.map { it.id }).orEmpty()
-    val emptyAccounts = candidates.filter { it.id !in withTransfers && it.id !in withTrades }
-    if (emptyAccounts.isEmpty()) return emptyList()
-
-    importEngine.import(
-        ImportBatch.manualEdits(
-            accounts =
-                emptyAccounts.map { account ->
-                    ImportAccountIntent(
-                        key = LocalAccountKey("reimport-delete-${account.id.id}"),
-                        source = Source.Csv(csvImport.id),
-                        operation = ImportOperation.DELETE,
-                        existingId = account.id,
-                    )
-                },
-        ),
+            )
+        },
+        logLabel = "Re-import",
+        rowLabel = "row",
+        onProgress = onProgress,
+        chunkSize = chunkSize,
     )
-    return emptyAccounts.map { it.name }
-}
-
-/**
- * Summary of a bulk re-import run across many already-imported files. [filesImported] counts files a
- * re-import actually ran over (had a resolvable strategy). [merges] and [skipped] carry the actual
- * duplicate-account consolidations performed (and the ones that could not be merged) across all files,
- * so the UI can show WHICH accounts merged — the per-file preview's key detail the bulk path drops.
- */
-data class CsvBulkReimportResult(
-    override val filesImported: Int,
-    override val transfersCreated: Int,
-    override val duplicatesSkipped: Int,
-    override val filesSkippedNoStrategy: Int,
-    override val filesFailed: Int,
-    val merges: List<ReimportMerge>,
-    val reversals: List<ReimportReversal>,
-    val valueUpdates: Int,
-    val tradeConversions: Int,
-    /** Rows re-run so their unidentified counterparty is rebooked and/or reconciled away. */
-    val counterpartyReconciles: Int,
-    /** Trade rows whose duplicate conversion (another export's wording of it) was removed. */
-    val duplicateTrades: Int,
-    /** Rows released for re-import because the transfer they claimed is stale or shared. */
-    val staleDuplicates: Int,
-    val emptyAccountsDeleted: Int,
-    val skipped: List<ReimportSkippedAccount>,
-) : BulkImportResult {
-    override fun toSummary(): String =
-        buildString {
-            append("Re-imported $filesImported file${if (filesImported == 1) "" else "s"}")
-            append(" · $transfersCreated new")
-            if (valueUpdates > 0) append(" · $valueUpdates updated")
-            if (tradeConversions > 0) append(" · $tradeConversions converted to trades")
-            if (counterpartyReconciles > 0) append(" · $counterpartyReconciles rebooked")
-            if (duplicateTrades > 0) {
-                append(" · $duplicateTrades duplicate conversion${if (duplicateTrades == 1) "" else "s"} removed")
-            }
-            if (staleDuplicates > 0) {
-                append(" · $staleDuplicates row${if (staleDuplicates == 1) "" else "s"} released")
-            }
-            if (merges.isNotEmpty()) append(" · ${merges.size} account${if (merges.size == 1) "" else "s"} merged")
-            if (reversals.isNotEmpty()) append(" · ${reversals.size} merge${if (reversals.size == 1) "" else "s"} reversed")
-            if (emptyAccountsDeleted > 0) append(" · $emptyAccountsDeleted empty removed")
-            if (duplicatesSkipped > 0) append(" · $duplicatesSkipped duplicates skipped")
-            if (filesSkippedNoStrategy > 0) append(" · $filesSkippedNoStrategy skipped (no strategy)")
-            if (skipped.isNotEmpty()) append(" · ${skipped.size} not merged/updated")
-            if (filesFailed > 0) append(" · $filesFailed failed")
-        }
-}
 
 /**
  * Re-imports every already-imported [imports] file in one go: for each, resolves the strategy it was
@@ -1742,7 +1617,7 @@ data class CsvBulkReimportResult(
  * time — takes priority over the shared [sourceAccountOverride], so a file that already imported
  * successfully once never needs the user to pick a source account again.
  */
-@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+@Suppress("LongParameterList", "LongMethod")
 suspend fun bulkReimportCsv(
     imports: List<CsvImport>,
     sourceAccountOverride: AccountId?,
@@ -1762,32 +1637,33 @@ suspend fun bulkReimportCsv(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
-): CsvBulkReimportResult {
-    var filesImported = 0
-    var transfers = 0
-    var duplicates = 0
-    var skippedNoStrategy = 0
-    var failed = 0
-    val merges = mutableListOf<ReimportMerge>()
-    val reversals = mutableListOf<ReimportReversal>()
-    var valueUpdates = 0
-    var tradeConversions = 0
-    var counterpartyReconciles = 0
-    var duplicateTrades = 0
-    var staleDuplicates = 0
-    var emptyAccountsDeleted = 0
-    val skipped = mutableListOf<ReimportSkippedAccount>()
-    // Create every crypto asset the batch needs up front, sized to the batch-wide max precision per
-    // ticker, so cross-file ordering never leaves a ticker missing or a scale factor too small (the
-    // net-new ERROR rows a re-import picks up are denominated in these assets).
-    val tracker = BulkProgressTracker(imports.map { it.rowCount }, onProgress)
-    tracker.started(detail = "Preparing")
-    val cryptoAssets =
-        ensureCryptoAssetsForImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository)
-    val historicalSourceAccounts = csvImportRepository.historicalSourceAccounts()
-
-    imports.forEachIndexed { index, listedImport ->
-        tracker.fileStarted(index, listedImport.originalFileName)
+): BulkReimportResult =
+    runBulkReimport(
+        imports = imports,
+        rowCount = { it.rowCount },
+        fileName = { it.originalFileName },
+        logLabel = "CSV",
+        maintenance = maintenance,
+        onProgress = onProgress,
+        startDetail = "Preparing",
+        prepare = {
+            // Create every crypto asset the batch needs up front, sized to the batch-wide max precision
+            // per ticker, so cross-file ordering never leaves a ticker missing or a scale factor too
+            // small (the net-new ERROR rows a re-import picks up are denominated in these assets).
+            BulkCsvReimportContext(
+                cryptoAssets =
+                    ensureCryptoAssetsForImports(
+                        imports,
+                        strategies,
+                        currencies,
+                        csvImportRepository,
+                        importEngine,
+                        cryptoRepository,
+                    ),
+                historicalSourceAccounts = csvImportRepository.historicalSourceAccounts(),
+            )
+        },
+    ) { _, listedImport, context, onFileProgress ->
         // getAllImports() doesn't populate columns; re-fetch the full import so the strategy match works.
         val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
         val sampleRows = csvImportRepository.getImportRows(csvImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
@@ -1797,11 +1673,9 @@ suspend fun bulkReimportCsv(
             csvImport.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
                 ?: strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, sampleRows)
         if (matched == null) {
-            skippedNoStrategy++
-            return@forEachIndexed
-        }
-        val effectiveOverride = historicalSourceAccounts[csvImport.id] ?: sourceAccountOverride
-        try {
+            BulkReimportFileOutcome.NoStrategy
+        } else {
+            val effectiveOverride = context.historicalSourceAccounts[csvImport.id] ?: sourceAccountOverride
             val plan =
                 planCsvReimport(
                     csvImport = csvImport,
@@ -1815,12 +1689,12 @@ suspend fun bulkReimportCsv(
                     relationshipRepository = relationshipRepository,
                     transferSourceRepository = transferSourceRepository,
                     passThroughAccounts = passThroughAccounts,
-                    onProgress = { tracker.phase(index, csvImport.originalFileName, it) },
-                    cryptoAssets = cryptoAssets,
+                    onProgress = onFileProgress,
+                    cryptoAssets = context.cryptoAssets,
                     attributeAccountMatchers = attributeAccountMatchers,
                     tradeRepository = tradeRepository,
                 )
-            val result =
+            BulkReimportFileOutcome.Reimported(
                 executeCsvReimport(
                     plan = plan,
                     csvImport = csvImport,
@@ -1833,47 +1707,18 @@ suspend fun bulkReimportCsv(
                     maintenance = maintenance,
                     importEngine = importEngine,
                     passThroughAccounts = passThroughAccounts,
-                    onProgress = { tracker.phase(index, csvImport.originalFileName, it) },
+                    onProgress = onFileProgress,
                     refreshViews = false,
                     cryptoRepository = cryptoRepository,
                     tradeRepository = tradeRepository,
                     attributeAccountMatchers = attributeAccountMatchers,
-                )
-            filesImported++
-            transfers += result.importResult?.successCount ?: 0
-            duplicates += result.importResult?.duplicateCount ?: 0
-            merges += result.mergedAccounts
-            reversals += result.reversedMerges
-            valueUpdates += result.updatedRows.size
-            tradeConversions += result.convertedRows.size
-            counterpartyReconciles += result.counterpartyReconciledRows.size
-            duplicateTrades += result.duplicateTradeRows.size
-            staleDuplicates += result.staleDuplicateRows.size
-            emptyAccountsDeleted += result.deletedEmptyAccounts.size
-            skipped += result.skipped
-        } catch (expected: Exception) {
-            logger.error(expected) { "Bulk CSV re-import failed for ${csvImport.originalFileName}: ${expected.message}" }
-            failed++
+                ),
+            )
         }
     }
 
-    tracker.done()
-    maintenance.refreshMaterializedViews()
-
-    return CsvBulkReimportResult(
-        filesImported = filesImported,
-        transfersCreated = transfers,
-        duplicatesSkipped = duplicates,
-        filesSkippedNoStrategy = skippedNoStrategy,
-        filesFailed = failed,
-        merges = merges,
-        reversals = reversals,
-        valueUpdates = valueUpdates,
-        tradeConversions = tradeConversions,
-        counterpartyReconciles = counterpartyReconciles,
-        duplicateTrades = duplicateTrades,
-        staleDuplicates = staleDuplicates,
-        emptyAccountsDeleted = emptyAccountsDeleted,
-        skipped = skipped,
-    )
-}
+/** Run-wide state a bulk CSV re-import computes once, before the first file. */
+private data class BulkCsvReimportContext(
+    val cryptoAssets: List<CryptoAsset>,
+    val historicalSourceAccounts: Map<CsvImportId, AccountId>,
+)

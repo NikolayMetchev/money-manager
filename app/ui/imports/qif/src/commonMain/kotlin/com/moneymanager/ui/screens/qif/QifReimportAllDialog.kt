@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.BulkImportProgress
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
@@ -28,7 +29,6 @@ import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.qifimporter.QifBulkReimportResult
 import com.moneymanager.qifimporter.bulkReimportQif
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
@@ -76,7 +76,7 @@ fun QifReimportAllDialog(
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var isRunning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<BulkImportProgress?>(null) }
-    var result by remember { mutableStateOf<QifBulkReimportResult?>(null) }
+    var result by remember { mutableStateOf<BulkReimportResult?>(null) }
 
     LaunchedEffect(accounts) {
         if (sourceAccountId == null) {
