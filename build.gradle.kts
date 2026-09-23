@@ -35,11 +35,6 @@ if (providers.gradleProperty("enableGradleDoctor").orNull == "true") {
     pluginManager.apply("com.osacky.doctor")
 }
 
-tasks.register("lintFormat") {
-    description = "Runs all formatting tasks"
-    group = "formatting"
-}
-
 // One package, one module. Split packages defeat the point of the module split: `internal` silently
 // leaks across a boundary the compiler can no longer police, IDE navigation blurs, and it stops being
 // obvious which module owns a type. Test source sets are exempt — they compile separately, so sharing

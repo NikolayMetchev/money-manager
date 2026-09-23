@@ -167,6 +167,15 @@ ktlint {
     }
 }
 
+// Registered per module rather than wired up from the root: a root task depending on every
+// subproject's tasks would need to walk sibling projects, which project isolation forbids. Running
+// `./gradlew lintFormat` selects this task in every project by name.
+tasks.register("lintFormat") {
+    description = "Runs all formatting tasks"
+    group = "formatting"
+    dependsOn("ktlintFormat", "sortDependencies")
+}
+
 configure<KoverProjectExtension> {
     reports {
         filters {
