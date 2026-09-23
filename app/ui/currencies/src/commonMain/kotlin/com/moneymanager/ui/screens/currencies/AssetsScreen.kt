@@ -65,6 +65,7 @@ private fun CryptoAssetsTab(cryptoRepository: CryptoReadRepository) {
     AssetListTab(
         title = "Your Crypto Assets",
         items = cryptoAssets,
+        itemKey = { it.id.id },
         emptyMessage = "No crypto assets yet. Add your first one!",
         createDialog = { onClose -> CreateCryptoDialog(onCryptoCreated = { onClose() }, onDismiss = onClose) },
     ) { crypto ->

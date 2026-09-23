@@ -30,12 +30,14 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 
 /**
  * The list screen shared by the fiat and crypto tabs: a headline, the items (or an empty-state
- * message), and a "+" button that opens [createDialog], which is handed the callback that closes it.
+ * message) keyed by [itemKey] so per-row state follows its asset, and a "+" button that opens
+ * [createDialog], which is handed the callback that closes it.
  */
 @Composable
 internal fun <T> AssetListTab(
     title: String,
     items: List<T>,
+    itemKey: (T) -> Long,
     emptyMessage: String,
     createDialog: @Composable (onClose: () -> Unit) -> Unit,
     itemContent: @Composable (T) -> Unit,
@@ -73,7 +75,7 @@ internal fun <T> AssetListTab(
                         state = lazyListState,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(items) { item -> itemContent(item) }
+                        items(items, key = itemKey) { item -> itemContent(item) }
                     }
                     VerticalScrollbarForLazyList(
                         lazyListState = lazyListState,

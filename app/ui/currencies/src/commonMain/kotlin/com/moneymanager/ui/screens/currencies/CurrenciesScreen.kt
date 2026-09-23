@@ -25,6 +25,7 @@ fun CurrenciesScreen(
     AssetListTab(
         title = "Your Currencies",
         items = currencies,
+        itemKey = { it.id.id },
         emptyMessage = "No currencies yet. Add your first currency!",
         createDialog = { onClose -> CreateCurrencyDialog(onCurrencyCreated = { onClose() }, onDismiss = onClose) },
     ) { currency ->
