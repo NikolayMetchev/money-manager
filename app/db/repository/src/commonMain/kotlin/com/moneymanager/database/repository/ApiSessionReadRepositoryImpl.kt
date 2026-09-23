@@ -101,9 +101,7 @@ class ApiSessionReadRepositoryImpl(
             selectQueries
                 .selectDownloadWatermarksByCredential(credentialId.id, excludingSessionId.id)
                 .executeAsList()
-                .mapNotNull { row ->
-                    row.covers_until?.let { row.endpoint_key to Instant.fromEpochMilliseconds(it) }
-                }.toMap()
+                .associate { row -> row.endpoint_key to Instant.fromEpochMilliseconds(row.covers_until) }
         }
 
     override suspend fun getResponsesBySession(sessionId: ApiSessionId): List<ApiResponse> =
