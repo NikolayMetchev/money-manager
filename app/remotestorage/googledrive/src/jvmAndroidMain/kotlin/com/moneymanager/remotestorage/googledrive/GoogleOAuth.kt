@@ -47,8 +47,10 @@ class GoogleOAuth(
                 parameters.append("response_type", "code")
                 parameters.append("scope", scopes.joinToString(" "))
                 // offline + consent forces Google to return a refresh token we can reuse silently later.
+                // select_account shows the account chooser instead of silently using the browser's
+                // default Google account, which may not be the one the user wants to connect.
                 parameters.append("access_type", "offline")
-                parameters.append("prompt", "consent")
+                parameters.append("prompt", "select_account consent")
                 // state binds this request to the callback so a forged redirect can't inject a code (CSRF).
                 parameters.append("state", state)
             }.buildString()
