@@ -83,7 +83,7 @@ class ApiRequestSignerJwtTest {
                 decode(claims),
             )
 
-            val decoder = CryptographyProvider.Default.get(ECDSA).publicKeyDecoder(EC.Curve.P256)
+            val decoder = checkNotNull(CryptographyProvider.Default.getOrNull(ECDSA)).publicKeyDecoder(EC.Curve.P256)
             val verified =
                 decoder
                     .decodeFromByteArray(EC.PublicKey.Format.PEM, PUBLIC_KEY.encodeToByteArray())
@@ -121,7 +121,7 @@ class ApiRequestSignerJwtTest {
             val (header, claims, signature) = authorization.removePrefix("Bearer ").split(".")
 
             assertTrue(decode(header).startsWith("""{"alg":"EdDSA","kid":"$API_KEY","""), decode(header))
-            val decoder = CryptographyProvider.Default.get(EdDSA).publicKeyDecoder(EdDSA.Curve.Ed25519)
+            val decoder = checkNotNull(CryptographyProvider.Default.getOrNull(EdDSA)).publicKeyDecoder(EdDSA.Curve.Ed25519)
             val verified =
                 decoder
                     .decodeFromByteArray(EdDSA.PublicKey.Format.PEM, ED25519_PUBLIC_KEY.encodeToByteArray())
