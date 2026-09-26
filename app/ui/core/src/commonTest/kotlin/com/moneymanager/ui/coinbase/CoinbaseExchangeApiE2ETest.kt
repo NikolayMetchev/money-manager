@@ -246,6 +246,7 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
         watermarks: Map<String, Instant>,
         requested: MutableList<String> = mutableListOf(),
         unauthenticated: MutableList<String> = mutableListOf(),
+        gbpLedgerPage: (String?) -> String = { gbpLedger },
     ) {
         val apiClient =
             createApiClient(
@@ -260,7 +261,7 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
                             when (path) {
                                 "/v2/accounts" -> accountsPage(params["starting_after"])
                                 "/v2/accounts/$btcWallet/transactions" -> btcLedgerPage(params["starting_after"])
-                                "/v2/accounts/$gbpWallet/transactions" -> gbpLedger
+                                "/v2/accounts/$gbpWallet/transactions" -> gbpLedgerPage(params["starting_after"])
                                 else -> error("unexpected request $path")
                             }
                         respond(
@@ -302,6 +303,24 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
             val repeat = downloadOnce()
             assertTrue(secondPage !in repeat, "the ledger's first page is already older than the watermark: $repeat")
             assertTrue("/v2/accounts/$gbpWallet/transactions?" in repeat, "every wallet is still checked for new rows")
+        }
+
+    @Test
+    fun `a wallet ledger that echoes back the cursor it was sent stops paging`() =
+        runTest {
+            val strategy = coinbaseStrategy()
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val credentialId = repositories.importEngine.createApiCredential(apiKey, now)
+            val sessionId = repositories.importEngine.createApiSession(apiKey, deviceId, now, credentialId)
+            val echoing = gbpLedger.replace(""""next_starting_after":null""", """"next_starting_after":"stuck"""")
+            val requested = mutableListOf<String>()
+
+            download(strategy, sessionId, emptyMap(), requested = requested, gbpLedgerPage = { echoing })
+
+            assertEquals(
+                listOf("/v2/accounts/$gbpWallet/transactions?", "/v2/accounts/$gbpWallet/transactions?stuck"),
+                requested.filter { it.startsWith("/v2/accounts/$gbpWallet/") },
+            )
         }
 
     private suspend fun balances(accountName: String): Map<String, String> {

@@ -485,7 +485,9 @@ suspend fun downloadApiSessionExchange(
                             items.size >= pagination.limitValue && (totalCount == null || itemsSeenInWindow < totalCount)
                         }
                         nextCursorField != null -> {
-                            nextToken = stringFieldFromJson(body, nextCursorField)?.takeIf { it.isNotBlank() }
+                            val sentToken = nextToken
+                            // A provider echoing the token it was sent would otherwise page forever.
+                            nextToken = stringFieldFromJson(body, nextCursorField)?.takeIf { it.isNotBlank() && it != sentToken }
                             tokenPage += 1
                             val pagedPastCutoff =
                                 tokenWalkCutoff != null &&
@@ -543,7 +545,8 @@ suspend fun downloadApiSessionExchange(
                         pageItems.size >= pagination.limitValue
                     }
                     nextCursorField != null -> {
-                        nextToken = stringFieldFromJson(body, nextCursorField)?.takeIf { it.isNotBlank() }
+                        val sentToken = nextToken
+                        nextToken = stringFieldFromJson(body, nextCursorField)?.takeIf { it.isNotBlank() && it != sentToken }
                         tokenPage += 1
                         nextToken != null && pageItems.isNotEmpty()
                     }

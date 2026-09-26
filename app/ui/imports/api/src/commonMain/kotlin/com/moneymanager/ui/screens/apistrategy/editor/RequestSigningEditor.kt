@@ -223,7 +223,7 @@ private fun JwtFieldListEditor(
                         value = field.template,
                         onValueChange = { update(field.copy(template = it)) },
                         enabled = enabled,
-                        supportingText = "Tokens: {apiKey} {nonceHex} {now} {exp} {method} {host} {path}",
+                        supportingText = "Tokens: {alg} {apiKey} {nonceHex} {now} {exp} {method} {host} {path}",
                     )
                     ToggleRow(
                         label = "Numeric value",

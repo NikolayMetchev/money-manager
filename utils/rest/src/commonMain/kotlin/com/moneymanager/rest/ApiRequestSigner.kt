@@ -177,8 +177,8 @@ class ApiRequestSigner(
             val value = tokens.entries.fold(field.template) { acc, (token, v) -> acc.replace(token, v) }
             val rendered =
                 if (field.numeric) {
-                    require(value.toLongOrNull() != null) { "JWT field '${field.name}' is numeric but rendered as '$value'" }
-                    value
+                    // Re-render the parsed Long: toLongOrNull accepts forms like "+5" that are not valid JSON numbers.
+                    requireNotNull(value.toLongOrNull()) { "JWT field '${field.name}' is numeric but rendered as '$value'" }.toString()
                 } else {
                     jsonString(value)
                 }

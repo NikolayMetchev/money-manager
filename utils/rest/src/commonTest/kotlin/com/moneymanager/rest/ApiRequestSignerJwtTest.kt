@@ -138,6 +138,15 @@ class ApiRequestSignerJwtTest {
             assertTrue(error.message.orEmpty().contains("ECDSA"), error.message)
         }
 
+    @Test
+    fun `a numeric field with a leading plus sign renders as a valid JSON number`() =
+        runTest {
+            val plusClaim = config.copy(jwt = config.jwt!!.copy(claims = listOf(JwtField("n", "+5", numeric = true))))
+            val claims = sign(PRIVATE_KEY, plusClaim).headers.getValue("Authorization").split(".")[1]
+
+            assertEquals("""{"n":5}""", decode(claims))
+        }
+
     private fun decode(segment: String): String = URL_SAFE.decode(segment).decodeToString()
 
     private companion object {
