@@ -111,7 +111,7 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
         ]}"""
 
     @Test
-    fun `downloads every wallet ledger page, and imports its movements and trades`() =
+    fun `downloads every wallet ledger page then imports its movements and trades`() =
         runTest {
             val strategy = coinbaseStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))

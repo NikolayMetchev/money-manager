@@ -28,7 +28,7 @@ class FanOutValueSetTest {
     }
 
     @Test
-    fun `a fan-out value is substituted into the path, URL-encoded`() {
+    fun `a fan-out value is URL-encoded into the path`() {
         assertEquals("v2/accounts/a%20b/transactions", resolveFanOutPath("v2/accounts/{fanOut}/transactions", "a b"))
         assertEquals("api/v3/myTrades", resolveFanOutPath("api/v3/myTrades", "BTCUSDT"))
         assertEquals("v2/accounts/{fanOut}/transactions", resolveFanOutPath("v2/accounts/{fanOut}/transactions", null))

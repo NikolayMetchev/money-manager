@@ -59,7 +59,6 @@ class ApiRequestSignerJwtTest {
             apiSecret = secret,
             nonce = 0,
             requestId = 0,
-            httpMethod = "GET",
             nowEpochSeconds = NOW,
         )
 
@@ -84,10 +83,9 @@ class ApiRequestSignerJwtTest {
                 decode(claims),
             )
 
+            val decoder = CryptographyProvider.Default.get(ECDSA).publicKeyDecoder(EC.Curve.P256)
             val verified =
-                CryptographyProvider.Default
-                    .get(ECDSA)
-                    .publicKeyDecoder(EC.Curve.P256)
+                decoder
                     .decodeFromByteArray(EC.PublicKey.Format.PEM, PUBLIC_KEY.encodeToByteArray())
                     .signatureVerifier(SHA256, ECDSA.SignatureFormat.RAW)
                     .tryVerifySignature("$header.$claims".encodeToByteArray(), URL_SAFE.decode(signature))
@@ -107,7 +105,7 @@ class ApiRequestSignerJwtTest {
         }
 
     @Test
-    fun `accepts the key's bare base64 DER, SEC1 or PKCS8, without PEM labels`() =
+    fun `accepts the bare base64 DER of the key in SEC1 or PKCS8 form without PEM labels`() =
         runTest {
             val sec1Body = PRIVATE_KEY.lines().filterNot { it.startsWith("-----") || it.isBlank() }.joinToString("")
             val pkcs8Body = PKCS8_KEY.lines().filterNot { it.startsWith("-----") || it.isBlank() }.joinToString("")
@@ -123,10 +121,9 @@ class ApiRequestSignerJwtTest {
             val (header, claims, signature) = authorization.removePrefix("Bearer ").split(".")
 
             assertTrue(decode(header).startsWith("""{"alg":"EdDSA","kid":"$API_KEY","""), decode(header))
+            val decoder = CryptographyProvider.Default.get(EdDSA).publicKeyDecoder(EdDSA.Curve.Ed25519)
             val verified =
-                CryptographyProvider.Default
-                    .get(EdDSA)
-                    .publicKeyDecoder(EdDSA.Curve.Ed25519)
+                decoder
                     .decodeFromByteArray(EdDSA.PublicKey.Format.PEM, ED25519_PUBLIC_KEY.encodeToByteArray())
                     .signatureVerifier()
                     .tryVerifySignature("$header.$claims".encodeToByteArray(), URL_SAFE.decode(signature))

@@ -1545,8 +1545,7 @@ object BuiltInApiStrategies {
             nextCursorField: String,
         ) = ApiPaginationConfig(
             mode = mode,
-            limitParam = "limit",
-            limitValue = 100,
+            // Default page size ("limit" = 100), sent on the wire.
             sendLimitParam = true,
             cursorParam = cursorParam,
             nextCursorField = nextCursorField,
@@ -1559,7 +1558,6 @@ object BuiltInApiStrategies {
                 amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                 timestampField = "created_at",
                 timestampFormat = TimestampFormat.ISO_8601,
-                idField = "id",
                 descriptionField = "details.title",
                 counterpartyAddressField = "to.address",
                 counterpartyNetworkField = "network.network_name",
@@ -1616,7 +1614,6 @@ object BuiltInApiStrategies {
                                             JwtField("exp", "{exp}", numeric = true),
                                             JwtField("uri", "{method} {host}{path}"),
                                         ),
-                                    ttlSeconds = 120,
                                 ),
                         ),
                     syntheticAccount = ApiSyntheticAccount(name = "Coinbase", externalId = "coinbase"),
