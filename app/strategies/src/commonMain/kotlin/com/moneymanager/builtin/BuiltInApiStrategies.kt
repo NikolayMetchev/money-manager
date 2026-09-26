@@ -30,6 +30,9 @@ import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import com.moneymanager.domain.model.apistrategy.FieldPlacement
 import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
+import com.moneymanager.domain.model.apistrategy.JwtAlgorithm
+import com.moneymanager.domain.model.apistrategy.JwtField
+import com.moneymanager.domain.model.apistrategy.JwtSigningConfig
 import com.moneymanager.domain.model.apistrategy.NonceFormat
 import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.OffsetMode
@@ -58,10 +61,11 @@ object BuiltInApiStrategies {
     val cryptoComExchangeStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
     val krakenStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
     val binanceStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
+    val coinbaseStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000c")
 
     /** All built-in API import strategies. */
     fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> =
-        listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now), kraken(now), binance(now))
+        listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now), kraken(now), binance(now), coinbase(now))
 
     /** The built-in Monzo API import strategy. */
     fun monzo(now: Instant): ApiImportStrategy =
@@ -1504,6 +1508,160 @@ object BuiltInApiStrategies {
                                 "access restriction.",
                             "Copy the API key and paste it below as the API key.",
                             "Copy the Secret Key — shown only once — and paste it below as the API secret.",
+                        ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in Coinbase strategy — pure config over the generic signed-exchange engine (no provider code).
+     * Coinbase CDP API keys authenticate each request with a freshly signed JWT (see [JwtSigningConfig]),
+     * EdDSA for an Ed25519 key (the portal's default) or ES256 for an ECDSA one; the key's id or name is the
+     * api key, its private key the secret.
+     *
+     * Every wallet (`v2/accounts`) has its own ledger (`v2/accounts/{id}/transactions`, fanned out per
+     * wallet id and walked by `starting_after` token, newest first), and together those ledgers are the
+     * whole account. Deposits, withdrawals, sends, receives and rewards are signed ledger rows. Buys,
+     * sells, converts and Advanced Trade fills post one row per wallet they touch, sharing the
+     * `buy`/`sell`/`trade` id or Advanced Trade order id, so they are grouped back into trades (see
+     * [ApiTransactionMappings.reconcileTradeAmountsField]) at the exact amounts that settled; a purchase
+     * paid by card posts only the crypto row, and is booked against its `native_amount`. The Advanced
+     * Trade fills endpoint is deliberately not used: an order placed as "spend £X" reports its fills'
+     * `size` in the quote asset, and the ledger already has the settled amounts.
+     *
+     * Field paths follow the Coinbase docs; verify against a live response when connecting real keys
+     * (same caveat as the other exchange built-ins).
+     */
+    fun coinbase(now: Instant): ApiImportStrategy {
+        val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
+
+        // Page size goes on the wire via the pagination config, not as a static query param, so each
+        // endpoint's key stays its bare path (FromValueEndpoint below references "v2/accounts" by it).
+        fun tokenPaging(
+            mode: PaginationMode,
+            cursorParam: String,
+            nextCursorField: String,
+        ) = ApiPaginationConfig(
+            mode = mode,
+            limitParam = "limit",
+            limitValue = 100,
+            sendLimitParam = true,
+            cursorParam = cursorParam,
+            nextCursorField = nextCursorField,
+        )
+
+        val ledgerMappings =
+            ApiTransactionMappings(
+                amountField = "amount.amount",
+                currencyField = "amount.currency",
+                amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                timestampField = "created_at",
+                timestampFormat = TimestampFormat.ISO_8601,
+                idField = "id",
+                descriptionField = "details.title",
+                counterpartyAddressField = "to.address",
+                counterpartyNetworkField = "network.network_name",
+                txidField = "network.hash",
+                // Every row is one wallet's own signed movement (negative = out).
+                directionFromAmountSign = true,
+                itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "completed")),
+                // Buys/sells/converts and Advanced Trade fills: one row per wallet touched, grouped into a
+                // trade by the id of the buy/sell/convert (or the Advanced Trade order) they belong to
+                // rather than booked as transfers. The rows carry the exact settled amounts, so no
+                // quantity is ever derived from a price.
+                excludeField = "type",
+                excludeValues = setOf("buy", "sell", "trade", "advanced_trade_fill", "retail_simple_dust"),
+                reconcileTradeAmountsField = "trade.id",
+                reconcileTradeAmountsFallbackFields = listOf("buy.id", "sell.id", "advanced_trade_fill.order_id"),
+                // An Advanced Trade fill's commission is settled outside its legs, and both legs repeat it:
+                // book it once, on the leg in the pair's quote asset.
+                feeAmountField = "advanced_trade_fill.commission",
+                feeInstrumentField = "advanced_trade_fill.product_id",
+                unpairedTradeLegCounterAmountField = "native_amount",
+                unpairedTradeLegFundingAccountName = "Coinbase Payment Methods",
+            )
+
+        return ApiImportStrategy(
+            id = ApiImportStrategyId(coinbaseStrategyId),
+            name = "Coinbase",
+            config =
+                ApiStrategyConfig(
+                    baseUrl = "https://api.coinbase.com",
+                    authType = ApiAuthType.SIGNED,
+                    accountsEndpoint = unused,
+                    transactionsEndpoint = unused,
+                    accountMappings = ApiAccountMappings(),
+                    transactionMappings = ApiTransactionMappings(),
+                    requestSigning =
+                        ApiRequestSigningConfig(
+                            jwt =
+                                JwtSigningConfig(
+                                    // CDP keys are Ed25519 by default and ECDSA on request; sign as whichever
+                                    // the pasted secret is.
+                                    algorithm = JwtAlgorithm.DETECT,
+                                    header =
+                                        listOf(
+                                            JwtField("alg", "{alg}"),
+                                            JwtField("kid", "{apiKey}"),
+                                            JwtField("nonce", "{nonceHex}"),
+                                            JwtField("typ", "JWT"),
+                                        ),
+                                    claims =
+                                        listOf(
+                                            JwtField("iss", "cdp"),
+                                            JwtField("sub", "{apiKey}"),
+                                            JwtField("nbf", "{now}", numeric = true),
+                                            JwtField("exp", "{exp}", numeric = true),
+                                            JwtField("uri", "{method} {host}{path}"),
+                                        ),
+                                    ttlSeconds = 120,
+                                ),
+                        ),
+                    syntheticAccount = ApiSyntheticAccount(name = "Coinbase", externalId = "coinbase"),
+                    valueEndpoints =
+                        listOf(
+                            ApiEndpointConfig(
+                                path = "v2/accounts",
+                                responseArrayKey = "data",
+                                pagination = tokenPaging(PaginationMode.TOKEN_CURSOR, "starting_after", "pagination.next_starting_after"),
+                            ),
+                        ),
+                    dataEndpoints =
+                        listOf(
+                            ApiDataEndpoint(
+                                ApiEndpointConfig(
+                                    path = "v2/accounts/{fanOut}/transactions",
+                                    responseArrayKey = "data",
+                                    // Newest first, so an incremental walk can stop at the watermark.
+                                    queryParams = listOf(ApiQueryParam(name = "order", value = "desc")),
+                                    pagination =
+                                        tokenPaging(PaginationMode.TOKEN_CURSOR, "starting_after", "pagination.next_starting_after")
+                                            .copy(cursorResponseField = "created_at"),
+                                    // Wallet ids are lowercase UUIDs, substituted into the path.
+                                    fanOut =
+                                        ApiFanOut(
+                                            param = null,
+                                            values = ApiValueSet.FromValueEndpoint("v2/accounts", listOf("id")),
+                                            preserveCase = true,
+                                        ),
+                                ),
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings = ledgerMappings,
+                            ),
+                        ),
+                    // v2 allows 10,000 requests an hour per key (~2.8/s).
+                    rateLimitMillis = 400L,
+                    rateLimitErrorSubstrings = listOf("rate_limit_exceeded", "Too Many Requests"),
+                    tokenPageUrl = "https://portal.cdp.coinbase.com/projects/api-keys",
+                    connectInstructions =
+                        listOf(
+                            "Open the Coinbase Developer Platform API keys page in your browser and sign in with " +
+                                "your Coinbase account.",
+                            "Create a Secret API key (Ed25519, the default, or ECDSA) and grant only the View permission.",
+                            "Paste the API key ID (or, for an older key, its name organizations/…/apiKeys/…) below as the API key.",
+                            "Paste the API secret (or the whole downloaded key file) below as the API secret.",
                         ),
                 ),
             createdAt = now,

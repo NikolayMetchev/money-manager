@@ -761,6 +761,25 @@ internal fun PaginationEditor(
             IntFieldRow("Lookback days", config.lookbackDays, { onChange(config.copy(lookbackDays = it)) }, enabled)
             QueryParamsEditor(params = config.extraParams, onChange = { onChange(config.copy(extraParams = it)) }, enabled = enabled)
         }
+        PaginationMode.TOKEN_CURSOR -> {
+            TextFieldRow("Cursor param", config.cursorParam, { onChange(config.copy(cursorParam = it)) }, enabled)
+            TextFieldRow(
+                "Item timestamp field (stops an incremental walk)",
+                config.cursorResponseField,
+                { onChange(config.copy(cursorResponseField = it)) },
+                enabled,
+            )
+        }
+    }
+    TextFieldRow(
+        "Next-page token field (optional)",
+        config.nextCursorField.orEmpty(),
+        { onChange(config.copy(nextCursorField = it.ifBlank { null })) },
+        enabled,
+        supportingText = "Dot-path to the response's next-page token, sent back as the cursor param",
+    )
+    if (config.nextCursorField != null && config.mode == PaginationMode.DATE_WINDOW) {
+        TextFieldRow("Cursor param", config.cursorParam, { onChange(config.copy(cursorParam = it)) }, enabled)
     }
     // Applies to every mode: it clamps the date-window sweep and sets the cursor loop's stop point.
     IntFieldRow(

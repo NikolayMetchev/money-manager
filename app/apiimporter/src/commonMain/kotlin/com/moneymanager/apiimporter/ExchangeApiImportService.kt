@@ -1,6 +1,7 @@
 package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.Asset
@@ -53,6 +54,7 @@ import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
 import io.ktor.http.encodeURLParameter
+import io.ktor.http.encodeURLPathPart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
@@ -245,12 +247,13 @@ suspend fun downloadApiSessionExchange(
         endpoint: ApiEndpointConfig,
         params: LinkedHashMap<String, String>,
         recordedUrl: String,
+        fanOutValue: String? = null,
     ): String? {
         if (recordedUrl in downloadedUrls) return existingResponseJsonByUrl[recordedUrl]
         lastFetchWindowOutOfRange = false
         var rateLimitRetries = 0
         while (true) {
-            val endpointUrl = buildExchangeEndpointUrl(strategy.config.baseUrl, endpoint.path)
+            val endpointUrl = buildExchangeEndpointUrl(strategy.config.baseUrl, resolveFanOutPath(endpoint.path, fanOutValue))
             val response =
                 if (endpoint.unsigned) {
                     apiClient.send(
@@ -260,8 +263,8 @@ suspend fun downloadApiSessionExchange(
                         storeResponse = endpoint.storeResponse,
                     )
                 } else {
-                    val nonce =
-                        nextExchangeNonce(lastNonce, Clock.System.now().toEpochMilliseconds() + serverClockOffsetMillis())
+                    val nowMillis = Clock.System.now().toEpochMilliseconds() + serverClockOffsetMillis()
+                    val nonce = nextExchangeNonce(lastNonce, nowMillis)
                     lastNonce = nonce
                     // Parameters the signing scheme adds to every signed request (Binance's recvWindow).
                     // They go in with the endpoint's own params so the signature covers them.
@@ -287,6 +290,8 @@ suspend fun downloadApiSessionExchange(
                             apiSecret = apiSecret,
                             nonce = nonce,
                             requestId = requestId,
+                            httpMethod = endpoint.method.name,
+                            nowEpochSeconds = nowMillis / 1_000,
                         )
                     requestId += 1
                     apiClient.send(
@@ -387,7 +392,7 @@ suspend fun downloadApiSessionExchange(
                     ),
                 )
                 val recordedUrl = markerUrl(strategy.config.baseUrl, endpoint.path, endpointKey, null, cursor, fanOutValue)
-                val body = fetchPage(endpoint, params, recordedUrl)
+                val body = fetchPage(endpoint, params, recordedUrl, fanOutValue)
                 if (body == null) {
                     endpointBroken = true
                 } else {
@@ -406,16 +411,24 @@ suspend fun downloadApiSessionExchange(
         }
 
         val windows = dateWindowsOrSingle(pagination, now, since)
+        // A token walk has no window to start later, so an incremental one instead stops once it pages
+        // back past what an earlier download already covered.
+        val tokenWalkCutoff =
+            if (since != null && pagination?.mode == PaginationMode.TOKEN_CURSOR) incrementalStartMillis(since, pagination) else null
         if (since != null) {
-            windows.firstOrNull()?.start?.let { start -> earliestIncrementalStart = minOf(start, earliestIncrementalStart ?: start) }
+            val start = windows.firstOrNull()?.start ?: tokenWalkCutoff?.let { Instant.fromEpochMilliseconds(it) }
+            start?.let { earliestIncrementalStart = minOf(it, earliestIncrementalStart ?: it) }
         }
         windows.forEachIndexed { windowIndex, window ->
             if (endpointBroken) return@forEachIndexed
             // A non-positive limitValue would never advance the offset, looping forever on the same
             // page; treat a misconfigured limit as "no offset paging" rather than hang.
             val offsetParam = pagination?.offsetParam?.takeIf { (pagination.limitValue) > 0 }
+            val nextCursorField = pagination?.nextCursorField?.takeIf { offsetParam == null }
             var offset = if (pagination?.offsetMode == OffsetMode.PAGE_NUMBER) 1 else 0
             var itemsSeenInWindow = 0
+            var nextToken: String? = null
+            var tokenPage = 0
             var keepPaging = true
             while (keepPaging) {
                 val params = linkedMapOf<String, String>()
@@ -428,6 +441,10 @@ suspend fun downloadApiSessionExchange(
                 }
                 if (offsetParam != null) {
                     params[offsetParam] = offset.toString()
+                    if (pagination.sendLimitParam) params[pagination.limitParam] = pagination.limitValue.toString()
+                }
+                if (nextCursorField != null) {
+                    nextToken?.let { params[pagination.cursorParam] = it }
                     if (pagination.sendLimitParam) params[pagination.limitParam] = pagination.limitValue.toString()
                 }
 
@@ -446,10 +463,10 @@ suspend fun downloadApiSessionExchange(
                         endpoint.path,
                         endpointKey,
                         window,
-                        offsetParam?.let { offset.toString() },
+                        offsetParam?.let { offset.toString() } ?: nextCursorField?.let { tokenPage.toString() },
                         fanOutValue,
                     )
-                val body = fetchPage(endpoint, params, recordedUrl)
+                val body = fetchPage(endpoint, params, recordedUrl, fanOutValue)
                 if (body == null) {
                     // A window the provider won't serve is skipped (no coverage recorded for it) so the
                     // newer windows still run; any other failure abandons the endpoint as before.
@@ -460,13 +477,28 @@ suspend fun downloadApiSessionExchange(
                 itemSink?.addAll(items)
 
                 keepPaging =
-                    if (offsetParam == null) {
-                        false
-                    } else {
-                        itemsSeenInWindow += items.size
-                        offset += if (pagination.offsetMode == OffsetMode.PAGE_NUMBER) 1 else pagination.limitValue
-                        val totalCount = pagination.totalCountField?.let { field -> totalCountFromJson(body, field) }
-                        items.size >= pagination.limitValue && (totalCount == null || itemsSeenInWindow < totalCount)
+                    when {
+                        offsetParam != null -> {
+                            itemsSeenInWindow += items.size
+                            offset += if (pagination.offsetMode == OffsetMode.PAGE_NUMBER) 1 else pagination.limitValue
+                            val totalCount = pagination.totalCountField?.let { field -> totalCountFromJson(body, field) }
+                            items.size >= pagination.limitValue && (totalCount == null || itemsSeenInWindow < totalCount)
+                        }
+                        nextCursorField != null -> {
+                            nextToken = stringFieldFromJson(body, nextCursorField)?.takeIf { it.isNotBlank() }
+                            tokenPage += 1
+                            val pagedPastCutoff =
+                                tokenWalkCutoff != null &&
+                                    items.any { item ->
+                                        item.str(pagination.cursorResponseField)?.let(::parseCursorInstantMillis)?.let {
+                                            it <
+                                                tokenWalkCutoff
+                                        } ==
+                                            true
+                                    }
+                            nextToken != null && items.isNotEmpty() && !pagedPastCutoff
+                        }
+                        else -> false
                     }
             }
             // Reached only when every offset page of this window succeeded: a failing page sets
@@ -483,7 +515,10 @@ suspend fun downloadApiSessionExchange(
         val items = mutableListOf<JsonObject>()
         val pagination = endpoint.pagination
         val offsetParam = pagination?.offsetParam?.takeIf { (pagination.limitValue) > 0 }
+        val nextCursorField = pagination?.nextCursorField?.takeIf { offsetParam == null }
         var offset = if (pagination?.offsetMode == OffsetMode.PAGE_NUMBER) 1 else 0
+        var nextToken: String? = null
+        var tokenPage = 0
         var keepPaging = true
         while (keepPaging) {
             val params = linkedMapOf<String, String>()
@@ -492,17 +527,27 @@ suspend fun downloadApiSessionExchange(
                 params[offsetParam] = offset.toString()
                 if (pagination.sendLimitParam) params[pagination.limitParam] = pagination.limitValue.toString()
             }
-            val recordedUrl =
-                markerUrl(strategy.config.baseUrl, endpoint.path, endpointKey, null, offsetParam?.let { offset.toString() }, null)
+            if (nextCursorField != null) {
+                nextToken?.let { params[pagination.cursorParam] = it }
+                if (pagination.sendLimitParam) params[pagination.limitParam] = pagination.limitValue.toString()
+            }
+            val page = offsetParam?.let { offset.toString() } ?: nextCursorField?.let { tokenPage.toString() }
+            val recordedUrl = markerUrl(strategy.config.baseUrl, endpoint.path, endpointKey, null, page, null)
             val body = fetchPage(endpoint, params, recordedUrl) ?: break
-            val page = pageItems(endpoint, body)
-            items += page
+            val pageItems = pageItems(endpoint, body)
+            items += pageItems
             keepPaging =
-                if (offsetParam == null) {
-                    false
-                } else {
-                    offset += if (pagination.offsetMode == OffsetMode.PAGE_NUMBER) 1 else pagination.limitValue
-                    page.size >= pagination.limitValue
+                when {
+                    offsetParam != null -> {
+                        offset += if (pagination.offsetMode == OffsetMode.PAGE_NUMBER) 1 else pagination.limitValue
+                        pageItems.size >= pagination.limitValue
+                    }
+                    nextCursorField != null -> {
+                        nextToken = stringFieldFromJson(body, nextCursorField)?.takeIf { it.isNotBlank() }
+                        tokenPage += 1
+                        nextToken != null && pageItems.isNotEmpty()
+                    }
+                    else -> false
                 }
         }
         valueItemsByPath[endpointDedupeKey(endpoint)] = items
@@ -519,8 +564,8 @@ suspend fun downloadApiSessionExchange(
     // Pass 2: every fan-out data endpoint, once per resolved value.
     strategy.config.dataEndpoints.forEachIndexed { endpointIndex, dataEndpoint ->
         val fanOut = dataEndpoint.endpoint.fanOut ?: return@forEachIndexed
-        val values = resolveValueSet(fanOut.values, valueItemsByPath, dataItemsByPath)
-        val allowed = fanOut.validAgainst?.let { resolveValueSet(it, valueItemsByPath, dataItemsByPath).toSet() }
+        val values = resolveValueSet(fanOut.values, valueItemsByPath, dataItemsByPath, fanOut.preserveCase)
+        val allowed = fanOut.validAgainst?.let { resolveValueSet(it, valueItemsByPath, dataItemsByPath, fanOut.preserveCase).toSet() }
         val surviving = (if (allowed != null) values.filter { it in allowed } else values).distinct().sorted()
         surviving.forEach { value -> sweepEndpoint(dataEndpoint.endpoint, endpointIndex, fanOut.param, value, null) }
     }
@@ -538,13 +583,14 @@ private fun JsonElement.jsonPrimitiveOrNull(): String? = (this as? JsonPrimitive
 /**
  * Resolves an [ApiValueSet] to its concrete string values, given the value-endpoint and (non-fan-out)
  * data-endpoint items already downloaded this session (see [ApiValueSet]'s KDoc for the vocabulary).
- * Every resolved value is uppercased and blank values are dropped, matching how asset/symbol codes are
- * conventionally cased by every exchange this engine targets.
+ * Blank values are dropped and, unless [preserveCase], every value is uppercased, matching how
+ * asset/symbol codes are conventionally cased by the exchanges this engine targets.
  */
 internal fun resolveValueSet(
     valueSet: ApiValueSet,
     valueItemsByPath: Map<String, List<JsonObject>>,
     dataItemsByPath: Map<String, List<JsonObject>>,
+    preserveCase: Boolean = false,
 ): List<String> =
     when (valueSet) {
         is ApiValueSet.Static -> valueSet.values
@@ -556,13 +602,26 @@ internal fun resolveValueSet(
             dataItemsByPath[valueSet.endpointPath].orEmpty().flatMap { item ->
                 valueSet.fields.mapNotNull { field -> item.str(field) }
             }
-        is ApiValueSet.Union -> valueSet.sets.flatMap { resolveValueSet(it, valueItemsByPath, dataItemsByPath) }
+        is ApiValueSet.Union -> valueSet.sets.flatMap { resolveValueSet(it, valueItemsByPath, dataItemsByPath, preserveCase) }
         is ApiValueSet.CrossProduct -> {
-            val lefts = resolveValueSet(valueSet.left, valueItemsByPath, dataItemsByPath).distinct()
-            val rights = resolveValueSet(valueSet.right, valueItemsByPath, dataItemsByPath).distinct()
+            val lefts = resolveValueSet(valueSet.left, valueItemsByPath, dataItemsByPath, preserveCase).distinct()
+            val rights = resolveValueSet(valueSet.right, valueItemsByPath, dataItemsByPath, preserveCase).distinct()
             lefts.flatMap { l -> rights.map { r -> valueSet.template.replace("{left}", l).replace("{right}", r) } }
         }
-    }.filter { it.isNotBlank() }.map { it.uppercase() }
+    }.filter { it.isNotBlank() }.map { if (preserveCase) it else it.uppercase() }
+
+/** The `{fanOut}` placeholder an [ApiEndpointConfig.path] may carry, replaced by each fan-out value. */
+private const val FAN_OUT_PATH_PLACEHOLDER = "{fanOut}"
+
+/** [path] with its `{fanOut}` placeholder (if any) replaced by the URL-path-encoded [fanOutValue]. */
+internal fun resolveFanOutPath(
+    path: String,
+    fanOutValue: String?,
+): String = if (fanOutValue == null) path else path.replace(FAN_OUT_PATH_PLACEHOLDER, fanOutValue.encodeURLPathPart())
+
+/** Reads a token-cursor position (an ISO-8601 instant, or epoch millis) as epoch millis; null if neither. */
+private fun parseCursorInstantMillis(value: String): Long? =
+    runCatching { Instant.parse(value).toEpochMilliseconds() }.getOrNull() ?: value.toLongOrNull()
 
 /** Appends [params] as an unsigned, percent-encoded query string — used for [ApiEndpointConfig.unsigned]. */
 private fun appendUnsignedQueryParams(
@@ -661,6 +720,17 @@ private fun formatWindowBound(
         WindowBoundFormat.EPOCH_MS -> instant.toEpochMilliseconds().toString()
         WindowBoundFormat.EPOCH_S -> instant.epochSeconds.toString()
         WindowBoundFormat.ISO_8601 -> instant.toString()
+    }
+
+/** Reads a string field from a response envelope (e.g. a next-page token), null if absent or not a primitive. */
+private fun stringFieldFromJson(
+    json: String,
+    field: String,
+): String? =
+    try {
+        (Json.parseToJsonElement(json).resolveJsonPathElement(field) as? JsonPrimitive)?.contentOrNullCompat()
+    } catch (e: SerializationException) {
+        null
     }
 
 /** Reads an integer total-count field from a response envelope (e.g. Kraken `result.count`). */
@@ -773,6 +843,20 @@ private data class ParsedLedgerTradeLeg(
     val timestamp: Instant,
     val requestId: ApiRequestId,
     val jsonPath: String,
+    /**
+     * The other side of the trade as this row itself reports it (see
+     * [ApiTransactionMappings.unpairedTradeLegCounterAmountField]) — used only when no other ledger row
+     * records it, i.e. the trade was paid for from outside the exchange.
+     */
+    val counterAssetCode: String? = null,
+    val counterAmount: BigDecimal? = null,
+    val fundingAccountName: String? = null,
+)
+
+/** [reconcileTradesAgainstLedger]'s trades, plus the funding movements its single-leg trades need. */
+private data class LedgerReconciledTrades(
+    val trades: List<ParsedTrade>,
+    val fundingTransfers: List<ParsedExchangeTransfer>,
 )
 
 /** Accumulator for parsed items across all of a session's responses. */
@@ -925,13 +1009,14 @@ suspend fun importApiSessionExchange(
             ?: code
 
     fun canonicalAsset(code: String): String = stripAssetSuffix(code).let { aliases[it.uppercase()] ?: it }
-    val trades = reconcileTradesAgainstLedger(parsed.trades, parsed.ledgerTradeLegs, ::canonicalAsset)
+    val ledgerReconciled = reconcileTradesAgainstLedger(parsed.trades, parsed.ledgerTradeLegs, ::canonicalAsset)
+    val trades = ledgerReconciled.trades
     // Enrichment endpoints (e.g. Kraken DepositStatus/WithdrawStatus) supply on-chain address/network/
     // txid for transfers built from a different endpoint (Ledgers), matched by joinKey; a transfer's own
     // fields win when present.
     val enrichByKey = parsed.enrichments.associateBy { it.id }
     val transfers =
-        parsed.transfers.map { tx ->
+        (parsed.transfers + ledgerReconciled.fundingTransfers).map { tx ->
             val enrichment = tx.joinKey?.let { enrichByKey[it] }
             val aliased = tx.copy(currencyCode = canonicalAsset(tx.currencyCode))
             if (enrichment == null) {
@@ -1143,6 +1228,9 @@ suspend fun importApiSessionExchange(
     for (tx in transfers) {
         val txAsset = asset(tx.currencyCode) ?: continue // single jump — allowed
         val money = Money.fromDisplayValue(tx.amount, txAsset)
+        // Set when the far end is only the generic funding account: the exchange could not say where the
+        // money came from or went to.
+        var unidentifiedCounterparty: AccountId? = null
         val (from, to) =
             if (tx.isFeeOnly) {
                 // A refund (negated ledger fee, e.g. crediting back a failed withdrawal's charge) runs the
@@ -1166,7 +1254,9 @@ suspend fun importApiSessionExchange(
                         // on/off-ramp) — a named account, so the same movement seen from the other side
                         // reconciles to it instead of everything piling into one funding account.
                         ?: tx.counterpartyAccountName?.let { accountKeys[it] }
-                val counterparty = counterpartyKey?.let { AccountRef.Local(it) } ?: AccountRef.Existing(fundingId)
+                val counterparty =
+                    counterpartyKey?.let { AccountRef.Local(it) }
+                        ?: AccountRef.Existing(fundingId).also { unidentifiedCounterparty = fundingId }
                 if (tx.direction == TransferDirection.IN) counterparty to exchangeRef else exchangeRef to counterparty
             }
         val grossMoney =
@@ -1194,6 +1284,11 @@ suspend fun importApiSessionExchange(
                 txnIdAttr = txnIdAttr,
                 txid = tx.txid,
                 txidAttr = txidAttr,
+            ).copy(
+                // A bank export naming this exchange records the same deposit/withdrawal with its real far
+                // end (the user's own bank account); this lets it reconcile against that record instead of
+                // both debiting (or crediting) the exchange.
+                unidentifiedCounterpartyAccountId = unidentifiedCounterparty,
             )
     }
 
@@ -1449,9 +1544,11 @@ private fun parseExchangeTransfer(
 
     val result = mutableListOf<ParsedExchangeTransfer>()
     if (excluded) {
-        val refField = tm.reconcileTradeAmountsField
-        val refid = refField?.let { obj.str(it) }
+        val refid =
+            (listOfNotNull(tm.reconcileTradeAmountsField) + tm.reconcileTradeAmountsFallbackFields)
+                .firstNotNullOfOrNull { field -> obj.str(field)?.takeIf { it.isNotBlank() } }
         if (refid != null && rawAmount != null) {
+            val counterField = tm.unpairedTradeLegCounterAmountField
             into.ledgerTradeLegs +=
                 ParsedLedgerTradeLeg(
                     refid = refid,
@@ -1460,6 +1557,9 @@ private fun parseExchangeTransfer(
                     timestamp = timestamp,
                     requestId = requestId,
                     jsonPath = jsonPath,
+                    counterAssetCode = counterField?.let { obj.str("$it.currency") },
+                    counterAmount = counterField?.let { obj.str("$it.amount") }?.let { runCatching { BigDecimal(it) }.getOrNull() },
+                    fundingAccountName = tm.unpairedTradeLegFundingAccountName,
                 )
         }
     } else if (rawAmount != null) {
@@ -1503,7 +1603,15 @@ private fun parseExchangeTransfer(
     // original charge) — abs()-ing it would book the refund as a second charge instead of crediting it
     // back, so the sign decides direction: negative -> refund (Fees -> exchange), positive -> charge
     // (exchange -> Fees).
-    val rawFeeAmount = tm.feeAmountField?.let { obj.str(it)?.let { v -> runCatching { BigDecimal(v) }.getOrNull() } }
+    // A fee every leg of a fill repeats is charged once, on the leg in the pair's quote asset.
+    val feeOnThisRow =
+        tm.feeInstrumentField?.let { field ->
+            obj.str(field)?.substringAfterLast(tm.feeInstrumentSeparator)?.equals(currency, ignoreCase = true) == true
+        } ?: true
+    val rawFeeAmount =
+        tm.feeAmountField
+            ?.takeIf { feeOnThisRow }
+            ?.let { obj.str(it)?.let { v -> runCatching { BigDecimal(v) }.getOrNull() } }
     if (rawFeeAmount != null && rawFeeAmount != BigDecimal.ZERO) {
         val isRefund = rawFeeAmount < BigDecimal.ZERO
         result +=
@@ -1535,13 +1643,15 @@ private fun parseExchangeTransfer(
  * [ApiTransactionMappings.reconcileTradeAmountsField]): a trade's leg amounts are overridden by the
  * matching ledger group's signed amounts where present, and any ledger group matching no trade at all
  * is booked as its own trade — Kraken's Ledgers `balance` is ground truth, so no movement it reports
- * may be silently dropped or left at a TradesHistory amount it disagrees with.
+ * may be silently dropped or left at a TradesHistory amount it disagrees with. A group of one leg that
+ * names its own counter amount (see [ApiTransactionMappings.unpairedTradeLegCounterAmountField]) is
+ * booked as a trade against that amount, funded by a transfer so the counter asset nets to zero.
  */
 private fun reconcileTradesAgainstLedger(
     rawTrades: List<ParsedTrade>,
     ledgerLegs: List<ParsedLedgerTradeLeg>,
     canonicalAsset: (String) -> String,
-): List<ParsedTrade> {
+): LedgerReconciledTrades {
     val trades =
         rawTrades.map {
             it.copy(
@@ -1550,8 +1660,11 @@ private fun reconcileTradesAgainstLedger(
                 feeCode = it.feeCode?.let(canonicalAsset),
             )
         }
-    val legsByRefid = ledgerLegs.map { it.copy(assetCode = canonicalAsset(it.assetCode)) }.groupBy { it.refid }
-    if (legsByRefid.isEmpty()) return trades
+    val legsByRefid =
+        ledgerLegs
+            .map { it.copy(assetCode = canonicalAsset(it.assetCode), counterAssetCode = it.counterAssetCode?.let(canonicalAsset)) }
+            .groupBy { it.refid }
+    if (legsByRefid.isEmpty()) return LedgerReconciledTrades(trades, emptyList())
 
     val consumedRefids = mutableSetOf<String>()
 
@@ -1586,10 +1699,60 @@ private fun reconcileTradesAgainstLedger(
             )
         }
 
+    val unmatchedGroups = legsByRefid.entries.filterNot { it.key in consumedRefids }
+    val singleLegGroups =
+        unmatchedGroups.mapNotNull { (refid, legs) ->
+            legs.singleOrNull()?.takeIf { it.counterAmount != null }?.let {
+                refid to
+                    it
+            }
+        }
+    val fundingTransfers = mutableListOf<ParsedExchangeTransfer>()
+    val singleLegTrades =
+        singleLegGroups.mapNotNull { (refid, leg) ->
+            val counterCode = leg.counterAssetCode ?: return@mapNotNull null
+            val counterAmount = leg.counterAmount?.abs() ?: return@mapNotNull null
+            if (leg.signedAmount == BigDecimal.ZERO || counterAmount == BigDecimal.ZERO) return@mapNotNull null
+            // An incoming leg was bought with money that came from outside (a card), an outgoing one
+            // sold for money that left the exchange (a bank payout).
+            val bought = leg.signedAmount > BigDecimal.ZERO
+            fundingTransfers +=
+                ParsedExchangeTransfer(
+                    id = "$refid-funding",
+                    timestamp = leg.timestamp,
+                    currencyCode = counterCode,
+                    amount = counterAmount,
+                    direction = if (bought) TransferDirection.IN else TransferDirection.OUT,
+                    description = if (bought) "Deposit $counterCode" else "Withdraw $counterCode",
+                    requestId = leg.requestId,
+                    jsonPath = leg.jsonPath,
+                    counterpartyAddress = null,
+                    network = null,
+                    txid = null,
+                    aliasAccount = null,
+                    counterpartyAccountName = leg.fundingAccountName,
+                    joinKey = null,
+                )
+            ParsedTrade(
+                id = refid,
+                timestamp = leg.timestamp,
+                isBuy = bought,
+                baseCode = leg.assetCode,
+                quoteCode = counterCode,
+                baseQuantity = leg.signedAmount.abs(),
+                quoteAmount = counterAmount,
+                feeAmount = null,
+                feeCode = null,
+                orderId = null,
+                requestId = leg.requestId,
+                jsonPath = leg.jsonPath,
+            )
+        }
+
     val orphanTrades =
-        legsByRefid.entries
-            .filterNot { it.key in consumedRefids }
+        unmatchedGroups
             .mapNotNull { (refid, legs) ->
+                if (legs.size > 2) return@mapNotNull aggregatedLegsTrade(refid, legs)
                 if (legs.size != 2) return@mapNotNull null
                 val outLeg = legs.firstOrNull { it.signedAmount < BigDecimal.ZERO } ?: return@mapNotNull null
                 val inLeg = legs.firstOrNull { it.signedAmount > BigDecimal.ZERO } ?: return@mapNotNull null
@@ -1608,7 +1771,39 @@ private fun reconcileTradesAgainstLedger(
                     jsonPath = outLeg.jsonPath,
                 )
             }
-    return reconciled + orphanTrades
+    return LedgerReconciledTrades(reconciled + orphanTrades + singleLegTrades, fundingTransfers)
+}
+
+/**
+ * One trade from a ledger group of several rows — an order filled in parts, each fill posting a row per
+ * asset — when the rows net to exactly one asset leaving and one arriving; null otherwise.
+ */
+private fun aggregatedLegsTrade(
+    refid: String,
+    legs: List<ParsedLedgerTradeLeg>,
+): ParsedTrade? {
+    val netByAsset =
+        legs
+            .groupBy { it.assetCode }
+            .mapValues { (_, assetLegs) -> assetLegs.fold(BigDecimal.ZERO) { total, leg -> total + leg.signedAmount } }
+    if (netByAsset.size != 2) return null
+    val (outCode, outNet) = netByAsset.entries.firstOrNull { it.value < BigDecimal.ZERO } ?: return null
+    val (inCode, inNet) = netByAsset.entries.firstOrNull { it.value > BigDecimal.ZERO } ?: return null
+    val first = legs.minBy { it.timestamp }
+    return ParsedTrade(
+        id = refid,
+        timestamp = first.timestamp,
+        isBuy = false,
+        baseCode = outCode,
+        quoteCode = inCode,
+        baseQuantity = outNet.abs(),
+        quoteAmount = inNet,
+        feeAmount = null,
+        feeCode = null,
+        orderId = null,
+        requestId = first.requestId,
+        jsonPath = first.jsonPath,
+    )
 }
 
 /** Converts an exchange-reported display value exactly; throws if the asset's scale can't

@@ -12,8 +12,9 @@ kotlin {
                 api(projects.app.model.core)
                 api(libs.ktor.client.core)
 
-                // HMAC signing for exchange APIs (Crypto.com/Binance/Kraken), same lib as utils/archive.
+                // HMAC/ECDSA signing for exchange APIs (Crypto.com/Binance/Kraken/Coinbase), same lib as utils/archive.
                 implementation(libs.cryptography.core)
+                implementation(libs.cryptography.random)
                 implementation(libs.ktor.client.cio)
             }
         }

@@ -21,6 +21,20 @@ class FanOutValueSetTest {
     }
 
     @Test
+    fun `preserveCase keeps opaque ids exactly as the provider spelled them`() {
+        val values = mapOf("v2/accounts" to listOf(obj("id" to "5f1f2d7a-btc"), obj("id" to "")))
+        val result = resolveValueSet(ApiValueSet.FromValueEndpoint("v2/accounts", listOf("id")), values, emptyMap(), preserveCase = true)
+        assertEquals(listOf("5f1f2d7a-btc"), result)
+    }
+
+    @Test
+    fun `a fan-out value is substituted into the path, URL-encoded`() {
+        assertEquals("v2/accounts/a%20b/transactions", resolveFanOutPath("v2/accounts/{fanOut}/transactions", "a b"))
+        assertEquals("api/v3/myTrades", resolveFanOutPath("api/v3/myTrades", "BTCUSDT"))
+        assertEquals("v2/accounts/{fanOut}/transactions", resolveFanOutPath("v2/accounts/{fanOut}/transactions", null))
+    }
+
+    @Test
     fun `from-value-endpoint reads every configured field across every item`() {
         val values =
             mapOf(

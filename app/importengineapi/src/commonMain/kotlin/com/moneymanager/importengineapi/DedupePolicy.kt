@@ -121,10 +121,11 @@ sealed interface DedupePolicy {
         /** Allowed amount difference as a percentage (BigDecimal for precise monetary comparison). */
         val internalTransferAmountTolerance: BigDecimal = BigDecimal.ZERO,
         /**
-         * Unidentified-counterparty reconciliation, as on [FuzzyAllFields] — here it is the *existing*
-         * leg that carries the attribute: an API import that names both owned ends of a movement (a bank
-         * resolving the far account by sort code + account number) excludes the placeholder leg an
-         * earlier export left behind.
+         * Unidentified-counterparty reconciliation, as on [FuzzyAllFields], in both directions: an API
+         * import that names both owned ends of a movement (a bank resolving the far account by sort code +
+         * account number) excludes the placeholder leg an earlier export left behind; and an incoming leg
+         * that is itself a placeholder ([ImportTransfer.unidentifiedCounterpartyAccountId], an exchange's
+         * "fiat deposit") is excluded against the existing leg that names the far end.
          */
         val unidentifiedCounterpartyAttributeTypeId: AttributeTypeId? = null,
         /**

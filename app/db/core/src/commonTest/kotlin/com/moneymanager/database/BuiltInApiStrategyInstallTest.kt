@@ -33,7 +33,53 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .map { it.name }
                     .toSet()
-            assertEquals(setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken", "Binance"), names)
+            assertEquals(setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken", "Binance", "Coinbase"), names)
+        }
+
+    @Test
+    fun `the Coinbase strategy installs with its JWT-signed exchange configuration`() =
+        runTest {
+            repositories.installBuiltInApiStrategies()
+            val coinbase =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Coinbase" }
+
+            assertEquals(ApiAuthType.SIGNED, coinbase.config.authType)
+            val jwt = assertNotNull(coinbase.config.requestSigning?.jwt, "JWT signing recipe persisted")
+            assertEquals(listOf("iss", "sub", "nbf", "exp", "uri"), jwt.claims.map { it.name })
+            assertEquals("Coinbase", assertNotNull(coinbase.config.syntheticAccount).name)
+            val ledger = coinbase.config.dataEndpoints.first { it.endpoint.fanOut != null }
+            assertTrue(assertNotNull(ledger.endpoint.fanOut).preserveCase, "wallet ids keep their case")
+            assertEquals(
+                listOf("buy.id", "sell.id", "advanced_trade_fill.order_id"),
+                assertNotNull(ledger.transactionMappings).reconcileTradeAmountsFallbackFields,
+            )
+        }
+
+    @Test
+    fun `the Coinbase strategy survives an export file round trip`() =
+        runTest {
+            val now = kotlin.time.Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val original =
+                com.moneymanager.builtin.BuiltInApiStrategies
+                    .coinbase(now)
+            val json =
+                com.moneymanager.database.json.ApiStrategyExportCodec.encode(
+                    ApiStrategyExportMapper
+                        .toExport(original, "test"),
+                )
+            val rebuilt =
+                ApiStrategyExportMapper.fromExport(
+                    com.moneymanager.database.json.ApiStrategyExportCodec
+                        .decode(json),
+                    original.id,
+                    now,
+                )
+            assertEquals(original.config.requestSigning, rebuilt.config.requestSigning)
+            assertEquals(original.config.dataEndpoints.toSet(), rebuilt.config.dataEndpoints.toSet())
+            assertEquals(original.config.valueEndpoints.toSet(), rebuilt.config.valueEndpoints.toSet())
         }
 
     @Test
