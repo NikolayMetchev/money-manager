@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.FieldPlacement
+import com.moneymanager.domain.model.apistrategy.JwtAlgorithm
+import com.moneymanager.domain.model.apistrategy.JwtField
+import com.moneymanager.domain.model.apistrategy.JwtSigningConfig
 import com.moneymanager.domain.model.apistrategy.NonceFormat
 import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.ParamStringFormat
@@ -186,9 +189,97 @@ internal fun SigPartListEditor(
     }
 }
 
+/** Editor for a JWT's ordered header or claim fields (name, template, numeric flag). */
+@Composable
+private fun JwtFieldListEditor(
+    title: String,
+    fields: List<JwtField>,
+    onChange: (List<JwtField>) -> Unit,
+    enabled: Boolean,
+) {
+    Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        fields.forEachIndexed { index, field ->
+            fun update(updated: JwtField) = onChange(fields.mapIndexed { i, f -> if (i == index) updated else f })
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            ) {
+                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    EditorCardHeader(
+                        title = field.name.ifBlank { "Field ${index + 1}" },
+                        onRemove = { onChange(fields.filterIndexed { i, _ -> i != index }) },
+                        enabled = enabled,
+                    )
+                    TextFieldRow(
+                        label = "Name",
+                        value = field.name,
+                        onValueChange = { update(field.copy(name = it)) },
+                        enabled = enabled,
+                        isError = field.name.isBlank(),
+                    )
+                    TextFieldRow(
+                        label = "Value template",
+                        value = field.template,
+                        onValueChange = { update(field.copy(template = it)) },
+                        enabled = enabled,
+                        supportingText = "Tokens: {alg} {apiKey} {nonceHex} {now} {exp} {method} {host} {path}",
+                    )
+                    ToggleRow(
+                        label = "Numeric value",
+                        checked = field.numeric,
+                        onCheckedChange = { update(field.copy(numeric = it)) },
+                        enabled = enabled,
+                    )
+                }
+            }
+        }
+        TextButton(onClick = { onChange(fields + JwtField("", "")) }, enabled = enabled) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text("Add field")
+        }
+    }
+}
+
+/** Editor for [JwtSigningConfig]: per-request JWT authentication in place of an HMAC signature. */
+@Composable
+private fun JwtSigningEditor(
+    jwt: JwtSigningConfig,
+    onChange: (JwtSigningConfig) -> Unit,
+    enabled: Boolean,
+) {
+    EnumDropdown(
+        label = "JWT algorithm",
+        options = JwtAlgorithm.entries,
+        selected = jwt.algorithm,
+        onSelect = { onChange(jwt.copy(algorithm = it)) },
+        optionLabel = { it.name },
+        enabled = enabled,
+    )
+    JwtFieldListEditor("JWT header", jwt.header, { onChange(jwt.copy(header = it)) }, enabled)
+    JwtFieldListEditor("JWT claims", jwt.claims, { onChange(jwt.copy(claims = it)) }, enabled)
+    TextFieldRow(
+        label = "Lifetime (seconds)",
+        value = jwt.ttlSeconds.toString(),
+        onValueChange = { v -> v.toLongOrNull()?.let { onChange(jwt.copy(ttlSeconds = it)) } },
+        enabled = enabled,
+        supportingText = "Added to {now} to render {exp}",
+    )
+    FieldPlacementEditor("Token placement", jwt.placement, { onChange(jwt.copy(placement = it)) }, enabled)
+    TextFieldRow(
+        label = "Token prefix",
+        value = jwt.prefix,
+        onValueChange = { onChange(jwt.copy(prefix = it)) },
+        enabled = enabled,
+        supportingText = "Written before the token (e.g. \"Bearer \")",
+    )
+}
+
 /**
  * Editor for the optional proactive [ApiRequestSigningConfig] (used when `authType == SIGNED`): the
- * complete provider-agnostic HMAC recipe (algorithm, message parts, field placements, body format).
+ * complete provider-agnostic HMAC recipe (algorithm, message parts, field placements, body format), or
+ * a JWT recipe in its place.
  */
 @Composable
 internal fun RequestSigningEditor(
@@ -203,6 +294,22 @@ internal fun RequestSigningEditor(
         enabled = enabled,
     )
     val c = config ?: return
+
+    ToggleRow(
+        label = "Authenticate with a signed JWT instead of an HMAC signature",
+        checked = c.jwt != null,
+        onCheckedChange = { on -> onChange(c.copy(jwt = if (on) JwtSigningConfig() else null)) },
+        enabled = enabled,
+    )
+    c.jwt?.let { jwt ->
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            JwtSigningEditor(jwt, { onChange(c.copy(jwt = it)) }, enabled)
+        }
+        return
+    }
+    val apiKey = c.apiKey ?: FieldPlacement(SigFieldLocation.HEADER, "")
+    val signature = c.signature ?: FieldPlacement(SigFieldLocation.QUERY, "")
+    val nonce = c.nonce ?: NonceSpec(placement = FieldPlacement(SigFieldLocation.QUERY, ""))
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         EnumDropdown(
@@ -233,22 +340,22 @@ internal fun RequestSigningEditor(
         Text("Signed message parts", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         SigPartListEditor(parts = c.message, onChange = { onChange(c.copy(message = it)) }, enabled = enabled)
 
-        FieldPlacementEditor("API key placement", c.apiKey, { onChange(c.copy(apiKey = it)) }, enabled)
-        FieldPlacementEditor("Signature placement", c.signature, { onChange(c.copy(signature = it)) }, enabled)
+        FieldPlacementEditor("API key placement", apiKey, { onChange(c.copy(apiKey = it)) }, enabled)
+        FieldPlacementEditor("Signature placement", signature, { onChange(c.copy(signature = it)) }, enabled)
 
         Text("Nonce", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         EnumDropdown(
             label = "Nonce format",
             options = NonceFormat.entries,
-            selected = c.nonce.format,
-            onSelect = { onChange(c.copy(nonce = c.nonce.copy(format = it))) },
+            selected = nonce.format,
+            onSelect = { onChange(c.copy(nonce = nonce.copy(format = it))) },
             optionLabel = { it.name },
             enabled = enabled,
         )
         FieldPlacementEditor(
             label = "Nonce placement",
-            placement = c.nonce.placement,
-            onChange = { onChange(c.copy(nonce = c.nonce.copy(placement = it))) },
+            placement = nonce.placement,
+            onChange = { onChange(c.copy(nonce = nonce.copy(placement = it))) },
             enabled = enabled,
         )
 
@@ -343,12 +450,20 @@ private fun SigPart.isValidForSave(): Boolean =
     }
 
 /** Whether a request-signing config has every required (and enabled-conditional) field set. */
-internal fun ApiRequestSigningConfig.isValidForSave(): Boolean =
-    message.isNotEmpty() &&
+internal fun ApiRequestSigningConfig.isValidForSave(): Boolean {
+    jwt?.let { return it.isValidForSave() }
+    return message.isNotEmpty() &&
         message.all { it.isValidForSave() } &&
-        apiKey.name.isNotBlank() &&
-        signature.name.isNotBlank() &&
-        nonce.placement.name.isNotBlank() &&
+        apiKey?.name?.isNotBlank() == true &&
+        signature?.name?.isNotBlank() == true &&
+        nonce?.placement?.name?.isNotBlank() == true &&
         (requestId?.placement?.name?.isNotBlank() ?: true) &&
         (method?.name?.isNotBlank() ?: true) &&
         (bodyFormat != BodyFormat.JSON_ENVELOPE || !paramsEnvelopeKey.isNullOrBlank())
+}
+
+private fun JwtSigningConfig.isValidForSave(): Boolean =
+    claims.isNotEmpty() &&
+        (header + claims).all { it.name.isNotBlank() } &&
+        ttlSeconds > 0 &&
+        placement.name.isNotBlank()

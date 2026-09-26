@@ -330,6 +330,15 @@ class ImportDeduper(
             policy.reconciledRelationshipTypeId,
         )?.let { return it }
 
+        // The reverse: this provider cannot name the far end (an exchange's "fiat deposit"), while an
+        // existing record (the bank's) does - this leg is the placeholder, so it is the one excluded.
+        classifyAsUnidentifiedCounterpartyReconciled(
+            transfer,
+            policy.unidentifiedCounterpartyWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
+
         // This feed splits a charge the other source folded into one gross row, so the amounts never
         // match; pair them on the gross total instead and exclude that row.
         classifyAsGrossNetReconciled(

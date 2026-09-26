@@ -100,6 +100,19 @@ enum class PaginationMode {
      * interrupted-and-retried session, and any cross-session overlap is absorbed by the import deduper.
      */
     FORWARD_ID_CURSOR,
+
+    /**
+     * A single (non-windowed) walk paged by an opaque next-page token the response itself supplies (at
+     * [ApiPaginationConfig.nextCursorField]), sent back as [ApiPaginationConfig.cursorParam] until the
+     * token comes back blank or absent — for an endpoint with no date filter at all (Coinbase's
+     * `v2/accounts/{id}/transactions`, newest first).
+     *
+     * Incremental: when an earlier download already covered a period, the walk stops once a page's
+     * oldest item (by [ApiPaginationConfig.cursorResponseField], an ISO-8601 or epoch timestamp) is older
+     * than that watermark minus [ApiPaginationConfig.incrementalOverlapDays] — so it relies on the
+     * endpoint returning newest items first.
+     */
+    TOKEN_CURSOR,
 }
 
 /**
@@ -197,6 +210,16 @@ data class ApiPaginationConfig(
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     @Serializable(with = SortedStringListSerializer::class)
     val windowRangeErrorSubstrings: List<String> = listOf("range is too large", "time range too large"),
+    /**
+     * Dot-path to an opaque next-page token in the response envelope (Coinbase v2
+     * `pagination.next_starting_after`, Advanced Trade `cursor`). When set, every request unit — each
+     * [PaginationMode.DATE_WINDOW] window, or the single [PaginationMode.TOKEN_CURSOR] walk — keeps
+     * requesting with [cursorParam] = that token until it comes back blank or absent.
+     *
+     * Same NEVER-encode rationale as [windowRangeErrorSubstrings].
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val nextCursorField: String? = null,
 )
 
 /**
@@ -406,6 +429,17 @@ data class ApiTransactionMappings(
     val feeCurrencyField: String? = null,
     val feeDescriptionField: String? = null,
     val feeIncludedInAmount: Boolean = false,
+    /**
+     * Dot-path to a trading-pair symbol (e.g. Coinbase `advanced_trade_fill.product_id`, "BTC-GBP") for a
+     * ledger whose every leg of a fill repeats the fill's [feeAmountField], charged in the pair's quote
+     * asset. When set, the fee is booked only on the row in that quote asset (split off the symbol at
+     * [feeInstrumentSeparator]), so it is charged once rather than once per leg. Omitted from JSON when
+     * null so existing strategies keep their hash.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val feeInstrumentField: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val feeInstrumentSeparator: String = "-",
     @Serializable(with = SortedStringToStringMapSerializer::class)
     val customFields: Map<String, String> = emptyMap(),
     @Serializable(with = SortedStringSetSerializer::class)
@@ -465,7 +499,9 @@ data class ApiTransactionMappings(
     val excludeValues: Set<String> = emptySet(),
     /**
      * Dot-path to a field identifying the trade this row belongs to (e.g. Kraken Ledgers `refid`, which
-     * equals the matching `TradesHistory` trade's own id). When set on a row excluded via
+     * equals the matching `TradesHistory` trade's own id). A group of more than two rows (an order's
+     * fills, each posting one row per asset) is booked as one trade when its rows net to one asset out
+     * and one asset in. When set on a row excluded via
      * [excludeField]/[excludeValues] (a duplicate trade-type ledger entry), the row's signed amount is
      * kept as an authoritative leg for reconciling that trade's booked amount — Kraken's TradesHistory
      * `cost` is a display-rounded price*volume for synthetic crypto/crypto pairs and can disagree with
@@ -473,6 +509,30 @@ data class ApiTransactionMappings(
      * own trade from the two legs, so no movement the ledger reports is ever silently dropped.
      */
     val reconcileTradeAmountsField: String? = null,
+    /**
+     * Further dot-paths tried, in order, when [reconcileTradeAmountsField] resolves to nothing — for a
+     * ledger whose rows name the trade they belong to under a field that depends on the row's type
+     * (Coinbase: `buy.id`, `sell.id` or `trade.id`). Order is semantic (first non-blank wins) - keeps
+     * default insertion-order serialization.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val reconcileTradeAmountsFallbackFields: List<String> = emptyList(),
+    /**
+     * Dot-path to an amount object (`{amount, currency}`, read via `.amount`/`.currency`) giving the other
+     * side of a trade-type ledger row whose group has only this one leg — a purchase paid for straight
+     * from a card or bank, so no ledger row records the money leaving (Coinbase `native_amount`). Such a
+     * group is booked as a trade against that amount, plus a transfer of it between
+     * [unpairedTradeLegFundingAccountName] and the exchange account so the exchange's balance of that
+     * asset still nets to zero. Null (the default) drops single-leg groups, as before.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val unpairedTradeLegCounterAmountField: String? = null,
+    /**
+     * The account an [unpairedTradeLegCounterAmountField] trade is funded from (a purchase) or paid out
+     * to (a sale); null uses the strategy-wide "<synthetic account> Funding".
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val unpairedTradeLegFundingAccountName: String? = null,
     /**
      * Conditions that must all hold (logical AND) against the item's raw JSON for it to be imported at
      * all — the include-form counterpart of [excludeField]/[excludeValues] (e.g. Binance's
@@ -846,15 +906,21 @@ sealed interface SigPart {
  */
 @Serializable
 data class ApiRequestSigningConfig(
-    val algorithm: SigningAlgorithm,
+    val algorithm: SigningAlgorithm = SigningAlgorithm.HMAC_SHA256,
     val secretEncoding: SecretEncoding = SecretEncoding.UTF8,
     val signatureEncoding: SignatureEncoding = SignatureEncoding.HEX,
     // Order is semantic (bytes are concatenated in list order before signing) - keeps default
     // insertion-order serialization.
-    val message: List<SigPart>,
-    val apiKey: FieldPlacement,
-    val nonce: NonceSpec,
-    val signature: FieldPlacement,
+    // The HMAC recipe below is required unless [jwt] is set; defaulted (and never encoded when left at
+    // the default) only so a JWT-signed strategy needn't carry an unused one.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val message: List<SigPart> = emptyList(),
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val apiKey: FieldPlacement? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val nonce: NonceSpec? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val signature: FieldPlacement? = null,
     val requestId: RequestIdSpec? = null,
     /** Where the API method name is written on the request (Crypto.com body field "method"); null omits it. */
     val method: FieldPlacement? = null,
@@ -884,6 +950,61 @@ data class ApiRequestSigningConfig(
      */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val serverTimeSync: ApiServerTimeSync? = null,
+    /**
+     * When set, requests are authenticated with a freshly signed JWT instead of an HMAC signature, and
+     * [message]/[apiKey]/[nonce]/[signature]/[algorithm] are ignored. Same NEVER-encode rationale as
+     * [signedParams].
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val jwt: JwtSigningConfig? = null,
+)
+
+/** Asymmetric algorithm a [JwtSigningConfig] signs with. */
+@Serializable
+enum class JwtAlgorithm {
+    /** ECDSA over P-256 with SHA-256; the api secret is a P-256 private key (PEM, or its base64 DER). */
+    ES256,
+
+    /** Ed25519; the api secret is a base64 32-byte seed or 64-byte seed + public key, or a PEM key. */
+    EdDSA,
+
+    /**
+     * Whichever of the above the api secret is a key for — for a provider that issues both kinds (Coinbase
+     * CDP keys are Ed25519 by default, ECDSA on request). Pair with an `alg` header of `{alg}`.
+     */
+    DETECT,
+}
+
+/**
+ * One header or claim of a signed JWT. [template] may reference `{alg}` (the JWS name of the algorithm
+ * the token is signed with), `{apiKey}`, `{nonceHex}` (a fresh random hex string), `{now}`/`{exp}` (epoch seconds, now and now + [JwtSigningConfig.ttlSeconds]),
+ * `{method}` (the HTTP verb), `{host}` and `{path}` (the request URI path, without the query string).
+ * When [numeric] is true the rendered value is emitted as a JSON number rather than a string.
+ */
+@Serializable
+data class JwtField(
+    val name: String,
+    val template: String,
+    val numeric: Boolean = false,
+)
+
+/**
+ * Per-request JWT authentication: the engine renders [header] and [claims], signs
+ * `base64url(header).base64url(claims)` with the api secret per [algorithm], and places the token
+ * (prefixed by [prefix]) per [placement]. Coinbase CDP keys use ES256 with
+ * `kid`/`nonce` header fields and `iss`/`sub`/`nbf`/`exp`/`uri` claims, sent as `Authorization: Bearer`.
+ *
+ * [header]/[claims] order is semantic (it's the serialised order) - keeps default insertion-order
+ * serialization.
+ */
+@Serializable
+data class JwtSigningConfig(
+    val algorithm: JwtAlgorithm = JwtAlgorithm.ES256,
+    val header: List<JwtField> = emptyList(),
+    val claims: List<JwtField> = emptyList(),
+    val ttlSeconds: Long = 120,
+    val placement: FieldPlacement = FieldPlacement(SigFieldLocation.HEADER, "Authorization"),
+    val prefix: String = "Bearer ",
 )
 
 /**
@@ -979,9 +1100,20 @@ sealed interface ApiValueSet {
  */
 @Serializable
 data class ApiFanOut(
-    val param: String,
+    /**
+     * The query/body parameter each value is sent as; null when the value is only substituted into the
+     * endpoint path via a `{fanOut}` placeholder (Coinbase `v2/accounts/{fanOut}/transactions`).
+     */
+    val param: String?,
     val values: ApiValueSet,
     val validAgainst: ApiValueSet? = null,
+    /**
+     * Keeps resolved values as the provider spelled them. By default every value is uppercased (asset
+     * and symbol codes); an opaque id, such as a lowercase account UUID, must not be. Omitted from JSON
+     * when false so existing strategies keep their hash.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val preserveCase: Boolean = false,
 )
 
 // ---------------------------------------------------------------------------------------------

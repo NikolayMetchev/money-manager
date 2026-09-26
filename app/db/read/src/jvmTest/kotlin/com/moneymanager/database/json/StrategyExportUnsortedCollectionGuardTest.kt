@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.ApiValueSet
+import com.moneymanager.domain.model.apistrategy.JwtSigningConfig
 import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
@@ -55,6 +56,10 @@ class StrategyExportUnsortedCollectionGuardTest {
             ApiStrategyConfig::class to "connectInstructions",
             ApiRequestSigningConfig::class to "message",
             SigPart.Sha256::class to "parts",
+            // A JWT's header/claims serialise in list order; first non-blank trade-group field wins.
+            JwtSigningConfig::class to "header",
+            JwtSigningConfig::class to "claims",
+            ApiTransactionMappings::class to "reconcileTradeAmountsFallbackFields",
             // Order-carrying by design: readable composite-key construction / template substitution
             // order. Neither is authored through a row-based UI editor (built-in-strategy code only),
             // so the false-conflict risk the guard protects against doesn't apply.

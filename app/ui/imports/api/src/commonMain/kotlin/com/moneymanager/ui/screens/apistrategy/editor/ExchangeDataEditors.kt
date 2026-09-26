@@ -318,6 +318,30 @@ internal fun TransactionMappingsFields(
             valueLabel = "Account name",
             enabled = enabled,
         )
+        TextFieldRow(
+            "Trade group field (optional, on excluded trade-type rows)",
+            mappings.reconcileTradeAmountsField.orEmpty(),
+            { onChange(mappings.copy(reconcileTradeAmountsField = it.ifBlank { null })) },
+            enabled,
+        )
+        StringListEditor(
+            label = "Fallback trade group fields (first non-blank wins)",
+            items = mappings.reconcileTradeAmountsFallbackFields,
+            onChange = { onChange(mappings.copy(reconcileTradeAmountsFallbackFields = it)) },
+            enabled = enabled,
+        )
+        TextFieldRow(
+            "Single-leg trade counter amount (optional, an {amount, currency} object)",
+            mappings.unpairedTradeLegCounterAmountField.orEmpty(),
+            { onChange(mappings.copy(unpairedTradeLegCounterAmountField = it.ifBlank { null })) },
+            enabled,
+        )
+        TextFieldRow(
+            "Single-leg trade funding account (optional)",
+            mappings.unpairedTradeLegFundingAccountName.orEmpty(),
+            { onChange(mappings.copy(unpairedTradeLegFundingAccountName = it.ifBlank { null })) },
+            enabled,
+        )
     }
 }
 
