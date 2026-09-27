@@ -30,6 +30,7 @@ androidx-sqlite = "2.7.1"
 androidx-test-core = "1.7.0"
 androidx-test-monitor = "1.8.0"
 androidx-test-runner = "1.7.0"
+androidx-test-uiautomator = "2.4.0"
 compose-charts = "1.0.0"
 compose-plugin = "1.12.1"
 compose-material-icons-desktop = "1.7.3"
@@ -58,6 +59,7 @@ mappie = "2.4.20-2.4.3"
 module-graph = "0.15.0"
 poi = "5.5.1"
 proguard = "7.8.2"
+junit = "4.13.2"
 metro = "1.4.5"
 mokkery = "3.5.0"
 schemaspy = "7.0.2"
@@ -121,6 +123,7 @@ androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidx-s
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test-core" }
 androidx-test-monitor = { module = "androidx.test:monitor", version.ref = "androidx-test-monitor" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
+androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "androidx-test-uiautomator" }
 compose-animation-core-desktop = { module = "org.jetbrains.compose.animation:animation-core-desktop", version.ref = "compose-plugin" }
 compose-charts = { module = "io.github.ehsannarmani:compose-charts", version.ref = "compose-charts" }
 compose-charts-desktop = { module = "io.github.ehsannarmani:compose-charts-desktop", version.ref = "compose-charts" }
@@ -155,6 +158,7 @@ detekt-gradle-plugin = { module = "dev.detekt:dev.detekt.gradle.plugin", version
 develocity-gradle-plugin = { module = "com.gradle:develocity-gradle-plugin", version.ref = "develocity" }
 diamondedge-logging = { module = "com.diamondedge:logging", version.ref = "diamondedge-logging" }
 human-readable = { module = "nl.jacobras:Human-Readable", version.ref = "human-readable" }
+junit = { module = "junit:junit", version.ref = "junit" }
 kmlogging = { module = "org.lighthousegames:logging", version.ref = "kmlogging" }
 kotlin-compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }

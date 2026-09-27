@@ -34,6 +34,9 @@ Build-speed flags (off by default): the Android release variant (R8/minified) on
 device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compiles them anyway).
 `-PtestMaxParallelForks=N` overrides the parallel test-fork default (e.g. `=1` to serialize), and
 `-PandroidCoverage=true` enables JaCoCo coverage for instrumented tests (main-branch CI passes it).
+`-PreleaseSmokeTest=true` builds the release variant debug-signed and enables `app/main/android-smoketest`:
+`./gradlew :app:main:android-smoketest:pixel6api36ReleaseAndroidTest -PreleaseSmokeTest=true --console=plain` installs the
+minified APK and drives first run. CI runs it only via the manual "Android Release Smoke Test" workflow (dispatch it on main or a PR branch).
 
 **Pre-push**: Always run `./gradlew build buildHealth` locally before pushing.
 
@@ -65,6 +68,7 @@ device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compil
 | `app/ui/core/` | Compose UI (JVM/Android only) |
 | `app/main/jvm/` | JVM Desktop entry point |
 | `app/main/android/` | Android entry point |
+| `app/main/android-smoketest/` | Self-instrumenting UiAutomator smoke test of the R8-minified release APK (only has a variant with `-PreleaseSmokeTest=true`) |
 
 ### Domain Entities
 
@@ -255,8 +259,8 @@ set of writes.
 - **Android Device Tests**: Use `:app:ui:core:pixel6api36AndroidDeviceTest` for UI tests on managed
   device emulator. **Android emulator API level sync**: change the level here and you must change it
   in `gradle/libs.versions.toml` (`android-targetSdk`), the Gradle managed device
-  (`moneymanager.android-convention.gradle.kts`), the CI emulator
-  (`.github/workflows/build.yml`) and the IntelliJ run configuration
+  (`moneymanager.android-convention.gradle.kts` and `app/main/android-smoketest/build.gradle.kts`),
+  the CI emulator (`.github/workflows/build.yml` and `.github/workflows/android-release-smoke-test.yml`) and the IntelliJ run configuration
   (`.idea/runConfigurations/Android_Tests.xml`) too.
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
 
