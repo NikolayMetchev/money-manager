@@ -352,11 +352,10 @@ jobs:
           QODANA_ENDPOINT: 'https://qodana.cloud'
         with:
           upload-result: true
-          # On PRs analyse only the changed files and fail solely on problems they introduce. The
-          # whole-project + cloud-baseline approach didn't subtract main's pre-existing problems on PR
-          # runs (they were all reported as "new"); push-to-main runs still do a full scan and refresh
-          # the baseline.
-          pr-mode: ${{ github.event_name == 'pull_request' }}
+          # Full scan on PRs too, not pr-mode: changed-files-only let a PR pass while breaking main
+          # (e.g. a change in one module making another module's code flaggable). Main carries no
+          # accepted findings, so with a fail threshold of 0 a PR fails exactly when main would.
+          pr-mode: false
           use-caches: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/') }}
       - name: Upload SARIF as artifact
         if: always()

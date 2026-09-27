@@ -60,15 +60,14 @@ class AccountAuditDiffTest {
         assertTrue(updateDiff.hasFieldChanges)
     }
 
-    private fun ownership(
+    private fun ownershipAdded(
         id: Long,
-        auditType: AuditType,
         timestampMs: Long,
         personName: String,
     ) = PersonAccountOwnershipAuditEntry(
         id = id,
         auditTimestamp = Instant.fromEpochMilliseconds(timestampMs),
-        auditType = auditType,
+        auditType = AuditType.INSERT,
         personAccountOwnershipId = id,
         revisionId = 1,
         personId = PersonId(id),
@@ -83,7 +82,7 @@ class AccountAuditDiffTest {
     fun `standalone owner add surfaces as its own diff`() {
         val entries = listOf(entry(id = 1, auditType = AuditType.INSERT, revisionId = 1, categoryName = null))
         // The ownership add happens well after the account INSERT (outside the matching window).
-        val ownershipEntries = listOf(ownership(id = 5, auditType = AuditType.INSERT, timestampMs = 60_000, personName = "Alice"))
+        val ownershipEntries = listOf(ownershipAdded(id = 5, timestampMs = 60_000, personName = "Alice"))
 
         val diffs =
             computeAccountAuditDiffs(
@@ -110,7 +109,7 @@ class AccountAuditDiffTest {
     fun `owner add concurrent with an account change attaches to that entry`() {
         val entries = listOf(entry(id = 1, auditType = AuditType.INSERT, revisionId = 1, categoryName = null))
         // Within the 2s window of the account INSERT (id=1 -> timestamp 1000ms).
-        val ownershipEntries = listOf(ownership(id = 6, auditType = AuditType.INSERT, timestampMs = 1500, personName = "Bob"))
+        val ownershipEntries = listOf(ownershipAdded(id = 6, timestampMs = 1500, personName = "Bob"))
 
         val diffs =
             computeAccountAuditDiffs(

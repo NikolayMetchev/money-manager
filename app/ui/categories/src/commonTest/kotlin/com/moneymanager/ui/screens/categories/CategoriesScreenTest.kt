@@ -13,28 +13,8 @@ import androidx.compose.ui.test.performTextInput
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.write.AccountAttributeWriteRepository
-import com.moneymanager.domain.repository.write.AccountMappingWriteRepository
-import com.moneymanager.domain.repository.write.AccountWriteRepository
-import com.moneymanager.domain.repository.write.ApiImportStrategyWriteRepository
-import com.moneymanager.domain.repository.write.ApiSessionWriteRepository
-import com.moneymanager.domain.repository.write.AttributeTypeWriteRepository
 import com.moneymanager.domain.repository.write.CategoryWriteRepository
-import com.moneymanager.domain.repository.write.CryptoWriteRepository
-import com.moneymanager.domain.repository.write.CsvImportStrategyWriteRepository
-import com.moneymanager.domain.repository.write.CsvImportWriteRepository
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
-import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
-import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
-import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
-import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
-import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
-import com.moneymanager.domain.repository.write.PersonWriteRepository
-import com.moneymanager.domain.repository.write.QifImportWriteRepository
-import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
-import com.moneymanager.domain.repository.write.SettingsWriteRepository
-import com.moneymanager.domain.repository.write.TradeWriteRepository
-import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
@@ -60,28 +40,28 @@ class CategoriesScreenTest {
     // and because it delegates to [categoryRepository], the existing verifySuspend assertions still hold.
     private fun importEngineFor(categoryRepository: CategoryWriteRepository): ImportEngine =
         ImportEngineImpl(
-            transactionRepository = mock<TransactionWriteRepository>(MockMode.autoUnit),
-            accountRepository = mock<AccountWriteRepository>(MockMode.autoUnit),
-            accountAttributeRepository = mock<AccountAttributeWriteRepository>(MockMode.autoUnit),
-            personRepository = mock<PersonWriteRepository>(MockMode.autoUnit),
-            personAttributeRepository = mock<PersonAttributeWriteRepository>(MockMode.autoUnit),
-            ownershipRepository = mock<PersonAccountOwnershipWriteRepository>(MockMode.autoUnit),
+            transactionRepository = mock(MockMode.autoUnit),
+            accountRepository = mock(MockMode.autoUnit),
+            accountAttributeRepository = mock(MockMode.autoUnit),
+            personRepository = mock(MockMode.autoUnit),
+            personAttributeRepository = mock(MockMode.autoUnit),
+            ownershipRepository = mock(MockMode.autoUnit),
             categoryRepository = categoryRepository,
-            currencyRepository = mock<CurrencyWriteRepository>(MockMode.autoUnit),
-            cryptoRepository = mock<CryptoWriteRepository>(MockMode.autoUnit),
-            tradeRepository = mock<TradeWriteRepository>(MockMode.autoUnit),
-            exchangeOrderRepository = mock<ExchangeOrderWriteRepository>(MockMode.autoUnit),
-            attributeTypeRepository = mock<AttributeTypeWriteRepository>(MockMode.autoUnit),
-            relationshipTypeRepository = mock<RelationshipTypeWriteRepository>(MockMode.autoUnit),
-            csvImportStrategyRepository = mock<CsvImportStrategyWriteRepository>(MockMode.autoUnit),
-            apiImportStrategyRepository = mock<ApiImportStrategyWriteRepository>(MockMode.autoUnit),
-            accountMappingRepository = mock<AccountMappingWriteRepository>(MockMode.autoUnit),
-            csvImportRepository = mock<CsvImportWriteRepository>(MockMode.autoUnit),
-            qifImportRepository = mock<QifImportWriteRepository>(MockMode.autoUnit),
-            apiSessionRepository = mock<ApiSessionWriteRepository>(MockMode.autoUnit),
-            settingsRepository = mock<SettingsWriteRepository>(MockMode.autoUnit),
-            importDirectoryRepository = mock<ImportDirectoryWriteRepository>(MockMode.autoUnit),
-            passThroughAccountRepository = mock<PassThroughAccountWriteRepository>(MockMode.autoUnit),
+            currencyRepository = mock(MockMode.autoUnit),
+            cryptoRepository = mock(MockMode.autoUnit),
+            tradeRepository = mock(MockMode.autoUnit),
+            exchangeOrderRepository = mock(MockMode.autoUnit),
+            attributeTypeRepository = mock(MockMode.autoUnit),
+            relationshipTypeRepository = mock(MockMode.autoUnit),
+            csvImportStrategyRepository = mock(MockMode.autoUnit),
+            apiImportStrategyRepository = mock(MockMode.autoUnit),
+            accountMappingRepository = mock(MockMode.autoUnit),
+            csvImportRepository = mock(MockMode.autoUnit),
+            qifImportRepository = mock(MockMode.autoUnit),
+            apiSessionRepository = mock(MockMode.autoUnit),
+            settingsRepository = mock(MockMode.autoUnit),
+            importDirectoryRepository = mock(MockMode.autoUnit),
+            passThroughAccountRepository = mock(MockMode.autoUnit),
         )
 
     private val fakeCurrencyRepository: CurrencyWriteRepository =
