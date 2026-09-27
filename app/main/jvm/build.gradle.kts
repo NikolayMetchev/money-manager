@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 plugins {
     id("moneymanager.kotlin-convention")
     alias(libs.plugins.compose)
@@ -109,6 +111,67 @@ compose.desktop {
             }
         }
     }
+}
+
+// ProGuard doesn't follow META-INF/services, so it silently strips classes that are only reached through
+// ServiceLoader (the SQLite JDBC driver, the crypto provider, ...) and the release app then fails at
+// runtime while the build still passes. Fail the build instead when a declared provider went missing.
+val verifyProguardServiceProviders =
+    tasks.register("verifyProguardServiceProviders") {
+        description = "Checks every META-INF/services provider survived ProGuard shrinking."
+        group = "verification"
+        dependsOn("proguardReleaseJars")
+        val proguardJarsDir = layout.buildDirectory.dir("compose/tmp/main-release/proguard")
+        val reportFile = layout.buildDirectory.file("reports/proguard/service-providers.txt")
+        inputs.dir(proguardJarsDir)
+        outputs.file(reportFile)
+        doLast {
+            val jars =
+                proguardJarsDir
+                    .get()
+                    .asFile
+                    .listFiles { file -> file.extension == "jar" }
+                    .orEmpty()
+            val classes = mutableSetOf<String>()
+            val providers = mutableListOf<Pair<String, String>>()
+            jars.forEach { jar ->
+                ZipFile(jar).use { zip ->
+                    zip.entries().asSequence().forEach { entry ->
+                        when {
+                            entry.name.endsWith(".class") ->
+                                classes += entry.name.removeSuffix(".class").replace('/', '.')
+                            entry.name.startsWith("META-INF/services/") && !entry.isDirectory ->
+                                zip
+                                    .getInputStream(entry)
+                                    .bufferedReader()
+                                    .readLines()
+                                    .map { it.substringBefore('#').trim() }
+                                    .filter { it.isNotEmpty() }
+                                    .forEach { providers += entry.name.removePrefix("META-INF/services/") to it }
+                        }
+                    }
+                }
+            }
+            // Annotation processors are compile-time only; the app never loads them
+            val missing =
+                providers.filter { (service, provider) ->
+                    service != "javax.annotation.processing.Processor" && provider !in classes
+                }
+            reportFile.get().asFile.writeText(
+                providers.joinToString("\n", postfix = "\n") { (service, provider) ->
+                    "${if (provider in classes) "ok" else "MISSING"} $service -> $provider"
+                },
+            )
+            check(missing.isEmpty()) {
+                "ProGuard removed ServiceLoader providers; add -keep rules to proguard-rules.pro:\n" +
+                    missing.joinToString("\n") { (service, provider) -> "  $service -> $provider" }
+            }
+        }
+    }
+
+// Every release installer (packageRelease{Deb,Dmg,Msi}) is built from this distributable
+tasks.matching { it.name == "createReleaseDistributable" }.configureEach {
+    dependsOn(verifyProguardServiceProviders)
 }
 
 // Handle duplicate JARs in distribution tasks
