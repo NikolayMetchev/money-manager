@@ -254,13 +254,13 @@ jobs:
     runs-on: windows-latest
     needs: [changes, lint-format]
     # Only release.yml ever configured the desktop app on Windows, so Windows-only breakage (like
-    # the WiX setup below) surfaced at release time while every Linux job stayed green.
+    # the WiX setup below) surfaced at release time while every Linux job stayed green. Main only:
+    # ProGuard alone takes ~17 minutes on a Windows runner, too slow to gate every PR on.
     if: >-
       !cancelled() &&
       needs.changes.outputs.code == 'true' &&
       (needs.lint-format.result == 'success' || needs.lint-format.result == 'skipped') &&
-      (github.event_name == 'pull_request' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code
@@ -274,7 +274,6 @@ jobs:
           # Compose configures WiX by registering tasks on the root project, which isolated projects
           # rejects (https://youtrack.jetbrains.com/issue/CMP-8375), so opt out for this build only.
           command: :app:main:jvm:packageReleaseMsi -Dorg.gradle.isolated-projects=false --stacktrace
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
   android-release:
