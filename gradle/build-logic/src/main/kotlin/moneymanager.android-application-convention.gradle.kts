@@ -57,7 +57,15 @@ configure<ApplicationExtension> {
 // R8 minification + resource shrinking of the release variant costs minutes on every build, so the
 // variant only exists when explicitly requested: the release workflow and the main-branch CI job
 // pass -PbuildRelease=true; PR and local builds assemble debug only.
-val buildRelease = providers.gradleProperty("buildRelease").map(String::toBoolean).getOrElse(false)
+// -PreleaseSmokeTest=true (app/main/android-smoketest) also builds it, signed with the debug key so
+// the minified APK can be installed on an emulator; the published release APK stays unsigned.
+val releaseSmokeTest = providers.gradleProperty("releaseSmokeTest").map(String::toBoolean).getOrElse(false)
+val buildRelease = releaseSmokeTest || providers.gradleProperty("buildRelease").map(String::toBoolean).getOrElse(false)
+if (releaseSmokeTest) {
+    configure<ApplicationExtension> {
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("debug")
+    }
+}
 configure<ApplicationAndroidComponentsExtension> {
     beforeVariants(selector().withBuildType("release")) { variant ->
         variant.enable = buildRelease

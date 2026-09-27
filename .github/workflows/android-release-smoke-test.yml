@@ -1,0 +1,108 @@
+name: Android Release Smoke Test
+
+# Installs the R8-minified release APK on an emulator and drives first run (app/main/android-smoketest).
+# The instrumented tests in build.yml only run the unminified debug build, so this is the only check
+# that the shrunk app actually starts. Manual only: dispatch it on main, or on a PR's branch to check
+# that PR (`gh workflow run android-release-smoke-test.yml --ref <branch>`).
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: Release APK Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android/sdk/ndk
+          sudo rm -rf /opt/ghc
+          df -h
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Setup Gradle environment
+        uses: ./.github/actions/gradle-setup
+        with:
+          cache-read-only: true
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+
+      # Same key as build.yml's android-test job, so the snapshot it saves on main is reused here.
+      - name: AVD cache
+        uses: actions/cache@v6
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          # Android emulator API level sync: update with the Gradle managed device,
+          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
+          key: avd-pixel6-api36-aosp-atd-${{ runner.os }}
+
+      - name: Create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          # Android emulator API level sync: update with the Gradle managed device,
+          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
+          api-level: 36
+          arch: x86_64
+          profile: pixel_6
+          target: aosp_atd
+          # The API-36 ATD images are only published on the dev sdkmanager channel.
+          channel: dev
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: echo "Generated AVD snapshot for caching."
+
+      # Build before booting the emulator, so the R8 build's minutes aren't spent with it idling.
+      - name: Build release APK and smoke test APK
+        env:
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+        run: >-
+          ./gradlew :app:main:android:assembleRelease :app:main:android-smoketest:assembleRelease
+          -PreleaseSmokeTest=true --stacktrace --console=plain
+
+      - name: Run release smoke test
+        timeout-minutes: 20
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+        with:
+          # Android emulator API level sync: update with the Gradle managed device,
+          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
+          api-level: 36
+          arch: x86_64
+          profile: pixel_6
+          target: aosp_atd
+          # The API-36 ATD images are only published on the dev sdkmanager channel.
+          channel: dev
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: ./gradlew :app:main:android-smoketest:connectedReleaseAndroidTest -PreleaseSmokeTest=true --stacktrace --console=plain
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-release-smoke-test-results
+          path: |
+            app/main/android-smoketest/build/reports/androidTests/**
+            app/main/android-smoketest/build/outputs/androidTest-results/**
+          retention-days: 7

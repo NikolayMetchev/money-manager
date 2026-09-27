@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Lets the self-instrumenting test resolve the app it drives (Android 11+ package visibility). -->
+    <queries>
+        <package android:name="com.moneymanager" />
+    </queries>
+</manifest>
