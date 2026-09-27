@@ -98,6 +98,10 @@ exclude:
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/CsvImportApplier.kt
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/CsvReimport.kt
       - app/qifimporter/src/commonMain/kotlin/com/moneymanager/qifimporter/QifReimport.kt
+      # Production code builds these audit entries only through Mappie mappers, whose constructor
+      # calls are generated at compile time, so the linter sees nothing but test fixtures' constants.
+      - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/AccountAuditEntry.kt
+      - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/PersonAccountOwnershipAuditEntry.kt
 
   # [4] — platform capability methods and an interface default that intentionally return a
   # constant (both platforms support every provider; non-token backends return null), plus test
