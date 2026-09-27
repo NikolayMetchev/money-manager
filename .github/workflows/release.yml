@@ -81,7 +81,9 @@ jobs:
         include:
           - platform: Windows
             os: windows-latest
-            task: :app:main:jvm:packageReleaseMsi
+            # Compose configures WiX by registering tasks on the root project, which isolated projects
+            # rejects (https://youtrack.jetbrains.com/issue/CMP-8375), so opt out for this build only.
+            task: :app:main:jvm:packageReleaseMsi -Dorg.gradle.isolated-projects=false
             artifact-name: windows-installer
             artifact-path: app/main/jvm/build/compose/binaries/main-release/msi/*.msi
           - platform: macOS
