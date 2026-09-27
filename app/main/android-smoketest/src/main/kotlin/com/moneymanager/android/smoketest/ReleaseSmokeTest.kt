@@ -48,7 +48,11 @@ class ReleaseSmokeTest {
         waitFor("Accounts")
         for (screen in listOf("Categories", "People", "Imports", "Settings", "Accounts")) {
             tap(screen)
-            device.waitForIdle()
+            // Every label stays in the navigation bar, so only its selected state shows the tap landed.
+            if (!device.wait(Until.hasObject(By.selected(true).hasDescendant(By.text(screen))), TIMEOUT_MILLIS)) {
+                assertAppAlive("after opening $screen")
+                failShowingScreen("Tapping \"$screen\" never selected it")
+            }
             assertAppAlive("after opening $screen")
         }
     }
@@ -60,8 +64,12 @@ class ReleaseSmokeTest {
             dismissSystemAnrDialog()
         }
         assertAppAlive("while waiting for \"$text\"")
-        val screen = ByteArrayOutputStream().also(device::dumpWindowHierarchy).toString()
-        fail("\"$text\" never appeared on screen. Window hierarchy:\n$screen")
+        failShowingScreen("\"$text\" never appeared on screen")
+    }
+
+    private fun failShowingScreen(message: String): Nothing {
+        val hierarchy = ByteArrayOutputStream().also(device::dumpWindowHierarchy).toString()
+        throw AssertionError("$message. Window hierarchy:\n$hierarchy")
     }
 
     // A freshly booted emulator often shows "Process system isn't responding" over the app.

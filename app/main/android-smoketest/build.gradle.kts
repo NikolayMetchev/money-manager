@@ -8,7 +8,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // with) the app's obfuscated classes.
 //
 // The release variant only exists with -PreleaseSmokeTest=true, which also debug-signs it:
-//   ./gradlew :app:main:android-smoketest:pixel6api36ReleaseAndroidTest -PreleaseSmokeTest=true
+//   ./gradlew :app:main:android-smoketest:pixel6api36ReleaseAndroidTest -PreleaseSmokeTest=true --console=plain
 plugins {
     id("moneymanager.kotlin-convention")
     id("com.android.test")

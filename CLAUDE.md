@@ -35,7 +35,7 @@ device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compil
 `-PtestMaxParallelForks=N` overrides the parallel test-fork default (e.g. `=1` to serialize), and
 `-PandroidCoverage=true` enables JaCoCo coverage for instrumented tests (main-branch CI passes it).
 `-PreleaseSmokeTest=true` builds the release variant debug-signed and enables `app/main/android-smoketest`:
-`./gradlew :app:main:android-smoketest:pixel6api36ReleaseAndroidTest -PreleaseSmokeTest=true` installs the
+`./gradlew :app:main:android-smoketest:pixel6api36ReleaseAndroidTest -PreleaseSmokeTest=true --console=plain` installs the
 minified APK and drives first run. CI runs it only via the manual "Android Release Smoke Test" workflow (dispatch it on main or a PR branch).
 
 **Pre-push**: Always run `./gradlew build buildHealth` locally before pushing.
