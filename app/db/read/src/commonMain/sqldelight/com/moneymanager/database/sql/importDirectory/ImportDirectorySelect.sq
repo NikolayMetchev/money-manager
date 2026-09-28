@@ -35,3 +35,10 @@ LEFT JOIN import_directory p ON p.id = d.parent_id
 LEFT JOIN import_directory_file_csv_import c ON c.file_id = f.id
 LEFT JOIN import_directory_file_qif_import q ON q.file_id = f.id
 WHERE COALESCE(d.account_id, p.account_id) IS NOT NULL;
+
+-- The directory every directory-scanned CSV import came from, for grouping/labelling the CSV imports
+-- screen. An import reused by checksum across directories appears once per directory.
+selectCsvImportDirectories:
+SELECT c.csv_import_id, f.directory_id
+FROM import_directory_file f
+JOIN import_directory_file_csv_import c ON c.file_id = f.id;

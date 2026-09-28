@@ -18,6 +18,7 @@ kotlin {
                 api(projects.app.model.timeline)
                 api(projects.app.ui.audit)
 
+                implementation(projects.app.model.importdirectory)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
                 implementation(projects.utils.compose.filePicker)
@@ -44,6 +45,7 @@ kotlin {
                 api(libs.androidx.compose.ui)
 
                 implementation(projects.app.db.read)
+                implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.passthrough)
                 implementation(libs.androidx.compose.animation)
                 implementation(libs.androidx.compose.animation.core)
@@ -74,6 +76,7 @@ kotlin {
 
                 implementation(projects.app.db.read)
                 implementation(projects.app.model.accountmapping)
+                implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.passthrough)
                 implementation(projects.app.model.timeline)
                 implementation(libs.compose.animation.core.desktop)
@@ -90,6 +93,7 @@ kotlin {
         }
         getByName("jvmTest") {
             dependencies {
+                implementation(projects.app.model.importdirectory)
                 implementation(kotlin("test"))
                 implementation(compose.desktop.currentOs)
                 implementation(libs.compose.ui.test.desktop)
@@ -97,6 +101,7 @@ kotlin {
         }
         getByName("androidDeviceTest") {
             dependencies {
+                implementation(projects.app.model.importdirectory)
                 implementation(projects.test.app.ui)
                 implementation(libs.androidx.compose.ui.test)
             }

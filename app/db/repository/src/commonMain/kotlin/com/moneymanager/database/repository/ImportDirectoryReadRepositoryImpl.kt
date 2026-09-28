@@ -110,6 +110,19 @@ class ImportDirectoryReadRepositoryImpl(
                 }.toUnambiguousMap()
         }
 
+    override fun csvImportDirectories(): Flow<Map<CsvImportId, List<ImportDirectoryId>>> =
+        selectQueries
+            .selectCsvImportDirectories()
+            .asFlow()
+            .mapToList(coroutineContext)
+            .map { rows ->
+                rows
+                    .groupBy(
+                        { CsvImportId(Uuid.parse(it.csv_import_id)) },
+                        { ImportDirectoryId(Uuid.parse(it.directory_id)) },
+                    ).mapValues { (_, directoryIds) -> directoryIds.distinct() }
+            }
+
     /**
      * A staged import can be reused (by content checksum) across more than one directory, so the same
      * import id can appear here paired with a DIFFERENT directory's account. Collapsing that with a

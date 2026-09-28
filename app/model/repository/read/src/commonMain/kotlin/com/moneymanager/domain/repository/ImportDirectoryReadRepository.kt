@@ -33,4 +33,12 @@ interface ImportDirectoryReadRepository {
 
     /** QIF equivalent of [csvImportSourceAccounts]. */
     suspend fun qifImportSourceAccounts(): Map<QifImportId, AccountId>
+
+    /**
+     * The directories every directory-scanned CSV import was staged from. A list because an import can be
+     * reused (by content checksum) across more than one directory. Imports added via the file picker have
+     * no entry. A flow over the link table itself: a scan that reuses an existing import only adds a link,
+     * leaving the import list unchanged, so watching imports alone would miss it.
+     */
+    fun csvImportDirectories(): Flow<Map<CsvImportId, List<ImportDirectoryId>>>
 }

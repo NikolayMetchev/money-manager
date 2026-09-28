@@ -48,6 +48,7 @@ fun ImportFileCard(
     ignored: Boolean,
     onClick: () -> Unit,
     onSetIgnored: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
     details: @Composable ColumnScope.(Color) -> Unit = {},
     footer: @Composable ColumnScope.(Color) -> Unit = {},
 ) {
@@ -67,7 +68,7 @@ fun ImportFileCard(
 
     Card(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = containerColor),

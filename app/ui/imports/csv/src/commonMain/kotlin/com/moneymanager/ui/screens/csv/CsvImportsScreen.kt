@@ -1,5 +1,6 @@
 package com.moneymanager.ui.screens.csv
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -27,8 +29,11 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.rememberBinaryFilePicker
 import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
@@ -40,11 +45,11 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
@@ -121,9 +126,16 @@ fun CsvImportsScreen(
     // The account files scanned from each import directory belong to (see ImportDirectory.accountId),
     // used below for files whose applied/matched strategy has no hard-coded SOURCE_ACCOUNT of its own.
     var directoryAccounts by remember { mutableStateOf<Map<CsvImportId, AccountId>>(emptyMap()) }
+    val directories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        importDirectoryRepository.getAllDirectories()
+    }
+    val importDirectoryIds by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
+        importDirectoryRepository.csvImportDirectories()
+    }
     LaunchedEffect(imports) {
         directoryAccounts = importDirectoryRepository.csvImportSourceAccounts()
     }
+    val importDirectories = remember(importDirectoryIds, directories) { resolveImportDirectories(importDirectoryIds, directories) }
 
     // Unimported files carry no stored strategy, so match one per file the same way "Import all" does
     // (content/filename-aware, needs each file's columns + sampled rows — not in getAllImports()), to
@@ -373,6 +385,7 @@ fun CsvImportsScreen(
                             import = import,
                             dateRange = dateRanges[import.id.id.toString()],
                             sourceAccountName = resolveSourceAccountName(import, strategies, directoryAccounts, accounts),
+                            sourceDirectories = importDirectories[import.id].orEmpty(),
                             onClick = { onImportClick(import.id) },
                             ignored = true,
                             onSetIgnored = { ignore ->
@@ -382,68 +395,73 @@ fun CsvImportsScreen(
                     }
                 }
             } else {
-                val groups =
-                    remember(unimported, importedList, matchedStrategies, selectedTab) {
-                        if (selectedTab == ImportTab.UNIMPORTED) {
-                            buildUnimportedStrategyGroups(unimported, matchedStrategies)
-                        } else {
-                            buildImportedStrategyGroups(importedList)
-                        }
-                    }
                 val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    groups.forEach { group ->
-                        val sectionKey = "$selectedTab:${group.key?.toString() ?: "none"}"
-                        val expanded = expandedSections[sectionKey] ?: true
-                        item(key = "header-$sectionKey") {
-                            val isNoStrategyGroup =
-                                selectedTab == ImportTab.UNIMPORTED && group.key == null && group.actionable
-                            StrategySectionHeader(
-                                title = group.label,
-                                count = group.imports.size,
-                                expanded = expanded,
-                                onToggleExpanded = { expandedSections[sectionKey] = !expanded },
-                                actionLabel =
-                                    when {
-                                        !group.actionable -> null
-                                        isNoStrategyGroup -> "Ignore all"
-                                        selectedTab == ImportTab.UNIMPORTED -> "Import all"
-                                        else -> "Re-import all"
-                                    },
-                                onAction = {
-                                    when {
-                                        isNoStrategyGroup ->
-                                            scope.launch {
-                                                group.imports.forEach { importEngine.setCsvImportIgnored(it.id, true) }
-                                            }
-                                        selectedTab == ImportTab.UNIMPORTED -> importAllScope = group.imports
-                                        else -> reimportAllScope = group.imports
-                                    }
-                                },
-                                isWarning = group.isWarning,
-                            )
+                val onSetIgnored: (CsvImport, Boolean) -> Unit = { import, ignore ->
+                    scope.launch { importEngine.setCsvImportIgnored(import.id, ignore) }
+                }
+                if (selectedTab == ImportTab.UNIMPORTED) {
+                    val tree =
+                        remember(unimported, importDirectories, directories, matchedStrategies) {
+                            buildUnimportedDirectoryTree(unimported, importDirectories, directories, matchedStrategies)
                         }
-                        if (expanded) {
-                            items(group.imports, key = { it.id.toString() }) { import ->
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        tree.forEach { root ->
+                            directoryTreeItems(
+                                node = root,
+                                depth = 0,
+                                expandedSections = expandedSections,
+                                onImportAll = { importAllScope = it },
+                                onIgnoreAll = { files ->
+                                    scope.launch { files.forEach { importEngine.setCsvImportIgnored(it.id, true) } }
+                                },
+                            ) { import, group, indent ->
                                 CsvImportCard(
                                     import = import,
                                     dateRange = dateRanges[import.id.id.toString()],
                                     sourceAccountName = resolveSourceAccountName(import, strategies, directoryAccounts, accounts),
-                                    matchedStrategyName =
-                                        if (selectedTab == ImportTab.UNIMPORTED && group.actionable && !group.isWarning) {
-                                            group.label
-                                        } else {
-                                            null
-                                        },
-                                    noMatchingStrategy = selectedTab == ImportTab.UNIMPORTED && group.isWarning,
+                                    matchedStrategyName = group.label.takeIf { group.actionable && !group.isWarning },
+                                    noMatchingStrategy = group.isWarning,
                                     onClick = { onImportClick(import.id) },
                                     ignored = false,
-                                    onSetIgnored = { ignore ->
-                                        scope.launch { importEngine.setCsvImportIgnored(import.id, ignore) }
-                                    },
+                                    onSetIgnored = { onSetIgnored(import, it) },
+                                    modifier = Modifier.padding(start = indent),
                                 )
+                            }
+                        }
+                    }
+                } else {
+                    val groups = remember(importedList) { buildImportedStrategyGroups(importedList) }
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        groups.forEach { group ->
+                            val sectionKey = "imported:${group.key?.toString() ?: "none"}"
+                            val expanded = expandedSections[sectionKey] ?: true
+                            item(key = "header-$sectionKey") {
+                                ImportSectionHeader(
+                                    title = group.label,
+                                    count = group.imports.size,
+                                    expanded = expanded,
+                                    onToggleExpanded = { expandedSections[sectionKey] = !expanded },
+                                    actionLabel = "Re-import all",
+                                    onAction = { reimportAllScope = group.imports },
+                                    isWarning = group.isWarning,
+                                )
+                            }
+                            if (expanded) {
+                                items(group.imports, key = { it.id.toString() }) { import ->
+                                    CsvImportCard(
+                                        import = import,
+                                        dateRange = dateRanges[import.id.id.toString()],
+                                        sourceAccountName = resolveSourceAccountName(import, strategies, directoryAccounts, accounts),
+                                        sourceDirectories = importDirectories[import.id].orEmpty(),
+                                        onClick = { onImportClick(import.id) },
+                                        ignored = false,
+                                        onSetIgnored = { onSetIgnored(import, it) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -453,66 +471,70 @@ fun CsvImportsScreen(
     }
 }
 
-/**
- * One strategy's files within a tab; [key] is null for the "no strategy"/"unknown strategy" bucket.
- * [actionable] is false only for the transient "still matching" bucket, which has no scoped action yet.
- */
-private data class CsvStrategyGroup(
-    val key: CsvImportStrategyId?,
-    val label: String,
-    val imports: List<CsvImport>,
-    val isWarning: Boolean = false,
-    val actionable: Boolean = true,
-)
+private val TREE_INDENT = 20.dp
 
 /**
- * Groups already-imported files by the strategy they were last applied with — a field every
- * [CsvImport] already carries, so no extra queries are needed. "No strategy" first, this stays sorted
- * by label with a fallback "Unknown strategy" bucket kept last (below) for imports whose applied
- * strategy has since been deleted or otherwise lost its name.
+ * Emits [node]'s folder header and, when expanded, its subfolders (first, as in a file tree) then its
+ * own files split by strategy, each level indented one [TREE_INDENT] further.
  */
-private fun buildImportedStrategyGroups(importedList: List<CsvImport>): List<CsvStrategyGroup> =
-    importedList
-        .groupBy { it.lastAppliedStrategyId }
-        .map { (id, files) ->
-            val label = files.firstOrNull { !it.lastAppliedStrategyName.isNullOrBlank() }?.lastAppliedStrategyName
-            CsvStrategyGroup(key = id, label = label ?: "Unknown strategy", imports = files)
-        }.sortedBy { it.label.lowercase() }
-
-/**
- * Groups unimported files by their auto-matched strategy ([matches], built by content/filename-aware
- * [selectForCsv] since these files have no stored strategy yet). Files with no match ([matches] value
- * null) form a "No strategy" group surfaced first with warning styling, so they're never lost among
- * matched files. While [matches] hasn't finished resolving, every file is shown under one "Matching
- * strategies…" bucket with no scoped action, rather than leaving the tab blank.
- */
-private fun buildUnimportedStrategyGroups(
-    unimported: List<CsvImport>,
-    matches: Map<CsvImportId, CsvImportStrategy?>?,
-): List<CsvStrategyGroup> {
-    if (matches == null) {
-        return listOf(
-            CsvStrategyGroup(key = null, label = "Matching strategies…", imports = unimported, actionable = false),
+@Suppress("LongParameterList")
+private fun LazyListScope.directoryTreeItems(
+    node: CsvDirectoryNode,
+    depth: Int,
+    expandedSections: SnapshotStateMap<String, Boolean>,
+    onImportAll: (List<CsvImport>) -> Unit,
+    onIgnoreAll: (List<CsvImport>) -> Unit,
+    card: @Composable (CsvImport, CsvStrategyGroup, Dp) -> Unit,
+) {
+    val expanded = expandedSections[node.key] ?: true
+    item(key = "header-${node.key}") {
+        ImportSectionHeader(
+            title = node.label,
+            count = node.allImports.size,
+            expanded = expanded,
+            onToggleExpanded = { expandedSections[node.key] = !expanded },
+            actionLabel = "Import all",
+            onAction = { onImportAll(node.allImports) },
+            isWarning = false,
+            titleStyle = if (depth == 0) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
+            indent = TREE_INDENT * depth,
+            badge = node.provider?.label(),
         )
     }
-    val byStrategyId = unimported.groupBy { matches[it.id]?.id }
-    val noStrategy = byStrategyId[null].orEmpty()
-    val strategyById = matches.values.filterNotNull().associateBy { it.id }
-    val withStrategy =
-        byStrategyId.entries
-            .filter { it.key != null }
-            .map { (id, files) -> CsvStrategyGroup(key = id, label = strategyById[id]?.name ?: "Unknown strategy", imports = files) }
-            .sortedBy { it.label.lowercase() }
-    return buildList {
-        if (noStrategy.isNotEmpty()) {
-            add(CsvStrategyGroup(key = null, label = "No strategy", imports = noStrategy, isWarning = true))
+    if (!expanded) return
+    node.children.forEach { child ->
+        directoryTreeItems(child, depth + 1, expandedSections, onImportAll, onIgnoreAll, card)
+    }
+    val groupIndent = TREE_INDENT * (depth + 1)
+    node.strategyGroups.forEach { group ->
+        val sectionKey = "${node.key}:strategy:${group.key?.toString() ?: "none"}"
+        val groupExpanded = expandedSections[sectionKey] ?: true
+        item(key = "header-$sectionKey") {
+            val isNoStrategyGroup = group.key == null && group.actionable
+            ImportSectionHeader(
+                title = group.label,
+                count = group.imports.size,
+                expanded = groupExpanded,
+                onToggleExpanded = { expandedSections[sectionKey] = !groupExpanded },
+                actionLabel =
+                    when {
+                        !group.actionable -> null
+                        isNoStrategyGroup -> "Ignore all"
+                        else -> "Import all"
+                    },
+                onAction = { if (isNoStrategyGroup) onIgnoreAll(group.imports) else onImportAll(group.imports) },
+                isWarning = group.isWarning,
+                indent = groupIndent,
+            )
         }
-        addAll(withStrategy)
+        if (groupExpanded) {
+            items(group.imports, key = { it.id.toString() }) { import -> card(import, group, groupIndent + TREE_INDENT) }
+        }
     }
 }
 
 @Composable
-private fun StrategySectionHeader(
+private fun ImportSectionHeader(
     title: String,
     count: Int,
     expanded: Boolean,
@@ -520,6 +542,10 @@ private fun StrategySectionHeader(
     actionLabel: String?,
     onAction: () -> Unit,
     isWarning: Boolean,
+    titleStyle: TextStyle = MaterialTheme.typography.titleSmall,
+    indent: Dp = 0.dp,
+    // A small tag after the title, e.g. whether a directory is on Google Drive or local.
+    badge: String? = null,
 ) {
     val titleColor = if (isWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
     Row(
@@ -527,7 +553,7 @@ private fun StrategySectionHeader(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onToggleExpanded)
-                .padding(vertical = 4.dp),
+                .padding(start = indent, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -543,9 +569,21 @@ private fun StrategySectionHeader(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = if (isWarning) "⚠ $title ($count)" else "$title ($count)",
-                style = MaterialTheme.typography.titleSmall,
+                style = titleStyle,
                 color = titleColor,
             )
+            if (badge != null) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = badge,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier =
+                        Modifier
+                            .background(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.shapes.small)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
         }
         if (actionLabel != null) {
             TextButton(onClick = onAction) { Text(actionLabel) }
@@ -583,6 +621,10 @@ private fun CsvImportCard(
     onClick: () -> Unit,
     ignored: Boolean,
     onSetIgnored: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    // The directories the file was scanned from; shown where the list isn't already a directory tree.
+    // Null omits the line (in the Unimported tab the tree already places the file in its folder).
+    sourceDirectories: List<ImportDirectory>? = null,
     // Auto-matched strategy name for an unimported file (null elsewhere, and null when unmatched — see
     // [noMatchingStrategy]). Already-imported cards show their strategy via `lastAppliedStrategyName` below.
     matchedStrategyName: String? = null,
@@ -601,11 +643,19 @@ private fun CsvImportCard(
         ignored = ignored,
         onClick = onClick,
         onSetIgnored = onSetIgnored,
+        modifier = modifier,
         details = { metadataColor ->
             ImportCardDetailText(
                 text = "Source account: ${sourceAccountName ?: "Not set — choose at import"}",
                 color = metadataColor,
             )
+            if (sourceDirectories != null) {
+                val directoryText =
+                    sourceDirectories
+                        .joinToString { "${it.listLabel()} (${it.provider.label()})" }
+                        .ifEmpty { MANUALLY_ADDED_LABEL }
+                ImportCardDetailText(text = "Directory: $directoryText", color = metadataColor)
+            }
             if (matchedStrategyName != null) {
                 ImportCardDetailText(text = "Strategy: $matchedStrategyName", color = metadataColor)
             } else if (noMatchingStrategy) {

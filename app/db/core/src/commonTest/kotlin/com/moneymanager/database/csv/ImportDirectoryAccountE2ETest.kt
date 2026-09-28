@@ -161,6 +161,32 @@ class ImportDirectoryAccountE2ETest : DbTest() {
     }
 
     @Test
+    fun `csvImportDirectories maps each scanned file to its directory and omits manual imports`() =
+        runTest {
+            val first = directory("First", accountId = null)
+            val second = directory("Second", accountId = null)
+            stageInto(first, "first.csv", monzoCsv("tx-first"))
+            stageInto(second, "second.csv", monzoCsv("tx-second"))
+            val manual = stage("manual.csv", monzoCsv("tx-manual"))
+
+            val importsByName =
+                repositories.csvImportRepository
+                    .getAllImports()
+                    .first()
+                    .associateBy { it.originalFileName }
+            val directories = repositories.importDirectoryRepository.csvImportDirectories().first()
+
+            assertEquals(
+                mapOf(
+                    importsByName.getValue("first.csv").id to listOf(first.id),
+                    importsByName.getValue("second.csv").id to listOf(second.id),
+                ),
+                directories,
+            )
+            assertEquals(null, directories[manual.id])
+        }
+
+    @Test
     fun twoDirectoriesWithDifferentAccounts_eachFileLandsOnItsOwnAccount() =
         runTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
