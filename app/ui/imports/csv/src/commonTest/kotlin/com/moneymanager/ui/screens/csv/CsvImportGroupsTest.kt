@@ -19,7 +19,14 @@ class CsvImportGroupsTest {
     private val monzoB = csvImport("monzo-b.csv")
     private val unmatched = csvImport("weird.csv")
     private val manual = csvImport("manual.csv")
-    private val monzo = strategy("Monzo CSV")
+    private val monzo =
+        CsvImportStrategy(
+            id = CsvImportStrategyId(Uuid.random()),
+            name = "Monzo CSV",
+            config = CsvStrategyConfig(identificationColumns = emptySet(), fieldMappings = emptyMap()),
+            createdAt = Instant.fromEpochMilliseconds(0),
+            updatedAt = Instant.fromEpochMilliseconds(0),
+        )
 
     private val drive =
         directory(displayPath = "My Drive / Statements", folderRef = "drive-root", provider = ImportDirectoryProvider.GDRIVE)
@@ -109,15 +116,6 @@ class CsvImportGroupsTest {
             deviceInfo = DeviceInfo.Jvm("os", "machine"),
             fileChecksum = fileName,
             fileLastModified = Instant.fromEpochMilliseconds(0),
-        )
-
-    private fun strategy(name: String) =
-        CsvImportStrategy(
-            id = CsvImportStrategyId(Uuid.random()),
-            name = name,
-            config = CsvStrategyConfig(identificationColumns = emptySet(), fieldMappings = emptyMap()),
-            createdAt = Instant.fromEpochMilliseconds(0),
-            updatedAt = Instant.fromEpochMilliseconds(0),
         )
 
     private fun directory(
