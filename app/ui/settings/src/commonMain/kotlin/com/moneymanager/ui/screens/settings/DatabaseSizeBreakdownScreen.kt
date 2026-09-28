@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.humanreadable.HumanReadable
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ScreenSizeClass
 import com.moneymanager.ui.util.formatGroupedNumber
@@ -64,7 +65,6 @@ import ir.ehsannarmani.compose_charts.models.Pie
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import nl.jacobras.humanreadable.HumanReadable
 import kotlin.math.PI
 import kotlin.math.acos
 import kotlin.math.roundToInt

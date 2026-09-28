@@ -1,4 +1,7 @@
+import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 plugins {
     id("moneymanager.kotlin-convention")
@@ -39,6 +42,87 @@ dependencies {
     runtimeOnly(compose.desktop.currentOs)
     runtimeOnly(libs.log4j.core)
     runtimeOnly(libs.log4j.slf4j2.impl)
+}
+
+// sqlite-jdbc bundles its JNI library for ~24 OS/arch combinations (~11 MB compressed), and every
+// installer would ship all of them. jpackage bundles the host's JRE, so each installer only ever runs
+// on the OS/arch it was built on: keep that one native library and drop the rest.
+abstract class StripForeignSqliteNatives : TransformAction<StripForeignSqliteNatives.Parameters> {
+    interface Parameters : TransformParameters {
+        /** sqlite-jdbc's folder for the host, e.g. `Linux/x86_64` (see `org.sqlite.util.OSInfo`). */
+        @get:Input
+        val hostNativeFolder: Property<String>
+    }
+
+    @get:InputArtifact
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val inputArtifact: Provider<FileSystemLocation>
+
+    override fun transform(outputs: TransformOutputs) {
+        val input = inputArtifact.get().asFile
+        if (!input.name.startsWith("sqlite-jdbc-")) {
+            outputs.file(input)
+            return
+        }
+        val nativeRoot = "org/sqlite/native/"
+        val keep = "$nativeRoot${parameters.hostNativeFolder.get()}/"
+        var keptNative = false
+        ZipInputStream(input.inputStream().buffered()).use { zipIn ->
+            ZipOutputStream(outputs.file(input.name).outputStream().buffered()).use { zipOut ->
+                generateSequence { zipIn.nextEntry }.forEach { entry ->
+                    val name = entry.name
+                    val isForeignNative =
+                        name.startsWith(nativeRoot) && !name.startsWith(keep) && !keep.startsWith(name)
+                    if (!isForeignNative) {
+                        keptNative = keptNative || (name.startsWith(keep) && !entry.isDirectory)
+                        zipOut.putNextEntry(ZipEntry(name).apply { time = entry.time })
+                        zipIn.copyTo(zipOut)
+                        zipOut.closeEntry()
+                    }
+                }
+            }
+        }
+        check(keptNative) {
+            "${input.name} has no native library under $keep; the app couldn't open a database on this host"
+        }
+    }
+}
+
+// Mirrors sqlite-jdbc's OSInfo naming for the platforms we build installers on
+fun sqliteNativeFolder(): String {
+    val osName = System.getProperty("os.name")
+    val os =
+        when {
+            osName.startsWith("Windows") -> "Windows"
+            osName.startsWith("Mac") || osName.startsWith("Darwin") -> "Mac"
+            osName.startsWith("Linux") -> "Linux"
+            else -> osName.replace(" ", "")
+        }
+    val arch =
+        when (val osArch = System.getProperty("os.arch").lowercase()) {
+            "amd64", "x86_64", "x64" -> "x86_64"
+            "arm64", "aarch64" -> "aarch64"
+            "x86", "i386", "i486", "i586", "i686" -> "x86"
+            else -> osArch
+        }
+    return "$os/$arch"
+}
+
+val sqliteNativesStripped = Attribute.of("moneymanager.sqliteNativesStripped", Boolean::class.javaObjectType)
+
+dependencies {
+    attributesSchema { attribute(sqliteNativesStripped) }
+    artifactTypes.getByName("jar").attributes.attribute(sqliteNativesStripped, false)
+    registerTransform(StripForeignSqliteNatives::class) {
+        from.attribute(sqliteNativesStripped, false)
+        to.attribute(sqliteNativesStripped, true)
+        parameters.hostNativeFolder.set(sqliteNativeFolder())
+    }
+}
+
+// runtimeClasspath feeds `run`, the distributables and ProGuard, so all of them get the stripped jar
+configurations.named("runtimeClasspath") {
+    attributes.attribute(sqliteNativesStripped, true)
 }
 
 // Copy VERSION file to resources

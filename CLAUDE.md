@@ -49,6 +49,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `gradle/build-logic/` | Convention plugins (kotlin, android, compose, metro, mappie) |
 | `utils/bigdecimal/` | Arbitrary-precision decimal arithmetic (JVM/Android) |
 | `utils/currency/` | Locale-aware currency formatting |
+| `utils/humanreadable/` | English file-size / duration / "time ago" formatting (replaces Human-Readable, whose localisation layer pulled ICU4J into the desktop build) |
 | `utils/archive/` | Compress + password-encrypt the DB archive (`ArchiveCodec`); shared by remote backends |
 | `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` |
 | `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core`; `qif`→`csv`, `csvstrategy`→`qif`+`accountmapping` |

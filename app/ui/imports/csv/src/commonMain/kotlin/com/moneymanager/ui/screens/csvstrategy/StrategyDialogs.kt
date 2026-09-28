@@ -33,12 +33,12 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.humanreadable.HumanReadable
 import com.moneymanager.importengineapi.deleteCsvStrategy
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import kotlinx.coroutines.launch
-import nl.jacobras.humanreadable.HumanReadable
 
 /**
  * Dialog for deleting a CSV import strategy.

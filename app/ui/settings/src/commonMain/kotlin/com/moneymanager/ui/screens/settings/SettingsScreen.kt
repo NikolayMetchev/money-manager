@@ -44,6 +44,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.humanreadable.HumanReadable
 import com.moneymanager.importengineapi.setDefaultCurrency
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
@@ -59,7 +60,6 @@ import com.moneymanager.ui.util.SampleDataSize
 import com.moneymanager.ui.util.generateSampleData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import nl.jacobras.humanreadable.HumanReadable
 import kotlin.time.Duration
 
 private enum class MaintenanceOperation {

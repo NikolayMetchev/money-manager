@@ -18,7 +18,7 @@ kotlin {
                 implementation(projects.app.ui.components)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.compose.scrollbar)
-                implementation(libs.human.readable)
+                implementation(projects.utils.humanreadable)
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)
             }

@@ -20,8 +20,8 @@ kotlin {
                 implementation(projects.app.ui.components)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
+                implementation(projects.utils.humanreadable)
                 implementation(libs.compose.charts)
-                implementation(libs.human.readable)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }

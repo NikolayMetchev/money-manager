@@ -55,9 +55,9 @@ import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.strategy.CsvImportParseResult
 import com.moneymanager.domain.strategy.CsvStrategyImportExport
 import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.humanreadable.HumanReadable
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
-import nl.jacobras.humanreadable.HumanReadable
 
 @Composable
 fun CsvStrategiesScreen(
