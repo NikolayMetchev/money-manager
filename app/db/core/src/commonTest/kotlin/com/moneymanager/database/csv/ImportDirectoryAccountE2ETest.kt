@@ -174,7 +174,7 @@ class ImportDirectoryAccountE2ETest : DbTest() {
                     .getAllImports()
                     .first()
                     .associateBy { it.originalFileName }
-            val directories = repositories.importDirectoryRepository.csvImportDirectories()
+            val directories = repositories.importDirectoryRepository.csvImportDirectories().first()
 
             assertEquals(
                 mapOf(

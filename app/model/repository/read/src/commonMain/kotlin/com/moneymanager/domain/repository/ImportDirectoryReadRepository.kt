@@ -37,7 +37,8 @@ interface ImportDirectoryReadRepository {
     /**
      * The directories every directory-scanned CSV import was staged from. A list because an import can be
      * reused (by content checksum) across more than one directory. Imports added via the file picker have
-     * no entry.
+     * no entry. A flow over the link table itself: a scan that reuses an existing import only adds a link,
+     * leaving the import list unchanged, so watching imports alone would miss it.
      */
-    suspend fun csvImportDirectories(): Map<CsvImportId, List<ImportDirectoryId>>
+    fun csvImportDirectories(): Flow<Map<CsvImportId, List<ImportDirectoryId>>>
 }

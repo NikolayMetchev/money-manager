@@ -45,7 +45,6 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
@@ -130,10 +129,11 @@ fun CsvImportsScreen(
     val directories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         importDirectoryRepository.getAllDirectories()
     }
-    var importDirectoryIds by remember { mutableStateOf<Map<CsvImportId, List<ImportDirectoryId>>>(emptyMap()) }
+    val importDirectoryIds by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
+        importDirectoryRepository.csvImportDirectories()
+    }
     LaunchedEffect(imports) {
         directoryAccounts = importDirectoryRepository.csvImportSourceAccounts()
-        importDirectoryIds = importDirectoryRepository.csvImportDirectories()
     }
     val importDirectories = remember(importDirectoryIds, directories) { resolveImportDirectories(importDirectoryIds, directories) }
 
