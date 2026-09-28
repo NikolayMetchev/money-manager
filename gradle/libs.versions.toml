@@ -41,7 +41,6 @@ detekt = "2.0.0-alpha.6"
 dokka = "2.2.0"
 diamondedge-logging = "2.1.2"
 gradle-doctor = "0.12.1"
-human-readable = "1.13.1"
 # JVM version sync: keep jvm-target and jvm-toolchain aligned with .github/actions/gradle-setup/action.yml,
 # .github/workflows/lint-format.yml, and CLAUDE.md.
 jvm-target = "25"
@@ -157,7 +156,6 @@ dependency-analysis-gradle-plugin = { module = "com.autonomousapps:dependency-an
 detekt-gradle-plugin = { module = "dev.detekt:dev.detekt.gradle.plugin", version.ref = "detekt" }
 develocity-gradle-plugin = { module = "com.gradle:develocity-gradle-plugin", version.ref = "develocity" }
 diamondedge-logging = { module = "com.diamondedge:logging", version.ref = "diamondedge-logging" }
-human-readable = { module = "nl.jacobras:Human-Readable", version.ref = "human-readable" }
 junit = { module = "junit:junit", version.ref = "junit" }
 kmlogging = { module = "org.lighthousegames:logging", version.ref = "kmlogging" }
 kotlin-compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
