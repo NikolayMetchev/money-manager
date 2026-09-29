@@ -147,7 +147,7 @@ class MoneyManagerDatabaseWrapper(
             "SELECT (SELECT COUNT(*) FROM reconciliation_account_link) + (SELECT COUNT(*) FROM trade_attribute), " +
                 "(SELECT COALESCE(SUM(shadow_account_id * 31 + real_account_id), 0) FROM reconciliation_account_link), " +
                 "(SELECT COALESCE(SUM(created_at), 0) FROM reconciliation_account_link) + " +
-                "(SELECT COALESCE(SUM(length(attribute_value) + id * 31), 0) FROM trade_attribute)",
+                "(SELECT COALESCE(SUM(length(attribute_value) + trade_id * 31 + attribute_type_id), 0) FROM trade_attribute)",
             { cursor ->
                 if (cursor.next().value) {
                     token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!

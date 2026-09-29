@@ -17,8 +17,8 @@ private const val MIN_PREFIX_KEY_LENGTH = 4
 private const val MIN_SUGGESTION_SIMILARITY = 0.6
 
 /**
- * A wallet of [source] with no link yet, and the real account it most plausibly mirrors (for the user
- * to confirm), if any.
+ * A reconciliation source's wallet with no link yet, and the real account it most plausibly mirrors
+ * (for the user to confirm), if any.
  */
 data class UnlinkedWallet(
     val wallet: ShadowAccount,

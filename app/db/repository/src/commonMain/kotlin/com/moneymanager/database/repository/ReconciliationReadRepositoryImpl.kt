@@ -61,6 +61,7 @@ class ReconciliationReadRepositoryImpl(
         return withContext(coroutineContext) {
             // Each id is bound four times (one per UNION branch), so chunk to stay under the variable limit.
             accountIds
+                .asSequence()
                 .map { it.id }
                 .distinct()
                 .chunked(MAX_IDS_PER_QUERY / 4)
@@ -81,7 +82,7 @@ class ReconciliationReadRepositoryImpl(
                         amount = Money(if (row.sign < 0) -magnitude else magnitude, asset),
                         isExcluded = row.is_excluded == 1L,
                     )
-                }
+                }.toList()
         }
     }
 }

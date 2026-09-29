@@ -72,7 +72,7 @@ fun AccountPicker(
 
     // Shadow accounts hold a reconciliation source's copy of the data (e.g. Koinly's), not real money, so
     // they're hidden by default; the tickbox in the menu brings them back.
-    val shadowAccountIds by produceState(emptySet<AccountId>(), accounts) {
+    val shadowAccountIds: Set<AccountId> by produceState(emptySet(), accounts) {
         value = accountRepository.getAccountIdsByAttribute(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID)
     }
     var hideShadowAccounts by remember { mutableStateOf(true) }

@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.compose-ui-feature-convention")
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.mokkery)
 }
 
 kotlin {
@@ -20,6 +21,7 @@ kotlin {
             dependencies {
                 implementation(projects.test.app.ui)
                 implementation(kotlin("test"))
+                implementation(libs.mokkery.runtime)
             }
         }
         getByName("androidMain") {
@@ -63,6 +65,7 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(libs.compose.ui.test.desktop)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.mokkery.core)
 
                 runtimeOnly(compose.desktop.currentOs)
             }
@@ -73,12 +76,14 @@ kotlin {
                 implementation(projects.test.app.ui)
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.mokkery.core)
             }
         }
         getByName("androidHostTest") {
             dependencies {
                 implementation(projects.app.model.core)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.mokkery.core)
             }
         }
     }
