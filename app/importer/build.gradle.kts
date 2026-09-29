@@ -25,6 +25,7 @@ kotlin {
                 implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.csvstrategy)
                 implementation(projects.app.model.importdirectory)
+                implementation(projects.app.model.reconciliation)
                 implementation(projects.utils.bigdecimal)
             }
         }
@@ -42,6 +43,7 @@ kotlin {
                 implementation(projects.app.model.csvstrategy)
                 implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.passthrough)
+                implementation(projects.app.model.reconciliation)
                 implementation(projects.utils.bigdecimal)
             }
         }

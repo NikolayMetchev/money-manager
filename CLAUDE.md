@@ -52,12 +52,13 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `utils/humanreadable/` | English file-size / duration / "time ago" formatting (replaces Human-Readable, whose localisation layer pulled ICU4J into the desktop build) |
 | `utils/archive/` | Compress + password-encrypt the DB archive (`ArchiveCodec`); shared by remote backends |
 | `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` |
-| `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core`; `qif`→`csv`, `csvstrategy`→`qif`+`accountmapping` |
+| `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,reconciliation,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core`; `qif`→`csv`, `csvstrategy`→`qif`+`accountmapping` |
 | `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces. `write` depends on `read` (each write interface extends its read) |
 | `app/db/schema/`, `app/db/read/`, `app/db/repository/`, `app/db/write/`, `app/db/core/` | SQLDelight schema; generated read SQL + Mappie mappers + JSON codecs; read repository impls; write SQL + impls; `DatabaseManager` and services |
 | `app/importengineapi/` | `ImportEngine` interface + `ImportBatch`/`ImportResult` model + `ImportEngine.*` write helpers (DB-free) |
 | `app/importer/` | `ImportEngineImpl` — the **sole** DB writer (consumes write repositories) |
 | `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Parse/download sources and build an `ImportBatch` (DB-free, enforced) |
+| `app/reconciliation/` | Source-agnostic reconciliation: leg matcher + shadow→real auto-link planner (DB-free, enforced) |
 | `app/strategies/` | Built-in strategy/pass-through definitions in Kotlin — rendered to the `webpage/strategy-library` catalog site by `tools/strategy-catalog` on Pages deploys (DB-free, nothing checked in or seeded) |
 | `app/remotestorage/core/` | Generic `RemoteStorageProvider` interface + factory (DB-free, backend-agnostic) |
 | `app/remotestorage/googledrive/` | Google Drive backend — Drive REST v3 over Ktor (JVM + Android) |
@@ -172,6 +173,34 @@ client (Desktop type) via the in-app wizard; least-privilege `drive.file` scope.
 persisted in `LocalSettings` keyed by a short hash of the OAuth client id (raw ids exceed the JVM prefs
 80-char key limit). Connection scope is **per database** — each binding stores its own OAuth client, so
 different databases can use different Google accounts.
+
+## Reconciliation Sources (Koinly, …)
+
+A CSV strategy with a `ReconciliationConfig(sourceName, linkableAccountPrefix)` is a **reconciliation
+source** (built-in: Koinly). Its data never touches real accounts:
+
+- Every account it resolves/creates is a **shadow account** tagged with the `reconciliation-source`
+  account attribute (-9, value = source name). The mapper only sees that source's shadow accounts
+  (`accountsVisibleTo`), and `ImportBatch.shadowSource` makes the engine match names only among them,
+  tag what it creates, and reject a batch referencing any other account. Because real imports only load
+  transfers on their own accounts for dedupe, shadow data is isolated in both directions — no exclusion
+  attribute needed, trades included.
+- Shadow **wallets** (names starting with `linkableAccountPrefix`) are linked to real accounts in
+  `reconciliation_account_link` (many real → one wallet; one wallet per source per real account),
+  written via `ReconciliationLinkMutation`. The Reconciliation tab auto-links exact name matches and
+  lists the rest as "needs attention" (link to an existing account or create one).
+- `reconcile()` (`app/reconciliation`) matches legs per link group on (asset, signed amount): exact
+  second, then nearest within 24h, then summed per (group, asset, second) so a fee booked separately on
+  one side still matches the other side's gross leg.
+- Rows the source marks deleted are imported **excluded** (attribute mapping → `excluded`), like
+  declined card payments. Trades can be excluded too (`trade_attribute`, honoured by
+  `BalanceLegsSelect`, toggled by hand in `TradeExclusionDialog`), and a transfer's fee/pass-through
+  legs inherit its exclusion. Imports declare the attribute types their source **owns**
+  (`ownedAttributeTypeIds`: a CSV strategy's mapped columns); a re-import removes an owned type the row no
+  longer reports — so a row un-deleted at the source comes back — and never touches other attributes.
+- `CsvStrategyConfig.assetAliases` maps a source's tickers onto Money Manager's (Koinly `KNCL` → `KNC`).
+- Shadow accounts are hidden by default in the Accounts screen and in `AccountPicker` (tickbox to show).
+- Keep it source-agnostic: no Koinly-specific code outside the built-in strategy's config.
 
 ## Dependency Injection
 

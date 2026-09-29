@@ -47,6 +47,7 @@ import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepos
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.QifImportWriteRepository
+import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
 import com.moneymanager.domain.repository.write.TradeWriteRepository
@@ -81,7 +82,9 @@ import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.QifImportMutation
+import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.importengineapi.RowOutcome
+import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.WriteIntent
 import com.moneymanager.importengineapi.bankKeyFromExternalId
@@ -147,6 +150,8 @@ class ImportEngineImpl(
      */
     private val transferRelationshipRepository: TransferRelationshipReadRepository? = null,
     private val editGate: EditGate = EditGate.AlwaysWritable,
+    /** Writes shadow→real reconciliation links. Optional like [transferRelationshipRepository]; DI supplies it. */
+    private val reconciliationLinkRepository: ReconciliationLinkWriteRepository? = null,
 ) : ImportEngine {
     override suspend fun import(
         batch: ImportBatch,
@@ -155,6 +160,7 @@ class ImportEngineImpl(
     ): ImportResult {
         editGate.ensureWritable()
         validate(batch)
+        batch.shadowSource?.let { requireShadowOnlyReferences(batch, it) }
 
         // ----- Lookup-table resolution (first: ids feed attributes/relationships built by callers) -----
         val attributeTypeIds = batch.attributeTypeNames.associateWith { attributeTypeRepository.getOrCreate(it) }
@@ -244,6 +250,13 @@ class ImportEngineImpl(
                     occurrence = occurrence,
                 )
             tradeOccurrences[tupleKey] = occurrence + 1
+            if (intent.attributes.isNotEmpty()) tradeRepository.upsertAttributes(tradeResult.id, intent.attributes)
+            // A re-imported trade loses the attributes its source owns but no longer reports (e.g. the
+            // `excluded` of a trade the source has since un-deleted), like a transfer UPDATE.
+            if (!tradeResult.created) {
+                val reported = intent.attributes.mapTo(mutableSetOf()) { it.typeId }
+                (intent.ownedAttributeTypeIds - reported).forEach { tradeRepository.removeAttribute(tradeResult.id, it) }
+            }
             createdTradeIds[intent.key] = tradeResult.id
             if (!tradeResult.created) dedupedTradeKeys += intent.key
         }
@@ -285,6 +298,11 @@ class ImportEngineImpl(
 
         onProgress?.invoke(ImportProgress("Resolving accounts"))
         val accountResolution = resolveAccounts(batch.copy(accountsToCreate = batch.accountsToCreate.creates()))
+        batch.shadowSource?.let { source ->
+            val shadowIds = shadowAccountIds(source)
+            val strays = accountResolution.keyToId.values.filterNot { it in shadowIds }
+            require(strays.isEmpty()) { "Reconciliation import for '$source' resolved onto non-shadow account(s) $strays" }
+        }
 
         onProgress?.invoke(ImportProgress("Resolving people"))
         val personResolution = resolvePeople(batch.copy(peopleToCreate = batch.peopleToCreate.creates()))
@@ -556,7 +574,16 @@ class ImportEngineImpl(
         val excluded = resolvedTransfers.count { it.excludedFromBalances }
 
         onProgress?.invoke(ImportProgress("Importing transactions", fraction = 0f, processed = 0, total = toImport.size))
-        val createdIds = writeTransfers(toImport, toUpdate, batchSize, onProgress)
+        // The engine's own cross-source reconcile marker is never "owned" by a source: a row that
+        // re-imports must not un-exclude a transfer the engine reconciled away.
+        val engineOwnedTypeId =
+            when (val policy = batch.dedupePolicy) {
+                is DedupePolicy.FuzzyAllFields -> policy.reconciledExclusionAttributeTypeId
+                is DedupePolicy.UniqueIdentifier -> policy.reconciledExclusionAttributeTypeId
+                is DedupePolicy.ApiMultiKey -> policy.reconciledExclusionAttributeTypeId
+                else -> null
+            }
+        val createdIds = writeTransfers(toImport, toUpdate, batchSize, onProgress, engineOwnedTypeId)
 
         val createdTransferIds = toImport.zip(createdIds).associate { (c, id) -> requireNotNull(c.transfer.rowKey) to id }
 
@@ -724,10 +751,14 @@ class ImportEngineImpl(
     private suspend fun resolveAccounts(batch: ImportBatch): AccountResolution {
         if (batch.accountsToCreate.isEmpty()) return AccountResolution(emptyMap(), 0)
 
+        // A shadow-only batch must never match (and so reuse) a real account by name: only the source's
+        // own shadow accounts are candidates, and a name clash with a real account creates a suffixed one.
+        val shadowScope = batch.shadowSource?.let { shadowAccountIds(it) }
         val byName =
             accountRepository
                 .getAllAccounts()
                 .first()
+                .filter { shadowScope == null || it.id in shadowScope }
                 .associate { it.name to it.id }
                 .toMutableMap()
         val existingAccountAttrIndex = buildExistingAccountAttrIndex(batch.accountsToCreate)
@@ -742,7 +773,15 @@ class ImportEngineImpl(
 
         val keyToId = mutableMapOf<LocalAccountKey, AccountId>()
         var created = 0
-        for (intent in batch.accountsToCreate) {
+        val shadowTag =
+            batch.shadowSource?.let { NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID), it) }
+        for (rawIntent in batch.accountsToCreate) {
+            val intent =
+                if (shadowTag == null || rawIntent.attributes.any { it.typeId == shadowTag.typeId }) {
+                    rawIntent
+                } else {
+                    rawIntent.copy(attributes = rawIntent.attributes + shadowTag)
+                }
             val match = matchAccount(intent, byName, byAttr, byPersonalKey, batchCreatedByName, claimedAccountIds)
             if (match != null) {
                 // A bank-identity (adopted) match re-points the existing account onto this intent only for
@@ -1407,6 +1446,7 @@ class ImportEngineImpl(
         toUpdate: List<Classified>,
         batchSize: Int,
         onProgress: (suspend (ImportProgress) -> Unit)?,
+        engineOwnedTypeId: AttributeTypeId?,
     ): List<TransferId> {
         if (toImport.isEmpty() && toUpdate.isEmpty()) return emptyList()
 
@@ -1421,7 +1461,7 @@ class ImportEngineImpl(
             }
         if (chunks.isEmpty()) {
             // No creates, only updates: apply them in their own transaction.
-            val (updates, updateSources) = buildUpdates(toUpdate)
+            val (updates, updateSources) = buildUpdates(toUpdate, engineOwnedTypeId)
             transactionRepository.importTransfers(
                 transfers = emptyList(),
                 newAttributes = emptyMap(),
@@ -1462,7 +1502,7 @@ class ImportEngineImpl(
                 )
             // Updates ride with the final create chunk (one transaction in the common single-chunk case).
             val (updates, updateSources) =
-                if (index == chunks.lastIndex) buildUpdates(toUpdate) else emptyList<TransferUpdate>() to emptyList()
+                if (index == chunks.lastIndex) buildUpdates(toUpdate, engineOwnedTypeId) else emptyList<TransferUpdate>() to emptyList()
             val allCreatedIds =
                 transactionRepository.importTransfers(
                     transfers = payload.transfers,
@@ -1616,9 +1656,13 @@ class ImportEngineImpl(
             )
             if (t.attributes.isNotEmpty()) newAttributes[mainTempId] = t.attributes
             if (relationships.isNotEmpty()) newRelationships[mainTempId] = relationships
+            // Legs derived from an excluded movement (e.g. a cancelled/deleted row) are excluded with it,
+            // or its fee and spend legs would still move balances.
+            val exclusion = t.attributes.filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
             // The fee is a real movement out of the main transfer's account; counts in balances.
             if (fee != null && feeTempId != null) {
                 addLeg(feeTempId, fee.description, fee.source, fee.target, fee.amount, fee.rowKey)
+                if (exclusion.isNotEmpty()) newAttributes[feeTempId] = exclusion
             }
             // The pass-through spend legs, one per adjacent pair of the chain (C1→C2, …, Cn→merchant),
             // same amount as the funding leg (the main transfer). Each movement links to the next leg
@@ -1637,6 +1681,7 @@ class ImportEngineImpl(
                         passThrough.amount,
                         passThrough.rowKey,
                     )
+                    if (exclusion.isNotEmpty()) newAttributes[spendTempId] = exclusion
                     val legKey = LegKey(chunkStartIndex + chunkIndex, legIndex)
                     spendTempIdByLeg[legKey] = spendTempId
                     spendResultIndices[legKey] = transfersToCreate.lastIndex
@@ -1694,12 +1739,21 @@ class ImportEngineImpl(
                 )
             }
 
-    private fun buildUpdates(toUpdate: List<Classified>): Pair<List<TransferUpdate>, List<Source>> {
+    private suspend fun buildUpdates(
+        toUpdate: List<Classified>,
+        engineOwnedTypeId: AttributeTypeId?,
+    ): Pair<List<TransferUpdate>, List<Source>> {
         val updates = mutableListOf<TransferUpdate>()
         val orderedUpdateSources = mutableListOf<Source>()
+        val excludedTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
+        // Main transfers whose exclusion the source now asserts (true) or has withdrawn (false).
+        val exclusionChanges = mutableMapOf<TransferId, Pair<NewAttribute?, Source>>()
         for (classified in toUpdate) {
             val existingId = classified.existing ?: continue
             val t = classified.transfer
+            val reported = t.attributes.mapTo(mutableSetOf()) { it.typeId }
+            val removed = t.ownedAttributeTypeIds - reported - setOfNotNull(engineOwnedTypeId)
+            val source = t.source.forRow(requireNotNull(t.rowKey))
             updates +=
                 TransferUpdate(
                     transfer =
@@ -1712,10 +1766,49 @@ class ImportEngineImpl(
                             amount = requireNotNull(t.amount),
                         ),
                     newAttributes = t.attributes,
+                    removedAttributeTypeIds = removed,
                 )
-            orderedUpdateSources += t.source.forRow(requireNotNull(t.rowKey))
+            orderedUpdateSources += source
+            if (excludedTypeId in t.ownedAttributeTypeIds) {
+                exclusionChanges[existingId] = t.attributes.firstOrNull { it.typeId == excludedTypeId } to source
+            }
         }
+        feeLegExclusionUpdates(exclusionChanges, excludedTypeId, updates.mapTo(mutableSetOf()) { it.transfer.id })
+            .forEach { (update, source) ->
+                updates += update
+                orderedUpdateSources += source
+            }
         return updates to orderedUpdateSources
+    }
+
+    /**
+     * Fee legs follow their main transfer's exclusion when a re-import changes it, as they do on
+     * creation (see buildCreatePayload): a fee of a row the source deleted mustn't move balances, and
+     * one of a row it un-deleted must again. Needs [transferRelationshipRepository]; skipped without it.
+     */
+    private suspend fun feeLegExclusionUpdates(
+        exclusionChanges: Map<TransferId, Pair<NewAttribute?, Source>>,
+        excludedTypeId: AttributeTypeId,
+        alreadyUpdated: Set<TransferId>,
+    ): List<Pair<TransferUpdate, Source>> {
+        val relationships = transferRelationshipRepository ?: return emptyList()
+        if (exclusionChanges.isEmpty()) return emptyList()
+        val feeOf =
+            relationships
+                .getByTransfers(exclusionChanges.keys)
+                .filter { it.relationshipType.id.id == WellKnownIds.FEE_RELATIONSHIP_TYPE_ID && it.id1 in exclusionChanges }
+                .associate { it.id2 to it.id1 }
+                .filterKeys { it !in alreadyUpdated }
+        if (feeOf.isEmpty()) return emptyList()
+        return transactionRepository.getTransactionsByIds(feeOf.keys).mapNotNull { (feeId, fee) ->
+            val (exclusion, source) = exclusionChanges.getValue(feeOf.getValue(feeId))
+            val isExcluded = fee.attributes.any { it.attributeType.id == excludedTypeId }
+            when {
+                exclusion != null && !isExcluded -> TransferUpdate(fee, listOf(exclusion)) to source
+                exclusion == null && isExcluded -> TransferUpdate(fee, emptyList(), setOf(excludedTypeId)) to source
+                else -> null
+            }
+        }
     }
 
     // endregion
@@ -1776,7 +1869,88 @@ class ImportEngineImpl(
         this[key] = value
     }
 
+    /** Ids of the shadow accounts of reconciliation source [source]. */
+    private suspend fun shadowAccountIds(source: String): Set<AccountId> =
+        accountAttributeRepository
+            .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID))
+            .first()
+            .filter { it.value == source }
+            .mapTo(mutableSetOf()) { it.accountId }
+
+    /**
+     * Fails a shadow-only batch (see [ImportBatch.shadowSource]) that names an existing account outside
+     * [source]'s shadow accounts — the last line of defence keeping reconciliation data off real accounts.
+     * Batch-local account refs are policed after resolution instead.
+     */
+    private suspend fun requireShadowOnlyReferences(
+        batch: ImportBatch,
+        source: String,
+    ) {
+        val referenced = mutableSetOf<AccountId>()
+
+        fun add(ref: AccountRef?) {
+            if (ref is AccountRef.Existing) referenced += ref.id
+        }
+        for (t in batch.transfers.creates()) {
+            add(t.fromAccount)
+            add(t.toAccount)
+            t.fee?.let {
+                add(it.source)
+                add(it.target)
+            }
+            t.passThrough?.let { pt ->
+                pt.conduits.forEach(::add)
+                add(pt.merchantTarget)
+            }
+        }
+        for (trade in batch.trades.creates()) {
+            trade.fromAccountId?.let(referenced::add)
+            trade.toAccountId?.let(referenced::add)
+        }
+        if (referenced.isEmpty()) return
+        val strays = referenced - shadowAccountIds(source)
+        require(strays.isEmpty()) { "Reconciliation import for '$source' references non-shadow account(s) $strays" }
+    }
+
+    private suspend fun applyReconciliationLinkMutations(mutations: List<ReconciliationLinkMutation>) {
+        val repository = requireNotNull(reconciliationLinkRepository) { "Reconciliation links are not supported by this engine" }
+        val sourceByShadow =
+            accountAttributeRepository
+                .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID))
+                .first()
+                .associate { it.accountId to it.value }
+        for (m in mutations) {
+            when (m) {
+                is ReconciliationLinkMutation.SetLinks -> {
+                    val source =
+                        requireNotNull(sourceByShadow[m.shadowAccountId]) { "Account ${m.shadowAccountId} is not a shadow account" }
+                    val shadowTargets = m.realAccountIds.filter { it in sourceByShadow }
+                    require(shadowTargets.isEmpty()) { "Cannot link a shadow account to shadow account(s) $shadowTargets" }
+                    // One shadow account per source per real account, or the matcher couldn't tell which
+                    // wallet a real leg belongs to.
+                    val taken =
+                        repository.getLinks().first().filter { link ->
+                            link.shadowAccountId != m.shadowAccountId &&
+                                link.realAccountId in m.realAccountIds &&
+                                sourceByShadow[link.shadowAccountId] == source
+                        }
+                    require(taken.isEmpty()) {
+                        "Account(s) ${taken.map { it.realAccountId }} already linked to another '$source' shadow account"
+                    }
+                    repository.setLinks(m.shadowAccountId, m.realAccountIds)
+                }
+            }
+        }
+    }
+
     private suspend fun applyConfigMutations(batch: ImportBatch): ConfigOutcome {
+        if (batch.reconciliationLinkMutations.isNotEmpty()) applyReconciliationLinkMutations(batch.reconciliationLinkMutations)
+        for (m in batch.tradeAttributeMutations) {
+            when (m) {
+                is TradeAttributeMutation.Set -> tradeRepository.upsertAttributes(m.tradeId, listOf(NewAttribute(m.typeId, m.value)))
+                is TradeAttributeMutation.Remove -> tradeRepository.removeAttribute(m.tradeId, m.typeId)
+            }
+        }
         for (m in batch.passThroughMutations) {
             when (m) {
                 is PassThroughMutation.Create -> passThroughAccountRepository.create(m.account)

@@ -46,6 +46,7 @@ kotlin {
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
+                api(projects.app.model.reconciliation)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.repository.write)
 
@@ -56,6 +57,7 @@ kotlin {
         }
         getByName("androidMain") {
             dependencies {
+                api(projects.app.model.reconciliation)
                 implementation(projects.utils.bigdecimal)
                 implementation(libs.kotlinx.serialization.core)
             }

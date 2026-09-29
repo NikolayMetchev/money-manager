@@ -63,6 +63,7 @@ import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ExchangeOrderId
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
@@ -75,6 +76,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
@@ -191,6 +193,8 @@ fun AccountTransactionsScreen(
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     exchangeOrderRepository: ExchangeOrderReadRepository,
     maintenance: Maintenance,
+    // Null disables trade editing (the exclusion toggle); tests of transfer behaviour needn't supply it.
+    tradeRepository: TradeReadRepository? = null,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
     onAccountClick: (AccountId, String, CurrencyId?, TransferId?) -> Unit = { _, _, _, _ -> },
@@ -226,6 +230,7 @@ fun AccountTransactionsScreen(
     // Edit transaction state - stores the transfer ID to edit, actual transfer is fetched from repository
     var transactionIdToEdit by remember { mutableStateOf<TransferId?>(null) }
     var transactionToEdit by remember { mutableStateOf<Transfer?>(null) }
+    var tradeIdToEdit by remember { mutableStateOf<TradeId?>(null) }
 
     // Edit account state - stores the account selected for editing
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
@@ -1132,6 +1137,7 @@ fun AccountTransactionsScreen(
                                         transactionIdToEdit = transfer.id
                                     }
                                 },
+                                onEditTradeClick = { tradeIdToEdit = it },
                                 onAuditClick = onAuditClick,
                                 onOrderLinkClick = onOrderLinkClick,
                                 onFeeLinkClick = { linkedTransferId ->
@@ -1235,6 +1241,16 @@ fun AccountTransactionsScreen(
                 }
             }
         }
+    }
+
+    val editedTradeId = tradeIdToEdit
+    if (editedTradeId != null && tradeRepository != null) {
+        TradeExclusionDialog(
+            tradeId = editedTradeId,
+            tradeRepository = tradeRepository,
+            onDismiss = { tradeIdToEdit = null },
+            onSaved = { refreshTrigger++ },
+        )
     }
 
     // Show edit dialog if a transaction is selected for editing

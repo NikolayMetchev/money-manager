@@ -5,3 +5,11 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 delete:
 DELETE FROM trade WHERE id = ?;
+
+upsertAttribute:
+INSERT INTO trade_attribute(trade_id, attribute_type_id, attribute_value)
+VALUES (?, ?, ?)
+ON CONFLICT(trade_id, attribute_type_id) DO UPDATE SET attribute_value = excluded.attribute_value;
+
+deleteAttribute:
+DELETE FROM trade_attribute WHERE trade_id = ? AND attribute_type_id = ?;

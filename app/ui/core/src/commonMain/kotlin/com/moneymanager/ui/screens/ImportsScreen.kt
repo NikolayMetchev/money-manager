@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
@@ -37,6 +38,7 @@ import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -51,6 +53,7 @@ import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
 import com.moneymanager.ui.screens.csv.CsvImportsScreen
 import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesScreen
 import com.moneymanager.ui.screens.qif.QifImportsScreen
+import com.moneymanager.ui.screens.reconciliation.ReconciliationScreen
 import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
 import com.moneymanager.ui.screens.transactions.ManualEntriesScreen
 
@@ -60,6 +63,7 @@ fun ImportsScreen(
     onTabSelected: (ImportTab) -> Unit,
     importDirectoryRepository: ImportDirectoryReadRepository,
     importTimelineRepository: ImportTimelineReadRepository,
+    reconciliationRepository: ReconciliationReadRepository,
     importFileSourceFactory: ImportFileSourceFactory?,
     driveFolderBrowser: DriveFolderBrowser?,
     csvImportRepository: CsvImportReadRepository,
@@ -96,6 +100,7 @@ fun ImportsScreen(
     onImportDirectoryAuditClick: (ImportDirectory) -> Unit,
     onTransactionsImported: () -> Unit,
     onBrowsePassThroughCatalog: () -> Unit = {},
+    onReconciliationLegClick: (ReconciliationLeg) -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
@@ -128,6 +133,11 @@ fun ImportsScreen(
                 selected = selectedTab == ImportTab.TIMELINE,
                 onClick = { onTabSelected(ImportTab.TIMELINE) },
                 text = { Text("Timeline") },
+            )
+            Tab(
+                selected = selectedTab == ImportTab.RECONCILIATION,
+                onClick = { onTabSelected(ImportTab.RECONCILIATION) },
+                text = { Text("Reconciliation") },
             )
         }
 
@@ -231,6 +241,14 @@ fun ImportsScreen(
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     onOpenFile = onTimelineFileClick,
+                )
+            ImportTab.RECONCILIATION ->
+                ReconciliationScreen(
+                    reconciliationRepository = reconciliationRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
+                    onOpenLeg = onReconciliationLegClick,
                 )
         }
     }

@@ -1,5 +1,6 @@
 package com.moneymanager.domain.repository.write
 
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Source
@@ -102,8 +103,13 @@ interface TransactionWriteRepository : TransactionReadRepository {
     }
 }
 
-/** An existing transfer to update during an import, with attributes to add. */
+/**
+ * An existing transfer to update during an import, with attributes to add (or change) and the attribute
+ * types to remove — those its source owns but no longer reports (e.g. `excluded` on a row the source
+ * un-deleted).
+ */
 data class TransferUpdate(
     val transfer: Transfer,
     val newAttributes: List<NewAttribute>,
+    val removedAttributeTypeIds: Set<AttributeTypeId> = emptySet(),
 )

@@ -1,0 +1,19 @@
+-- Links a shadow account (one carrying the 'reconciliation-source' attribute, -9) to the real accounts
+-- whose transactions it mirrors, so the reconciliation screen can compare the two. Many real accounts
+-- may link to one shadow account (a source's single "Binance" wallet vs Binance, Binance Earn, ...).
+-- A real account links to at most one shadow account per source; the import engine enforces that
+-- (the source lives on the shadow account's attribute, out of reach of a table constraint).
+--
+-- Excluded from the audit trail (see EXCLUDED_FROM_AUDIT in MoneyManagerDatabaseWrapper) like
+-- account_mapping; its edits are folded into the sync change token instead.
+CREATE TABLE reconciliation_account_link (
+    shadow_account_id INTEGER NOT NULL,
+    real_account_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (shadow_account_id, real_account_id),
+    CHECK (shadow_account_id != real_account_id),
+    FOREIGN KEY (shadow_account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (real_account_id) REFERENCES account(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_reconciliation_account_link_real ON reconciliation_account_link(real_account_id);

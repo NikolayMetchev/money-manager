@@ -25,6 +25,7 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -70,6 +71,7 @@ data class ImportsDomain(
     val qifImportRepository: QifImportReadRepository,
     val importDirectoryRepository: ImportDirectoryReadRepository,
     val importTimelineRepository: ImportTimelineReadRepository,
+    val reconciliationRepository: ReconciliationReadRepository,
     val passThroughAccountRepository: PassThroughAccountReadRepository,
     val maintenance: Maintenance,
 )
@@ -126,6 +128,7 @@ fun Application.toAppServices(importEngine: ImportEngine) =
                 qifImportRepository = imports.qifImportRepository,
                 importDirectoryRepository = imports.importDirectoryRepository,
                 importTimelineRepository = imports.importTimelineRepository,
+                reconciliationRepository = imports.reconciliationRepository,
                 passThroughAccountRepository = imports.passThroughAccountRepository,
                 maintenance = imports.maintenance,
             ),

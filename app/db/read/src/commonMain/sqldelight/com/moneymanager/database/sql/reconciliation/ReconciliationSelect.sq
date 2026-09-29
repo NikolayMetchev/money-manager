@@ -1,0 +1,112 @@
+-- Reconciliation reads: shadow accounts (carrying the 'reconciliation-source' attribute, -9), the
+-- shadow->real account links, and the per-account legs the reconciliation matcher compares.
+
+selectShadowAccounts:
+SELECT a.id, a.name, aa.attribute_value AS source_name
+FROM account a
+JOIN account_attribute aa ON aa.account_id = a.id AND aa.attribute_type_id = -9
+ORDER BY a.name;
+
+selectLinks:
+SELECT shadow_account_id, real_account_id
+FROM reconciliation_account_link
+ORDER BY shadow_account_id, real_account_id;
+
+-- One row per (transaction, account it touches) for the given accounts, like
+-- BalanceLegsSelect.selectAllTransactionLegs but restricted, with the transfer's counterparty and the
+-- asset's details. `sign` is +1 for an inflow to the account, -1 for an outflow. Unordered: the caller
+-- queries in chunks and sorts the union itself.
+selectLegsForAccounts:
+    SELECT
+        tr.id,
+        0 AS is_trade,
+        tr.timestamp,
+        tr.description,
+        tr.target_account_id AS account_id,
+        tr.source_account_id AS counterparty_account_id,
+        tr.amount,
+        1 AS sign,
+        ad.id AS asset_id,
+        ad.code AS asset_code,
+        ad.name AS asset_name,
+        ad.scale_factor AS asset_scale_factor,
+        ad.kind AS asset_kind,
+        CASE WHEN EXISTS (
+            SELECT 1 FROM transfer_attribute ta
+            WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+        ) THEN 1 ELSE 0 END AS is_excluded
+    FROM transfer tr
+    JOIN asset_details ad ON ad.id = tr.asset_id
+    WHERE tr.target_account_id IN :accountIds
+
+    UNION ALL
+
+    SELECT
+        tr.id,
+        0,
+        tr.timestamp,
+        tr.description,
+        tr.source_account_id,
+        tr.target_account_id,
+        tr.amount,
+        -1,
+        ad.id,
+        ad.code,
+        ad.name,
+        ad.scale_factor,
+        ad.kind,
+        CASE WHEN EXISTS (
+            SELECT 1 FROM transfer_attribute ta
+            WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+        ) THEN 1 ELSE 0 END
+    FROM transfer tr
+    JOIN asset_details ad ON ad.id = tr.asset_id
+    WHERE tr.source_account_id IN :accountIds
+
+    UNION ALL
+
+    SELECT
+        td.id,
+        1,
+        td.timestamp,
+        td.description,
+        td.to_account_id,
+        NULL,
+        td.to_amount,
+        1,
+        ad.id,
+        ad.code,
+        ad.name,
+        ad.scale_factor,
+        ad.kind,
+        CASE WHEN EXISTS (
+            SELECT 1 FROM trade_attribute ta
+            WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1
+        ) THEN 1 ELSE 0 END
+    FROM trade td
+    JOIN asset_details ad ON ad.id = td.to_asset_id
+    WHERE td.to_account_id IN :accountIds
+
+    UNION ALL
+
+    SELECT
+        td.id,
+        1,
+        td.timestamp,
+        td.description,
+        td.from_account_id,
+        NULL,
+        td.from_amount,
+        -1,
+        ad.id,
+        ad.code,
+        ad.name,
+        ad.scale_factor,
+        ad.kind,
+        CASE WHEN EXISTS (
+            SELECT 1 FROM trade_attribute ta
+            WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1
+        ) THEN 1 ELSE 0 END
+    FROM trade td
+    JOIN asset_details ad ON ad.id = td.from_asset_id
+    WHERE td.from_account_id IN :accountIds;

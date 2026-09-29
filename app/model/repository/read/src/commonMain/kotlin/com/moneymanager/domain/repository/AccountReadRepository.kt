@@ -21,6 +21,12 @@ interface AccountReadRepository {
      */
     suspend fun getPreviousAccountNames(): Map<String, AccountId>
 
+    /** Ids of the accounts carrying an attribute of [attributeTypeId] whose value is exactly [value] (any value when null). */
+    suspend fun getAccountIdsByAttribute(
+        attributeTypeId: Long,
+        value: String? = null,
+    ): Set<AccountId>
+
     suspend fun countTransfersByAccount(accountId: AccountId): Long
 
     /**

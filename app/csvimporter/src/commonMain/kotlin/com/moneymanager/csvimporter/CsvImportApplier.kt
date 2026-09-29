@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
@@ -184,20 +185,26 @@ private fun collectCryptoCodes(
 ): Set<String> {
     fun columnIndex(name: String): Int? = columns.firstOrNull { it.originalName == name }?.columnIndex
 
+    // (column index, extraction) for each column holding an asset code: the currency lookups plus a fee
+    // paid in its own asset.
+    val lookups = listOf(TransferField.CURRENCY, TransferField.TO_CURRENCY).mapNotNull { strategy.config.fieldMappings[it] }
     val currencyColumns =
-        listOf(TransferField.CURRENCY, TransferField.TO_CURRENCY).mapNotNull { field ->
-            (strategy.config.fieldMappings[field] as? CurrencyLookupMapping)?.columnName?.let(::columnIndex)
-        }
+        lookups.filterIsInstance<CurrencyLookupMapping>().mapNotNull { m -> columnIndex(m.columnName)?.let { it to m.extraction } } +
+            listOfNotNull(
+                (strategy.config.fieldMappings[TransferField.AMOUNT] as? AmountParsingMapping)?.let { m ->
+                    m.feeCurrencyColumnName?.let(::columnIndex)?.let { it to m.feeCurrencyExtraction }
+                },
+            )
     if (currencyColumns.isEmpty()) return emptySet()
 
     val codes = mutableSetOf<String>()
     for (row in rows) {
-        for (currencyCol in currencyColumns) {
+        for ((currencyCol, extraction) in currencyColumns) {
             val code =
                 row.values
                     .getOrNull(currencyCol)
                     ?.trim()
-                    ?.uppercase()
+                    ?.let { strategy.config.resolveAssetCode(extractOrRaw(it, extraction)) }
             if (!code.isNullOrEmpty() && code !in fiatCodes && code !in existingCryptoCodes) {
                 codes += code
             }
@@ -382,7 +389,7 @@ suspend fun applyStagedCsv(
     val cryptoAssets = ensureCryptoAssets(strategy, stagedImport.columns, rows, currencies, importEngine, cryptoRepository)
 
     // Re-fetch accounts so payee accounts created by earlier files in the same scan are seen.
-    val accounts = accountRepository.getAllAccounts().first()
+    val accounts = accountRepository.accountsVisibleTo(strategy)
     val mappings = accountMappingRepository.getAllMappings().first()
     val historicalAccountNames = accountRepository.getPreviousAccountNames()
     val basePrep =
@@ -559,6 +566,7 @@ private suspend fun createNewAccounts(
     accountsToCreate: List<NewAccount>,
     csvImportId: CsvImportId,
     firstRowByAccountName: Map<String, Long>,
+    shadowSource: String?,
 ): Set<String> {
     if (accountsToCreate.isEmpty()) return emptySet()
     val createdAccountNames = mutableSetOf<String>()
@@ -578,7 +586,7 @@ private suspend fun createNewAccounts(
     }
     try {
         // Bulk-create all accounts in a single engine batch
-        importEngine.createAccounts(newAccounts, sourceFor)
+        importEngine.createAccounts(newAccounts, shadowSource = shadowSource, sourceFor = sourceFor)
         newAccounts.forEach { account -> createdAccountNames.add(account.name) }
         logger.info { "Created ${accountsToCreate.size} new accounts" }
     } catch (expected: Exception) {
@@ -586,7 +594,7 @@ private suspend fun createNewAccounts(
         logger.warn(expected) { "Bulk account creation failed, falling back to per-account creation" }
         for (account in newAccounts) {
             try {
-                importEngine.createAccount(account, sourceFor(account))
+                importEngine.createAccount(account, sourceFor(account), shadowSource)
                 createdAccountNames.add(account.name)
                 logger.info { "Created new account: ${account.name}" }
             } catch (expectedAccountError: Exception) {
@@ -690,17 +698,21 @@ suspend fun runCsvImport(
 ): CsvImportResult {
     logger.info { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
 
+    // A reconciliation source may only be pointed at its own shadow accounts; drop any "map to existing
+    // account" choice that names a real one (the row then creates its shadow account as usual).
+    val visibleAccountsById = accountRepository.accountsVisibleTo(strategy).associateBy { it.id }
+    val existingSelections = selectedExistingAccounts.filterValues { it in visibleAccountsById }
     val accountsToCreate =
         buildAccountsToCreate(
             preparation = basePrep,
-            existingAccountSelections = selectedExistingAccounts,
+            existingAccountSelections = existingSelections,
             newAccountNames = selectedNewAccountNames,
         )
     val selectedMappingsToPersist =
         buildPendingAccountMappings(
             preparation = basePrep,
-            accountSelections = selectedExistingAccounts,
-            accountsById = accountRepository.getAllAccounts().first().associateBy { it.id },
+            accountSelections = existingSelections,
+            accountsById = visibleAccountsById,
         )
     persistMappingsWithFallback(importEngine, selectedMappingsToPersist)
 
@@ -712,6 +724,7 @@ suspend fun runCsvImport(
         accountsToCreate = accountsToCreate,
         csvImportId = csvImport.id,
         firstRowByAccountName = firstRowByAccountName,
+        shadowSource = strategy.shadowSource,
     )
 
     // No auto-capture of template/regex/exact mappings: the strategy re-derives the target account
@@ -721,7 +734,7 @@ suspend fun runCsvImport(
 
     // Re-map with new account IDs
     logger.info { "Re-mapping transfers with updated account IDs" }
-    val updatedAccounts = accountRepository.getAllAccounts().first()
+    val updatedAccounts = accountRepository.accountsVisibleTo(strategy)
     val accountsByName = updatedAccounts.associateBy { it.name }
     val currenciesById = currencies.associateBy { it.id }
     val currenciesByCode = currencies.associateBy { it.code.uppercase() }
@@ -771,13 +784,17 @@ suspend fun runCsvImport(
     // Pre-resolve attribute types. The unidentified-counterparty marker is engine-facing rather than a
     // mapped column, and is resolved for every import: even a file that identifies both ends of every row
     // needs it, to recognise (and supersede) the placeholder legs an earlier export left behind.
+    // Every mapped type is resolved, not only those some row carries: the strategy owns them all, and a
+    // re-import must be able to remove one a row no longer reports (e.g. `excluded` on an un-deleted row).
+    val mappedAttributeTypeNames = strategy.config.attributeMappings.mapTo(mutableSetOf()) { it.attributeTypeName }
     val allAttributeTypeNames =
         finalPrep.validTransfers
             .flatMap { it.attributes }
             .map { it.first }
-            .toSet() + WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME
+            .toSet() + mappedAttributeTypeNames + WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME
     val attributeTypeIdByName = importEngine.getOrCreateAttributeTypes(allAttributeTypeNames.toList())
     val unidentifiedCounterpartyTypeId = attributeTypeIdByName[WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME]
+    val ownedAttributeTypeIds = mappedAttributeTypeNames.mapNotNullTo(mutableSetOf()) { attributeTypeIdByName[it] }
 
     logger.info { "Starting to import $validCount transfers" }
 
@@ -810,6 +827,7 @@ suspend fun runCsvImport(
                         openingDate = Clock.System.now(),
                     ),
                     Source.Csv(csvImport.id),
+                    shadowSource = strategy.shadowSource,
                 )
         } else {
             null
@@ -850,6 +868,8 @@ suspend fun runCsvImport(
                 fromAmount = row.transfer.amount,
                 toAccountId = row.transfer.targetAccountId,
                 toAmount = credit,
+                attributes = attributesFor(row.attributes),
+                ownedAttributeTypeIds = ownedAttributeTypeIds,
             )
         } +
             assembledTrades.map { assembled ->
@@ -867,12 +887,17 @@ suspend fun runCsvImport(
 
     // A trade carries no fee field, so a conversion row that also has a fee would otherwise drop it.
     // Emit each such fee as its own standalone movement (source account -> "<strategy> Fees") so the
-    // money isn't lost. (Not produced by the current built-in strategies, but keeps the path honest.)
+    // money isn't lost (e.g. Koinly trades). It carries the row's unique-id attributes, or re-importing
+    // an overlapping export would book the fee again: the trade itself dedupes on its tuple, but a
+    // key-less transfer never dedupes under a unique-id policy.
     val tradeFeeTransfers =
         finalPrep.validTransfers.mapNotNull { row ->
             if (row.tradeTo == null) return@mapNotNull null
             val fee = row.feeAmount ?: return@mapNotNull null
             val feeAcct = feeAccountId ?: return@mapNotNull null
+            val uniqueAttributes = row.attributes.filter { (name, _) -> name in uniqueIdTypeNames }
+            // Excluded with its trade (e.g. a row the source marks deleted).
+            val exclusion = attributesFor(row.attributes).filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
             ImportTransfer(
                 rowKey = ImportRowKey.CsvRow(row.rowIndex),
                 fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
@@ -881,6 +906,9 @@ suspend fun runCsvImport(
                 timestamp = row.transfer.timestamp,
                 description = "${row.transfer.description} (fee)",
                 amount = fee,
+                attributes = attributesFor(uniqueAttributes) + exclusion,
+                ownedAttributeTypeIds = ownedAttributeTypeIds.filterTo(mutableSetOf()) { it.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID },
+                uniqueKey = uniqueAttributes.takeIf { uniqueIdTypeNames.isNotEmpty() }?.toMap(),
             )
         }
 
@@ -992,6 +1020,7 @@ suspend fun runCsvImport(
                                     ?.let { NewAttribute(it, "true") },
                             ),
                     uniqueKey = uniqueKey,
+                    ownedAttributeTypeIds = ownedAttributeTypeIds,
                     fee = fee,
                     passThrough = passThrough,
                     batchRelationships = listOfNotNull(conversionLinkByRow[row.rowIndex]),
@@ -1046,6 +1075,7 @@ suspend fun runCsvImport(
     val batch =
         ImportBatch(
             transfers = importTransfers + tradeFeeTransfers,
+            shadowSource = strategy.shadowSource,
             peopleToCreate = peopleToCreate,
             ownerships = personOwnerships,
             trades = importTrades,

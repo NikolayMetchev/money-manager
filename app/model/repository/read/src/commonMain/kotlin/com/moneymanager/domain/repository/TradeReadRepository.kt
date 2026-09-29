@@ -2,12 +2,16 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Trade
+import com.moneymanager.domain.model.TradeAttribute
 import com.moneymanager.domain.model.TradeId
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
 interface TradeReadRepository {
     fun getTradeById(id: TradeId): Flow<Trade?>
+
+    /** The attributes set on trade [id] (e.g. `excluded` with its reason), ordered by type name. */
+    fun getAttributes(id: TradeId): Flow<List<TradeAttribute>>
 
     fun getTradesByAccount(accountId: AccountId): Flow<List<Trade>>
 

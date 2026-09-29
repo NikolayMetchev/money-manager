@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
+import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,10 +22,12 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.AssetId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
@@ -46,6 +49,7 @@ import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.formatAmount
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -87,6 +91,14 @@ fun AccountsScreen(
     var selectedOwnerIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var nameFilter by remember { mutableStateOf("") }
     var selectedAssetIds by remember { mutableStateOf<Set<AssetId>>(emptySet()) }
+    var showShadowAccounts by remember { mutableStateOf(false) }
+    // Shadow accounts hold a reconciliation source's copy of the data (e.g. Koinly's), not real money,
+    // so they're hidden unless asked for.
+    val shadowAccountIds by rememberFlowAsStateWithSchemaErrorHandling(initial = emptySet()) {
+        accountAttributeRepository
+            .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID))
+            .map { attributes -> attributes.mapTo(mutableSetOf()) { it.accountId } }
+    }
 
     // Drop selections for owners that no longer exist (e.g. a person was deleted).
     val availableOwnerIds = people.map { it.id.id }.toSet()
@@ -123,8 +135,18 @@ fun AccountsScreen(
     }
 
     val displayedAccounts =
-        remember(accounts, nameFilter, selectedOwnerIds, ownerIdsByAccount, selectedAssetIds, balancesByAccount) {
+        remember(
+            accounts,
+            nameFilter,
+            selectedOwnerIds,
+            ownerIdsByAccount,
+            selectedAssetIds,
+            balancesByAccount,
+            showShadowAccounts,
+            shadowAccountIds,
+        ) {
             accounts.filter { account ->
+                val matchesShadow = showShadowAccounts || account.id !in shadowAccountIds
                 val matchesName = nameFilter.isBlank() || account.name.contains(nameFilter, ignoreCase = true)
                 val matchesOwner =
                     selectedOwnerIds.isEmpty() ||
@@ -132,7 +154,7 @@ fun AccountsScreen(
                 val matchesAsset =
                     selectedAssetIds.isEmpty() ||
                         balancesByAccount[account.id].orEmpty().any { it.balance.asset.id in selectedAssetIds }
-                matchesName && matchesOwner && matchesAsset
+                matchesShadow && matchesName && matchesOwner && matchesAsset
             }
         }
 
@@ -203,6 +225,13 @@ fun AccountsScreen(
                     searchText = { "${it.code} ${it.name}" },
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (shadowAccountIds.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = showShadowAccounts, onCheckedChange = { showShadowAccounts = it })
+                    Text("Show reconciliation accounts (${shadowAccountIds.size})")
+                }
             }
 
             if (displayedAccounts.isEmpty()) {

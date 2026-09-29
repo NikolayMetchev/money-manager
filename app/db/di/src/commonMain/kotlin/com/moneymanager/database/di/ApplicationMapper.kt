@@ -31,6 +31,7 @@ fun DatabaseComponent.toApplication() =
                 qifImportRepository = qifImportRepository,
                 importDirectoryRepository = importDirectoryRepository,
                 importTimelineRepository = importTimelineRepository,
+                reconciliationRepository = reconciliationLinkRepository,
                 passThroughAccountRepository = passThroughAccountRepository,
                 maintenance = maintenanceService,
             ),

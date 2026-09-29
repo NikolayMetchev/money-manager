@@ -738,6 +738,7 @@ class AccountsScreenTest {
             everySuspend { updateAccountWithAttributes(any(), any(), any(), any(), any(), any()) } returns 1L
             everySuspend { countTransfersByAccount(any()) } returns 0L
             everySuspend { getTransfersBetweenAccounts(any(), any()) } returns emptyList()
+            everySuspend { getAccountIdsByAttribute(any(), any()) } returns emptySet()
         }
 
     private fun createTransactionRepository(balances: List<AccountBalance> = emptyList()): TransactionWriteRepository =
@@ -793,6 +794,7 @@ class AccountsScreenTest {
     private fun createAccountAttributeRepository(): AccountAttributeWriteRepository =
         mock(MockMode.autoUnit) {
             every { getByAccount(any()) } returns flowOf(emptyList())
+            every { getByType(any()) } returns flowOf(emptyList())
             everySuspend { insert(any(), any(), any()) } returns 0L
             everySuspend { insertInCreationMode(any(), any(), any()) } returns 0L
         }

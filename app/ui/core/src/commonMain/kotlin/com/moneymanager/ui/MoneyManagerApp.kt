@@ -517,6 +517,7 @@ fun MoneyManagerApp(
                                                 personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                                 exchangeOrderRepository = services.transactions.exchangeOrderRepository,
                                                 maintenance = services.imports.maintenance,
+                                                tradeRepository = services.transactions.tradeRepository,
                                                 onAccountIdChange = { accountId ->
                                                     currentlyViewedAccountId = accountId
                                                 },
@@ -606,6 +607,7 @@ fun MoneyManagerApp(
                                                 },
                                                 importDirectoryRepository = services.imports.importDirectoryRepository,
                                                 importTimelineRepository = services.imports.importTimelineRepository,
+                                                reconciliationRepository = services.imports.reconciliationRepository,
                                                 importFileSourceFactory = importFileSourceFactory,
                                                 driveFolderBrowser = driveFolderBrowser,
                                                 csvImportRepository = services.imports.csvImportRepository,
@@ -634,6 +636,16 @@ fun MoneyManagerApp(
                                                 deviceId = services.deviceId,
                                                 onCsvImportClick = { importId ->
                                                     navigationHistory.navigateTo(Screen.CsvImportDetail(importId))
+                                                },
+                                                onReconciliationLegClick = { leg ->
+                                                    navigationHistory.navigateTo(
+                                                        Screen.AccountTransactions(
+                                                            accountId = leg.accountId,
+                                                            accountName =
+                                                                accounts.find { it.id == leg.accountId }?.name ?: leg.accountId.toString(),
+                                                            scrollToTransferId = TransferId(leg.transactionId),
+                                                        ),
+                                                    )
                                                 },
                                                 onTimelineFileClick = { file ->
                                                     when (file.kind) {

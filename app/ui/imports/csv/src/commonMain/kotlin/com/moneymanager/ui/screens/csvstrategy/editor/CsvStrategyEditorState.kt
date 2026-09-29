@@ -238,6 +238,21 @@ internal class CsvStrategyEditorState(
     // the UI round-trips it instead of silently dropping the trades it assembles.
     val tradeGroupConfig = config?.tradeGroupConfig
 
+    // Blank = an ordinary strategy; non-blank = a reconciliation source importing into shadow accounts.
+    var reconciliationSourceName by mutableStateOf(config?.reconciliation?.sourceName.orEmpty())
+    var reconciliationLinkablePrefix by mutableStateOf(config?.reconciliation?.linkableAccountPrefix.orEmpty())
+
+    // "FROM=TO" pairs, comma-separated (see CsvStrategyConfig.assetAliases).
+    var assetAliasesText by mutableStateOf(formatAssetAliases(config?.assetAliases.orEmpty()))
+
+    // No editors of their own yet (set by built-in strategies); carried through so saving an edited
+    // strategy doesn't silently drop them.
+    val sourceTemplateExtraction = sourceTemplate?.extraction
+    val targetTemplateExtraction = targetTemplate?.extraction
+    val currencyExtraction = (currencyMapping as? CurrencyLookupMapping)?.extraction
+    val feeCurrencyColumnName = amountMapping?.feeCurrencyColumnName
+    val feeCurrencyExtraction = amountMapping?.feeCurrencyExtraction
+
     // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialTargetAccountColumnName: String? = targetAccountColumnName
     val initialDescriptionColumnName: String? = descriptionColumnName

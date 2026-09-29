@@ -148,6 +148,9 @@ data class AttributeMatchAccountMapping(
  * Useful when one logical account exists per currency and the CSV only carries
  * the currency code.
  *
+ * When [extraction] is set, the column value is first cleaned through it (e.g. Koinly's
+ * `Binance;binance` wallet cell → `Binance`); a value the pattern doesn't match is used as-is.
+ *
  * Persisted `CsvAccountMapping` overrides on the raw column value are applied first,
  * so renamed accounts keep matching.
  */
@@ -158,6 +161,8 @@ data class TemplateAccountMapping(
     val prefix: String = "",
     val suffix: String = "",
     val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val extraction: ColumnExtraction? = null,
 ) : FieldMapping
 
 /**
@@ -245,6 +250,10 @@ data class AmountParsingMapping(
     val flipAccountsOnPositive: Boolean = false,
     val feeColumnName: String? = null,
     val feeConditions: List<RowCondition> = emptyList(),
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val feeCurrencyColumnName: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val feeCurrencyExtraction: ColumnExtraction? = null,
 ) : FieldMapping {
     init {
         when (mode) {
@@ -275,12 +284,15 @@ data class HardCodedCurrencyMapping(
 
 /**
  * Looks up a currency by code from a CSV column.
- * The column should contain ISO 4217 currency codes (e.g., "GBP", "USD", "EUR").
+ * The column should contain ISO 4217 currency codes (e.g., "GBP", "USD", "EUR") or crypto codes.
+ * When [extraction] is set the cell is first cleaned through it (e.g. Koinly's `BTC;1` → `BTC`).
  */
 @Serializable
 data class CurrencyLookupMapping(
     override val fieldType: TransferField,
     val columnName: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val extraction: ColumnExtraction? = null,
 ) : FieldMapping
 
 /**

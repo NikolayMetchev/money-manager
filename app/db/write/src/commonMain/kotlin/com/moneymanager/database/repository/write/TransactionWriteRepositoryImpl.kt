@@ -196,6 +196,14 @@ class TransactionWriteRepositoryImpl(
                         amount = updatedTransfer.amount.amount.toString(),
                         id = updatedTransfer.id.id,
                     )
+                    if (update.removedAttributeTypeIds.isNotEmpty()) {
+                        val removed = update.removedAttributeTypeIds.mapTo(mutableSetOf()) { it.id }
+                        transferAttributeSelectQueries
+                            .selectByTransaction(updatedTransfer.id.id) { rowId, _, typeId, _, _, _, _ -> rowId to typeId }
+                            .executeAsList()
+                            .filter { (_, typeId) -> typeId in removed }
+                            .forEach { (rowId, _) -> transferAttributeWriteQueries.deleteById(rowId) }
+                    }
                     if (update.newAttributes.isNotEmpty()) {
                         // The existing transfer may already carry some of these attribute types (e.g. a
                         // cross-source reconciliation added one, so a re-import of an otherwise-unchanged

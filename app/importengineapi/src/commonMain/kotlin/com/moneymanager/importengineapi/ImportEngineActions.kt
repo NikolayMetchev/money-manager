@@ -142,6 +142,7 @@ suspend fun ImportEngine.getOrCreateAttributeTypes(names: List<String>): Map<Str
  */
 suspend fun ImportEngine.createAccounts(
     accounts: List<Account>,
+    shadowSource: String? = null,
     sourceFor: (Account) -> Source,
 ): List<AccountId> {
     if (accounts.isEmpty()) return emptyList()
@@ -156,7 +157,7 @@ suspend fun ImportEngine.createAccounts(
                 categoryId = account.categoryId,
             )
         }
-    val result = import(ImportBatch(accountsToCreate = intents))
+    val result = import(ImportBatch(accountsToCreate = intents, shadowSource = shadowSource))
     return intents.map { requireNotNull(result.createdAccountIds[it.key]) { "Account ${it.name} was not created" } }
 }
 
@@ -164,4 +165,5 @@ suspend fun ImportEngine.createAccounts(
 suspend fun ImportEngine.createAccount(
     account: Account,
     source: Source,
-): AccountId = createAccounts(listOf(account)) { source }.single()
+    shadowSource: String? = null,
+): AccountId = createAccounts(listOf(account), shadowSource) { source }.single()

@@ -42,6 +42,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -74,6 +75,7 @@ fun AccountTransactionCard(
     isHighlighted: Boolean = false,
     onAccountClick: (AccountId) -> Unit = {},
     onEditClick: (Transfer) -> Unit = {},
+    onEditTradeClick: (TradeId) -> Unit = {},
     onAuditClick: (TransferId) -> Unit = {},
     onFeeLinkClick: (TransferId) -> Unit = {},
     onOrderLinkClick: (ExchangeOrderId) -> Unit = {},
@@ -312,7 +314,11 @@ fun AccountTransactionCard(
                 state = rememberTooltipState(),
             ) {
                 IconButton(
-                    onClick = {
+                    onClick = onClick@{
+                        (runningBalance.transactionId as? TradeId)?.let {
+                            onEditTradeClick(it)
+                            return@onClick
+                        }
                         // Reconstruct Transfer object from AccountRow fields
                         // Note: Amount needs to be positive value from the materialized view
                         val amount =

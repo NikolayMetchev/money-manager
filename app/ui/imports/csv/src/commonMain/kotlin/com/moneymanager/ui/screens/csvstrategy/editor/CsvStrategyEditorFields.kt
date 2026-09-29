@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
@@ -201,6 +202,7 @@ internal fun buildStrategyFromEditorState(
                                 prefix = state.sourceTemplatePrefix,
                                 suffix = state.sourceTemplateSuffix,
                                 defaultCategoryId = state.sourceDefaultCategoryId,
+                                extraction = state.sourceTemplateExtraction,
                             ),
                         )
                     }
@@ -237,6 +239,7 @@ internal fun buildStrategyFromEditorState(
                             prefix = state.targetTemplatePrefix,
                             suffix = state.targetTemplateSuffix,
                             defaultCategoryId = state.targetDefaultCategoryId,
+                            extraction = state.targetTemplateExtraction,
                         )
                     TargetAccountMode.CONDITIONAL ->
                         ConditionalAccountMapping(
@@ -286,6 +289,8 @@ internal fun buildStrategyFromEditorState(
                     flipAccountsOnPositive = state.flipAccountsOnPositive,
                     feeColumnName = state.feeColumnName,
                     feeConditions = if (state.feeColumnName != null) state.feeConditions else emptyList(),
+                    feeCurrencyColumnName = state.feeCurrencyColumnName.takeIf { state.feeColumnName != null },
+                    feeCurrencyExtraction = state.feeCurrencyExtraction.takeIf { state.feeColumnName != null },
                 ),
             )
             put(
@@ -300,6 +305,7 @@ internal fun buildStrategyFromEditorState(
                         CurrencyLookupMapping(
                             fieldType = TransferField.CURRENCY,
                             columnName = state.currencyColumnName!!,
+                            extraction = state.currencyExtraction,
                         )
                 },
             )
@@ -339,9 +345,27 @@ internal fun buildStrategyFromEditorState(
                         ?.let { AttributeAccountMatch(column = it, attributeTypeName = state.fundingMatchAttributeTypeName) },
                 conversionConfig = state.conversionConfig,
                 tradeGroupConfig = state.tradeGroupConfig,
+                reconciliation =
+                    state.reconciliationSourceName.trim().takeIf { it.isNotEmpty() }?.let { source ->
+                        ReconciliationConfig(source, state.reconciliationLinkablePrefix.takeIf { it.isNotEmpty() })
+                    },
+                assetAliases = parseAssetAliases(state.assetAliasesText),
             ),
         worksheetName = state.worksheetName,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
 }
+
+/** Renders asset aliases as the editor's `FROM=TO, …` text. */
+internal fun formatAssetAliases(aliases: Map<String, String>): String =
+    aliases.entries.sortedBy { it.key }.joinToString(", ") { "${it.key}=${it.value}" }
+
+/** Parses `FROM=TO, …` (upper-cased; malformed entries dropped) into asset aliases. */
+internal fun parseAssetAliases(text: String): Map<String, String> =
+    text
+        .split(',', '\n')
+        .mapNotNull { entry ->
+            val parts = entry.split('=').map { it.trim().uppercase() }
+            parts.takeIf { it.size == 2 && it.all(String::isNotEmpty) }?.let { it[0] to it[1] }
+        }.toMap()

@@ -1,0 +1,6 @@
+insertLink:
+INSERT OR IGNORE INTO reconciliation_account_link (shadow_account_id, real_account_id, created_at)
+VALUES (?, ?, ?);
+
+deleteLinksForShadow:
+DELETE FROM reconciliation_account_link WHERE shadow_account_id = ?;
