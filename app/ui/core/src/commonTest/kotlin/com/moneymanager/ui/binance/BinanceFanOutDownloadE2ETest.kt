@@ -2,6 +2,7 @@ package com.moneymanager.ui.binance
 
 import com.moneymanager.apiimporter.downloadApiSessionExchange
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.importengineapi.createApiCredential
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.rest.ApiRequestSigner
@@ -34,11 +35,25 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
     private val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
     private val token = "test-binance-key"
 
-    private suspend fun binanceStrategy() =
-        repositories.apiImportStrategyRepository
-            .getAllStrategies()
-            .first()
-            .single { it.name == "Binance" }
+    /**
+     * The built-in Binance strategy with every date-windowed endpoint's lookback capped at [TEST_LOOKBACK_DAYS].
+     * The default multi-year lookback sweeps ~760 windows per download, each recorded through the engine,
+     * which made this the slowest test in the build; a few windows per endpoint exercise the same paths.
+     */
+    private suspend fun binanceStrategy(): ApiImportStrategy {
+        val strategy =
+            repositories.apiImportStrategyRepository
+                .getAllStrategies()
+                .first()
+                .single { it.name == "Binance" }
+        val dataEndpoints =
+            strategy.config.dataEndpoints.map { data ->
+                val pagination = data.endpoint.pagination ?: return@map data
+                val lookbackDays = minOf(pagination.lookbackDays, TEST_LOOKBACK_DAYS)
+                data.copy(endpoint = data.endpoint.copy(pagination = pagination.copy(lookbackDays = lookbackDays)))
+            }
+        return strategy.copy(config = strategy.config.copy(dataEndpoints = dataEndpoints))
+    }
 
     @Test
     fun `spot-trade fan-out queries only the symbol that survives the exchangeInfo intersection`() =
@@ -238,4 +253,9 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
             // first rejection, capping attempts at 2 (one per `type`).
             assertTrue(transferAttempts > 2, "the endpoint keeps paging past a rejected window (got $transferAttempts)")
         }
+
+    private companion object {
+        // Longer than the transfer endpoint's own 135-day cap, so the out-of-range test still straddles its cutoff.
+        const val TEST_LOOKBACK_DAYS = 180
+    }
 }
