@@ -1073,7 +1073,7 @@ class ImportEngineDbTest : DbTest() {
                                     description = "Curve",
                                     amount = Money(1010, currency),
                                     attributes = if (deleted) listOf(NewAttribute(excluded, "deleted")) else emptyList(),
-                                    ownedAttributeTypeIds = setOf(excluded),
+                                    ownedAttributes = mapOf(excluded to setOf("deleted")),
                                     passThrough =
                                         ImportPassThrough(
                                             conduits = listOf(AccountRef.Local(LocalAccountKey("curve"))),

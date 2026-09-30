@@ -35,7 +35,8 @@ fun realAccounts(
 }
 
 /**
- * The links that can be made **without asking**: each unlinked wallet of [source] whose name (after
+ * The links that can be made **without asking**: each unlinked wallet of [source] — unless the user
+ * removed its links (see [ShadowAccount.autoLinkDeclined]) — whose name (after
  * the source's wallet prefix) equals exactly one real account's name, ignoring case, spacing and
  * punctuation — and that real account isn't already linked to another wallet of the source. Anything
  * less certain is left for the user (see [unlinkedWallets]).
@@ -56,7 +57,7 @@ fun planAutoLinks(
 
     val candidates =
         wallets
-            .filter { it.accountId !in linkedWallets }
+            .filter { it.accountId !in linkedWallets && !it.autoLinkDeclined }
             .mapNotNull { wallet -> realByKey[nameKey(source.walletName(wallet))]?.singleOrNull()?.let { wallet.accountId to it.id } }
     // Several wallets resolving to one real account is ambiguous: link none of them, the user chooses.
     val claims = candidates.groupingBy { it.second }.eachCount()

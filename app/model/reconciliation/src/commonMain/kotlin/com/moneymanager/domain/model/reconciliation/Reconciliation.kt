@@ -12,6 +12,8 @@ data class ShadowAccount(
     val accountId: AccountId,
     val name: String,
     val sourceName: String,
+    /** The user removed this wallet's last link, so it is never linked automatically again. */
+    val autoLinkDeclined: Boolean = false,
 )
 
 /** The user's statement that [shadowAccountId] mirrors the real account [realAccountId]. */
@@ -56,4 +58,10 @@ data class ReconciliationLeg(
     val counterpartyAccountId: AccountId?,
     val amount: Money,
     val isExcluded: Boolean,
+    /**
+     * Shared by the legs of one movement (e.g. a trade and the fee its source booked as a separate
+     * transfer), so they can be summed against the other side's single gross leg without pulling in
+     * unrelated movements that happen to share a second.
+     */
+    val movementKey: String = "$kind:$transactionId",
 )

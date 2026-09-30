@@ -85,8 +85,8 @@ interface TransactionWriteRepository : TransactionReadRepository {
             "Default importTransfers does not persist newRelationships; override importTransfers in this implementation."
         }
         require(updateSources.size == updates.size) { "updateSources must align 1:1 with updates" }
-        require(updates.all { it.removedAttributeTypeIds.isEmpty() }) {
-            "The default importTransfers cannot remove attribute types; override it to support removedAttributeTypeIds"
+        require(updates.all { it.removedAttributes.isEmpty() }) {
+            "The default importTransfers cannot remove attributes; override it to support removedAttributes"
         }
         // Default (non-atomic) implementation for fakes/alternative impls; the real impl overrides this
         // to run everything in one transaction and record the per-update source.
@@ -107,12 +107,13 @@ interface TransactionWriteRepository : TransactionReadRepository {
 }
 
 /**
- * An existing transfer to update during an import, with attributes to add (or change) and the attribute
- * types to remove — those its source owns but no longer reports (e.g. `excluded` on a row the source
- * un-deleted).
+ * An existing transfer to update during an import, with attributes to add (or change) and attributes to
+ * remove — those its source owns but no longer reports (e.g. `excluded` on a row the source un-deleted).
+ * [removedAttributes] maps a type to the values that may be removed (null = whatever value it holds), so a
+ * same-type attribute set by someone else (e.g. a manual exclusion) survives.
  */
 data class TransferUpdate(
     val transfer: Transfer,
     val newAttributes: List<NewAttribute>,
-    val removedAttributeTypeIds: Set<AttributeTypeId> = emptySet(),
+    val removedAttributes: Map<AttributeTypeId, Set<String>?> = emptyMap(),
 )

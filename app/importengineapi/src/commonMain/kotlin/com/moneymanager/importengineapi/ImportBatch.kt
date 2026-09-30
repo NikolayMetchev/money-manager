@@ -299,8 +299,8 @@ data class ImportTradeIntent(
      * a cross-source reconcile suppresses the trade: that trade belongs to another source.
      */
     val attributes: List<NewAttribute> = emptyList(),
-    /** As [ImportTransfer.ownedAttributeTypeIds]: owned types absent from [attributes] are removed on a dedupe. */
-    val ownedAttributeTypeIds: Set<AttributeTypeId> = emptySet(),
+    /** As [ImportTransfer.ownedAttributes]: owned values absent from [attributes] are removed on a dedupe. */
+    val ownedAttributes: Map<AttributeTypeId, Set<String>?> = emptyMap(),
 ) : WriteIntent
 
 /** Builder-chosen placeholder identity for an exchange order upserted in this batch. */
@@ -465,12 +465,15 @@ data class ImportTransfer(
     val excludedFromBalances: Boolean = false,
     val fee: ImportFee? = null,
     /**
-     * The attribute types this source reports (e.g. a CSV strategy's mapped columns). When the row
-     * re-imports onto an existing transfer (UPDATED), an owned type absent from [attributes] is removed —
-     * how a row the source has since un-deleted loses its `excluded` — while attributes added by the
-     * user, the engine or other sources are left alone. Empty = add/change only, never remove.
+     * The attribute types this source reports (e.g. a CSV strategy's mapped columns), each with the
+     * values it writes for that type — null when the value comes straight from the data and so could be
+     * anything. When the row re-imports onto an existing transfer (UPDATED), an owned type absent from
+     * [attributes] is removed if its stored value is one the source writes — how a row the source has
+     * since un-deleted loses its `excluded` = "deleted in Koinly" — while the same type set by the user
+     * (e.g. a manual exclusion with its own reason), the engine or another source is left alone. Empty =
+     * add/change only, never remove.
      */
-    val ownedAttributeTypeIds: Set<AttributeTypeId> = emptySet(),
+    val ownedAttributes: Map<AttributeTypeId, Set<String>?> = emptyMap(),
     /**
      * The amount another source would record for this same movement, when that differs from [amount]
      * because this source splits out a charge the other one folds in. A Binance withdrawal is the

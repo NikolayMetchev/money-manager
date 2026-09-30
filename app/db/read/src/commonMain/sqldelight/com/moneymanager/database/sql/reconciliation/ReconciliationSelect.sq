@@ -2,7 +2,10 @@
 -- shadow->real account links, and the per-account legs the reconciliation matcher compares.
 
 selectShadowAccounts:
-SELECT a.id, a.name, aa.attribute_value AS source_name
+SELECT a.id, a.name, aa.attribute_value AS source_name,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM account_attribute d WHERE d.account_id = a.id AND d.attribute_type_id = -10
+    ) THEN 1 ELSE 0 END AS auto_link_declined
 FROM account a
 JOIN account_attribute aa ON aa.account_id = a.id AND aa.attribute_type_id = -9
 ORDER BY a.name;
@@ -14,7 +17,9 @@ ORDER BY shadow_account_id, real_account_id;
 
 -- One row per (transaction, account it touches) for the given accounts, like
 -- BalanceLegsSelect.selectAllTransactionLegs but restricted, with the transfer's counterparty and the
--- asset's details. `sign` is +1 for an inflow to the account, -1 for an outflow. Unordered: the caller
+-- asset's details. `sign` is +1 for an inflow to the account, -1 for an outflow. `movement_key` groups
+-- the legs of one movement: the CSV row that produced them (a Koinly trade and its fee transfer), else
+-- the transfer a fee leg belongs to, else the transaction itself. Unordered: the caller
 -- queries in chunks and sorts the union itself.
 selectLegsForAccounts:
     SELECT
@@ -34,7 +39,16 @@ selectLegsForAccounts:
         CASE WHEN EXISTS (
             SELECT 1 FROM transfer_attribute ta
             WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
-        ) THEN 1 ELSE 0 END AS is_excluded
+        ) THEN 1 ELSE 0 END AS is_excluded,
+        COALESCE(
+            (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
+             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id
+             WHERE es.entity_type_id = 7 AND es.entity_id = tr.id AND ces.csv_row_index IS NOT NULL
+             ORDER BY es.revision_id LIMIT 1),
+            (SELECT 't' || rel.id1 FROM transfer_relationship rel
+             WHERE rel.id2 = tr.id AND rel.relationship_type_id = 2 LIMIT 1),
+            't' || tr.id
+        ) AS movement_key
     FROM transfer tr
     JOIN asset_details ad ON ad.id = tr.asset_id
     WHERE tr.target_account_id IN :accountIds
@@ -58,7 +72,16 @@ selectLegsForAccounts:
         CASE WHEN EXISTS (
             SELECT 1 FROM transfer_attribute ta
             WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
-        ) THEN 1 ELSE 0 END
+        ) THEN 1 ELSE 0 END,
+        COALESCE(
+            (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
+             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id
+             WHERE es.entity_type_id = 7 AND es.entity_id = tr.id AND ces.csv_row_index IS NOT NULL
+             ORDER BY es.revision_id LIMIT 1),
+            (SELECT 't' || rel.id1 FROM transfer_relationship rel
+             WHERE rel.id2 = tr.id AND rel.relationship_type_id = 2 LIMIT 1),
+            't' || tr.id
+        )
     FROM transfer tr
     JOIN asset_details ad ON ad.id = tr.asset_id
     WHERE tr.source_account_id IN :accountIds
@@ -82,7 +105,14 @@ selectLegsForAccounts:
         CASE WHEN EXISTS (
             SELECT 1 FROM trade_attribute ta
             WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1
-        ) THEN 1 ELSE 0 END
+        ) THEN 1 ELSE 0 END,
+        COALESCE(
+            (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
+             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id
+             WHERE es.entity_type_id = 11 AND es.entity_id = td.id AND ces.csv_row_index IS NOT NULL
+             ORDER BY es.revision_id LIMIT 1),
+            'd' || td.id
+        )
     FROM trade td
     JOIN asset_details ad ON ad.id = td.to_asset_id
     WHERE td.to_account_id IN :accountIds
@@ -106,7 +136,14 @@ selectLegsForAccounts:
         CASE WHEN EXISTS (
             SELECT 1 FROM trade_attribute ta
             WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1
-        ) THEN 1 ELSE 0 END
+        ) THEN 1 ELSE 0 END,
+        COALESCE(
+            (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
+             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id
+             WHERE es.entity_type_id = 11 AND es.entity_id = td.id AND ces.csv_row_index IS NOT NULL
+             ORDER BY es.revision_id LIMIT 1),
+            'd' || td.id
+        )
     FROM trade td
     JOIN asset_details ad ON ad.id = td.from_asset_id
     WHERE td.from_account_id IN :accountIds;

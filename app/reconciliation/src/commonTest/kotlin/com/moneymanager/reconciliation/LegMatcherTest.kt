@@ -37,16 +37,20 @@ class LegMatcherTest {
         at: Instant,
         asset: CryptoAsset = ada,
         excluded: Boolean = false,
-    ) = ReconciliationLeg(
-        transactionId = nextId++,
-        kind = if (counterparty == null) LegTransactionKind.TRADE else LegTransactionKind.TRANSFER,
-        timestamp = at,
-        description = "",
-        accountId = account,
-        counterpartyAccountId = counterparty,
-        amount = Money.fromDisplayValue(BigDecimal(amount), asset),
-        isExcluded = excluded,
-    )
+        movement: String? = null,
+    ) = (nextId++).let { id ->
+        ReconciliationLeg(
+            transactionId = id,
+            kind = if (counterparty == null) LegTransactionKind.TRADE else LegTransactionKind.TRANSFER,
+            timestamp = at,
+            description = "",
+            accountId = account,
+            counterpartyAccountId = counterparty,
+            amount = Money.fromDisplayValue(BigDecimal(amount), asset),
+            isExcluded = excluded,
+            movementKey = movement ?: "m$id",
+        )
+    }
 
     private fun ada(amount: String) = Money.fromDisplayValue(BigDecimal(amount), ada)
 
@@ -133,7 +137,8 @@ class LegMatcherTest {
     @Test
     fun `a fee booked separately on one side matches the other side's gross leg`() {
         // Source: trade principal + its fee, same second. Real: one gross debit half a minute later.
-        val source = listOf(leg(wallet, null, "-985.32", t0), leg(wallet, sourceRewards, "-14.68", t0))
+        val source =
+            listOf(leg(wallet, null, "-985.32", t0, movement = "row7"), leg(wallet, sourceRewards, "-14.68", t0, movement = "row7"))
         val real = listOf(leg(binance, null, "-1000", t0 + 35.seconds))
 
         val result = reconcile(source, links, real)
@@ -146,6 +151,31 @@ class LegMatcherTest {
                 .sourceLegs.size,
         )
         assertTrue(result.missingInMm.isEmpty())
+        assertTrue(result.missingInSource.isEmpty())
+    }
+
+    @Test
+    fun `unrelated movements in the same second are never summed together`() {
+        // Two separate rewards stamped the same second must not pass for one real +3.
+        val source = listOf(leg(wallet, sourceRewards, "1", t0), leg(wallet, sourceRewards, "2", t0))
+        val real = listOf(leg(binance, stakingRewards, "3", t0))
+
+        val result = reconcile(source, links, real)
+
+        assertTrue(result.matches.isEmpty())
+        assertEquals(2, result.missingInMm.size)
+        assertEquals(1, result.missingInSource.size)
+    }
+
+    @Test
+    fun `excluded source legs do not widen the date range`() {
+        // A deleted row is out of scope, so the real leg only it covered isn't reported missing either.
+        val source = listOf(leg(wallet, sourceRewards, "1", t0), leg(wallet, sourceRewards, "5", t0 + 30.hours, excluded = true))
+        val real = listOf(leg(binance, stakingRewards, "1", t0), leg(binance, stakingRewards, "5", t0 + 30.hours))
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(1, result.exactMatches.size)
         assertTrue(result.missingInSource.isEmpty())
     }
 }

@@ -47,7 +47,9 @@ class ReconciliationReadRepositoryImpl(
             .selectShadowAccounts()
             .asFlow()
             .mapToList(coroutineContext)
-            .map { rows -> rows.map { ShadowAccount(AccountId(it.id), it.name, it.source_name) } }
+            .map { rows ->
+                rows.map { ShadowAccount(AccountId(it.id), it.name, it.source_name, autoLinkDeclined = it.auto_link_declined == 1L) }
+            }
 
     override fun getLinks(): Flow<List<ReconciliationLink>> =
         queries
@@ -81,6 +83,7 @@ class ReconciliationReadRepositoryImpl(
                         counterpartyAccountId = row.counterparty_account_id?.let(::AccountId),
                         amount = Money(if (row.sign < 0) -magnitude else magnitude, asset),
                         isExcluded = row.is_excluded == 1L,
+                        movementKey = row.movement_key,
                     )
                 }.toList()
         }

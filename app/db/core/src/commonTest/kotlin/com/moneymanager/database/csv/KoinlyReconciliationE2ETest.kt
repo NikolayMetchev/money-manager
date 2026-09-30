@@ -17,6 +17,8 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.setReconciliationLinks
 import com.moneymanager.importengineapi.setTradeExcluded
+import com.moneymanager.reconciliation.planAutoLinks
+import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
@@ -314,6 +316,60 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
             repositories.importEngine.setTradeExcluded(trade.id, null)
             assertEquals("358.32414347", balanceOf("Koinly · Coinbase", "KNC"))
+        }
+
+    @Test
+    fun aManualExclusionSurvivesReimportingTheLiveRow() =
+        runTest {
+            applyAll(listOf(stage("a.csv", listOf(coinbaseDeposit, coinbaseTrade))))
+            val coinbase = assertNotNull(accountByName("Koinly · Coinbase")).id
+            val trade =
+                repositories.tradeRepository
+                    .getTradesByAccount(coinbase)
+                    .first()
+                    .single()
+            repositories.importEngine.setTradeExcluded(trade.id, "duplicate of another wallet")
+
+            // Koinly owns `excluded`, but only the value it writes ("deleted in Koinly"): an overlapping
+            // export with the row live must leave the user's own exclusion alone.
+            applyAll(listOf(stage("b.csv", listOf(coinbaseDeposit, coinbaseTrade))))
+
+            assertNull(balanceOf("Koinly · Coinbase", "KNC"))
+        }
+
+    @Test
+    fun removingAWalletsLastLinkStopsAutoLinkingIt() =
+        runTest {
+            applyAll(listOf(stage("transactions.csv", listOf(binanceReward))))
+            val shadow = assertNotNull(accountByName("Koinly · Binance")).id
+            val binance =
+                repositories.importEngine.createAccount(
+                    Account(id = AccountId(0), name = "Binance", openingDate = now),
+                    Source.Manual,
+                )
+            val reconciliation = repositories.reconciliationLinkRepository
+
+            suspend fun declined() =
+                reconciliation
+                    .getShadowAccounts()
+                    .first()
+                    .single { it.accountId == shadow }
+                    .autoLinkDeclined
+
+            repositories.importEngine.setReconciliationLinks(shadow, setOf(binance))
+            assertEquals(false, declined())
+
+            repositories.importEngine.setReconciliationLinks(shadow, emptySet())
+            assertTrue(declined())
+            val source = reconciliation.getSources().first().single()
+            val real = realAccounts(repositories.accountRepository.getAllAccounts().first(), reconciliation.getShadowAccounts().first())
+            assertEquals(
+                emptyMap(),
+                planAutoLinks(source, reconciliation.getShadowAccounts().first(), reconciliation.getLinks().first(), real),
+            )
+
+            repositories.importEngine.setReconciliationLinks(shadow, setOf(binance))
+            assertEquals(false, declined())
         }
 
     @Test

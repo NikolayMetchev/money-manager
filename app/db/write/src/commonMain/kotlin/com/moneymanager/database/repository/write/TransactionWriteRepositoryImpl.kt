@@ -196,13 +196,16 @@ class TransactionWriteRepositoryImpl(
                         amount = updatedTransfer.amount.amount.toString(),
                         id = updatedTransfer.id.id,
                     )
-                    if (update.removedAttributeTypeIds.isNotEmpty()) {
-                        val removed = update.removedAttributeTypeIds.mapTo(mutableSetOf()) { it.id }
+                    if (update.removedAttributes.isNotEmpty()) {
+                        val removable = update.removedAttributes.mapKeys { it.key.id }
                         val rowIds =
                             transferAttributeSelectQueries
-                                .selectByTransaction(updatedTransfer.id.id) { rowId, _, typeId, _, _, _, _ -> rowId to typeId }
-                                .executeAsList()
-                                .filter { (_, typeId) -> typeId in removed }
+                                .selectByTransaction(updatedTransfer.id.id) { rowId, _, typeId, value, _, _, _ ->
+                                    Triple(rowId, typeId, value)
+                                }.executeAsList()
+                                .filter { (_, typeId, value) ->
+                                    typeId in removable && removable[typeId].let { values -> values == null || value in values }
+                                }.map { (rowId, typeId, _) -> rowId to typeId }
                         // In creation mode, like the additions below: the field update already bumped the
                         // revision once for this update.
                         database.beginCreationMode()

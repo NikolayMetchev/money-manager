@@ -188,16 +188,22 @@ private fun SourceReconciliation(
         error?.let { message ->
             item { Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 4.dp)) }
         }
-        if (unlinked.isNotEmpty()) {
+        // Wallets the user deliberately unlinked aren't a problem to fix, just not compared.
+        val (declined, needsAttention) = unlinked.partition { it.wallet.autoLinkDeclined }
+        listOf(
+            needsAttention to "Needs attention: ${needsAttention.size} ${source.name} wallet(s) not linked to an account",
+            declined to "Not compared: ${declined.size} wallet(s) whose links you removed",
+        ).forEach { (wallets, heading) ->
+            if (wallets.isEmpty()) return@forEach
             item {
                 Text(
-                    "Needs attention: ${unlinked.size} ${source.name} wallet(s) not linked to an account",
+                    heading,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = if (wallets === needsAttention) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
                 )
             }
-            items(unlinked, key = { "unlinked-${it.wallet.accountId.id}" }) { wallet ->
+            items(wallets, key = { "unlinked-${it.wallet.accountId.id}" }) { wallet ->
                 UnlinkedWalletCard(
                     wallet = wallet,
                     walletName = source.walletName(wallet.wallet),
@@ -321,14 +327,22 @@ private fun UnlinkedWalletCard(
     isReal: (Account) -> Boolean,
     onLink: (AccountId) -> Unit,
 ) {
+    val declined = wallet.wallet.autoLinkDeclined
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = if (declined) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer,
+            ),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(walletName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(
-                "Pick the Money Manager account this wallet mirrors, or create it (\"Create New Account\" in the list).",
+                if (declined) {
+                    "You removed this wallet's links, so it isn't compared or linked automatically. Link it again to compare it."
+                } else {
+                    "Pick the Money Manager account this wallet mirrors, or create it (\"Create New Account\" in the list)."
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
             wallet.suggestion?.let { suggestion ->

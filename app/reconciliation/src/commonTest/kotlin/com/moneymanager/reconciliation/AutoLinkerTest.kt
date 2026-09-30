@@ -82,4 +82,11 @@ class AutoLinkerTest {
     fun `suggestion prefers the shortest account extending the wallet name`() {
         assertEquals("Binance Earn", suggestRealAccount("Bin", listOf(real(2, "Binance Earn"), real(6, "Binance Earn Rewards")))?.name)
     }
+
+    @Test
+    fun `a wallet whose links the user removed is never linked automatically`() {
+        val shadows = listOf(ShadowAccount(AccountId(100), "Koinly · Binance", "Koinly", autoLinkDeclined = true))
+
+        assertEquals(emptyMap(), planAutoLinks(source, shadows, emptyList(), reals))
+    }
 }

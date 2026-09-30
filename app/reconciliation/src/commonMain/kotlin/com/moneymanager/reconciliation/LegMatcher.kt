@@ -71,7 +71,10 @@ val DEFAULT_FUZZY_WINDOW: Duration = 24.hours
  * Legs are compared per **link group** — a wallet (shadow account) plus every real account linked to it
  * — so a source that books one "Binance" wallet can be compared against several real Binance accounts. A
  * pair matches on (group, asset, signed amount), first at the same second (exact), then nearest within
- * [fuzzyWindow]; each leg is used once, so repeated identical movements pair up one-to-one.
+ * [fuzzyWindow]; each leg is used once, so repeated identical movements pair up one-to-one. A final pass
+ * sums the leftover legs of each movement (see [ReconciliationLeg.movementKey]) per group and asset — how
+ * a trade or withdrawal whose fee one side books separately and the other folds into the gross amount
+ * still reconciles.
  *
  * Out of scope: legs on unlinked shadow accounts (counterparties, fees, wallets still to be linked), real
  * legs outside the source's date range, excluded legs on either side (already-reconciled duplicates,
@@ -89,8 +92,13 @@ fun reconcile(
     realLegs: List<ReconciliationLeg>,
     fuzzyWindow: Duration = DEFAULT_FUZZY_WINDOW,
 ): ReconciliationResult {
+    // Excluded legs (e.g. rows the source deleted) are out of scope, so they don't widen the range either:
+    // a real leg only a deleted row covered mustn't be reported as missing from the source.
     val sourceRange =
-        sourceLegs.takeIf { it.isNotEmpty() }?.let { legs -> legs.minOf { it.timestamp }..legs.maxOf { it.timestamp } }
+        sourceLegs
+            .filterNot { it.isExcluded }
+            .takeIf { it.isNotEmpty() }
+            ?.let { legs -> legs.minOf { it.timestamp }..legs.maxOf { it.timestamp } }
     // One source's links: the engine allows a real account one wallet per source, which is what lets
     // each real leg belong to exactly one group.
     require(links.groupBy { it.realAccountId }.values.all { it.size == 1 }) {
@@ -165,7 +173,7 @@ fun reconcile(
                 }
         }
 
-    // Pass 3: the leftovers of one movement, summed per side (group, asset, second), nearest first.
+    // Pass 3: the leftovers of one movement, summed per side (group, asset, movement), nearest first.
     val sourceBundles = bundles(inScopeSource.filter { it !in matchedSource }) { groupOfSource(it.accountId)!! }
     val realBundles = bundles(inScopeReal.filter { it !in consumed }) { groupOfReal(it.accountId)!! }
     val realBundlesByTotal = realBundles.groupBy { it.totalKey }
@@ -205,7 +213,7 @@ fun reconcile(
     )
 }
 
-/** The legs of one side of one movement: same group, asset and second. */
+/** The legs of one side of one movement (see [ReconciliationLeg.movementKey]) in one group and asset. */
 private data class LegBundle(
     val legs: List<ReconciliationLeg>,
     val totalKey: MatchKey,
@@ -218,7 +226,7 @@ private fun bundles(
     groupOf: (ReconciliationLeg) -> AccountId,
 ): List<LegBundle> =
     legs
-        .groupBy { Triple(groupOf(it), it.amount.asset.id, it.timestamp.epochSeconds) }
+        .groupBy { Triple(groupOf(it), it.amount.asset.id, it.movementKey) }
         .map { (key, bundleLegs) ->
             LegBundle(bundleLegs, MatchKey(key.first, key.second, bundleLegs.map { it.amount.amount }.reduce { a, b -> a + b }))
         }

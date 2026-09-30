@@ -794,7 +794,16 @@ suspend fun runCsvImport(
             .toSet() + mappedAttributeTypeNames + WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME
     val attributeTypeIdByName = importEngine.getOrCreateAttributeTypes(allAttributeTypeNames.toList())
     val unidentifiedCounterpartyTypeId = attributeTypeIdByName[WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME]
-    val ownedAttributeTypeIds = mappedAttributeTypeNames.mapNotNullTo(mutableSetOf()) { attributeTypeIdByName[it] }
+    // The values each mapped type can take: a fixed `emitWhenMatched` label, or anything (null) when some
+    // mapping copies the column's content. A re-import only removes an owned value it could have written.
+    val ownedAttributes: Map<AttributeTypeId, Set<String>?> =
+        strategy.config.attributeMappings
+            .groupBy { it.attributeTypeName }
+            .mapNotNull { (name, mappings) ->
+                val typeId = attributeTypeIdByName[name] ?: return@mapNotNull null
+                val fixed = mappings.map { it.emitWhenMatched }
+                typeId to (if (fixed.all { it != null }) fixed.filterNotNull().toSet() else null)
+            }.toMap()
 
     logger.info { "Starting to import $validCount transfers" }
 
@@ -869,7 +878,7 @@ suspend fun runCsvImport(
                 toAccountId = row.transfer.targetAccountId,
                 toAmount = credit,
                 attributes = attributesFor(row.attributes),
-                ownedAttributeTypeIds = ownedAttributeTypeIds,
+                ownedAttributes = ownedAttributes,
             )
         } +
             assembledTrades.map { assembled ->
@@ -907,7 +916,7 @@ suspend fun runCsvImport(
                 description = "${row.transfer.description} (fee)",
                 amount = fee,
                 attributes = attributesFor(uniqueAttributes) + exclusion,
-                ownedAttributeTypeIds = ownedAttributeTypeIds.filterTo(mutableSetOf()) { it.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID },
+                ownedAttributes = ownedAttributes.filterKeys { it.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID },
                 uniqueKey = uniqueAttributes.takeIf { uniqueIdTypeNames.isNotEmpty() }?.toMap(),
             )
         }
@@ -1020,7 +1029,7 @@ suspend fun runCsvImport(
                                     ?.let { NewAttribute(it, "true") },
                             ),
                     uniqueKey = uniqueKey,
-                    ownedAttributeTypeIds = ownedAttributeTypeIds,
+                    ownedAttributes = ownedAttributes,
                     fee = fee,
                     passThrough = passThrough,
                     batchRelationships = listOfNotNull(conversionLinkByRow[row.rowIndex]),

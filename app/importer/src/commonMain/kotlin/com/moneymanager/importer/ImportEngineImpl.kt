@@ -255,7 +255,16 @@ class ImportEngineImpl(
             // `excluded` of a trade the source has since un-deleted), like a transfer UPDATE.
             if (!tradeResult.created) {
                 val reported = intent.attributes.mapTo(mutableSetOf()) { it.typeId }
-                (intent.ownedAttributeTypeIds - reported).forEach { tradeRepository.removeAttribute(tradeResult.id, it) }
+                val stale = intent.ownedAttributes.filterKeys { it !in reported }
+                if (stale.isNotEmpty()) {
+                    tradeRepository
+                        .getAttributes(tradeResult.id)
+                        .first()
+                        .filter { attr ->
+                            stale.containsKey(attr.attributeType.id) &&
+                                stale[attr.attributeType.id].let { it == null || attr.value in it }
+                        }.forEach { tradeRepository.removeAttribute(tradeResult.id, it.attributeType.id) }
+                }
             }
             createdTradeIds[intent.key] = tradeResult.id
             if (!tradeResult.created) dedupedTradeKeys += intent.key
@@ -1747,12 +1756,12 @@ class ImportEngineImpl(
         val orderedUpdateSources = mutableListOf<Source>()
         val excludedTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
         // Main transfers whose exclusion the source now asserts (true) or has withdrawn (false).
-        val exclusionChanges = mutableMapOf<TransferId, Pair<NewAttribute?, Source>>()
+        val exclusionChanges = mutableMapOf<TransferId, ExclusionChange>()
         for (classified in toUpdate) {
             val existingId = classified.existing ?: continue
             val t = classified.transfer
             val reported = t.attributes.mapTo(mutableSetOf()) { it.typeId }
-            val removed = t.ownedAttributeTypeIds - reported - setOfNotNull(engineOwnedTypeId)
+            val removed = t.ownedAttributes.filterKeys { it !in reported && it != engineOwnedTypeId }
             val source = t.source.forRow(requireNotNull(t.rowKey))
             updates +=
                 TransferUpdate(
@@ -1766,11 +1775,12 @@ class ImportEngineImpl(
                             amount = requireNotNull(t.amount),
                         ),
                     newAttributes = t.attributes,
-                    removedAttributeTypeIds = removed,
+                    removedAttributes = removed,
                 )
             orderedUpdateSources += source
-            if (excludedTypeId in t.ownedAttributeTypeIds) {
-                exclusionChanges[existingId] = t.attributes.firstOrNull { it.typeId == excludedTypeId } to source
+            if (t.ownedAttributes.containsKey(excludedTypeId)) {
+                exclusionChanges[existingId] =
+                    ExclusionChange(t.attributes.firstOrNull { it.typeId == excludedTypeId }, t.ownedAttributes[excludedTypeId], source)
             }
         }
         derivedLegExclusionUpdates(exclusionChanges, excludedTypeId, updates.mapTo(mutableSetOf()) { it.transfer.id })
@@ -1788,7 +1798,7 @@ class ImportEngineImpl(
      * un-deleted must again. Needs [transferRelationshipRepository]; skipped without it.
      */
     private suspend fun derivedLegExclusionUpdates(
-        exclusionChanges: Map<TransferId, Pair<NewAttribute?, Source>>,
+        exclusionChanges: Map<TransferId, ExclusionChange>,
         excludedTypeId: AttributeTypeId,
         alreadyUpdated: Set<TransferId>,
     ): List<Pair<TransferUpdate, Source>> {
@@ -1811,17 +1821,26 @@ class ImportEngineImpl(
         mainOf.keys.removeAll(alreadyUpdated)
         if (mainOf.isEmpty()) return emptyList()
         return transactionRepository.getTransactionsByIds(mainOf.keys).mapNotNull { (legId, leg) ->
-            val (exclusion, source) = exclusionChanges.getValue(mainOf.getValue(legId))
-            val isExcluded = leg.attributes.any { it.attributeType.id == excludedTypeId }
+            val change = exclusionChanges.getValue(mainOf.getValue(legId))
+            val stored = leg.attributes.firstOrNull { it.attributeType.id == excludedTypeId }
             when {
-                exclusion != null && !isExcluded -> TransferUpdate(leg, listOf(exclusion)) to source
-                exclusion == null && isExcluded -> TransferUpdate(leg, emptyList(), setOf(excludedTypeId)) to source
+                change.exclusion != null && stored == null -> TransferUpdate(leg, listOf(change.exclusion)) to change.source
+                // Only lift an exclusion the source itself set (see ImportTransfer.ownedAttributes).
+                change.exclusion == null && stored != null && change.ownedValues.let { it == null || stored.value in it } ->
+                    TransferUpdate(leg, emptyList(), mapOf(excludedTypeId to change.ownedValues)) to change.source
                 else -> null
             }
         }
     }
 
     // endregion
+
+    /** A re-imported main transfer's exclusion as its source now reports it (null = not excluded). */
+    private data class ExclusionChange(
+        val exclusion: NewAttribute?,
+        val ownedValues: Set<String>?,
+        val source: Source,
+    )
 
     private fun resolveRef(
         ref: AccountRef,
@@ -1896,6 +1915,12 @@ class ImportEngineImpl(
         batch: ImportBatch,
         source: String,
     ) {
+        // Only creates: an UPDATE/DELETE names an existing record by id, which could be a real one.
+        val nonCreates =
+            batch.transfers.count { it.operation != ImportOperation.CREATE } +
+                batch.trades.count { it.operation != ImportOperation.CREATE } +
+                batch.accountsToCreate.count { it.operation != ImportOperation.CREATE }
+        require(nonCreates == 0) { "Reconciliation import for '$source' may only create records ($nonCreates update/delete intents)" }
         val referenced = mutableSetOf<AccountId>()
 
         fun add(ref: AccountRef?) {
@@ -1948,6 +1973,19 @@ class ImportEngineImpl(
                         "Account(s) ${taken.map { it.realAccountId }} already linked to another '$source' shadow account"
                     }
                     repository.setLinks(m.shadowAccountId, m.realAccountIds)
+                    // Unlinking a wallet completely is a decision automatic linking must respect;
+                    // linking it again withdraws that decision.
+                    val declinedTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_AUTO_LINK_DECLINED_ATTR_TYPE_ID)
+                    val declined =
+                        accountAttributeRepository.getByAccount(m.shadowAccountId).first().filter {
+                            it.attributeType.id ==
+                                declinedTypeId
+                        }
+                    when {
+                        m.realAccountIds.isEmpty() && declined.isEmpty() ->
+                            accountAttributeRepository.insert(m.shadowAccountId, declinedTypeId, "true")
+                        m.realAccountIds.isNotEmpty() -> declined.forEach { accountAttributeRepository.delete(it.id) }
+                    }
                 }
             }
         }

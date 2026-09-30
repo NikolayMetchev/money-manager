@@ -55,6 +55,12 @@ object WellKnownIds {
     const val ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID: Long = -9
 
     /**
+     * "reconciliation-auto-link-declined" account attribute on a shadow wallet whose last link the user
+     * removed: automatic linking leaves it alone, so the removal sticks. Linking it again clears it.
+     */
+    const val ACCOUNT_RECONCILIATION_AUTO_LINK_DECLINED_ATTR_TYPE_ID: Long = -10
+
+    /**
      * "unidentified-counterparty" transfer attribute: this leg's counterparty account is only the raw
      * description the export carried (no strategy rule, persisted mapping or bank identity resolved it),
      * so the account is a placeholder standing in for whoever the real other end was. Marks the leg as
