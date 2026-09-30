@@ -102,9 +102,16 @@ kotlin {
         }
         getByName("androidDeviceTest") {
             dependencies {
+                implementation(projects.app.strategies)
                 implementation(projects.app.model.importdirectory)
                 implementation(projects.test.app.ui)
                 implementation(libs.androidx.compose.ui.test)
+            }
+        }
+
+        getByName("androidHostTest") {
+            dependencies {
+                implementation(projects.app.strategies)
             }
         }
     }
