@@ -4,6 +4,7 @@ package com.moneymanager.ui.screens.reconciliation
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
@@ -221,6 +222,33 @@ class ReconciliationScreenTest {
 
             waitForIdle()
             assertEquals(0, onAllNodesWithText("Automatic linking failed", substring = true).fetchSemanticsNodes().size)
+        }
+    }
+
+    @Test
+    fun walletControlsAreDisabledWhileCreateAllRuns() {
+        runMoneyManagerComposeUiTest {
+            val wallet = ShadowAccount(AccountId(100), "Koinly · Ledger", "Koinly")
+            setContent {
+                CompositionLocalProvider(LocalImportEngine provides importEngine { awaitCancellation() }) {
+                    ProvideSchemaAwareScope {
+                        ReconciliationScreen(
+                            reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
+                            accountRepository =
+                                accountRepository(listOf(Account(id = wallet.accountId, name = wallet.name, openingDate = epoch))),
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            onOpenLeg = {},
+                        )
+                    }
+                }
+            }
+
+            waitForIdle()
+            onNodeWithText("Create all (1)").performClick()
+            waitForIdle()
+            onNodeWithText("Create new account").assertIsNotEnabled()
+            onNodeWithText("Create all (1)").assertIsNotEnabled()
         }
     }
 }

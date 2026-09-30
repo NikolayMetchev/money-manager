@@ -248,6 +248,8 @@ private fun SourceReconciliation(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     existingNames = existingNames,
+                    // "Create all" links in a second batch that would overwrite a link made meanwhile.
+                    enabled = !creatingAll,
                     isReal = { it.id !in allShadowIds },
                     onLink = { realId -> setLinks(wallet.wallet.accountId, setOf(realId)) },
                 )
@@ -363,6 +365,7 @@ private fun UnlinkedWalletCard(
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     existingNames: Set<String>,
+    enabled: Boolean,
     isReal: (Account) -> Boolean,
     onLink: (AccountId) -> Unit,
 ) {
@@ -386,7 +389,10 @@ private fun UnlinkedWalletCard(
                 style = MaterialTheme.typography.bodySmall,
             )
             wallet.suggestion?.let { suggestion ->
-                TextButton(onClick = { onLink(suggestion.id) }) { Text("Link to suggested account \"${suggestion.name}\"") }
+                TextButton(
+                    onClick = { onLink(suggestion.id) },
+                    enabled = enabled,
+                ) { Text("Link to suggested account \"${suggestion.name}\"") }
             }
             AccountPicker(
                 selectedAccountId = null,
@@ -395,9 +401,10 @@ private fun UnlinkedWalletCard(
                 accountRepository = accountRepository,
                 categoryRepository = categoryRepository,
                 personRepository = personRepository,
+                enabled = enabled,
                 accountFilter = isReal,
             )
-            TextButton(onClick = { showCreateDialog = true }) { Text("Create new account") }
+            TextButton(onClick = { showCreateDialog = true }, enabled = enabled) { Text("Create new account") }
         }
     }
     if (showCreateDialog) {
