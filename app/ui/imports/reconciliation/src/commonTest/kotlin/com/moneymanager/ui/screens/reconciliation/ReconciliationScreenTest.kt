@@ -20,12 +20,12 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
+import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
 import dev.mokkery.every
 import dev.mokkery.everySuspend
@@ -60,6 +60,9 @@ class ReconciliationScreenTest {
             every { getAllAccounts() } returns flowOf(accounts)
             everySuspend { getAccountIdsByAttribute(any(), any()) } returns emptySet()
         }
+
+    private fun importEngine(onImport: suspend (ImportBatch) -> ImportResult): ImportEngine =
+        mock { everySuspend { import(any(), any(), any()) } calls { (batch: ImportBatch) -> onImport(batch) } }
 
     private val categoryRepository: CategoryReadRepository =
         mock { every { getAllCategories() } returns flowOf(emptyList()) }
@@ -127,15 +130,9 @@ class ReconciliationScreenTest {
                     wallets.map { Account(id = it.accountId, name = it.name, openingDate = epoch) }
             val batches = mutableListOf<ImportBatch>()
             val engine =
-                object : ImportEngine {
-                    override suspend fun import(
-                        batch: ImportBatch,
-                        onProgress: (suspend (ImportProgress) -> Unit)?,
-                        batchSize: Int,
-                    ): ImportResult {
-                        batches += batch
-                        return ImportResult(createdAccountIds = batch.accountsToCreate.associate { it.key to AccountId(500) })
-                    }
+                importEngine { batch ->
+                    batches += batch
+                    ImportResult(createdAccountIds = batch.accountsToCreate.associate { it.key to AccountId(500) })
                 }
             // The links flow is static, so the Binance wallet stays unlinked despite its exact match.
             setContent {
@@ -204,15 +201,9 @@ class ReconciliationScreenTest {
             val links = MutableStateFlow(emptyList<ReconciliationLink>())
             // Like the real engine, the links flow emits the new link before import() has returned.
             val engine =
-                object : ImportEngine {
-                    override suspend fun import(
-                        batch: ImportBatch,
-                        onProgress: (suspend (ImportProgress) -> Unit)?,
-                        batchSize: Int,
-                    ): ImportResult {
-                        links.value = listOf(ReconciliationLink(wallet.accountId, AccountId(1)))
-                        awaitCancellation()
-                    }
+                importEngine {
+                    links.value = listOf(ReconciliationLink(wallet.accountId, AccountId(1)))
+                    awaitCancellation()
                 }
             setContent {
                 CompositionLocalProvider(LocalImportEngine provides engine) {
