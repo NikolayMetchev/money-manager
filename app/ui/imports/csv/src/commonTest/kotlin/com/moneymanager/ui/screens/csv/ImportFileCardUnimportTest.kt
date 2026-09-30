@@ -14,38 +14,40 @@ import kotlin.time.Instant
 
 private val appliedAt = Instant.fromEpochMilliseconds(1_700_000_000_000L)
 
-@Composable
-private fun UnimportTestCard(
+// A factory rather than a @Composable helper: Qodana holds every function in a test source set to the
+// lowercase test-naming convention, which a PascalCase composable can't meet.
+private fun cardContent(
     lastAppliedAt: Instant?,
     lastUnimportedAt: Instant? = null,
     ignored: Boolean = false,
     onUnimport: (() -> Unit)? = null,
-) {
-    MaterialTheme {
-        ImportFileCard(
-            fileName = "statement.csv",
-            metadataText = "2 rows, 3 columns",
-            addedAt = appliedAt,
-            errorCount = 0,
-            lastAppliedAt = lastAppliedAt,
-            applicationCount = if (lastAppliedAt == null) 0 else 1,
-            lastAppliedStrategyName = "Monzo",
-            dateRange = null,
-            ignored = ignored,
-            onClick = {},
-            onSetIgnored = {},
-            lastUnimportedAt = lastUnimportedAt,
-            onUnimport = onUnimport,
-        )
+): @Composable () -> Unit =
+    {
+        MaterialTheme {
+            ImportFileCard(
+                fileName = "statement.csv",
+                metadataText = "2 rows, 3 columns",
+                addedAt = appliedAt,
+                errorCount = 0,
+                lastAppliedAt = lastAppliedAt,
+                applicationCount = if (lastAppliedAt == null) 0 else 1,
+                lastAppliedStrategyName = "Monzo",
+                dateRange = null,
+                ignored = ignored,
+                onClick = {},
+                onSetIgnored = {},
+                lastUnimportedAt = lastUnimportedAt,
+                onUnimport = onUnimport,
+            )
+        }
     }
-}
 
 class ImportFileCardUnimportTest {
     @Test
     fun importedFile_offersUnimport() {
         runMoneyManagerComposeUiTest {
             var clicks = 0
-            setContent { UnimportTestCard(lastAppliedAt = appliedAt, onUnimport = { clicks++ }) }
+            setContent(cardContent(lastAppliedAt = appliedAt, onUnimport = { clicks++ }))
 
             onNodeWithText("Unimport").performClick()
             waitForIdle()
@@ -56,7 +58,7 @@ class ImportFileCardUnimportTest {
     @Test
     fun unimportedFile_saysSoInsteadOfNotImportedYet() {
         runMoneyManagerComposeUiTest {
-            setContent { UnimportTestCard(lastAppliedAt = null, lastUnimportedAt = appliedAt, ignored = true) }
+            setContent(cardContent(lastAppliedAt = null, lastUnimportedAt = appliedAt, ignored = true))
 
             onNodeWithText("Unimported on", substring = true).assertExists()
             onNodeWithText("Not imported yet").assertDoesNotExist()
