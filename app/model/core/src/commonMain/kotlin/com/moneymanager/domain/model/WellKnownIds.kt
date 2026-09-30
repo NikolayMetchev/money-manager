@@ -46,6 +46,21 @@ object WellKnownIds {
     const val ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME: String = "card-last4"
 
     /**
+     * "reconciliation-source" account attribute: marks a **shadow account** holding data imported from a
+     * reconciliation source (e.g. a Koinly export); the value is the source name. Shadow accounts are
+     * only ever touched by imports through a strategy with a `ReconciliationConfig` of the same source,
+     * are compared against real accounts via `reconciliation_account_link`, and should be filtered out of
+     * real-money views.
+     */
+    const val ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID: Long = -9
+
+    /**
+     * "reconciliation-auto-link-declined" account attribute on a shadow wallet whose last link the user
+     * removed: automatic linking leaves it alone, so the removal sticks. Linking it again clears it.
+     */
+    const val ACCOUNT_RECONCILIATION_AUTO_LINK_DECLINED_ATTR_TYPE_ID: Long = -10
+
+    /**
      * "unidentified-counterparty" transfer attribute: this leg's counterparty account is only the raw
      * description the export carried (no strategy rule, persisted mapping or bank identity resolved it),
      * so the account is a placeholder standing in for whoever the real other end was. Marks the leg as

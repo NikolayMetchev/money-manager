@@ -32,6 +32,7 @@ kotlin {
                 api(projects.app.ui.imports.csv)
                 api(projects.app.ui.imports.importDirectory)
                 api(projects.app.ui.imports.qif)
+                api(projects.app.ui.imports.reconciliation)
                 api(projects.app.ui.imports.timeline)
                 api(projects.app.ui.people)
                 api(projects.app.ui.settings)
@@ -66,6 +67,7 @@ kotlin {
             dependsOn(jvmAndroidMain)
             dependencies {
                 api(projects.app.db.write)
+                api(projects.app.model.reconciliation)
                 api(libs.androidx.compose.foundation)
                 api(libs.androidx.compose.foundation.layout)
                 api(libs.androidx.compose.runtime)
@@ -98,6 +100,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.importdirectory)
+                api(projects.app.model.reconciliation)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
                 api(projects.app.remotestorage.sync)

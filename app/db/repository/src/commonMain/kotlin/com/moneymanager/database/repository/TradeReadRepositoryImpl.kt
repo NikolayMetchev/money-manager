@@ -6,11 +6,15 @@ import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.TradeMapper
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Trade
+import com.moneymanager.domain.model.TradeAttribute
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.repository.TradeReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
 
@@ -18,6 +22,21 @@ class TradeReadRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : TradeReadRepository {
     private val selectQueries = database.tradeSelectQueries
+
+    override fun getAttributes(id: TradeId): Flow<List<TradeAttribute>> =
+        selectQueries
+            .selectAttributes(id.id)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { rows ->
+                rows.map {
+                    TradeAttribute(
+                        tradeId = TradeId(it.trade_id),
+                        attributeType = AttributeType(AttributeTypeId(it.attribute_type_id), it.attribute_type_name),
+                        value = it.attribute_value,
+                    )
+                }
+            }
 
     override fun getTradeById(id: TradeId): Flow<Trade?> =
         selectQueries

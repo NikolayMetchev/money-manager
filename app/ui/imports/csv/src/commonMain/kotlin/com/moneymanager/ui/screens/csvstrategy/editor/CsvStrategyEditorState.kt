@@ -108,6 +108,16 @@ internal class CsvStrategyEditorState(
         mutableStateOf(if (feeColumnName == null) emptyList() else amountMapping?.feeConditions.keepPresentIn(availableColumnNames))
 
     private val sourceMapping = config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+
+    // Source mappings the editor has no widget for (e.g. Koinly's conditional wallet/counterparty
+    // source): carried through verbatim unless the user picks a fixed account or a template instead.
+    val unmodelledSourceMapping: FieldMapping? =
+        sourceMapping?.takeUnless { it is HardCodedAccountMapping || it is TemplateAccountMapping }
+
+    // The credited-leg mappings that turn a row into a trade (TO_AMOUNT/TO_CURRENCY) have no widget
+    // either; carried through so saving an edited strategy keeps its trade detection.
+    val tradeCreditMappings: Map<TransferField, FieldMapping> =
+        config?.fieldMappings.orEmpty().filterKeys { it == TransferField.TO_AMOUNT || it == TransferField.TO_CURRENCY }
     private val sourceTemplate = sourceMapping as? TemplateAccountMapping
     var sourceAccountMode by
         mutableStateOf(if (sourceTemplate != null) SourceAccountMode.TEMPLATE else SourceAccountMode.FIXED_ACCOUNT)
@@ -237,6 +247,21 @@ internal class CsvStrategyEditorState(
     // trade assembly is configured only by built-in strategies. Held here so editing such a strategy in
     // the UI round-trips it instead of silently dropping the trades it assembles.
     val tradeGroupConfig = config?.tradeGroupConfig
+
+    // Blank = an ordinary strategy; non-blank = a reconciliation source importing into shadow accounts.
+    var reconciliationSourceName by mutableStateOf(config?.reconciliation?.sourceName.orEmpty())
+    var reconciliationLinkablePrefix by mutableStateOf(config?.reconciliation?.linkableAccountPrefix.orEmpty())
+
+    // "FROM=TO" pairs, comma-separated (see CsvStrategyConfig.assetAliases).
+    var assetAliasesText by mutableStateOf(formatAssetAliases(config?.assetAliases.orEmpty()))
+
+    // No editors of their own yet (set by built-in strategies); carried through so saving an edited
+    // strategy doesn't silently drop them.
+    val sourceTemplateExtraction = sourceTemplate?.extraction
+    val targetTemplateExtraction = targetTemplate?.extraction
+    val currencyExtraction = (currencyMapping as? CurrencyLookupMapping)?.extraction
+    val feeCurrencyColumnName = amountMapping?.feeCurrencyColumnName
+    val feeCurrencyExtraction = amountMapping?.feeCurrencyExtraction
 
     // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialTargetAccountColumnName: String? = targetAccountColumnName

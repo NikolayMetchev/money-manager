@@ -1,0 +1,14 @@
+-- Attributes on a trade, mirroring transfer_attribute. The well-known 'excluded' type (-1) keeps the
+-- trade out of balances (see BalanceLegsSelect), e.g. a trade the source reports as deleted/cancelled.
+-- One value per (trade, type). Excluded from the audit trail (EXCLUDED_FROM_AUDIT in
+-- MoneyManagerDatabaseWrapper); its edits are folded into the sync change token instead.
+CREATE TABLE trade_attribute (
+    trade_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    PRIMARY KEY (trade_id, attribute_type_id),
+    FOREIGN KEY (trade_id) REFERENCES trade(id) ON DELETE CASCADE,
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_trade_attribute_type ON trade_attribute(attribute_type_id);

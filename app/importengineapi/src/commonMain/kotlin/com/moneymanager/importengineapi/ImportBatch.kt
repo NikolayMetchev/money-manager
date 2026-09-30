@@ -293,6 +293,14 @@ data class ImportTradeIntent(
     override val operation: ImportOperation = ImportOperation.CREATE,
     /** The trade to DELETE (required for that operation). */
     val existingId: TradeId? = null,
+    /**
+     * Set on the trade once it is created, or on the identical trade it dedupes onto (the same movement
+     * re-imported) — e.g. the source's id, or `excluded` for a trade the source deleted. Not applied when
+     * a cross-source reconcile suppresses the trade: that trade belongs to another source.
+     */
+    val attributes: List<NewAttribute> = emptyList(),
+    /** As [ImportTransfer.ownedAttributes]: owned values absent from [attributes] are removed on a dedupe. */
+    val ownedAttributes: Map<AttributeTypeId, Set<String>?> = emptyMap(),
 ) : WriteIntent
 
 /** Builder-chosen placeholder identity for an exchange order upserted in this batch. */
@@ -457,6 +465,16 @@ data class ImportTransfer(
     val excludedFromBalances: Boolean = false,
     val fee: ImportFee? = null,
     /**
+     * The attribute types this source reports (e.g. a CSV strategy's mapped columns), each with the
+     * values it writes for that type — null when the value comes straight from the data and so could be
+     * anything. When the row re-imports onto an existing transfer (UPDATED), an owned type absent from
+     * [attributes] is removed if its stored value is one the source writes — how a row the source has
+     * since un-deleted loses its `excluded` = "deleted in Koinly" — while the same type set by the user
+     * (e.g. a manual exclusion with its own reason), the engine or another source is left alone. Empty =
+     * add/change only, never remove.
+     */
+    val ownedAttributes: Map<AttributeTypeId, Set<String>?> = emptyMap(),
+    /**
      * The amount another source would record for this same movement, when that differs from [amount]
      * because this source splits out a charge the other one folds in. A Binance withdrawal is the
      * case: the API reports the net amount and books the fee as its own transfer, while the statement
@@ -561,6 +579,19 @@ data class ImportBatch(
     val uniqueKeyExtractor: ExistingUniqueKeyExtractor? = null,
     /** Required when [dedupePolicy] is [DedupePolicy.ApiMultiKey]. */
     val apiIdExtractor: ExistingApiIdExtractor? = null,
+    /**
+     * Set for an import from a reconciliation source (the strategy's `ReconciliationConfig.sourceName`):
+     * the batch may only touch that source's **shadow accounts**. Name matching for [accountsToCreate]
+     * considers only those accounts, every created account is tagged with the source (the
+     * `reconciliation-source` attribute), and the batch fails if any transfer/trade references an
+     * existing account that isn't one of them. This keeps reconciliation data out of real balances and
+     * out of real imports' dedupe (which only loads transfers on the batch's own accounts).
+     */
+    val shadowSource: String? = null,
+    /** Direct edits of trade attributes (e.g. excluding a trade from balances by hand). */
+    val tradeAttributeMutations: List<TradeAttributeMutation> = emptyList(),
+    /** Replaces the real-account links of shadow accounts (see `reconciliation_account_link`). */
+    val reconciliationLinkMutations: List<ReconciliationLinkMutation> = emptyList(),
 ) {
     companion object {
         /**

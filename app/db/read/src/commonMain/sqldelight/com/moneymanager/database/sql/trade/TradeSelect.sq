@@ -113,3 +113,10 @@ selectAccountsWithTrades:
 SELECT DISTINCT from_account_id AS account_id FROM trade WHERE from_account_id IN :accountIds
 UNION
 SELECT DISTINCT to_account_id FROM trade WHERE to_account_id IN :accountIds;
+
+selectAttributes:
+SELECT ta.trade_id, ta.attribute_type_id, at.name AS attribute_type_name, ta.attribute_value
+FROM trade_attribute ta
+JOIN attribute_type at ON at.id = ta.attribute_type_id
+WHERE ta.trade_id = ?
+ORDER BY at.name;

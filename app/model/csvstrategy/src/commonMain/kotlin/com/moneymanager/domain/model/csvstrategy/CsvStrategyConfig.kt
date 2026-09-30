@@ -2,6 +2,7 @@ package com.moneymanager.domain.model.csvstrategy
 
 import com.moneymanager.domain.model.serialization.SortedListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
+import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -53,6 +54,11 @@ import kotlinx.serialization.encoding.Encoder
  *                            sharing a timestamp; the importer assembles each such group into a single
  *                            `trade` on the owner account (see [TradeGroupConfig]). Null when every
  *                            cross-asset movement already arrives on one row.
+ * @property assetAliases Source asset code → the code Money Manager uses for the same asset, applied to
+ *                        every currency column before lookup (e.g. Koinly's legacy `KNCL` → `KNC`), so the
+ *                        source neither mints a duplicate asset nor fails to match. Keys are upper case.
+ * @property reconciliation When set, this strategy imports a reconciliation source into shadow
+ *                          accounts only (see [ReconciliationConfig]). Null for ordinary strategies.
  */
 @Serializable
 data class CsvStrategyConfig<out M>(
@@ -81,6 +87,13 @@ data class CsvStrategyConfig<out M>(
     // Same NEVER-encode rationale: only a strategy that assembles trades from row groups rehashes.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val tradeGroupConfig: TradeGroupConfig? = null,
+    // Same NEVER-encode rationale: only reconciliation-source strategies rehash.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val reconciliation: ReconciliationConfig? = null,
+    // NEVER-encoded when empty, same rationale.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @Serializable(with = SortedStringToStringMapSerializer::class)
+    val assetAliases: Map<String, String> = emptyMap(),
 ) {
     /** This config with each field mapping replaced by [transform]'s result, everything else unchanged. */
     fun <N> mapFieldMappings(transform: (M) -> N): CsvStrategyConfig<N> =
@@ -96,6 +109,8 @@ data class CsvStrategyConfig<out M>(
             conversionConfig = conversionConfig,
             fundingAttributeMatch = fundingAttributeMatch,
             tradeGroupConfig = tradeGroupConfig,
+            reconciliation = reconciliation,
+            assetAliases = assetAliases,
         )
 }
 

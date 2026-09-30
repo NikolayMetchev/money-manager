@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.RowCondition
@@ -46,6 +47,7 @@ object BuiltInCsvStrategies {
     val curveCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
     val cryptoComCardXlsxStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
     val binanceCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000c")
+    val koinlyCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000d")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -242,6 +244,7 @@ object BuiltInCsvStrategies {
             buildCurveCsvStrategy(now),
             buildCryptoComCardXlsxStrategy(now),
             buildBinanceCsvStrategy(now),
+            buildKoinlyCsvStrategy(now),
         )
 
     /**
@@ -1743,4 +1746,187 @@ object BuiltInCsvStrategies {
             updatedAt = now,
         )
     }
+
+    /** Koinly wallet accounts are named with this prefix; see [buildKoinlyCsvStrategy]. */
+    private const val KOINLY_WALLET_PREFIX = "Koinly · "
+
+    /** Koinly cells for wallets and assets read `Name;koinly-id` (e.g. `Binance;binance`, `BTC;1`). */
+    private val KOINLY_NAME_EXTRACTION = ColumnExtraction(pattern = "^([^;]*)", outputTemplate = "$1")
+
+    /**
+     * The counterparty of a Koinly deposit/withdrawal, which names only the user's own wallet: the row's
+     * Tag ("reward", "lending_interest", …) when it has one, otherwise a generic external account.
+     */
+    private fun koinlyCounterparty(fieldType: TransferField) =
+        ConditionalAccountMapping(
+            fieldType = fieldType,
+            conditions = listOf(RowCondition("Tag", RowConditionOperator.IS_BLANK)),
+            whenTrue =
+                RegexAccountMapping(
+                    fieldType = fieldType,
+                    columnName = "Type",
+                    rules = listOf(RegexRule(pattern = "^", accountName = "Koinly: External")),
+                ),
+            whenFalse =
+                RegexAccountMapping(
+                    fieldType = fieldType,
+                    columnName = "Tag",
+                    rules = listOf(RegexRule(pattern = "^(.+)$", accountName = "Koinly: Other", accountNameTemplate = "Koinly: $1")),
+                ),
+        )
+
+    /** A side of a Koinly row: its wallet when the row names one, otherwise the counterparty. */
+    private fun koinlySide(
+        fieldType: TransferField,
+        walletColumn: String,
+    ) = ConditionalAccountMapping(
+        fieldType = fieldType,
+        conditions = listOf(RowCondition(walletColumn, RowConditionOperator.IS_NOT_BLANK)),
+        whenTrue =
+            TemplateAccountMapping(
+                fieldType = fieldType,
+                columnName = walletColumn,
+                prefix = KOINLY_WALLET_PREFIX,
+                extraction = KOINLY_NAME_EXTRACTION,
+            ),
+        whenFalse = koinlyCounterparty(fieldType),
+    )
+
+    /**
+     * Koinly's full transaction export ("Export → Transactions (CSV)"). Koinly is a crypto-tax platform
+     * holding its own copy of every crypto movement, so this strategy is a **reconciliation source**: its
+     * rows land in shadow accounts ("Koinly · Binance", "Koinly: reward", "Koinly Fees") that never count
+     * towards real balances, and the Reconciliation tab compares them against the real accounts the
+     * wallets are linked to.
+     *
+     * One row per movement, typed by `Type`: a deposit fills only the To side, a withdrawal only the From
+     * side, a transfer both (two of the user's wallets), a trade both with the same wallet and different
+     * assets. A preprocessing swap moves a deposit's amount/asset into the From columns so From always
+     * holds the primary leg; the To columns then only ever carry a trade's credited leg.
+     */
+    fun buildKoinlyCsvStrategy(now: Instant): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                TransferField.SOURCE_ACCOUNT to koinlySide(TransferField.SOURCE_ACCOUNT, "From Wallet (read-only)"),
+                TransferField.TARGET_ACCOUNT to koinlySide(TransferField.TARGET_ACCOUNT, "To Wallet (read-only)"),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = "Date (UTC)",
+                        dateFormat = "yyyy-MM-dd",
+                        dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        fieldType = TransferField.DESCRIPTION,
+                        columnName = "Description",
+                        fallbackColumns = listOf("Tag", "Type"),
+                    ),
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "From Amount",
+                        feeColumnName = "Fee Amount",
+                        feeCurrencyColumnName = "Fee Currency",
+                        feeCurrencyExtraction = KOINLY_NAME_EXTRACTION,
+                    ),
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(
+                        fieldType = TransferField.CURRENCY,
+                        columnName = "From Currency",
+                        extraction = KOINLY_NAME_EXTRACTION,
+                    ),
+                TransferField.TO_AMOUNT to
+                    AmountParsingMapping(
+                        fieldType = TransferField.TO_AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "To Amount",
+                    ),
+                TransferField.TO_CURRENCY to
+                    CurrencyLookupMapping(
+                        fieldType = TransferField.TO_CURRENCY,
+                        columnName = "To Currency",
+                        extraction = KOINLY_NAME_EXTRACTION,
+                    ),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(koinlyCsvStrategyId),
+            name = "Koinly",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = KOINLY_COLUMNS,
+                    fieldMappings = fieldMappings,
+                    attributeMappings =
+                        listOf(
+                            AttributeColumnMapping("ID (read-only)", "koinly-id", isUniqueIdentifier = true),
+                            AttributeColumnMapping("Type", "koinly-type"),
+                            AttributeColumnMapping("Tag", "koinly-tag"),
+                            AttributeColumnMapping("TxHash", "koinly-tx-hash"),
+                            // A row deleted in Koinly is kept but excluded, like a declined card payment.
+                            AttributeColumnMapping(
+                                columnName = "Deleted",
+                                attributeTypeName = "excluded",
+                                extraction = ColumnExtraction(pattern = "^true$"),
+                                emitWhenMatched = "deleted in Koinly",
+                            ),
+                        ),
+                    rowPreprocessingRules =
+                        listOf(
+                            RowPreprocessingRule(
+                                conditions = listOf(RowCondition("Type", RowConditionOperator.EQUALS_VALUE, "deposit")),
+                                columnSwaps =
+                                    listOf(
+                                        ColumnPairSwap("From Amount", "To Amount"),
+                                        ColumnPairSwap("From Currency", "To Currency"),
+                                    ),
+                            ),
+                        ),
+                    reconciliation = ReconciliationConfig(sourceName = "Koinly", linkableAccountPrefix = KOINLY_WALLET_PREFIX),
+                    // Koinly keeps the pre-migration ticker for legacy Kyber Network (KNCL); exchanges and
+                    // Money Manager call it KNC.
+                    assetAliases = mapOf("KNCL" to "KNC"),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    private val KOINLY_COLUMNS =
+        setOf(
+            "ID (read-only)",
+            "Date (UTC)",
+            "Type",
+            "Tag",
+            "From Wallet (read-only)",
+            "From Wallet ID",
+            "From Amount",
+            "From Currency",
+            "To Wallet (read-only)",
+            "To Wallet ID",
+            "To Amount",
+            "To Currency",
+            "Fee Amount",
+            "Fee Currency",
+            "Net Worth Amount",
+            "Net Worth Currency",
+            "Fee Worth Amount",
+            "Fee Worth Currency",
+            "Net Value (read-only)",
+            "Fee Value (read-only)",
+            "Value Currency (read-only)",
+            "Deleted",
+            "From Source (read-only)",
+            "To Source (read-only)",
+            "Negative Balances (read-only)",
+            "Missing Rates (read-only)",
+            "Missing Cost Basis (read-only)",
+            "Synced To Accounting At (UTC read-only)",
+            "TxSrc",
+            "TxDest",
+            "TxHash",
+            "Description",
+        )
 }

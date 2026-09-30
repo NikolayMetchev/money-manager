@@ -16,6 +16,7 @@ kotlin {
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
+                api(projects.app.model.reconciliation)
                 api(projects.app.model.timeline)
                 api(libs.kotlinx.coroutines.core)
             }
@@ -31,6 +32,7 @@ kotlin {
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
+                api(projects.app.model.reconciliation)
                 api(projects.app.model.timeline)
             }
         }

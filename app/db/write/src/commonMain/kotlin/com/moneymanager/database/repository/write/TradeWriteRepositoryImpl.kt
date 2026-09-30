@@ -3,9 +3,11 @@ package com.moneymanager.database.repository.write
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.repository.TradeReadRepository
@@ -84,5 +86,23 @@ class TradeWriteRepositoryImpl(
     override suspend fun deleteTrade(id: TradeId): Unit =
         withContext(Dispatchers.Default) {
             writeQueries.delete(id.id)
+        }
+
+    override suspend fun upsertAttributes(
+        id: TradeId,
+        attributes: List<NewAttribute>,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.transaction {
+                attributes.forEach { writeQueries.upsertAttribute(id.id, it.typeId.id, it.value) }
+            }
+        }
+
+    override suspend fun removeAttribute(
+        id: TradeId,
+        typeId: AttributeTypeId,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.deleteAttribute(id.id, typeId.id)
         }
 }

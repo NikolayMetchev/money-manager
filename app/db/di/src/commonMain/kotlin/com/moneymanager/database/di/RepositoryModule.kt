@@ -22,6 +22,7 @@ import com.moneymanager.database.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.database.repository.PersonAttributeReadRepositoryImpl
 import com.moneymanager.database.repository.PersonReadRepositoryImpl
 import com.moneymanager.database.repository.QifImportReadRepositoryImpl
+import com.moneymanager.database.repository.ReconciliationReadRepositoryImpl
 import com.moneymanager.database.repository.RelationshipTypeReadRepositoryImpl
 import com.moneymanager.database.repository.SettingsReadRepositoryImpl
 import com.moneymanager.database.repository.TradeReadRepositoryImpl
@@ -49,6 +50,7 @@ import com.moneymanager.database.repository.write.PersonAccountOwnershipWriteRep
 import com.moneymanager.database.repository.write.PersonAttributeWriteRepositoryImpl
 import com.moneymanager.database.repository.write.PersonWriteRepositoryImpl
 import com.moneymanager.database.repository.write.QifImportWriteRepositoryImpl
+import com.moneymanager.database.repository.write.ReconciliationLinkWriteRepositoryImpl
 import com.moneymanager.database.repository.write.RelationshipTypeWriteRepositoryImpl
 import com.moneymanager.database.repository.write.SettingsWriteRepositoryImpl
 import com.moneymanager.database.repository.write.TradeWriteRepositoryImpl
@@ -84,6 +86,7 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
+import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.RelationshipTypeReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
@@ -110,6 +113,7 @@ import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepos
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.QifImportWriteRepository
+import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
 import com.moneymanager.domain.repository.write.TradeWriteRepository
@@ -271,6 +275,20 @@ object RepositoryModule {
         deviceId: DeviceId,
         reader: ImportDirectoryReadRepository,
     ): ImportDirectoryWriteRepository = ImportDirectoryWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideReconciliationReadRepository(
+        database: MoneyManagerDatabaseWrapper,
+        csvImportStrategyRepository: CsvImportStrategyReadRepository,
+    ): ReconciliationReadRepository = ReconciliationReadRepositoryImpl(database, csvImportStrategyRepository)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideReconciliationLinkWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: ReconciliationReadRepository,
+    ): ReconciliationLinkWriteRepository = ReconciliationLinkWriteRepositoryImpl(database, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -536,6 +554,7 @@ object RepositoryModule {
         importDirectoryRepository: ImportDirectoryWriteRepository,
         passThroughAccountRepository: PassThroughAccountWriteRepository,
         transferRelationshipRepository: TransferRelationshipReadRepository,
+        reconciliationLinkRepository: ReconciliationLinkWriteRepository,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,
@@ -561,5 +580,6 @@ object RepositoryModule {
             importDirectoryRepository = importDirectoryRepository,
             passThroughAccountRepository = passThroughAccountRepository,
             transferRelationshipRepository = transferRelationshipRepository,
+            reconciliationLinkRepository = reconciliationLinkRepository,
         )
 }

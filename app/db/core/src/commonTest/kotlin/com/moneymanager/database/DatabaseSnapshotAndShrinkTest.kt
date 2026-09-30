@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
@@ -83,7 +84,8 @@ class DatabaseSnapshotAndShrinkTest : DbTest() {
                 Account(id = AccountId(0), name = "Tracked", openingDate = Clock.System.now()),
             )
             val afterChange = database.dataChangeToken()
-            assertTrue(afterChange > before, "creating an account should advance the change token")
+            // The token is a hash (it can wrap), so only (in)equality is meaningful, not ordering.
+            assertNotEquals(before, afterChange, "creating an account should change the token")
 
             // Rebuilding materialized views is not a logical change and must not move the token.
             repositories.maintenanceService.fullRefreshMaterializedViews()

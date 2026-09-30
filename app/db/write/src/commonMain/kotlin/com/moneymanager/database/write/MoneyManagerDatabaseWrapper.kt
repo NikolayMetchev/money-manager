@@ -43,6 +43,7 @@ class MoneyManagerDatabaseWrapper(
     val personWriteQueries get() = writeDb.personWriteQueries
     val passThroughAccountWriteQueries get() = writeDb.passThroughAccountWriteQueries
     val qifImportWriteQueries get() = writeDb.qifImportWriteQueries
+    val reconciliationLinkWriteQueries get() = writeDb.reconciliationLinkWriteQueries
     val relationshipTypeWriteQueries get() = writeDb.relationshipTypeWriteQueries
     val settingsWriteQueries get() = writeDb.settingsWriteQueries
     val tradeWriteQueries get() = writeDb.tradeWriteQueries
@@ -78,7 +79,8 @@ class MoneyManagerDatabaseWrapper(
      *    excluded from the audit trail but is still part of the synced database and must register as a
      *    change — otherwise e.g. setting the default currency would never be detected as unsynced, and
      *  - a rolling hash of the `account_mapping` table, which is user-managed first-class data but is
-     *    not audited (see EXCLUDED_FROM_AUDIT), so its edits must still register as a change.
+     *    not audited (see EXCLUDED_FROM_AUDIT), so its edits must still register as a change (the
+     *    same goes for `reconciliation_account_link`).
      *
      * Derived materialized-view rebuilds append no audit rows and don't touch settings, so this stays a
      * stable "has the data changed since last sync?" signal that ignores our own view maintenance. Only
@@ -109,7 +111,7 @@ class MoneyManagerDatabaseWrapper(
                     0,
                 ).value
             }
-        return foldAccountMappingsInto(foldSettingsInto(auditRowCount))
+        return foldReconciliationTablesInto(foldAccountMappingsInto(foldSettingsInto(auditRowCount)))
     }
 
     /**
@@ -126,6 +128,44 @@ class MoneyManagerDatabaseWrapper(
                     token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
                     token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
                     token = token * SETTINGS_HASH_PRIME + cursor.getLong(2)!!
+                }
+                QueryResult.Unit
+            },
+            0,
+        )
+        return token
+    }
+
+    /**
+     * Mixes the non-audited `reconciliation_account_link` and `trade_attribute` tables into [base], like
+     * [foldAccountMappingsInto]: their edits must register as unsynced.
+     */
+    private fun foldReconciliationTablesInto(base: Long): Long {
+        var token = base
+        executeQuery(
+            null,
+            "SELECT COUNT(*), COALESCE(SUM(shadow_account_id * 31 + real_account_id), 0), " +
+                "COALESCE(SUM(created_at), 0) FROM reconciliation_account_link",
+            { cursor ->
+                if (cursor.next().value) {
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(2)!!
+                }
+                QueryResult.Unit
+            },
+            0,
+        )
+        // trade_attribute has no updated_at, and a value can change in place (e.g. an exclusion reason), so
+        // fold every row's content; SQLite has no string hash, hence the Kotlin fold. The table is small.
+        executeQuery(
+            null,
+            "SELECT trade_id, attribute_type_id, attribute_value FROM trade_attribute ORDER BY trade_id, attribute_type_id",
+            { cursor ->
+                while (cursor.next().value) {
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
+                    token = token * SETTINGS_HASH_PRIME + cursor.getString(2)!!.hashCode()
                 }
                 QueryResult.Unit
             },
@@ -365,6 +405,8 @@ class MoneyManagerDatabaseWrapper(
             "pending_materialized_view_changes",
             "sqlite_sequence",
             "account_mapping",
+            "reconciliation_account_link",
+            "trade_attribute",
             "csv_column_metadata",
             "csv_import_error",
             "csv_import_metadata",

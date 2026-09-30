@@ -460,6 +460,7 @@ class CsvStrategyExportService(
                     defaultCategoryId =
                         categoriesByName[defaultCategoryName]?.id
                             ?: Category.UNCATEGORIZED_ID,
+                    extraction = extraction,
                 )
             is ConditionalAccountExport ->
                 ConditionalAccountMapping(
@@ -496,6 +497,8 @@ class CsvStrategyExportService(
                     flipAccountsOnPositive = flipAccountsOnPositive,
                     feeColumnName = feeColumnName,
                     feeConditions = feeConditions,
+                    feeCurrencyColumnName = feeCurrencyColumnName,
+                    feeCurrencyExtraction = feeCurrencyExtraction,
                 )
             is HardCodedCurrencyExport ->
                 HardCodedCurrencyMapping(
@@ -508,6 +511,7 @@ class CsvStrategyExportService(
                 CurrencyLookupMapping(
                     fieldType = fieldType,
                     columnName = columnName,
+                    extraction = extraction,
                 )
             is HardCodedTimezoneExport ->
                 HardCodedTimezoneMapping(

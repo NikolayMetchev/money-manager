@@ -159,6 +159,52 @@ internal fun AdvancedTab(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        Text("Reconciliation Source (Optional)", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Import this data only into shadow accounts (e.g. a Koinly export) so it never affects real " +
+                "balances, and compare it against your real transactions on the Reconciliation tab. " +
+                "Leave blank for an ordinary strategy.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+            value = state.reconciliationSourceName,
+            onValueChange = { state.reconciliationSourceName = it },
+            label = { Text("Source name") },
+            singleLine = true,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (state.reconciliationSourceName.isNotBlank()) {
+            OutlinedTextField(
+                value = state.reconciliationLinkablePrefix,
+                onValueChange = { state.reconciliationLinkablePrefix = it },
+                label = { Text("Wallet account prefix (accounts to link to real ones; blank = all)") },
+                singleLine = true,
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Asset Aliases (Optional)", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Map this source's asset codes onto the ones Money Manager uses, e.g. KNCL=KNC, CELO=CGLD.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+            value = state.assetAliasesText,
+            onValueChange = { state.assetAliasesText = it },
+            label = { Text("Aliases (FROM=TO, comma-separated)") },
+            singleLine = true,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
         Text("Row Preprocessing Rules (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
             "Swap column values and/or flip source/target accounts when conditions match",

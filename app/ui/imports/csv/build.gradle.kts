@@ -32,6 +32,7 @@ kotlin {
         }
         getByName("commonTest") {
             dependencies {
+                implementation(projects.app.strategies)
                 implementation(projects.test.app.ui)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
@@ -102,8 +103,15 @@ kotlin {
         getByName("androidDeviceTest") {
             dependencies {
                 implementation(projects.app.model.importdirectory)
+                implementation(projects.app.strategies)
                 implementation(projects.test.app.ui)
                 implementation(libs.androidx.compose.ui.test)
+            }
+        }
+
+        getByName("androidHostTest") {
+            dependencies {
+                implementation(projects.app.strategies)
             }
         }
     }

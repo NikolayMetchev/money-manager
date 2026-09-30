@@ -47,3 +47,8 @@ SELECT
 FROM account_attribute
 JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id
 ORDER BY attribute_type.name, account_attribute.account_id;
+
+selectAccountIdsByTypeAndValue:
+SELECT DISTINCT account_id
+FROM account_attribute
+WHERE attribute_type_id = :typeId AND (:value IS NULL OR attribute_value = :value);

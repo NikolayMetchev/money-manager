@@ -31,6 +31,7 @@ kotlin {
         }
         getByName("androidMain") {
             dependencies {
+                api(projects.app.model.reconciliation)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.sqldelight.runtime)
             }
@@ -45,6 +46,7 @@ kotlin {
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
+                api(projects.app.model.reconciliation)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
 

@@ -1,7 +1,9 @@
 package com.moneymanager.domain.repository.write
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.repository.TradeReadRepository
@@ -43,4 +45,16 @@ interface TradeWriteRepository : TradeReadRepository {
     ): TradeCreateResult
 
     suspend fun deleteTrade(id: TradeId)
+
+    /** Sets each of [attributes] on trade [id], replacing an existing value of the same type. */
+    suspend fun upsertAttributes(
+        id: TradeId,
+        attributes: List<NewAttribute>,
+    )
+
+    /** Removes trade [id]'s attribute of type [typeId], if any. */
+    suspend fun removeAttribute(
+        id: TradeId,
+        typeId: AttributeTypeId,
+    )
 }

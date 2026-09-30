@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
@@ -13,6 +14,8 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -28,6 +31,33 @@ import kotlin.time.Instant
  * repository, keeping the engine the sole writer. Each create reads its generated id back from the
  * result map under a per-call read-back key derived from the input.
  */
+
+// region Trade attributes
+
+/** Excludes trade [tradeId] from balances with [reason], or brings it back when [reason] is null. */
+suspend fun ImportEngine.setTradeExcluded(
+    tradeId: TradeId,
+    reason: String?,
+) {
+    val typeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
+    val mutation =
+        if (reason == null) TradeAttributeMutation.Remove(tradeId, typeId) else TradeAttributeMutation.Set(tradeId, typeId, reason)
+    import(ImportBatch(tradeAttributeMutations = listOf(mutation)))
+}
+
+// endregion
+
+// region Reconciliation links
+
+/** Links [shadowAccountId] to exactly [realAccountIds] (see [ReconciliationLinkMutation.SetLinks]). */
+suspend fun ImportEngine.setReconciliationLinks(
+    shadowAccountId: AccountId,
+    realAccountIds: Set<AccountId>,
+) {
+    import(ImportBatch(reconciliationLinkMutations = listOf(ReconciliationLinkMutation.SetLinks(shadowAccountId, realAccountIds))))
+}
+
+// endregion
 
 // region Pass-through accounts
 

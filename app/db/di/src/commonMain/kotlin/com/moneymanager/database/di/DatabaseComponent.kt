@@ -27,6 +27,7 @@ import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepos
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.QifImportWriteRepository
+import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
 import com.moneymanager.domain.repository.write.TradeWriteRepository
@@ -72,6 +73,7 @@ interface DatabaseComponent {
     val deviceRepository: DeviceWriteRepository
     val importDirectoryRepository: ImportDirectoryWriteRepository
     val importTimelineRepository: ImportTimelineReadRepository
+    val reconciliationLinkRepository: ReconciliationLinkWriteRepository
     val maintenanceService: DatabaseMaintenanceService
     val personAccountOwnershipRepository: PersonAccountOwnershipWriteRepository
     val personAttributeRepository: PersonAttributeWriteRepository

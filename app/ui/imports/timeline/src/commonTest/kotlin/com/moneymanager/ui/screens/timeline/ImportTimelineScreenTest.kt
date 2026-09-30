@@ -61,6 +61,11 @@ class ImportTimelineScreenTest {
 
             override suspend fun getPreviousAccountNames(): Map<String, AccountId> = emptyMap()
 
+            override suspend fun getAccountIdsByAttribute(
+                attributeTypeId: Long,
+                value: String?,
+            ): Set<AccountId> = emptySet()
+
             override suspend fun countTransfersByAccount(accountId: AccountId): Long = 0
 
             override suspend fun accountsWithTransfers(accountIds: Collection<AccountId>): Set<AccountId> = emptySet()

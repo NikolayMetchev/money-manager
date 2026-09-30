@@ -2,12 +2,14 @@ package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiImportStrategyId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
@@ -38,6 +40,36 @@ sealed interface PassThroughMutation {
     data class Delete(
         val id: PassThroughAccountId,
     ) : PassThroughMutation
+}
+
+/** A direct edit of one attribute on an existing trade. */
+sealed interface TradeAttributeMutation {
+    val tradeId: TradeId
+    val typeId: AttributeTypeId
+
+    data class Set(
+        override val tradeId: TradeId,
+        override val typeId: AttributeTypeId,
+        val value: String,
+    ) : TradeAttributeMutation
+
+    data class Remove(
+        override val tradeId: TradeId,
+        override val typeId: AttributeTypeId,
+    ) : TradeAttributeMutation
+}
+
+/** A write on the shadow→real reconciliation account links. */
+sealed interface ReconciliationLinkMutation {
+    /**
+     * Replaces every link of [shadowAccountId] with links to [realAccountIds] (empty = unlink it). The
+     * engine rejects a non-shadow [shadowAccountId], a shadow account among [realAccountIds], and a real
+     * account already linked to another shadow account of the same source.
+     */
+    data class SetLinks(
+        val shadowAccountId: AccountId,
+        val realAccountIds: Set<AccountId>,
+    ) : ReconciliationLinkMutation
 }
 
 /** A write on the CSV import-strategy table. */

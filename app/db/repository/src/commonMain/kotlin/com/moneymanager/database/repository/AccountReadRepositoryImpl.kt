@@ -26,6 +26,7 @@ class AccountReadRepositoryImpl(
     private val selectQueries = database.accountSelectQueries
     private val transferSelectQueries = database.transferSelectQueries
     private val mergeSelectQueries = database.accountMergeSelectQueries
+    private val attributeSelectQueries = database.accountAttributeSelectQueries
 
     override fun getAllAccounts(): Flow<List<Account>> =
         selectQueries
@@ -47,6 +48,17 @@ class AccountReadRepositoryImpl(
                 .selectPreviousAccountNames { name, accountId -> name.lowercase() to AccountId(accountId) }
                 .executeAsList()
                 .toMap()
+        }
+
+    override suspend fun getAccountIdsByAttribute(
+        attributeTypeId: Long,
+        value: String?,
+    ): Set<AccountId> =
+        withContext(Dispatchers.Default) {
+            attributeSelectQueries
+                .selectAccountIdsByTypeAndValue(attributeTypeId, value)
+                .executeAsList()
+                .mapTo(mutableSetOf(), ::AccountId)
         }
 
     override suspend fun countTransfersByAccount(accountId: AccountId): Long =

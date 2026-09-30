@@ -8,6 +8,7 @@ import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
+import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.domain.repository.write.AccountAttributeWriteRepository
@@ -63,6 +64,7 @@ data class Imports(
     val qifImportRepository: QifImportWriteRepository,
     val importDirectoryRepository: ImportDirectoryReadRepository,
     val importTimelineRepository: ImportTimelineReadRepository,
+    val reconciliationRepository: ReconciliationReadRepository,
     val passThroughAccountRepository: PassThroughAccountReadRepository,
     val maintenance: Maintenance,
 )

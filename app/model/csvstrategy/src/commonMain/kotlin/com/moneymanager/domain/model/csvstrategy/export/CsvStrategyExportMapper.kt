@@ -82,6 +82,7 @@ object CsvStrategyExportMapper {
                     prefix = prefix,
                     suffix = suffix,
                     defaultCategoryName = categoryNameById(defaultCategoryId) ?: Category.UNCATEGORIZED_NAME,
+                    extraction = extraction,
                 )
             is ConditionalAccountMapping ->
                 ConditionalAccountExport(
@@ -118,6 +119,8 @@ object CsvStrategyExportMapper {
                     flipAccountsOnPositive = flipAccountsOnPositive,
                     feeColumnName = feeColumnName,
                     feeConditions = feeConditions,
+                    feeCurrencyColumnName = feeCurrencyColumnName,
+                    feeCurrencyExtraction = feeCurrencyExtraction,
                 )
             is HardCodedCurrencyMapping ->
                 HardCodedCurrencyExport(
@@ -128,6 +131,7 @@ object CsvStrategyExportMapper {
                 CurrencyLookupExport(
                     fieldType = fieldType,
                     columnName = columnName,
+                    extraction = extraction,
                 )
             is HardCodedTimezoneMapping ->
                 HardCodedTimezoneExport(

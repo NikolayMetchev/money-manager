@@ -111,6 +111,9 @@ data class TemplateAccountExport(
     val prefix: String = "",
     val suffix: String = "",
     val defaultCategoryName: String,
+    // NEVER-encoded when null so adding it didn't rehash every existing strategy.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val extraction: ColumnExtraction? = null,
 ) : FieldMappingExport
 
 /**
@@ -171,6 +174,10 @@ data class AmountParsingExport(
     val feeColumnName: String? = null,
     @Serializable(with = SortedRowConditionListSerializer::class)
     val feeConditions: List<RowCondition> = emptyList(),
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val feeCurrencyColumnName: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val feeCurrencyExtraction: ColumnExtraction? = null,
 ) : FieldMappingExport
 
 /**
@@ -191,6 +198,8 @@ data class HardCodedCurrencyExport(
 data class CurrencyLookupExport(
     override val fieldType: TransferField,
     val columnName: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val extraction: ColumnExtraction? = null,
 ) : FieldMappingExport
 
 /**

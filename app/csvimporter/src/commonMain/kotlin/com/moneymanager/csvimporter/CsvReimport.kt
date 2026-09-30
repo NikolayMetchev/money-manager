@@ -418,7 +418,7 @@ suspend fun planCsvReimport(
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
     if (allRows.isEmpty()) return ReimportPlan(emptyList(), emptyList())
 
-    val accounts = accountRepository.getAllAccounts().first()
+    val accounts = accountRepository.accountsVisibleTo(strategy)
     val mappings = accountMappingRepository.getAllMappings().first()
     val historicalAccountNames = accountRepository.getPreviousAccountNames()
     val importCreated = csvImportRepository.getAccountsCreatedByImport(csvImport.id)

@@ -50,6 +50,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.importfilesource.DriveFolderBrowser
@@ -517,6 +518,7 @@ fun MoneyManagerApp(
                                                 personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                                 exchangeOrderRepository = services.transactions.exchangeOrderRepository,
                                                 maintenance = services.imports.maintenance,
+                                                tradeRepository = services.transactions.tradeRepository,
                                                 onAccountIdChange = { accountId ->
                                                     currentlyViewedAccountId = accountId
                                                 },
@@ -606,6 +608,7 @@ fun MoneyManagerApp(
                                                 },
                                                 importDirectoryRepository = services.imports.importDirectoryRepository,
                                                 importTimelineRepository = services.imports.importTimelineRepository,
+                                                reconciliationRepository = services.imports.reconciliationRepository,
                                                 importFileSourceFactory = importFileSourceFactory,
                                                 driveFolderBrowser = driveFolderBrowser,
                                                 csvImportRepository = services.imports.csvImportRepository,
@@ -634,6 +637,21 @@ fun MoneyManagerApp(
                                                 deviceId = services.deviceId,
                                                 onCsvImportClick = { importId ->
                                                     navigationHistory.navigateTo(Screen.CsvImportDetail(importId))
+                                                },
+                                                onReconciliationLegClick = { leg ->
+                                                    navigationHistory.navigateTo(
+                                                        Screen.AccountTransactions(
+                                                            accountId = leg.accountId,
+                                                            accountName =
+                                                                accounts.find { it.id == leg.accountId }?.name ?: leg.accountId.toString(),
+                                                            // Only transfers can be scrolled to; a trade leg just opens its account.
+                                                            scrollToTransferId =
+                                                                TransferId(leg.transactionId).takeIf {
+                                                                    leg.kind ==
+                                                                        LegTransactionKind.TRANSFER
+                                                                },
+                                                        ),
+                                                    )
                                                 },
                                                 onTimelineFileClick = { file ->
                                                     when (file.kind) {
