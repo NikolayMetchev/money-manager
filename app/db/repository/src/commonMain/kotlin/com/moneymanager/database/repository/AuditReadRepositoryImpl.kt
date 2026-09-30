@@ -25,6 +25,7 @@ import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CryptoAuditEntry
 import com.moneymanager.domain.model.CryptoId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
@@ -44,11 +45,16 @@ import com.moneymanager.domain.model.TransferAttributeAuditEntry
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyAuditEntry
+import com.moneymanager.domain.model.csv.CsvImportHistoryEvent
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyAuditEntry
 import com.moneymanager.domain.repository.AuditReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
+
+// audit_type ids as the triggers write them (1 = INSERT, 3 = DELETE).
+private const val AUDIT_TYPE_INSERT = 1L
+private const val AUDIT_TYPE_DELETE = 3L
 
 class AuditReadRepositoryImpl(
     database: MoneyManagerDatabase,
@@ -182,6 +188,25 @@ class AuditReadRepositoryImpl(
             { auditSelectQueries.selectAuditHistoryForImportDirectory(directoryId.id.toString()).executeAsList() },
             ImportDirectoryAuditEntryMapper::map,
         )
+
+    override suspend fun getCsvImportHistory(importId: CsvImportId): List<CsvImportHistoryEvent> =
+        withContext(Dispatchers.Default) {
+            val events = mutableListOf<CsvImportHistoryEvent>()
+            auditSelectQueries.selectCsvImportApplicationHistory(importId.id.toString()).executeAsList().forEach { row ->
+                when (row.audit_type_id) {
+                    AUDIT_TYPE_INSERT ->
+                        events += CsvImportHistoryEvent.Applied(row.strategy_name, Instant.fromEpochMilliseconds(row.applied_at))
+                    AUDIT_TYPE_DELETE -> {
+                        val at = Instant.fromEpochMilliseconds(row.audit_timestamp)
+                        // One unimport deletes every application at once: adjacent DELETE rows are one event.
+                        if ((events.lastOrNull() as? CsvImportHistoryEvent.Unimported)?.at != at) {
+                            events += CsvImportHistoryEvent.Unimported(at)
+                        }
+                    }
+                }
+            }
+            events
+        }
 
     private fun fetchAccountAttributeAudit(accountId: AccountId): List<AccountAttributeAuditEntry> =
         auditSelectQueries

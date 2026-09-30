@@ -409,3 +409,12 @@ FROM exchange_order_audit
 JOIN audit_type ON exchange_order_audit.audit_type_id = audit_type.id
 WHERE exchange_order_audit.exchange_order_id = ?
 ORDER BY exchange_order_audit.audit_timestamp DESC, exchange_order_audit.id DESC;
+
+-- A CSV file's strategy-application trail, newest first: INSERT rows are applications, DELETE rows
+-- unimports (one per application row the unimport cleared). Ordered by id rather than timestamp because
+-- audit_timestamp only has second resolution.
+selectCsvImportApplicationHistory:
+SELECT audit_type_id, audit_timestamp, strategy_name, applied_at
+FROM csv_import_application_audit
+WHERE csv_import_id = ?
+ORDER BY id DESC;

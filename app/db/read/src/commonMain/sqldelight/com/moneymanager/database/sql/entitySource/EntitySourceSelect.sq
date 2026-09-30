@@ -6,6 +6,31 @@ FROM entity_source
 JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
 WHERE csv_entity_source.csv_import_id = ? AND entity_source.entity_type_id = 1;
 
+-- Transfers (entity_type_id = 7) created (not merely updated) by the given CSV import, still-existing
+-- only: revision_id = 1 is the creating write, so a transfer another file created and this one only
+-- UPDATED is excluded, and the join against `transfer` skips ids a prior pass already deleted
+-- (entity_source is never cascade-cleaned). Fee and pass-through legs carry the same CSV source. Used by
+-- unimport to find everything the file produced.
+selectTransferIdsCreatedByCsvImport:
+SELECT DISTINCT entity_source.entity_id
+FROM entity_source
+JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+JOIN transfer ON transfer.id = entity_source.entity_id
+WHERE csv_entity_source.csv_import_id = ?
+  AND entity_source.entity_type_id = 7
+  AND entity_source.revision_id = 1;
+
+-- Trades (entity_type_id = 11) created by the given CSV import, still-existing only — see
+-- selectTransferIdsCreatedByCsvImport.
+selectTradeIdsCreatedByCsvImport:
+SELECT DISTINCT entity_source.entity_id
+FROM entity_source
+JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+JOIN trade ON trade.id = entity_source.entity_id
+WHERE csv_entity_source.csv_import_id = ?
+  AND entity_source.entity_type_id = 11
+  AND entity_source.revision_id = 1;
+
 -- Accounts (entity_type_id = 1) whose creation was recorded against the given QIF import — the QIF
 -- analogue of selectAccountIdsCreatedByCsvImport, used by QIF re-import to scope merges/deletes.
 selectAccountIdsCreatedByQifImport:

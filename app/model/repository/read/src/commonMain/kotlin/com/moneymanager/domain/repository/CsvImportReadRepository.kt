@@ -2,6 +2,8 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.XlsxImportBlob
@@ -37,6 +39,26 @@ interface CsvImportReadRepository {
      * scope account merges/deletions to import-created accounts only.
      */
     suspend fun getAccountsCreatedByImport(id: CsvImportId): Set<AccountId>
+
+    /**
+     * Ids of the still-existing transfers this import created (not merely updated), including the fee
+     * and pass-through legs its rows produced. Used by unimport to find everything the file booked.
+     */
+    suspend fun getTransferIdsCreatedByImport(id: CsvImportId): Set<TransferId>
+
+    /** Ids of the still-existing trades this import created. See [getTransferIdsCreatedByImport]. */
+    suspend fun getTradeIdsCreatedByImport(id: CsvImportId): Set<TradeId>
+
+    /**
+     * For every import other than [excluding], the rows whose linked transaction is one of
+     * [transferIds]/[tradeIds] — rows another file marked DUPLICATE or UPDATED against them. Imports
+     * with no such rows are omitted.
+     */
+    suspend fun findRowsReferencingTransactions(
+        excluding: CsvImportId,
+        transferIds: Set<TransferId>,
+        tradeIds: Set<TradeId>,
+    ): Map<CsvImportId, List<Long>>
 
     /**
      * Finds imports that match the given file checksum.

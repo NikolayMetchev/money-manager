@@ -69,6 +69,9 @@ class AuditSourceCoverageTest : DbTest() {
         private val SOURCELESS_AUDIT_TABLES =
             setOf(
                 "pass_through_account_audit",
+                // A strategy application is itself the provenance event for a CSV file's transactions;
+                // it has no revision of its own for an entity_source row to attribute.
+                "csv_import_application_audit",
             )
 
         // Provenanced entity types whose write paths (with source recording) are not implemented yet.

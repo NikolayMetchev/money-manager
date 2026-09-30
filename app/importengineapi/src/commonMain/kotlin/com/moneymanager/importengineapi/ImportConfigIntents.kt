@@ -196,6 +196,14 @@ sealed interface CsvImportMutation {
         val ignored: Boolean,
     ) : CsvImportMutation
 
+    /**
+     * Returns the file to the never-applied state (rows reset, errors and applications cleared) after
+     * an unimport deleted the transactions it created.
+     */
+    data class ResetToUnimported(
+        val id: CsvImportId,
+    ) : CsvImportMutation
+
     data class UpdateRowTransferId(
         val id: CsvImportId,
         val rowIndex: Long,

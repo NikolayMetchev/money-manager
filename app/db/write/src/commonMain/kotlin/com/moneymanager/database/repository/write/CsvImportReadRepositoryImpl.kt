@@ -9,6 +9,8 @@ import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -99,6 +101,44 @@ class CsvImportReadRepositoryImpl(
                 .toSet()
         }
 
+    override suspend fun getTransferIdsCreatedByImport(id: CsvImportId): Set<TransferId> =
+        withContext(coroutineContext) {
+            entitySourceSelectQueries
+                .selectTransferIdsCreatedByCsvImport(id.id.toString())
+                .executeAsList()
+                .map { TransferId(it) }
+                .toSet()
+        }
+
+    override suspend fun getTradeIdsCreatedByImport(id: CsvImportId): Set<TradeId> =
+        withContext(coroutineContext) {
+            entitySourceSelectQueries
+                .selectTradeIdsCreatedByCsvImport(id.id.toString())
+                .executeAsList()
+                .map { TradeId(it) }
+                .toSet()
+        }
+
+    override suspend fun findRowsReferencingTransactions(
+        excluding: CsvImportId,
+        transferIds: Set<TransferId>,
+        tradeIds: Set<TradeId>,
+    ): Map<CsvImportId, List<Long>> =
+        withContext(coroutineContext) {
+            val transactionIds = transferIds.map { it.id } + tradeIds.map { it.id }
+            if (transactionIds.isEmpty()) return@withContext emptyMap()
+            csvImportSelectQueries
+                .selectAllImports(::toCsvImportRecord)
+                .executeAsList()
+                .filter { it.importId != excluding.id.toString() }
+                .mapNotNull { other ->
+                    tableManager
+                        .findRowsWithTransactionIds(other.tableName, transactionIds)
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { rows -> CsvImportId(Uuid.parse(other.importId)) to rows }
+                }.toMap()
+        }
+
     override suspend fun historicalSourceAccounts(): Map<CsvImportId, AccountId> =
         withContext(coroutineContext) {
             entitySourceSelectQueries
@@ -141,6 +181,7 @@ class CsvImportReadRepositoryImpl(
         val lastAppliedStrategyId: String?,
         val lastAppliedStrategyName: String?,
         val lastAppliedAtMs: Long?,
+        val lastUnimportedAtMs: Long?,
     )
 
     private fun toCsvImportRecord(
@@ -158,6 +199,7 @@ class CsvImportReadRepositoryImpl(
         lastAppliedStrategyId: String?,
         lastAppliedStrategyName: String?,
         lastAppliedAtMs: Long?,
+        lastUnimportedAtMs: Long?,
         platformName: String,
         osName: String?,
         machineName: String?,
@@ -184,6 +226,7 @@ class CsvImportReadRepositoryImpl(
             lastAppliedStrategyId = lastAppliedStrategyId,
             lastAppliedStrategyName = lastAppliedStrategyName,
             lastAppliedAtMs = lastAppliedAtMs,
+            lastUnimportedAtMs = lastUnimportedAtMs,
         )
 
     private fun Long.toIntChecked(field: String): Int {
@@ -215,6 +258,7 @@ class CsvImportReadRepositoryImpl(
             lastAppliedStrategyId = record.lastAppliedStrategyId,
             lastAppliedStrategyName = record.lastAppliedStrategyName,
             lastAppliedAtMs = record.lastAppliedAtMs,
+            lastUnimportedAtMs = record.lastUnimportedAtMs,
             columns = columns,
         )
 
@@ -238,6 +282,7 @@ class CsvImportReadRepositoryImpl(
         lastAppliedStrategyId: String?,
         lastAppliedStrategyName: String?,
         lastAppliedAtMs: Long?,
+        lastUnimportedAtMs: Long?,
         columns: List<CsvColumn> = loadColumns(importId),
     ): CsvImport =
         CsvImport(
@@ -270,6 +315,7 @@ class CsvImportReadRepositoryImpl(
                 lastAppliedAtMs?.let { appliedAt ->
                     Instant.fromEpochMilliseconds(appliedAt)
                 },
+            lastUnimportedAt = lastUnimportedAtMs?.let(Instant::fromEpochMilliseconds),
         )
 
     private fun loadColumns(importId: String): List<CsvColumn> =

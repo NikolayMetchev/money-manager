@@ -32,10 +32,12 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.CsvImportHistoryEvent
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
@@ -74,6 +76,7 @@ fun CsvImportDetailScreen(
     transferSourceRepository: TransferSourceReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
     tradeRepository: TradeReadRepository,
+    auditRepository: AuditReadRepository,
     importEngine: ImportEngine,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
@@ -90,6 +93,8 @@ fun CsvImportDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showApplyStrategyDialog by remember { mutableStateOf(false) }
     var showReimportDialog by remember { mutableStateOf(false) }
+    var showUnimportDialog by remember { mutableStateOf(false) }
+    var history by remember { mutableStateOf<List<CsvImportHistoryEvent>>(emptyList()) }
     var isDeleting by remember { mutableStateOf(false) }
     var importSuccessMessage by remember { mutableStateOf<String?>(null) }
     var importFailedRows by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -109,6 +114,11 @@ fun CsvImportDetailScreen(
             val matchingStrategy = strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, rows)
             hasMatchingStrategy = matchingStrategy != null
         }
+    }
+
+    // The import flow re-emits whenever its applications change (import, re-import, unimport).
+    LaunchedEffect(import) {
+        history = if (import == null) emptyList() else auditRepository.getCsvImportHistory(importId)
     }
 
     // Determine amount column index by looking for common amount column names
@@ -198,6 +208,21 @@ fun CsvImportDetailScreen(
                         color =
                             if (import?.lastAppliedStrategyId != null) {
                                 MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            },
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(
+                    onClick = { showUnimportDialog = true },
+                    enabled = !isDeleting && import?.lastAppliedAt != null,
+                ) {
+                    Text(
+                        text = "Unimport",
+                        color =
+                            if (import?.lastAppliedAt != null) {
+                                MaterialTheme.colorScheme.error
                             } else {
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                             },
@@ -329,6 +354,7 @@ fun CsvImportDetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    CsvImportHistory(history)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -412,6 +438,27 @@ fun CsvImportDetailScreen(
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text("Cancel")
                 }
+            },
+        )
+    }
+
+    if (showUnimportDialog && import != null) {
+        UnimportDialog(
+            csvImport = import!!,
+            csvImportRepository = csvImportRepository,
+            accountRepository = accountRepository,
+            transactionRepository = transactionRepository,
+            transferRelationshipRepository = transferRelationshipRepository,
+            tradeRepository = tradeRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+            onDismiss = { showUnimportDialog = false },
+            onComplete = { result ->
+                showUnimportDialog = false
+                importSuccessMessage = result.summary(import!!.originalFileName)
+                importFailedRows = emptyList()
+                failedRowIndexes = emptySet()
+                rowsRefreshTrigger++
             },
         )
     }
@@ -510,6 +557,34 @@ fun CsvImportDetailScreen(
                         .toSet()
                 rowsRefreshTrigger++
             },
+        )
+    }
+}
+
+/** The file's application/unimport trail, newest first; only shown once the file has been unimported. */
+@Composable
+private fun CsvImportHistory(history: List<CsvImportHistoryEvent>) {
+    // Without an unimport the "Imported"/"Applied N times" lines above already tell the whole story.
+    if (history.none { it is CsvImportHistoryEvent.Unimported }) return
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = "Import history",
+        style = MaterialTheme.typography.labelMedium,
+    )
+    history.forEach { event ->
+        Text(
+            text =
+                when (event) {
+                    is CsvImportHistoryEvent.Applied -> "Imported via ${event.strategyName} · ${event.at.displayDateTime()}"
+                    is CsvImportHistoryEvent.Unimported -> "Unimported · ${event.at.displayDateTime()}"
+                },
+            style = MaterialTheme.typography.bodySmall,
+            color =
+                if (event is CsvImportHistoryEvent.Unimported) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
         )
     }
 }

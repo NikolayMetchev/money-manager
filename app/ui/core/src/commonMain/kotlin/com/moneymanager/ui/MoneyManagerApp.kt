@@ -770,6 +770,7 @@ fun MoneyManagerApp(
                                                 transferSourceRepository = services.transactions.transferSourceRepository,
                                                 transferRelationshipRepository = services.transactions.transferRelationshipRepository,
                                                 tradeRepository = services.transactions.tradeRepository,
+                                                auditRepository = services.audit.auditRepository,
                                                 importEngine = services.transactions.importEngine,
                                                 onBack = { navigationHistory.navigateBack() },
                                                 onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
