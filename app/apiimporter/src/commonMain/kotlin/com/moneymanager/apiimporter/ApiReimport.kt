@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -30,6 +29,7 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import com.moneymanager.importengineapi.markApiSessionImported
+import com.moneymanager.importengineapi.reconciledPartnerUnhideUpdates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -38,15 +38,11 @@ import kotlin.time.Clock
 
 private val logger = logging()
 
-/** Value an internal-transfer reconcile's exclusion attribute always carries (see `ImportDeduper`). */
-private const val EXCLUDED_ATTR_VALUE = "reconciled"
-
 // Slices one session's re-import gets on the progress bar (see ScaledProgress). Deleting the
 // session's own rows and re-running the import both sweep their own 0..1; the tail steps are single
 // unmeasurable operations, so they only advance the bar to their mark.
 private const val DELETE_BASE = 0f
 private const val DELETE_SPAN = 0.25f
-private const val UNHIDE_BASE = 0.25f
 private const val RERUN_BASE = 0.3f
 private const val RERUN_SPAN = 0.55f
 private const val CLEANUP_BASE = 0.88f
@@ -122,25 +118,17 @@ suspend fun executeApiReimport(
     val importStartedAt = Clock.System.now()
     val bar = ScaledProgress(onProgress)
 
-    // Snapshot RECONCILED-relationship partners of every to-be-deleted transfer BEFORE deleting: the
-    // relationship row cascades away with the transfer, but a partner's EXCLUDED attribute does not —
-    // left alone, that leg would stay hidden with no partner to explain it.
-    val existingRelationships =
-        if (plan.transferIds.isEmpty()) emptyList() else transferRelationshipRepository.getByTransfers(plan.transferIds)
-    val reconciledPartners =
-        existingRelationships
-            .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-            .flatMap { listOf(it.id1, it.id2) }
-            .filterNot { it in plan.transferIds }
-            .toSet()
+    // Rides in the delete batch: the engine applies updates before deletes, so the un-hide can't be lost.
+    val unhideUpdates = reconciledPartnerUnhideUpdates(plan.transferIds, transferRelationshipRepository, transactionRepository)
 
     bar.emit(base = DELETE_BASE, detail = "Removing session's transactions")
     importEngine.import(
         ImportBatch(
             transfers =
-                plan.transferIds.map { id ->
-                    ImportTransfer(source = Source.Api(session.id), operation = ImportOperation.DELETE, existingId = id)
-                },
+                unhideUpdates +
+                    plan.transferIds.map { id ->
+                        ImportTransfer(source = Source.Api(session.id), operation = ImportOperation.DELETE, existingId = id)
+                    },
             trades =
                 plan.tradeIds.map { id ->
                     ImportTradeIntent(
@@ -157,39 +145,6 @@ suspend fun executeApiReimport(
         // during the deletion pass that would read as the opposite of what is happening.
         onProgress = bar.sink(base = DELETE_BASE, span = DELETE_SPAN, detail = "Removing session's transactions"),
     )
-
-    // A surviving partner un-excludes only once it has no RECONCILED relationship left at all — one
-    // reconciled against more than one deleted session leg (unusual, but possible) must stay hidden
-    // until every one of them is gone.
-    if (reconciledPartners.isNotEmpty()) {
-        val remainingRelationships = transferRelationshipRepository.getByTransfers(reconciledPartners)
-        val stillReconciled =
-            remainingRelationships
-                .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-                .flatMap { listOf(it.id1, it.id2) }
-                .toSet()
-        val toUnexclude = reconciledPartners - stillReconciled
-        if (toUnexclude.isNotEmpty()) {
-            val partnerTransfers = transactionRepository.getTransactionsByIds(toUnexclude)
-            val updates =
-                toUnexclude.mapNotNull { id ->
-                    val attr =
-                        partnerTransfers[id]?.attributes?.firstOrNull {
-                            it.attributeType.id.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID && it.value == EXCLUDED_ATTR_VALUE
-                        } ?: return@mapNotNull null
-                    ImportTransfer(
-                        source = Source.System,
-                        operation = ImportOperation.UPDATE,
-                        existingId = id,
-                        deletedAttributeIds = setOf(attr.id),
-                    )
-                }
-            if (updates.isNotEmpty()) {
-                bar.emit(base = UNHIDE_BASE, detail = "Un-hiding reconciled transactions")
-                importEngine.import(ImportBatch(transfers = updates, dedupePolicy = DedupePolicy.None))
-            }
-        }
-    }
 
     bar.emit(base = RERUN_BASE, detail = "Re-importing")
     val rerun =

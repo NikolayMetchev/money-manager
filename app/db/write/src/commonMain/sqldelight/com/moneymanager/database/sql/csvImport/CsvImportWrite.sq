@@ -18,6 +18,11 @@ VALUES (?, ?, ?, ?);
 deleteColumnsByImportId:
 DELETE FROM csv_column_metadata WHERE import_id = ?;
 
+-- Only unimport deletes applications; the csv_import_application_audit DELETE entries it leaves behind
+-- are how the file's "unimported" state is remembered.
+deleteApplicationsByImportId:
+DELETE FROM csv_import_application WHERE csv_import_id = ?;
+
 insertApplication:
 INSERT INTO csv_import_application (id, csv_import_id, strategy_id, strategy_name, applied_at)
 VALUES (?, ?, ?, ?, ?);

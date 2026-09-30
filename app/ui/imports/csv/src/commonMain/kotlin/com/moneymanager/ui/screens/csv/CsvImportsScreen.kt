@@ -18,8 +18,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -302,6 +304,10 @@ fun CsvImportsScreen(
             var importAllScope by remember { mutableStateOf<List<CsvImport>?>(null) }
             // Same idea for "Re-import all".
             var reimportAllScope by remember { mutableStateOf<List<CsvImport>?>(null) }
+            // The imported file whose Unimport was clicked; null hides the dialog.
+            var unimportTarget by remember { mutableStateOf<CsvImport?>(null) }
+            // Same idea as reimportAllScope, for "Unimport all".
+            var unimportAllScope by remember { mutableStateOf<List<CsvImport>?>(null) }
 
             if (selectedTab == ImportTab.UNIMPORTED && unimported.isNotEmpty()) {
                 Button(
@@ -314,11 +320,20 @@ fun CsvImportsScreen(
             }
 
             if (selectedTab == ImportTab.IMPORTED && importedList.isNotEmpty()) {
-                Button(
-                    onClick = { reimportAllScope = importedList },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Re-import all (${importedList.size})")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { reimportAllScope = importedList },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Re-import all (${importedList.size})")
+                    }
+                    OutlinedButton(
+                        onClick = { unimportAllScope = importedList },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    ) {
+                        Text("Unimport all (${importedList.size})")
+                    }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -364,6 +379,44 @@ fun CsvImportsScreen(
                     importEngine = importEngine,
                     onDismiss = { reimportAllScope = null },
                     onComplete = { reimportAllScope = null },
+                )
+            }
+
+            unimportTarget?.let { target ->
+                UnimportDialog(
+                    csvImport = target,
+                    csvImportRepository = csvImportRepository,
+                    accountRepository = accountRepository,
+                    transactionRepository = transactionRepository,
+                    transferRelationshipRepository = transferRelationshipRepository,
+                    tradeRepository = tradeRepository,
+                    maintenance = maintenance,
+                    importEngine = importEngine,
+                    onDismiss = { unimportTarget = null },
+                    onComplete = { result ->
+                        unimportTarget = null
+                        importMessageIsError = false
+                        importMessage = result.summary(target.originalFileName)
+                    },
+                )
+            }
+
+            unimportAllScope?.let { scoped ->
+                CsvUnimportAllDialog(
+                    imports = scoped,
+                    csvImportRepository = csvImportRepository,
+                    accountRepository = accountRepository,
+                    transactionRepository = transactionRepository,
+                    transferRelationshipRepository = transferRelationshipRepository,
+                    tradeRepository = tradeRepository,
+                    maintenance = maintenance,
+                    importEngine = importEngine,
+                    onDismiss = { unimportAllScope = null },
+                    onComplete = { result ->
+                        unimportAllScope = null
+                        importMessageIsError = false
+                        importMessage = result.summary("${scoped.size} file(s)")
+                    },
                 )
             }
 
@@ -448,6 +501,8 @@ fun CsvImportsScreen(
                                     actionLabel = "Re-import all",
                                     onAction = { reimportAllScope = group.imports },
                                     isWarning = group.isWarning,
+                                    secondaryActionLabel = "Unimport all",
+                                    onSecondaryAction = { unimportAllScope = group.imports },
                                 )
                             }
                             if (expanded) {
@@ -460,6 +515,7 @@ fun CsvImportsScreen(
                                         onClick = { onImportClick(import.id) },
                                         ignored = false,
                                         onSetIgnored = { onSetIgnored(import, it) },
+                                        onUnimport = { unimportTarget = import },
                                     )
                                 }
                             }
@@ -546,6 +602,9 @@ private fun ImportSectionHeader(
     indent: Dp = 0.dp,
     // A small tag after the title, e.g. whether a directory is on Google Drive or local.
     badge: String? = null,
+    // An extra, destructive action drawn before the main one (e.g. "Unimport all" beside "Re-import all").
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: () -> Unit = {},
 ) {
     val titleColor = if (isWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
     Row(
@@ -583,6 +642,11 @@ private fun ImportSectionHeader(
                             .background(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.shapes.small)
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                 )
+            }
+        }
+        if (secondaryActionLabel != null) {
+            TextButton(onClick = onSecondaryAction) {
+                Text(secondaryActionLabel, color = MaterialTheme.colorScheme.error)
             }
         }
         if (actionLabel != null) {
@@ -629,6 +693,7 @@ private fun CsvImportCard(
     // [noMatchingStrategy]). Already-imported cards show their strategy via `lastAppliedStrategyName` below.
     matchedStrategyName: String? = null,
     noMatchingStrategy: Boolean = false,
+    onUnimport: (() -> Unit)? = null,
 ) {
     val isImported = import.lastAppliedAt != null
     ImportFileCard(
@@ -644,6 +709,8 @@ private fun CsvImportCard(
         onClick = onClick,
         onSetIgnored = onSetIgnored,
         modifier = modifier,
+        lastUnimportedAt = import.lastUnimportedAt,
+        onUnimport = onUnimport,
         details = { metadataColor ->
             ImportCardDetailText(
                 text = "Source account: ${sourceAccountName ?: "Not set — choose at import"}",

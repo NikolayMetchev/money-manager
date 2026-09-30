@@ -113,6 +113,9 @@ class CsvTableManager(
                     MIN(entity_source.entity_id) AS transaction_id
                 FROM csv_entity_source
                 JOIN entity_source ON entity_source.id = csv_entity_source.id
+                -- entity_source outlives deleted transfers; without this a reset row would still
+                -- report a transfer that a re-import rewrite or an unimport removed.
+                JOIN transfer ON transfer.id = entity_source.entity_id
                 WHERE csv_entity_source.csv_import_id = '$csvImportId'
                   AND entity_source.entity_type_id = 7
                 GROUP BY csv_entity_source.csv_import_id, csv_entity_source.csv_row_index
@@ -242,5 +245,41 @@ class CsvTableManager(
                 "WHERE row_index IN (${rowIndexes.joinToString(",")})",
             0,
         )
+    }
+
+    /** Returns every row of [tableName] to the never-imported state (see [resetRowStatuses]). */
+    fun resetAllRowStatuses(tableName: String) {
+        database.execute(null, "UPDATE $tableName SET import_status = NULL, transaction_id = NULL", 0)
+    }
+
+    /**
+     * The rows of [tableName] whose linked transaction (transfer or trade — they share one id space) is
+     * one of [transactionIds]. The column is TEXT but may hold the id in either storage class, hence the
+     * cast.
+     */
+    fun findRowsWithTransactionIds(
+        tableName: String,
+        transactionIds: Collection<Long>,
+    ): List<Long> {
+        val rows = mutableListOf<Long>()
+        transactionIds.chunked(ID_CHUNK_SIZE).forEach { chunk ->
+            database.executeQuery(
+                null,
+                "SELECT row_index FROM $tableName " +
+                    "WHERE CAST(transaction_id AS INTEGER) IN (${chunk.joinToString(",")}) ORDER BY row_index",
+                { cursor ->
+                    while (cursor.next().value) {
+                        cursor.getLong(0)?.let(rows::add)
+                    }
+                    QueryResult.Unit
+                },
+                0,
+            )
+        }
+        return rows.distinct().sorted()
+    }
+
+    private companion object {
+        const val ID_CHUNK_SIZE = 500
     }
 }

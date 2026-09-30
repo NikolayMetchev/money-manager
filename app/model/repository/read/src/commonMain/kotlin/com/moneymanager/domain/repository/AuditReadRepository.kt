@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CryptoAuditEntry
 import com.moneymanager.domain.model.CryptoId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
@@ -23,6 +24,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyAuditEntry
+import com.moneymanager.domain.model.csv.CsvImportHistoryEvent
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyAuditEntry
 
 interface AuditReadRepository {
@@ -156,4 +158,10 @@ interface AuditReadRepository {
      * @return List of audit entries for the directory
      */
     suspend fun getAuditHistoryForImportDirectory(directoryId: ImportDirectoryId): List<ImportDirectoryAuditEntry>
+
+    /**
+     * A CSV file's import history — each strategy application and each unimport — newest first. An
+     * unimport that cleared several applications at once is a single [CsvImportHistoryEvent.Unimported].
+     */
+    suspend fun getCsvImportHistory(importId: CsvImportId): List<CsvImportHistoryEvent>
 }

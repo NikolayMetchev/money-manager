@@ -49,6 +49,10 @@ fun ImportFileCard(
     onClick: () -> Unit,
     onSetIgnored: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    // When the file was last unimported, if ever; shown in place of "Not imported yet".
+    lastUnimportedAt: Instant? = null,
+    // Offered on imported files; null for formats that don't support unimporting.
+    onUnimport: (() -> Unit)? = null,
     details: @Composable ColumnScope.(Color) -> Unit = {},
     footer: @Composable ColumnScope.(Color) -> Unit = {},
 ) {
@@ -96,6 +100,10 @@ fun ImportFileCard(
                         TextButton(onClick = { onSetIgnored(false) }) { Text("Restore") }
                     } else if (!isImported) {
                         TextButton(onClick = { onSetIgnored(true) }) { Text("Ignore") }
+                    } else if (onUnimport != null) {
+                        TextButton(onClick = onUnimport) {
+                            Text("Unimport", color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
@@ -136,11 +144,18 @@ fun ImportFileCard(
                                 append(strategyName)
                             }
                         }
+                    } else if (lastUnimportedAt != null) {
+                        "Unimported on ${lastUnimportedAt.displayDateTime()}"
                     } else {
                         "Not imported yet"
                     },
                 style = MaterialTheme.typography.bodySmall,
-                color = if (isImported) metadataColor else MaterialTheme.colorScheme.secondary,
+                color =
+                    when {
+                        isImported -> metadataColor
+                        lastUnimportedAt != null -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.secondary
+                    },
             )
             if (dateRange != null) {
                 Spacer(modifier = Modifier.height(2.dp))

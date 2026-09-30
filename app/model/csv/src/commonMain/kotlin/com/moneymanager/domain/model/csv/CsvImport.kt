@@ -24,4 +24,6 @@ data class CsvImport(
     val lastAppliedAt: Instant? = null,
     /** User dismissed this file: hidden from the actionable lists and skipped by "Import all". */
     val ignored: Boolean = false,
+    /** When the file was last unimported (its transactions deleted and applications cleared), if ever. */
+    val lastUnimportedAt: Instant? = null,
 )

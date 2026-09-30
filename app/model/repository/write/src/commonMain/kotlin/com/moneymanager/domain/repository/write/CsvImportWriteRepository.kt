@@ -50,6 +50,13 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     suspend fun deleteImport(id: CsvImportId)
 
     /**
+     * Returns an import to the never-applied state: every row's status and transaction link are
+     * cleared, its errors are dropped and its strategy applications are deleted (the application audit
+     * trail keeps the history). The caller deletes the transactions themselves.
+     */
+    suspend fun resetToUnimported(id: CsvImportId)
+
+    /**
      * Marks an import as ignored (or clears the flag). Ignored files are hidden from the actionable
      * Unimported/Imported lists and skipped by "Import all".
      */

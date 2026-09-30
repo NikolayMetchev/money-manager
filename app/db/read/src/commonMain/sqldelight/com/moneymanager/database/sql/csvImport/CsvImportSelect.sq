@@ -1,4 +1,6 @@
 -- csv_import_metadata queries
+-- last_unimported_at: an application row is only ever deleted by an unimport, so the newest DELETE
+-- entry in its audit trail is when the file was last unimported.
 selectAllImports:
 SELECT
     csv_import_metadata.id,
@@ -23,6 +25,11 @@ SELECT
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,
+    (
+        SELECT MAX(unimport.audit_timestamp)
+        FROM csv_import_application_audit unimport
+        WHERE unimport.csv_import_id = csv_import_metadata.id AND unimport.audit_type_id = 3
+    ) AS last_unimported_at,
     device_view.platform_name,
     device_view.os_name,
     device_view.machine_name,
@@ -64,6 +71,11 @@ SELECT
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,
+    (
+        SELECT MAX(unimport.audit_timestamp)
+        FROM csv_import_application_audit unimport
+        WHERE unimport.csv_import_id = csv_import_metadata.id AND unimport.audit_type_id = 3
+    ) AS last_unimported_at,
     device_view.platform_name,
     device_view.os_name,
     device_view.machine_name,
@@ -105,6 +117,11 @@ SELECT
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,
+    (
+        SELECT MAX(unimport.audit_timestamp)
+        FROM csv_import_application_audit unimport
+        WHERE unimport.csv_import_id = csv_import_metadata.id AND unimport.audit_type_id = 3
+    ) AS last_unimported_at,
     device_view.platform_name,
     device_view.os_name,
     device_view.machine_name,

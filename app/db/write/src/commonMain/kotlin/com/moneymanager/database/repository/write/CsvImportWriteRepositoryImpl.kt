@@ -137,6 +137,19 @@ class CsvImportWriteRepositoryImpl(
             csvImportWriteQueries.deleteImport(id.id.toString())
         }
 
+    override suspend fun resetToUnimported(id: CsvImportId): Unit =
+        withContext(coroutineContext) {
+            val import =
+                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                    ?: return@withContext
+
+            database.transaction {
+                tableManager.resetAllRowStatuses(import.table_name)
+                csvImportWriteQueries.deleteErrorsByImportId(id.id.toString())
+                csvImportWriteQueries.deleteApplicationsByImportId(id.id.toString())
+            }
+        }
+
     override suspend fun setImportIgnored(
         id: CsvImportId,
         ignored: Boolean,

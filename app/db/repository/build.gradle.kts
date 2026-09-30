@@ -42,6 +42,7 @@ kotlin {
                 api(projects.app.model.accountmapping)
                 api(projects.app.model.apistrategy)
                 api(projects.app.model.core)
+                api(projects.app.model.csv)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)

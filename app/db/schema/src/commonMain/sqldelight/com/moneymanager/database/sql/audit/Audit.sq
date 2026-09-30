@@ -323,3 +323,22 @@ CREATE INDEX IF NOT EXISTS idx_exchange_order_audit_order_id ON exchange_order_a
 CREATE INDEX IF NOT EXISTS idx_exchange_order_audit_timestamp ON exchange_order_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_exchange_order_audit_type ON exchange_order_audit(audit_type_id);
 CREATE INDEX IF NOT EXISTS idx_exchange_order_audit_order_id_timestamp ON exchange_order_audit(exchange_order_id, audit_timestamp DESC);
+
+-- csv_import_application_audit: Audit trail for csv_import_application (written by custom triggers;
+-- the table falls under the csv_import_ prefix excluded from the generic audit mechanism). Application
+-- rows are only ever inserted (a strategy was applied) or deleted (the file was unimported), so an
+-- INSERT entry reads as "applied" and a DELETE entry as "unimported". No FK to csv_import_metadata:
+-- the history has to outlive the application rows it describes.
+CREATE TABLE csv_import_application_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    csv_import_application_id TEXT NOT NULL,
+    csv_import_id TEXT NOT NULL,
+    strategy_id TEXT,
+    strategy_name TEXT NOT NULL,
+    applied_at INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_csv_import_application_audit_import_timestamp ON csv_import_application_audit(csv_import_id, audit_timestamp DESC);
