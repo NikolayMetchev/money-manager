@@ -5,6 +5,12 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
 import com.moneymanager.domain.model.reconciliation.ReconciliationSource
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportProgress
+import com.moneymanager.importengineapi.ImportResult
+import com.moneymanager.importengineapi.ReconciliationLinkMutation
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -89,4 +95,52 @@ class AutoLinkerTest {
 
         assertEquals(emptyMap(), planAutoLinks(source, shadows, emptyList(), reals))
     }
+
+    @Test
+    fun `accounts are planned for wallets whose name is free`() {
+        val shadows =
+            listOf(
+                shadow(100, "Koinly · Ledger"),
+                // An account already has this name (ignoring case): link to it instead.
+                shadow(101, "Koinly · BINANCE"),
+                // Two wallets would create the same account: the user decides.
+                shadow(102, "Koinly · Trezor"),
+                shadow(103, "Koinly · trezor"),
+                shadow(104, "Koinly · "),
+            )
+
+        val plan = planAccountCreation(source, shadows, reals)
+
+        assertEquals(mapOf(AccountId(100) to "Ledger"), plan)
+    }
+
+    @Test
+    fun `created accounts are linked to their wallets`() =
+        runTest {
+            val batches = mutableListOf<ImportBatch>()
+            val engine =
+                object : ImportEngine {
+                    override suspend fun import(
+                        batch: ImportBatch,
+                        onProgress: (suspend (ImportProgress) -> Unit)?,
+                        batchSize: Int,
+                    ): ImportResult {
+                        batches += batch
+                        return ImportResult(
+                            createdAccountIds = batch.accountsToCreate.withIndex().associate { (i, it) -> it.key to AccountId(500L + i) },
+                        )
+                    }
+                }
+
+            engine.createAndLinkAccounts(mapOf(AccountId(100) to "Ledger", AccountId(101) to "Trezor"), epoch)
+
+            assertEquals(listOf("Ledger", "Trezor"), batches[0].accountsToCreate.map { it.name })
+            assertEquals(
+                listOf(
+                    ReconciliationLinkMutation.SetLinks(AccountId(100), setOf(AccountId(500))),
+                    ReconciliationLinkMutation.SetLinks(AccountId(101), setOf(AccountId(501))),
+                ),
+                batches[1].reconciliationLinkMutations,
+            )
+        }
 }

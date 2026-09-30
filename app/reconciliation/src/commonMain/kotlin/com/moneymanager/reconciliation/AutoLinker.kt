@@ -2,13 +2,17 @@ package com.moneymanager.reconciliation
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
 import com.moneymanager.domain.model.reconciliation.ReconciliationSource
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
+import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.importengineapi.StringSimilarity
+import kotlin.time.Instant
 
 /** Shorter real names ("OF", "GBR") prefix far too many wallet names to be meaningful suggestions. */
 private const val MIN_PREFIX_KEY_LENGTH = 4
@@ -114,4 +118,50 @@ suspend fun ImportEngine.applyAutoLinks(plan: Map<AccountId, AccountId>) {
             reconciliationLinkMutations = plan.map { (shadow, real) -> ReconciliationLinkMutation.SetLinks(shadow, setOf(real)) },
         ),
     )
+}
+
+/**
+ * The real accounts that can be created for [wallets] of [source] without asking, each named after its
+ * wallet (see [ReconciliationSource.walletName]). A wallet is left out when its name is blank, when an
+ * existing account already carries that name (ignoring case, spacing and punctuation — account names are
+ * unique, and the user should link to that account instead), or when another of [wallets] would create
+ * the same name.
+ *
+ * @return shadow account id → the name of the real account to create and link it to
+ */
+fun planAccountCreation(
+    source: ReconciliationSource,
+    wallets: List<ShadowAccount>,
+    accounts: List<Account>,
+): Map<AccountId, String> {
+    val takenKeys = accounts.mapTo(mutableSetOf()) { nameKey(it.name) }
+    val candidates =
+        wallets
+            .map { it.accountId to source.walletName(it) }
+            .filter { (_, name) -> nameKey(name).isNotEmpty() && nameKey(name) !in takenKeys }
+    val claims = candidates.groupingBy { nameKey(it.second) }.eachCount()
+    return candidates.filter { (_, name) -> claims.getValue(nameKey(name)) == 1 }.toMap()
+}
+
+/**
+ * Creates the real accounts a [plan] (see [planAccountCreation]) names, opened at [openingDate], and links
+ * each wallet to its new account. No-op when the plan is empty.
+ */
+suspend fun ImportEngine.createAndLinkAccounts(
+    plan: Map<AccountId, String>,
+    openingDate: Instant,
+) {
+    if (plan.isEmpty()) return
+    val intents =
+        plan.entries.associate { (walletId, name) ->
+            walletId to
+                ImportAccountIntent(
+                    key = LocalAccountKey("reconciliation-${walletId.id}"),
+                    source = Source.Manual,
+                    name = name,
+                    openingDate = openingDate,
+                )
+        }
+    val created = import(ImportBatch.manualEdits(accounts = intents.values.toList())).createdAccountIds
+    applyAutoLinks(intents.mapValues { (_, intent) -> created.getValue(intent.key) })
 }
