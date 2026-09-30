@@ -571,20 +571,30 @@ private fun CsvImportHistory(history: List<CsvImportHistoryEvent>) {
         text = "Import history",
         style = MaterialTheme.typography.labelMedium,
     )
-    history.forEach { event ->
-        Text(
-            text =
-                when (event) {
-                    is CsvImportHistoryEvent.Applied -> "Imported via ${event.strategyName} · ${event.at.displayDateTime()}"
-                    is CsvImportHistoryEvent.Unimported -> "Unimported · ${event.at.displayDateTime()}"
-                },
-            style = MaterialTheme.typography.bodySmall,
-            color =
-                if (event is CsvImportHistoryEvent.Unimported) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-        )
+    // Bounded and scrollable so a long trail never pushes the rows table out of view.
+    Column(
+        modifier =
+            Modifier
+                .heightIn(max = HISTORY_MAX_HEIGHT)
+                .verticalScroll(rememberScrollState()),
+    ) {
+        history.forEach { event ->
+            Text(
+                text =
+                    when (event) {
+                        is CsvImportHistoryEvent.Applied -> "Imported via ${event.strategyName} · ${event.at.displayDateTime()}"
+                        is CsvImportHistoryEvent.Unimported -> "Unimported · ${event.at.displayDateTime()}"
+                    },
+                style = MaterialTheme.typography.bodySmall,
+                color =
+                    if (event is CsvImportHistoryEvent.Unimported) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+            )
+        }
     }
 }
+
+private val HISTORY_MAX_HEIGHT = 120.dp

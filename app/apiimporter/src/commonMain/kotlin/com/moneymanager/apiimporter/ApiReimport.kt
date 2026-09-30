@@ -29,8 +29,7 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import com.moneymanager.importengineapi.markApiSessionImported
-import com.moneymanager.importengineapi.reconciledPartnersOf
-import com.moneymanager.importengineapi.unexcludeOrphanedReconciledPartners
+import com.moneymanager.importengineapi.reconciledPartnerUnhideUpdates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -44,7 +43,6 @@ private val logger = logging()
 // unmeasurable operations, so they only advance the bar to their mark.
 private const val DELETE_BASE = 0f
 private const val DELETE_SPAN = 0.25f
-private const val UNHIDE_BASE = 0.25f
 private const val RERUN_BASE = 0.3f
 private const val RERUN_SPAN = 0.55f
 private const val CLEANUP_BASE = 0.88f
@@ -120,15 +118,17 @@ suspend fun executeApiReimport(
     val importStartedAt = Clock.System.now()
     val bar = ScaledProgress(onProgress)
 
-    val reconciledPartners = reconciledPartnersOf(plan.transferIds, transferRelationshipRepository)
+    // Rides in the delete batch: the engine applies updates before deletes, so the un-hide can't be lost.
+    val unhideUpdates = reconciledPartnerUnhideUpdates(plan.transferIds, transferRelationshipRepository, transactionRepository)
 
     bar.emit(base = DELETE_BASE, detail = "Removing session's transactions")
     importEngine.import(
         ImportBatch(
             transfers =
-                plan.transferIds.map { id ->
-                    ImportTransfer(source = Source.Api(session.id), operation = ImportOperation.DELETE, existingId = id)
-                },
+                unhideUpdates +
+                    plan.transferIds.map { id ->
+                        ImportTransfer(source = Source.Api(session.id), operation = ImportOperation.DELETE, existingId = id)
+                    },
             trades =
                 plan.tradeIds.map { id ->
                     ImportTradeIntent(
@@ -145,10 +145,6 @@ suspend fun executeApiReimport(
         // during the deletion pass that would read as the opposite of what is happening.
         onProgress = bar.sink(base = DELETE_BASE, span = DELETE_SPAN, detail = "Removing session's transactions"),
     )
-
-    importEngine.unexcludeOrphanedReconciledPartners(reconciledPartners, transferRelationshipRepository, transactionRepository) {
-        bar.emit(base = UNHIDE_BASE, detail = "Un-hiding reconciled transactions")
-    }
 
     bar.emit(base = RERUN_BASE, detail = "Re-importing")
     val rerun =
