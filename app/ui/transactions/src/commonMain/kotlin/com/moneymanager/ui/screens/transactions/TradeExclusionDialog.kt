@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.TradeReadRepository
@@ -39,6 +40,7 @@ import kotlinx.coroutines.launch
 fun TradeExclusionDialog(
     tradeId: TradeId,
     tradeRepository: TradeReadRepository,
+    maintenance: Maintenance,
     onDismiss: () -> Unit,
     onSaved: () -> Unit = {},
 ) {
@@ -92,6 +94,8 @@ fun TradeExclusionDialog(
                     scope.launch {
                         runCatching {
                             importEngine.setTradeExcluded(tradeId, if (isExcluded) reason.trim() else null)
+                            // Balances come from materialized views; recompute so the change shows.
+                            maintenance.refreshMaterializedViews()
                         }.onSuccess {
                             onSaved()
                             onDismiss()

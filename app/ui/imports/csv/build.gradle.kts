@@ -32,6 +32,7 @@ kotlin {
         }
         getByName("commonTest") {
             dependencies {
+                implementation(projects.app.strategies)
                 implementation(projects.test.app.ui)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)

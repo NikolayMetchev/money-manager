@@ -198,11 +198,19 @@ class TransactionWriteRepositoryImpl(
                     )
                     if (update.removedAttributeTypeIds.isNotEmpty()) {
                         val removed = update.removedAttributeTypeIds.mapTo(mutableSetOf()) { it.id }
-                        transferAttributeSelectQueries
-                            .selectByTransaction(updatedTransfer.id.id) { rowId, _, typeId, _, _, _, _ -> rowId to typeId }
-                            .executeAsList()
-                            .filter { (_, typeId) -> typeId in removed }
-                            .forEach { (rowId, _) -> transferAttributeWriteQueries.deleteById(rowId) }
+                        val rowIds =
+                            transferAttributeSelectQueries
+                                .selectByTransaction(updatedTransfer.id.id) { rowId, _, typeId, _, _, _, _ -> rowId to typeId }
+                                .executeAsList()
+                                .filter { (_, typeId) -> typeId in removed }
+                        // In creation mode, like the additions below: the field update already bumped the
+                        // revision once for this update.
+                        database.beginCreationMode()
+                        try {
+                            rowIds.forEach { (rowId, _) -> transferAttributeWriteQueries.deleteById(rowId) }
+                        } finally {
+                            database.endCreationMode()
+                        }
                     }
                     if (update.newAttributes.isNotEmpty()) {
                         // The existing transfer may already carry some of these attribute types (e.g. a

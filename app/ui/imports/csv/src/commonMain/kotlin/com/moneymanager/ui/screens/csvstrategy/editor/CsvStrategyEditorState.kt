@@ -108,6 +108,16 @@ internal class CsvStrategyEditorState(
         mutableStateOf(if (feeColumnName == null) emptyList() else amountMapping?.feeConditions.keepPresentIn(availableColumnNames))
 
     private val sourceMapping = config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+
+    // Source mappings the editor has no widget for (e.g. Koinly's conditional wallet/counterparty
+    // source): carried through verbatim unless the user picks a fixed account or a template instead.
+    val unmodelledSourceMapping: FieldMapping? =
+        sourceMapping?.takeUnless { it is HardCodedAccountMapping || it is TemplateAccountMapping }
+
+    // The credited-leg mappings that turn a row into a trade (TO_AMOUNT/TO_CURRENCY) have no widget
+    // either; carried through so saving an edited strategy keeps its trade detection.
+    val tradeCreditMappings: Map<TransferField, FieldMapping> =
+        config?.fieldMappings.orEmpty().filterKeys { it == TransferField.TO_AMOUNT || it == TransferField.TO_CURRENCY }
     private val sourceTemplate = sourceMapping as? TemplateAccountMapping
     var sourceAccountMode by
         mutableStateOf(if (sourceTemplate != null) SourceAccountMode.TEMPLATE else SourceAccountMode.FIXED_ACCOUNT)

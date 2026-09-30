@@ -91,6 +91,11 @@ fun reconcile(
 ): ReconciliationResult {
     val sourceRange =
         sourceLegs.takeIf { it.isNotEmpty() }?.let { legs -> legs.minOf { it.timestamp }..legs.maxOf { it.timestamp } }
+    // One source's links: the engine allows a real account one wallet per source, which is what lets
+    // each real leg belong to exactly one group.
+    require(links.groupBy { it.realAccountId }.values.all { it.size == 1 }) {
+        "reconcile() takes one source's links; a real account is linked to several wallets"
+    }
     val walletByReal: Map<AccountId, AccountId> = links.associate { it.realAccountId to it.shadowAccountId }
     val linkedWallets: Set<AccountId> = links.mapTo(mutableSetOf()) { it.shadowAccountId }
 

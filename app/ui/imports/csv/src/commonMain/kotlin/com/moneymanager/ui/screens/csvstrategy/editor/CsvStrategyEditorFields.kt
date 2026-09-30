@@ -183,15 +183,18 @@ internal fun buildStrategyFromEditorState(
         buildMap {
             when (state.sourceAccountMode) {
                 SourceAccountMode.FIXED_ACCOUNT ->
-                    state.selectedAccountId?.let { accountId ->
-                        put(
-                            TransferField.SOURCE_ACCOUNT,
-                            HardCodedAccountMapping(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                accountId = accountId,
-                            ),
-                        )
-                    }
+                    state.selectedAccountId
+                        ?.let { accountId ->
+                            put(
+                                TransferField.SOURCE_ACCOUNT,
+                                HardCodedAccountMapping(
+                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                    accountId = accountId,
+                                ),
+                            )
+                        }
+                        // No fixed account chosen: keep a source mapping the editor can't show.
+                        ?: state.unmodelledSourceMapping?.let { put(TransferField.SOURCE_ACCOUNT, it) }
                 SourceAccountMode.TEMPLATE ->
                     state.sourceTemplateColumnName?.let { column ->
                         put(
@@ -309,6 +312,7 @@ internal fun buildStrategyFromEditorState(
                         )
                 },
             )
+            putAll(state.tradeCreditMappings)
             put(
                 TransferField.TIMEZONE,
                 when (state.timezoneMode) {

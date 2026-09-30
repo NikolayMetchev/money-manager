@@ -1248,6 +1248,7 @@ fun AccountTransactionsScreen(
         TradeExclusionDialog(
             tradeId = editedTradeId,
             tradeRepository = tradeRepository,
+            maintenance = maintenance,
             onDismiss = { tradeIdToEdit = null },
             onSaved = { refreshTrigger++ },
         )

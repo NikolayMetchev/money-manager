@@ -1773,7 +1773,7 @@ class ImportEngineImpl(
                 exclusionChanges[existingId] = t.attributes.firstOrNull { it.typeId == excludedTypeId } to source
             }
         }
-        feeLegExclusionUpdates(exclusionChanges, excludedTypeId, updates.mapTo(mutableSetOf()) { it.transfer.id })
+        derivedLegExclusionUpdates(exclusionChanges, excludedTypeId, updates.mapTo(mutableSetOf()) { it.transfer.id })
             .forEach { (update, source) ->
                 updates += update
                 orderedUpdateSources += source
@@ -1782,30 +1782,40 @@ class ImportEngineImpl(
     }
 
     /**
-     * Fee legs follow their main transfer's exclusion when a re-import changes it, as they do on
-     * creation (see buildCreatePayload): a fee of a row the source deleted mustn't move balances, and
-     * one of a row it un-deleted must again. Needs [transferRelationshipRepository]; skipped without it.
+     * The legs derived from a main transfer — its fee and its pass-through spend legs (C1→C2, …, Cn→merchant,
+     * each linked to the next) — follow its exclusion when a re-import changes it, as they do on creation
+     * (see buildCreatePayload): a row the source deleted mustn't move balances through them, and one it
+     * un-deleted must again. Needs [transferRelationshipRepository]; skipped without it.
      */
-    private suspend fun feeLegExclusionUpdates(
+    private suspend fun derivedLegExclusionUpdates(
         exclusionChanges: Map<TransferId, Pair<NewAttribute?, Source>>,
         excludedTypeId: AttributeTypeId,
         alreadyUpdated: Set<TransferId>,
     ): List<Pair<TransferUpdate, Source>> {
         val relationships = transferRelationshipRepository ?: return emptyList()
         if (exclusionChanges.isEmpty()) return emptyList()
-        val feeOf =
-            relationships
-                .getByTransfers(exclusionChanges.keys)
-                .filter { it.relationshipType.id.id == WellKnownIds.FEE_RELATIONSHIP_TYPE_ID && it.id1 in exclusionChanges }
-                .associate { it.id2 to it.id1 }
-                .filterKeys { it !in alreadyUpdated }
-        if (feeOf.isEmpty()) return emptyList()
-        return transactionRepository.getTransactionsByIds(feeOf.keys).mapNotNull { (feeId, fee) ->
-            val (exclusion, source) = exclusionChanges.getValue(feeOf.getValue(feeId))
-            val isExcluded = fee.attributes.any { it.attributeType.id == excludedTypeId }
+        val derivedTypes = setOf(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID, WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
+        // Derived leg -> the main transfer it hangs off, walking fee/pass-through links outwards (id1 -> id2).
+        val mainOf = mutableMapOf<TransferId, TransferId>()
+        var frontier: Map<TransferId, TransferId> = exclusionChanges.keys.associateWith { it }
+        while (frontier.isNotEmpty()) {
+            val next =
+                relationships
+                    .getByTransfers(frontier.keys)
+                    .filter { it.relationshipType.id.id in derivedTypes && it.id1 in frontier }
+                    .filter { it.id2 !in mainOf && it.id2 !in exclusionChanges }
+                    .associate { it.id2 to frontier.getValue(it.id1) }
+            mainOf += next
+            frontier = next
+        }
+        mainOf.keys.removeAll(alreadyUpdated)
+        if (mainOf.isEmpty()) return emptyList()
+        return transactionRepository.getTransactionsByIds(mainOf.keys).mapNotNull { (legId, leg) ->
+            val (exclusion, source) = exclusionChanges.getValue(mainOf.getValue(legId))
+            val isExcluded = leg.attributes.any { it.attributeType.id == excludedTypeId }
             when {
-                exclusion != null && !isExcluded -> TransferUpdate(fee, listOf(exclusion)) to source
-                exclusion == null && isExcluded -> TransferUpdate(fee, emptyList(), setOf(excludedTypeId)) to source
+                exclusion != null && !isExcluded -> TransferUpdate(leg, listOf(exclusion)) to source
+                exclusion == null && isExcluded -> TransferUpdate(leg, emptyList(), setOf(excludedTypeId)) to source
                 else -> null
             }
         }

@@ -50,6 +50,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.importfilesource.DriveFolderBrowser
@@ -643,7 +644,12 @@ fun MoneyManagerApp(
                                                             accountId = leg.accountId,
                                                             accountName =
                                                                 accounts.find { it.id == leg.accountId }?.name ?: leg.accountId.toString(),
-                                                            scrollToTransferId = TransferId(leg.transactionId),
+                                                            // Only transfers can be scrolled to; a trade leg just opens its account.
+                                                            scrollToTransferId =
+                                                                TransferId(leg.transactionId).takeIf {
+                                                                    leg.kind ==
+                                                                        LegTransactionKind.TRANSFER
+                                                                },
                                                         ),
                                                     )
                                                 },

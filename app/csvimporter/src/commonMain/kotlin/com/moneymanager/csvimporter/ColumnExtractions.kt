@@ -54,7 +54,13 @@ private fun parseTemplateToken(
     if (next == '{') {
         val end = template.indexOf('}', startIndex = start + 2)
         if (end == -1) return null
-        val value = (match.groups as? MatchNamedGroupCollection)?.get(template.substring(start + 2, end))?.value.orEmpty()
+        // An undefined group name throws rather than returning null; it becomes "" like an absent group.
+        val value =
+            try {
+                (match.groups as? MatchNamedGroupCollection)?.get(template.substring(start + 2, end))?.value.orEmpty()
+            } catch (_: IllegalArgumentException) {
+                ""
+            }
         return value to (end - start + 1)
     }
     if (next.isDigit()) return match.groupValues.getOrNull(next - '0').orEmpty() to 2

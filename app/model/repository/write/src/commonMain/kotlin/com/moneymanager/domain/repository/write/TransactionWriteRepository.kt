@@ -85,6 +85,9 @@ interface TransactionWriteRepository : TransactionReadRepository {
             "Default importTransfers does not persist newRelationships; override importTransfers in this implementation."
         }
         require(updateSources.size == updates.size) { "updateSources must align 1:1 with updates" }
+        require(updates.all { it.removedAttributeTypeIds.isEmpty() }) {
+            "The default importTransfers cannot remove attribute types; override it to support removedAttributeTypeIds"
+        }
         // Default (non-atomic) implementation for fakes/alternative impls; the real impl overrides this
         // to run everything in one transaction and record the per-update source.
         val created =

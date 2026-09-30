@@ -1,5 +1,6 @@
 package com.moneymanager.ui.screens.csvstrategy
 
+import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
@@ -272,6 +273,18 @@ class StrategyFormRoundTripTest {
      * description cleanup regex, the time given to date-only rows, the category new accounts land
      * in, and the worksheet an Excel strategy targets all have to survive load -> build untouched.
      */
+    @Test
+    fun `the built-in Koinly strategy survives a no-op save`() {
+        // Its conditional source, credited-leg (trade) mappings, extractions, fee currency, aliases and
+        // reconciliation config have no dedicated widgets; saving unchanged must keep every one of them.
+        val koinly = BuiltInCsvStrategies.buildKoinlyCsvStrategy(timestamp)
+
+        val state = CsvStrategyEditorState(koinly, koinly.config.identificationColumns)
+        val rebuilt = buildStrategyFromEditorState(state, koinly.id, koinly.createdAt, koinly.updatedAt)
+
+        assertEquals(koinly.config, rebuilt.config)
+    }
+
     @Test
     fun `properties with no widget survive a no-op save`() {
         val original =

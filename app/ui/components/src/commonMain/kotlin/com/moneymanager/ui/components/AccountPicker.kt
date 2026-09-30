@@ -144,7 +144,8 @@ fun AccountPicker(
                     searchQuery = ""
                 },
             )
-            if (shadowAccountIds.isNotEmpty()) {
+            // Only where it does something: the caller's own filter may already drop every shadow account.
+            if (accounts.any { it.id in shadowAccountIds && it.id != excludeAccountId && accountFilter(it) }) {
                 DropdownMenuItem(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {

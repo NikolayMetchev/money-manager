@@ -144,15 +144,28 @@ class MoneyManagerDatabaseWrapper(
         var token = base
         executeQuery(
             null,
-            "SELECT (SELECT COUNT(*) FROM reconciliation_account_link) + (SELECT COUNT(*) FROM trade_attribute), " +
-                "(SELECT COALESCE(SUM(shadow_account_id * 31 + real_account_id), 0) FROM reconciliation_account_link), " +
-                "(SELECT COALESCE(SUM(created_at), 0) FROM reconciliation_account_link) + " +
-                "(SELECT COALESCE(SUM(length(attribute_value) + trade_id * 31 + attribute_type_id), 0) FROM trade_attribute)",
+            "SELECT COUNT(*), COALESCE(SUM(shadow_account_id * 31 + real_account_id), 0), " +
+                "COALESCE(SUM(created_at), 0) FROM reconciliation_account_link",
             { cursor ->
                 if (cursor.next().value) {
                     token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
                     token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
                     token = token * SETTINGS_HASH_PRIME + cursor.getLong(2)!!
+                }
+                QueryResult.Unit
+            },
+            0,
+        )
+        // trade_attribute has no updated_at, and a value can change in place (e.g. an exclusion reason), so
+        // fold every row's content; SQLite has no string hash, hence the Kotlin fold. The table is small.
+        executeQuery(
+            null,
+            "SELECT trade_id, attribute_type_id, attribute_value FROM trade_attribute ORDER BY trade_id, attribute_type_id",
+            { cursor ->
+                while (cursor.next().value) {
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
+                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
+                    token = token * SETTINGS_HASH_PRIME + cursor.getString(2)!!.hashCode()
                 }
                 QueryResult.Unit
             },

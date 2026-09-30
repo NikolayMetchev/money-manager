@@ -1051,6 +1051,76 @@ class ImportEngineDbTest : DbTest() {
         }
 
     @Test
+    fun passThrough_spendLegFollowsTheFundingLegsExclusionOnReimport() =
+        runTest {
+            val cardId = createSourceAccount()
+            val currency = gbp()
+            val excluded = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
+
+            // The same row twice: first reported deleted (excluded), then un-deleted. The source owns the
+            // excluded attribute, so the re-import drops it — and the spend leg must follow.
+            suspend fun importRow(deleted: Boolean) =
+                repositories.importEngine.import(
+                    ImportBatch(
+                        transfers =
+                            listOf(
+                                ImportTransfer(
+                                    rowKey = ImportRowKey.CsvRow(0),
+                                    fromAccount = AccountRef.Existing(cardId),
+                                    toAccount = AccountRef.Local(LocalAccountKey("curve")),
+                                    source = Source.SampleGenerator,
+                                    timestamp = baseTime,
+                                    description = "Curve",
+                                    amount = Money(1010, currency),
+                                    attributes = if (deleted) listOf(NewAttribute(excluded, "deleted")) else emptyList(),
+                                    ownedAttributeTypeIds = setOf(excluded),
+                                    passThrough =
+                                        ImportPassThrough(
+                                            conduits = listOf(AccountRef.Local(LocalAccountKey("curve"))),
+                                            merchantTarget = AccountRef.Local(LocalAccountKey("merchant")),
+                                            amount = Money(1010, currency),
+                                            spendDescriptions = listOf("National Lottery"),
+                                            relationshipTypeId = RelationshipTypeId(WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID),
+                                        ),
+                                ),
+                            ),
+                        dedupePolicy = DedupePolicy.FuzzyAllFields(),
+                        accountsToCreate =
+                            listOf("curve" to "Curve", "merchant" to "National Lottery").map { (key, name) ->
+                                ImportAccountIntent(
+                                    key = LocalAccountKey(key),
+                                    match = AccountMatchKey.ByName(name),
+                                    name = name,
+                                    openingDate = baseTime,
+                                    source = Source.SampleGenerator,
+                                )
+                            },
+                    ),
+                )
+
+            suspend fun spendLegExcluded(): Boolean {
+                val merchantId =
+                    repositories.accountRepository
+                        .getAllAccounts()
+                        .first()
+                        .first { it.name == "National Lottery" }
+                        .id
+                val spend =
+                    repositories.transactionRepository
+                        .getTransactionsByAccount(merchantId)
+                        .first()
+                        .single()
+                return spend.attributes.any { it.attributeType.id == excluded }
+            }
+
+            importRow(deleted = true)
+            assertTrue(spendLegExcluded(), "a deleted row's spend leg is excluded with it")
+
+            importRow(deleted = false)
+            assertEquals(false, spendLegExcluded(), "un-deleting the row brings its spend leg back")
+        }
+
+    @Test
     fun passThrough_chainExpandsIntoLinkedLegs_everyConduitNetsToZero() =
         runTest {
             val cardId = createSourceAccount()
