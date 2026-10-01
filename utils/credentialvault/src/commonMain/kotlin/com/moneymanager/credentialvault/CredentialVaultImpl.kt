@@ -216,7 +216,7 @@ class CredentialVaultImpl(
 
     private companion object {
         const val MAX_RADIX = 36
-        val json = Json { ignoreUnknownKeys = true }
+        val json: Json = Json { ignoreUnknownKeys = true }
 
         // Hashed rather than raw: a database path easily exceeds java.util.prefs' 80-char key limit.
         fun locationKey(databaseKey: String) = "credvault.path.${databaseKey.hashCode().toUInt().toString(MAX_RADIX)}"
