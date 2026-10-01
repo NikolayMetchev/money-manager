@@ -22,6 +22,13 @@ import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.qif.QifParser
 import com.moneymanager.xlsx.createXlsxParser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.lighthousegames.logging.logging
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
@@ -53,12 +60,16 @@ internal fun isSupportedImportFile(fileName: String): Boolean = supportedKind(fi
  * entirely; otherwise the file is downloaded and sha256-confirmed. A changed file produces a fresh
  * staging row; a bad file is recorded as a failure and does not abort the scan.
  *
+ * Every file is scanned in its own coroutine on [Dispatchers.IO], so downloads run concurrently. The
+ * engine doesn't serialize writes itself, so every database step holds [dbLock]; callers scanning
+ * several directories at once must share one lock between them.
+ *
  * A top-level [directory] with no [ImportDirectory.accountId] set gets one resolved automatically
  * before scanning: an existing account named exactly [ImportDirectory.name] if one exists, else a
  * newly created one (see [ensureDirectoryAccount]) — the user can still override it via "Set account".
  * Discovered subfolders (`topLevel == false`) are left alone; they inherit their parent's account.
  */
-@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+@Suppress("LongParameterList")
 suspend fun scanImportDirectory(
     directory: ImportDirectory,
     fileSource: ImportFileSource,
@@ -66,59 +77,102 @@ suspend fun scanImportDirectory(
     csvImportRepository: CsvImportReadRepository,
     qifImportRepository: QifImportReadRepository,
     importEngine: ImportEngine,
+    dbLock: Mutex = Mutex(),
     onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): ScanResult {
     if (directory.topLevel && directory.accountId == null) {
-        ensureDirectoryAccount(directory, importEngine)
+        dbLock.withLock { ensureDirectoryAccount(directory, importEngine) }
     }
     val entries = fileSource.list()
-    var downloaded = 0
-    var unchanged = 0
-    var skipped = 0
-    var failed = 0
-    val failures = mutableListOf<String>()
+    val context =
+        ScanContext(directory, fileSource, importDirectoryRepository, csvImportRepository, qifImportRepository, importEngine, dbLock)
+    val progressLock = Mutex()
+    var done = 0
+    onProgress(0, entries.size)
 
-    entries.forEachIndexed { index, entry ->
-        onProgress(index, entries.size)
-        val kind = supportedKind(entry.name)
-        if (kind == null) {
-            // Don't even download unsupported files (e.g. PDFs).
-            skipped++
-            return@forEachIndexed
+    val outcomes =
+        coroutineScope {
+            entries
+                .map { entry ->
+                    async(Dispatchers.IO) {
+                        context.scanFile(entry).also { progressLock.withLock { onProgress(++done, entries.size) } }
+                    }
+                }.awaitAll()
         }
-        try {
-            val tracked = importDirectoryRepository.getTrackedFile(directory.id, entry.ref)
-            val lastModified = entry.lastModifiedInstant()
 
-            // Incremental skip: a server-provided content hash (e.g. Drive md5Checksum) that matches the
-            // last import means the bytes are unchanged, so there is no need to download the file at all.
-            // Only remote backends supply this; local entries have a null hash and fall through to
-            // download + sha256 below (cheap, no network — and robust against preserved timestamps).
-            val remoteContentHash = entry.remoteContentHash
-            if (remoteContentHash != null && tracked?.remoteContentHash == remoteContentHash) {
-                importEngine.recordDirectoryFileImported(
-                    directoryId = directory.id,
-                    fileRef = entry.ref,
-                    fileName = entry.name,
-                    lastModified = lastModified,
-                    checksum = tracked.checksum,
-                    remoteContentHash = remoteContentHash,
-                    csvImportId = tracked.csvImportId,
-                    qifImportId = tracked.qifImportId,
-                    importedAt = Clock.System.now(),
-                )
-                unchanged++
-                return@forEachIndexed
+    val failures = outcomes.filterIsInstance<FileOutcome.Failed>().map { it.message }
+    return ScanResult(
+        filesDownloaded = outcomes.count { it == FileOutcome.Downloaded },
+        filesUnchanged = outcomes.count { it == FileOutcome.Unchanged },
+        filesSkipped = outcomes.count { it == FileOutcome.Skipped },
+        filesFailed = failures.size,
+        failures = failures,
+    )
+}
+
+private sealed interface FileOutcome {
+    data object Downloaded : FileOutcome
+
+    data object Unchanged : FileOutcome
+
+    data object Skipped : FileOutcome
+
+    data class Failed(
+        val message: String,
+    ) : FileOutcome
+}
+
+private class ScanContext(
+    val directory: ImportDirectory,
+    val fileSource: ImportFileSource,
+    val importDirectoryRepository: ImportDirectoryReadRepository,
+    val csvImportRepository: CsvImportReadRepository,
+    val qifImportRepository: QifImportReadRepository,
+    val importEngine: ImportEngine,
+    val dbLock: Mutex,
+)
+
+@Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount")
+private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
+    // Don't even download unsupported files (e.g. PDFs).
+    val kind = supportedKind(entry.name) ?: return FileOutcome.Skipped
+    return try {
+        val lastModified = entry.lastModifiedInstant()
+
+        // Incremental skip: a server-provided content hash (e.g. Drive md5Checksum) that matches the
+        // last import means the bytes are unchanged, so there is no need to download the file at all.
+        // Only remote backends supply this; local entries have a null hash and fall through to
+        // download + sha256 below (cheap, no network — and robust against preserved timestamps).
+        val remoteContentHash = entry.remoteContentHash
+        val tracked =
+            dbLock.withLock {
+                val tracked = importDirectoryRepository.getTrackedFile(directory.id, entry.ref)
+                if (remoteContentHash != null && tracked?.remoteContentHash == remoteContentHash) {
+                    importEngine.recordDirectoryFileImported(
+                        directoryId = directory.id,
+                        fileRef = entry.ref,
+                        fileName = entry.name,
+                        lastModified = lastModified,
+                        checksum = tracked.checksum,
+                        remoteContentHash = remoteContentHash,
+                        csvImportId = tracked.csvImportId,
+                        qifImportId = tracked.qifImportId,
+                        importedAt = Clock.System.now(),
+                    )
+                    return FileOutcome.Unchanged
+                }
+                tracked
             }
 
-            // Always hash the content: a provider that preserves/backdates the timestamp on an edit
-            // would otherwise hide a real content change forever. The checksum below decides re-staging.
-            // Excel is binary and must be hashed/staged from raw bytes; decoding it as UTF-8 text (like
-            // CSV/QIF) would both corrupt the checksum and lose data, so it branches before decoding.
-            val rawBytes = fileSource.download(entry.ref)
-            val content = if (kind == SupportedKind.XLSX) null else rawBytes.decodeToString()
-            val checksum = content?.let(::sha256Hex) ?: sha256Hex(rawBytes)
+        // Always hash the content: a provider that preserves/backdates the timestamp on an edit
+        // would otherwise hide a real content change forever. The checksum below decides re-staging.
+        // Excel is binary and must be hashed/staged from raw bytes; decoding it as UTF-8 text (like
+        // CSV/QIF) would both corrupt the checksum and lose data, so it branches before decoding.
+        val rawBytes = fileSource.download(entry.ref)
+        val content = if (kind == SupportedKind.XLSX) null else rawBytes.decodeToString()
+        val checksum = content?.let(::sha256Hex) ?: sha256Hex(rawBytes)
 
+        dbLock.withLock {
             // Content unchanged despite a moved timestamp: advance the cursor, don't re-stage.
             if (tracked?.checksum == checksum) {
                 importEngine.recordDirectoryFileImported(
@@ -132,8 +186,7 @@ suspend fun scanImportDirectory(
                     qifImportId = tracked.qifImportId,
                     importedAt = Clock.System.now(),
                 )
-                unchanged++
-                return@forEachIndexed
+                return FileOutcome.Unchanged
             }
 
             var csvImportId: CsvImportId? = null
@@ -167,25 +220,14 @@ suspend fun scanImportDirectory(
                 qifImportId = qifImportId,
                 importedAt = Clock.System.now(),
             )
-            downloaded++
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (expected: Exception) {
-            scanLogger.error(expected) { "Scan failed for ${entry.name} in '${directory.name}': ${expected.message}" }
-            failed++
-            failures.add("${entry.name}: ${expected.message}")
         }
+        FileOutcome.Downloaded
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (expected: Exception) {
+        scanLogger.error(expected) { "Scan failed for ${entry.name} in '${directory.name}': ${expected.message}" }
+        FileOutcome.Failed("${entry.name}: ${expected.message}")
     }
-
-    onProgress(entries.size, entries.size)
-
-    return ScanResult(
-        filesDownloaded = downloaded,
-        filesUnchanged = unchanged,
-        filesSkipped = skipped,
-        filesFailed = failed,
-        failures = failures,
-    )
 }
 
 private suspend fun stageCsv(

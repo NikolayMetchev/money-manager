@@ -13,6 +13,11 @@ import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
 import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.reconnect
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -143,9 +148,10 @@ class StrategySyncController(
         val provider = resolveSignedIn()
         val remote = remoteByKey(provider)
         val local = library.listLocal(appVersion).associateBy { it.key }
+        val contents = prefetchComparisons(provider, local.keys, remote)
         val items =
             (local.keys + remote.keys).map { key ->
-                StrategyItem(key, classify(provider, library, key, local[key]?.contentHash, remote[key]))
+                StrategyItem(key, classify(contents, library, key, local[key]?.contentHash, remote[key]))
             }
         _state.value = StrategyLibraryState(items = items.sortedBy { it.key.name.lowercase() })
     }
@@ -181,19 +187,21 @@ class StrategySyncController(
                 completedSteps++
             }
 
+            val contents = prefetchComparisons(provider, local.keys, remote)
             var uploaded = 0
             for ((_, entry) in local) {
                 step("Syncing ${entry.key.name}…")
-                if (reconcileUpload(provider, library, entry, remote[entry.key], forceUpload)) uploaded++
+                if (reconcileUpload(provider, contents, library, entry, remote[entry.key], forceUpload)) uploaded++
             }
 
             var pulled = 0
             if (selectedToPull.isNotEmpty()) {
                 remote = remoteByKey(provider) // refresh ids/revisions after uploads
+                val pulls = prefetch(provider, selectedToPull.mapNotNull { remote[it] })
                 for (key in selectedToPull) {
                     step("Importing ${key.name}…")
                     val remoteFile = remote[key] ?: continue
-                    val json = provider.download(remoteFile.id).decodeToString()
+                    val json = pulls.get(remoteFile)
                     library.applyIncoming(key, json, resolutions[key] ?: emptyMap())
                     store.putBaseline(key, StrategySyncedBaseline(remoteFile.id, remoteFile.revisionId, library.canonicalHash(key, json)))
                     pulled++
@@ -218,7 +226,7 @@ class StrategySyncController(
     }
 
     private suspend fun classify(
-        provider: RemoteStorageProvider,
+        contents: RemoteContents,
         library: StrategyLibrary,
         key: StrategyKey,
         localHash: String?,
@@ -231,11 +239,11 @@ class StrategySyncController(
         val baseline = store.baseline(key)
         if (baseline == null) {
             // Never synced but present both sides: compare content to tell equal from conflicting.
-            val remoteHash = library.canonicalHash(key, provider.download(remoteFile.id).decodeToString())
+            val remoteHash = library.canonicalHash(key, contents.get(remoteFile))
             return if (remoteHash == localHash) StrategyItemStatus.IN_SYNC else StrategyItemStatus.CONFLICT
         }
         val localChanged = localHash != baseline.syncedHash
-        val remoteChanged = remoteEffectivelyChanged(provider, library, key, remoteFile, baseline)
+        val remoteChanged = remoteEffectivelyChanged(contents, library, key, remoteFile, baseline)
         return when {
             !localChanged && !remoteChanged -> StrategyItemStatus.IN_SYNC
             localChanged && !remoteChanged -> StrategyItemStatus.LOCAL_AHEAD
@@ -249,8 +257,10 @@ class StrategySyncController(
      * returns whether it uploaded. New local → create; local-ahead → update; conflict → only when the
      * key is in [forceUpload]; never-synced-but-equal → adopt the baseline without uploading.
      */
+    @Suppress("LongParameterList")
     private suspend fun reconcileUpload(
         provider: RemoteStorageProvider,
+        contents: RemoteContents,
         library: StrategyLibrary,
         entry: LocalStrategyEntry,
         remoteFile: RemoteFile?,
@@ -264,7 +274,7 @@ class StrategySyncController(
         if (baseline == null) {
             // Present both sides but never synced (e.g. identical built-ins on first connect): compare
             // content. Equal → adopt the baseline; different → a conflict, upload only if forced.
-            val remoteHash = library.canonicalHash(entry.key, provider.download(remoteFile.id).decodeToString())
+            val remoteHash = library.canonicalHash(entry.key, contents.get(remoteFile))
             return when {
                 remoteHash == entry.contentHash -> {
                     store.putBaseline(entry.key, StrategySyncedBaseline(remoteFile.id, remoteFile.revisionId, entry.contentHash))
@@ -278,7 +288,7 @@ class StrategySyncController(
             }
         }
         val localChanged = entry.contentHash != baseline.syncedHash
-        val remoteChanged = remoteEffectivelyChanged(provider, library, entry.key, remoteFile, baseline)
+        val remoteChanged = remoteEffectivelyChanged(contents, library, entry.key, remoteFile, baseline)
         // Auto-upload local-ahead; a conflict (both changed) only uploads when the user forced it.
         if (localChanged && (!remoteChanged || entry.key in forceUpload)) {
             upload(provider, entry, remoteFile.id)
@@ -312,17 +322,57 @@ class StrategySyncController(
      * so a local-only edit stays LOCAL_AHEAD instead of degrading into a false CONFLICT.
      */
     private suspend fun remoteEffectivelyChanged(
-        provider: RemoteStorageProvider,
+        contents: RemoteContents,
         library: StrategyLibrary,
         key: StrategyKey,
         remoteFile: RemoteFile,
         baseline: StrategySyncedBaseline,
     ): Boolean {
         if (!remoteAdvanced(remoteFile, baseline)) return false
-        val remoteHash = library.canonicalHash(key, provider.download(remoteFile.id).decodeToString())
+        val remoteHash = library.canonicalHash(key, contents.get(remoteFile))
         if (remoteHash != baseline.syncedHash) return true
         store.putBaseline(key, baseline.copy(remoteFileId = remoteFile.id, syncedRevision = remoteFile.revisionId))
         return false
+    }
+
+    /**
+     * Fetches, concurrently, every remote artifact the classification below will compare by content: one
+     * present on both sides that was never synced, or whose revision moved past its baseline.
+     */
+    private suspend fun prefetchComparisons(
+        provider: RemoteStorageProvider,
+        localKeys: Set<StrategyKey>,
+        remote: Map<StrategyKey, RemoteFile>,
+    ): RemoteContents =
+        prefetch(
+            provider,
+            localKeys.mapNotNull { key ->
+                val remoteFile = remote[key] ?: return@mapNotNull null
+                val baseline = store.baseline(key)
+                remoteFile.takeIf { baseline == null || remoteAdvanced(it, baseline) }
+            },
+        )
+
+    private suspend fun prefetch(
+        provider: RemoteStorageProvider,
+        files: Collection<RemoteFile>,
+    ): RemoteContents {
+        val bodies =
+            coroutineScope {
+                files
+                    .map { file -> async(Dispatchers.IO) { file.id to provider.download(file.id).decodeToString() } }
+                    .awaitAll()
+                    .toMap()
+            }
+        return RemoteContents(provider, bodies)
+    }
+
+    /** Remote artifact bodies fetched up front; anything not prefetched is downloaded on demand. */
+    private class RemoteContents(
+        private val provider: RemoteStorageProvider,
+        private val prefetched: Map<String, String>,
+    ) {
+        suspend fun get(file: RemoteFile): String = prefetched[file.id] ?: provider.download(file.id).decodeToString()
     }
 
     private suspend fun remoteByKey(provider: RemoteStorageProvider): Map<StrategyKey, RemoteFile> =

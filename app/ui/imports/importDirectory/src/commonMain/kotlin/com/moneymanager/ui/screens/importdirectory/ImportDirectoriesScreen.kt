@@ -21,8 +21,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -31,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.ScanResult
 import com.moneymanager.csvimporter.discoverImportableFolders
 import com.moneymanager.csvimporter.scanImportDirectory
 import com.moneymanager.domain.model.AccountId
@@ -51,13 +54,25 @@ import com.moneymanager.importengineapi.deleteImportDirectory
 import com.moneymanager.importengineapi.updateImportDirectory
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
+import com.moneymanager.ui.background.formatElapsedTime
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.navigation.ImportTab
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
 /**
@@ -99,9 +114,19 @@ fun ImportDirectoriesScreen(
     var statusMessage by remember { mutableStateOf<String?>(null) }
     // Per-file scan failures ("file name: reason") from the last download, shown under the status line.
     var scanFailures by remember { mutableStateOf<List<String>>(emptyList()) }
-    var scanningId by remember { mutableStateOf<ImportDirectoryId?>(null) }
-    // done / total of the in-progress download, for the per-directory progress bar.
-    var scanProgress by remember { mutableStateOf(0 to 0) }
+    // done / total of each in-progress download, keyed by directory; drives the per-row progress bars.
+    // All of this state is written from IO-dispatcher coroutines, which snapshot state allows.
+    val scanProgress = remember { mutableStateMapOf<ImportDirectoryId, Pair<Int, Int>>() }
+    // Top-level folders whose subfolder tree is still being walked (the value is unused).
+    val discovering = remember { mutableStateMapOf<ImportDirectoryId, Unit>() }
+    // Every folder "Download all" has queued, kept after it finishes so the overall bar adds up the whole
+    // run: null until the folder's file list comes back, then its done / total.
+    val downloadAllProgress = remember { mutableStateMapOf<ImportDirectoryId, Pair<Int, Int>?>() }
+    var downloadAllRunning by remember { mutableStateOf(false) }
+    var downloadAllStartedAt by remember { mutableStateOf<TimeSource.Monotonic.ValueTimeMark?>(null) }
+    val scanning = downloadAllRunning || scanProgress.isNotEmpty() || discovering.isNotEmpty()
+    // Directories scan concurrently but the engine doesn't serialize writes, so all of them share it.
+    val dbLock = remember { Mutex() }
 
     fun scannable(directory: ImportDirectory): Boolean =
         importFileSourceFactory != null &&
@@ -109,116 +134,157 @@ fun ImportDirectoriesScreen(
             (directory.provider != ImportDirectoryProvider.LOCAL || directory.deviceId == deviceId)
 
     // Walks [root]'s folder tree all the way down and creates a (non-top-level) import directory for
-    // every NEW subfolder that contains importable files. Does NOT download files. Returns the count
-    // created. [dirsByRef] is updated with the new directories (keyed by folder ref).
+    // every NEW subfolder that contains importable files, calling [onCreated] as each one is created so
+    // the caller can download it while the walk goes on. Does NOT download files itself. Returns the
+    // count created. [dirsByRef] is updated with the new directories (keyed by folder ref).
     suspend fun createSubdirectories(
         root: ImportDirectory,
         dirsByRef: MutableMap<String, ImportDirectory>,
+        onCreated: (ImportDirectory) -> Unit = {},
     ): Int {
         val factory = importFileSourceFactory ?: return 0
-        val discovered =
+        discovering[root.id] = Unit
+        try {
+            var created = 0
             discoverImportableFolders(
                 rootFolderRef = root.folderRef,
                 rootDisplayPath = root.displayPath ?: root.folderRef,
                 openFolder = { ref -> factory.create(probeDirectory(root, ref)) },
+                onFound = { folder ->
+                    dbLock.withLock {
+                        if (folder.folderRef !in dirsByRef) {
+                            val leaf =
+                                ImportDirectory(
+                                    id = ImportDirectoryId(Uuid.random()),
+                                    name = folder.displayPath,
+                                    provider = root.provider,
+                                    folderRef = folder.folderRef,
+                                    displayPath = folder.displayPath,
+                                    providerConfig = root.providerConfig,
+                                    deviceId = root.deviceId,
+                                    topLevel = false,
+                                    parentId = root.id,
+                                    createdAt = Clock.System.now(),
+                                    updatedAt = Clock.System.now(),
+                                )
+                            importEngine.createImportDirectory(leaf)
+                            dirsByRef[folder.folderRef] = leaf
+                            created++
+                            onCreated(leaf)
+                        }
+                    }
+                },
             )
-        var created = 0
-        for (folder in discovered) {
-            if (folder.folderRef in dirsByRef) continue
-            val leaf =
-                ImportDirectory(
-                    id = ImportDirectoryId(Uuid.random()),
-                    name = folder.displayPath,
-                    provider = root.provider,
-                    folderRef = folder.folderRef,
-                    displayPath = folder.displayPath,
-                    providerConfig = root.providerConfig,
-                    deviceId = root.deviceId,
-                    topLevel = false,
-                    parentId = root.id,
-                    createdAt = Clock.System.now(),
-                    updatedAt = Clock.System.now(),
-                )
-            importEngine.createImportDirectory(leaf)
-            dirsByRef[folder.folderRef] = leaf
-            created++
+            return created
+        } finally {
+            discovering.remove(root.id)
         }
-        return created
     }
 
-    suspend fun downloadFolder(directory: ImportDirectory) =
-        scanImportDirectory(
-            directory = directory,
-            fileSource = importFileSourceFactory!!.create(directory),
-            importDirectoryRepository = importDirectoryRepository,
-            csvImportRepository = csvImportRepository,
-            qifImportRepository = qifImportRepository,
-            importEngine = importEngine,
-            onProgress = { done, total -> scanProgress = done to total },
-        )
+    // Downloads [directory]'s own importable files, showing its row as busy ("Connecting…" until the
+    // file count is known) while it runs. [onProgress] additionally sees every done / total update.
+    suspend fun downloadFolder(
+        directory: ImportDirectory,
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+    ): ScanResult =
+        try {
+            scanProgress[directory.id] = 0 to 0
+            scanImportDirectory(
+                directory = directory,
+                fileSource = importFileSourceFactory!!.create(directory),
+                importDirectoryRepository = importDirectoryRepository,
+                csvImportRepository = csvImportRepository,
+                qifImportRepository = qifImportRepository,
+                importEngine = importEngine,
+                dbLock = dbLock,
+                onProgress = { done, total ->
+                    scanProgress[directory.id] = done to total
+                    onProgress(done, total)
+                },
+            )
+        } finally {
+            scanProgress.remove(directory.id)
+        }
 
     // Per-row action: a top-level folder both downloads its OWN importable files and discovers +
     // creates child directories for any subfolders; a discovered subfolder just downloads its files.
     fun downloadDirectory(directory: ImportDirectory) {
-        scanningId = directory.id
-        scanProgress = 0 to 0
         statusMessage = null
         scanFailures = emptyList()
         scope.launch {
             try {
-                val result = downloadFolder(directory)
-                scanFailures = result.failures
-                val failedSuffix = if (result.filesFailed > 0) ", ${result.filesFailed} failed" else ""
-                statusMessage =
-                    if (directory.topLevel) {
-                        val created = createSubdirectories(directory, directories.associateByTo(mutableMapOf()) { it.folderRef })
-                        "${directory.name}: downloaded ${result.filesDownloaded} file(s)$failedSuffix; " +
-                            "created $created subfolder director${if (created == 1) "y" else "ies"}."
-                    } else {
-                        "${directory.name}: downloaded ${result.filesDownloaded} file(s)$failedSuffix."
-                    }
+                coroutineScope {
+                    val created =
+                        async(Dispatchers.IO) {
+                            if (directory.topLevel) {
+                                createSubdirectories(directory, directories.associateByTo(mutableMapOf()) { it.folderRef })
+                            } else {
+                                null
+                            }
+                        }
+                    val result = withContext(Dispatchers.IO) { downloadFolder(directory) }
+                    scanFailures = result.failures
+                    val failedSuffix = if (result.filesFailed > 0) ", ${result.filesFailed} failed" else ""
+                    val createdCount = created.await()
+                    statusMessage =
+                        if (createdCount != null) {
+                            "${directory.name}: downloaded ${result.filesDownloaded} file(s)$failedSuffix; " +
+                                "created $createdCount subfolder director${if (createdCount == 1) "y" else "ies"}."
+                        } else {
+                            "${directory.name}: downloaded ${result.filesDownloaded} file(s)$failedSuffix."
+                        }
+                }
             } catch (expected: Exception) {
                 statusMessage = "${directory.name}: failed — ${expected.message}"
-            } finally {
-                scanningId = null
             }
         }
     }
 
+    // Downloads every included folder at once. Known folders start straight away; subfolders discovered
+    // under the top-level folders start as soon as they are found, so the overall total grows over the run.
     fun downloadAll() {
         statusMessage = null
         scanFailures = emptyList()
+        downloadAllProgress.clear()
+        val startedAt = TimeSource.Monotonic.markNow()
+        downloadAllStartedAt = startedAt
+        downloadAllRunning = true
         scope.launch {
             try {
                 val dirsByRef = directories.associateByTo(mutableMapOf()) { it.folderRef }
-                // Phase 1: discover + create subfolder directories for every (included) top-level folder.
-                var created = 0
-                for (root in directories.filter { it.topLevel && scannable(it) && !it.excluded }) {
-                    scanningId = root.id
-                    scanProgress = 0 to 0
-                    created += createSubdirectories(root, dirsByRef)
-                }
-                // Phase 2: download each included directory's own importable files (top-levels + leaves).
-                var downloaded = 0
-                var failed = 0
-                val failures = mutableListOf<String>()
-                for (dir in dirsByRef.values.filter { scannable(it) && !it.excluded }) {
-                    scanningId = dir.id
-                    scanProgress = 0 to 0
-                    val result = downloadFolder(dir)
-                    downloaded += result.filesDownloaded
-                    failed += result.filesFailed
-                    // Prefix with the directory so the same filename in two folders stays tellable apart.
-                    failures += result.failures.map { "${dir.name} — $it" }
-                }
-                scanFailures = failures
+                val results = mutableListOf<Pair<ImportDirectory, ScanResult>>()
+                val resultsLock = Mutex()
+                val created =
+                    coroutineScope {
+                        val runScope = this
+
+                        fun startDownload(dir: ImportDirectory) {
+                            downloadAllProgress[dir.id] = null
+                            runScope.launch(Dispatchers.IO) {
+                                val result = downloadFolder(dir) { done, total -> downloadAllProgress[dir.id] = done to total }
+                                resultsLock.withLock { results += dir to result }
+                            }
+                        }
+
+                        dirsByRef.values.filter { scannable(it) && !it.excluded }.forEach(::startDownload)
+                        directories
+                            .filter { it.topLevel && scannable(it) && !it.excluded }
+                            .map { root -> async(Dispatchers.IO) { createSubdirectories(root, dirsByRef, ::startDownload) } }
+                            .awaitAll()
+                            .sum()
+                    }
+                val downloaded = results.sumOf { (_, result) -> result.filesDownloaded }
+                val failed = results.sumOf { (_, result) -> result.filesFailed }
+                // Prefix with the directory so the same filename in two folders stays tellable apart.
+                scanFailures = results.flatMap { (dir, result) -> result.failures.map { "${dir.name} — $it" } }
                 val failedSuffix = if (failed > 0) "; $failed failed" else ""
                 statusMessage =
-                    "Created $created new director${if (created == 1) "y" else "ies"}; downloaded $downloaded file(s)$failedSuffix."
+                    "Created $created new director${if (created == 1) "y" else "ies"}; downloaded $downloaded file(s)$failedSuffix " +
+                    "in ${formatElapsedTime(startedAt.elapsedNow())}."
             } catch (expected: Exception) {
-                statusMessage = "Download all failed — ${expected.message}"
+                statusMessage = "Download all failed after ${formatElapsedTime(startedAt.elapsedNow())} — ${expected.message}"
             } finally {
-                scanningId = null
+                downloadAllRunning = false
             }
         }
     }
@@ -245,7 +311,7 @@ fun ImportDirectoriesScreen(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    enabled = scanningId == null && directories.any(::scannable),
+                    enabled = !scanning && directories.any(::scannable),
                     onClick = { downloadAll() },
                 ) { Text("Download all") }
                 Button(onClick = { showAddDialog = true }) { Text("Add directory") }
@@ -257,6 +323,15 @@ fun ImportDirectoriesScreen(
                 "subfolders; download those too, then use each row's import link. Tick \"Exclude\" to skip a folder.",
             style = MaterialTheme.typography.bodyMedium,
         )
+
+        val startedAt = downloadAllStartedAt
+        if (downloadAllRunning && startedAt != null) {
+            DownloadAllProgress(
+                startedAt = startedAt,
+                folderProgress = downloadAllProgress.values.toList(),
+                discoveringFolders = discovering.size,
+            )
+        }
 
         statusMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
         scanFailures.forEach { failure ->
@@ -299,9 +374,8 @@ fun ImportDirectoriesScreen(
                     qifImports = qifImports,
                     deviceId = deviceId,
                     indent = indent,
-                    canDownload = importFileSourceFactory != null && scanningId == null,
-                    isDownloading = scanningId == directory.id,
-                    scanProgress = scanProgress,
+                    canDownload = importFileSourceFactory != null && !scanning,
+                    scanProgress = scanProgress[directory.id] ?: (0 to 0).takeIf { directory.id in discovering },
                     onDownload = { downloadDirectory(directory) },
                     onToggleExclude = {
                         scope.launch { importEngine.updateImportDirectory(directory.copy(excluded = !directory.excluded)) }
@@ -347,6 +421,47 @@ fun ImportDirectoriesScreen(
     }
 }
 
+/**
+ * The overall "Download all" bar: files done / total summed over every queued folder. The total keeps
+ * growing while subfolders are still being found or folders are still listing their files, so the text
+ * says when more may come. The elapsed time ticks every second.
+ */
+@Composable
+private fun DownloadAllProgress(
+    startedAt: TimeSource.Monotonic.ValueTimeMark,
+    folderProgress: List<Pair<Int, Int>?>,
+    discoveringFolders: Int,
+) {
+    val listed = folderProgress.filterNotNull()
+    val done = listed.sumOf { it.first }
+    val total = listed.sumOf { it.second }
+    val stillListing = folderProgress.size - listed.size
+    val pending =
+        buildList {
+            if (discoveringFolders > 0) add("still finding subfolders")
+            if (stillListing > 0) add("$stillListing folder${if (stillListing == 1) "" else "s"} still listing files")
+        }
+    var elapsed by remember(startedAt) { mutableStateOf(startedAt.elapsedNow()) }
+    LaunchedEffect(startedAt) {
+        while (true) {
+            elapsed = startedAt.elapsedNow()
+            delay(1.seconds)
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            "Downloading all (${formatElapsedTime(elapsed)}): $done / $total files done, ${total - done} left" +
+                if (pending.isEmpty()) "" else " (${pending.joinToString()} — total may grow)",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (total > 0) {
+            LinearProgressIndicator(progress = { done.toFloat() / total }, modifier = Modifier.fillMaxWidth())
+        } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
 @Composable
 @Suppress("LongParameterList", "LongMethod")
 private fun ImportDirectoryRow(
@@ -360,8 +475,8 @@ private fun ImportDirectoryRow(
     deviceId: DeviceId,
     indent: Dp,
     canDownload: Boolean,
-    isDownloading: Boolean,
-    scanProgress: Pair<Int, Int>,
+    // done / total while this directory is downloading, null when idle.
+    scanProgress: Pair<Int, Int>?,
     onDownload: () -> Unit,
     onToggleExclude: () -> Unit,
     onAccountChanged: (AccountId?) -> Unit,
@@ -373,6 +488,7 @@ private fun ImportDirectoryRow(
         importDirectoryRepository.getTrackedFiles(directory.id)
     }
 
+    val isDownloading = scanProgress != null
     val csvCount = trackedFiles.count { it.csvImportId != null }
     val qifCount = trackedFiles.count { it.qifImportId != null }
     // lastAppliedAt != null means the staged file has been imported (a strategy was applied).
@@ -460,7 +576,7 @@ private fun ImportDirectoryRow(
                 Text("Configured on another device — download from that device.", style = MaterialTheme.typography.bodySmall)
             }
             if (isDownloading) {
-                val (done, total) = scanProgress
+                val (done, total) = checkNotNull(scanProgress)
                 Text(
                     if (total > 0) "Downloading… $done / $total files" else "Connecting…",
                     style = MaterialTheme.typography.bodySmall,
