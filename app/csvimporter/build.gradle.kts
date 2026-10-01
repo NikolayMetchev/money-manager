@@ -17,6 +17,7 @@ kotlin {
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
+                api(libs.kotlinx.coroutines.core)
 
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.datetime)
@@ -34,6 +35,7 @@ kotlin {
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.repository.read)
+                api(libs.kotlinx.coroutines.core)
 
                 implementation(projects.app.model.qif)
                 implementation(projects.utils.bigdecimal)
@@ -41,20 +43,19 @@ kotlin {
                 implementation(projects.utils.parsers.qif)
                 implementation(projects.utils.parsers.xlsx)
                 implementation(libs.diamondedge.logging)
-                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
         getByName("androidMain") {
             dependencies {
                 api(projects.app.importfilesource.core)
+                api(libs.kotlinx.coroutines.core)
 
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.parsers.csv)
                 implementation(projects.utils.parsers.qif)
                 implementation(projects.utils.parsers.xlsx)
                 implementation(libs.diamondedge.logging)
-                implementation(libs.kotlinx.coroutines.core)
             }
         }
 

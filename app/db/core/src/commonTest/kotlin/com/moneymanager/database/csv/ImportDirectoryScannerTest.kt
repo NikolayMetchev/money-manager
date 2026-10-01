@@ -18,13 +18,18 @@ import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportSubfolder
 import com.moneymanager.test.database.DbTest
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 private class FileSpec(
@@ -38,7 +43,12 @@ private class FileSpec(
 /** A controllable [ImportFileSource] over an in-memory set of files. */
 private class FakeFileSource(
     private val files: List<FileSpec>,
+    // Runs inside each download, after it is counted; lets a test hold downloads open.
+    private val onDownload: suspend (startedSoFar: Int) -> Unit = {},
 ) : ImportFileSource {
+    // The scanner downloads concurrently on the IO dispatcher, so the counter needs a lock.
+    private val countLock = Mutex()
+
     /** Counts downloads so tests can assert the scanner skipped them for unchanged remote files. */
     var downloadCount: Int = 0
         private set
@@ -56,7 +66,7 @@ private class FakeFileSource(
     override suspend fun listSubfolders(): List<ImportSubfolder> = emptyList()
 
     override suspend fun download(fileRef: String): ByteArray {
-        downloadCount++
+        onDownload(countLock.withLock { ++downloadCount })
         return files.first { it.name == fileRef }.content.encodeToByteArray()
     }
 }
@@ -125,6 +135,25 @@ class ImportDirectoryScannerTest : DbTest() {
         qifImportRepository = repositories.qifImportRepository,
         importEngine = engine,
     )
+
+    @Test
+    fun `scan downloads every file concurrently`() =
+        runTest {
+            val engine = engine()
+            val directory = newDirectory(engine)
+            val names = listOf("jan.csv", "feb.csv", "mar.csv")
+            // No download may finish until all of them have started, which a one-at-a-time scan never reaches.
+            val allStarted = CompletableDeferred<Unit>()
+            val source =
+                FakeFileSource(names.mapIndexed { i, name -> FileSpec(name, "$csvV1\n0$i/03/2024,Extra,1.00", 1_000) }) { started ->
+                    if (started == names.size) allStarted.complete(Unit)
+                    withTimeout(10.seconds) { allStarted.await() }
+                }
+
+            val result = scan(engine, directory, source)
+
+            assertEquals(names.size, result.filesDownloaded, "every file should be staged once all downloads overlapped")
+        }
 
     @Test
     fun `scan stages a new csv then skips it when unchanged`() =
