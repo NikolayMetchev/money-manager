@@ -99,10 +99,13 @@ class CredentialVaultImpl(
         }
     }
 
-    override fun lock() {
-        val path = currentPath() ?: return
-        password = null
-        mutableState.value = lockedStateFor(path)
+    override suspend fun lock() {
+        // Under the write lock, so an in-flight update can't republish Unlocked after the password is forgotten.
+        mutex.withLock {
+            val path = currentPath() ?: return
+            password = null
+            mutableState.value = lockedStateFor(path)
+        }
     }
 
     override suspend fun changePassword(newPassword: String) {

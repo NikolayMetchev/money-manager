@@ -71,7 +71,7 @@ internal fun CredentialsCard() {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             when (val current = state) {
                 is VaultState.Unlocked -> {
-                    OutlinedButton(onClick = { vault.lock() }) { Text("Lock now") }
+                    OutlinedButton(onClick = { runAction { vault.lock() } }) { Text("Lock now") }
                     OutlinedButton(onClick = { changingPassword = true }) { Text("Change password…") }
                     if (movePicker.isSupported) {
                         OutlinedButton(onClick = { movePicker.launch(CredentialFilePickerMode.CHOOSE_NEW, current.path) }) {

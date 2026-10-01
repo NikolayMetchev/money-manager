@@ -135,6 +135,10 @@ private fun buildDriveClient(
                 }
                 // Attach the token up front for Drive API hosts instead of waiting for a 401 challenge.
                 sendWithoutRequest { request -> request.url.host.endsWith("googleapis.com") }
+                // Never let the client hold tokens itself: clients are cached for the app's lifetime, so a cached
+                // token would outlive locking the vault or switching to a database with another vault. The
+                // account store re-checks the vault on every request instead.
+                cacheTokens = false
             }
         }
     }

@@ -199,6 +199,7 @@ fun ApiSessionsScreen(
     // that download, so the box visibly unticks rather than silently leaving every later download a
     // full re-sweep.
     var forceFullDownloadByCredential by remember { mutableStateOf<Set<ApiCredentialId>>(emptySet()) }
+    var signingKeyErrorByCredential by remember { mutableStateOf<Map<ApiCredentialId, String>>(emptyMap()) }
     var pendingImport by remember { mutableStateOf<PendingApiImport?>(null) }
     var pendingReimport by remember { mutableStateOf<PendingApiReimport?>(null) }
     var pendingReimportAll by remember { mutableStateOf<PendingApiReimportAll?>(null) }
@@ -518,11 +519,17 @@ fun ApiSessionsScreen(
                                 requiresSigning = requiresSigningByCredential[credential.id] == true,
                                 transactionsBlockReason = transactionsBlockReasonByCredential[credential.id],
                                 secrets = strategyNameByCredential[credential.id]?.let { vaultBundle?.apiCredential(it) },
+                                signingKeyError = signingKeyErrorByCredential[credential.id],
                                 onGenerateSigningKey = {
+                                    signingKeyErrorByCredential = signingKeyErrorByCredential - credential.id
                                     scope.launch {
                                         val name = strategyNameByCredential[credential.id] ?: return@launch
-                                        vault.storeNewSigningKey(name)
-                                        refresh()
+                                        val error = vault.storeNewSigningKey(name)
+                                        if (error == null) {
+                                            refresh()
+                                        } else {
+                                            signingKeyErrorByCredential = signingKeyErrorByCredential + (credential.id to error)
+                                        }
                                     }
                                 },
                                 onCopyText = { text -> scope.launch { clipboard.setPlainText(text) } },
@@ -983,6 +990,7 @@ private fun CounterpartyConfirmationDialog(
 private fun CredentialCard(
     credential: ApiCredential,
     secrets: StoredApiCredential?,
+    signingKeyError: String?,
     dateRangeBySession: Map<String, ImportFileDateRange>,
     providerLabel: String?,
     requiresSigning: Boolean,
@@ -1039,6 +1047,7 @@ private fun CredentialCard(
             if (requiresSigning) {
                 SigningKeySection(
                     publicKey = secrets?.publicKeyPem,
+                    errorMessage = signingKeyError,
                     onGenerateSigningKey = onGenerateSigningKey,
                     onCopyText = onCopyText,
                 )

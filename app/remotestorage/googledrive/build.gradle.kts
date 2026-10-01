@@ -64,6 +64,7 @@ kotlin {
 
         getByName("jvmTest") {
             dependencies {
+                implementation(projects.test.utils.credentialvault)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
             }

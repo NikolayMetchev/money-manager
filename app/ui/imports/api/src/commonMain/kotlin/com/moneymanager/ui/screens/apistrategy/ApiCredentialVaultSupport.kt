@@ -27,10 +27,14 @@ import com.moneymanager.ui.api.sca.generateScaKeyPair
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalImportEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+
+private val logger = logging()
 
 /**
  * Gives every installed strategy that has secrets in the unlocked credential vault a connection row in
@@ -55,8 +59,16 @@ internal fun EnsureApiConnectionRows(
             .toSet()
     LaunchedEffect(missing) {
         if (missing.isEmpty()) return@LaunchedEffect
-        importEngine.ensureApiCredentials(missing, Clock.System.now())
-        onCreated()
+        // Best effort: editing may be locked (a cloud-backed database whose remote copy is ahead), and this
+        // runs unprompted whenever the screen opens. The rows stay missing, so a later visit retries.
+        try {
+            importEngine.ensureApiCredentials(missing, Clock.System.now())
+            onCreated()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (expected: Exception) {
+            logger.error(expected) { "Couldn't create API connection rows: ${expected.message}" }
+        }
     }
 }
 
@@ -94,14 +106,25 @@ internal fun CredentialsLockedBanner(reason: String) {
     }
 }
 
-/** Generates a fresh SCA signing key pair and stores it with [strategyName]'s credentials. */
-internal suspend fun CredentialVault.storeNewSigningKey(strategyName: String) {
-    val keyPair = withContext(Dispatchers.Default) { generateScaKeyPair() }
-    update("Save the $strategyName signing key") { bundle ->
-        val existing = bundle.apiCredential(strategyName) ?: return@update bundle
-        bundle.withApiCredential(existing.copy(privateKeyPem = keyPair.privateKeyPem, publicKeyPem = keyPair.publicKeyPem))
+/**
+ * Generates a fresh SCA signing key pair and stores it with [strategyName]'s credentials. Returns null on
+ * success, or a message for the signing-key section when the vault stays locked or can't be written.
+ */
+internal suspend fun CredentialVault.storeNewSigningKey(strategyName: String): String? =
+    try {
+        val keyPair = withContext(Dispatchers.Default) { generateScaKeyPair() }
+        update("Save the $strategyName signing key") { bundle ->
+            val existing = bundle.apiCredential(strategyName) ?: return@update bundle
+            bundle.withApiCredential(existing.copy(privateKeyPem = keyPair.privateKeyPem, publicKeyPem = keyPair.publicKeyPem))
+        }
+        null
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: CredentialVaultLockedException) {
+        "Unlock your credential file to save the signing key."
+    } catch (expected: Exception) {
+        "Couldn't save the signing key: ${expected.message ?: expected::class.simpleName}"
     }
-}
 
 /** Why a download can't get the secrets it needs, worded for the user. */
 internal class MissingApiSecretsException(

@@ -199,6 +199,7 @@ private fun ApiConnectionRow(
     val scope = rememberSchemaAwareCoroutineScope()
     val clipboard = LocalClipboard.current
     val uriHandler = LocalUriHandler.current
+    var signingKeyError by remember(strategy.id) { mutableStateOf<String?>(null) }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -271,9 +272,11 @@ private fun ApiConnectionRow(
                     SigningKeySection(
                         publicKey = credential.publicKeyPem,
                         onGenerateSigningKey = {
-                            scope.launch { vault.storeNewSigningKey(strategy.name) }
+                            signingKeyError = null
+                            scope.launch { signingKeyError = vault.storeNewSigningKey(strategy.name) }
                         },
                         onCopyText = { text -> scope.launch { clipboard.setPlainText(text) } },
+                        errorMessage = signingKeyError,
                     )
                 }
             }

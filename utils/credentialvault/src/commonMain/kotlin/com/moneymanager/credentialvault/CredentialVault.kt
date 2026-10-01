@@ -70,8 +70,8 @@ interface CredentialVault {
         path: String? = null,
     )
 
-    /** Forgets the password and decrypted secrets until the next unlock. */
-    fun lock()
+    /** Forgets the password and decrypted secrets until the next unlock. Waits for an in-flight write to finish. */
+    suspend fun lock()
 
     /** Re-encrypts the unlocked vault under [newPassword]. */
     suspend fun changePassword(newPassword: String)

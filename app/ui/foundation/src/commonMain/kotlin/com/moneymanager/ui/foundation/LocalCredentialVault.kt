@@ -35,7 +35,7 @@ private object UnprovidedCredentialVault : CredentialVault {
         path: String?,
     ) = unprovided()
 
-    override fun lock() = Unit
+    override suspend fun lock() = Unit
 
     override suspend fun changePassword(newPassword: String) = unprovided()
 
