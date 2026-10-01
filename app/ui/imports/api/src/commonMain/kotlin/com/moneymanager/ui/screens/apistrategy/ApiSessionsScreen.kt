@@ -42,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -75,6 +76,8 @@ import com.moneymanager.apiimporter.importApiSessionExchange
 import com.moneymanager.apiimporter.importApiSessionPeople
 import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.credentialvault.StoredApiCredential
+import com.moneymanager.credentialvault.VaultState
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiCredential
 import com.moneymanager.domain.model.ApiCredentialId
@@ -103,16 +106,15 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.importengineapi.markApiSessionImported
-import com.moneymanager.importengineapi.updateApiCredentialKeys
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.ScaParams
 import com.moneymanager.rest.createApiClient
-import com.moneymanager.ui.api.sca.generateScaKeyPair
 import com.moneymanager.ui.api.sca.signScaChallenge
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.formatElapsedTime
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.currentCountryCode
@@ -120,11 +122,9 @@ import com.moneymanager.ui.util.displayDate
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -156,6 +156,9 @@ fun ApiSessionsScreen(
     onTransactionsImported: () -> Unit = {},
 ) {
     val importEngine = LocalImportEngine.current
+    val vault = LocalCredentialVault.current
+    val vaultState by vault.state.collectAsState()
+    val vaultBundle = (vaultState as? VaultState.Unlocked)?.bundle
     val scope = rememberSchemaAwareCoroutineScope()
     val backgroundTasks = LocalBackgroundTaskManager.current
     val clipboard = LocalClipboard.current
@@ -210,10 +213,10 @@ fun ApiSessionsScreen(
     // has a signing key (e.g. Wise statements). Null disables signing (e.g. Monzo).
     fun scaParamsFor(
         strategy: ApiImportStrategy,
-        credential: ApiCredential,
+        secrets: StoredApiCredential,
     ): ScaParams? {
         val signing = strategy.config.signing ?: return null
-        val privateKey = credential.privateKey ?: return null
+        val privateKey = secrets.privateKeyPem ?: return null
         return ScaParams(
             challengeHeader = signing.challengeHeader,
             signatureHeader = signing.signatureHeader,
@@ -397,6 +400,7 @@ fun ApiSessionsScreen(
     }
 
     LaunchedEffect(Unit) { refresh() }
+    EnsureApiConnectionRows(strategies = strategies, credentialRows = credentials, onCreated = { refresh() })
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -414,6 +418,11 @@ fun ApiSessionsScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        if (vaultBundle == null) {
+            CredentialsLockedBanner(reason = "Show your API credentials")
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         when {
             isLoading -> {
@@ -508,14 +517,11 @@ fun ApiSessionsScreen(
                                 providerLabel = strategyNameByCredential[credential.id],
                                 requiresSigning = requiresSigningByCredential[credential.id] == true,
                                 transactionsBlockReason = transactionsBlockReasonByCredential[credential.id],
+                                secrets = strategyNameByCredential[credential.id]?.let { vaultBundle?.apiCredential(it) },
                                 onGenerateSigningKey = {
                                     scope.launch {
-                                        val keyPair = withContext(Dispatchers.Default) { generateScaKeyPair() }
-                                        importEngine.updateApiCredentialKeys(
-                                            credentialId = credential.id,
-                                            privateKey = keyPair.privateKeyPem,
-                                            publicKey = keyPair.publicKeyPem,
-                                        )
+                                        val name = strategyNameByCredential[credential.id] ?: return@launch
+                                        vault.storeNewSigningKey(name)
                                         refresh()
                                     }
                                 },
@@ -558,9 +564,23 @@ fun ApiSessionsScreen(
                                     forceFullDownloadByCredential = forceFullDownloadByCredential - credential.id
                                     scope.launch {
                                         val resolvedStrategy = resolveStrategy(credential)
+                                        // Fetch the secrets before creating a session, so a locked or empty
+                                        // vault doesn't leave an empty session behind.
+                                        val secrets =
+                                            try {
+                                                resolvedStrategy?.let { vault.downloadSecretsFor(it) }
+                                            } catch (blocked: MissingApiSecretsException) {
+                                                backgroundTasks.startTask(
+                                                    key = apiDownloadTaskKey(credential.id),
+                                                    title = "Download",
+                                                    initialDetail = "Fetching credentials.",
+                                                ) {
+                                                    blocked.message.orEmpty()
+                                                }
+                                                return@launch
+                                            }
                                         val newSessionId =
                                             importEngine.createApiSession(
-                                                token = credential.token,
                                                 deviceId = deviceId,
                                                 createdAt = Clock.System.now(),
                                                 credentialId = credential.id,
@@ -586,6 +606,7 @@ fun ApiSessionsScreen(
                                             val strategy =
                                                 resolvedStrategy
                                                     ?: return@startTask "No import strategy is linked to this credential; reconnect it."
+                                            val credentialSecrets = requireNotNull(secrets)
                                             // One client/session for accounts, transactions and people.
                                             val apiClient =
                                                 createApiClient(
@@ -606,7 +627,7 @@ fun ApiSessionsScreen(
                                                     strategy.config.requestSigning
                                                         ?: return@startTask "This strategy is missing its request-signing config."
                                                 val apiSecret =
-                                                    credential.apiSecret?.takeIf { it.isNotBlank() }
+                                                    credentialSecrets.apiSecret?.takeIf { it.isNotBlank() }
                                                         ?: return@startTask "This credential has no API secret; reconnect it."
                                                 update("Downloading exchange data...")
                                                 val signer = com.moneymanager.rest.ApiRequestSigner(requestSigning)
@@ -614,7 +635,7 @@ fun ApiSessionsScreen(
                                                     com.moneymanager.apiimporter.downloadApiSessionExchange(
                                                         apiClient = apiClient,
                                                         signer = signer,
-                                                        apiKey = credential.token,
+                                                        apiKey = credentialSecrets.token,
                                                         apiSecret = apiSecret,
                                                         apiSessionRepository = apiSessionRepository,
                                                         sessionId = newSessionId,
@@ -640,11 +661,11 @@ fun ApiSessionsScreen(
                                                 refresh()
                                                 return@startTask exchangeResult.displaySummary()
                                             }
-                                            val sca = scaParamsFor(strategy, credential)
+                                            val sca = scaParamsFor(strategy, credentialSecrets)
                                             update("Downloading accounts...")
                                             val accounts =
                                                 downloadApiSessionAccounts(
-                                                    token = credential.token,
+                                                    token = credentialSecrets.token,
                                                     apiClient = apiClient,
                                                     apiSessionRepository = apiSessionRepository,
                                                     sessionId = newSessionId,
@@ -654,7 +675,7 @@ fun ApiSessionsScreen(
                                             if (strategy.config.accountIdentifiersEndpoint != null) {
                                                 update("Downloading account identifiers...")
                                                 downloadApiSessionAccountIdentifiers(
-                                                    token = credential.token,
+                                                    token = credentialSecrets.token,
                                                     apiClient = apiClient,
                                                     apiSessionRepository = apiSessionRepository,
                                                     sessionId = newSessionId,
@@ -668,7 +689,7 @@ fun ApiSessionsScreen(
                                                 } else {
                                                     update("Downloading transactions...")
                                                     downloadApiSessionTransactions(
-                                                        token = credential.token,
+                                                        token = credentialSecrets.token,
                                                         apiClient = apiClient,
                                                         apiSessionRepository = apiSessionRepository,
                                                         sessionId = newSessionId,
@@ -688,7 +709,7 @@ fun ApiSessionsScreen(
                                                 if (strategy.config.peopleDownload != null) {
                                                     update("Downloading people...")
                                                     downloadApiSessionPeople(
-                                                        token = credential.token,
+                                                        token = credentialSecrets.token,
                                                         apiClient = apiClient,
                                                         apiSessionRepository = apiSessionRepository,
                                                         sessionId = newSessionId,
@@ -961,6 +982,7 @@ private fun CounterpartyConfirmationDialog(
 @Composable
 private fun CredentialCard(
     credential: ApiCredential,
+    secrets: StoredApiCredential?,
     dateRangeBySession: Map<String, ImportFileDateRange>,
     providerLabel: String?,
     requiresSigning: Boolean,
@@ -989,11 +1011,12 @@ private fun CredentialCard(
     onSessionClick: (ApiSession) -> Unit,
     onCopyError: (String) -> Unit,
 ) {
+    val token = secrets?.token
     val displayToken =
-        if (credential.token.length > 16) {
-            "${credential.token.take(8)}...${credential.token.takeLast(8)}"
-        } else {
-            credential.token
+        when {
+            token == null -> "Credentials locked"
+            token.length > 16 -> "${token.take(8)}...${token.takeLast(8)}"
+            else -> token
         }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1015,7 +1038,7 @@ private fun CredentialCard(
 
             if (requiresSigning) {
                 SigningKeySection(
-                    publicKey = credential.publicKey,
+                    publicKey = secrets?.publicKeyPem,
                     onGenerateSigningKey = onGenerateSigningKey,
                     onCopyText = onCopyText,
                 )

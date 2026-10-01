@@ -19,7 +19,7 @@ class DbEntitySourceTest : DbTest() {
     fun `recordEntityProvenance persists api detail per revision of the same entity`() =
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
-            val sessionId = repositories.apiSessionRepository.createSession("token", deviceId, Clock.System.now(), null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, Clock.System.now(), null)
             val requestId =
                 repositories.apiSessionRepository.insertRequest(
                     sessionId = sessionId,

@@ -16,20 +16,14 @@ import kotlin.time.Instant
 
 interface ApiSessionWriteRepository : ApiSessionReadRepository {
     /**
-     * Creates a new credential (saved token), carrying its own [strategyId] and optional signing
-     * keys, and returns its generated ID. A credential's identity is this generated ID, not the raw
-     * token; the token column is globally unique, so attempting to save the same token twice fails
-     * rather than merging into — or silently overwriting the strategy/keys of — an existing row.
-     *
-     * @param strategyId Optional link to the API import strategy this credential uses.
+     * Returns the connection row for [strategyId], creating it (stamped [createdAt]) if the strategy has
+     * none yet. Idempotent, so a strategy reinstalled into a fresh database reconnects to the secrets
+     * already in the credential vault without ever duplicating its connection. The secrets themselves
+     * are never stored in the database.
      */
-    suspend fun createCredential(
-        token: String,
+    suspend fun ensureCredential(
+        strategyId: ApiImportStrategyId,
         createdAt: Instant,
-        strategyId: ApiImportStrategyId? = null,
-        privateKey: String? = null,
-        publicKey: String? = null,
-        apiSecret: String? = null,
     ): ApiCredentialId
 
     /**
@@ -41,28 +35,8 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
     )
 
     /**
-     * Stores (or replaces) the PEM-encoded RSA signing key pair on a credential.
-     */
-    suspend fun updateCredentialKeys(
-        credentialId: ApiCredentialId,
-        privateKey: String?,
-        publicKey: String?,
-    )
-
-    /**
-     * Replaces the token (and, for signed strategies, the api secret) of an existing credential, so a
-     * rotated or mistyped token is edited in place rather than added as a second credential.
-     */
-    suspend fun updateCredentialSecrets(
-        credentialId: ApiCredentialId,
-        token: String,
-        apiSecret: String?,
-    )
-
-    /**
      * Creates a new API session for the given device.
      *
-     * @param token The session token
      * @param deviceId The device that owns this session
      * @param createdAt The creation timestamp
      * @param expiresAt Optional expiry timestamp; null means the session never expires
@@ -70,7 +44,6 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
      * @return The ID of the newly created session
      */
     suspend fun createSession(
-        token: String,
         deviceId: DeviceId,
         createdAt: Instant,
         expiresAt: Instant?,

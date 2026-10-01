@@ -88,7 +88,6 @@ class WiseImportE2ETest : DbTest() {
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-wise-token",
                     deviceId = deviceId,
                     createdAt = now,
                     expiresAt = null,
@@ -184,7 +183,6 @@ class WiseImportE2ETest : DbTest() {
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-wise-token",
                     deviceId = deviceId,
                     createdAt = now,
                     expiresAt = null,
@@ -281,7 +279,7 @@ class WiseImportE2ETest : DbTest() {
             // an account with no transfers referencing it is never created (see BatchAccountResolver
             // .pruneUnreferencedSourceAccounts), so a real statement line is what makes it exist here.
             val accountsSessionId =
-                repositories.apiSessionRepository.createSession("test-wise-token", deviceId, now, null)
+                repositories.apiSessionRepository.createSession(deviceId, now, null)
             downloadApiSessionAccounts(
                 token = "test-wise-token",
                 apiClient = clientFor(accountsSessionId),
@@ -307,7 +305,7 @@ class WiseImportE2ETest : DbTest() {
 
             // 2. Download + import people from the profiles endpoint.
             val peopleSessionId =
-                repositories.apiSessionRepository.createSession("test-wise-token", deviceId, now, null)
+                repositories.apiSessionRepository.createSession(deviceId, now, null)
             val downloadResult =
                 downloadApiSessionPeople(
                     token = "test-wise-token",
@@ -364,7 +362,7 @@ class WiseImportE2ETest : DbTest() {
             val monzoAttribute = repositories.attributeTypeRepository.getOrCreate("monzo-external-id")
             repositories.personAttributeRepository.insert(adaId, monzoAttribute, "monzo-123")
 
-            val peopleSessionId = repositories.apiSessionRepository.createSession("test-wise-token", deviceId, now, null)
+            val peopleSessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val client =
                 createApiClient(
                     trafficRecorder =

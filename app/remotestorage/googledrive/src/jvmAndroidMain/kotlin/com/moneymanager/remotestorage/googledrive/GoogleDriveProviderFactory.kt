@@ -1,6 +1,6 @@
 package com.moneymanager.remotestorage.googledrive
 
-import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.remotestorage.RemoteAuthException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -45,13 +45,13 @@ fun buildBearerDriveClient(
 /**
  * Builds a [GoogleDriveProvider] for the JVM/desktop loopback flow from the OAuth client id/secret in
  * [config] (the app's shipped default credentials, or a per-binding override) plus the platform
- * [browser] for the consent step. Tokens are read from / written to [localSettings] via
+ * [browser] for the consent step. The refresh token is read from / written to the credential [vault] via
  * [GoogleDriveAccountStore]; the Drive REST client uses Ktor's Bearer auth plugin to attach the access
  * token and refresh it on a 401.
  */
 fun googleDriveProvider(
     config: String?,
-    localSettings: LocalSettings,
+    vault: CredentialVault,
     browser: BrowserLauncher,
     subfolder: String? = null,
 ): GoogleDriveProvider {
@@ -59,7 +59,7 @@ fun googleDriveProvider(
         GoogleDriveCredentials.fromConfig(
             requireNotNull(config) { "Google Drive is not configured in this build (no OAuth client credentials)." },
         )
-    val accountStore = GoogleDriveAccountStore(localSettings)
+    val accountStore = GoogleDriveAccountStore(vault)
     val oauth = GoogleOAuth(tokenHttpClient)
     val driveClient =
         synchronized(driveClients) {
@@ -86,7 +86,7 @@ fun googleDriveProvider(
  */
 fun googleDriveTokenSource(
     config: String?,
-    localSettings: LocalSettings,
+    vault: CredentialVault,
     browser: BrowserLauncher,
     scopes: List<String> = listOf(DRIVE_FILE_SCOPE, DRIVE_READONLY_SCOPE),
 ): GoogleAccessTokenSource {
@@ -94,7 +94,7 @@ fun googleDriveTokenSource(
         GoogleDriveCredentials.fromConfig(
             requireNotNull(config) { "Google Drive is not configured (no OAuth client credentials)." },
         )
-    val accountStore = GoogleDriveAccountStore(localSettings)
+    val accountStore = GoogleDriveAccountStore(vault)
     val oauth = GoogleOAuth(tokenHttpClient)
     val driveClient = buildDriveClient(credentials, accountStore, oauth, browser, scopes)
     return JvmGoogleAccessTokenSource(credentials, accountStore, browser, oauth, driveClient, scopes)
@@ -117,29 +117,20 @@ private fun buildDriveClient(
         install(Auth) {
             bearer {
                 loadTokens {
-                    accountStore.refreshToken(credentials.clientId)?.let { refresh ->
-                        BearerTokens(accountStore.accessToken(credentials.clientId)?.token.orEmpty(), refresh)
+                    val refresh = accountStore.refreshToken(credentials.clientId) ?: return@loadTokens null
+                    val cached = accountStore.accessToken(credentials.clientId)
+                    // Access tokens are cached in memory only, so every app run starts without one. Refresh up
+                    // front rather than send an empty bearer token: Google rejects that without the Bearer
+                    // challenge Ktor needs to trigger refreshTokens, so the request would just fail.
+                    if (cached != null && cached.expiresAtMillis > System.currentTimeMillis() + ACCESS_TOKEN_EXPIRY_MARGIN_MS) {
+                        BearerTokens(cached.token, refresh)
+                    } else {
+                        freshTokens(credentials, refresh, accountStore, oauth, browser, scopes)
                     }
                 }
                 refreshTokens {
                     accountStore.refreshToken(credentials.clientId)?.let { refresh ->
-                        val tokens =
-                            try {
-                                oauth.refresh(credentials, refresh).copy(refreshToken = refresh)
-                            } catch (expired: RemoteAuthException) {
-                                // A revoked/expired refresh token comes back as `invalid_grant`. The stored
-                                // token is dead, so clear it and re-run the browser consent flow (the same
-                                // one used to connect originally) instead of surfacing the error.
-                                if ("invalid_grant" !in expired.message.orEmpty()) throw expired
-                                accountStore.clear(credentials.clientId)
-                                performLoopbackSignIn(credentials, accountStore, browser, oauth, scopes)
-                            }
-                        accountStore.saveAccessToken(
-                            credentials.clientId,
-                            tokens.accessToken,
-                            accessTokenExpiry(tokens.expiresInSeconds),
-                        )
-                        BearerTokens(tokens.accessToken, tokens.refreshToken ?: refresh)
+                        freshTokens(credentials, refresh, accountStore, oauth, browser, scopes)
                     }
                 }
                 // Attach the token up front for Drive API hosts instead of waiting for a 401 challenge.
@@ -147,6 +138,34 @@ private fun buildDriveClient(
             }
         }
     }
+
+/**
+ * Exchanges [refresh] for a new access token and caches it. A revoked/expired refresh token comes back as
+ * `invalid_grant`; the stored token is then dead, so it is cleared and the browser consent flow (the same
+ * one used to connect originally) runs again instead of surfacing the error.
+ */
+private suspend fun freshTokens(
+    credentials: GoogleDriveCredentials,
+    refresh: String,
+    accountStore: GoogleDriveAccountStore,
+    oauth: GoogleOAuth,
+    browser: BrowserLauncher,
+    scopes: List<String>,
+): BearerTokens {
+    val tokens =
+        try {
+            oauth.refresh(credentials, refresh).copy(refreshToken = refresh)
+        } catch (expired: RemoteAuthException) {
+            if ("invalid_grant" !in expired.message.orEmpty()) throw expired
+            accountStore.clear(credentials.clientId)
+            performLoopbackSignIn(credentials, accountStore, browser, oauth, scopes)
+        }
+    accountStore.saveAccessToken(credentials.clientId, tokens.accessToken, accessTokenExpiry(tokens.expiresInSeconds))
+    return BearerTokens(tokens.accessToken, tokens.refreshToken ?: refresh)
+}
+
+// Treat a token this close to expiry as expired, so it can't lapse between the check and the request.
+private const val ACCESS_TOKEN_EXPIRY_MARGIN_MS = 60_000L
 
 /** Epoch-millis expiry from an OAuth `expires_in` (seconds); shared with sign-in so both agree. */
 internal fun accessTokenExpiry(expiresInSeconds: Long): Long = System.currentTimeMillis() + expiresInSeconds * 1000L

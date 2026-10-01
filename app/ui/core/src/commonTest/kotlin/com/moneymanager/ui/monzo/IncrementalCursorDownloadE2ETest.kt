@@ -4,7 +4,6 @@ import com.moneymanager.apiimporter.downloadApiSessionAccounts
 import com.moneymanager.apiimporter.downloadApiSessionTransactions
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.importengineapi.createApiCredential
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
@@ -93,7 +92,7 @@ class IncrementalCursorDownloadE2ETest : DbTest() {
                 .getAllStrategies()
                 .first()
                 .single { it.name == "Monzo" }
-        val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+        val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
         val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
 
         fun clientFor() =
@@ -123,7 +122,7 @@ class IncrementalCursorDownloadE2ETest : DbTest() {
     @Test
     fun `a second cursor download stops paging once it reaches the watermark`() =
         runTest {
-            val credentialId = repositories.importEngine.createApiCredential(token, now)
+            val credentialId = apiConnection("Monzo", now)
 
             // Page 1, page 2, then the empty page that ends the walk.
             assertEquals(3, download(credentialId), "the first download pages back to the account's opening")

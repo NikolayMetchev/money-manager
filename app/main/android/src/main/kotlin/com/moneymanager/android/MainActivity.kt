@@ -116,8 +116,8 @@ class MainActivity : ComponentActivity() {
         val component: AppComponent = AppComponent.create(params)
         val controller = component.remoteDatabaseController
         remoteController = controller
-        val importFileSourceFactory = createImportFileSourceFactory(params, component.localSettings)
-        val driveFolderBrowser = createDriveFolderBrowser(params, component.localSettings)
+        val importFileSourceFactory = createImportFileSourceFactory(params, component.credentialVault)
+        val driveFolderBrowser = createDriveFolderBrowser(params, component.credentialVault)
 
         setContent {
             AppStartupHost(
@@ -142,6 +142,7 @@ class MainActivity : ComponentActivity() {
                 importFileSourceFactory = importFileSourceFactory,
                 driveFolderBrowser = driveFolderBrowser,
                 cryptoCatalogRefresher = HttpCryptoCatalogRefresher(),
+                credentialVault = component.credentialVault,
                 onDatabaseReady = { database, _ -> openDatabase = database },
             )
         }

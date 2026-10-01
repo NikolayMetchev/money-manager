@@ -1,7 +1,7 @@
 package com.moneymanager.remotestorage.di
 
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.di.params.AppComponentParams
-import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
 import com.moneymanager.remotestorage.RemoteStorageType
@@ -23,7 +23,7 @@ private fun googleDriveDefaultConfig(): String? =
 @Suppress("ktlint:standard:function-naming")
 actual fun createRemoteStorageProviderFactory(
     params: AppComponentParams,
-    localSettings: LocalSettings,
+    vault: CredentialVault,
 ): RemoteStorageProviderFactory =
     object : RemoteStorageProviderFactory {
         // Desktop ships its own OAuth client, so no bring-your-own config step is needed (like Android).
@@ -36,7 +36,7 @@ actual fun createRemoteStorageProviderFactory(
         ): RemoteStorageProvider =
             when (providerId) {
                 GOOGLE_DRIVE_PROVIDER_ID ->
-                    googleDriveProvider(config ?: googleDriveDefaultConfig(), localSettings, DesktopBrowserLauncher(), subfolder)
+                    googleDriveProvider(config ?: googleDriveDefaultConfig(), vault, DesktopBrowserLauncher(), subfolder)
                 else -> throw IllegalArgumentException("Unknown remote storage provider: $providerId")
             }
     }

@@ -14,7 +14,6 @@ import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
-import com.moneymanager.importengineapi.createApiCredential
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.rest.ApiRequestSigner
 import com.moneymanager.rest.ApiSessionTrafficRecorder
@@ -115,8 +114,8 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
         runTest {
             val strategy = coinbaseStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-            val credentialId = repositories.importEngine.createApiCredential(apiKey, now)
-            val sessionId = repositories.importEngine.createApiSession(apiKey, deviceId, now, credentialId)
+            val credentialId = apiConnection("Coinbase", now)
+            val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
             val unauthenticated = mutableListOf<String>()
             download(strategy, sessionId, emptyMap(), unauthenticated = unauthenticated)
             assertEquals(emptyList(), unauthenticated, "every request must carry a signed JWT")
@@ -215,8 +214,8 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
 
             val strategy = coinbaseStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-            val credentialId = repositories.importEngine.createApiCredential(apiKey, now)
-            val sessionId = repositories.importEngine.createApiSession(apiKey, deviceId, now, credentialId)
+            val credentialId = apiConnection("Coinbase", now)
+            val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
             download(strategy, sessionId, emptyMap())
             importApiSessionExchange(
                 apiSessionRepository = repositories.apiSessionRepository,
@@ -290,10 +289,10 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
         runTest {
             val strategy = coinbaseStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-            val credentialId = repositories.importEngine.createApiCredential(apiKey, now)
+            val credentialId = apiConnection("Coinbase", now)
 
             suspend fun downloadOnce(): List<String> {
-                val sessionId = repositories.importEngine.createApiSession(apiKey, deviceId, now, credentialId)
+                val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
                 val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
                 return mutableListOf<String>().also { download(strategy, sessionId, watermarks, requested = it) }
             }
@@ -310,8 +309,8 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
         runTest {
             val strategy = coinbaseStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-            val credentialId = repositories.importEngine.createApiCredential(apiKey, now)
-            val sessionId = repositories.importEngine.createApiSession(apiKey, deviceId, now, credentialId)
+            val credentialId = apiConnection("Coinbase", now)
+            val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
             val echoing = gbpLedger.replace(""""next_starting_after":null""", """"next_starting_after":"stuck"""")
             val requested = mutableListOf<String>()
 

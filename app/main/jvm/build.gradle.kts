@@ -31,6 +31,7 @@ dependencies {
     implementation(projects.app.ui.components)
     implementation(projects.app.ui.core)
     implementation(projects.app.ui.foundation)
+    implementation(projects.utils.credentialvault)
     implementation(projects.utils.localsettings)
     implementation(libs.compose.ui.graphics.desktop)
     implementation(libs.compose.ui.unit.desktop)

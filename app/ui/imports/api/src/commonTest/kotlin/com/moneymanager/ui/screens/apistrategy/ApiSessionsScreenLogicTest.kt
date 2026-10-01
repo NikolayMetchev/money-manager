@@ -200,7 +200,6 @@ class ApiSessionsScreenLogicTest {
         strategyId: ApiImportStrategyId?,
     ) = ApiCredential(
         id = ApiCredentialId(id),
-        token = "token-$id",
         createdAt = Instant.DISTANT_PAST,
         strategyId = strategyId,
     )
@@ -210,7 +209,6 @@ class ApiSessionsScreenLogicTest {
         credentialId: ApiCredentialId,
     ) = ApiSession(
         id = ApiSessionId(id),
-        token = "token",
         deviceId = DeviceId(1),
         createdAt = Instant.DISTANT_PAST,
         expiresAt = null,

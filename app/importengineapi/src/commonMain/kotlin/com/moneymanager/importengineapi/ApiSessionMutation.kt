@@ -19,15 +19,14 @@ import kotlin.time.Instant
  * [ImportResult].
  */
 sealed interface ApiSessionMutation {
-    data class CreateCredential(
+    /**
+     * Gets or creates the (secret-free) connection row for [strategyId]; the id is read back under [key].
+     * The secrets themselves go to the credential vault, never through the engine.
+     */
+    data class EnsureCredential(
         val key: String,
-        val token: String,
+        val strategyId: ApiImportStrategyId,
         val createdAt: Instant,
-        val strategyId: ApiImportStrategyId? = null,
-        val privateKey: String? = null,
-        val publicKey: String? = null,
-        /** HMAC secret for ApiAuthType.SIGNED strategies; [token] holds the api key. */
-        val apiSecret: String? = null,
     ) : ApiSessionMutation
 
     data class UpdateCredentialStrategy(
@@ -35,21 +34,8 @@ sealed interface ApiSessionMutation {
         val strategyId: ApiImportStrategyId?,
     ) : ApiSessionMutation
 
-    data class UpdateCredentialKeys(
-        val credentialId: ApiCredentialId,
-        val privateKey: String?,
-        val publicKey: String?,
-    ) : ApiSessionMutation
-
-    data class UpdateCredentialSecrets(
-        val credentialId: ApiCredentialId,
-        val token: String,
-        val apiSecret: String?,
-    ) : ApiSessionMutation
-
     data class CreateSession(
         val key: String,
-        val token: String,
         val deviceId: DeviceId,
         val createdAt: Instant,
         val credentialId: ApiCredentialId? = null,

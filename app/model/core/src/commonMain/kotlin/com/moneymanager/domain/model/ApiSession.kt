@@ -3,26 +3,15 @@ package com.moneymanager.domain.model
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
+/**
+ * A connected API: the database's non-secret anchor for one strategy's download sessions. The token,
+ * api secret and signing keys live in the encrypted credential vault, keyed by strategy name.
+ */
 data class ApiCredential(
     val id: ApiCredentialId,
-    val token: String,
     val createdAt: Instant,
     val strategyId: ApiImportStrategyId? = null,
-    /** PEM-encoded RSA keys for request signing (e.g. Wise SCA); null when not configured. */
-    val privateKey: String? = null,
-    val publicKey: String? = null,
-    /**
-     * HMAC secret for signed exchange APIs (ApiAuthType.SIGNED; e.g. Crypto.com, Kraken). For these
-     * strategies [token] holds the api key and this holds the api secret. Null for bearer/SCA strategies.
-     */
-    val apiSecret: String? = null,
-) {
-    override fun toString(): String =
-        "ApiCredential(id=$id, token=<redacted>, createdAt=$createdAt, " +
-            "strategyId=$strategyId, privateKey=${if (privateKey != null) "<redacted>" else "null"}, " +
-            "publicKey=${if (publicKey != null) "<redacted>" else "null"}, " +
-            "apiSecret=${if (apiSecret != null) "<redacted>" else "null"})"
-}
+)
 
 @JvmInline
 value class ApiCredentialId(
@@ -33,7 +22,6 @@ value class ApiCredentialId(
 
 data class ApiSession(
     val id: ApiSessionId,
-    val token: String,
     val deviceId: DeviceId,
     val createdAt: Instant,
     val expiresAt: Instant?,

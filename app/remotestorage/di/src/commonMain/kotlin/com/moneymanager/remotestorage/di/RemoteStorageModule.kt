@@ -1,5 +1,6 @@
 package com.moneymanager.remotestorage.di
 
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.di.scope.AppScope
@@ -22,8 +23,8 @@ object RemoteStorageModule {
     @SingleIn(AppScope::class)
     fun provideRemoteStorageProviderFactory(
         params: AppComponentParams,
-        localSettings: LocalSettings,
-    ): RemoteStorageProviderFactory = createRemoteStorageProviderFactory(params, localSettings)
+        vault: CredentialVault,
+    ): RemoteStorageProviderFactory = createRemoteStorageProviderFactory(params, vault)
 
     @Provides
     @SingleIn(AppScope::class)

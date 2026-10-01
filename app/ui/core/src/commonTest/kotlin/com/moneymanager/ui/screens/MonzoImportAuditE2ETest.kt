@@ -152,7 +152,6 @@ class MonzoImportAuditE2ETest {
                     )
                 val sessionId =
                     dc.apiSessionRepository.createSession(
-                        token = "test-monzo-token",
                         deviceId = deviceId,
                         createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                         expiresAt = null,

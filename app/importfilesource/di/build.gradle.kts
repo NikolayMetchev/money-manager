@@ -11,7 +11,7 @@ kotlin {
             dependencies {
                 api(projects.app.di.params)
                 api(projects.app.importfilesource.core)
-                api(projects.utils.localsettings)
+                api(projects.utils.credentialvault)
             }
         }
 
@@ -19,7 +19,7 @@ kotlin {
             dependencies {
                 api(projects.app.di.params)
                 api(projects.app.importfilesource.core)
-                api(projects.utils.localsettings)
+                api(projects.utils.credentialvault)
 
                 implementation(projects.app.importfilesource.localfolder)
                 implementation(projects.app.model.importdirectory)

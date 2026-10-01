@@ -225,6 +225,8 @@ fun SettingsScreen(
             onRequestSwitchDatabase = onRequestSwitchDatabase,
         )
 
+        CredentialsCard()
+
         // Cloud Storage Section (only when the remote-sync dependencies are wired in)
         if (remoteController != null && database != null) {
             CloudStorageCard(

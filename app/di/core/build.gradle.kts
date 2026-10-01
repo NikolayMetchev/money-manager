@@ -24,6 +24,8 @@ kotlin {
                 api(projects.app.remotestorage.sync)
                 api(projects.app.strategycatalog)
                 api(projects.app.strategycatalog.di)
+                api(projects.utils.credentialvault)
+                api(projects.utils.credentialvault.di)
                 api(projects.utils.localsettings)
                 api(projects.utils.localsettings.di)
             }
@@ -41,11 +43,13 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.strategycatalog)
+                api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
                 implementation(projects.app.db.di)
                 implementation(projects.app.remotestorage.core)
                 implementation(projects.app.remotestorage.di)
                 implementation(projects.app.strategycatalog.di)
+                implementation(projects.utils.credentialvault.di)
                 implementation(projects.utils.localsettings.di)
             }
         }

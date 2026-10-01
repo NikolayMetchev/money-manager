@@ -3,6 +3,7 @@ package com.moneymanager.test.database
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.sql.entitySource.EntitySourceWriteQueries
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
+import kotlin.time.Instant
 
 open class DbTest {
     protected lateinit var database: MoneyManagerDatabaseWrapper
@@ -44,6 +46,22 @@ open class DbTest {
     @AfterTest
     fun cleanup() {
         deleteTestDatabase(testDbLocation)
+    }
+
+    /**
+     * The connection row for the installed API strategy named [strategyName], created on first use. API
+     * secrets live in the credential vault, so tests that drive a download pass the token directly.
+     */
+    protected suspend fun apiConnection(
+        strategyName: String,
+        createdAt: Instant,
+    ): ApiCredentialId {
+        val strategy =
+            repositories.apiImportStrategyRepository
+                .getAllStrategies()
+                .first()
+                .single { it.name == strategyName }
+        return repositories.apiSessionRepository.ensureCredential(strategy.id, createdAt)
     }
 
     /**

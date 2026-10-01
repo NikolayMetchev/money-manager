@@ -1,12 +1,12 @@
 package com.moneymanager.importfilesource.di
 
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.importfilesource.localfolder.LocalFolderImportFileSource
-import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.googledrive.DesktopBrowserLauncher
 import com.moneymanager.remotestorage.googledrive.GoogleDriveCredentials
 import com.moneymanager.remotestorage.googledrive.GoogleOAuthDefaults
@@ -25,7 +25,7 @@ private fun googleDriveDefaultConfig(): String? =
 @Suppress("ktlint:standard:function-naming")
 actual fun createImportFileSourceFactory(
     params: AppComponentParams,
-    localSettings: LocalSettings,
+    vault: CredentialVault,
 ): ImportFileSourceFactory =
     object : ImportFileSourceFactory {
         // Desktop reads both local folders and Google Drive.
@@ -38,7 +38,7 @@ actual fun createImportFileSourceFactory(
                     val tokenSource =
                         googleDriveTokenSource(
                             config = directory.providerConfig ?: googleDriveDefaultConfig(),
-                            localSettings = localSettings,
+                            vault = vault,
                             browser = DesktopBrowserLauncher(),
                         )
                     if (!tokenSource.isSignedInWithRequiredScopes()) tokenSource.signIn()

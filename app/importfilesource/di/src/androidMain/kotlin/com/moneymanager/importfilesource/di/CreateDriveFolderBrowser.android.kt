@@ -1,15 +1,15 @@
 package com.moneymanager.importfilesource.di
 
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFolder
-import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.googledrive.DriveImportFileSource
 
 @Suppress("ktlint:standard:function-naming", "UnusedParameter")
 actual fun createDriveFolderBrowser(
     params: AppComponentParams,
-    localSettings: LocalSettings,
+    vault: CredentialVault,
 ): DriveFolderBrowser? =
     object : DriveFolderBrowser {
         override val rootFolderId: String = DriveImportFileSource.ROOT_FOLDER_ID

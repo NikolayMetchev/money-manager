@@ -1,19 +1,19 @@
 package com.moneymanager.database.repository
 
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.importengineapi.updateApiCredentialSecrets
+import com.moneymanager.importengineapi.ensureApiCredentials
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFails
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.time.Instant
 
 /**
- * An API strategy holds at most one credential, and that credential is editable in place — the two rules the
- * connections checklist relies on.
+ * An API strategy holds at most one connection row, and asking for it again returns the same row — the rules
+ * the connections checklist relies on to reconnect strategies from the credential vault without duplicates.
  */
 class ApiCredentialConnectionTest : DbTest() {
     override val installBuiltInStrategies: Boolean = true
@@ -23,58 +23,28 @@ class ApiCredentialConnectionTest : DbTest() {
     private suspend fun strategies(): List<ApiImportStrategy> = repositories.apiImportStrategyRepository.getAllStrategies().first()
 
     @Test
-    fun `a strategy cannot have two credentials`() =
+    fun `ensuring a connection twice returns the same row`() =
         runTest {
             val strategy = strategies().first()
-            repositories.apiSessionRepository.createCredential(
-                token = "first-token",
-                createdAt = now,
-                strategyId = strategy.id,
-            )
 
-            assertFails {
-                repositories.apiSessionRepository.createCredential(
-                    token = "second-token",
-                    createdAt = now,
-                    strategyId = strategy.id,
-                )
-            }
+            val first = repositories.apiSessionRepository.ensureCredential(strategy.id, now)
+            val second = repositories.apiSessionRepository.ensureCredential(strategy.id, now)
+
+            assertEquals(first, second)
+            assertEquals(1, repositories.apiSessionRepository.getAllCredentials().size)
         }
 
     @Test
-    fun `different strategies each get their own credential`() =
+    fun `different strategies each get their own connection`() =
         runTest {
             val (first, second) = strategies().take(2)
 
-            repositories.apiSessionRepository.createCredential("token-one", now, first.id)
-            repositories.apiSessionRepository.createCredential("token-two", now, second.id)
+            val ids = repositories.importEngine.ensureApiCredentials(listOf(first.id, second.id), now)
 
+            assertNotEquals(ids.getValue(first.id), ids.getValue(second.id))
             val byStrategy = repositories.apiSessionRepository.getAllCredentials().associateBy { it.strategyId }
-            assertEquals("token-one", byStrategy[first.id]?.token)
-            assertEquals("token-two", byStrategy[second.id]?.token)
-        }
-
-    @Test
-    fun `the import engine replaces a token in place rather than adding a credential`() =
-        runTest {
-            val strategy = strategies().first { it.name == "Crypto.com Exchange" }
-            val id =
-                repositories.apiSessionRepository.createCredential(
-                    token = "old-key",
-                    createdAt = now,
-                    strategyId = strategy.id,
-                    apiSecret = "old-secret",
-                )
-
-            repositories.importEngine.updateApiCredentialSecrets(id, token = "new-key", apiSecret = "new-secret")
-
-            val credentials = repositories.apiSessionRepository.getAllCredentials()
-            assertEquals(1, credentials.size)
-            val credential = credentials.single()
-            assertEquals(id, credential.id)
-            assertEquals("new-key", credential.token)
-            assertEquals("new-secret", credential.apiSecret)
-            assertEquals(strategy.id, credential.strategyId)
+            assertEquals(ids.getValue(first.id), byStrategy[first.id]?.id)
+            assertEquals(ids.getValue(second.id), byStrategy[second.id]?.id)
         }
 
     @Test
@@ -83,7 +53,7 @@ class ApiCredentialConnectionTest : DbTest() {
             val strategy = strategies().first()
             assertEquals(emptyList(), repositories.apiSessionRepository.getCredentialsFlow().first())
 
-            repositories.apiSessionRepository.createCredential("a-token", now, strategy.id)
+            repositories.importEngine.ensureApiCredentials(listOf(strategy.id), now)
 
             val credential =
                 repositories.apiSessionRepository

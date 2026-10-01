@@ -12,6 +12,7 @@ kotlin {
                 api(projects.app.di.scope)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
             }
         }
@@ -23,6 +24,7 @@ kotlin {
                 api(projects.app.di.scope)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
 
                 implementation(projects.app.remotestorage.googledrive)

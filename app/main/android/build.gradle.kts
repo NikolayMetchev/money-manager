@@ -56,6 +56,7 @@ dependencies {
     implementation(projects.app.strategycatalog)
     implementation(projects.app.ui.core)
     implementation(projects.app.ui.foundation)
+    implementation(projects.utils.credentialvault)
     implementation(projects.utils.localsettings)
     implementation(kotlin("stdlib"))
     implementation(libs.androidx.activity)

@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,23 +31,21 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.ApiCredential
+import com.moneymanager.credentialvault.CredentialVaultLockedException
+import com.moneymanager.credentialvault.StoredApiCredential
+import com.moneymanager.credentialvault.VaultState
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
-import com.moneymanager.importengineapi.createApiCredential
-import com.moneymanager.importengineapi.updateApiCredentialKeys
-import com.moneymanager.importengineapi.updateApiCredentialSecrets
-import com.moneymanager.ui.api.sca.generateScaKeyPair
+import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.setPlainText
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 
 /**
@@ -56,8 +55,9 @@ import kotlin.time.Clock
  * providers walks the list once instead of re-picking a provider from a dropdown each time. Every API can
  * also be skipped for now — the row stays connectable, nothing is hidden.
  *
- * A strategy holds **at most one** credential (enforced by `UNIQUE(strategy_id)` on `api_credential`), so a
- * connected API offers *edit*, never *add another*.
+ * The secrets live in the encrypted credential vault (keyed by strategy name), not the database, so an API
+ * stays connected across a database wipe; the database only gets a secret-free connection row. A strategy
+ * holds **at most one** credential, so a connected API offers *edit*, never *add another*.
  */
 @Composable
 fun ApiConnectionsScreen(
@@ -69,10 +69,16 @@ fun ApiConnectionsScreen(
     val strategies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         apiImportStrategyRepository.getAllStrategies()
     }
-    val credentials by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+    val credentialRows by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         apiSessionRepository.getCredentialsFlow()
     }
-    val credentialByStrategy = credentials.mapNotNull { c -> c.strategyId?.let { it to c } }.toMap()
+    val vault = LocalCredentialVault.current
+    val vaultState by vault.state.collectAsState()
+    val bundle = (vaultState as? VaultState.Unlocked)?.bundle
+    val credentialByStrategy =
+        strategies.mapNotNull { strategy -> bundle?.apiCredential(strategy.name)?.let { strategy.id to it } }.toMap()
+
+    EnsureApiConnectionRows(strategies = strategies, credentialRows = credentialRows)
 
     // Skipping is a "not now", not a decision worth persisting: the row stays listed as not connected, so the
     // checklist itself is the reminder. Forgotten when the screen goes away.
@@ -126,6 +132,8 @@ fun ApiConnectionsScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
+        if (bundle == null) CredentialsLockedBanner(reason = "Show your API connections")
+
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(sorted, key = { it.id.toString() }) { strategy ->
                 val credential = credentialByStrategy[strategy.id]
@@ -135,8 +143,10 @@ fun ApiConnectionsScreen(
                     // The token column is globally unique. Rather than decode a driver-specific constraint
                     // error after the fact, spot the clash before saving.
                     tokensUsedElsewhere =
-                        credentials
-                            .filter { it.id != credential?.id }
+                        bundle
+                            ?.apiCredentials
+                            .orEmpty()
+                            .filter { it.strategyName != strategy.name }
                             .map { it.token }
                             .toSet(),
                     expanded = expandedStrategyId == strategy.id,
@@ -177,7 +187,7 @@ internal fun nextApiToSetUp(
 @Composable
 private fun ApiConnectionRow(
     strategy: ApiImportStrategy,
-    credential: ApiCredential?,
+    credential: StoredApiCredential?,
     tokensUsedElsewhere: Set<String>,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
@@ -185,6 +195,7 @@ private fun ApiConnectionRow(
     onSkip: () -> Unit,
 ) {
     val importEngine = LocalImportEngine.current
+    val vault = LocalCredentialVault.current
     val scope = rememberSchemaAwareCoroutineScope()
     val clipboard = LocalClipboard.current
     val uriHandler = LocalUriHandler.current
@@ -232,20 +243,20 @@ private fun ApiConnectionRow(
                     onSubmit = { token, secret, onFailure ->
                         scope.launch {
                             try {
-                                if (credential == null) {
-                                    importEngine.createApiCredential(
-                                        token = token,
-                                        createdAt = Clock.System.now(),
-                                        strategyId = strategy.id,
-                                        apiSecret = secret,
-                                    )
-                                } else {
-                                    importEngine.updateApiCredentialSecrets(
-                                        credentialId = credential.id,
-                                        token = token,
-                                        apiSecret = secret,
+                                val now = Clock.System.now()
+                                vault.update("Save the ${strategy.name} credentials") { bundle ->
+                                    val existing = bundle.apiCredential(strategy.name)
+                                    bundle.withApiCredential(
+                                        existing?.copy(token = token, apiSecret = secret)
+                                            ?: StoredApiCredential(
+                                                strategyName = strategy.name,
+                                                token = token,
+                                                createdAtEpochMillis = now.toEpochMilliseconds(),
+                                                apiSecret = secret,
+                                            ),
                                     )
                                 }
+                                importEngine.ensureApiCredential(strategy.id, now)
                                 onSaved()
                             } catch (expected: Exception) {
                                 onFailure(saveFailureMessage(expected))
@@ -258,16 +269,9 @@ private fun ApiConnectionRow(
                 if (credential != null && strategy.config.signing != null) {
                     HorizontalDivider()
                     SigningKeySection(
-                        publicKey = credential.publicKey,
+                        publicKey = credential.publicKeyPem,
                         onGenerateSigningKey = {
-                            scope.launch {
-                                val keyPair = withContext(Dispatchers.Default) { generateScaKeyPair() }
-                                importEngine.updateApiCredentialKeys(
-                                    credentialId = credential.id,
-                                    privateKey = keyPair.privateKeyPem,
-                                    publicKey = keyPair.publicKeyPem,
-                                )
-                            }
+                            scope.launch { vault.storeNewSigningKey(strategy.name) }
                         },
                         onCopyText = { text -> scope.launch { clipboard.setPlainText(text) } },
                     )
@@ -280,7 +284,7 @@ private fun ApiConnectionRow(
 @Composable
 private fun ApiCredentialForm(
     strategy: ApiImportStrategy,
-    credential: ApiCredential?,
+    credential: StoredApiCredential?,
     tokensUsedElsewhere: Set<String>,
     onOpenTokenPage: (String) -> Unit,
     onSubmit: (token: String, secret: String?, onFailure: (String) -> Unit) -> Unit,
@@ -375,4 +379,8 @@ private fun maskToken(token: String): String {
     return "${token.take(4)}…${token.takeLast(4)}"
 }
 
-private fun saveFailureMessage(error: Throwable): String = "Couldn't save the credentials: ${error.message ?: error::class.simpleName}"
+private fun saveFailureMessage(error: Throwable): String =
+    when (error) {
+        is CredentialVaultLockedException -> "Unlock or create your credential file to save these credentials."
+        else -> "Couldn't save the credentials: ${error.message ?: error::class.simpleName}"
+    }
