@@ -50,19 +50,24 @@ import com.moneymanager.reconciliation.LegMatch
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.reconciliation.UnlinkedWallet
 import com.moneymanager.reconciliation.applyAutoLinks
+import com.moneymanager.reconciliation.createAndLinkAccounts
+import com.moneymanager.reconciliation.planAccountCreation
 import com.moneymanager.reconciliation.planAutoLinks
 import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.reconciliation.unlinkedWallets
 import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Clock
 import kotlin.time.Duration
 
 private enum class ResultTab(
@@ -148,13 +153,14 @@ private fun SourceReconciliation(
     val real = remember(accounts, allShadowAccounts) { realAccounts(accounts, allShadowAccounts) }
     val accountNames = remember(accounts) { accounts.associate { it.id to it.name } }
     val allShadowIds = remember(allShadowAccounts) { allShadowAccounts.mapTo(mutableSetOf()) { it.accountId } }
+    val existingNames = remember(accounts) { accounts.mapTo(mutableSetOf()) { it.name } }
     var error by remember { mutableStateOf<String?>(null) }
 
     // Link whatever can be linked with certainty as soon as new wallets or real accounts appear.
     LaunchedEffect(source, shadowAccounts, links, real) {
         val plan = planAutoLinks(source, shadowAccounts, links, real)
         if (plan.isNotEmpty()) {
-            runCatching { importEngine.applyAutoLinks(plan) }.onFailure { error = "Automatic linking failed: ${it.message}" }
+            runCatchingUnlessCancelled { importEngine.applyAutoLinks(plan) }.onFailure { error = "Automatic linking failed: ${it.message}" }
         }
     }
 
@@ -168,6 +174,11 @@ private fun SourceReconciliation(
     }
 
     val unlinked = remember(source, shadowAccounts, links, real) { unlinkedWallets(source, shadowAccounts, links, real) }
+    // One new real account per wallet still needing attention, named after the wallet.
+    val createPlan =
+        remember(source, unlinked, accounts) {
+            planAccountCreation(source, unlinked.filterNot { it.wallet.autoLinkDeclined }.map { it.wallet }, accounts)
+        }
     var hideUnknownAssets by remember { mutableStateOf(true) }
     var tab by remember { mutableStateOf(ResultTab.MISSING_IN_MM) }
     val expanded = remember(source) { mutableStateMapOf<String, Boolean>() }
@@ -177,9 +188,21 @@ private fun SourceReconciliation(
         realIds: Set<AccountId>,
     ) {
         scope.launch {
-            runCatching { importEngine.setReconciliationLinks(shadow, realIds) }
+            runCatchingUnlessCancelled { importEngine.setReconciliationLinks(shadow, realIds) }
                 .onSuccess { error = null }
                 .onFailure { error = it.message }
+        }
+    }
+
+    var creatingAll by remember { mutableStateOf(false) }
+
+    fun createAll(plan: Map<AccountId, String>) {
+        creatingAll = true
+        scope.launch {
+            runCatchingUnlessCancelled { importEngine.createAndLinkAccounts(plan, Clock.System.now()) }
+                .onSuccess { error = null }
+                .onFailure { error = "Creating accounts failed: ${it.message}" }
+            creatingAll = false
         }
     }
 
@@ -196,12 +219,26 @@ private fun SourceReconciliation(
         ).forEach { (wallets, heading) ->
             if (wallets.isEmpty()) return@forEach
             item {
-                Text(
-                    heading,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (wallets === needsAttention) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
+                    Text(
+                        heading,
+                        style = MaterialTheme.typography.titleSmall,
+                        color =
+                            if (wallets ===
+                                needsAttention
+                            ) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (wallets === needsAttention) {
+                        TextButton(onClick = { createAll(createPlan) }, enabled = createPlan.isNotEmpty() && !creatingAll) {
+                            Text("Create all (${createPlan.size})")
+                        }
+                    }
+                }
             }
             items(wallets, key = { "unlinked-${it.wallet.accountId.id}" }) { wallet ->
                 UnlinkedWalletCard(
@@ -210,6 +247,9 @@ private fun SourceReconciliation(
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
+                    existingNames = existingNames,
+                    // "Create all" links in a second batch that would overwrite a link made meanwhile.
+                    enabled = !creatingAll,
                     isReal = { it.id !in allShadowIds },
                     onLink = { realId -> setLinks(wallet.wallet.accountId, setOf(realId)) },
                 )
@@ -324,10 +364,13 @@ private fun UnlinkedWalletCard(
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
+    existingNames: Set<String>,
+    enabled: Boolean,
     isReal: (Account) -> Boolean,
     onLink: (AccountId) -> Unit,
 ) {
     val declined = wallet.wallet.autoLinkDeclined
+    var showCreateDialog by remember { mutableStateOf(false) }
     Card(
         colors =
             CardDefaults.cardColors(
@@ -341,12 +384,15 @@ private fun UnlinkedWalletCard(
                 if (declined) {
                     "You removed this wallet's links, so it isn't compared or linked automatically. Link it again to compare it."
                 } else {
-                    "Pick the Money Manager account this wallet mirrors, or create it (\"Create New Account\" in the list)."
+                    "Pick the Money Manager account this wallet mirrors, or create it."
                 },
                 style = MaterialTheme.typography.bodySmall,
             )
             wallet.suggestion?.let { suggestion ->
-                TextButton(onClick = { onLink(suggestion.id) }) { Text("Link to suggested account \"${suggestion.name}\"") }
+                TextButton(
+                    onClick = { onLink(suggestion.id) },
+                    enabled = enabled,
+                ) { Text("Link to suggested account \"${suggestion.name}\"") }
             }
             AccountPicker(
                 selectedAccountId = null,
@@ -355,9 +401,21 @@ private fun UnlinkedWalletCard(
                 accountRepository = accountRepository,
                 categoryRepository = categoryRepository,
                 personRepository = personRepository,
+                enabled = enabled,
                 accountFilter = isReal,
             )
+            TextButton(onClick = { showCreateDialog = true }, enabled = enabled) { Text("Create new account") }
         }
+    }
+    if (showCreateDialog) {
+        CreateAccountDialog(
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
+            onDismiss = { showCreateDialog = false },
+            onAccountCreated = onLink,
+            initialName = walletName,
+            existingNames = existingNames,
+        )
     }
 }
 
@@ -511,5 +569,12 @@ private fun MatchRow(
         }
     }
 }
+
+/**
+ * [runCatching] that lets cancellation propagate. A write here routinely updates the very flows its
+ * effect is keyed on, restarting (so cancelling) it before `import()` returns; that is not a failure.
+ */
+private inline fun <T> runCatchingUnlessCancelled(block: () -> T): Result<T> =
+    runCatching(block).onFailure { if (it is CancellationException) throw it }
 
 private fun formatDelta(delta: Duration): String = delta.absoluteValue.toString().let { if (delta.isNegative()) "-$it" else "+$it" }
