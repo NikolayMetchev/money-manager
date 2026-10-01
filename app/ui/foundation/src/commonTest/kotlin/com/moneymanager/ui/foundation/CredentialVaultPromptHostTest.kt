@@ -69,7 +69,7 @@ class CredentialVaultPromptHostTest {
     }
 
     @Test
-    fun a_locked_vault_prompts_for_the_password_and_rejects_a_wrong_one() =
+    fun a_locked_vault_prompts_for_the_password_and_rejects_a_wrong_one() {
         runMoneyManagerComposeUiTest {
             var outcome: Result<Unit>? = null
             showPromptFor(lockedVault) { outcome = it }
@@ -86,9 +86,10 @@ class CredentialVaultPromptHostTest {
             assertEquals(true, outcome?.isSuccess)
             assertEquals(monzo, lockedVault.bundleOrNull()?.apiCredential("Monzo"))
         }
+    }
 
     @Test
-    fun cancelling_the_prompt_fails_the_request_and_leaves_the_vault_locked() =
+    fun cancelling_the_prompt_fails_the_request_and_leaves_the_vault_locked() {
         runMoneyManagerComposeUiTest {
             var outcome: Result<Unit>? = null
             showPromptFor(lockedVault) { outcome = it }
@@ -100,9 +101,10 @@ class CredentialVaultPromptHostTest {
             assertIs<CredentialVaultLockedException>(outcome?.exceptionOrNull())
             assertIs<VaultState.Locked>(lockedVault.state.value)
         }
+    }
 
     @Test
-    fun without_a_file_the_prompt_creates_one_at_the_default_location() =
+    fun without_a_file_the_prompt_creates_one_at_the_default_location() {
         runMoneyManagerComposeUiTest {
             var outcome: Result<Unit>? = null
             showPromptFor(emptyVault) { outcome = it }
@@ -117,4 +119,5 @@ class CredentialVaultPromptHostTest {
             assertEquals(true, outcome?.isSuccess)
             assertEquals(VaultState.Unlocked(emptyVault.defaultPath()!!, emptyVault.bundleOrNull()!!), emptyVault.state.value)
         }
+    }
 }

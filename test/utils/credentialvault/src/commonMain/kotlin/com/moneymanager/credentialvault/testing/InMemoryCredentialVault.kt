@@ -3,7 +3,6 @@ package com.moneymanager.credentialvault.testing
 import com.moneymanager.credentialvault.CredentialBundle
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.CredentialVaultImpl
-import com.moneymanager.credentialvault.VaultPathResolver
 import com.moneymanager.credentialvault.VaultStorage
 import com.moneymanager.localsettings.LocalSettings
 
@@ -53,7 +52,7 @@ fun inMemoryCredentialVault(
     storage: VaultStorage = InMemoryVaultStorage(),
     localSettings: LocalSettings = InMemoryLocalSettings(),
 ): CredentialVault =
-    CredentialVaultImpl(storage, VaultPathResolver { "$it.credentials" }, localSettings).apply {
+    CredentialVaultImpl(storage, pathResolver = { "$it.credentials" }, localSettings = localSettings).apply {
         bindToDatabase(TEST_VAULT_DATABASE_KEY)
     }
 

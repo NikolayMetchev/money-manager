@@ -62,7 +62,7 @@ class ApiConnectionsVaultE2ETest : DbTest() {
     }
 
     @Test
-    fun a_fresh_database_reconnects_apis_from_the_vault() =
+    fun a_fresh_database_reconnects_apis_from_the_vault() {
         runMoneyManagerComposeUiTest {
             val vault = runBlocking { unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzo))) }
             assertNull(connectionRowFor("Monzo"), "a fresh database has no connection rows")
@@ -73,9 +73,10 @@ class ApiConnectionsVaultE2ETest : DbTest() {
             waitUntil(timeoutMillis = 10_000) { connectionRowFor("Monzo") != null }
             waitForIdle()
         }
+    }
 
     @Test
-    fun saving_a_token_stores_it_in_the_vault_not_the_database() =
+    fun saving_a_token_stores_it_in_the_vault_not_the_database() {
         runMoneyManagerComposeUiTest {
             val vault = runBlocking { unlockedCredentialVault() }
             showConnections(vault)
@@ -95,4 +96,5 @@ class ApiConnectionsVaultE2ETest : DbTest() {
             assertEquals("binance-key-abcdef", saved?.token)
             assertEquals("binance-secret", saved?.apiSecret)
         }
+    }
 }

@@ -1,14 +1,12 @@
 package com.moneymanager.credentialvault
 
 import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
  * Everything the credential vault file holds. Kept outside any database so wiping or recreating a
  * database never costs the user their API tokens or Google sign-in.
  */
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class CredentialBundle(
     // Always written, even though it equals the default: otherwise every version would omit it and a file
