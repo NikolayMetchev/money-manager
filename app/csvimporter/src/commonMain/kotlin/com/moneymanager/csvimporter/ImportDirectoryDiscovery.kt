@@ -2,7 +2,6 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.importfilesource.ImportFileSource
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope

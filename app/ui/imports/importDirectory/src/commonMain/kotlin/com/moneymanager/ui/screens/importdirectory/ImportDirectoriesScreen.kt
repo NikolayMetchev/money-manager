@@ -61,7 +61,6 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.navigation.ImportTab
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -576,7 +575,7 @@ private fun ImportDirectoryRow(
                 Text("Configured on another device — download from that device.", style = MaterialTheme.typography.bodySmall)
             }
             if (isDownloading) {
-                val (done, total) = checkNotNull(scanProgress)
+                val (done, total) = scanProgress
                 Text(
                     if (total > 0) "Downloading… $done / $total files" else "Connecting…",
                     style = MaterialTheme.typography.bodySmall,
