@@ -69,6 +69,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -252,7 +253,26 @@ fun ImportDirectoriesScreen(
             try {
                 val dirsByRef = directories.associateByTo(mutableMapOf()) { it.folderRef }
                 val results = mutableListOf<Pair<ImportDirectory, ScanResult>>()
+                // Folder-level errors (a listing or discovery that threw), kept apart from per-file failures.
+                val folderFailures = mutableListOf<String>()
                 val resultsLock = Mutex()
+
+                // One folder failing must not cancel the rest of the run, so each one's error is recorded
+                // against it instead of propagating to the shared scope.
+                suspend fun <T> containingFailure(
+                    dir: ImportDirectory,
+                    what: String,
+                    fallback: T,
+                    block: suspend () -> T,
+                ): T =
+                    try {
+                        block()
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (expected: Exception) {
+                        resultsLock.withLock { folderFailures += "${dir.name} — couldn't $what: ${expected.message}" }
+                        fallback
+                    }
                 val created =
                     coroutineScope {
                         val runScope = this
@@ -260,23 +280,40 @@ fun ImportDirectoriesScreen(
                         fun startDownload(dir: ImportDirectory) {
                             downloadAllProgress[dir.id] = null
                             runScope.launch(Dispatchers.IO) {
-                                val result = downloadFolder(dir) { done, total -> downloadAllProgress[dir.id] = done to total }
-                                resultsLock.withLock { results += dir to result }
+                                val result =
+                                    containingFailure(dir, "download this folder", null) {
+                                        downloadFolder(dir) { done, total -> downloadAllProgress[dir.id] = done to total }
+                                    }
+                                if (result == null) {
+                                    // Its files never got counted, so drop it rather than leave it "still listing".
+                                    downloadAllProgress.remove(dir.id)
+                                } else {
+                                    resultsLock.withLock { results += dir to result }
+                                }
                             }
                         }
 
                         dirsByRef.values.filter { scannable(it) && !it.excluded }.forEach(::startDownload)
                         directories
                             .filter { it.topLevel && scannable(it) && !it.excluded }
-                            .map { root -> async(Dispatchers.IO) { createSubdirectories(root, dirsByRef, ::startDownload) } }
-                            .awaitAll()
+                            .map { root ->
+                                async(Dispatchers.IO) {
+                                    containingFailure(root, "search its subfolders", 0) {
+                                        createSubdirectories(root, dirsByRef, ::startDownload)
+                                    }
+                                }
+                            }.awaitAll()
                             .sum()
                     }
                 val downloaded = results.sumOf { (_, result) -> result.filesDownloaded }
                 val failed = results.sumOf { (_, result) -> result.filesFailed }
                 // Prefix with the directory so the same filename in two folders stays tellable apart.
-                scanFailures = results.flatMap { (dir, result) -> result.failures.map { "${dir.name} — $it" } }
-                val failedSuffix = if (failed > 0) "; $failed failed" else ""
+                scanFailures = folderFailures + results.flatMap { (dir, result) -> result.failures.map { "${dir.name} — $it" } }
+                val failedSuffix =
+                    listOfNotNull(
+                        "$failed file(s) failed".takeIf { failed > 0 },
+                        "${folderFailures.size} folder(s) failed".takeIf { folderFailures.isNotEmpty() },
+                    ).joinToString(separator = "") { "; $it" }
                 statusMessage =
                     "Created $created new director${if (created == 1) "y" else "ies"}; downloaded $downloaded file(s)$failedSuffix " +
                     "in ${formatElapsedTime(startedAt.elapsedNow())}."
