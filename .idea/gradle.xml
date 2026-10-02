@@ -56,11 +56,13 @@
             <option value="$PROJECT_DIR$/app/model/importdirectory" />
             <option value="$PROJECT_DIR$/app/model/passthrough" />
             <option value="$PROJECT_DIR$/app/model/qif" />
+            <option value="$PROJECT_DIR$/app/model/reconciliation" />
             <option value="$PROJECT_DIR$/app/model/repository" />
             <option value="$PROJECT_DIR$/app/model/repository/read" />
             <option value="$PROJECT_DIR$/app/model/repository/write" />
             <option value="$PROJECT_DIR$/app/model/timeline" />
             <option value="$PROJECT_DIR$/app/qifimporter" />
+            <option value="$PROJECT_DIR$/app/reconciliation" />
             <option value="$PROJECT_DIR$/app/remotestorage" />
             <option value="$PROJECT_DIR$/app/remotestorage/core" />
             <option value="$PROJECT_DIR$/app/remotestorage/di" />
@@ -82,6 +84,7 @@
             <option value="$PROJECT_DIR$/app/ui/imports/csv" />
             <option value="$PROJECT_DIR$/app/ui/imports/importDirectory" />
             <option value="$PROJECT_DIR$/app/ui/imports/qif" />
+            <option value="$PROJECT_DIR$/app/ui/imports/reconciliation" />
             <option value="$PROJECT_DIR$/app/ui/imports/timeline" />
             <option value="$PROJECT_DIR$/app/ui/people" />
             <option value="$PROJECT_DIR$/app/ui/settings" />
@@ -91,6 +94,8 @@
             <option value="$PROJECT_DIR$/test/app" />
             <option value="$PROJECT_DIR$/test/app/db" />
             <option value="$PROJECT_DIR$/test/app/ui" />
+            <option value="$PROJECT_DIR$/test/utils" />
+            <option value="$PROJECT_DIR$/test/utils/credentialvault" />
             <option value="$PROJECT_DIR$/tools" />
             <option value="$PROJECT_DIR$/tools/crypto-dataset" />
             <option value="$PROJECT_DIR$/tools/strategy-catalog" />
@@ -100,7 +105,10 @@
             <option value="$PROJECT_DIR$/utils/compose" />
             <option value="$PROJECT_DIR$/utils/compose/filePicker" />
             <option value="$PROJECT_DIR$/utils/compose/scrollbar" />
+            <option value="$PROJECT_DIR$/utils/credentialvault" />
+            <option value="$PROJECT_DIR$/utils/credentialvault/di" />
             <option value="$PROJECT_DIR$/utils/currency" />
+            <option value="$PROJECT_DIR$/utils/humanreadable" />
             <option value="$PROJECT_DIR$/utils/localsettings" />
             <option value="$PROJECT_DIR$/utils/localsettings/di" />
             <option value="$PROJECT_DIR$/utils/parsers" />
