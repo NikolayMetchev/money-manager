@@ -162,4 +162,39 @@ class ApiRequestSignerTest {
                 signed.body,
             )
         }
+
+    @Test
+    fun `bybit header-placed HMAC-SHA256 hex vector with static recv-window header`() =
+        runTest {
+            val config =
+                ApiRequestSigningConfig(
+                    algorithm = SigningAlgorithm.HMAC_SHA256,
+                    secretEncoding = SecretEncoding.UTF8,
+                    signatureEncoding = SignatureEncoding.HEX,
+                    message = listOf(SigPart.Nonce, SigPart.ApiKey, SigPart.Literal("5000"), SigPart.QueryString),
+                    apiKey = FieldPlacement(SigFieldLocation.HEADER, "X-BAPI-API-KEY"),
+                    nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.HEADER, "X-BAPI-TIMESTAMP")),
+                    signature = FieldPlacement(SigFieldLocation.HEADER, "X-BAPI-SIGN"),
+                    bodyFormat = BodyFormat.NONE,
+                    staticHeaders = mapOf("X-BAPI-RECV-WINDOW" to "5000"),
+                )
+            val signed =
+                ApiRequestSigner(config).sign(
+                    endpointUrl = "https://api.bybit.com/v5/order/realtime",
+                    path = "/v5/order/realtime",
+                    methodName = "v5/order/realtime",
+                    params = linkedMapOf("category" to "option", "symbol" to "BTC-29JUL22-25000-C"),
+                    apiKey = "XXXXXXXXXX",
+                    apiSecret = "YYYYYYYYYY",
+                    nonce = 1658384314791,
+                    requestId = 0,
+                )
+            // Bybit publishes the signed-string format (its docs' example string is exactly this message)
+            // but no signature, so the expected value is an independent openssl HMAC over that string.
+            assertEquals("https://api.bybit.com/v5/order/realtime?category=option&symbol=BTC-29JUL22-25000-C", signed.url)
+            assertEquals("37813c67fafb3017e92354eb88f218e7e52a98f9f5eb74cfcf0b21f17edb143b", signed.headers["X-BAPI-SIGN"])
+            assertEquals("XXXXXXXXXX", signed.headers["X-BAPI-API-KEY"])
+            assertEquals("1658384314791", signed.headers["X-BAPI-TIMESTAMP"])
+            assertEquals("5000", signed.headers["X-BAPI-RECV-WINDOW"])
+        }
 }

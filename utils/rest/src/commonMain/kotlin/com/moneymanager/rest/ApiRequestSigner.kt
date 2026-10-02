@@ -80,7 +80,7 @@ class ApiRequestSigner(
         val nonceValue = formatNonce(nonce, nonceSpec.format)
         val requestIdValue = config.requestId?.let { formatRequestId(it.format, requestId) }
 
-        val headers = mutableMapOf<String, String>()
+        val headers = config.staticHeaders.toMutableMap()
         val queryParams = mutableMapOf<String, String>()
         val bodyFields = linkedMapOf<String, String>()
 

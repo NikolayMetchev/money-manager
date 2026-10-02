@@ -19,12 +19,14 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.OffsetMode
 import com.moneymanager.domain.model.apistrategy.PaginationMode
+import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -53,6 +55,7 @@ import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
+import io.ktor.http.decodeURLQueryComponent
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.encodeURLPathPart
 import kotlinx.coroutines.delay
@@ -487,7 +490,7 @@ suspend fun downloadApiSessionExchange(
                         nextCursorField != null -> {
                             val sentToken = nextToken
                             // A provider echoing the token it was sent would otherwise page forever.
-                            nextToken = stringFieldFromJson(body, nextCursorField)?.takeIf { it.isNotBlank() && it != sentToken }
+                            nextToken = nextPageToken(body, pagination, sentToken)
                             tokenPage += 1
                             val pagedPastCutoff =
                                 tokenWalkCutoff != null &&
@@ -546,7 +549,7 @@ suspend fun downloadApiSessionExchange(
                     }
                     nextCursorField != null -> {
                         val sentToken = nextToken
-                        nextToken = stringFieldFromJson(body, nextCursorField)?.takeIf { it.isNotBlank() && it != sentToken }
+                        nextToken = nextPageToken(body, pagination, sentToken)
                         tokenPage += 1
                         nextToken != null && pageItems.isNotEmpty()
                     }
@@ -736,6 +739,22 @@ private fun stringFieldFromJson(
         null
     }
 
+/**
+ * The next-page token at [ApiPaginationConfig.nextCursorField], decoded when the provider sends it
+ * already percent-encoded ([ApiPaginationConfig.nextCursorUrlEncoded]) so the request's own encoding
+ * reproduces it exactly. Null when absent, blank, or the same token that was just sent - a provider
+ * echoing it back would otherwise page forever.
+ */
+internal fun nextPageToken(
+    body: String,
+    pagination: ApiPaginationConfig,
+    sentToken: String?,
+): String? {
+    val raw = pagination.nextCursorField?.let { stringFieldFromJson(body, it) }?.takeIf { it.isNotBlank() } ?: return null
+    val token = if (pagination.nextCursorUrlEncoded) raw.decodeURLQueryComponent() else raw
+    return token.takeIf { it != sentToken }
+}
+
 /** Reads an integer total-count field from a response envelope (e.g. Kraken `result.count`). */
 private fun totalCountFromJson(
     json: String,
@@ -878,6 +897,7 @@ private fun parseExchangeItem(
     requestId: ApiRequestId,
     jsonPath: String,
     into: ParsedExchangeData,
+    windowStart: Instant?,
 ) {
     if (dataEndpoint.enrichesTransfers) {
         dataEndpoint.transactionMappings?.let { parseEnrichment(obj, it) }?.let(into.enrichments::add)
@@ -885,7 +905,7 @@ private fun parseExchangeItem(
     }
     when (dataEndpoint.kind) {
         ApiEndpointKind.TRADES ->
-            dataEndpoint.tradeMappings?.let { parseTrade(obj, it, requestId, jsonPath) }?.let(into.trades::add)
+            dataEndpoint.tradeMappings?.let { parseTrade(obj, it, requestId, jsonPath, windowStart) }?.let(into.trades::add)
         ApiEndpointKind.ORDERS ->
             dataEndpoint.tradeMappings?.let { parseOrder(obj, it, requestId, jsonPath) }?.let(into.orders::add)
         ApiEndpointKind.DEPOSITS ->
@@ -899,6 +919,7 @@ private fun parseExchangeItem(
                         jsonPath,
                         into,
                         dataEndpoint.counterpartyAccountName,
+                        windowStart,
                     )
                 }?.let(into.transfers::addAll)
         ApiEndpointKind.WITHDRAWALS ->
@@ -912,6 +933,7 @@ private fun parseExchangeItem(
                         jsonPath,
                         into,
                         dataEndpoint.counterpartyAccountName,
+                        windowStart,
                     )
                 }?.let(into.transfers::addAll)
         ApiEndpointKind.BANK_TRANSACTIONS -> Unit
@@ -968,6 +990,7 @@ suspend fun importApiSessionExchange(
             )
         }
         val request = requestsById[response.requestId] ?: return@forEachResponse
+        val windowStart = windowStartFromMarker(request.url)
         // Prefer the precise "ep=<key>" marker (disambiguates endpoints sharing a path, e.g. Kraken's
         // Ledgers deposit/withdrawal split); a QUERY_ONLY signed URL (Binance) carries no marker, so fall
         // back to a plain path match, which is unambiguous there since query params live in the URL.
@@ -993,7 +1016,7 @@ suspend fun importApiSessionExchange(
                     } else {
                         arrayItemJsonPath(dataEndpoint.endpoint.responseArrayKey, index).value
                     }
-                parseExchangeItem(it, dataEndpoint, response.requestId, jsonPath, parsed)
+                parseExchangeItem(it, dataEndpoint, response.requestId, jsonPath, parsed, windowStart)
             }
         }
     }
@@ -1445,11 +1468,38 @@ private fun parseOrder(
     )
 }
 
+/**
+ * An item's timestamp, or [windowStart] when the provider reports the epoch itself (`0`) — a placeholder
+ * for "unknown" (Bybit's oldest deposit records carry `successAt = "0"` and no other date). The start of the
+ * date window the row was fetched in is the earliest moment it can have happened, so booking it there is
+ * at most one window off and never later than movements that depended on it.
+ * A row with no timestamp field at all is still skipped, as before.
+ */
+internal fun itemTimestamp(
+    raw: String?,
+    format: TimestampFormat,
+    pattern: String?,
+    windowStart: Instant?,
+): Instant? {
+    val parsed = raw?.let { parseApiTimestamp(it, format, pattern) } ?: return null
+    return if (parsed.toEpochMilliseconds() <= 0L && windowStart != null) windowStart else parsed
+}
+
+/** The start of the date window recorded in an exchange marker URL (`&ws=<epoch ms>`), if it has one. */
+internal fun windowStartFromMarker(url: String): Instant? =
+    Regex("[?&]ws=(\\d+)")
+        .find(url)
+        ?.groupValues
+        ?.get(1)
+        ?.toLongOrNull()
+        ?.let { Instant.fromEpochMilliseconds(it) }
+
 private fun parseTrade(
     obj: JsonObject,
     tm: ApiTradeMappings,
     requestId: ApiRequestId,
     jsonPath: String,
+    windowStart: Instant?,
 ): ParsedTrade? {
     if (!tm.itemFilters.all { obj.evaluatePredicate(it) }) return null
     val (baseCode, quoteCode) =
@@ -1468,7 +1518,8 @@ private fun parseTrade(
         tm.quoteQuantityField?.let { obj.str(it)?.let { v -> runCatching { BigDecimal(v) }.getOrNull() } }
             ?: tm.priceField?.let { obj.str(it)?.let { p -> runCatching { baseQty * BigDecimal(p) }.getOrNull() } }
             ?: return null
-    val timestamp = obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) } ?: return null
+    val timestamp =
+        itemTimestamp(obj.str(tm.timestampField), tm.timestampFormat, tm.timestampPattern, windowStart) ?: return null
     val id =
         tm.compositeIdFields
             .takeIf { it.isNotEmpty() }
@@ -1529,11 +1580,12 @@ private fun parseExchangeTransfer(
     jsonPath: String,
     into: ParsedExchangeData,
     counterpartyAccountName: String? = null,
+    windowStart: Instant? = null,
 ): List<ParsedExchangeTransfer> {
     if (!tm.itemFilters.all { obj.evaluatePredicate(it) }) return emptyList()
     val currency = obj.str(tm.currencyField) ?: return emptyList()
     val timestamp =
-        obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) } ?: return emptyList()
+        itemTimestamp(obj.str(tm.timestampField), tm.timestampFormat, tm.timestampPattern, windowStart) ?: return emptyList()
     val id =
         tm.compositeIdFields
             .takeIf { it.isNotEmpty() }
@@ -1570,11 +1622,18 @@ private fun parseExchangeTransfer(
         // entry sharing the same id with the opposite sign of the original debit/credit, netting to
         // zero; deriving direction from the sign instead of trusting the endpoint's fixed direction
         // preserves that net-zero.
+        // An endpoint listing both directions with unsigned amounts (Bybit Earn's Stake/Redeem orders)
+        // names the direction in a field instead, read like a bank feed's FIELD sign source.
+        val fieldDirection =
+            tm.signField
+                ?.takeIf { tm.signSource == ApiSignSource.FIELD }
+                ?.let { obj.str(it) }
+                ?.let { if (it in tm.creditValues) TransferDirection.IN else TransferDirection.OUT }
         val resolvedDirection =
-            if (tm.directionFromAmountSign) {
-                if (rawAmount < BigDecimal.ZERO) TransferDirection.OUT else TransferDirection.IN
-            } else {
-                direction
+            when {
+                tm.directionFromAmountSign -> if (rawAmount < BigDecimal.ZERO) TransferDirection.OUT else TransferDirection.IN
+                fieldDirection != null -> fieldDirection
+                else -> direction
             }
         val amount = rawAmount.abs()
         val description =

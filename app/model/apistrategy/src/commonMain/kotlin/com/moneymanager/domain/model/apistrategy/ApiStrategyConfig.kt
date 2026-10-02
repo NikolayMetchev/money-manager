@@ -220,6 +220,15 @@ data class ApiPaginationConfig(
      */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val nextCursorField: String? = null,
+    /**
+     * Whether the [nextCursorField] token arrives already percent-encoded and must reach the provider
+     * byte-for-byte (Bybit `nextPageCursor`, e.g. `123%3A2%2C123%3A2`). Request params are percent-encoded
+     * when the request is built, so such a token is decoded first; otherwise it would be sent double-encoded.
+     *
+     * Same NEVER-encode rationale as [windowRangeErrorSubstrings].
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val nextCursorUrlEncoded: Boolean = false,
 )
 
 /**
@@ -950,6 +959,15 @@ data class ApiRequestSigningConfig(
      */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val serverTimeSync: ApiServerTimeSync? = null,
+    /**
+     * Fixed headers sent on **every** HMAC-signed request — for a provider whose stale-nonce tolerance is a
+     * header rather than a request parameter (Bybit's `X-BAPI-RECV-WINDOW`, which is also part of the signed
+     * message, so a strategy repeats its value as a [SigPart.Literal] in [message]). Same NEVER-encode
+     * rationale as [signedParams].
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @Serializable(with = SortedStringToStringMapSerializer::class)
+    val staticHeaders: Map<String, String> = emptyMap(),
     /**
      * When set, requests are authenticated with a freshly signed JWT instead of an HMAC signature, and
      * [message]/[apiKey]/[nonce]/[signature]/[algorithm] are ignored. Same NEVER-encode rationale as

@@ -781,6 +781,14 @@ internal fun PaginationEditor(
     if (config.nextCursorField != null && config.mode == PaginationMode.DATE_WINDOW) {
         TextFieldRow("Cursor param", config.cursorParam, { onChange(config.copy(cursorParam = it)) }, enabled)
     }
+    if (config.nextCursorField != null) {
+        ToggleRow(
+            label = "Next-page token is already URL-encoded (e.g. Bybit)",
+            checked = config.nextCursorUrlEncoded,
+            onCheckedChange = { onChange(config.copy(nextCursorUrlEncoded = it)) },
+            enabled = enabled,
+        )
+    }
     // Applies to every mode: it clamps the date-window sweep and sets the cursor loop's stop point.
     IntFieldRow(
         "Incremental overlap days",
