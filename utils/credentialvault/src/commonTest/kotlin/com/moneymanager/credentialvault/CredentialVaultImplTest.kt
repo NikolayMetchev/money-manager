@@ -10,6 +10,7 @@ import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -206,4 +207,109 @@ class CredentialVaultImplTest {
 
         assertFalse("secret-token" in text || "hmac-value" in text || "refresh-value" in text)
     }
+
+    @Test
+    fun `merging keeps both sides with the newer API credential and the local Google account`() {
+        val oldMonzo = monzo.copy(token = "old", createdAtEpochMillis = 1)
+        val newMonzo = monzo.copy(token = "new", createdAtEpochMillis = 2)
+        val wise = StoredApiCredential(strategyName = "Wise", token = "wise", createdAtEpochMillis = 1)
+        val local =
+            CredentialBundle(
+                apiCredentials = listOf(oldMonzo),
+                googleAccounts = listOf(StoredGoogleAccount("client", "local-refresh")),
+            )
+        val remote =
+            CredentialBundle(
+                apiCredentials = listOf(newMonzo, wise),
+                googleAccounts = listOf(StoredGoogleAccount("client", "remote-refresh"), StoredGoogleAccount("other", "other-refresh")),
+            )
+
+        val merged = local.mergedWith(remote)
+
+        assertEquals(newMonzo, merged.apiCredential("Monzo"))
+        assertEquals(wise, merged.apiCredential("Wise"))
+        assertEquals("local-refresh", merged.googleAccount("client")?.refreshToken)
+        assertEquals("other-refresh", merged.googleAccount("other")?.refreshToken)
+    }
+
+    @Test
+    fun `encryptedBytes returns the file as stored or null before it exists`() =
+        runTest {
+            val storage = InMemoryVaultStorage()
+            val vault = inMemoryCredentialVault(storage)
+            assertNull(vault.encryptedBytes())
+
+            vault.create(vault.defaultPath()!!, TEST_VAULT_PASSWORD)
+            vault.lock()
+
+            assertTrue(
+                storage.files.values
+                    .single()
+                    .contentEquals(vault.encryptedBytes()),
+            )
+        }
+
+    @Test
+    fun `applying a remote copy replaces or merges the secrets`() =
+        runTest {
+            val wise = StoredApiCredential(strategyName = "Wise", token = "wise", createdAtEpochMillis = 1)
+            val remote = ArchiveCodec.pack(json(CredentialBundle(apiCredentials = listOf(wise))), TEST_VAULT_PASSWORD)
+            val vault = inMemoryCredentialVault()
+            vault.create(vault.defaultPath()!!, TEST_VAULT_PASSWORD)
+            vault.update("test") { it.withApiCredential(monzo) }
+
+            vault.applyRemote(remote, password = null, merge = true)
+            assertEquals(
+                setOf("Monzo", "Wise"),
+                vault
+                    .bundleOrNull()
+                    ?.apiCredentials
+                    ?.map { it.strategyName }
+                    ?.toSet(),
+            )
+
+            vault.applyRemote(remote, password = null, merge = false)
+            assertEquals(listOf(wise), vault.bundleOrNull()?.apiCredentials)
+        }
+
+    @Test
+    fun `applying a remote copy under another password adopts that password`() =
+        runTest {
+            val remote = ArchiveCodec.pack(json(CredentialBundle()), "remote-password")
+            val vault = inMemoryCredentialVault()
+            vault.create(vault.defaultPath()!!, TEST_VAULT_PASSWORD)
+
+            assertFailsWith<ArchiveDecryptionException> { vault.applyRemote(remote, password = null, merge = true) }
+            vault.applyRemote(remote, password = "remote-password", merge = true)
+            vault.lock()
+
+            assertFailsWith<ArchiveDecryptionException> { vault.unlock(TEST_VAULT_PASSWORD) }
+            vault.unlock("remote-password")
+        }
+
+    @Test
+    fun `a secret saved after the local read is merged rather than replaced`() =
+        runTest {
+            val wise = StoredApiCredential(strategyName = "Wise", token = "wise", createdAtEpochMillis = 1)
+            val remote = ArchiveCodec.pack(json(CredentialBundle(apiCredentials = listOf(wise))), TEST_VAULT_PASSWORD)
+            val vault = inMemoryCredentialVault()
+            vault.create(vault.defaultPath()!!, TEST_VAULT_PASSWORD)
+            val readBeforeDownload = vault.encryptedBytes()
+            vault.update("test") { it.withApiCredential(monzo) }
+
+            val applied = vault.applyRemote(remote, password = null, merge = false, expectedLocal = readBeforeDownload)
+
+            assertTrue(applied.merged)
+            assertEquals(
+                setOf("Monzo", "Wise"),
+                vault
+                    .bundleOrNull()
+                    ?.apiCredentials
+                    ?.map { it.strategyName }
+                    ?.toSet(),
+            )
+            assertTrue(applied.fileBytes.contentEquals(vault.encryptedBytes()))
+        }
+
+    private fun json(bundle: CredentialBundle): ByteArray = Json.encodeToString(bundle).encodeToByteArray()
 }

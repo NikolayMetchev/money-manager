@@ -169,6 +169,33 @@ class CredentialVaultImpl(
         }
     }
 
+    override suspend fun encryptedBytes(): ByteArray? =
+        mutex.withLock {
+            currentPath()?.takeIf(storage::exists)?.let(storage::read)
+        }
+
+    override suspend fun applyRemote(
+        bytes: ByteArray,
+        password: String?,
+        merge: Boolean,
+        expectedLocal: ByteArray?,
+    ): AppliedRemote =
+        mutex.withLock {
+            val unlocked = requireUnlockedState()
+            val current = requireNotNull(this.password)
+            val remotePassword = password ?: current
+            val remote = decode(ArchiveCodec.unpack(bytes, remotePassword))
+            val changedSinceRead = expectedLocal != null && !storage.read(unlocked.path).contentEquals(expectedLocal)
+            val effectiveMerge = merge || changedSinceRead
+            val updated = if (effectiveMerge) unlocked.bundle.mergedWith(remote) else remote
+            if (updated != unlocked.bundle || remotePassword != current) {
+                write(unlocked.path, updated, remotePassword)
+                this.password = remotePassword
+                mutableState.value = VaultState.Unlocked(unlocked.path, updated)
+            }
+            AppliedRemote(storage.read(unlocked.path), effectiveMerge)
+        }
+
     private fun currentPath(): String? =
         when (val current = mutableState.value) {
             VaultState.Unbound -> null

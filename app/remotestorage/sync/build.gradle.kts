@@ -11,6 +11,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.remotestorage.core)
+                api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
 
                 implementation(projects.utils.archive)
@@ -25,6 +26,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.remotestorage.core)
+                api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
                 // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
                 api(libs.kotlinx.coroutines.core)
@@ -38,6 +40,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.remotestorage.core)
+                api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
                 // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
                 api(libs.kotlinx.coroutines.core)
@@ -47,6 +50,7 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(projects.test.app.db)
+                implementation(projects.test.utils.credentialvault)
                 implementation(projects.utils.archive)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)

@@ -194,6 +194,14 @@ Google refresh tokens.
   any installed strategy with vault secrets, which is how a recreated database reconnects.
 - The vault is `AppScope` and re-bound (`bindToDatabase`) on every database switch, which locks it if the
   file changes. Tests use `unlockedCredentialVault()` from `test/utils/credentialvault`.
+- **Opt-in cloud backup**: `CredentialSyncController` (`app/remotestorage/sync`) uploads the vault file's
+  already-encrypted bytes, as is, to Drive `Money Manager/Credentials/<vault file name>`. It runs on its
+  own connection, like the strategy library. Sync is two-way against a per-vault-path baseline: the side
+  that changed wins. When both sides changed, or a new device finds an existing backup, the two are merged
+  with `CredentialBundle.mergedWith`: the newer API credential wins and the local Google account wins. A
+  backup under another password needs that password once, and the local vault then adopts it
+  (`CredentialVault.applyRemote`). `CredentialBackupSyncHost` syncs on unlock and after every change, and it
+  never prompts.
 
 ## Reconciliation Sources (Koinly, …)
 

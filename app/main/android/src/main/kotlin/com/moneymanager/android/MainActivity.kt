@@ -143,6 +143,7 @@ class MainActivity : ComponentActivity() {
                 driveFolderBrowser = driveFolderBrowser,
                 cryptoCatalogRefresher = HttpCryptoCatalogRefresher(),
                 credentialVault = component.credentialVault,
+                credentialSyncController = component.credentialSyncController,
                 onDatabaseReady = { database, _ -> openDatabase = database },
             )
         }

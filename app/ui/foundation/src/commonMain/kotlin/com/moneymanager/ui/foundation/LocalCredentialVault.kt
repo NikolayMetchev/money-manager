@@ -1,6 +1,7 @@
 package com.moneymanager.ui.foundation
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.moneymanager.credentialvault.AppliedRemote
 import com.moneymanager.credentialvault.CredentialBundle
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.CredentialVaultLockedException
@@ -50,6 +51,15 @@ private object UnprovidedCredentialVault : CredentialVault {
         reason: String,
         transform: (CredentialBundle) -> CredentialBundle,
     ) = unprovided()
+
+    override suspend fun encryptedBytes(): ByteArray? = null
+
+    override suspend fun applyRemote(
+        bytes: ByteArray,
+        password: String?,
+        merge: Boolean,
+        expectedLocal: ByteArray?,
+    ): AppliedRemote = unprovided()
 
     private fun unprovided(): Nothing = throw CredentialVaultLockedException("No credential vault is available")
 }

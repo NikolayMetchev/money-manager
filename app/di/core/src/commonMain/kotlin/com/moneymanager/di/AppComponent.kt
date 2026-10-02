@@ -6,6 +6,7 @@ import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.di.scope.AppScope
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.remotestorage.sync.CredentialSyncController
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.strategycatalog.StrategyCatalogController
@@ -19,6 +20,7 @@ interface AppComponent {
     val localSettings: LocalSettings
     val remoteDatabaseController: RemoteDatabaseController
     val strategySyncController: StrategySyncController
+    val credentialSyncController: CredentialSyncController
     val strategyCatalogController: StrategyCatalogController
     val credentialVault: CredentialVault
 
