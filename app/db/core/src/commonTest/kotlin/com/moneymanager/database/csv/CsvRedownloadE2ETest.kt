@@ -2,19 +2,15 @@
 
 package com.moneymanager.database.csv
 
-import com.moneymanager.csvimporter.CsvRedownloadPlan
 import com.moneymanager.csvimporter.bulkApplyCsv
-import com.moneymanager.csvimporter.executeCsvRedownload
 import com.moneymanager.csvimporter.executeCsvUnimport
 import com.moneymanager.csvimporter.planCsvUnimport
-import com.moneymanager.csvimporter.prepareCsvRedownload
 import com.moneymanager.csvimporter.redownloadImportDirectory
 import com.moneymanager.csvimporter.scanImportDirectory
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.importengineapi.createCsvImport
@@ -22,14 +18,12 @@ import com.moneymanager.importengineapi.createImportDirectory
 import com.moneymanager.importengineapi.recordDirectoryFileImported
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
-import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.importfilesource.ImportSubfolder
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -55,13 +49,6 @@ class CsvRedownloadE2ETest : DbTest() {
             override suspend fun listSubfolders(): List<ImportSubfolder> = emptyList()
 
             override suspend fun download(fileRef: String) = fileContent.encodeToByteArray()
-        }
-
-    private val factory =
-        object : ImportFileSourceFactory {
-            override fun supportsProvider(provider: ImportDirectoryProvider) = true
-
-            override suspend fun create(directory: ImportDirectory) = source
         }
 
     private val maintenance =
@@ -133,8 +120,32 @@ class CsvRedownloadE2ETest : DbTest() {
             tradeRepository = repositories.tradeRepository,
         )
 
-    private suspend fun prepare(id: CsvImportId) =
-        prepareCsvRedownload(id, repositories.csvImportRepository, repositories.importDirectoryRepository, factory)
+    private suspend fun redownload(
+        directory: ImportDirectory,
+        unimport: Boolean = false,
+    ) = redownloadImportDirectory(
+        directory = directory,
+        fileSource = source,
+        importDirectoryRepository = repositories.importDirectoryRepository,
+        csvImportRepository = repositories.csvImportRepository,
+        importEngine = repositories.importEngine,
+        unimport =
+            if (unimport) {
+                { importId ->
+                    executeCsvUnimport(
+                        plan = planCsvUnimport(importId, repositories.csvImportRepository),
+                        accountRepository = repositories.accountRepository,
+                        transactionRepository = repositories.transactionRepository,
+                        transferRelationshipRepository = repositories.transferRelationshipRepository,
+                        tradeRepository = repositories.tradeRepository,
+                        maintenance = maintenance,
+                        importEngine = repositories.importEngine,
+                    )
+                }
+            } else {
+                null
+            },
+    )
 
     private suspend fun rows(id: CsvImportId) = repositories.csvImportRepository.getImportRows(id, limit = 100, offset = 0)
 
@@ -163,9 +174,7 @@ class CsvRedownloadE2ETest : DbTest() {
             )
             assertEquals(0, importAll(staleId).filesImported, "the stale columns match no strategy")
 
-            val redownload = prepare(staleId)
-            assertIs<CsvRedownloadPlan.Replace>(redownload.plan)
-            executeCsvRedownload(redownload, repositories.importEngine)
+            assertEquals(listOf(fileName), redownload(directory).replaced)
 
             val restaged = assertNotNull(repositories.csvImportRepository.getImport(staleId).first())
             assertEquals(header.split(","), restaged.columns.sortedBy { it.columnIndex }.map { it.originalName })
@@ -191,11 +200,9 @@ class CsvRedownloadE2ETest : DbTest() {
                     listOf(preamble, "$header,Note", "12345678,userDeposit,USDT,5,5,2022-02-01 09:00:00,") +
                         spotRows.map { "$it,ok" }
                 ).joinToString("\n")
-            val redownload = prepare(id)
-            val plan = assertIs<CsvRedownloadPlan.Replace>(redownload.plan)
-            assertEquals(listOf("Note"), plan.addedColumns)
-            assertEquals(1, plan.newRows)
-            executeCsvRedownload(redownload, repositories.importEngine)
+            val result = redownload(directory)
+            assertEquals(listOf(fileName), result.replaced)
+            assertEquals(listOf(fileName), result.reimportSuggested, "its columns changed under imported rows")
 
             val after = rows(id)
             assertEquals(null, after.first().importStatus, "the new row has never been imported")
@@ -216,36 +223,6 @@ class CsvRedownloadE2ETest : DbTest() {
         }
 
     @Test
-    fun `an imported row the file no longer has blocks until the file is unimported`() =
-        runTest {
-            fileContent = (listOf(preamble, header) + spotRows).joinToString("\n")
-            val directory = directory()
-            scan(directory)
-            val id = stagedId(directory)
-            importAll(id)
-
-            fileContent = (listOf(preamble, header) + spotRows.dropLast(1)).joinToString("\n")
-            val blocked = assertIs<CsvRedownloadPlan.Blocked>(prepare(id).plan)
-            assertEquals(listOf("userDeposit"), blocked.unmatchedImportedRows.map { it.values[1] })
-
-            executeCsvUnimport(
-                plan = planCsvUnimport(id, repositories.csvImportRepository),
-                accountRepository = repositories.accountRepository,
-                transactionRepository = repositories.transactionRepository,
-                transferRelationshipRepository = repositories.transferRelationshipRepository,
-                tradeRepository = repositories.tradeRepository,
-                maintenance = maintenance,
-                importEngine = repositories.importEngine,
-            )
-            val redownload = prepare(id)
-            assertIs<CsvRedownloadPlan.Replace>(redownload.plan)
-            executeCsvRedownload(redownload, repositories.importEngine)
-
-            assertEquals(spotRows.size - 1, rows(id).size)
-            assertEquals(true, rows(id).none { it.importStatus == ImportStatus.IMPORTED })
-        }
-
-    @Test
     fun `re-downloading a directory re-stages its files and only unimports when asked`() =
         runTest {
             fileContent = (listOf(preamble, header) + spotRows).joinToString("\n")
@@ -255,36 +232,11 @@ class CsvRedownloadE2ETest : DbTest() {
             importAll(id)
             fileContent = (listOf(preamble, header) + spotRows.dropLast(1)).joinToString("\n")
 
-            suspend fun redownloadDirectory(unimport: Boolean) =
-                redownloadImportDirectory(
-                    directory = directory,
-                    fileSource = source,
-                    importDirectoryRepository = repositories.importDirectoryRepository,
-                    csvImportRepository = repositories.csvImportRepository,
-                    importEngine = repositories.importEngine,
-                    unimport =
-                        if (unimport) {
-                            { importId ->
-                                executeCsvUnimport(
-                                    plan = planCsvUnimport(importId, repositories.csvImportRepository),
-                                    accountRepository = repositories.accountRepository,
-                                    transactionRepository = repositories.transactionRepository,
-                                    transferRelationshipRepository = repositories.transferRelationshipRepository,
-                                    tradeRepository = repositories.tradeRepository,
-                                    maintenance = maintenance,
-                                    importEngine = repositories.importEngine,
-                                )
-                            }
-                        } else {
-                            null
-                        },
-                )
-
-            val skipped = redownloadDirectory(unimport = false)
+            val skipped = redownload(directory)
             assertEquals(listOf(fileName), skipped.blocked, "an imported row went missing, so the file is left alone")
             assertEquals(spotRows.size, rows(id).size)
 
-            val forced = redownloadDirectory(unimport = true)
+            val forced = redownload(directory, unimport = true)
             assertEquals(listOf(fileName), forced.unimported)
             assertEquals(spotRows.size - 1, rows(id).size)
         }

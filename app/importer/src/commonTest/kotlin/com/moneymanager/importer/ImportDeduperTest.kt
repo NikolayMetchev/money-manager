@@ -796,7 +796,7 @@ class ImportDeduperTest {
     private fun netAndFee(feeTimestamp: Instant = baseTime) =
         listOf(
             existing(50, description = "Withdraw BTC", amount = 100, src = wallet, tgt = chainAddress),
-            existing(51, description = "BTC fee", amount = 5, timestamp = feeTimestamp, src = wallet, tgt = fees),
+            existing(51, description = "BTC fee", timestamp = feeTimestamp, src = wallet, tgt = fees),
         )
 
     @Test
@@ -840,14 +840,14 @@ class ImportDeduperTest {
     // window it fetched it in, which can be weeks before it happened.
     private val windowEnd = baseTime + 30.days
 
-    private fun approximateDeposit(id: Long) =
-        existing(id, description = "Deposit USDT", amount = 1346, src = placeholder, tgt = wallet)
+    private fun approximateDeposit() =
+        existing(60, description = "Deposit USDT", amount = 1346, src = placeholder, tgt = wallet)
             .copy(approximateUntil = windowEnd)
 
     @Test
     fun preciseRow_supersedesAnApproximateLegAnywhereInItsWindow() {
         val incoming = placeholderDeposit(0, amount = 1346, timestamp = baseTime + 4.days + 14.hours)
-        val result = ImportDeduper(unidentifiedPolicy, existing = listOf(approximateDeposit(60))).classify(listOf(incoming)).single()
+        val result = ImportDeduper(unidentifiedPolicy, existing = listOf(approximateDeposit())).classify(listOf(incoming)).single()
         assertEquals(ImportStatus.IMPORTED, result.status)
         assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) }, "the precise record stays counted")
         assertEquals(TransferId(60), result.excludeExisting?.transfer?.id)
@@ -856,7 +856,7 @@ class ImportDeduperTest {
     @Test
     fun preciseRow_outsideTheApproximateWindowIsAPlainImport() {
         val incoming = placeholderDeposit(0, amount = 1346, timestamp = windowEnd + 2.days)
-        val result = ImportDeduper(unidentifiedPolicy, existing = listOf(approximateDeposit(60))).classify(listOf(incoming)).single()
+        val result = ImportDeduper(unidentifiedPolicy, existing = listOf(approximateDeposit())).classify(listOf(incoming)).single()
         assertEquals(null, result.excludeExisting)
         assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
     }

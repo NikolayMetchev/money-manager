@@ -1789,6 +1789,9 @@ object BuiltInCsvStrategies {
     /** Trade reconciliation window; see [BINANCE_TRADE_RECONCILE_WINDOW_SECONDS] for why it is tight. */
     private const val BYBIT_TRADE_RECONCILE_WINDOW_SECONDS = 5L
 
+    /** Every Bybit ledger names a row's kind in this column. */
+    private const val BYBIT_TYPE_COLUMN = "Type"
+
     /** Every Bybit ledger stamps rows `yyyy-MM-dd HH:mm:ss` in UTC. */
     private fun bybitTimestamp(columnName: String) =
         DateTimeParsingMapping(
@@ -1800,10 +1803,9 @@ object BuiltInCsvStrategies {
 
     /**
      * The field mappings every Bybit ledger shares: the Bybit account on one side, [targetRules] over
-     * [typeColumn] on the other, and a signed [amountColumn] whose positive rows arrive into Bybit.
+     * the `Type` column on the other, and a signed [amountColumn] whose positive rows arrive into Bybit.
      */
     private fun bybitFieldMappings(
-        typeColumn: String,
         targetRules: List<RegexRule>,
         timeColumn: String,
         amountColumn: String,
@@ -1820,7 +1822,7 @@ object BuiltInCsvStrategies {
         TransferField.TARGET_ACCOUNT to
             ConditionalAccountMapping(
                 fieldType = TransferField.TARGET_ACCOUNT,
-                conditions = listOf(RowCondition(typeColumn, RowConditionOperator.IS_BLANK)),
+                conditions = listOf(RowCondition(BYBIT_TYPE_COLUMN, RowConditionOperator.IS_BLANK)),
                 whenTrue =
                     RegexAccountMapping(
                         fieldType = TransferField.TARGET_ACCOUNT,
@@ -1828,13 +1830,13 @@ object BuiltInCsvStrategies {
                         rules = listOf(RegexRule(pattern = "^", accountName = BYBIT_TRADING_ACCOUNT)),
                     ),
                 whenFalse =
-                    RegexAccountMapping(fieldType = TransferField.TARGET_ACCOUNT, columnName = typeColumn, rules = targetRules),
+                    RegexAccountMapping(fieldType = TransferField.TARGET_ACCOUNT, columnName = BYBIT_TYPE_COLUMN, rules = targetRules),
             ),
         TransferField.TIMESTAMP to bybitTimestamp(timeColumn),
         TransferField.DESCRIPTION to
             DirectColumnMapping(
                 fieldType = TransferField.DESCRIPTION,
-                columnName = typeColumn,
+                columnName = BYBIT_TYPE_COLUMN,
                 // A Spot convert leg has an empty Type.
                 fallbackColumns = listOf(coinColumn),
             ),
@@ -1855,14 +1857,13 @@ object BuiltInCsvStrategies {
 
     /** Attribute mappings every Bybit ledger shares, plus the exclusion of wallet-to-wallet moves. */
     private fun bybitAttributeMappings(
-        typeColumn: String,
         internalTransferPattern: String,
         extra: List<AttributeColumnMapping> = emptyList(),
     ) = listOf(
         AttributeColumnMapping("Uid", "bybit-uid"),
-        AttributeColumnMapping(typeColumn, "bybit-type"),
+        AttributeColumnMapping(BYBIT_TYPE_COLUMN, "bybit-type"),
         AttributeColumnMapping(
-            columnName = typeColumn,
+            columnName = BYBIT_TYPE_COLUMN,
             attributeTypeName = "excluded",
             extraction = ColumnExtraction(pattern = internalTransferPattern),
             emitWhenMatched = BYBIT_INTERNAL_TRANSFER_EXCLUSION,
@@ -1906,8 +1907,8 @@ object BuiltInCsvStrategies {
             config =
                 CsvStrategyConfig(
                     identificationColumns = setOf("Uid", "Type", "Coin", "Amount", "Wallet Balance", "Time(UTC)"),
-                    fieldMappings = bybitFieldMappings("Type", targetRules, "Time(UTC)", "Amount", "Coin"),
-                    attributeMappings = bybitAttributeMappings("Type", internalTransfer),
+                    fieldMappings = bybitFieldMappings(targetRules, "Time(UTC)", "Amount", "Coin"),
+                    attributeMappings = bybitAttributeMappings(internalTransfer),
                     contentMatchRules = listOf(bybitUidRule),
                     crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
                     tradeGroupConfig =
@@ -1948,10 +1949,9 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns =
                         setOf("Uid", "Date & Time(UTC)", "Coin", "QTY", "Type", "Account Balance", "Description"),
-                    fieldMappings = bybitFieldMappings("Type", targetRules, "Date & Time(UTC)", "QTY", "Coin"),
+                    fieldMappings = bybitFieldMappings(targetRules, "Date & Time(UTC)", "QTY", "Coin"),
                     attributeMappings =
                         bybitAttributeMappings(
-                            "Type",
                             internalTransfer,
                             listOf(AttributeColumnMapping("Description", "bybit-description")),
                         ),
@@ -1999,10 +1999,9 @@ object BuiltInCsvStrategies {
                             "Action",
                             "Time(UTC)",
                         ),
-                    fieldMappings = bybitFieldMappings("Type", targetRules, "Time(UTC)", "Change", "Currency"),
+                    fieldMappings = bybitFieldMappings(targetRules, "Time(UTC)", "Change", "Currency"),
                     attributeMappings =
                         bybitAttributeMappings(
-                            "Type",
                             internalTransfer,
                             listOf(AttributeColumnMapping("Contract", "bybit-contract")),
                         ),

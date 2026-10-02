@@ -19,7 +19,6 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.recordDirectoryFileImported
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
-import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
@@ -157,31 +156,6 @@ private fun List<String>.padded(size: Int): List<String> = if (this.size >= size
 internal fun parseStagedCsv(content: String): CsvParseResult {
     val parser = CsvParser()
     return parser.parse(content, CsvParseOptions(delimiter = parser.detectDelimiter(content)))
-}
-
-/**
- * Downloads [importId]'s file again from the import folder it was staged from, parses it with the
- * current parser, and plans how to re-stage it ([planCsvRedownload]). Nothing is written.
- */
-suspend fun prepareCsvRedownload(
-    importId: CsvImportId,
-    csvImportRepository: CsvImportReadRepository,
-    importDirectoryRepository: ImportDirectoryReadRepository,
-    fileSourceFactory: ImportFileSourceFactory,
-): CsvRedownload {
-    val staged =
-        csvImportRepository.getImport(importId).first() ?: redownloadFailure("The import no longer exists.")
-    val tracked =
-        importDirectoryRepository.getTrackedFilesForCsvImport(importId).firstOrNull()
-            ?: redownloadFailure("${staged.originalFileName} was not staged from an import folder.")
-    val directory =
-        importDirectoryRepository.getDirectoryById(tracked.directoryId).first()
-            ?: redownloadFailure("The import folder for ${staged.originalFileName} no longer exists.")
-    if (!fileSourceFactory.supportsProvider(directory.provider)) {
-        redownloadFailure("This device cannot read ${directory.provider} folders.")
-    }
-    val source = fileSourceFactory.create(directory)
-    return prepareFromSource(staged, tracked, source, source.list(), csvImportRepository)
 }
 
 /** Downloads [tracked] from the already-open [source] (whose listing is [entries]) and plans its re-stage. */
@@ -362,7 +336,6 @@ suspend fun executeCsvRedownload(
         checksum = redownload.checksum,
         remoteContentHash = source.remoteContentHash,
         csvImportId = redownload.importId,
-        qifImportId = null,
         importedAt = Clock.System.now(),
     )
 }
