@@ -139,12 +139,12 @@ class CredentialSyncController(
         val remoteChanged = known == null || (remote.revisionId != null && remote.revisionId != known.syncedRevision)
         when {
             remoteChanged -> {
-                vault.applyRemote(provider.download(remote.id), remotePassword, merge = localChanged)
-                val updated = vault.encryptedBytes() ?: return
-                if (localChanged) {
-                    upload(provider, remote.id, name, path, updated)
+                // Passing `local` makes a secret saved during the download merge in rather than be replaced.
+                val applied = vault.applyRemote(provider.download(remote.id), remotePassword, merge = localChanged, expectedLocal = local)
+                if (applied.merged) {
+                    upload(provider, remote.id, name, path, applied.fileBytes)
                 } else {
-                    saveBaseline(path, remote, updated)
+                    saveBaseline(path, remote, applied.fileBytes)
                 }
             }
             localChanged -> upload(provider, remote.id, name, path, local)

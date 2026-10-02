@@ -287,5 +287,29 @@ class CredentialVaultImplTest {
             vault.unlock("remote-password")
         }
 
+    @Test
+    fun `a secret saved after the local read is merged rather than replaced`() =
+        runTest {
+            val wise = StoredApiCredential(strategyName = "Wise", token = "wise", createdAtEpochMillis = 1)
+            val remote = ArchiveCodec.pack(json(CredentialBundle(apiCredentials = listOf(wise))), TEST_VAULT_PASSWORD)
+            val vault = inMemoryCredentialVault()
+            vault.create(vault.defaultPath()!!, TEST_VAULT_PASSWORD)
+            val readBeforeDownload = vault.encryptedBytes()
+            vault.update("test") { it.withApiCredential(monzo) }
+
+            val applied = vault.applyRemote(remote, password = null, merge = false, expectedLocal = readBeforeDownload)
+
+            assertTrue(applied.merged)
+            assertEquals(
+                setOf("Monzo", "Wise"),
+                vault
+                    .bundleOrNull()
+                    ?.apiCredentials
+                    ?.map { it.strategyName }
+                    ?.toSet(),
+            )
+            assertTrue(applied.fileBytes.contentEquals(vault.encryptedBytes()))
+        }
+
     private fun json(bundle: CredentialBundle): ByteArray = Json.encodeToString(bundle).encodeToByteArray()
 }

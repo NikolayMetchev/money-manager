@@ -106,14 +106,26 @@ interface CredentialVault {
      * [CredentialBundle.mergedWith] (this side preferred). When [password] differs from the current one, the
      * local file is re-encrypted under it, so every device sharing the backup converges on one password.
      *
+     * Pass the file's bytes as last read in [expectedLocal]: if the file changed since (a secret saved while
+     * the backup was downloading), the backup is merged in rather than replacing that change.
+     *
      * Requires the vault to be unlocked. Throws `ArchiveDecryptionException` if [password] is wrong.
      */
     suspend fun applyRemote(
         bytes: ByteArray,
         password: String?,
         merge: Boolean,
-    )
+        expectedLocal: ByteArray? = null,
+    ): AppliedRemote
 }
+
+/** The outcome of [CredentialVault.applyRemote]. */
+class AppliedRemote(
+    /** The vault file's bytes once applied, read under the same lock, so no later change is mistaken for them. */
+    val fileBytes: ByteArray,
+    /** True if the backup was merged in (so the result holds local changes the backup lacks). */
+    val merged: Boolean,
+)
 
 /** The decrypted secrets if the vault is already unlocked, without prompting. */
 fun CredentialVault.bundleOrNull(): CredentialBundle? = (state.value as? VaultState.Unlocked)?.bundle
