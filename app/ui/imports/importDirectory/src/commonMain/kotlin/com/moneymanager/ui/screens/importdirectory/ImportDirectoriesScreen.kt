@@ -130,8 +130,11 @@ fun ImportDirectoriesScreen(
     // run: null until the folder's file list comes back, then its done / total.
     val downloadAllProgress = remember { mutableStateMapOf<ImportDirectoryId, Pair<Int, Int>?>() }
     var downloadAllRunning by remember { mutableStateOf(false) }
+    // Set for a whole re-download run: its per-folder progress entries come and go between folders, and
+    // nothing else may start in those gaps.
+    var redownloadRunning by remember { mutableStateOf(false) }
     var downloadAllStartedAt by remember { mutableStateOf<TimeSource.Monotonic.ValueTimeMark?>(null) }
-    val scanning = downloadAllRunning || scanProgress.isNotEmpty() || discovering.isNotEmpty()
+    val scanning = downloadAllRunning || redownloadRunning || scanProgress.isNotEmpty() || discovering.isNotEmpty()
     // Directories scan concurrently but the engine doesn't serialize writes, so all of them share it.
     val dbLock = remember { Mutex() }
 
@@ -261,37 +264,42 @@ fun ImportDirectoriesScreen(
         statusMessage = null
         scanFailures = emptyList()
         scope.launch {
-            var result = DirectoryRedownloadResult()
-            for (folder in folders) {
-                try {
-                    scanProgress[folder.id] = 0 to 0
-                    result +=
-                        withContext(Dispatchers.IO) {
-                            dbLock.withLock {
-                                redownloadImportDirectory(
-                                    directory = folder,
-                                    fileSource = importFileSourceFactory!!.create(folder),
-                                    importDirectoryRepository = importDirectoryRepository,
-                                    csvImportRepository = csvImportRepository,
-                                    importEngine = importEngine,
-                                    unimport = unimportCsv.takeIf { unimportBlocked },
-                                    onProgress = { done, total -> scanProgress[folder.id] = done to total },
-                                )
+            redownloadRunning = true
+            try {
+                var result = DirectoryRedownloadResult()
+                for (folder in folders) {
+                    try {
+                        scanProgress[folder.id] = 0 to 0
+                        result +=
+                            withContext(Dispatchers.IO) {
+                                dbLock.withLock {
+                                    redownloadImportDirectory(
+                                        directory = folder,
+                                        fileSource = importFileSourceFactory!!.create(folder),
+                                        importDirectoryRepository = importDirectoryRepository,
+                                        csvImportRepository = csvImportRepository,
+                                        importEngine = importEngine,
+                                        unimport = unimportCsv.takeIf { unimportBlocked },
+                                        onProgress = { done, total -> scanProgress[folder.id] = done to total },
+                                    )
+                                }
                             }
-                        }
-                } catch (expected: CancellationException) {
-                    throw expected
-                } catch (expected: Exception) {
-                    result += DirectoryRedownloadResult(failures = listOf("${folder.name}: ${expected.message}"))
-                } finally {
-                    scanProgress.remove(folder.id)
+                    } catch (expected: CancellationException) {
+                        throw expected
+                    } catch (expected: Exception) {
+                        result += DirectoryRedownloadResult(failures = listOf("${folder.name}: ${expected.message}"))
+                    } finally {
+                        scanProgress.remove(folder.id)
+                    }
                 }
+                statusMessage = result.summary()
+                scanFailures =
+                    result.failures +
+                    result.blocked.map { "$it: imported rows are not in the new copy; re-download with \"unimport\" ticked" } +
+                    result.reimportSuggested.map { "$it: columns changed; Re-import it to apply them to its transactions" }
+            } finally {
+                redownloadRunning = false
             }
-            statusMessage = result.summary()
-            scanFailures =
-                result.failures +
-                result.blocked.map { "$it: imported rows are not in the new copy; re-download with \"unimport\" ticked" } +
-                result.reimportSuggested.map { "$it: columns changed; Re-import it to apply them to its transactions" }
         }
     }
 

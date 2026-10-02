@@ -885,6 +885,33 @@ class ImportDeduperTest {
         )
     }
 
+    @Test
+    fun excludedApproximateRow_claimsNothing() {
+        // A row that already counts nowhere must not use up the precise leg a real record will need.
+        val apiPolicy =
+            DedupePolicy.ApiMultiKey(
+                reconcileWindow = 60.minutes,
+                reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+                reconciledRelationshipTypeId = RelationshipTypeId(1),
+            )
+        val preciseLeg =
+            existing(62, description = "userDeposit", amount = 1346, timestamp = baseTime + 4.days, src = placeholder, tgt = wallet)
+        val excludedApproximate =
+            importTransfer(
+                0,
+                description = "Deposit USDT",
+                amount = 1346,
+                apiId = "x",
+                src = AccountId(40),
+                tgt = wallet,
+                attributes = listOf(NewAttribute(AttributeTypeId(-1), "deleted")),
+            ).copy(approximateUntil = windowEnd)
+
+        val result = ImportDeduper(apiPolicy, existing = listOf(preciseLeg)).classify(listOf(excludedApproximate)).single()
+
+        assertTrue(result.transfer.relationships.isEmpty(), "no reconciled link, so the precise leg stays unclaimed")
+    }
+
     // Funding-card reconcile: a conduit (e.g. Curve) spend, `conduit -> merchant`, reconciles against
     // the funding leg `fundingAccount -> conduit` by amount+window, ignoring the merchant.
     private val conduit = AccountId(10)

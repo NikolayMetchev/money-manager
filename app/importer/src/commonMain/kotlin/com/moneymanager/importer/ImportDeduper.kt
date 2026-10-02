@@ -651,6 +651,7 @@ class ImportDeduper(
         relationshipTypeId: RelationshipTypeId?,
     ): Classified? {
         if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
+        if (transfer.isExcluded(exclusionTypeId)) return null
         val until = transfer.approximateUntil ?: return null
         val timestamp = transfer.timestamp ?: return null
         val flows =
