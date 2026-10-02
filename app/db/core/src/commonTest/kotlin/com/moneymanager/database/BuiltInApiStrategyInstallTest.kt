@@ -33,7 +33,10 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .map { it.name }
                     .toSet()
-            assertEquals(setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken", "Binance", "Coinbase"), names)
+            assertEquals(
+                setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken", "Binance", "Coinbase", "Bybit"),
+                names,
+            )
         }
 
     @Test
@@ -80,6 +83,50 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertEquals(original.config.requestSigning, rebuilt.config.requestSigning)
             assertEquals(original.config.dataEndpoints.toSet(), rebuilt.config.dataEndpoints.toSet())
             assertEquals(original.config.valueEndpoints.toSet(), rebuilt.config.valueEndpoints.toSet())
+        }
+
+    @Test
+    fun `the Bybit strategy installs with its header-signed exchange configuration`() =
+        runTest {
+            repositories.installBuiltInApiStrategies()
+            val bybit =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Bybit" }
+
+            assertEquals(ApiAuthType.SIGNED, bybit.config.authType)
+            val signing = assertNotNull(bybit.config.requestSigning, "signing recipe persisted")
+            assertEquals(mapOf("X-BAPI-RECV-WINDOW" to "20000"), signing.staticHeaders)
+            assertEquals("Bybit", assertNotNull(bybit.config.syntheticAccount).name)
+            val trades = bybit.config.dataEndpoints.first { it.endpoint.path == "v5/execution/list" }
+            assertTrue(assertNotNull(trades.endpoint.pagination).nextCursorUrlEncoded, "pre-encoded cursor flag persisted")
+            val earn = bybit.config.dataEndpoints.first { it.endpoint.path == "v5/earn/order" }
+            assertEquals(ApiSignSource.FIELD, assertNotNull(earn.transactionMappings).signSource)
+            val ledgers = bybit.config.dataEndpoints.filter { it.endpoint.path == "v5/account/transaction-log" }
+            assertEquals(2, ledgers.size, "linear and inverse ledgers share a path, disambiguated by category")
+        }
+
+    @Test
+    fun `the Bybit strategy survives an export file round trip`() =
+        runTest {
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val original = BuiltInApiStrategies.bybit(now)
+            val json = ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(original, "test"))
+            val rebuilt = ApiStrategyExportMapper.fromExport(ApiStrategyExportCodec.decode(json), original.id, now)
+            assertEquals(original.config.requestSigning, rebuilt.config.requestSigning)
+            assertEquals(original.config.dataEndpoints.toSet(), rebuilt.config.dataEndpoints.toSet())
+        }
+
+    @Test
+    fun `strategies that leave the new signing and paging fields at their defaults do not encode them`() =
+        runTest {
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            for (strategy in BuiltInApiStrategies.builtInApiStrategies(now).filter { it.name != "Bybit" }) {
+                val json = ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(strategy, "test"))
+                assertTrue("staticHeaders" !in json, "${strategy.name} must keep its hash")
+                assertTrue("nextCursorUrlEncoded" !in json, "${strategy.name} must keep its hash")
+            }
         }
 
     @Test

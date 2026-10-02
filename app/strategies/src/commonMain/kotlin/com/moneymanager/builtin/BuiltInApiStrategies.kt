@@ -62,10 +62,11 @@ object BuiltInApiStrategies {
     val krakenStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
     val binanceStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
     val coinbaseStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000c")
+    val bybitStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000d")
 
     /** All built-in API import strategies. */
     fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> =
-        listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now), kraken(now), binance(now), coinbase(now))
+        listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now), kraken(now), binance(now), coinbase(now), bybit(now))
 
     /** The built-in Monzo API import strategy. */
     fun monzo(now: Instant): ApiImportStrategy =
@@ -1659,6 +1660,320 @@ object BuiltInApiStrategies {
                             "Create a Secret API key (Ed25519, the default, or ECDSA) and grant only the View permission.",
                             "Paste the API key ID (or, for an older key, its name organizations/…/apiKeys/…) below as the API key.",
                             "Paste the API secret (or the whole downloaded key file) below as the API secret.",
+                        ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in Bybit strategy — pure config over the generic signed-exchange engine (no provider code).
+     * Bybit V5 signs `timestamp + apiKey + recvWindow + queryString` with HMAC-SHA256 (hex) and carries all
+     * four values in `X-BAPI-*` headers; every list endpoint wraps its rows in `result.list`/`result.rows`
+     * and pages within a date window by an opaque, already-URL-encoded `nextPageCursor`.
+     *
+     * The Funding and Unified Trading wallets are one "Bybit" account (moving between them changes
+     * nothing), so wallet-to-wallet transfers aren't fetched. Flexible Savings principal sits in "Bybit Earn"
+     * and derivatives profit/loss (realized PnL, funding, fees) flows through "Bybit Derivatives", leaving the
+     * Bybit account comparable with the spot balances the exchange shows.
+     *
+     * Field paths follow the V5 docs; verify against a live response when connecting real keys (same
+     * caveat as the other exchange built-ins) — in particular whether a withdrawal's `amount` excludes its
+     * `withdrawFee`, and whether reinvested Earn yield belongs on "Bybit Earn" rather than the Bybit account.
+     */
+    fun bybit(now: Instant): ApiImportStrategy {
+        val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
+        val recvWindowMillis = "20000"
+
+        // Every list endpoint pages a date window by nextPageCursor. Requests reaching further back than an
+        // endpoint serves (trade and transaction-log history stops at 2 years) are skipped, not fatal.
+        fun window(
+            days: Int,
+            limit: Int,
+            lookbackDays: Int = ApiPaginationConfig().lookbackDays,
+        ) = ApiPaginationConfig(
+            mode = PaginationMode.DATE_WINDOW,
+            startParam = "startTime",
+            endParam = "endTime",
+            windowBoundFormat = WindowBoundFormat.EPOCH_MS,
+            windowDays = days,
+            lookbackDays = lookbackDays,
+            limitValue = limit,
+            sendLimitParam = true,
+            cursorParam = "cursor",
+            nextCursorField = "result.nextPageCursor",
+            nextCursorUrlEncoded = true,
+            windowRangeErrorSubstrings = listOf("cannot exceed", "out of range", "range is too large", "time range too large"),
+        )
+
+        // The asset endpoints require endTime - startTime < 30 days; the engine already ends every
+        // non-final window 1 ms short of windowDays.
+        val assetWindow = window(days = 30, limit = 50)
+        // Trade, transaction-log and Earn history spans are capped at 7 days, and trade/transaction-log
+        // history at 2 years back (720 keeps the grid-anchored first window inside that).
+        val twoYears = 720
+        val weekWindow = window(days = 7, limit = 100, lookbackDays = twoYears)
+
+        fun signed(
+            path: String,
+            arrayKey: String,
+            pagination: ApiPaginationConfig?,
+            queryParams: List<ApiQueryParam> = emptyList(),
+        ) = ApiEndpointConfig(
+            path = path,
+            responseArrayKey = arrayKey,
+            queryParams = queryParams,
+            pagination = pagination,
+            successCodeField = "retCode",
+            successCodeOkValue = "0",
+        )
+
+        fun status(value: String) = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = value))
+
+        // Longest-match-wins quote-asset suffixes for splitting a spot symbol ("BTCUSDT").
+        val quoteAssets =
+            listOf("BRL", "BRZ", "BTC", "DAI", "ETH", "EUR", "GBP", "MNT", "PLN", "TRY", "USDC", "USDE", "USDT")
+
+        val earnAccount = "Bybit Earn"
+
+        // Unified-account ledger rows that move money because of a derivatives position; the rest
+        // (transfers in/out, spot fills) are already covered by the endpoints above.
+        fun derivativesLedger(category: String) =
+            ApiDataEndpoint(
+                signed(
+                    "v5/account/transaction-log",
+                    "result.list",
+                    window(days = 7, limit = 50, lookbackDays = twoYears),
+                    queryParams = listOf(ApiQueryParam("accountType", "UNIFIED"), ApiQueryParam("category", category)),
+                ),
+                ApiEndpointKind.DEPOSITS,
+                transactionMappings =
+                    ApiTransactionMappings(
+                        // change = cashFlow (realized PnL) + funding - fee: what the wallet actually moved.
+                        amountField = "change",
+                        directionFromAmountSign = true,
+                        currencyField = "currency",
+                        descriptionField = "type",
+                        timestampField = "transactionTime",
+                        timestampFormat = TimestampFormat.EPOCH_MS,
+                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                        idField = "id",
+                        itemFilters =
+                            listOf(
+                                RulePredicate(path = "type", op = PredicateOp.IN, value = "TRADE,SETTLEMENT,DELIVERY,LIQUIDATION,ADL"),
+                            ),
+                    ),
+                counterpartyAccountName = "Bybit Derivatives",
+            )
+
+        return ApiImportStrategy(
+            id = ApiImportStrategyId(bybitStrategyId),
+            name = "Bybit",
+            config =
+                ApiStrategyConfig(
+                    baseUrl = "https://api.bybit.com",
+                    authType = ApiAuthType.SIGNED,
+                    accountsEndpoint = unused,
+                    transactionsEndpoint = unused,
+                    accountMappings = ApiAccountMappings(),
+                    transactionMappings = ApiTransactionMappings(),
+                    requestSigning =
+                        ApiRequestSigningConfig(
+                            algorithm = SigningAlgorithm.HMAC_SHA256,
+                            secretEncoding = SecretEncoding.UTF8,
+                            signatureEncoding = SignatureEncoding.HEX,
+                            message = listOf(SigPart.Nonce, SigPart.ApiKey, SigPart.Literal(recvWindowMillis), SigPart.QueryString),
+                            apiKey = FieldPlacement(SigFieldLocation.HEADER, "X-BAPI-API-KEY"),
+                            nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.HEADER, "X-BAPI-TIMESTAMP")),
+                            signature = FieldPlacement(SigFieldLocation.HEADER, "X-BAPI-SIGN"),
+                            bodyFormat = BodyFormat.NONE,
+                            // The default 5s window is easily spent by a slow request; the value is part of
+                            // the signed message too, hence the Literal above.
+                            staticHeaders = mapOf("X-BAPI-RECV-WINDOW" to recvWindowMillis),
+                            // Bybit rejects a timestamp more than 1s ahead of its own clock, which no
+                            // recv window forgives.
+                            serverTimeSync = ApiServerTimeSync(path = "v5/market/time", field = "time"),
+                        ),
+                    syntheticAccount = ApiSyntheticAccount(name = "Bybit", externalId = "bybit"),
+                    dataEndpoints =
+                        listOf(
+                            ApiDataEndpoint(
+                                signed(
+                                    "v5/execution/list",
+                                    "result.list",
+                                    weekWindow,
+                                    queryParams = listOf(ApiQueryParam("category", "spot")),
+                                ),
+                                ApiEndpointKind.TRADES,
+                                tradeMappings =
+                                    ApiTradeMappings(
+                                        instrumentField = "symbol",
+                                        splitMode = InstrumentSplitMode.QUOTE_SUFFIX,
+                                        quoteAssets = quoteAssets,
+                                        sideField = "side",
+                                        buyValues = setOf("Buy"),
+                                        baseQuantityField = "execQty",
+                                        quoteQuantityField = "execValue",
+                                        feeField = "execFee",
+                                        feeCurrencyField = "feeCurrency",
+                                        timestampField = "execTime",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        idField = "execId",
+                                        orderIdField = "orderId",
+                                        itemFilters = listOf(RulePredicate(path = "execType", op = PredicateOp.EQUALS, value = "Trade")),
+                                    ),
+                            ),
+                            ApiDataEndpoint(
+                                signed("v5/asset/deposit/query-record", "result.rows", assetWindow),
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "coin",
+                                        timestampField = "successAt",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        idField = "id",
+                                        counterpartyAddressField = "fromAddress",
+                                        counterpartyNetworkField = "chain",
+                                        txidField = "txID",
+                                        // status 3 = success.
+                                        itemFilters = status("3"),
+                                    ),
+                                fixedDirection = TransferDirection.IN,
+                                counterpartyAccountName = "Bybit Funding",
+                            ),
+                            ApiDataEndpoint(
+                                signed("v5/asset/withdraw/query-record", "result.rows", assetWindow),
+                                ApiEndpointKind.WITHDRAWALS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "coin",
+                                        timestampField = "createTime",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        idField = "withdrawId",
+                                        // An off-chain withdrawal to another Bybit user carries their UID here.
+                                        counterpartyAddressField = "toAddress",
+                                        counterpartyNetworkField = "chain",
+                                        txidField = "txID",
+                                        feeAmountField = "withdrawFee",
+                                        itemFilters = status("success"),
+                                    ),
+                                fixedDirection = TransferDirection.OUT,
+                                counterpartyAccountName = "Bybit Funding",
+                            ),
+                            // Transfers from another Bybit user (by email/phone/UID) never appear on-chain.
+                            ApiDataEndpoint(
+                                signed("v5/asset/deposit/query-internal-record", "result.rows", assetWindow),
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "coin",
+                                        timestampField = "createdTime",
+                                        timestampFormat = TimestampFormat.EPOCH_S,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        idField = "id",
+                                        counterpartyAddressField = "address",
+                                        txidField = "txID",
+                                        // status 2 = success.
+                                        itemFilters = status("2"),
+                                    ),
+                                fixedDirection = TransferDirection.IN,
+                                counterpartyAccountName = "Bybit Funding",
+                            ),
+                            // Convert history has no time filter at all: one walk over 1-based "index" pages.
+                            ApiDataEndpoint(
+                                signed(
+                                    "v5/asset/exchange/query-convert-history",
+                                    "result.list",
+                                    ApiPaginationConfig(
+                                        offsetParam = "index",
+                                        offsetMode = OffsetMode.PAGE_NUMBER,
+                                        limitValue = 100,
+                                        sendLimitParam = true,
+                                    ),
+                                ),
+                                ApiEndpointKind.TRADES,
+                                tradeMappings =
+                                    ApiTradeMappings(
+                                        instrumentField = "unused",
+                                        splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
+                                        baseAssetField = "toCoin",
+                                        quoteAssetField = "fromCoin",
+                                        fixedSideBuy = true,
+                                        baseQuantityField = "toAmount",
+                                        quoteQuantityField = "fromAmount",
+                                        timestampField = "createdAt",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        idField = "exchangeTxId",
+                                        itemFilters =
+                                            listOf(
+                                                RulePredicate(path = "exchangeStatus", op = PredicateOp.EQUALS, value = "success"),
+                                            ),
+                                    ),
+                            ),
+                            // Stakes and redemptions share one list (there is no filter to split it), so the
+                            // row's orderType decides the direction.
+                            ApiDataEndpoint(
+                                signed(
+                                    "v5/earn/order",
+                                    "result.list",
+                                    weekWindow,
+                                    queryParams = listOf(ApiQueryParam("category", "FlexibleSaving")),
+                                ),
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        amountField = "orderValue",
+                                        currencyField = "coin",
+                                        timestampField = "createdAt",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        descriptionField = "orderType",
+                                        idField = "orderId",
+                                        signSource = ApiSignSource.FIELD,
+                                        signField = "orderType",
+                                        creditValues = setOf("Redeem"),
+                                        itemFilters = status("Success"),
+                                    ),
+                                counterpartyAccountName = earnAccount,
+                            ),
+                            ApiDataEndpoint(
+                                signed(
+                                    "v5/earn/yield",
+                                    "result.list",
+                                    weekWindow,
+                                    queryParams = listOf(ApiQueryParam("category", "FlexibleSaving")),
+                                ),
+                                ApiEndpointKind.DEPOSITS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        currencyField = "coin",
+                                        timestampField = "createdAt",
+                                        timestampFormat = TimestampFormat.EPOCH_MS,
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        idField = "id",
+                                        itemFilters = status("Success"),
+                                    ),
+                                fixedDirection = TransferDirection.IN,
+                                counterpartyAccountName = "Bybit Earn Rewards",
+                            ),
+                            derivativesLedger("linear"),
+                            derivativesLedger("inverse"),
+                        ),
+                    // Bybit allows roughly 10 requests a second per endpoint group for a personal key.
+                    rateLimitMillis = 250L,
+                    rateLimitErrorSubstrings = listOf("Too many visits", "10006"),
+                    tokenPageUrl = "https://www.bybit.com/app/user/api-management",
+                    connectInstructions =
+                        listOf(
+                            "Open the Bybit API Management page in your browser and sign in.",
+                            "Create a new key, choosing \"System-generated API Keys\" (HMAC) — self-generated RSA keys are not supported.",
+                            "Choose \"Read-Only\" and tick the read permissions for Unified Trading (Spot, Contract), " +
+                                "Assets (Wallet, Exchange) and Earn.",
+                            "Copy the API key and paste it below as the API key.",
+                            "Copy the API secret — shown only once — and paste it below as the API secret.",
                         ),
                 ),
             createdAt = now,
