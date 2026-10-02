@@ -111,7 +111,7 @@ class BybitExchangeApiE2ETest : DbTest() {
         )
 
     @Test
-    fun `downloads every endpoint page then imports trades, transfers, earn and derivatives`() =
+    fun `downloads every endpoint page then imports trades transfers earn and derivatives`() =
         runTest {
             val strategy = bybitStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))

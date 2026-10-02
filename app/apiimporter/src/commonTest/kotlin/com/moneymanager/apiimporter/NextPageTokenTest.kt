@@ -23,7 +23,7 @@ class NextPageTokenTest {
     }
 
     @Test
-    fun `a blank, absent or echoed token ends the walk`() {
+    fun `a blank or absent or echoed token ends the walk`() {
         val encoded = pagination.copy(nextCursorUrlEncoded = true)
 
         assertNull(nextPageToken(body(""), encoded, sentToken = null))

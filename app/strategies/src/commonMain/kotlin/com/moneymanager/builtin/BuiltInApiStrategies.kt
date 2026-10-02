@@ -1753,12 +1753,10 @@ object BuiltInApiStrategies {
                         // change = cashFlow (realized PnL) + funding - fee: what the wallet actually moved.
                         amountField = "change",
                         directionFromAmountSign = true,
-                        currencyField = "currency",
                         descriptionField = "type",
                         timestampField = "transactionTime",
                         timestampFormat = TimestampFormat.EPOCH_MS,
                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                        idField = "id",
                         itemFilters =
                             listOf(
                                 RulePredicate(path = "type", op = PredicateOp.IN, value = "TRADE,SETTLEMENT,DELIVERY,LIQUIDATION,ADL"),
@@ -1833,7 +1831,6 @@ object BuiltInApiStrategies {
                                         timestampField = "successAt",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                                        idField = "id",
                                         counterpartyAddressField = "fromAddress",
                                         counterpartyNetworkField = "chain",
                                         txidField = "txID",
@@ -1873,7 +1870,6 @@ object BuiltInApiStrategies {
                                         timestampField = "createdTime",
                                         timestampFormat = TimestampFormat.EPOCH_S,
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                                        idField = "id",
                                         counterpartyAddressField = "address",
                                         txidField = "txID",
                                         // status 2 = success.
@@ -1890,7 +1886,7 @@ object BuiltInApiStrategies {
                                     ApiPaginationConfig(
                                         offsetParam = "index",
                                         offsetMode = OffsetMode.PAGE_NUMBER,
-                                        limitValue = 100,
+                                        // Bybit's maximum page of 100 is already the default limitValue.
                                         sendLimitParam = true,
                                     ),
                                 ),
@@ -1953,7 +1949,6 @@ object BuiltInApiStrategies {
                                         timestampField = "createdAt",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                                        idField = "id",
                                         itemFilters = status("Success"),
                                     ),
                                 fixedDirection = TransferDirection.IN,
