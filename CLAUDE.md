@@ -71,7 +71,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `app/ui/core/` | Compose UI (JVM/Android only) |
 | `app/main/jvm/` | JVM Desktop entry point |
 | `app/main/android/` | Android entry point |
-| `app/main/android-smoketest/` | Self-instrumenting UiAutomator smoke test of the R8-minified release APK (only has a variant with `-PreleaseSmokeTest=true`) |
+| `app/main/android-smoketest/` | Self-instrumenting UiAutomator smoke test of the R8-minified release APK (only included in the build with `-PreleaseSmokeTest=true`) |
 
 ### Domain Entities
 

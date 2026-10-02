@@ -76,6 +76,10 @@ develocity {
 
 rootProject.name = "money-manager"
 
+// The release smoke test has no variants without -PreleaseSmokeTest=true, and Android Studio's sync
+// fails on a variantless Android module, so leave it out of the build entirely unless asked for.
+val releaseSmokeTest = providers.gradleProperty("releaseSmokeTest").map(String::toBoolean).getOrElse(false)
+
 rootDir.walkTopDown()
     // Skip hidden directories (.git, .gradle, .idea, tooling dirs like .claude/worktrees that may hold
     // a checked-out copy of the repo) so their build.gradle.kts files aren't registered as modules.
@@ -86,6 +90,9 @@ rootDir.walkTopDown()
             ?.takeUnless { it == rootDir }
             ?.takeUnless { moduleDir ->
                 moduleDir.toRelativeString(rootDir).replace('\\', '/') == "gradle/build-logic"
+            }?.takeUnless { moduleDir ->
+                !releaseSmokeTest &&
+                    moduleDir.toRelativeString(rootDir).replace('\\', '/') == "app/main/android-smoketest"
             }
     }
     .forEach { moduleDir ->

@@ -79,7 +79,8 @@ android {
 }
 
 // Only the release variant is worth testing, and it can only resolve against the app's release
-// variant, which exists solely under -PreleaseSmokeTest=true. Otherwise the module has no variants.
+// variant, which exists solely under -PreleaseSmokeTest=true. Without it, settings.gradle.kts leaves this
+// module out entirely, since Android Studio sync fails on a module with no variants.
 configure<TestAndroidComponentsExtension> {
     beforeVariants { variant ->
         variant.enable = releaseSmokeTest && variant.buildType == "release"
