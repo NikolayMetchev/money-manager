@@ -44,6 +44,9 @@ import com.moneymanager.remotestorage.sync.SyncProgress
 import com.moneymanager.ui.components.SettingsSectionCard
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
+import org.lighthousegames.logging.logging
+
+private val logger = logging()
 
 /** How the user chose to resolve a conflicting artifact (changed on both sides since the last sync). */
 private enum class ConflictChoice {
@@ -99,6 +102,7 @@ fun StrategyCloudCard(
         prefix: String,
         cause: Throwable,
     ) {
+        logger.error(cause) { "Strategy cloud sync failed: $prefix ${cause.message}" }
         message = "$prefix ${cause.message}"
         needsReconnect = cause is RemoteAuthException
     }

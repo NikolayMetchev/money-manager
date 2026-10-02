@@ -55,7 +55,6 @@ class ApiBulkReimportResilienceTest {
     private fun session(id: Long) =
         ApiSession(
             id = ApiSessionId(id),
-            token = "token-$id",
             deviceId = DeviceId(1),
             createdAt = Instant.fromEpochMilliseconds(id),
             expiresAt = null,

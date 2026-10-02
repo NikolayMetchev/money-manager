@@ -3,7 +3,6 @@ package com.moneymanager.ui.exchange
 import com.moneymanager.apiimporter.downloadApiSessionExchange
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.importengineapi.createApiCredential
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.rest.ApiRequestSigner
 import com.moneymanager.rest.ApiSessionTrafficRecorder
@@ -48,7 +47,7 @@ class IncrementalExchangeDownloadE2ETest : DbTest() {
     ): Int {
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
         val strategy = krakenStrategy()
-        val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+        val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
         val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
         val apiClient =
             createApiClient(
@@ -83,7 +82,7 @@ class IncrementalExchangeDownloadE2ETest : DbTest() {
     @Test
     fun `a second exchange download fetches only the trailing windows`() =
         runTest {
-            val credentialId = repositories.importEngine.createApiCredential(token, now)
+            val credentialId = apiConnection("Kraken", now)
 
             val firstPages = download(credentialId)
             assertTrue(firstPages > 1, "the first download sweeps the full lookback in 90-day windows")
@@ -95,11 +94,11 @@ class IncrementalExchangeDownloadE2ETest : DbTest() {
     @Test
     fun `endpoints sharing a path get their own watermark`() =
         runTest {
-            val credentialId = repositories.importEngine.createApiCredential(token, now)
+            val credentialId = apiConnection("Kraken", now)
             download(credentialId)
 
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-            val probeSession = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+            val probeSession = repositories.importEngine.createApiSession(deviceId, now, credentialId)
             val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, probeSession)
 
             assertEquals(
@@ -112,7 +111,7 @@ class IncrementalExchangeDownloadE2ETest : DbTest() {
     @Test
     fun `forcing a full exchange download ignores the watermark`() =
         runTest {
-            val credentialId = repositories.importEngine.createApiCredential(token, now)
+            val credentialId = apiConnection("Kraken", now)
 
             val firstPages = download(credentialId)
 

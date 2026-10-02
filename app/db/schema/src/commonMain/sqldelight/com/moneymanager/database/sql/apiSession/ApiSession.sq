@@ -1,32 +1,20 @@
--- Stores a saved token/credential. One credential can produce many download sessions.
--- strategy_id links this credential to an api_import_strategy, determining how data is
--- fetched and mapped (bearer vs signed auth comes from the strategy's authType, not stored here).
--- NULL means a legacy strategy-less credential.
--- At most one credential per strategy: the UI connects an API once and edits that credential
--- thereafter. (SQLite treats NULLs as distinct, so legacy unlinked rows are unaffected.)
+-- A connected API: the non-secret anchor that download sessions, watermarks and the timeline hang off.
+-- The token, api secret and signing keys themselves live in the encrypted credential vault file (keyed
+-- by strategy name), never in the database, so wiping the database doesn't cost the user their tokens.
+-- strategy_id links this connection to an api_import_strategy; NULL once that strategy is deleted.
+-- At most one connection per strategy. (SQLite treats NULLs as distinct, so orphaned rows don't clash.)
 CREATE TABLE api_credential (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    token TEXT NOT NULL UNIQUE CHECK(length(trim(token)) > 0),
     created_at INTEGER NOT NULL,
     strategy_id TEXT UNIQUE,
-    -- PEM-encoded RSA key pair for request signing (e.g. Wise SCA); null when not configured.
-    -- A signing key is only meaningful as a pair, so enforce both-null or both-present.
-    private_key TEXT,
-    public_key TEXT,
-    -- HMAC secret for signed exchange APIs (ApiAuthType.SIGNED; e.g. Crypto.com, Kraken); token holds
-    -- the api key, this holds the api secret. Null for bearer/SCA strategies.
-    api_secret TEXT,
-    CHECK ((private_key IS NULL) = (public_key IS NULL)),
     FOREIGN KEY (strategy_id) REFERENCES api_import_strategy(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_api_credential_token ON api_credential(token);
 CREATE INDEX idx_api_credential_strategy_id ON api_credential(strategy_id);
 
 -- One session holds a full download: accounts, transactions and people are all fetched into it.
 CREATE TABLE api_session (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    token TEXT NOT NULL CHECK(length(trim(token)) > 0),
     device_id INTEGER NOT NULL,
     created_at INTEGER NOT NULL,
     expires_at INTEGER,

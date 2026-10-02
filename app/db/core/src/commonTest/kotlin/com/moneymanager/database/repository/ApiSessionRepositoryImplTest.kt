@@ -20,7 +20,6 @@ import kotlin.time.Instant
 
 class ApiSessionRepositoryImplTest : DbTest() {
     private val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
-    private val token = "test-token-abc123"
 
     private fun deviceId() = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
 
@@ -28,7 +27,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `createSession returns a positive id`() =
         runTest {
             val deviceId = deviceId()
-            val id = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val id = repositories.apiSessionRepository.createSession(deviceId, now, null)
             assertTrue(id.id > 0, "Session ID should be positive: $id")
         }
 
@@ -36,12 +35,11 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `getSessionById returns the created session`() =
         runTest {
             val deviceId = deviceId()
-            val id = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val id = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
             val session = repositories.apiSessionRepository.getSessionById(id)
             assertNotNull(session)
             assertEquals(id, session.id)
-            assertEquals(token, session.token)
             assertEquals(deviceId, session.deviceId)
             assertEquals(now, session.createdAt)
             assertNull(session.expiresAt)
@@ -55,29 +53,11 @@ class ApiSessionRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `getSessionByToken returns the created session`() =
-        runTest {
-            val deviceId = deviceId()
-            repositories.apiSessionRepository.createSession(token, deviceId, now, null)
-
-            val session = repositories.apiSessionRepository.getSessionByToken(token)
-            assertNotNull(session)
-            assertEquals(token, session.token)
-        }
-
-    @Test
-    fun `getSessionByToken returns null for unknown token`() =
-        runTest {
-            val session = repositories.apiSessionRepository.getSessionByToken("unknown-token")
-            assertNull(session)
-        }
-
-    @Test
     fun `createSession stores expiresAt correctly`() =
         runTest {
             val deviceId = deviceId()
             val expiresAt = now + 1.hours
-            val id = repositories.apiSessionRepository.createSession(token, deviceId, now, expiresAt)
+            val id = repositories.apiSessionRepository.createSession(deviceId, now, expiresAt)
 
             val session = repositories.apiSessionRepository.getSessionById(id)
             assertNotNull(session)
@@ -88,8 +68,8 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `getSessionsByDevice returns sessions for that device`() =
         runTest {
             val deviceId = deviceId()
-            repositories.apiSessionRepository.createSession("token-1", deviceId, now, null)
-            repositories.apiSessionRepository.createSession("token-2", deviceId, now, null)
+            repositories.apiSessionRepository.createSession(deviceId, now, null)
+            repositories.apiSessionRepository.createSession(deviceId, now, null)
 
             val sessions = repositories.apiSessionRepository.getSessionsByDevice(deviceId)
             assertEquals(2, sessions.size)
@@ -101,20 +81,19 @@ class ApiSessionRepositoryImplTest : DbTest() {
         runTest {
             val deviceId = deviceId()
             // Session expires in 1 hour
-            repositories.apiSessionRepository.createSession("expired-token", deviceId, now, now + 1.hours)
-            repositories.apiSessionRepository.createSession("valid-token", deviceId, now, now + 3.hours)
+            repositories.apiSessionRepository.createSession(deviceId, now, now + 1.hours)
+            val valid = repositories.apiSessionRepository.createSession(deviceId, now, now + 3.hours)
 
             // Check at now + 2 hours: first session is expired, second is not
             val active = repositories.apiSessionRepository.getSessions(now + 2.hours)
-            assertEquals(1, active.size)
-            assertEquals("valid-token", active.first().token)
+            assertEquals(listOf(valid), active.map { it.id })
         }
 
     @Test
     fun `insertRequest stores method url and headers`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val headerMap =
                 linkedMapOf(
                     "Authorization" to "Bearer token",
@@ -149,7 +128,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `getRequestsBySession returns newest first`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
             repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/1", emptyMap())
             repositories.apiSessionRepository.insertRequest(sessionId, "POST", "https://example.test/2", emptyMap())
@@ -166,7 +145,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `insertResponse stores json`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val responseJson = """{"accounts":[{"id":1}]}"""
             val requestId =
                 repositories.apiSessionRepository.insertRequest(
@@ -201,7 +180,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `deleteSession cascades to requests headers and responses`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
             val requestId =
                 repositories.apiSessionRepository.insertRequest(
@@ -227,7 +206,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `deleteSession removes the session`() =
         runTest {
             val deviceId = deviceId()
-            val id = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val id = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
             repositories.apiSessionRepository.deleteSession(id)
 
@@ -239,7 +218,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `insertResponseTransaction records an error transaction`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
                 repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions", emptyMap())
             val responseId =
@@ -265,7 +244,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `getResponseTransactions returns all entries for a response`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
                 repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions", emptyMap())
             val responseId =
@@ -302,7 +281,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `getResponseTransactionsBySession returns entries for all session responses`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val firstRequestId =
                 repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions?page=1", emptyMap())
             val secondRequestId =
@@ -344,7 +323,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `insertResponseTransaction rejects duplicate json path for response`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
                 repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions", emptyMap())
             val responseId =
@@ -377,7 +356,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `insertResponseTransaction rejects imported state without transaction id`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
                 repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions", emptyMap())
             val responseId =
@@ -402,7 +381,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `getResponseTransactions returns empty for response with no entries`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
                 repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions", emptyMap())
             val responseId =
@@ -420,7 +399,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `deleteSession cascades to api_response_transaction`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
                 repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions", emptyMap())
             val responseId =
@@ -449,7 +428,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `markSessionImported tracks imported revision`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
             repositories.apiSessionRepository.markSessionImported(
                 id = sessionId,
@@ -470,7 +449,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     fun `markSessionImported allows re-import for newer revision`() =
         runTest {
             val deviceId = deviceId()
-            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
             repositories.apiSessionRepository.markSessionImported(
                 id = sessionId,

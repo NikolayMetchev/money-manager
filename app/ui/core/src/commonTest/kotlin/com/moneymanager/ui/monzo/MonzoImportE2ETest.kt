@@ -748,7 +748,6 @@ class MonzoImportE2ETest : DbTest() {
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = now,
                     expiresAt = null,
@@ -926,7 +925,6 @@ class MonzoImportE2ETest : DbTest() {
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = now,
                     expiresAt = null,
@@ -1026,7 +1024,6 @@ class MonzoImportE2ETest : DbTest() {
                 )
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -1115,7 +1112,6 @@ class MonzoImportE2ETest : DbTest() {
                 )
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -1202,7 +1198,6 @@ class MonzoImportE2ETest : DbTest() {
                 )
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -1297,7 +1292,6 @@ class MonzoImportE2ETest : DbTest() {
                 )
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -1445,7 +1439,6 @@ class MonzoImportE2ETest : DbTest() {
                 )
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -1540,7 +1533,6 @@ class MonzoImportE2ETest : DbTest() {
                     }
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -1626,7 +1618,6 @@ class MonzoImportE2ETest : DbTest() {
                     .single { it.name == "Monzo" }
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -1711,7 +1702,6 @@ class MonzoImportE2ETest : DbTest() {
             ) {
                 val sessionId =
                     repositories.apiSessionRepository.createSession(
-                        token = sessionToken,
                         deviceId = deviceId,
                         createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                         expiresAt = null,
@@ -1818,7 +1808,6 @@ class MonzoImportE2ETest : DbTest() {
                 )
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -1925,7 +1914,6 @@ class MonzoImportE2ETest : DbTest() {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -2041,7 +2029,6 @@ class MonzoImportE2ETest : DbTest() {
                 )
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -2128,7 +2115,6 @@ class MonzoImportE2ETest : DbTest() {
             suspend fun importSession(transactionsJson: String) {
                 val sessionId =
                     repositories.apiSessionRepository.createSession(
-                        token = "test-monzo-token",
                         deviceId = deviceId,
                         createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                         expiresAt = null,
@@ -2206,7 +2192,6 @@ class MonzoImportE2ETest : DbTest() {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -2281,7 +2266,6 @@ class MonzoImportE2ETest : DbTest() {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -2397,7 +2381,6 @@ class MonzoImportE2ETest : DbTest() {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,
@@ -2497,7 +2480,6 @@ class MonzoImportE2ETest : DbTest() {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
                     expiresAt = null,

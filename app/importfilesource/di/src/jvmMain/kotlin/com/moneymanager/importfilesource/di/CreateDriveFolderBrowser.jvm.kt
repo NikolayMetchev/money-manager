@@ -1,9 +1,9 @@
 package com.moneymanager.importfilesource.di
 
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFolder
-import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.googledrive.DesktopBrowserLauncher
 import com.moneymanager.remotestorage.googledrive.DriveImportFileSource
 import com.moneymanager.remotestorage.googledrive.GoogleDriveCredentials
@@ -20,7 +20,7 @@ private fun googleDriveDefaultConfig(): String? =
 @Suppress("ktlint:standard:function-naming")
 actual fun createDriveFolderBrowser(
     params: AppComponentParams,
-    localSettings: LocalSettings,
+    vault: CredentialVault,
 ): DriveFolderBrowser? =
     object : DriveFolderBrowser {
         override val rootFolderId: String = DriveImportFileSource.ROOT_FOLDER_ID
@@ -33,7 +33,7 @@ actual fun createDriveFolderBrowser(
             val tokenSource =
                 googleDriveTokenSource(
                     config = providerConfig ?: googleDriveDefaultConfig(),
-                    localSettings = localSettings,
+                    vault = vault,
                     browser = DesktopBrowserLauncher(),
                 )
             if (!tokenSource.isSignedInWithRequiredScopes()) tokenSource.signIn()

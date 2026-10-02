@@ -3,7 +3,6 @@ package com.moneymanager.ui.binance
 import com.moneymanager.apiimporter.downloadApiSessionExchange
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.importengineapi.createApiCredential
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.rest.ApiRequestSigner
 import com.moneymanager.rest.ApiSessionTrafficRecorder
@@ -60,8 +59,8 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
         runTest {
             val strategy = binanceStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-            val credentialId = repositories.importEngine.createApiCredential(token, now)
-            val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+            val credentialId = apiConnection("Binance", now)
+            val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
             val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
 
             val apiClient =
@@ -119,10 +118,10 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
         runTest {
             val strategy = binanceStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-            val credentialId = repositories.importEngine.createApiCredential(token, now)
+            val credentialId = apiConnection("Binance", now)
 
             suspend fun download(): Int {
-                val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+                val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
                 val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
                 val apiClient =
                     createApiClient(
@@ -175,8 +174,8 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
         runTest {
             val strategy = binanceStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-            val credentialId = repositories.importEngine.createApiCredential(token, now)
-            val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+            val credentialId = apiConnection("Binance", now)
+            val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
             val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
 
             var transferAttempts = 0

@@ -173,7 +173,7 @@ class BinanceExchangeApiE2ETest : DbTest() {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Binance").first()
         assertNotNull(strategy, "built-in Binance strategy should be installed")
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
-        val sessionId = repositories.apiSessionRepository.createSession("apikey", deviceId, now, null)
+        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
         suspend fun stage(
             marker: String,

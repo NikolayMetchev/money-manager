@@ -29,6 +29,7 @@ import com.moneymanager.ui.CloseDatabaseDialog
 import com.moneymanager.ui.components.DatabaseProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
+import com.moneymanager.ui.foundation.CredentialVaultPromptHost
 import com.moneymanager.ui.toAppServices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -156,8 +157,8 @@ private fun MainWindow(onExit: () -> Unit) {
     val appVersion = component.appVersion
     val localSettings = component.localSettings
     val remoteController = component.remoteDatabaseController
-    val importFileSourceFactory = createImportFileSourceFactory(params, localSettings)
-    val driveFolderBrowser = createDriveFolderBrowser(params, localSettings)
+    val importFileSourceFactory = createImportFileSourceFactory(params, component.credentialVault)
+    val driveFolderBrowser = createDriveFolderBrowser(params, component.credentialVault)
     // The currently open database, tracked so we can push it and clean up on app close.
     val openDatabase = remember { arrayOfNulls<MoneyManagerDatabaseWrapper>(1) }
     val scope = rememberCoroutineScope()
@@ -197,6 +198,9 @@ private fun MainWindow(onExit: () -> Unit) {
         val progress = closeProgress
         if (progress != null) {
             DatabaseProgressScreen(progress, title = "Closing Money Manager")
+            // The closing upload needs the Google sign-in from the credential vault, and AppStartupHost (which
+            // normally hosts the unlock prompt) isn't composed while this progress screen is up.
+            CredentialVaultPromptHost(component.credentialVault)
         } else {
             closeDecision?.let { decision ->
                 val database = openDatabase[0]
@@ -243,6 +247,7 @@ private fun MainWindow(onExit: () -> Unit) {
                 importFileSourceFactory = importFileSourceFactory,
                 driveFolderBrowser = driveFolderBrowser,
                 cryptoCatalogRefresher = HttpCryptoCatalogRefresher(),
+                credentialVault = component.credentialVault,
                 onDatabaseReady = { database, _ -> openDatabase[0] = database },
             )
         }

@@ -59,11 +59,6 @@ class ApiSessionReadRepositoryImpl(
             selectQueries.selectById(id.id).executeAsOneOrNull()?.toApiSession()
         }
 
-    override suspend fun getSessionByToken(token: String): ApiSession? =
-        withContext(Dispatchers.Default) {
-            selectQueries.selectByToken(token).executeAsOneOrNull()?.toApiSession()
-        }
-
     override suspend fun getSessionsByDevice(deviceId: DeviceId): List<ApiSession> =
         withContext(Dispatchers.Default) {
             selectQueries.selectByDeviceId(deviceId.id).executeAsList().map { it.toApiSession() }
@@ -205,18 +200,13 @@ class ApiSessionReadRepositoryImpl(
     private fun com.moneymanager.database.sql.apiSession.Api_credential.toApiCredential(): ApiCredential =
         ApiCredential(
             id = ApiCredentialId(id),
-            token = token,
             createdAt = Instant.fromEpochMilliseconds(created_at),
             strategyId = strategy_id?.let { ApiImportStrategyId(Uuid.parse(it)) },
-            privateKey = private_key,
-            publicKey = public_key,
-            apiSecret = api_secret,
         )
 
     private fun com.moneymanager.database.sql.apiSession.Api_session_with_latest_import.toApiSession(): ApiSession =
         ApiSession(
             id = ApiSessionId(id),
-            token = token,
             deviceId = DeviceId(device_id),
             createdAt = Instant.fromEpochMilliseconds(created_at),
             expiresAt = expires_at?.let { Instant.fromEpochMilliseconds(it) },

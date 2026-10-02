@@ -1,5 +1,6 @@
 package com.moneymanager.di
 
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.di.scope.AppScope
@@ -19,6 +20,7 @@ interface AppComponent {
     val remoteDatabaseController: RemoteDatabaseController
     val strategySyncController: StrategySyncController
     val strategyCatalogController: StrategyCatalogController
+    val credentialVault: CredentialVault
 
     @DependencyGraph.Factory
     interface Factory {

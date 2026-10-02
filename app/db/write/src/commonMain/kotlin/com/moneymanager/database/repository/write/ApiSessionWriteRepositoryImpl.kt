@@ -24,27 +24,18 @@ class ApiSessionWriteRepositoryImpl(
 ) : ApiSessionWriteRepository,
     ApiSessionReadRepository by reader {
     private val writeQueries = database.apiSessionWriteQueries
+    private val selectQueries = database.apiSessionSelectQueries
 
-    override suspend fun createCredential(
-        token: String,
+    override suspend fun ensureCredential(
+        strategyId: ApiImportStrategyId,
         createdAt: Instant,
-        strategyId: ApiImportStrategyId?,
-        privateKey: String?,
-        publicKey: String?,
-        apiSecret: String?,
     ): ApiCredentialId =
         withContext(Dispatchers.Default) {
             val id =
                 writeQueries.transactionWithResult {
-                    writeQueries.insertCredential(
-                        token = token,
-                        created_at = createdAt.toEpochMilliseconds(),
-                        strategy_id = strategyId?.id?.toString(),
-                        private_key = privateKey,
-                        public_key = publicKey,
-                        api_secret = apiSecret,
-                    )
-                    writeQueries.lastInsertCredentialRowId().executeAsOne()
+                    val strategy = strategyId.id.toString()
+                    writeQueries.insertCredentialIfAbsent(created_at = createdAt.toEpochMilliseconds(), strategy_id = strategy)
+                    selectQueries.selectCredentialIdByStrategy(strategy).executeAsOne()
                 }
             ApiCredentialId(id)
         }
@@ -63,40 +54,7 @@ class ApiSessionWriteRepositoryImpl(
             check(affected == 1L) { "Expected to update one credential ($credentialId) strategy, but $affected rows matched" }
         }
 
-    override suspend fun updateCredentialKeys(
-        credentialId: ApiCredentialId,
-        privateKey: String?,
-        publicKey: String?,
-    ): Unit =
-        withContext(Dispatchers.Default) {
-            val affected =
-                writeQueries
-                    .updateCredentialKeys(
-                        private_key = privateKey,
-                        public_key = publicKey,
-                        id = credentialId.id,
-                    ).await()
-            check(affected == 1L) { "Expected to update one credential ($credentialId) keys, but $affected rows matched" }
-        }
-
-    override suspend fun updateCredentialSecrets(
-        credentialId: ApiCredentialId,
-        token: String,
-        apiSecret: String?,
-    ): Unit =
-        withContext(Dispatchers.Default) {
-            val affected =
-                writeQueries
-                    .updateCredentialSecrets(
-                        token = token,
-                        api_secret = apiSecret,
-                        id = credentialId.id,
-                    ).await()
-            check(affected == 1L) { "Expected to update one credential ($credentialId) secrets, but $affected rows matched" }
-        }
-
     override suspend fun createSession(
-        token: String,
         deviceId: DeviceId,
         createdAt: Instant,
         expiresAt: Instant?,
@@ -106,7 +64,6 @@ class ApiSessionWriteRepositoryImpl(
             val id =
                 writeQueries.transactionWithResult {
                     writeQueries.insert(
-                        token = token,
                         device_id = deviceId.id,
                         created_at = createdAt.toEpochMilliseconds(),
                         expires_at = expiresAt?.toEpochMilliseconds(),

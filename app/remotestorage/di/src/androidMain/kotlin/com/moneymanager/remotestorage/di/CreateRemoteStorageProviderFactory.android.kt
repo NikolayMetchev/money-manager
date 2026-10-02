@@ -1,19 +1,19 @@
 package com.moneymanager.remotestorage.di
 
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.di.params.AppComponentParams
-import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
 import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_PROVIDER_ID
 import com.moneymanager.remotestorage.googledrive.googleDriveProvider
 
-// localSettings is unused on Android: the native AuthorizationClient token source holds no persisted
+// vault is unused on Android: the native AuthorizationClient token source holds no persisted
 // refresh token (GMS re-issues access tokens silently), unlike the JVM loopback flow.
 @Suppress("ktlint:standard:function-naming", "UnusedParameter")
 actual fun createRemoteStorageProviderFactory(
     params: AppComponentParams,
-    localSettings: LocalSettings,
+    vault: CredentialVault,
 ): RemoteStorageProviderFactory =
     object : RemoteStorageProviderFactory {
         // Android authenticates natively (AuthorizationClient), so no bring-your-own config is needed.

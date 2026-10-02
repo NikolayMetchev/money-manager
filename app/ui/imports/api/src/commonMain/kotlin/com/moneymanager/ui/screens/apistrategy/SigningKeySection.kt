@@ -26,9 +26,11 @@ internal fun SigningKeySection(
     publicKey: String?,
     onGenerateSigningKey: () -> Unit,
     onCopyText: (String) -> Unit,
+    errorMessage: String? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(text = "Request signing (SCA)", style = MaterialTheme.typography.labelLarge)
+        errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         if (publicKey == null) {
             Text(
                 text =

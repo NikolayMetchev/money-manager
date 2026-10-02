@@ -241,7 +241,7 @@ class StarlingImportE2ETest : DbTest() {
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
-            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val strategy =
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
@@ -314,7 +314,7 @@ class StarlingImportE2ETest : DbTest() {
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
-            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val strategy =
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
@@ -413,7 +413,7 @@ class StarlingImportE2ETest : DbTest() {
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
-            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val strategy =
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
@@ -494,7 +494,7 @@ class StarlingImportE2ETest : DbTest() {
             repositories.accountAttributeRepository
                 .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), "12345678")
 
-            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val strategy =
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
@@ -568,7 +568,7 @@ class StarlingImportE2ETest : DbTest() {
             repositories.accountAttributeRepository
                 .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), "55556666")
 
-            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val strategy =
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
@@ -661,7 +661,7 @@ class StarlingImportE2ETest : DbTest() {
             repositories.accountAttributeRepository
                 .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID), "bank:099999:55556666")
 
-            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val strategy =
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
@@ -718,7 +718,7 @@ class StarlingImportE2ETest : DbTest() {
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
-            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val strategy =
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
@@ -785,7 +785,7 @@ class StarlingImportE2ETest : DbTest() {
                     .single { it.name == "Starling" }
 
             // One session holds accounts, transactions and the account holder.
-            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val apiClient =
                 createApiClient(
                     trafficRecorder =
@@ -860,7 +860,7 @@ class StarlingImportE2ETest : DbTest() {
 
             // Accounts and the holder are downloaded into one session; importing people before the
             // transactions still ends with the holder owning the own account.
-            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val apiClient =
                 createApiClient(
                     trafficRecorder =
@@ -945,7 +945,7 @@ class StarlingImportE2ETest : DbTest() {
                 )
 
             // Import the holder first — "Ada Lovelace" is created at revision 1 with no Starling external id.
-            val peopleSessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val peopleSessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             downloadApiSessionPeople(
                 token = "test-starling-token",
                 apiClient = clientFor(peopleSessionId),
@@ -963,7 +963,7 @@ class StarlingImportE2ETest : DbTest() {
 
             // Importing the SENDER counterparty "Ada Lovelace" matches the holder by name and backfills
             // its external id — this must NOT bump the person to a new (source-less) revision.
-            val txSessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val txSessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             downloadApiSessionAccounts(
                 token = "test-starling-token",
                 apiClient = clientFor(txSessionId),
@@ -1008,7 +1008,7 @@ class StarlingImportE2ETest : DbTest() {
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
-            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val strategy =
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()

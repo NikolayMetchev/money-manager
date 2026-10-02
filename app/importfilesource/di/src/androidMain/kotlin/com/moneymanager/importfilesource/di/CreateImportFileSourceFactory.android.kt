@@ -1,5 +1,6 @@
 package com.moneymanager.importfilesource.di
 
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
@@ -7,13 +8,12 @@ import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.importfilesource.localfolder.LocalFolderImportFileSource
 import com.moneymanager.importfilesource.localfolder.SafFolderImportFileSource
-import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.googledrive.driveImportFileSource
 
 @Suppress("ktlint:standard:function-naming", "UnusedParameter")
 actual fun createImportFileSourceFactory(
     params: AppComponentParams,
-    localSettings: LocalSettings,
+    vault: CredentialVault,
 ): ImportFileSourceFactory =
     object : ImportFileSourceFactory {
         override fun supportsProvider(provider: ImportDirectoryProvider): Boolean = true

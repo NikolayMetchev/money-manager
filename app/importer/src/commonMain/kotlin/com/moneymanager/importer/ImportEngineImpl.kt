@@ -2141,17 +2141,10 @@ class ImportEngineImpl(
         val apiResponseIds = mutableMapOf<String, ApiResponseId>()
         for (m in batch.apiSessionMutations) {
             when (m) {
-                is ApiSessionMutation.CreateCredential ->
+                is ApiSessionMutation.EnsureCredential ->
                     apiCredentialIds.putUnique(
                         m.key,
-                        apiSessionRepository.createCredential(
-                            m.token,
-                            m.createdAt,
-                            m.strategyId,
-                            m.privateKey,
-                            m.publicKey,
-                            m.apiSecret,
-                        ),
+                        apiSessionRepository.ensureCredential(m.strategyId, m.createdAt),
                         "ApiCredential",
                     )
                 is ApiSessionMutation.UpdateCredentialStrategy ->
@@ -2159,22 +2152,10 @@ class ImportEngineImpl(
                         m.credentialId,
                         m.strategyId,
                     )
-                is ApiSessionMutation.UpdateCredentialKeys ->
-                    apiSessionRepository.updateCredentialKeys(
-                        m.credentialId,
-                        m.privateKey,
-                        m.publicKey,
-                    )
-                is ApiSessionMutation.UpdateCredentialSecrets ->
-                    apiSessionRepository.updateCredentialSecrets(
-                        m.credentialId,
-                        m.token,
-                        m.apiSecret,
-                    )
                 is ApiSessionMutation.CreateSession ->
                     apiSessionIds.putUnique(
                         m.key,
-                        apiSessionRepository.createSession(m.token, m.deviceId, m.createdAt, expiresAt = null, m.credentialId),
+                        apiSessionRepository.createSession(m.deviceId, m.createdAt, expiresAt = null, m.credentialId),
                         "ApiSession",
                     )
                 is ApiSessionMutation.InsertRequest ->

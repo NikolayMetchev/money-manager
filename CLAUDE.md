@@ -51,6 +51,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `utils/currency/` | Locale-aware currency formatting |
 | `utils/humanreadable/` | English file-size / duration / "time ago" formatting (replaces Human-Readable, whose localisation layer pulled ICU4J into the desktop build) |
 | `utils/archive/` | Compress + password-encrypt the DB archive (`ArchiveCodec`); shared by remote backends |
+| `utils/credentialvault/` | The encrypted, password-protected credential file (API tokens, Google refresh tokens) that outlives the DB — see **Credentials** |
 | `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` |
 | `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,reconciliation,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core`; `qif`→`csv`, `csvstrategy`→`qif`+`accountmapping` |
 | `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces. `write` depends on `read` (each write interface extends its read) |
@@ -65,7 +66,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `app/remotestorage/sync/` | Hydrate/push orchestration (`RemoteDatabaseSyncService`/`RemoteDatabaseController`) |
 | `app/di/scope/`, `app/di/params/` | The `AppScope`/`DatabaseScope` markers, and `AppComponentParams`. Leaf modules, so contributing a DI module costs nothing else |
 | `app/di/core/` | The `AppComponent` graph only. Metro merges contributors off its compile classpath (see **Dependency Injection**) |
-| `app/db/di/`, `app/remotestorage/di/`, `app/strategycatalog/di/`, `utils/localsettings/di/` | Each feature's Metro modules, next to the code they provide |
+| `app/db/di/`, `app/remotestorage/di/`, `app/strategycatalog/di/`, `utils/localsettings/di/`, `utils/credentialvault/di/` | Each feature's Metro modules, next to the code they provide |
 | `app/importfilesource/di/` | Platform factories for import file sources (not Metro — the entry points call these directly) |
 | `app/ui/core/` | Compose UI (JVM/Android only) |
 | `app/main/jvm/` | JVM Desktop entry point |
@@ -169,10 +170,30 @@ re-hydrates it (decrypt → inflate → write local `.db` → rebuild materializ
   is the single DI entry point exposed by `AppComponent`.
 
 **Bring-your-own credentials**: the app ships **no** Google secrets. Each user supplies their own OAuth
-client (Desktop type) via the in-app wizard; least-privilege `drive.file` scope. The refresh token is
-persisted in `LocalSettings` keyed by a short hash of the OAuth client id (raw ids exceed the JVM prefs
-80-char key limit). Connection scope is **per database** — each binding stores its own OAuth client, so
+client (Desktop type) via the in-app wizard; least-privilege `drive.file` scope. The refresh token (and granted
+scopes) live in the credential vault keyed by OAuth client id (see **Credentials**); access tokens are
+cached in memory only. Connection scope is **per database** — each binding stores its own OAuth client, so
 different databases can use different Google accounts.
+
+## Credentials (the vault file)
+
+Secrets never live in the database, so wiping or recreating a database doesn't cost the user their tokens.
+`utils/credentialvault` keeps them in one **encrypted, password-protected file** — `ArchiveCodec` again,
+no new crypto — defaulting to `money-manager.credentials` next to the database (a user-chosen location
+is remembered per database in `LocalSettings`). It holds API tokens / api secrets / SCA signing keys and
+Google refresh tokens.
+
+- **The password is never stored** — not in the DB, `LocalSettings` or logs; only in memory while unlocked.
+- **Lazy unlock**: code that needs a secret calls `CredentialVault.requireUnlocked(reason)`, which raises an
+  `UnlockRequest`; `CredentialVaultPromptHost` (mounted once by `AppStartupHost`) asks for the password, or
+  where to create the file and with what password. Cancelling throws `CredentialVaultLockedException`.
+  In Compose, reach the vault through `LocalCredentialVault.current`.
+- **API credentials are keyed by strategy name**, not id: catalog installs give a strategy a fresh random id
+  in every database. `api_credential` is just a secret-free connection row (id, strategy) that sessions
+  hang off; `ImportEngine.ensureApiCredentials` creates it idempotently, and the API screens create rows for
+  any installed strategy with vault secrets, which is how a recreated database reconnects.
+- The vault is `AppScope` and re-bound (`bindToDatabase`) on every database switch, which locks it if the
+  file changes. Tests use `unlockedCredentialVault()` from `test/utils/credentialvault`.
 
 ## Reconciliation Sources (Koinly, …)
 

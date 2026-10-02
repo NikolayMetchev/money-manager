@@ -242,7 +242,6 @@ class ImportTimelineRepositoryImplTest : DbTest() {
             setupAccountsAndCurrency()
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = "token",
                     deviceId = repositories.deviceId,
                     createdAt = Clock.System.now(),
                     expiresAt = null,

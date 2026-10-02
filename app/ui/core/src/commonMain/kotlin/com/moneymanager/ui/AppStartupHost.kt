@@ -9,6 +9,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -22,6 +23,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
@@ -42,6 +44,8 @@ import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.SchemaErrorDetector
+import com.moneymanager.ui.foundation.CredentialVaultPromptHost
+import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.screens.FirstRunDatabaseSetupScreen
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.CancellationException
@@ -98,7 +102,49 @@ fun AppStartupHost(
     importFileSourceFactory: ImportFileSourceFactory? = null,
     driveFolderBrowser: DriveFolderBrowser? = null,
     cryptoCatalogRefresher: CryptoCatalogRefresher? = null,
+    credentialVault: CredentialVault? = null,
     onDatabaseReady: (MoneyManagerDatabaseWrapper?, DbLocation?) -> Unit = { _, _ -> },
+) {
+    val vault = credentialVault ?: LocalCredentialVault.current
+    CompositionLocalProvider(LocalCredentialVault provides vault) {
+        AppStartupContent(
+            databaseManager = databaseManager,
+            appVersion = appVersion,
+            localSettings = localSettings,
+            createAppServices = createAppServices,
+            onInfoLog = onInfoLog,
+            onErrorLog = onErrorLog,
+            remoteController = remoteController,
+            strategySyncController = strategySyncController,
+            strategyCatalogController = strategyCatalogController,
+            importFileSourceFactory = importFileSourceFactory,
+            driveFolderBrowser = driveFolderBrowser,
+            cryptoCatalogRefresher = cryptoCatalogRefresher,
+            credentialVault = vault,
+            onDatabaseReady = onDatabaseReady,
+        )
+        // Mounted over every startup state, so a secret needed before a database is open (restoring a
+        // cloud-backed one needs the Google sign-in) can still prompt.
+        CredentialVaultPromptHost(vault)
+    }
+}
+
+@Composable
+private fun AppStartupContent(
+    databaseManager: DatabaseManager,
+    appVersion: AppVersion,
+    localSettings: LocalSettings,
+    createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
+    onInfoLog: (String) -> Unit,
+    onErrorLog: (String, Throwable) -> Unit,
+    remoteController: RemoteDatabaseController?,
+    strategySyncController: StrategySyncController?,
+    strategyCatalogController: StrategyCatalogController?,
+    importFileSourceFactory: ImportFileSourceFactory?,
+    driveFolderBrowser: DriveFolderBrowser?,
+    cryptoCatalogRefresher: CryptoCatalogRefresher?,
+    credentialVault: CredentialVault,
+    onDatabaseReady: (MoneyManagerDatabaseWrapper?, DbLocation?) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var databaseState by remember { mutableStateOf<AppDatabaseState>(AppDatabaseState.Loading()) }
@@ -107,6 +153,13 @@ fun AppStartupHost(
 
     LaunchedEffect(Unit) {
         val binding = remoteController?.activeBinding()
+        // Bind the vault to the database we expect to open before opening anything, since restoring a
+        // cloud-backed database already needs the Google sign-in it holds.
+        credentialVault.bindToDatabase(
+            binding?.localCachePath
+                ?: localSettings.getString(KEY_LAST_DATABASE)
+                ?: databaseManager.getDefaultLocation().toString(),
+        )
         if (binding != null) {
             // If the working copy was kept on the previous close, open it directly: no password, no
             // download, no network. The remote is only touched at close, and only to upload changes.
@@ -179,6 +232,7 @@ fun AppStartupHost(
     when (val state = databaseState) {
         is AppDatabaseState.Loaded -> {
             LaunchedEffect(state.database) {
+                credentialVault.bindToDatabase(state.location.toString())
                 onDatabaseReady(state.database, state.location)
                 // Capture the "everything synced" baseline at session start for cloud-backed databases.
                 if (remoteController?.hasActiveSession() == true && !remoteController.hasSyncBaseline()) {

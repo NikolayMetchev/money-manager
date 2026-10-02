@@ -21,6 +21,7 @@ kotlin {
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
+                implementation(projects.utils.credentialvault)
                 implementation(projects.utils.rest)
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)

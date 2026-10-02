@@ -295,67 +295,42 @@ suspend fun ImportEngine.setSetupWizardCompleted(completed: Boolean) {
 
 // region API sessions
 
-suspend fun ImportEngine.createApiCredential(
-    token: String,
+/**
+ * Gets or creates the connection rows for [strategyIds], returning each one's credential id. Idempotent,
+ * so it is safe to call whenever the credential vault shows a strategy as connected.
+ */
+suspend fun ImportEngine.ensureApiCredentials(
+    strategyIds: Collection<ApiImportStrategyId>,
     createdAt: Instant,
-    strategyId: ApiImportStrategyId? = null,
-    privateKey: String? = null,
-    publicKey: String? = null,
-    apiSecret: String? = null,
-): ApiCredentialId {
-    // The read-back key is echoed through ImportResult, so derive it from the (non-secret) createdAt
-    // timestamp rather than the secret token. A helper creates exactly one credential per batch.
-    val key = createdAt.toString()
-    return requireNotNull(
+): Map<ApiImportStrategyId, ApiCredentialId> {
+    if (strategyIds.isEmpty()) return emptyMap()
+    val distinct = strategyIds.distinct()
+    val result =
         import(
             ImportBatch(
-                apiSessionMutations =
-                    listOf(
-                        ApiSessionMutation.CreateCredential(
-                            key,
-                            token,
-                            createdAt,
-                            strategyId,
-                            privateKey,
-                            publicKey,
-                            apiSecret,
-                        ),
-                    ),
+                apiSessionMutations = distinct.map { ApiSessionMutation.EnsureCredential(it.toString(), it, createdAt) },
             ),
-        ).apiCredentialIds[key],
-    )
+        )
+    return distinct.associateWith { requireNotNull(result.apiCredentialIds[it.toString()]) }
 }
 
-suspend fun ImportEngine.updateApiCredentialKeys(
-    credentialId: ApiCredentialId,
-    privateKey: String?,
-    publicKey: String?,
-) {
-    import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.UpdateCredentialKeys(credentialId, privateKey, publicKey))))
-}
-
-suspend fun ImportEngine.updateApiCredentialSecrets(
-    credentialId: ApiCredentialId,
-    token: String,
-    apiSecret: String?,
-) {
-    import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.UpdateCredentialSecrets(credentialId, token, apiSecret))))
-}
+suspend fun ImportEngine.ensureApiCredential(
+    strategyId: ApiImportStrategyId,
+    createdAt: Instant,
+): ApiCredentialId = ensureApiCredentials(listOf(strategyId), createdAt).getValue(strategyId)
 
 suspend fun ImportEngine.createApiSession(
-    token: String,
     deviceId: DeviceId,
     createdAt: Instant,
     credentialId: ApiCredentialId? = null,
 ): ApiSessionId {
-    // The read-back key is echoed through ImportResult, so derive it from the (non-secret) createdAt
-    // timestamp rather than the secret token. A helper creates exactly one session per batch.
+    // A helper creates exactly one session per batch, so any unique key will do.
     val key = createdAt.toString()
     return requireNotNull(
         import(
             ImportBatch(
                 apiSessionMutations =
-                    listOf(ApiSessionMutation.CreateSession(key, token, deviceId, createdAt, credentialId)),
+                    listOf(ApiSessionMutation.CreateSession(key, deviceId, createdAt, credentialId)),
             ),
         ).apiSessionIds[key],
     )

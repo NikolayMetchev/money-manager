@@ -13,6 +13,7 @@ kotlin {
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.repository.read)
                 api(projects.utils.bigdecimal)
+                api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
                 api(libs.androidx.navigation3.runtime)
                 api(libs.androidx.savedstate)
@@ -20,6 +21,7 @@ kotlin {
                 api(libs.kotlinx.datetime)
                 api(libs.kotlinx.serialization.core)
 
+                implementation(projects.utils.archive)
                 implementation(projects.utils.currency)
                 implementation(libs.kmlogging)
             }
@@ -31,7 +33,9 @@ kotlin {
         getByName("commonTest") {
             dependencies {
                 implementation(projects.test.app.ui)
+                implementation(projects.test.utils.credentialvault)
                 implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.kotlinx.serialization.json)
             }
         }
@@ -60,14 +64,15 @@ kotlin {
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.repository.read)
                 api(projects.utils.bigdecimal)
+                api(projects.utils.credentialvault)
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.androidx.navigation3.runtime.desktop)
                 api(libs.androidx.savedstate.desktop)
                 api(libs.compose.foundation.desktop)
+                api(libs.compose.foundation.layout.desktop)
                 api(libs.compose.ui.desktop)
 
                 implementation(libs.androidx.compose.runtime.annotation)
-                implementation(libs.compose.foundation.layout.desktop)
                 implementation(libs.compose.material.icons.core.desktop)
                 implementation(libs.compose.material3.desktop)
                 implementation(libs.compose.ui.graphics.desktop)
@@ -89,8 +94,10 @@ kotlin {
         getByName("androidDeviceTest") {
             dependencies {
                 implementation(projects.test.app.ui)
+                implementation(projects.test.utils.credentialvault)
                 implementation(kotlin("test"))
                 implementation(libs.androidx.compose.ui.test)
+                implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.kotlinx.serialization.json)
             }
         }

@@ -1,43 +1,61 @@
 package com.moneymanager.remotestorage.googledrive
 
-import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.credentialvault.CredentialVault
+import com.moneymanager.credentialvault.StoredGoogleAccount
+import com.moneymanager.credentialvault.VaultState
+import java.util.concurrent.ConcurrentHashMap
 
 /** A cached OAuth access token and the epoch-millis instant it expires. */
 data class StoredAccessToken(
     val token: String,
     val expiresAtMillis: Long,
+) {
+    override fun toString(): String = "StoredAccessToken(token=<redacted>, expiresAtMillis=$expiresAtMillis)"
+}
+
+/** An access token remembered together with the refresh token it was minted from (the key holds the vault file). */
+private class CachedAccessToken(
+    val clientId: String,
+    val refreshToken: String,
+    val token: StoredAccessToken,
 )
 
+// Access tokens live for an hour, so they are cached for this process only rather than written to the
+// vault; a new run spends one refresh call instead of re-encrypting the vault every hour. Process-wide
+// because providers (and so stores) are rebuilt per call. Each entry only counts while the vault is
+// unlocked on the same file and still holds the refresh token it came from, so locking, switching to a
+// database with another vault, or re-consenting invalidates it.
+private val accessTokens = ConcurrentHashMap<String, CachedAccessToken>()
+
 /**
- * Persists Google OAuth tokens, keyed by the user's OAuth client id, in `LocalSettings` (outside any
- * money-manager database, which is itself ephemeral when cloud-backed). Two things are stored:
- *
- * - the long-lived **refresh token** — written once at interactive sign-in and reused indefinitely;
- * - the short-lived **access token** (+ its expiry) — so a freshly constructed provider, or a new app
- *   run, reuses a still-valid token instead of calling the token endpoint again. Only when it has
- *   expired (or a request is rejected) do we refresh; only if the refresh token itself is rejected do
- *   we fall back to interactive re-authentication.
+ * Google OAuth tokens per OAuth client id. The long-lived **refresh token** and its granted scopes live
+ * in the encrypted [vault] (outside any database, so a wiped or cloud-hydrated database keeps its
+ * Google sign-in); reading them may prompt the user to unlock the vault. The short-lived **access
+ * token** is cached in memory only.
  *
  * One token set per OAuth client means re-using the same client across databases shares the Google
- * account, while different clients (e.g. a second account) get their own tokens. Stored unencrypted
- * on-device, matching the existing posture for API session tokens.
+ * account, while different clients (e.g. a second account) get their own tokens.
  */
 class GoogleDriveAccountStore(
-    private val localSettings: LocalSettings,
+    private val vault: CredentialVault,
 ) {
-    fun refreshToken(clientId: String): String? = localSettings.getString(refreshKey(clientId))
+    suspend fun refreshToken(clientId: String): String? = account(clientId)?.refreshToken
 
-    fun saveRefreshToken(
+    /** The OAuth scopes most recently granted for [clientId] (empty if never signed in). */
+    suspend fun grantedScopes(clientId: String): Set<String> = account(clientId)?.grantedScopes.orEmpty()
+
+    /** Records a completed interactive sign-in: the refresh token and the scopes it was granted for. */
+    suspend fun saveSignIn(
         clientId: String,
         refreshToken: String,
+        grantedScopes: Set<String>,
     ) {
-        localSettings.putString(refreshKey(clientId), refreshToken)
+        vault.update(REASON) { it.withGoogleAccount(StoredGoogleAccount(clientId, refreshToken, grantedScopes)) }
     }
 
     fun accessToken(clientId: String): StoredAccessToken? {
-        val token = localSettings.getString(accessKey(clientId)) ?: return null
-        val expiry = localSettings.getString(expiryKey(clientId))?.toLongOrNull() ?: return null
-        return StoredAccessToken(token, expiry)
+        val (path, refreshToken) = currentGrant(clientId) ?: return null
+        return accessTokens[cacheKey(path, clientId)]?.takeIf { it.refreshToken == refreshToken }?.token
     }
 
     fun saveAccessToken(
@@ -45,52 +63,34 @@ class GoogleDriveAccountStore(
         token: String,
         expiresAtMillis: Long,
     ) {
-        localSettings.putString(accessKey(clientId), token)
-        localSettings.putString(expiryKey(clientId), expiresAtMillis.toString())
+        val (path, refreshToken) = currentGrant(clientId) ?: return
+        accessTokens[cacheKey(path, clientId)] = CachedAccessToken(clientId, refreshToken, StoredAccessToken(token, expiresAtMillis))
     }
 
     fun clearAccessToken(clientId: String) {
-        localSettings.remove(accessKey(clientId))
-        localSettings.remove(expiryKey(clientId))
+        accessTokens.values.removeIf { it.clientId == clientId }
     }
 
-    /** The OAuth scopes most recently granted for [clientId] (empty if never recorded). */
-    fun grantedScopes(clientId: String): Set<String> =
-        localSettings
-            .getString(scopesKey(clientId))
-            ?.split(' ')
-            ?.filter { it.isNotBlank() }
-            ?.toSet()
-            .orEmpty()
+    // The unlocked vault's file and refresh token for [clientId], or null when locked or not signed in.
+    private fun currentGrant(clientId: String): Pair<String, String>? {
+        val unlocked = vault.state.value as? VaultState.Unlocked ?: return null
+        val refreshToken = unlocked.bundle.googleAccount(clientId)?.refreshToken ?: return null
+        return unlocked.path to refreshToken
+    }
 
-    fun saveGrantedScopes(
+    private fun cacheKey(
+        vaultPath: String,
         clientId: String,
-        scopes: Set<String>,
-    ) {
-        localSettings.putString(scopesKey(clientId), scopes.joinToString(" "))
-    }
+    ) = "$vaultPath\u0000$clientId"
 
-    fun clear(clientId: String) {
-        localSettings.remove(refreshKey(clientId))
-        localSettings.remove(scopesKey(clientId))
+    suspend fun clear(clientId: String) {
         clearAccessToken(clientId)
+        vault.update(REASON) { it.withoutGoogleAccount(clientId) }
     }
 
-    // Key by a short, stable hash of the client id, never the raw id: a Google OAuth client id is
-    // ~72 chars, and the JVM LocalSettings backing (java.util.prefs) rejects keys over 80 chars — which
-    // silently dropped the token, forcing a re-auth on every call. String.hashCode is deterministic
-    // across runs/platforms, so the same client always maps to the same handle.
-    private fun handle(clientId: String): String = clientId.hashCode().toUInt().toString(MAX_RADIX)
-
-    private fun refreshKey(clientId: String) = "gdrive.rt.${handle(clientId)}"
-
-    private fun accessKey(clientId: String) = "gdrive.at.${handle(clientId)}"
-
-    private fun expiryKey(clientId: String) = "gdrive.ate.${handle(clientId)}"
-
-    private fun scopesKey(clientId: String) = "gdrive.sc.${handle(clientId)}"
+    private suspend fun account(clientId: String): StoredGoogleAccount? = vault.requireUnlocked(REASON).googleAccount(clientId)
 
     private companion object {
-        const val MAX_RADIX = 36
+        const val REASON = "Connect to Google Drive"
     }
 }

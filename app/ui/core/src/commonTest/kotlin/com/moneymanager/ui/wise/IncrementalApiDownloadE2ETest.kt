@@ -6,7 +6,6 @@ import com.moneymanager.apiimporter.downloadApiSessionTransactions
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.importengineapi.createApiCredential
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
@@ -85,7 +84,7 @@ class IncrementalApiDownloadE2ETest : DbTest() {
                 .getAllStrategies()
                 .first()
                 .single { it.name == "Wise" }
-        val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+        val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
         val watermarks = repositories.apiSessionRepository.getDownloadWatermarks(credentialId, sessionId)
 
         fun clientFor() =
@@ -118,7 +117,7 @@ class IncrementalApiDownloadE2ETest : DbTest() {
     @Test
     fun `a second download fetches only the windows the first did not cover`() =
         runTest {
-            val credentialId = repositories.importEngine.createApiCredential(token, now)
+            val credentialId = apiConnection("Wise", now)
 
             val (_, firstPages) = download(credentialId)
             assertTrue(firstPages > 1, "the first download sweeps the full lookback in windows")
@@ -137,7 +136,7 @@ class IncrementalApiDownloadE2ETest : DbTest() {
     @Test
     fun `forcing a full download ignores the watermark`() =
         runTest {
-            val credentialId = repositories.importEngine.createApiCredential(token, now)
+            val credentialId = apiConnection("Wise", now)
 
             val (_, firstPages) = download(credentialId)
             val (_, forcedPages) = download(credentialId, forceFullDownload = true)
@@ -148,14 +147,14 @@ class IncrementalApiDownloadE2ETest : DbTest() {
     @Test
     fun `a failed download does not advance the watermark`() =
         runTest {
-            val credentialId = repositories.importEngine.createApiCredential(token, now)
+            val credentialId = apiConnection("Wise", now)
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val strategy =
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
                     .single { it.name == "Wise" }
-            val sessionId = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+            val sessionId = repositories.importEngine.createApiSession(deviceId, now, credentialId)
 
             // The statement endpoint errors with a JSON body, which the traffic interceptor still
             // records as a request+response pair. Coverage must not follow from those rows.
@@ -208,7 +207,7 @@ class IncrementalApiDownloadE2ETest : DbTest() {
 
             // The failed session stored request and response rows, but no coverage.
             assertTrue(repositories.apiSessionRepository.getResponsesBySession(sessionId).isNotEmpty())
-            val probe = repositories.importEngine.createApiSession(token, deviceId, now, credentialId)
+            val probe = repositories.importEngine.createApiSession(deviceId, now, credentialId)
             assertEquals(emptyMap(), repositories.apiSessionRepository.getDownloadWatermarks(credentialId, probe))
         }
 }

@@ -28,7 +28,6 @@ kotlin {
                 dependencies {
                     implementation(libs.kotlinx.coroutines.core)
                     implementation(libs.kotlinx.serialization.json)
-                    implementation(libs.ktor.client.auth)
                     implementation(libs.ktor.client.cio)
                 }
             }
@@ -38,8 +37,9 @@ kotlin {
             dependencies {
                 api(projects.app.importfilesource.core)
                 api(projects.app.remotestorage.core)
-                api(projects.utils.localsettings)
+                api(projects.utils.credentialvault)
                 api(libs.kotlinx.serialization.core)
+                api(libs.ktor.client.auth)
                 api(libs.ktor.client.core)
 
                 implementation(libs.ktor.http)
@@ -52,8 +52,9 @@ kotlin {
             dependencies {
                 api(projects.app.importfilesource.core)
                 api(projects.app.remotestorage.core)
-                api(projects.utils.localsettings)
+                api(projects.utils.credentialvault)
                 api(libs.kotlinx.serialization.core)
+                api(libs.ktor.client.auth)
                 api(libs.ktor.client.core)
 
                 implementation(libs.ktor.http)
@@ -63,6 +64,7 @@ kotlin {
 
         getByName("jvmTest") {
             dependencies {
+                implementation(projects.test.utils.credentialvault)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
             }

@@ -1,11 +1,11 @@
 selectAllCredentials:
 SELECT * FROM api_credential ORDER BY created_at DESC;
 
+selectCredentialIdByStrategy:
+SELECT id FROM api_credential WHERE strategy_id = ?;
+
 selectById:
 SELECT * FROM api_session_with_latest_import WHERE id = ?;
-
-selectByToken:
-SELECT * FROM api_session_with_latest_import WHERE token = ? ORDER BY created_at DESC LIMIT 1;
 
 selectByDeviceId:
 SELECT * FROM api_session_with_latest_import WHERE device_id = ? ORDER BY created_at DESC;

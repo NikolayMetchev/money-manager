@@ -6,8 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * JVM/desktop [GoogleAccessTokenSource]: the installed-app loopback OAuth flow with the user's own
- * ("bring your own") OAuth client, persisting a refresh token via [GoogleDriveAccountStore]. The Drive
+ * JVM/desktop [GoogleAccessTokenSource]: the installed-app loopback OAuth flow, persisting a refresh token
+ * in the credential vault via [GoogleDriveAccountStore]. The Drive
  * [httpClient] is the Bearer-plugin client built by the factory, which attaches the access token and
  * silently refreshes it (via [oauth] + the stored refresh token) on a 401.
  *
@@ -65,9 +65,8 @@ internal suspend fun performLoopbackSignIn(
                         "Google did not return a refresh token. Remove Money Manager from your Google " +
                             "account's third-party access and connect again.",
                     )
-            accountStore.saveRefreshToken(credentials.clientId, refreshToken)
+            accountStore.saveSignIn(credentials.clientId, refreshToken, scopes.toSet())
             accountStore.saveAccessToken(credentials.clientId, tokens.accessToken, accessTokenExpiry(tokens.expiresInSeconds))
-            accountStore.saveGrantedScopes(credentials.clientId, scopes.toSet())
             tokens
         }
     }

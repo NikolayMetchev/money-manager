@@ -170,7 +170,7 @@ class BinanceCsvThenApiE2ETest : DbTest() {
     private suspend fun importApi() {
         val strategy = assertNotNull(repositories.apiImportStrategyRepository.getStrategyByName("Binance").first())
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
-        val sessionId = repositories.apiSessionRepository.createSession("apikey", deviceId, now, null)
+        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
         suspend fun stage(
             marker: String,

@@ -38,11 +38,6 @@ interface ApiSessionReadRepository {
     suspend fun getSessionById(id: ApiSessionId): ApiSession?
 
     /**
-     * Returns the session with the given token, or null if not found.
-     */
-    suspend fun getSessionByToken(token: String): ApiSession?
-
-    /**
      * Returns all sessions for the given device, ordered by creation time descending.
      */
     suspend fun getSessionsByDevice(deviceId: DeviceId): List<ApiSession>

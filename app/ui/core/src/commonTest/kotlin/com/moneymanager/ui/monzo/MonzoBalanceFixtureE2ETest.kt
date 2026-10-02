@@ -76,7 +76,6 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
             val firstSession = sessions.minByOrNull { it.id } ?: return@runTest
             val sessionId =
                 repositories.apiSessionRepository.createSession(
-                    token = firstSession.token,
                     deviceId = deviceId,
                     createdAt = Instant.fromEpochMilliseconds(firstSession.createdAt),
                     expiresAt = firstSession.expiresAt?.let(Instant.Companion::fromEpochMilliseconds),
