@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlin.time.Duration.Companion.seconds
 
 /** The credential backup controller, or null when this build has no remote storage. Provided at the app root. */
 val LocalCredentialSyncController = staticCompositionLocalOf<CredentialSyncController?> { null }
@@ -33,9 +34,9 @@ fun CredentialBackupSyncHost(
             .distinctUntilChanged()
             .filterNotNull()
             // Several secrets are often saved in a burst (e.g. an API key and its secret); upload once.
-            .debounce(SYNC_DEBOUNCE_MILLIS)
+            .debounce(SYNC_DEBOUNCE)
             .collect { controller.syncNow(vault) }
     }
 }
 
-private const val SYNC_DEBOUNCE_MILLIS = 2_000L
+private val SYNC_DEBOUNCE = 2.seconds
