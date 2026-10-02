@@ -29,6 +29,22 @@ data class CredentialBundle(
     fun withoutGoogleAccount(clientId: String): CredentialBundle =
         copy(googleAccounts = googleAccounts.filterNot { it.clientId == clientId })
 
+    /**
+     * Combines this bundle with [other] (e.g. this device's vault and the copy backed up from another
+     * device), keeping every strategy and Google client either side knows. Where both hold an API
+     * credential, the more recently created wins; where both hold a Google account, this side's wins, since
+     * it is the sign-in this device just consented to.
+     */
+    fun mergedWith(other: CredentialBundle): CredentialBundle {
+        val mergedApi =
+            (apiCredentials + other.apiCredentials)
+                .groupBy { it.strategyName }
+                .values
+                .map { candidates -> candidates.maxBy { it.createdAtEpochMillis } }
+        val mergedGoogle = googleAccounts + other.googleAccounts.filter { googleAccount(it.clientId) == null }
+        return copy(apiCredentials = mergedApi, googleAccounts = mergedGoogle)
+    }
+
     override fun toString(): String = "CredentialBundle(version=$version, apiCredentials=$apiCredentials, googleAccounts=$googleAccounts)"
 
     companion object {

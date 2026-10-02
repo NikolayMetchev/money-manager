@@ -6,6 +6,8 @@ import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.di.scope.AppScope
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
+import com.moneymanager.remotestorage.sync.CredentialRemoteConnectionStore
+import com.moneymanager.remotestorage.sync.CredentialSyncController
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.RemoteDatabaseSyncService
 import com.moneymanager.remotestorage.sync.StrategyRemoteConnectionStore
@@ -51,4 +53,16 @@ object RemoteStorageModule {
         providerFactory: RemoteStorageProviderFactory,
         store: StrategyRemoteConnectionStore,
     ): StrategySyncController = StrategySyncController(providerFactory, store)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideCredentialRemoteConnectionStore(localSettings: LocalSettings): CredentialRemoteConnectionStore =
+        CredentialRemoteConnectionStore(localSettings)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideCredentialSyncController(
+        providerFactory: RemoteStorageProviderFactory,
+        store: CredentialRemoteConnectionStore,
+    ): CredentialSyncController = CredentialSyncController(providerFactory, store)
 }

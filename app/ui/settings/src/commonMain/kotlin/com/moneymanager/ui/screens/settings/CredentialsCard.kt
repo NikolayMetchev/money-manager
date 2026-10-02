@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -20,6 +22,9 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.VaultState
+import com.moneymanager.remotestorage.sync.CredentialSyncController
+import com.moneymanager.remotestorage.sync.CredentialSyncState
+import com.moneymanager.remotestorage.sync.CredentialSyncStatus
 import com.moneymanager.ui.components.SettingsSectionCard
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.CredentialFilePickerMode
@@ -87,6 +92,7 @@ internal fun CredentialsCard() {
             }
         }
         message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        LocalCredentialSyncController.current?.let { CredentialBackupSection(vault, it) }
     }
 
     if (changingPassword) {
@@ -95,6 +101,135 @@ internal fun CredentialsCard() {
             onDismiss = { changingPassword = false },
         )
     }
+}
+
+/**
+ * The opt-in backup of the credential file to remote storage. Its bytes are uploaded as they are, already
+ * encrypted, so the backup is as safe as the local file and opens with the same password.
+ */
+@Composable
+private fun CredentialBackupSection(
+    vault: CredentialVault,
+    controller: CredentialSyncController,
+) {
+    val state by controller.state.collectAsState()
+    val scope = rememberSchemaAwareCoroutineScope()
+    var connected by remember { mutableStateOf(controller.isConnected()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var askingForRemotePassword by remember { mutableStateOf(false) }
+
+    // Sync actions are user-initiated, so unlocking first (which may prompt) is expected here.
+    fun run(action: suspend () -> Unit) {
+        error = null
+        scope.launch {
+            try {
+                action()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (expected: Exception) {
+                // Declining the unlock prompt is a choice, not an error.
+                if (expected !is CredentialVaultLockedException) error = expected.message ?: "Something went wrong"
+            }
+        }
+    }
+
+    fun syncNow() =
+        run {
+            vault.requireUnlocked("Back up your credentials")
+            controller.syncNow(vault)
+        }
+
+    HorizontalDivider()
+    Text("Cloud backup", style = MaterialTheme.typography.titleSmall)
+    if (!connected) {
+        Text(
+            "Back the credential file up to the cloud, so another device (or this one after a reinstall) can get " +
+                "your credentials back. It stays encrypted with your password.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        controller.availableProviders().forEach { type ->
+            OutlinedButton(
+                onClick = {
+                    run {
+                        controller.connect(type.id, config = null)
+                        connected = true
+                        vault.requireUnlocked("Back up your credentials")
+                        controller.syncNow(vault)
+                    }
+                },
+            ) { Text("Back up to ${type.displayName}…") }
+        }
+    } else {
+        if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        Text(backupStatus(state), style = MaterialTheme.typography.bodyMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (state.status == CredentialSyncStatus.NEEDS_REMOTE_PASSWORD) {
+                OutlinedButton(onClick = { askingForRemotePassword = true }, enabled = !state.busy) { Text("Enter backup password…") }
+            }
+            if (state.needsReconnect) {
+                OutlinedButton(onClick = { run { controller.reconnect() } }, enabled = !state.busy) { Text("Reconnect") }
+            }
+            OutlinedButton(onClick = { syncNow() }, enabled = !state.busy) { Text("Sync now") }
+            TextButton(
+                onClick = {
+                    controller.disconnect()
+                    connected = false
+                },
+                enabled = !state.busy,
+            ) { Text("Stop backing up") }
+        }
+    }
+    error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+
+    if (askingForRemotePassword) {
+        BackupPasswordDialog(
+            onDismiss = { askingForRemotePassword = false },
+            onSubmit = { password ->
+                askingForRemotePassword = false
+                run { controller.syncNow(vault, remotePassword = password) }
+            },
+        )
+    }
+}
+
+private fun backupStatus(state: CredentialSyncState): String =
+    when (state.status) {
+        CredentialSyncStatus.IDLE -> "Backed up whenever the credential file is unlocked and changes."
+        CredentialSyncStatus.IN_SYNC -> "Backed up and up to date."
+        CredentialSyncStatus.NEEDS_REMOTE_PASSWORD ->
+            state.message ?: "The backup uses a different password. Enter it to merge the two."
+        CredentialSyncStatus.ERROR -> "Backup failed: ${state.message}"
+    }
+
+@Composable
+private fun BackupPasswordDialog(
+    onDismiss: () -> Unit,
+    onSubmit: (String) -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Backup password") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "The credential file in the cloud was saved with a different password. Enter it to merge the " +
+                        "two; this device's credential file will then use that password too.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                PasswordField(
+                    password,
+                    { password = it },
+                    "Backup password",
+                    modifier = Modifier.fillMaxWidth(),
+                    onSubmit = { if (password.isNotEmpty()) onSubmit(password) },
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSubmit(password) }, enabled = password.isNotEmpty()) { Text("Merge") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 private fun credentialStatus(state: VaultState): String =

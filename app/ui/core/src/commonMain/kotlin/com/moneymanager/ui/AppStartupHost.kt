@@ -36,6 +36,7 @@ import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteAuthException
+import com.moneymanager.remotestorage.sync.CredentialSyncController
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.strategycatalog.StrategyCatalogController
@@ -47,6 +48,8 @@ import com.moneymanager.ui.error.SchemaErrorDetector
 import com.moneymanager.ui.foundation.CredentialVaultPromptHost
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.screens.FirstRunDatabaseSetupScreen
+import com.moneymanager.ui.screens.settings.CredentialBackupSyncHost
+import com.moneymanager.ui.screens.settings.LocalCredentialSyncController
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -103,10 +106,14 @@ fun AppStartupHost(
     driveFolderBrowser: DriveFolderBrowser? = null,
     cryptoCatalogRefresher: CryptoCatalogRefresher? = null,
     credentialVault: CredentialVault? = null,
+    credentialSyncController: CredentialSyncController? = null,
     onDatabaseReady: (MoneyManagerDatabaseWrapper?, DbLocation?) -> Unit = { _, _ -> },
 ) {
     val vault = credentialVault ?: LocalCredentialVault.current
-    CompositionLocalProvider(LocalCredentialVault provides vault) {
+    CompositionLocalProvider(
+        LocalCredentialVault provides vault,
+        LocalCredentialSyncController provides credentialSyncController,
+    ) {
         AppStartupContent(
             databaseManager = databaseManager,
             appVersion = appVersion,
@@ -126,6 +133,7 @@ fun AppStartupHost(
         // Mounted over every startup state, so a secret needed before a database is open (restoring a
         // cloud-backed one needs the Google sign-in) can still prompt.
         CredentialVaultPromptHost(vault)
+        credentialSyncController?.let { CredentialBackupSyncHost(vault, it) }
     }
 }
 

@@ -51,5 +51,13 @@ private object UnprovidedCredentialVault : CredentialVault {
         transform: (CredentialBundle) -> CredentialBundle,
     ) = unprovided()
 
+    override suspend fun encryptedBytes(): ByteArray? = null
+
+    override suspend fun applyRemote(
+        bytes: ByteArray,
+        password: String?,
+        merge: Boolean,
+    ) = unprovided()
+
     private fun unprovided(): Nothing = throw CredentialVaultLockedException("No credential vault is available")
 }

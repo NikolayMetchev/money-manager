@@ -14,13 +14,13 @@ kotlin {
                 api(projects.app.remotestorage.sync)
                 api(projects.app.strategycatalog)
                 api(projects.app.ui.foundation)
+                api(projects.utils.credentialvault)
 
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.app.ui.components)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
-                implementation(projects.utils.credentialvault)
                 implementation(projects.utils.humanreadable)
                 implementation(libs.compose.charts)
                 implementation(libs.kmlogging)
@@ -54,6 +54,7 @@ kotlin {
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.strategycatalog)
+                api(projects.utils.credentialvault)
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
 

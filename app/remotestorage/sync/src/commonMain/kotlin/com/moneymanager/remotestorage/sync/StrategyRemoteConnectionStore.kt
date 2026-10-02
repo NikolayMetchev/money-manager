@@ -60,26 +60,13 @@ class StrategyRemoteConnectionStore(
         // characters: on JVM, LocalSettings is java.util.prefs backed by prefs.xml, and a single
         // XML-illegal character makes the WHOLE node fail to flush — silently losing every setting
         // written that session. Skipping the baseline merely degrades to "never synced" on restart.
-        if (fields.any { field -> field.contains(FIELD_SEP) || field.any { it.isIllegalInXml() } }) return
+        if (fields.any { field -> field.contains(FIELD_SEP) || !field.isXmlSafe() }) return
         localSettings.putString(baselineKey(key), fields.joinToString(FIELD_SEP))
     }
-
-    // XML 1.0 forbids control characters below 0x20 other than tab/newline/carriage-return.
-    private fun Char.isIllegalInXml(): Boolean = code < ' '.code && this != '\t' && this != '\n' && this != '\r'
 
     // NUL as the kind/name join separator can never collide with a real StrategyKind name or
     // strategy name, so no delimiter collision is possible.
     private fun baselineKey(key: StrategyKey): String = "$KEY_BASELINE_PREFIX${stableHash("${key.kind}\u0000${key.name}")}"
-
-    // FNV-1a 64-bit hex — a compact, stable settings-key suffix (well within the JVM prefs 80-char limit).
-    private fun stableHash(text: String): String {
-        var hash = FNV_OFFSET_BASIS
-        for (byte in text.encodeToByteArray()) {
-            hash = hash xor (byte.toLong() and 0xff)
-            hash *= FNV_PRIME
-        }
-        return hash.toULong().toString(HEX_RADIX)
-    }
 
     private companion object {
         const val KEY_PROVIDER_ID = "strategySync.providerId"
@@ -99,8 +86,5 @@ class StrategyRemoteConnectionStore(
         // (URL-safe base64) or in the hex content hash.
         const val FIELD_SEP = "|"
         const val BASELINE_FIELDS = 3
-        const val FNV_OFFSET_BASIS: Long = -3750763034362895579L
-        const val FNV_PRIME: Long = 1099511628211L
-        const val HEX_RADIX: Int = 16
     }
 }

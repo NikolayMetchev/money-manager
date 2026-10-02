@@ -248,6 +248,7 @@ private fun MainWindow(onExit: () -> Unit) {
                 driveFolderBrowser = driveFolderBrowser,
                 cryptoCatalogRefresher = HttpCryptoCatalogRefresher(),
                 credentialVault = component.credentialVault,
+                credentialSyncController = component.credentialSyncController,
                 onDatabaseReady = { database, _ -> openDatabase[0] = database },
             )
         }

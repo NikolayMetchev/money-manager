@@ -93,6 +93,26 @@ interface CredentialVault {
         reason: String,
         transform: (CredentialBundle) -> CredentialBundle,
     )
+
+    /**
+     * The bound vault file's raw, still-encrypted bytes (as backed up to remote storage), or null when no
+     * file exists yet. Never needs unlocking: the bytes are useless without the password.
+     */
+    suspend fun encryptedBytes(): ByteArray?
+
+    /**
+     * Takes in a backed-up copy of the vault: decrypts [bytes] with [password] (default: the in-memory one)
+     * and either replaces the unlocked secrets with it or, when [merge] is true, folds it in via
+     * [CredentialBundle.mergedWith] (this side preferred). When [password] differs from the current one, the
+     * local file is re-encrypted under it, so every device sharing the backup converges on one password.
+     *
+     * Requires the vault to be unlocked. Throws `ArchiveDecryptionException` if [password] is wrong.
+     */
+    suspend fun applyRemote(
+        bytes: ByteArray,
+        password: String?,
+        merge: Boolean,
+    )
 }
 
 /** The decrypted secrets if the vault is already unlocked, without prompting. */
