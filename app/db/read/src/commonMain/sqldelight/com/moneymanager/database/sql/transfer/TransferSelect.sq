@@ -25,6 +25,19 @@ WHERE (source_account_id = ? OR target_account_id = ?)
 AND timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
+-- Transfers on the given accounts that carry the named attribute, at any date. The importer loads the
+-- few legs whose timestamp is only approximate this way, since their true instant may lie well outside
+-- the date range it otherwise loads.
+selectByAccountsWithAttributeType:
+SELECT * FROM transfer_with_asset
+WHERE (source_account_id IN :accountIds OR target_account_id IN :accountIds)
+AND id IN (
+    SELECT transfer_attribute.transaction_id FROM transfer_attribute
+    JOIN attribute_type ON transfer_attribute.attribute_type_id = attribute_type.id
+    WHERE attribute_type.name = :attributeTypeName
+)
+ORDER BY timestamp DESC;
+
 selectAllBalances:
 SELECT
     account_balance_materialized_view.account_id,

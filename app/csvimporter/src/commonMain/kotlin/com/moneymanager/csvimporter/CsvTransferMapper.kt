@@ -875,8 +875,9 @@ class CsvTransferMapper(
      */
     private fun detectTradeLeg(values: List<String>): TradeLegInfo? {
         val config = strategy.config.tradeGroupConfig ?: return null
+        // A blank signal is only a leg when a pattern explicitly admits it (Bybit's spot ledger leaves Type
+        // empty on both legs of a Convert); an ordinary anchored pattern never matches the empty string.
         val signal = getColumnValueOrNull(config.signalColumn, values)?.trim().orEmpty()
-        if (signal.isEmpty()) return null
         val isDebitPattern = tradeDebitRegex?.containsMatchIn(signal) == true
         if (!isDebitPattern && tradeCreditRegex?.containsMatchIn(signal) != true) return null
         val sideColumn = config.sideAmountColumn ?: return TradeLegInfo(if (isDebitPattern) TradeLegSide.DEBIT else TradeLegSide.CREDIT)

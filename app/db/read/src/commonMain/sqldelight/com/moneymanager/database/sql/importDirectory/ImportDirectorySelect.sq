@@ -23,6 +23,15 @@ LEFT JOIN import_directory_file_csv_import c ON c.file_id = f.id
 LEFT JOIN import_directory_file_qif_import q ON q.file_id = f.id
 WHERE f.directory_id = ? AND f.file_ref = ?;
 
+-- The tracked files a CSV import was staged from (more than one when the same content sits in two folders).
+selectFilesForCsvImport:
+SELECT f.*, c.csv_import_id, q.qif_import_id
+FROM import_directory_file f
+JOIN import_directory_file_csv_import c ON c.file_id = f.id
+LEFT JOIN import_directory_file_qif_import q ON q.file_id = f.id
+WHERE c.csv_import_id = ?
+ORDER BY f.imported_at DESC;
+
 -- Effective account (own, else parent's) for every staged file that resolves to one, so a bulk CSV/QIF
 -- import run can resolve each file's source account with one query instead of N+1. A file with neither
 -- csv_import_id nor qif_import_id (not yet staged into either) is filtered out by the NOT NULL account

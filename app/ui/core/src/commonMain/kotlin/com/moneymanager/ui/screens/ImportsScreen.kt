@@ -12,6 +12,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.moneymanager.csvimporter.executeCsvUnimport
+import com.moneymanager.csvimporter.planCsvUnimport
 import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
@@ -45,6 +47,7 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.ui.navigation.ImportTab
@@ -155,6 +158,19 @@ fun ImportsScreen(
                     driveFolderBrowser = driveFolderBrowser,
                     onOpenImports = onTabSelected,
                     onOpenAudit = onImportDirectoryAuditClick,
+                    unimportCsv = { id ->
+                        executeCsvUnimport(
+                            plan = planCsvUnimport(id, csvImportRepository),
+                            accountRepository = accountRepository,
+                            transactionRepository = transactionRepository,
+                            transferRelationshipRepository = transferRelationshipRepository,
+                            tradeRepository = tradeRepository,
+                            maintenance = maintenance,
+                            importEngine = importEngine,
+                        )
+                        // Unimport parks the file on the Ignored tab; re-downloading it is meant to import it again.
+                        importEngine.setCsvImportIgnored(id, ignored = false)
+                    },
                 )
             ImportTab.CSV ->
                 CsvImportsScreen(

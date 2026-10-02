@@ -24,6 +24,9 @@ interface ImportDirectoryReadRepository {
         fileRef: String,
     ): ImportDirectoryFile?
 
+    /** The folder files [id] was staged from, most recently scanned first; empty for a file-picker import. */
+    suspend fun getTrackedFilesForCsvImport(id: CsvImportId): List<ImportDirectoryFile>
+
     /**
      * The effective account (the file's own directory account, else its parent's) for every staged CSV
      * import whose directory (or that directory's parent) has one set. Used to resolve a bulk import

@@ -3,6 +3,7 @@ package com.moneymanager.domain.repository.write
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import kotlin.time.Instant
 
@@ -42,6 +43,26 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
         headers: List<String>,
         rows: List<List<String>>,
         worksheetName: String,
+    )
+
+    /**
+     * Replaces a staged import's contents in place with a fresh parse of the same file (re-downloaded,
+     * possibly re-parsed differently), keeping its id, history and folder link. In one transaction: the
+     * dynamic table is recreated with [headers]/[rows], each [carriedRows] entry restores a row's status
+     * and transaction link, the file checksum/last-modified are updated, per-row errors are dropped, and
+     * the import's provenance rows are renumbered through [rowIndexRemap] (old index -> new index; a
+     * provenance row whose old index is absent loses its row reference). [xlsxBytes], when set, replaces
+     * the stored workbook.
+     */
+    suspend fun repopulateImport(
+        id: CsvImportId,
+        headers: List<String>,
+        rows: List<List<String>>,
+        fileChecksum: String,
+        fileLastModified: Instant,
+        carriedRows: List<CsvRowLink>,
+        rowIndexRemap: Map<Long, Long>,
+        xlsxBytes: ByteArray?,
     )
 
     /**

@@ -505,6 +505,15 @@ data class ImportTransfer(
      * transfer; the owned account is the other one).
      */
     val unidentifiedCounterpartyAccountId: AccountId? = null,
+    /**
+     * When set, [timestamp] is only the earliest this movement can have happened and this is the latest:
+     * the provider reported no real instant (Bybit's oldest deposits carry `successAt = 0`), so the
+     * importer booked it at the start of the date window it was fetched in. Cross-source reconciliation
+     * then matches the leg anywhere in that span instead of only near [timestamp], and treats another
+     * source's precisely-timed record of the movement as the better one. The producer also stores this
+     * as the `timestamp-approximate` attribute, so a later import sees it on the persisted leg.
+     */
+    val approximateUntil: Instant? = null,
     /** [ImportOperation.CREATE] (default), or UPDATE/DELETE of [existingId]. */
     override val operation: ImportOperation = ImportOperation.CREATE,
     /** The transfer to UPDATE/DELETE (required for those operations). */

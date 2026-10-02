@@ -77,7 +77,11 @@ class QifImportWriteRepositoryImpl(
 
     override suspend fun deleteImport(id: QifImportId): Unit =
         withContext(coroutineContext) {
-            writeQueries.deleteImport(id.id.toString())
+            database.transaction {
+                // As for CSV: forget the import-folder file staged into it, so the folder re-stages it.
+                writeQueries.deleteDirectoryFilesForImport(id.id.toString())
+                writeQueries.deleteImport(id.id.toString())
+            }
         }
 
     override suspend fun setImportIgnored(

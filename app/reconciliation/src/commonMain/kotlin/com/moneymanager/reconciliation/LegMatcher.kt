@@ -3,6 +3,7 @@ package com.moneymanager.reconciliation
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AssetId
+import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
 import kotlin.time.Duration
@@ -194,6 +195,41 @@ fun reconcile(
             }
         }
 
+    // Pass 4: the fees of a trade both sides already matched, summed per side (group, asset, second). A
+    // source can book one fee for an order whose every fill the exchange charged separately (Koinly's
+    // single trade fee against Bybit's per-fill tradingFee rows): separate transactions, so pass 3 never
+    // bundles them. Only seconds holding a matched trade qualify — two unrelated rewards that happen to
+    // share a second are still never summed.
+    val matchedTradeSeconds =
+        matches
+            .flatMap { it.sourceLegs }
+            .filter { it.kind == LegTransactionKind.TRADE }
+            .mapTo(mutableSetOf()) { groupOfSource(it.accountId)!! to it.timestamp.epochSeconds }
+
+    fun inMatchedTradeSecond(
+        leg: ReconciliationLeg,
+        group: AccountId,
+    ) = (group to leg.timestamp.epochSeconds) in matchedTradeSeconds
+
+    val sourceBySecond =
+        secondBundles(
+            inScopeSource.filter { it !in matchedSource && inMatchedTradeSecond(it, groupOfSource(it.accountId)!!) },
+        ) { groupOfSource(it.accountId)!! }
+    val realBySecond =
+        secondBundles(
+            inScopeReal.filter { it !in consumed && inMatchedTradeSecond(it, groupOfReal(it.accountId)!!) },
+        ) { groupOfReal(it.accountId)!! }
+            .associateBy { it.totalKey to it.timestamp.epochSeconds }
+    for (bundle in sourceBySecond) {
+        val real =
+            realBySecond[bundle.totalKey to bundle.timestamp.epochSeconds]
+                ?.takeIf { candidate -> candidate.legs.none { it in consumed } }
+                ?: continue
+        consumed += real.legs
+        matchedSource += bundle.legs
+        matches += LegMatch(bundle.legs, real.legs)
+    }
+
     return ReconciliationResult(
         sourceRange = sourceRange,
         matches = matches.sortedBy { it.sourceLeg.timestamp },
@@ -227,6 +263,16 @@ private fun bundles(
 ): List<LegBundle> =
     legs
         .groupBy { Triple(groupOf(it), it.amount.asset.id, it.movementKey) }
+        .map { (key, bundleLegs) ->
+            LegBundle(bundleLegs, MatchKey(key.first, key.second, bundleLegs.map { it.amount.amount }.reduce { a, b -> a + b }))
+        }
+
+private fun secondBundles(
+    legs: List<ReconciliationLeg>,
+    groupOf: (ReconciliationLeg) -> AccountId,
+): List<LegBundle> =
+    legs
+        .groupBy { Triple(groupOf(it), it.amount.asset.id, it.timestamp.epochSeconds) }
         .map { (key, bundleLegs) ->
             LegBundle(bundleLegs, MatchKey(key.first, key.second, bundleLegs.map { it.amount.amount }.reduce { a, b -> a + b }))
         }

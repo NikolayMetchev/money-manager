@@ -39,6 +39,12 @@ interface TransactionReadRepository {
         endDate: Instant,
     ): Flow<List<Transfer>>
 
+    /** Transfers on any of [accountIds] carrying an attribute of type [attributeTypeName], at any date. */
+    suspend fun getTransactionsByAccountsWithAttributeType(
+        accountIds: Collection<AccountId>,
+        attributeTypeName: String,
+    ): List<Transfer>
+
     fun getAccountBalances(): Flow<List<AccountBalance>>
 
     /**

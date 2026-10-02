@@ -33,10 +33,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.DirectoryRedownloadResult
 import com.moneymanager.csvimporter.ScanResult
 import com.moneymanager.csvimporter.discoverImportableFolders
+import com.moneymanager.csvimporter.redownloadImportDirectory
 import com.moneymanager.csvimporter.scanImportDirectory
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -95,6 +98,9 @@ fun ImportDirectoriesScreen(
     driveFolderBrowser: DriveFolderBrowser?,
     onOpenImports: (ImportTab) -> Unit = {},
     onOpenAudit: (ImportDirectory) -> Unit = {},
+    // Unimports one staged CSV file; offered by re-download for files whose imported rows changed. Null
+    // hides that option.
+    unimportCsv: (suspend (CsvImportId) -> Unit)? = null,
 ) {
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
@@ -111,6 +117,7 @@ fun ImportDirectoriesScreen(
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var redownloadTarget by remember { mutableStateOf<ImportDirectory?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     // Per-file scan failures ("file name: reason") from the last download, shown under the status line.
     var scanFailures by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -123,8 +130,11 @@ fun ImportDirectoriesScreen(
     // run: null until the folder's file list comes back, then its done / total.
     val downloadAllProgress = remember { mutableStateMapOf<ImportDirectoryId, Pair<Int, Int>?>() }
     var downloadAllRunning by remember { mutableStateOf(false) }
+    // Set for a whole re-download run: its per-folder progress entries come and go between folders, and
+    // nothing else may start in those gaps.
+    var redownloadRunning by remember { mutableStateOf(false) }
     var downloadAllStartedAt by remember { mutableStateOf<TimeSource.Monotonic.ValueTimeMark?>(null) }
-    val scanning = downloadAllRunning || scanProgress.isNotEmpty() || discovering.isNotEmpty()
+    val scanning = downloadAllRunning || redownloadRunning || scanProgress.isNotEmpty() || discovering.isNotEmpty()
     // Directories scan concurrently but the engine doesn't serialize writes, so all of them share it.
     val dbLock = remember { Mutex() }
 
@@ -236,6 +246,59 @@ fun ImportDirectoriesScreen(
                 }
             } catch (expected: Exception) {
                 statusMessage = "${directory.name}: failed — ${expected.message}"
+            }
+        }
+    }
+
+    // The folders a re-download of [directory] covers: itself, plus its discovered subfolders when it is a
+    // top-level folder. Excluded folders and ones configured on another device are skipped, as for download.
+    fun redownloadScope(directory: ImportDirectory): List<ImportDirectory> =
+        (listOf(directory) + directories.filter { it.parentId == directory.id })
+            .filter { scannable(it) && !it.excluded }
+
+    // Re-downloads every staged CSV in [folders] and re-stages each in place with the current parser.
+    fun redownload(
+        folders: List<ImportDirectory>,
+        unimportBlocked: Boolean,
+    ) {
+        statusMessage = null
+        scanFailures = emptyList()
+        scope.launch {
+            redownloadRunning = true
+            try {
+                var result = DirectoryRedownloadResult()
+                for (folder in folders) {
+                    try {
+                        scanProgress[folder.id] = 0 to 0
+                        result +=
+                            withContext(Dispatchers.IO) {
+                                dbLock.withLock {
+                                    redownloadImportDirectory(
+                                        directory = folder,
+                                        fileSource = importFileSourceFactory!!.create(folder),
+                                        importDirectoryRepository = importDirectoryRepository,
+                                        csvImportRepository = csvImportRepository,
+                                        importEngine = importEngine,
+                                        unimport = unimportCsv.takeIf { unimportBlocked },
+                                        onProgress = { done, total -> scanProgress[folder.id] = done to total },
+                                    )
+                                }
+                            }
+                    } catch (expected: CancellationException) {
+                        throw expected
+                    } catch (expected: Exception) {
+                        result += DirectoryRedownloadResult(failures = listOf("${folder.name}: ${expected.message}"))
+                    } finally {
+                        scanProgress.remove(folder.id)
+                    }
+                }
+                statusMessage = result.summary()
+                scanFailures =
+                    result.failures +
+                    result.blocked.map { "$it: imported rows are not in the new copy; re-download with \"unimport\" ticked" } +
+                    result.reimportSuggested.map { "$it: columns changed; Re-import it to apply them to its transactions" }
+            } finally {
+                redownloadRunning = false
             }
         }
     }
@@ -413,6 +476,8 @@ fun ImportDirectoriesScreen(
                     canDownload = importFileSourceFactory != null && !scanning,
                     scanProgress = scanProgress[directory.id] ?: (0 to 0).takeIf { directory.id in discovering },
                     onDownload = { downloadDirectory(directory) },
+                    canRedownload = importFileSourceFactory != null && !scanning && redownloadScope(directory).isNotEmpty(),
+                    onRedownload = { redownloadTarget = directory },
                     onToggleExclude = {
                         scope.launch { importEngine.updateImportDirectory(directory.copy(excluded = !directory.excluded)) }
                     },
@@ -425,6 +490,19 @@ fun ImportDirectoriesScreen(
                 )
             }
         }
+    }
+
+    redownloadTarget?.let { target ->
+        RedownloadDirectoryDialog(
+            directory = target,
+            folders = redownloadScope(target),
+            canUnimport = unimportCsv != null,
+            onDismiss = { redownloadTarget = null },
+            onConfirm = { unimportBlocked ->
+                redownloadTarget = null
+                redownload(redownloadScope(target), unimportBlocked)
+            },
+        )
     }
 
     if (showAddDialog) {
@@ -514,6 +592,8 @@ private fun ImportDirectoryRow(
     // done / total while this directory is downloading, null when idle.
     scanProgress: Pair<Int, Int>?,
     onDownload: () -> Unit,
+    canRedownload: Boolean,
+    onRedownload: () -> Unit,
     onToggleExclude: () -> Unit,
     onAccountChanged: (AccountId?) -> Unit,
     onImport: (ImportTab) -> Unit,
@@ -629,6 +709,7 @@ private fun ImportDirectoryRow(
                     enabled = canDownload && !onWrongDevice && !directory.excluded,
                     onClick = onDownload,
                 ) { Text(if (isDownloading) "Working…" else actionLabel) }
+                TextButton(enabled = canRedownload && !onWrongDevice, onClick = onRedownload) { Text("Re-download") }
                 // One link per type; enabled only while that type has downloaded files still to import.
                 TextButton(
                     enabled = outstandingCsv,
@@ -658,3 +739,61 @@ private fun probeDirectory(
     root: ImportDirectory,
     folderRef: String,
 ): ImportDirectory = root.copy(id = ImportDirectoryId(Uuid.random()), folderRef = folderRef)
+
+/**
+ * Confirms re-downloading every staged CSV in [folders] ([directory] and its subfolders). [canUnimport]
+ * offers to unimport the files whose imported rows the new copy no longer has, instead of skipping them.
+ */
+@Composable
+private fun RedownloadDirectoryDialog(
+    directory: ImportDirectory,
+    folders: List<ImportDirectory>,
+    canUnimport: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (unimportBlocked: Boolean) -> Unit,
+) {
+    var unimportBlocked by remember { mutableStateOf(false) }
+    val subfolders = folders.size - 1
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Re-download ${directory.name}?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    buildString {
+                        append("Every CSV file already downloaded from this folder")
+                        if (subfolders > 0) append(" and its $subfolders subfolder(s)")
+                        append(
+                            " is fetched again and re-read with the current parser, replacing its staged copy. " +
+                                "Imported rows keep their transactions; files whose rows changed shape can then be " +
+                                "re-imported.",
+                        )
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (canUnimport) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = unimportBlocked, onCheckedChange = { unimportBlocked = it })
+                        Text(
+                            "Unimport files whose imported rows are no longer in the folder's copy, then re-download them " +
+                                "(otherwise they are skipped)",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(unimportBlocked) }) { Text("Re-download") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+private fun DirectoryRedownloadResult.summary(): String =
+    buildString {
+        append("Re-downloaded ${replaced.size + unimported.size} file(s)")
+        if (unchanged.isNotEmpty()) append(", ${unchanged.size} unchanged")
+        if (unimported.isNotEmpty()) append(", ${unimported.size} unimported first")
+        if (blocked.isNotEmpty()) append(", ${blocked.size} skipped")
+        if (failures.isNotEmpty()) append(", ${failures.size} failed")
+        append(".")
+    }

@@ -48,6 +48,9 @@ object BuiltInCsvStrategies {
     val cryptoComCardXlsxStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
     val binanceCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000c")
     val koinlyCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000d")
+    val bybitSpotCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000e")
+    val bybitFundingCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000f")
+    val bybitUnifiedCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000010")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -245,6 +248,9 @@ object BuiltInCsvStrategies {
             buildCryptoComCardXlsxStrategy(now),
             buildBinanceCsvStrategy(now),
             buildKoinlyCsvStrategy(now),
+            buildBybitSpotCsvStrategy(now),
+            buildBybitFundingCsvStrategy(now),
+            buildBybitUnifiedCsvStrategy(now),
         )
 
     /**
@@ -1576,12 +1582,10 @@ object BuiltInCsvStrategies {
      * folds each such group into one `trade`. Fee rows stay out of the group on purpose — a `trade` row
      * has no fee field — and route to [BINANCE_FEES_ACCOUNT] as their own transfers, as the API does.
      *
-     * **Known limitation — withdrawals do not reconcile.** A `Withdraw` row remarked
-     * "Withdraw fee is included" is the **gross** amount, while the API records the withdrawal net and
-     * books the fee as its own transfer. Cross-source reconciliation matches on the amount, so the two
-     * never pair and such a withdrawal is counted twice if both sources are imported. The export gives
-     * no way to recover the fee, so nothing here can fix it; the affected rows are the ones carrying
-     * that remark, plus `Fiat Withdrawal`.
+     * A `Withdraw` row remarked "Withdraw fee is included" (and every `Fiat Withdrawal`) is the
+     * **gross** amount, while the API records the withdrawal net and books the fee as its own transfer.
+     * Amount equality can never pair those, so the engine reconciles the gross row against the net +
+     * fee pair instead, in either import order.
      *
      * Dust sweeps are the one conversion that cannot be assembled: a sweep debits several assets and
      * credits several BNB amounts, and nothing in the file says which credit came from which debit
@@ -1741,6 +1745,268 @@ object BuiltInCsvStrategies {
                             // default "Buy {to}/{from}" already matches the API importer's wording.
                             reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
                         ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * The one Bybit account, named as the Bybit API strategy's synthetic account. Bybit splits a user's
+     * holdings across Spot, Funding, Unified Trading and Earn wallets and exports one ledger per wallet,
+     * but the API treats them as a single balance, so every ledger books against this account too —
+     * that is what lets either source reconcile against the other.
+     */
+    private const val BYBIT_ACCOUNT = "Bybit"
+
+    /** Counterparty accounts the Bybit API strategy also creates; see [BINANCE_FEES_ACCOUNT] for why. */
+    private const val BYBIT_FEES_ACCOUNT = "Bybit Fees"
+
+    /** Placeholder counterparty for a deposit or withdrawal, as [BINANCE_FUNDING_ACCOUNT]. */
+    private const val BYBIT_FUNDING_ACCOUNT = "Bybit Funding"
+    private const val BYBIT_DERIVATIVES_ACCOUNT = "Bybit Derivatives"
+
+    /**
+     * Counterparty for a move between two of the user's own Bybit wallets. Both ends are [BYBIT_ACCOUNT],
+     * so such a move changes nothing; each ledger still records its half, which is booked here and
+     * excluded (see [BYBIT_INTERNAL_TRANSFER_EXCLUSION]) — kept visible, counted nowhere.
+     */
+    private const val BYBIT_INTERNAL_TRANSFERS_ACCOUNT = "Bybit Internal Transfers"
+
+    /** Suspense for a row the strategies do not model; the role of [BINANCE_TRADING_ACCOUNT]. */
+    private const val BYBIT_TRADING_ACCOUNT = "Bybit Trading"
+
+    /** The `excluded` value a wallet-to-wallet move carries; a re-import only lifts this value. */
+    private const val BYBIT_INTERNAL_TRANSFER_EXCLUSION = "Bybit internal wallet transfer"
+
+    /**
+     * Transfer reconciliation window against the Bybit API. The two sources stamp a withdrawal a couple
+     * of seconds apart (`createTime` vs the ledger's booking); an hour leaves room for settlement lag the
+     * way [BINANCE_RECONCILE_WINDOW_SECONDS] does, without reaching a different day's movement.
+     */
+    private const val BYBIT_RECONCILE_WINDOW_SECONDS = 3600L
+
+    /** Trade reconciliation window; see [BINANCE_TRADE_RECONCILE_WINDOW_SECONDS] for why it is tight. */
+    private const val BYBIT_TRADE_RECONCILE_WINDOW_SECONDS = 5L
+
+    /** Every Bybit ledger names a row's kind in this column. */
+    private const val BYBIT_TYPE_COLUMN = "Type"
+
+    /** Every Bybit ledger stamps rows `yyyy-MM-dd HH:mm:ss` in UTC. */
+    private fun bybitTimestamp(columnName: String) =
+        DateTimeParsingMapping(
+            fieldType = TransferField.TIMESTAMP,
+            dateColumnName = columnName,
+            dateFormat = "yyyy-MM-dd",
+            dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+        )
+
+    /**
+     * The field mappings every Bybit ledger shares: the Bybit account on one side, [targetRules] over
+     * the `Type` column on the other, and a signed [amountColumn] whose positive rows arrive into Bybit.
+     */
+    private fun bybitFieldMappings(
+        targetRules: List<RegexRule>,
+        timeColumn: String,
+        amountColumn: String,
+        coinColumn: String,
+    ) = mapOf(
+        TransferField.SOURCE_ACCOUNT to
+            RegexAccountMapping(
+                fieldType = TransferField.SOURCE_ACCOUNT,
+                columnName = "Uid",
+                rules = listOf(RegexRule(pattern = "^", accountName = BYBIT_ACCOUNT)),
+            ),
+        // A regex mapping resolves nothing for a blank cell (a Spot Convert leg's Type), so a blank Type is
+        // routed to the trade suspense explicitly; its group normally assembles into a trade anyway.
+        TransferField.TARGET_ACCOUNT to
+            ConditionalAccountMapping(
+                fieldType = TransferField.TARGET_ACCOUNT,
+                conditions = listOf(RowCondition(BYBIT_TYPE_COLUMN, RowConditionOperator.IS_BLANK)),
+                whenTrue =
+                    RegexAccountMapping(
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = "Uid",
+                        rules = listOf(RegexRule(pattern = "^", accountName = BYBIT_TRADING_ACCOUNT)),
+                    ),
+                whenFalse =
+                    RegexAccountMapping(fieldType = TransferField.TARGET_ACCOUNT, columnName = BYBIT_TYPE_COLUMN, rules = targetRules),
+            ),
+        TransferField.TIMESTAMP to bybitTimestamp(timeColumn),
+        TransferField.DESCRIPTION to
+            DirectColumnMapping(
+                fieldType = TransferField.DESCRIPTION,
+                columnName = BYBIT_TYPE_COLUMN,
+                // A Spot convert leg has an empty Type.
+                fallbackColumns = listOf(coinColumn),
+            ),
+        TransferField.AMOUNT to
+            AmountParsingMapping(
+                fieldType = TransferField.AMOUNT,
+                mode = AmountMode.SINGLE_COLUMN,
+                amountColumnName = amountColumn,
+                flipAccountsOnPositive = true,
+            ),
+        TransferField.CURRENCY to CurrencyLookupMapping(fieldType = TransferField.CURRENCY, columnName = coinColumn),
+        TransferField.TIMEZONE to HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
+    )
+
+    /** A deposit/withdrawal: the export never says where the money came from or went. */
+    private fun bybitFundingRule(pattern: String) =
+        RegexRule(pattern = pattern, accountName = BYBIT_FUNDING_ACCOUNT, counterpartyIsUnidentified = true)
+
+    /** Attribute mappings every Bybit ledger shares, plus the exclusion of wallet-to-wallet moves. */
+    private fun bybitAttributeMappings(
+        internalTransferPattern: String,
+        extra: List<AttributeColumnMapping> = emptyList(),
+    ) = listOf(
+        AttributeColumnMapping("Uid", "bybit-uid"),
+        AttributeColumnMapping(BYBIT_TYPE_COLUMN, "bybit-type"),
+        AttributeColumnMapping(
+            columnName = BYBIT_TYPE_COLUMN,
+            attributeTypeName = "excluded",
+            extraction = ColumnExtraction(pattern = internalTransferPattern),
+            emitWhenMatched = BYBIT_INTERNAL_TRANSFER_EXCLUSION,
+        ),
+    ) + extra
+
+    /**
+     * Bybit's newer exports carry a `Uid` column (and open with a `UID: …` preamble line the CSV parser
+     * skips). The 2023-era exports of the same ledgers (`spot_part-*.csv`, `Bybit-UM-TransactionLog-*`)
+     * hold the very same rows without it; requiring a numeric Uid keeps them from resolving to these
+     * strategies and booking every movement twice, exactly as the Binance strategy does with `User_ID`.
+     */
+    private val bybitUidRule = ContentMatchRule(columnName = "Uid", pattern = "^\\s*\\d+\\s*$")
+
+    /**
+     * Bybit's Spot-wallet ledger (`AssetChangeDetails_spot_*`). One row per balance change, typed by
+     * `Type`: `trade` fills and their `tradingFee` rows, `userDeposit`, and `internalAccountTransfer*`
+     * moves to and from the other wallets. A Convert leaves `Type` blank on both of its legs.
+     *
+     * A trade is split into one row per fill per leg, every row of an order stamped with the same second
+     * (a convert's two legs may straddle a second boundary). [CsvStrategyConfig.tradeGroupConfig] folds
+     * each group into one `trade`, classifying legs by the sign of `Amount`; fees stay their own
+     * transfers to [BYBIT_FEES_ACCOUNT], which is also where the API books them.
+     *
+     * Deposits book against the [BYBIT_FUNDING_ACCOUNT] placeholder so they reconcile against the API's
+     * record of the same deposit, which names the on-chain address when it has one.
+     */
+    fun buildBybitSpotCsvStrategy(now: Instant): CsvImportStrategy {
+        val internalTransfer = "^internalAccountTransfer"
+        val targetRules =
+            listOf(
+                bybitFundingRule("^user(Deposit|Withdraw)"),
+                RegexRule(pattern = "^tradingFee$", accountName = BYBIT_FEES_ACCOUNT),
+                RegexRule(pattern = internalTransfer, accountName = BYBIT_INTERNAL_TRANSFERS_ACCOUNT),
+                // Trade legs only reach here when their group did not resolve.
+                RegexRule(pattern = "^", accountName = BYBIT_TRADING_ACCOUNT),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(bybitSpotCsvStrategyId),
+            name = "Bybit Spot CSV",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf("Uid", "Type", "Coin", "Amount", "Wallet Balance", "Time(UTC)"),
+                    fieldMappings = bybitFieldMappings(targetRules, "Time(UTC)", "Amount", "Coin"),
+                    attributeMappings = bybitAttributeMappings(internalTransfer),
+                    contentMatchRules = listOf(bybitUidRule),
+                    crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
+                    tradeGroupConfig =
+                        TradeGroupConfig(
+                            signalColumn = "Type",
+                            // An empty Type is a Convert leg; the pattern has to admit it explicitly.
+                            debitPattern = "^(trade)?$",
+                            creditPattern = "^(trade)?$",
+                            sideAmountColumn = "Amount",
+                            groupingWindowSeconds = 1,
+                            reconcileWindowSeconds = BYBIT_TRADE_RECONCILE_WINDOW_SECONDS,
+                        ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Bybit's Funding-wallet ledger (`AssetChangeDetails_fund_*`): deposits, withdrawals and transfers to
+     * and from the other wallets, whose `Description` names the far wallet ("Transfer to Spot Account").
+     *
+     * A `Withdraw` row is **gross** — the coins that left plus the network fee — while the API books the
+     * net amount and the fee as two transfers. The engine reconciles the one gross row against that pair.
+     */
+    fun buildBybitFundingCsvStrategy(now: Instant): CsvImportStrategy {
+        val internalTransfer = "^Transfer (in|out)$"
+        val targetRules =
+            listOf(
+                bybitFundingRule("^(Deposit|Withdraw)$"),
+                RegexRule(pattern = internalTransfer, accountName = BYBIT_INTERNAL_TRANSFERS_ACCOUNT),
+                RegexRule(pattern = "^", accountName = BYBIT_TRADING_ACCOUNT),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(bybitFundingCsvStrategyId),
+            name = "Bybit Funding CSV",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns =
+                        setOf("Uid", "Date & Time(UTC)", "Coin", "QTY", "Type", "Account Balance", "Description"),
+                    fieldMappings = bybitFieldMappings(targetRules, "Date & Time(UTC)", "QTY", "Coin"),
+                    attributeMappings =
+                        bybitAttributeMappings(
+                            internalTransfer,
+                            listOf(AttributeColumnMapping("Description", "bybit-description")),
+                        ),
+                    contentMatchRules = listOf(bybitUidRule),
+                    crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Bybit's Unified Trading Account ledger (`AssetChangeDetails_uta_*`). `Change` is what the wallet
+     * actually moved (cash flow + funding − fee). Transfers to and from the other wallets are excluded
+     * like the other ledgers'; everything else is derivatives profit and loss, booked against
+     * [BYBIT_DERIVATIVES_ACCOUNT] as the API's transaction-log endpoints do.
+     */
+    fun buildBybitUnifiedCsvStrategy(now: Instant): CsvImportStrategy {
+        val internalTransfer = "^TRANSFER_(IN|OUT)$"
+        val targetRules =
+            listOf(
+                RegexRule(pattern = internalTransfer, accountName = BYBIT_INTERNAL_TRANSFERS_ACCOUNT),
+                RegexRule(pattern = "^", accountName = BYBIT_DERIVATIVES_ACCOUNT),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(bybitUnifiedCsvStrategyId),
+            name = "Bybit Unified CSV",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns =
+                        setOf(
+                            "Uid",
+                            "Currency",
+                            "Contract",
+                            "Type",
+                            "Direction",
+                            "Quantity",
+                            "Position",
+                            "Filled Price",
+                            "Funding",
+                            "Fee Paid",
+                            "Cash Flow",
+                            "Change",
+                            "Wallet Balance",
+                            "Action",
+                            "Time(UTC)",
+                        ),
+                    fieldMappings = bybitFieldMappings(targetRules, "Time(UTC)", "Change", "Currency"),
+                    attributeMappings =
+                        bybitAttributeMappings(
+                            internalTransfer,
+                            listOf(AttributeColumnMapping("Contract", "bybit-contract")),
+                        ),
+                    contentMatchRules = listOf(bybitUidRule),
+                    crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
                 ),
             createdAt = now,
             updatedAt = now,

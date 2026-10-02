@@ -1,7 +1,5 @@
 package com.moneymanager.csvimporter
 
-import com.moneymanager.csv.CsvParseOptions
-import com.moneymanager.csv.CsvParser
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
@@ -236,9 +234,7 @@ private suspend fun stageCsv(
     checksum: String,
     lastModified: Instant,
 ): CsvImportId {
-    val parser = CsvParser()
-    val delimiter = parser.detectDelimiter(content)
-    val parsed = parser.parse(content, CsvParseOptions(delimiter = delimiter))
+    val parsed = parseStagedCsv(content)
     return importEngine.createCsvImport(
         fileName = entry.name,
         headers = parsed.headers,
