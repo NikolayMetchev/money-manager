@@ -31,6 +31,8 @@ data class ExistingTransferInfo(
     val attributes: Map<AttributeTypeId, String> = emptyMap(),
     val uniqueKey: Map<String, String> = emptyMap(),
     val apiId: String? = null,
+    /** See [ImportTransfer.approximateUntil]: set when this leg's timestamp is only the earliest bound. */
+    val approximateUntil: Instant? = null,
 )
 
 /**
@@ -217,6 +219,17 @@ class ImportDeduper(
             }
         }
 
+    // Existing legs whose timestamp is only the earliest bound (see ExistingTransferInfo.approximateUntil).
+    private val approximateUntilById: Map<TransferId, Instant> =
+        existing.mapNotNull { info -> info.approximateUntil?.let { info.transferId to it } }.toMap()
+
+    private val approximateCandidates: List<Pair<TransferId, Transfer>> =
+        reconcileCandidates.filter { (id, _) -> id in approximateUntilById }
+
+    // The net-plus-fee rule looks for two legs leaving one account at one instant, whatever their amounts.
+    private val reconcileCandidatesByOutflow: Map<AccountId, List<Pair<TransferId, Transfer>>> =
+        reconcileCandidates.groupBy { (_, t) -> t.sourceAccountId }
+
     // The attribute marking a leg whose counterparty is only a description-derived placeholder.
     private val unidentifiedCounterpartyTypeId: AttributeTypeId? =
         when (policy) {
@@ -308,9 +321,26 @@ class ImportDeduper(
                     ?.first
         if (existingId != null) return Classified(transfer, ImportStatus.DUPLICATE, existingId)
 
+        // Another source booked this movement with only an approximate time; this record is precise.
+        classifyAsSupersedingApproximateLeg(
+            transfer,
+            policy.reconcileWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
+
         // Cross-source reconciliation: the same real movement seen from another provider. Keep this
         // record but tag it excluded-and-linked so the movement is counted once (see ApiMultiKey docs).
         classifyAsReconciled(
+            transfer,
+            policy.reconcileWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
+
+        // This provider could only date the movement approximately, so a precise record another source
+        // already holds wins, whichever counterparty either names.
+        classifyApproximateAsReconciled(
             transfer,
             policy.reconcileWindow,
             policy.reconciledExclusionAttributeTypeId,
@@ -518,8 +548,8 @@ class ImportDeduper(
      * so no balance moves. Matching is counterparty-agnostic (the gross row typically named only a
      * placeholder) and each existing leg is claimed once, nearest first.
      *
-     * Only this direction is handled. The opposite order — a gross row arriving against an existing
-     * net leg — would have to find and sum *two* existing rows, which is a different search.
+     * The opposite order — a gross row arriving against an existing net leg plus fee — is
+     * [classifyAsNetPlusFeeReconciled].
      */
     private fun classifyAsGrossNetReconciled(
         transfer: ImportTransfer,
@@ -528,6 +558,7 @@ class ImportDeduper(
         relationshipTypeId: RelationshipTypeId?,
     ): Classified? {
         if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
+        if (transfer.isExcluded(exclusionTypeId)) return null
         val gross = transfer.reconcileGrossAmount ?: return null
         if (gross == transfer.amount) return null
         val timestamp = transfer.timestamp ?: return null
@@ -556,6 +587,169 @@ class ImportDeduper(
     }
 
     /**
+     * Reconciles a precisely-timed incoming leg against an existing leg of the same movement that another
+     * source could only date approximately ([ExistingTransferInfo.approximateUntil]): same amount, the
+     * same way through the same accounts — or, when this row's counterparty is only a placeholder,
+     * through the same owned account — at an instant inside the existing leg's span. The incoming record
+     * is kept and the approximate one excluded, so the movement is counted once and at its real time
+     * (which is what lets a third source, like a tax tool's export, line up with it). Each existing leg
+     * is claimed at most once, nearest span first.
+     */
+    private fun classifyAsSupersedingApproximateLeg(
+        transfer: ImportTransfer,
+        window: Duration?,
+        exclusionTypeId: AttributeTypeId?,
+        relationshipTypeId: RelationshipTypeId?,
+    ): Classified? {
+        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
+        if (transfer.isExcluded(exclusionTypeId)) return null
+        if (approximateCandidates.isEmpty() || transfer.approximateUntil != null) return null
+        val timestamp = transfer.timestamp ?: return null
+        val from = transfer.fromAccount.requireId()
+        val to = transfer.toAccount.requireId()
+        val placeholder = transfer.unidentifiedCounterpartyAccountId
+        val (id, existingTransfer) =
+            approximateCandidates
+                .filter { (id, existing) ->
+                    val sameAccounts =
+                        existing.sourceAccountId == from &&
+                            existing.targetAccountId == to ||
+                            placeholder == from &&
+                            existing.targetAccountId == to ||
+                            placeholder == to &&
+                            existing.sourceAccountId == from
+                    existing.amount == transfer.amount &&
+                        sameAccounts &&
+                        id !in existingExcludedLegs &&
+                        id !in claimedReconcileTargets &&
+                        id !in consumedReconcileIds &&
+                        spansMeet(timestamp, null, existing.timestamp, approximateUntilById[id], window)
+                }.minByOrNull { (_, existing) -> (timestamp - existing.timestamp).absoluteValue }
+                ?: return null
+        consumedReconcileIds += id
+        return Classified(
+            transfer.copy(
+                relationships = transfer.relationships + NewRelationship(relatedTransferId = id, typeId = relationshipTypeId),
+            ),
+            ImportStatus.IMPORTED,
+            existing = null,
+            excludeExisting = ExcludeExistingLeg(existingTransfer, exclusionTypeId),
+        )
+    }
+
+    /**
+     * The mirror of [classifyAsSupersedingApproximateLeg]: this leg is the approximately-dated one, and an
+     * existing leg moving the same amount the same way through one of this leg's accounts, inside its
+     * span, is the precise record of the movement. Counterparties are not compared — the precise source
+     * may only have a placeholder for the far end, or a different name for it. This leg is imported
+     * excluded and linked; each existing leg is claimed at most once, nearest first.
+     */
+    private fun classifyApproximateAsReconciled(
+        transfer: ImportTransfer,
+        window: Duration?,
+        exclusionTypeId: AttributeTypeId?,
+        relationshipTypeId: RelationshipTypeId?,
+    ): Classified? {
+        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
+        val until = transfer.approximateUntil ?: return null
+        val timestamp = transfer.timestamp ?: return null
+        val flows =
+            listOf(
+                AccountFlowKey(transfer.toAccount.requireId(), inflow = true, transfer.amount),
+                AccountFlowKey(transfer.fromAccount.requireId(), inflow = false, transfer.amount),
+            )
+        val matchId =
+            flows
+                .flatMap { reconcileCandidatesByAccountFlow[it].orEmpty() }
+                .filter { (id, existing) ->
+                    id !in existingExcludedLegs &&
+                        id !in claimedReconcileTargets &&
+                        id !in consumedReconcileIds &&
+                        id !in approximateUntilById &&
+                        spansMeet(timestamp, until, existing.timestamp, null, window)
+                }.minByOrNull { (_, existing) -> (existing.timestamp - timestamp).absoluteValue }
+                ?.first
+                ?: return null
+        consumedReconcileIds += matchId
+        return Classified(
+            transfer.copy(
+                attributes = transfer.withExclusion(exclusionTypeId),
+                relationships = transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId),
+                fee = null,
+            ),
+            ImportStatus.IMPORTED,
+            existing = null,
+        )
+    }
+
+    /**
+     * The opposite order to [classifyAsGrossNetReconciled]: this row is the single **gross** leg and
+     * another source already booked the movement as a **net** leg plus a separate fee leg. A Bybit
+     * withdrawal is the case: the Funding ledger debits the coins that left plus the network fee in one
+     * row, while the API books the amount received and `withdrawFee` as two transfers.
+     *
+     * Only a placeholder row qualifies (its counterparty is unknown, which is why it cannot be the better
+     * record). The match is two identified, unexcluded legs leaving (or entering) the owned account at
+     * one shared instant within [window] whose amounts sum exactly to this row's; a coincidence that
+     * tight is not plausible for two unrelated movements. This row is imported excluded and linked to the
+     * larger (net) leg; both existing legs are claimed.
+     */
+    private fun classifyAsNetPlusFeeReconciled(
+        transfer: ImportTransfer,
+        window: Duration?,
+        exclusionTypeId: AttributeTypeId?,
+        relationshipTypeId: RelationshipTypeId?,
+    ): Classified? {
+        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
+        if (unidentifiedCounterpartyTypeId == null) return null
+        val placeholder = transfer.unidentifiedCounterpartyAccountId ?: return null
+        val gross = transfer.amount ?: return null
+        val timestamp = transfer.timestamp ?: return null
+        // Only an outflow from the owned account: money leaves gross, arrives net, and the fee goes elsewhere.
+        if (placeholder != transfer.toAccount.requireId()) return null
+        val owned = transfer.fromAccount.requireId()
+        val usable =
+            reconcileCandidatesByOutflow[owned]
+                .orEmpty()
+                .filter { (id, existing) ->
+                    existing.amount.asset == gross.asset &&
+                        existing.amount.amount < gross.amount &&
+                        existing.targetAccountId != placeholder &&
+                        id !in existingUnidentifiedLegs &&
+                        id !in existingExcludedLegs &&
+                        id !in claimedReconcileTargets &&
+                        id !in consumedReconcileIds &&
+                        (timestamp - existing.timestamp).absoluteValue <= window
+                }
+        val pair =
+            usable
+                .groupBy { (_, existing) -> existing.timestamp }
+                .values
+                .flatMap { legs ->
+                    legs.flatMapIndexed { i, net ->
+                        legs.drop(i + 1).mapNotNull { fee ->
+                            if (net.second.amount + fee.second.amount != gross) return@mapNotNull null
+                            if (net.second.amount.amount >= fee.second.amount.amount) net to fee else fee to net
+                        }
+                    }
+                }.filter { (net, _) -> net.second.targetAccountId !in ownBatchAccounts }
+                .minByOrNull { (net, _) -> (timestamp - net.second.timestamp).absoluteValue }
+                ?: return null
+        val (net, fee) = pair
+        consumedReconcileIds += net.first
+        consumedReconcileIds += fee.first
+        return Classified(
+            transfer.copy(
+                attributes = transfer.withExclusion(exclusionTypeId),
+                relationships = transfer.relationships + NewRelationship(relatedTransferId = net.first, typeId = relationshipTypeId),
+                fee = null,
+            ),
+            ImportStatus.IMPORTED,
+            existing = null,
+        )
+    }
+
+    /**
      * The mirror of [classifyAsUnidentifiedCounterpartyReconciled] for the opposite import order: this
      * row names both ends of the movement, and an existing leg recorded the same movement against a
      * description-derived placeholder. The incoming (better) record is kept and the placeholder leg is
@@ -568,6 +762,7 @@ class ImportDeduper(
         relationshipTypeId: RelationshipTypeId?,
     ): Classified? {
         if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
+        if (transfer.isExcluded(exclusionTypeId)) return null
         if (unidentifiedCounterpartyTypeId == null) return null
         if (transfer.unidentifiedCounterpartyAccountId != null) return null
         val timestamp = transfer.timestamp ?: return null
@@ -599,6 +794,14 @@ class ImportDeduper(
         }
         return null
     }
+
+    /**
+     * True when this incoming leg already arrives excluded (the source marks it deleted, or an internal
+     * move between wallets of one account). It counts nowhere, so it must never be the record that
+     * supersedes — and excludes — an existing leg: that would leave the movement counted zero times.
+     */
+    private fun ImportTransfer.isExcluded(exclusionTypeId: AttributeTypeId): Boolean =
+        excludedFromBalances || attributes.any { it.typeId == exclusionTypeId }
 
     /** This transfer's attributes plus the reconciliation exclusion, unless it already carries one. */
     private fun ImportTransfer.withExclusion(exclusionTypeId: AttributeTypeId): List<NewAttribute> =
@@ -691,8 +894,23 @@ class ImportDeduper(
         if (transfer.amount != existing.amount) return false
         if (transfer.fromAccount.requireId() != existing.sourceAccountId) return false
         if (transfer.toAccount.requireId() != existing.targetAccountId) return false
-        val delta = (requireNotNull(transfer.timestamp) - existing.timestamp).absoluteValue
-        return delta <= window
+        return spansMeet(requireNotNull(transfer.timestamp), transfer.approximateUntil, existing.timestamp, null, window)
+    }
+
+    /**
+     * True when two movements' possible instants come within [window] of each other. A precise leg's span
+     * is its timestamp alone; an approximate one runs from its timestamp to its `until` bound.
+     */
+    private fun spansMeet(
+        start: Instant,
+        until: Instant?,
+        otherStart: Instant,
+        otherUntil: Instant?,
+        window: Duration,
+    ): Boolean {
+        val end = maxOf(start, until ?: start)
+        val otherEnd = maxOf(otherStart, otherUntil ?: otherStart)
+        return otherStart - window <= end && start - window <= otherEnd
     }
 
     /** The existing transfers that could satisfy [apiMatches] (exact timestamp + amount bucket). */
@@ -768,6 +986,14 @@ class ImportDeduper(
                     if (attributesAreIdentical(transfer, existing)) ImportStatus.DUPLICATE else ImportStatus.UPDATED
                 return Classified(transfer, status, existing.transferId)
             }
+        // Before the fuzzy pass, which would drop this precisely-timed row as the duplicate: another
+        // source booked the movement with only an approximate time, so this row is the better record.
+        classifyAsSupersedingApproximateLeg(
+            transfer,
+            policy.reconcileWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
         // Funding-card reconcile (before fuzzy): a conduit spend whose funding card resolved to an
         // account reconciles against that account's funding leg by amount+currency+window, ignoring the
         // merchant — so it links (excluded) instead of dropping as a fuzzy duplicate or double-counting.
@@ -808,6 +1034,13 @@ class ImportDeduper(
         classifyAsSupersedingUnidentifiedLeg(
             transfer,
             policy.dateTolerance,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
+        // Fifth pass: this placeholder row is a gross amount another source split into net + fee.
+        classifyAsNetPlusFeeReconciled(
+            transfer,
+            policy.reconcileWindow,
             policy.reconciledExclusionAttributeTypeId,
             policy.reconciledRelationshipTypeId,
         )?.let { return it }

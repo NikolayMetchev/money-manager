@@ -125,6 +125,19 @@ class TransactionReadRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map { loadAttributesForTransfers(it) }
 
+    override suspend fun getTransactionsByAccountsWithAttributeType(
+        accountIds: Collection<AccountId>,
+        attributeTypeName: String,
+    ): List<Transfer> =
+        withContext(Dispatchers.Default) {
+            if (accountIds.isEmpty()) return@withContext emptyList()
+            loadAttributesForTransfers(
+                transferSelectQueries
+                    .selectByAccountsWithAttributeType(accountIds.map { it.id }.distinct(), attributeTypeName, TransferMapper::mapRaw)
+                    .executeAsList(),
+            )
+        }
+
     override suspend fun getUnreversedTransfersTouchingAccounts(
         accountIds: Set<AccountId>,
         amounts: Set<Money>,

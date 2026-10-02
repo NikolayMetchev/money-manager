@@ -70,6 +70,14 @@ object WellKnownIds {
      */
     const val UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME: String = "unidentified-counterparty"
 
+    /**
+     * "timestamp-approximate" transfer attribute: the provider gave no real instant for this leg, so its
+     * timestamp is only the earliest it can have happened, and the value (epoch milliseconds) is the
+     * latest. Cross-source reconciliation matches such a leg anywhere in that span and prefers the other
+     * source's precise record of the movement. Resolved by name (get-or-create).
+     */
+    const val TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME: String = "timestamp-approximate"
+
     /** "reconciled" relationship type: id1 mirrors id2 seen from another source. */
     const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = 1
 

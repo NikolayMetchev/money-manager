@@ -5,8 +5,29 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 deleteImport:
 DELETE FROM csv_import_metadata WHERE id = ?;
 
+-- The import-directory files staged into this import. Deleting their tracking rows (which cascades the
+-- link) lets the import itself be deleted, and makes the folder's next scan stage the file afresh.
+deleteDirectoryFilesForImport:
+DELETE FROM import_directory_file
+WHERE id IN (SELECT file_id FROM import_directory_file_csv_import WHERE csv_import_id = ?);
+
 updateImportCounts:
 UPDATE csv_import_metadata SET row_count = ?, column_count = ? WHERE id = ?;
+
+updateImportFile:
+UPDATE csv_import_metadata SET file_checksum = ?, file_last_modified = ? WHERE id = ?;
+
+-- Re-staging in place renumbers rows, so the provenance pointing at them is moved in two steps: park every
+-- old index out of the way (negated), then map each parked index to its new one. Anything still parked
+-- afterwards points at a row the new file no longer has.
+parkEntitySourceRows:
+UPDATE csv_entity_source SET csv_row_index = -csv_row_index WHERE csv_import_id = ? AND csv_row_index > 0;
+
+moveEntitySourceRow:
+UPDATE csv_entity_source SET csv_row_index = :newIndex WHERE csv_import_id = :importId AND csv_row_index = -:oldIndex;
+
+clearParkedEntitySourceRows:
+UPDATE csv_entity_source SET csv_row_index = NULL WHERE csv_import_id = ? AND csv_row_index < 0;
 
 setImportIgnored:
 UPDATE csv_import_metadata SET ignored = ? WHERE id = ?;
@@ -45,3 +66,6 @@ VALUES (?, ?, ?);
 
 updateXlsxBlobWorksheet:
 UPDATE xlsx_import_blob SET worksheet_name = ? WHERE csv_import_id = ?;
+
+updateXlsxBlobBytes:
+UPDATE xlsx_import_blob SET file_bytes = ? WHERE csv_import_id = ?;

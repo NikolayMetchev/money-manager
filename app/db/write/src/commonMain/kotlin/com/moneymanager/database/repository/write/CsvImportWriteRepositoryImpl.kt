@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.write.CsvImportWriteRepository
 import kotlinx.coroutines.Dispatchers
@@ -121,20 +122,77 @@ class CsvImportWriteRepositoryImpl(
             }
         }
 
+    override suspend fun repopulateImport(
+        id: CsvImportId,
+        headers: List<String>,
+        rows: List<List<String>>,
+        fileChecksum: String,
+        fileLastModified: Instant,
+        carriedRows: List<CsvRowLink>,
+        rowIndexRemap: Map<Long, Long>,
+        xlsxBytes: ByteArray?,
+    ): Unit =
+        withContext(coroutineContext) {
+            database.transaction {
+                val import =
+                    csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                        ?: return@transaction
+                val importId = id.id.toString()
+
+                // Dropping an AUTOINCREMENT table also drops its sequence, so the new rows number from 1 in
+                // order — the indexes the caller computed carriedRows and rowIndexRemap against.
+                tableManager.dropCsvTable(import.table_name)
+                tableManager.createCsvTable(import.table_name, headers.size)
+                tableManager.insertRowsBatch(import.table_name, rows, headers.size)
+                carriedRows.forEach { link ->
+                    tableManager.updateRowStatus(import.table_name, link.rowIndex, link.status.name, link.transferId)
+                }
+
+                csvImportWriteQueries.deleteColumnsByImportId(importId)
+                headers.forEachIndexed { index, header ->
+                    csvImportWriteQueries.insertColumn(
+                        id = Uuid.random().toString(),
+                        import_id = importId,
+                        column_index = index.toLong(),
+                        original_name = header,
+                    )
+                }
+                csvImportWriteQueries.updateImportCounts(
+                    row_count = rows.size.toLong(),
+                    column_count = headers.size.toLong(),
+                    id = importId,
+                )
+                csvImportWriteQueries.updateImportFile(fileChecksum, fileLastModified.toEpochMilliseconds(), importId)
+                csvImportWriteQueries.deleteErrorsByImportId(importId)
+
+                csvImportWriteQueries.parkEntitySourceRows(importId)
+                rowIndexRemap.forEach { (oldIndex, newIndex) ->
+                    csvImportWriteQueries.moveEntitySourceRow(newIndex = newIndex, importId = importId, oldIndex = oldIndex)
+                }
+                csvImportWriteQueries.clearParkedEntitySourceRows(importId)
+
+                xlsxBytes?.let { csvImportWriteQueries.updateXlsxBlobBytes(it, importId) }
+            }
+        }
+
     override suspend fun deleteImport(id: CsvImportId): Unit =
         withContext(coroutineContext) {
             val import =
                 csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
                     ?: return@withContext
 
-            // Drop the dynamic table first
-            tableManager.dropCsvTable(import.table_name)
+            database.transaction {
+                // A file staged from an import folder references this import; forget the file too, so the
+                // delete isn't blocked and the next scan of that folder stages the file again.
+                csvImportWriteQueries.deleteDirectoryFilesForImport(id.id.toString())
 
-            // Delete column metadata (cascades from import delete, but be explicit)
-            csvImportWriteQueries.deleteColumnsByImportId(id.id.toString())
+                tableManager.dropCsvTable(import.table_name)
 
-            // Delete import metadata
-            csvImportWriteQueries.deleteImport(id.id.toString())
+                // Delete column metadata (cascades from import delete, but be explicit)
+                csvImportWriteQueries.deleteColumnsByImportId(id.id.toString())
+
+                csvImportWriteQueries.deleteImport(id.id.toString())
+            }
         }
 
     override suspend fun resetToUnimported(id: CsvImportId): Unit =

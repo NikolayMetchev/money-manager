@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createImportDirectory
+import com.moneymanager.importengineapi.deleteCsvImport
 import com.moneymanager.importengineapi.recordDirectoryFileImported
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.importfilesource.ImportFileEntry
@@ -180,6 +181,29 @@ class ImportDirectoryScannerTest : DbTest() {
             assertEquals(1, second.filesUnchanged, "unchanged file should be counted")
             // A local file (no remote hash) is downloaded on every scan; the sha256 confirms it is unchanged.
             assertEquals(2, source.downloadCount, "local files fall back to download + sha256 each scan")
+        }
+
+    @Test
+    fun `deleting a staged import makes the next scan stage the file again`() =
+        runTest {
+            val engine = engine()
+            val directory = newDirectory(engine)
+            // A remote file whose hash never changes: only forgetting it can bring it back.
+            val source = FakeFileSource(listOf(FileSpec("jan.csv", csvV1, 1_000, remoteContentHash = "md5-aaa")))
+            scan(engine, directory, source)
+            val staged = assertNotNull(repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv")?.csvImportId)
+
+            engine.deleteCsvImport(staged)
+
+            assertEquals(
+                null,
+                repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv"),
+                "the folder forgets the file",
+            )
+            val rescan = scan(engine, directory, source)
+            assertEquals(1, rescan.filesDownloaded, "the deleted file is staged afresh")
+            val restaged = assertNotNull(repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv")?.csvImportId)
+            assertEquals(false, restaged == staged)
         }
 
     @Test

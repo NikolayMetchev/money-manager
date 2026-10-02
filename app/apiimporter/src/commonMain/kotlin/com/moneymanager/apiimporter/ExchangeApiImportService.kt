@@ -824,6 +824,8 @@ private data class ParsedExchangeTransfer(
      * an `amount` that duplicates the trade TradesHistory already supplied).
      */
     val isFeeOnly: Boolean = false,
+    /** See [ImportTransfer.approximateUntil]: set when [timestamp] is only the fetch window's start. */
+    val approximateUntil: Instant? = null,
 )
 
 private data class ParsedOrder(
@@ -898,6 +900,7 @@ private fun parseExchangeItem(
     jsonPath: String,
     into: ParsedExchangeData,
     windowStart: Instant?,
+    windowEnd: Instant?,
 ) {
     if (dataEndpoint.enrichesTransfers) {
         dataEndpoint.transactionMappings?.let { parseEnrichment(obj, it) }?.let(into.enrichments::add)
@@ -920,6 +923,7 @@ private fun parseExchangeItem(
                         into,
                         dataEndpoint.counterpartyAccountName,
                         windowStart,
+                        windowEnd,
                     )
                 }?.let(into.transfers::addAll)
         ApiEndpointKind.WITHDRAWALS ->
@@ -934,6 +938,7 @@ private fun parseExchangeItem(
                         into,
                         dataEndpoint.counterpartyAccountName,
                         windowStart,
+                        windowEnd,
                     )
                 }?.let(into.transfers::addAll)
         ApiEndpointKind.BANK_TRANSACTIONS -> Unit
@@ -991,6 +996,7 @@ suspend fun importApiSessionExchange(
         }
         val request = requestsById[response.requestId] ?: return@forEachResponse
         val windowStart = windowStartFromMarker(request.url)
+        val windowEnd = windowEndFromMarker(request.url)
         // Prefer the precise "ep=<key>" marker (disambiguates endpoints sharing a path, e.g. Kraken's
         // Ledgers deposit/withdrawal split); a QUERY_ONLY signed URL (Binance) carries no marker, so fall
         // back to a plain path match, which is unambiguous there since query params live in the URL.
@@ -1016,7 +1022,7 @@ suspend fun importApiSessionExchange(
                     } else {
                         arrayItemJsonPath(dataEndpoint.endpoint.responseArrayKey, index).value
                     }
-                parseExchangeItem(it, dataEndpoint, response.requestId, jsonPath, parsed, windowStart)
+                parseExchangeItem(it, dataEndpoint, response.requestId, jsonPath, parsed, windowStart, windowEnd)
             }
         }
     }
@@ -1096,6 +1102,7 @@ suspend fun importApiSessionExchange(
     val txidAttr = importEngine.getOrCreateAttributeType(BLOCKCHAIN_TXID_ATTR)
     val unidentifiedCounterpartyAttr =
         importEngine.getOrCreateAttributeType(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME)
+    val approximateTimestampAttr = importEngine.getOrCreateAttributeType(WellKnownIds.TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME)
 
     bar.emit(base = BUILD_BASE + 0.05f, detail = "Resolving accounts")
     val syntheticKey = LocalAccountKey("exchange-synthetic")
@@ -1310,12 +1317,22 @@ suspend fun importApiSessionExchange(
                 txnIdAttr = txnIdAttr,
                 txid = tx.txid,
                 txidAttr = txidAttr,
-            ).copy(
-                // A bank export naming this exchange records the same deposit/withdrawal with its real far
-                // end (the user's own bank account); this lets it reconcile against that record instead of
-                // both debiting (or crediting) the exchange.
-                unidentifiedCounterpartyAccountId = unidentifiedCounterparty,
-            )
+            ).let { transfer ->
+                transfer.copy(
+                    // A bank export naming this exchange records the same deposit/withdrawal with its real far
+                    // end (the user's own bank account); this lets it reconcile against that record instead of
+                    // both debiting (or crediting) the exchange.
+                    unidentifiedCounterpartyAccountId = unidentifiedCounterparty,
+                    approximateUntil = tx.approximateUntil,
+                    attributes =
+                        transfer.attributes +
+                            listOfNotNull(
+                                tx.approximateUntil?.let {
+                                    NewAttribute(approximateTimestampAttr, it.toEpochMilliseconds().toString())
+                                },
+                            ),
+                )
+            }
     }
 
     // Internal-transfer reconciliation: bridge the exchange account to any configured app account
@@ -1486,13 +1503,37 @@ internal fun itemTimestamp(
 }
 
 /** The start of the date window recorded in an exchange marker URL (`&ws=<epoch ms>`), if it has one. */
-internal fun windowStartFromMarker(url: String): Instant? =
-    Regex("[?&]ws=(\\d+)")
+internal fun windowStartFromMarker(url: String): Instant? = markerInstant(url, "ws")
+
+/** The end of the date window recorded in an exchange marker URL (`&we=<epoch ms>`), if it has one. */
+internal fun windowEndFromMarker(url: String): Instant? = markerInstant(url, "we")
+
+private fun markerInstant(
+    url: String,
+    param: String,
+): Instant? =
+    Regex("[?&]$param=(\\d+)")
         .find(url)
         ?.groupValues
         ?.get(1)
         ?.toLongOrNull()
         ?.let { Instant.fromEpochMilliseconds(it) }
+
+/**
+ * The latest moment an item booked at its fetch window's start (see [itemTimestamp]) can have happened —
+ * the window's end — or null when the item carried a real timestamp.
+ */
+internal fun approximateUntil(
+    raw: String?,
+    format: TimestampFormat,
+    pattern: String?,
+    windowStart: Instant?,
+    windowEnd: Instant?,
+): Instant? {
+    if (windowStart == null || windowEnd == null) return null
+    val parsed = raw?.let { parseApiTimestamp(it, format, pattern) } ?: return null
+    return windowEnd.takeIf { parsed.toEpochMilliseconds() <= 0L }
+}
 
 private fun parseTrade(
     obj: JsonObject,
@@ -1581,11 +1622,14 @@ private fun parseExchangeTransfer(
     into: ParsedExchangeData,
     counterpartyAccountName: String? = null,
     windowStart: Instant? = null,
+    windowEnd: Instant? = null,
 ): List<ParsedExchangeTransfer> {
     if (!tm.itemFilters.all { obj.evaluatePredicate(it) }) return emptyList()
     val currency = obj.str(tm.currencyField) ?: return emptyList()
+    val rawTimestamp = obj.str(tm.timestampField)
     val timestamp =
-        itemTimestamp(obj.str(tm.timestampField), tm.timestampFormat, tm.timestampPattern, windowStart) ?: return emptyList()
+        itemTimestamp(rawTimestamp, tm.timestampFormat, tm.timestampPattern, windowStart) ?: return emptyList()
+    val approximateUntil = approximateUntil(rawTimestamp, tm.timestampFormat, tm.timestampPattern, windowStart, windowEnd)
     val id =
         tm.compositeIdFields
             .takeIf { it.isNotEmpty() }
@@ -1655,6 +1699,7 @@ private fun parseExchangeTransfer(
                 aliasAccount = tm.counterpartyAliasField?.let { obj.str(it) }?.let { tm.counterpartyAccountAliases[it] },
                 counterpartyAccountName = counterpartyAccountName,
                 joinKey = tm.joinKeyField?.let { obj.str(it) },
+                approximateUntil = approximateUntil,
             )
     }
 
@@ -1695,6 +1740,7 @@ private fun parseExchangeTransfer(
                 counterpartyAccountName = null,
                 joinKey = null,
                 isFeeOnly = true,
+                approximateUntil = approximateUntil,
             )
     }
     return result

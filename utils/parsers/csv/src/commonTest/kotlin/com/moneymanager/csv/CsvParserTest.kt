@@ -42,6 +42,39 @@ class CsvParserTest {
         assertEquals(listOf("Alice", "30", "New York"), result.rows[0])
     }
 
+    // Preamble tests
+
+    @Test
+    fun parse_narrowerPreambleAboveHeader_isSkipped() {
+        val csv =
+            "UID: 16314371,Company Name: ,Country: \n" +
+                "Uid,Type,Coin,Amount,Wallet Balance,Time(UTC)\n" +
+                "16314371,,BTC,0.000205,0.00039664,2023-11-11 00:16:59"
+
+        val result = parser.parse(csv)
+
+        assertEquals(listOf("Uid", "Type", "Coin", "Amount", "Wallet Balance", "Time(UTC)"), result.headers)
+        assertEquals(listOf(listOf("16314371", "", "BTC", "0.000205", "0.00039664", "2023-11-11 00:16:59")), result.rows)
+    }
+
+    @Test
+    fun parse_preambleAndHeaderOnly_yieldsHeaderAndNoRows() {
+        val result = parser.parse("UID: 1,Company Name: \nDate,Type,Amount\n")
+
+        assertEquals(listOf("Date", "Type", "Amount"), result.headers)
+        assertEquals(emptyList(), result.rows)
+    }
+
+    @Test
+    fun parse_dataRowsWithTrailingDelimiter_keepHeader() {
+        val csv = "name,age\nAlice,30,\nBob,25,"
+
+        val result = parser.parse(csv)
+
+        assertEquals(listOf("name", "age"), result.headers)
+        assertEquals(listOf(listOf("Alice", "30"), listOf("Bob", "25")), result.rows)
+    }
+
     // Quoted field tests
 
     @Test

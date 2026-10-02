@@ -168,6 +168,32 @@ class LegMatcherTest {
     }
 
     @Test
+    fun `per-fill fees on one side match a single trade fee on the other`() {
+        // Koinly books one fee for the order; Bybit charges every fill separately, each its own transaction.
+        val usdt = CryptoAsset(id = CryptoId(3), code = "USDT", name = "Tether")
+        val source =
+            listOf(
+                leg(wallet, null, "-1345.880771", t0, asset = usdt, movement = "trade"),
+                leg(wallet, null, "968.4", t0, movement = "trade"),
+                leg(wallet, sourceRewards, "-0.9684", t0, movement = "fee"),
+            )
+        val real =
+            listOf(
+                leg(binance, null, "-1345.880771", t0, asset = usdt, movement = "trade"),
+                leg(binance, null, "968.4", t0, movement = "trade"),
+                leg(binance, stakingRewards, "-0.4928", t0),
+                leg(binance, stakingRewards, "-0.0111", t0),
+                leg(binance, stakingRewards, "-0.4645", t0),
+            )
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(3, result.matches.size)
+        assertTrue(result.missingInMm.isEmpty())
+        assertTrue(result.missingInSource.isEmpty())
+    }
+
+    @Test
     fun `excluded source legs do not widen the date range`() {
         // A deleted row is out of scope, so the real leg only it covered isn't reported missing either.
         val source = listOf(leg(wallet, sourceRewards, "1", t0), leg(wallet, sourceRewards, "5", t0 + 30.hours, excluded = true))

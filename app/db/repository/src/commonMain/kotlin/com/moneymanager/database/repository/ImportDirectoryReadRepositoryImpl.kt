@@ -86,6 +86,23 @@ class ImportDirectoryReadRepositoryImpl(
                 }
         }
 
+    override suspend fun getTrackedFilesForCsvImport(id: CsvImportId): List<ImportDirectoryFile> =
+        withContext(coroutineContext) {
+            selectQueries.selectFilesForCsvImport(id.id.toString()).executeAsList().map {
+                toFileDomain(
+                    it.directory_id,
+                    it.file_name,
+                    it.file_ref,
+                    it.last_modified,
+                    it.checksum,
+                    it.remote_content_hash,
+                    it.csv_import_id,
+                    it.qif_import_id,
+                    it.imported_at,
+                )
+            }
+        }
+
     override suspend fun csvImportSourceAccounts(): Map<CsvImportId, AccountId> =
         withContext(coroutineContext) {
             selectQueries

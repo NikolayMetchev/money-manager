@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
@@ -188,6 +189,22 @@ sealed interface CsvImportMutation {
         val headers: List<String>,
         val rows: List<List<String>>,
         val worksheetName: String,
+    ) : CsvImportMutation
+
+    /**
+     * Replaces a staged import's contents in place with a fresh parse of its re-downloaded file, keeping
+     * its id, history and folder link; see `CsvImportWriteRepository.repopulateImport`. [carriedRows] and
+     * [rowIndexRemap] carry an already-imported file's row outcomes and provenance onto the new rows.
+     */
+    class Repopulate(
+        val id: CsvImportId,
+        val headers: List<String>,
+        val rows: List<List<String>>,
+        val fileChecksum: String,
+        val fileLastModified: Instant,
+        val carriedRows: List<CsvRowLink> = emptyList(),
+        val rowIndexRemap: Map<Long, Long> = emptyMap(),
+        val xlsxBytes: ByteArray? = null,
     ) : CsvImportMutation
 
     /** Toggles the "ignored" flag; ignored files are hidden from the actionable lists. */

@@ -19,7 +19,8 @@ class CsvParser {
             return CsvParseResult(headers = emptyList(), rows = emptyList())
         }
 
-        val lines = parseLines(content, options)
+        val parsedLines = parseLines(content, options)
+        val lines = if (options.hasHeaders) parsedLines.drop(preambleLength(parsedLines)) else parsedLines
         if (lines.isEmpty()) {
             return CsvParseResult(headers = emptyList(), rows = emptyList())
         }
@@ -140,6 +141,30 @@ class CsvParser {
         return result
     }
 
+    /**
+     * How many leading rows are a preamble above the real header. Some exports (Bybit's statements) open
+     * with a narrower summary line such as `UID: 123,Company Name: ,Country: ` that would otherwise be read
+     * as the header, mis-sizing every column. A row only counts as preamble when it is narrower than every
+     * row after it (an ordinary header with one over-wide data row below is not), and the row after it looks
+     * like a header: no blank cells, and at least as wide as each of the rows that follow it. The blank-cell
+     * test keeps an ordinary file whose data rows carry a trailing delimiter (one cell wider than the
+     * header, that cell empty) from losing its real header.
+     */
+    private fun preambleLength(lines: List<List<String>>): Int {
+        var skipped = 0
+        while (skipped < MAX_PREAMBLE_ROWS && skipped + 1 < lines.size) {
+            val row = lines[skipped]
+            val header = lines[skipped + 1]
+            val following = lines.drop(skipped + 2).take(LINES_TO_ANALYZE)
+            val looksLikeHeader =
+                header.none { it.isBlank() } && following.all { it.size <= header.size }
+            val narrowerThanAllBelow = row.size < header.size && following.all { row.size < it.size }
+            if (!narrowerThanAllBelow || !looksLikeHeader) break
+            skipped++
+        }
+        return skipped
+    }
+
     private fun normalizeRows(
         rows: List<List<String>>,
         columnCount: Int,
@@ -197,6 +222,7 @@ class CsvParser {
 
     companion object {
         private const val LINES_TO_ANALYZE = 5
+        private const val MAX_PREAMBLE_ROWS = 3
         private const val CONSISTENCY_MULTIPLIER = 10
     }
 }

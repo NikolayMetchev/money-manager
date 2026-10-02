@@ -762,6 +762,129 @@ class ImportDeduperTest {
         assertEquals(null, result.excludeExisting)
     }
 
+    @Test
+    fun excludedRow_neverSupersedesAPlaceholderLeg() {
+        // A move between two wallets of one account arrives already excluded; it counts nowhere, so letting it
+        // exclude the export's real withdrawal of the same amount would count that withdrawal zero times.
+        val existingWithdrawal =
+            existing(41, description = "Withdraw", src = wallet, tgt = placeholder)
+                .copy(attributes = mapOf(AttributeTypeId(-9) to "true"))
+        val internalMove =
+            importTransfer(
+                0,
+                description = "TRANSFER_OUT",
+                timestamp = baseTime - 12.minutes,
+                src = wallet,
+                tgt = AccountId(37),
+                attributes = listOf(NewAttribute(AttributeTypeId(-1), "internal wallet transfer")),
+            )
+        val result = ImportDeduper(unidentifiedPolicy, existing = listOf(existingWithdrawal)).classify(listOf(internalMove)).single()
+        assertEquals(null, result.excludeExisting)
+    }
+
+    // Net + fee: an exchange API books a withdrawal as the amount received plus its fee, at one instant,
+    // where the wallet's own ledger has a single gross row naming no destination.
+    private val chainAddress = AccountId(38)
+    private val fees = AccountId(39)
+
+    private fun grossWithdrawal(
+        amount: Long = 105,
+        timestamp: Instant = baseTime + 2.minutes,
+    ) = importTransfer(0, description = "Withdraw", amount = amount, timestamp = timestamp, src = wallet, tgt = placeholder)
+        .copy(unidentifiedCounterpartyAccountId = placeholder)
+
+    private fun netAndFee(feeTimestamp: Instant = baseTime) =
+        listOf(
+            existing(50, description = "Withdraw BTC", amount = 100, src = wallet, tgt = chainAddress),
+            existing(51, description = "BTC fee", amount = 5, timestamp = feeTimestamp, src = wallet, tgt = fees),
+        )
+
+    @Test
+    fun grossRow_reconcilesAgainstAnExistingNetLegPlusFee() {
+        val result = ImportDeduper(unidentifiedPolicy, existing = netAndFee()).classify(listOf(grossWithdrawal())).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.any { it.typeId == AttributeTypeId(-1) }, "the gross row is the one excluded")
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(50), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
+            "linked to the net leg",
+        )
+    }
+
+    @Test
+    fun grossRow_needsTheExactSum() {
+        val result = ImportDeduper(unidentifiedPolicy, existing = netAndFee()).classify(listOf(grossWithdrawal(amount = 106))).single()
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun grossRow_needsBothLegsAtOneInstant() {
+        // Two unrelated outflows that happen to sum to the gross are not a withdrawal and its fee.
+        val result =
+            ImportDeduper(unidentifiedPolicy, existing = netAndFee(feeTimestamp = baseTime + 1.minutes))
+                .classify(listOf(grossWithdrawal()))
+                .single()
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun grossRow_onlyWithinTheReconcileWindow() {
+        val result =
+            ImportDeduper(unidentifiedPolicy, existing = netAndFee())
+                .classify(listOf(grossWithdrawal(timestamp = baseTime + 2.hours)))
+                .single()
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    // Approximate timestamps: a provider that reports no instant books the movement at the start of the
+    // window it fetched it in, which can be weeks before it happened.
+    private val windowEnd = baseTime + 30.days
+
+    private fun approximateDeposit(id: Long) =
+        existing(id, description = "Deposit USDT", amount = 1346, src = placeholder, tgt = wallet)
+            .copy(approximateUntil = windowEnd)
+
+    @Test
+    fun preciseRow_supersedesAnApproximateLegAnywhereInItsWindow() {
+        val incoming = placeholderDeposit(0, amount = 1346, timestamp = baseTime + 4.days + 14.hours)
+        val result = ImportDeduper(unidentifiedPolicy, existing = listOf(approximateDeposit(60))).classify(listOf(incoming)).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) }, "the precise record stays counted")
+        assertEquals(TransferId(60), result.excludeExisting?.transfer?.id)
+    }
+
+    @Test
+    fun preciseRow_outsideTheApproximateWindowIsAPlainImport() {
+        val incoming = placeholderDeposit(0, amount = 1346, timestamp = windowEnd + 2.days)
+        val result = ImportDeduper(unidentifiedPolicy, existing = listOf(approximateDeposit(60))).classify(listOf(incoming)).single()
+        assertEquals(null, result.excludeExisting)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun approximateRow_isExcludedAgainstAPreciseLegInItsWindow() {
+        val apiPolicy =
+            DedupePolicy.ApiMultiKey(
+                reconcileWindow = 60.minutes,
+                reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+                reconciledRelationshipTypeId = RelationshipTypeId(1),
+            )
+        val preciseCsvLeg =
+            existing(61, description = "userDeposit", amount = 1346, timestamp = baseTime + 4.days, src = placeholder, tgt = wallet)
+        val incoming =
+            importTransfer(0, description = "Deposit USDT", amount = 1346, apiId = "3562579", src = AccountId(40), tgt = wallet)
+                .copy(approximateUntil = windowEnd)
+        val result = ImportDeduper(apiPolicy, existing = listOf(preciseCsvLeg)).classify(listOf(incoming)).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.any { it.typeId == AttributeTypeId(-1) }, "the approximate record is excluded")
+        assertEquals(
+            TransferId(61),
+            result.transfer.relationships
+                .single()
+                .relatedTransferId,
+        )
+    }
+
     // Funding-card reconcile: a conduit (e.g. Curve) spend, `conduit -> merchant`, reconciles against
     // the funding leg `fundingAccount -> conduit` by amount+window, ignoring the merchant.
     private val conduit = AccountId(10)

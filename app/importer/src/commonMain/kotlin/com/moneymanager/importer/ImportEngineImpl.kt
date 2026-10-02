@@ -1427,16 +1427,33 @@ class ImportEngineImpl(
                 }
                 is DedupePolicy.None -> emptyList()
             }
+        // A leg another source could only date approximately may truly sit far outside the date range
+        // above, so load those few legs on the batch's accounts whatever their date.
+        val approximateLegs =
+            if (batch.dedupePolicy is DedupePolicy.FuzzyAllFields) {
+                transactionRepository.getTransactionsByAccountsWithAttributeType(
+                    accountIds,
+                    WellKnownIds.TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME,
+                )
+            } else {
+                emptyList()
+            }
 
         val uniqueKeyExtractor = batch.uniqueKeyExtractor
         val apiIdExtractor = batch.apiIdExtractor
-        return rawTransfers.map { transfer ->
+        return (rawTransfers + approximateLegs).distinctBy { it.id }.map { transfer ->
             ExistingTransferInfo(
                 transferId = transfer.id,
                 transfer = transfer,
                 attributes = transfer.attributes.associate { it.attributeType.id to it.value },
                 uniqueKey = uniqueKeyExtractor?.extract(transfer).orEmpty(),
                 apiId = apiIdExtractor?.extract(transfer),
+                approximateUntil =
+                    transfer.attributes
+                        .firstOrNull { it.attributeType.name == WellKnownIds.TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME }
+                        ?.value
+                        ?.toLongOrNull()
+                        ?.let { Instant.fromEpochMilliseconds(it) },
             )
         }
     }
@@ -2059,6 +2076,17 @@ class ImportEngineImpl(
                         "CsvImport",
                     )
                 is CsvImportMutation.Restage -> csvImportRepository.restageImport(m.id, m.headers, m.rows, m.worksheetName)
+                is CsvImportMutation.Repopulate ->
+                    csvImportRepository.repopulateImport(
+                        m.id,
+                        m.headers,
+                        m.rows,
+                        m.fileChecksum,
+                        m.fileLastModified,
+                        m.carriedRows,
+                        m.rowIndexRemap,
+                        m.xlsxBytes,
+                    )
                 is CsvImportMutation.Delete -> csvImportRepository.deleteImport(m.id)
                 is CsvImportMutation.SetIgnored -> csvImportRepository.setImportIgnored(m.id, m.ignored)
                 is CsvImportMutation.ResetToUnimported -> csvImportRepository.resetToUnimported(m.id)

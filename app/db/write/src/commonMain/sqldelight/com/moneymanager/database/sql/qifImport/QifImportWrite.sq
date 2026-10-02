@@ -5,6 +5,11 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 deleteImport:
 DELETE FROM qif_import_metadata WHERE id = ?;
 
+-- See CsvImportWrite.deleteDirectoryFilesForImport.
+deleteDirectoryFilesForImport:
+DELETE FROM import_directory_file
+WHERE id IN (SELECT file_id FROM import_directory_file_qif_import WHERE qif_import_id = ?);
+
 setImportIgnored:
 UPDATE qif_import_metadata SET ignored = ? WHERE id = ?;
 

@@ -324,6 +324,34 @@ class StrategySelectorTest {
         assertNull(builtIns.selectForCsv("20210424.csv", binanceColumns(legacyHeaders), rows))
     }
 
+    private val bybitSpotHeaders = listOf("Uid", "Type", "Coin", "Amount", "Wallet Balance", "Time(UTC)")
+
+    @Test
+    fun `each Bybit wallet ledger selects its own strategy`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val spot = listOf(binanceRow(0, listOf("12345678", "trade", "USDT", "-15.42", "685.10", "2022-01-05 13:18:18")))
+        assertEquals(
+            "Bybit Spot CSV",
+            builtIns.selectForCsv("AssetChangeDetails_spot_12345678_20220101_20221231_0.csv", binanceColumns(bybitSpotHeaders), spot)?.name,
+        )
+        val fundHeaders = listOf("Uid", "Date & Time(UTC)", "Coin", "QTY", "Type", "Account Balance", "Description")
+        val fund = listOf(binanceRow(0, listOf("12345678", "2023-11-13 09:18:18", "BTC", "-0.00039664", "Withdraw", "0", "Withdrawal")))
+        assertEquals(
+            "Bybit Funding CSV",
+            builtIns.selectForCsv("AssetChangeDetails_fund_12345678_20230101_20231231_0.csv", binanceColumns(fundHeaders), fund)?.name,
+        )
+    }
+
+    @Test
+    fun `an older Bybit export without Uid selects no strategy`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        // The 2023-era spot_part export holds the same rows as the newer one, minus the Uid column.
+        val rows = listOf(binanceRow(0, listOf("trade", "USDT", "-15.42", "685.10", "2022-01-05 13:18:18")))
+        assertNull(
+            builtIns.selectForCsv("spot_part-00000-177102ab-c000.csv", binanceColumns(bybitSpotHeaders.drop(1)), rows),
+        )
+    }
+
     @Test
     fun `a Monzo export still selects the Monzo CSV strategy alongside Binance`() {
         val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
