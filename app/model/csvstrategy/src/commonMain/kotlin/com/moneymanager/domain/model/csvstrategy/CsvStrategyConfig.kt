@@ -44,10 +44,9 @@ import kotlinx.serialization.encoding.Encoder
  *                                             amount, timestamps within this window) is imported
  *                                             but tagged excluded and linked as reconciled instead
  *                                             of counting twice. Null disables reconciliation.
- * @property conversionConfig When set, describes how this source expresses asset conversions as
- *                            separate debited/credited rows; the importer routes the legs through a
- *                            shared counterparty account and links each debit to its credit (see
- *                            [ConversionConfig]). Null when the source has no such conversions.
+ * @property legGroups How this source splits single movements — trades, conversions — across several
+ *                  rows, and how those rows are reassembled (see [LegGroupRule]). Empty when every
+ *                  movement arrives on one row.
  * @property fundingAttributeMatch When set, resolves each row's hidden funding account by matching a
  *                             CSV column against an account-attribute type (see [AttributeAccountMatch];
  *                             e.g. Curve's "Funding Card Last 4 Digits" column against the `card-last4`
@@ -55,10 +54,6 @@ import kotlinx.serialization.encoding.Encoder
  *                             against an unconsumed funding leg into the row's source account (same
  *                             amount+currency within [crossSourceReconcileWindowSeconds]), ignoring the
  *                             merchant. Null disables funding reconciliation.
- * @property tradeGroupConfig When set, describes how this source splits one trade across several rows
- *                            sharing a timestamp; the importer assembles each such group into a single
- *                            `trade` on the owner account (see [TradeGroupConfig]). Null when every
- *                            cross-asset movement already arrives on one row.
  * @property assetCodes How the source's asset codes map onto Money Manager's, applied to every currency
  *                      column before lookup (e.g. Koinly's legacy `KNCL` → `KNC`), so the source neither
  *                      mints a duplicate asset nor fails to match.
@@ -82,16 +77,16 @@ data class CsvStrategyConfig<out M>(
     val contentMatchRules: List<Condition> = emptyList(),
     val fileNamePattern: String? = null,
     val crossSourceReconcileWindowSeconds: Long? = null,
-    val conversionConfig: ConversionConfig? = null,
     // Omitted from JSON when null (unlike the fields above, which encode their null under the export
     // codec's encodeDefaults=true) so ADDING this field did not change the canonical hash of every
     // existing strategy — only a strategy that actually sets it (Curve) rehashed. Prevents a spurious
     // "all strategies changed" on catalog/Drive sync. See StrategyArtifactCodec.canonicalHash.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val fundingAttributeMatch: AttributeAccountMatch? = null,
-    // Same NEVER-encode rationale: only a strategy that assembles trades from row groups rehashes.
+    // A row is a leg of the first rule that claims it - order is semantic, keeps insertion-order
+    // serialization. NEVER-encoded when empty.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val tradeGroupConfig: TradeGroupConfig? = null,
+    val legGroups: List<LegGroupRule> = emptyList(),
     // Same NEVER-encode rationale: only reconciliation-source strategies rehash.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val reconciliation: ReconciliationConfig? = null,
@@ -110,9 +105,8 @@ data class CsvStrategyConfig<out M>(
             contentMatchRules = contentMatchRules,
             fileNamePattern = fileNamePattern,
             crossSourceReconcileWindowSeconds = crossSourceReconcileWindowSeconds,
-            conversionConfig = conversionConfig,
             fundingAttributeMatch = fundingAttributeMatch,
-            tradeGroupConfig = tradeGroupConfig,
+            legGroups = legGroups,
             reconciliation = reconciliation,
             assetCodes = assetCodes,
         )

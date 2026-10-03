@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.apistrategy.ApiLedgerTrades
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.ApiValueSet
@@ -648,7 +649,7 @@ private data class ParsedExchangeTransfer(
     val joinKey: String?,
     /**
      * When true, this movement is booked straight to the fee account (exchange -> Fees), never to
-     * the counterparty/funding side. Produced by [ApiTransactionMappings.feeAmountField] on a ledger row
+     * the counterparty/funding side. Produced by [ApiTransactionMappings.fee] on a ledger row
      * whose main [ApiTransactionMappings.amountField] was skipped as an excluded duplicate (Kraken's
      * `type=trade` ledger rows carry a same-asset settlement fee TradesHistory never reports, alongside
      * an `amount` that duplicates the trade TradesHistory already supplied).
@@ -687,7 +688,7 @@ private data class ParsedEnrichment(
 
 /**
  * One leg of a trade-type ledger row excluded from [ParsedExchangeData.transfers] as a duplicate of a
- * `TradesHistory` trade (see [ApiTransactionMappings.reconcileTradeAmountsField]) — kept so the trade's
+ * `TradesHistory` trade (see [ApiTransactionMappings.ledgerTrades]) — kept so the trade's
  * booked amount can be reconciled against what the ledger actually settled.
  */
 private data class ParsedLedgerTradeLeg(
@@ -699,7 +700,7 @@ private data class ParsedLedgerTradeLeg(
     val jsonPath: String,
     /**
      * The other side of the trade as this row itself reports it (see
-     * [ApiTransactionMappings.unpairedTradeLegCounterAmountField]) — used only when no other ledger row
+     * [ApiLedgerTrades.unpairedCounterAmountPath]) — used only when no other ledger row
      * records it, i.e. the trade was paid for from outside the exchange.
      */
     val counterAssetCode: String? = null,
@@ -1390,6 +1391,7 @@ private fun parseTrade(
             ?.joinToString("-")
             ?: obj.str(tm.idField)
             ?: return null
+    val fee = tm.fee?.takeIf { obj.matchesAll(it.conditions) }
     return ParsedTrade(
         id = id,
         timestamp = timestamp,
@@ -1398,10 +1400,11 @@ private fun parseTrade(
         quoteCode = quoteCode,
         baseQuantity = baseQty.abs(),
         quoteAmount = quoteAmount.abs(),
-        feeAmount = tm.feeField?.let { obj.str(it)?.let { v -> runCatching { BigDecimal(v).abs() }.getOrNull() } },
+        feeAmount =
+            fee?.let { obj.resolve(it.amount) }?.takeIf { it.isNotBlank() }?.let { v -> runCatching { BigDecimal(v).abs() }.getOrNull() },
         // Most exchanges charge the trade fee in the quote asset without a separate field for it
-        // (Kraken); an explicit feeCurrencyField (Crypto.com) overrides this default.
-        feeCode = tm.feeCurrencyField?.let { obj.str(it) } ?: quoteCode,
+        // (Kraken); an explicit fee currency (Crypto.com) overrides this default.
+        feeCode = fee?.currency?.let { obj.resolve(it) }?.takeIf { it.isNotBlank() } ?: quoteCode,
         orderId = tm.orderIdField?.let { obj.str(it) },
         requestId = requestId,
         jsonPath = jsonPath,
@@ -1461,14 +1464,16 @@ private fun parseExchangeTransfer(
             ?: return emptyList()
     val excluded = tm.excludeWhen.isNotEmpty() && obj.matchesAll(tm.excludeWhen)
     val rawAmount = obj.str(tm.amountField)?.let { runCatching { BigDecimal(it) }.getOrNull() }
+    val fee = tm.fee?.takeIf { obj.carriesFee(it, currency) }
+    val rawFeeAmount = fee?.let { obj.resolve(it.amount) }?.takeIf { it.isNotBlank() }?.let { runCatching { BigDecimal(it) }.getOrNull() }
+    val feeCurrency = fee?.currency?.let { obj.resolve(it) }?.takeIf { it.isNotBlank() } ?: currency
 
     val result = mutableListOf<ParsedExchangeTransfer>()
     if (excluded) {
-        val refid =
-            (listOfNotNull(tm.reconcileTradeAmountsField) + tm.reconcileTradeAmountsFallbackFields)
-                .firstNotNullOfOrNull { field -> obj.str(field)?.takeIf { it.isNotBlank() } }
-        if (refid != null && rawAmount != null) {
-            val counterField = tm.unpairedTradeLegCounterAmountField
+        val ledgerTrades = tm.ledgerTrades
+        val refid = ledgerTrades?.let { obj.resolve(it.key) }?.takeIf { it.isNotBlank() }
+        if (ledgerTrades != null && refid != null && rawAmount != null) {
+            val counterField = ledgerTrades.unpairedCounterAmountPath
             into.ledgerTradeLegs +=
                 ParsedLedgerTradeLeg(
                     refid = refid,
@@ -1479,7 +1484,7 @@ private fun parseExchangeTransfer(
                     jsonPath = jsonPath,
                     counterAssetCode = counterField?.let { obj.str("$it.currency") },
                     counterAmount = counterField?.let { obj.str("$it.amount") }?.let { runCatching { BigDecimal(it) }.getOrNull() },
-                    fundingAccountName = tm.unpairedTradeLegFundingAccountName,
+                    fundingAccountName = ledgerTrades.unpairedFundingAccountName,
                 )
         }
     } else if (rawAmount != null) {
@@ -1499,7 +1504,13 @@ private fun parseExchangeTransfer(
                         ?: direction
                 Direction.Outgoing -> TransferDirection.OUT
             }
-        val amount = rawAmount.abs()
+        // A gross amount already includes its fee: carve a same-asset fee out so the two sum back to it.
+        val amount =
+            if (fee?.includedInAmount == true && rawFeeAmount != null && feeCurrency.equals(currency, ignoreCase = true)) {
+                (rawAmount.abs() - rawFeeAmount.abs()).let { if (it < BigDecimal.ZERO) BigDecimal.ZERO else it }
+            } else {
+                rawAmount.abs()
+            }
         val description =
             obj.str(tm.descriptionField)?.takeIf { it.isNotBlank() }
                 ?: if (resolvedDirection == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
@@ -1531,26 +1542,18 @@ private fun parseExchangeTransfer(
     // back, so the sign decides direction: negative -> refund (Fees -> exchange), positive -> charge
     // (exchange -> Fees).
     // A fee every leg of a fill repeats is charged once, on the leg in the pair's quote asset.
-    val feeOnThisRow =
-        tm.feeInstrumentField?.let { field ->
-            obj.str(field)?.substringAfterLast(tm.feeInstrumentSeparator)?.equals(currency, ignoreCase = true) == true
-        } ?: true
-    val rawFeeAmount =
-        tm.feeAmountField
-            ?.takeIf { feeOnThisRow }
-            ?.let { obj.str(it)?.let { v -> runCatching { BigDecimal(v) }.getOrNull() } }
     if (rawFeeAmount != null && rawFeeAmount != BigDecimal.ZERO) {
         val isRefund = rawFeeAmount < BigDecimal.ZERO
         result +=
             ParsedExchangeTransfer(
                 id = "$id-fee",
                 timestamp = timestamp,
-                currencyCode = currency,
+                currencyCode = feeCurrency,
                 amount = rawFeeAmount.abs(),
                 direction = if (isRefund) TransferDirection.IN else TransferDirection.OUT,
                 description =
-                    tm.feeDescriptionField?.let { obj.str(it) }?.takeIf { it.isNotBlank() }
-                        ?: if (isRefund) "$currency fee refund" else "$currency fee",
+                    fee.description?.let { obj.resolve(it) }?.takeIf { it.isNotBlank() }
+                        ?: if (isRefund) "$feeCurrency fee refund" else "$feeCurrency fee",
                 requestId = requestId,
                 jsonPath = jsonPath,
                 counterpartyAddress = null,
@@ -1568,11 +1571,11 @@ private fun parseExchangeTransfer(
 
 /**
  * Reconciles parsed trades against their authoritative ledger legs (see
- * [ApiTransactionMappings.reconcileTradeAmountsField]): a trade's leg amounts are overridden by the
+ * [ApiTransactionMappings.ledgerTrades]): a trade's leg amounts are overridden by the
  * matching ledger group's signed amounts where present, and any ledger group matching no trade at all
  * is booked as its own trade — Kraken's Ledgers `balance` is ground truth, so no movement it reports
  * may be silently dropped or left at a TradesHistory amount it disagrees with. A group of one leg that
- * names its own counter amount (see [ApiTransactionMappings.unpairedTradeLegCounterAmountField]) is
+ * names its own counter amount (see [ApiLedgerTrades.unpairedCounterAmountPath]) is
  * booked as a trade against that amount, funded by a transfer so the counter asset nets to zero.
  */
 private fun reconcileTradesAgainstLedger(

@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiFanOut
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
+import com.moneymanager.domain.model.apistrategy.ApiLedgerTrades
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
@@ -49,6 +50,9 @@ import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -126,8 +130,7 @@ object BuiltInApiStrategies {
                                         // `atm_fees_detailed.fee_amount` (integer minor units; null/0 otherwise). Import it
                                         // as its own linked fee transfer. Monzo's `amount` is gross (= withdrawal_amount +
                                         // fee_amount), so the fee is carved out of the main transfer rather than added on top.
-                                        feeAmountField = "atm_fees_detailed.fee_amount",
-                                        feeIncludedInAmount = true,
+                                        fee = FeeRule(amount = ValueExpr(listOf("atm_fees_detailed.fee_amount")), includedInAmount = true),
                                     ),
                             ),
                         ),
@@ -454,8 +457,7 @@ object BuiltInApiStrategies {
                 buyValues = setOf("BUY", "buy"),
                 baseQuantityField = "traded_quantity",
                 priceField = "traded_price",
-                feeField = "fees",
-                feeCurrencyField = "fee_instrument_name",
+                fee = FeeRule(amount = ValueExpr(listOf("fees")), currency = ValueExpr(listOf("fee_instrument_name"))),
                 timestampField = "create_time",
                 timestampFormat = TimestampFormat.EPOCH_MS,
                 idField = "trade_id",
@@ -682,10 +684,10 @@ object BuiltInApiStrategies {
                 buyValues = setOf("buy"),
                 baseQuantityField = "vol",
                 quoteQuantityField = "cost",
-                // No feeField: TradesHistory's own fee is a quote-currency report that can disagree with
+                // No fee: TradesHistory's own fee is a quote-currency report that can disagree with
                 // (or duplicate) what was actually charged — sometimes in a different asset entirely (a
                 // base-asset settlement fee Kraken bills separately). The Ledgers `type=all` feed already
-                // supplies every fee authoritatively (see ledgerMappings' feeAmountField), so the trade
+                // supplies every fee authoritatively (see ledgerMappings' fee), so the trade
                 // path books none of its own.
                 timestampField = "time",
                 timestampFormat = TimestampFormat.EPOCH_S_FLOAT,
@@ -702,7 +704,7 @@ object BuiltInApiStrategies {
                 // itemKeyField below under this field name.
                 idField = "ledger_id",
                 amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                feeAmountField = "fee",
+                fee = FeeRule(amount = ValueExpr(listOf("fee"))),
                 joinKeyField = joinKey,
                 // A failed/cancelled deposit or withdrawal appears as two ledger rows sharing one refid
                 // with opposite-signed amounts (the debit and its reversal), netting to zero. Kraken's
@@ -711,7 +713,7 @@ object BuiltInApiStrategies {
                 direction = Direction.AmountSign(),
                 // Only meaningful on the excluded `type=trade` rows (see excludeWhen
                 // below) — refid equals the matching TradesHistory trade's own id.
-                reconcileTradeAmountsField = "refid",
+                ledgerTrades = ApiLedgerTrades(key = ValueExpr(listOf("refid"))),
             )
 
         // DepositStatus/WithdrawStatus supply no money movement of their own — they only enrich the
@@ -748,7 +750,7 @@ object BuiltInApiStrategies {
                                 // "trade_id" field before mapping: the native `trade_id` is a small per-fill
                                 // sequence number that collides across unrelated trades (observed repeatedly as
                                 // 0), whereas the key is unique and — critically — is the same identifier
-                                // Kraken's Ledgers rows carry as `refid`, letting reconcileTradeAmountsField join
+                                // Kraken's Ledgers rows carry as `refid`, letting ledgerTrades join
                                 // a trade to its authoritative ledger legs (see ledgerMappings).
                                 signed(
                                     "0/private/TradesHistory",
@@ -1200,7 +1202,7 @@ object BuiltInApiStrategies {
                                         counterpartyNetworkField = "network",
                                         txidField = "txId",
                                         // "amount" is net of the fee - transactionFee is booked separately.
-                                        feeAmountField = "transactionFee",
+                                        fee = FeeRule(amount = ValueExpr(listOf("transactionFee"))),
                                         // status 6 = completed (see the capital/withdraw/history docs).
                                         itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "6")),
                                     ),
@@ -1235,7 +1237,7 @@ object BuiltInApiStrategies {
                                         // export - which records the gross - can never be reconciled against
                                         // it. The deposit endpoint above needs no equivalent: Binance
                                         // returns totalFee "0" on every fiat deposit.
-                                        feeAmountField = "totalFee",
+                                        fee = FeeRule(amount = ValueExpr(listOf("totalFee"))),
                                         itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Successful")),
                                     ),
                                 counterpartyAccountName = "Binance Bank",
@@ -1253,8 +1255,7 @@ object BuiltInApiStrategies {
                                         // sourceAmount = fiat spent (quote).
                                         baseQuantityField = "obtainAmount",
                                         quoteQuantityField = "sourceAmount",
-                                        feeField = "totalFee",
-                                        feeCurrencyField = "fiatCurrency",
+                                        fee = FeeRule(amount = ValueExpr(listOf("totalFee")), currency = ValueExpr(listOf("fiatCurrency"))),
                                         timestampField = "createTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "orderNo",
@@ -1274,8 +1275,7 @@ object BuiltInApiStrategies {
                                         // obtainAmount = fiat received (quote).
                                         baseQuantityField = "sourceAmount",
                                         quoteQuantityField = "obtainAmount",
-                                        feeField = "totalFee",
-                                        feeCurrencyField = "fiatCurrency",
+                                        fee = FeeRule(amount = ValueExpr(listOf("totalFee")), currency = ValueExpr(listOf("fiatCurrency"))),
                                         timestampField = "createTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "orderNo",
@@ -1395,8 +1395,11 @@ object BuiltInApiStrategies {
                                         buyValues = setOf("true"),
                                         baseQuantityField = "qty",
                                         quoteQuantityField = "quoteQty",
-                                        feeField = "commission",
-                                        feeCurrencyField = "commissionAsset",
+                                        fee =
+                                            FeeRule(
+                                                amount = ValueExpr(listOf("commission")),
+                                                currency = ValueExpr(listOf("commissionAsset")),
+                                            ),
                                         timestampField = "time",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "id",
@@ -1466,7 +1469,7 @@ object BuiltInApiStrategies {
      * whole account. Deposits, withdrawals, sends, receives and rewards are signed ledger rows. Buys,
      * sells, converts and Advanced Trade fills post one row per wallet they touch, sharing the
      * `buy`/`sell`/`trade` id or Advanced Trade order id, so they are grouped back into trades (see
-     * [ApiTransactionMappings.reconcileTradeAmountsField]) at the exact amounts that settled; a purchase
+     * [ApiTransactionMappings.ledgerTrades]) at the exact amounts that settled; a purchase
      * paid by card posts only the crypto row, and is booked against its `native_amount`. The Advanced
      * Trade fills endpoint is deliberately not used: an order placed as "spend £X" reports its fills'
      * `size` in the quote asset, and the ledger already has the settled amounts.
@@ -1506,14 +1509,20 @@ object BuiltInApiStrategies {
                 // rather than booked as transfers. The rows carry the exact settled amounts, so no
                 // quantity is ever derived from a price.
                 excludeWhen = listOf(Condition("type", ConditionOp.IN, value = "advanced_trade_fill,buy,retail_simple_dust,sell,trade")),
-                reconcileTradeAmountsField = "trade.id",
-                reconcileTradeAmountsFallbackFields = listOf("buy.id", "sell.id", "advanced_trade_fill.order_id"),
+                ledgerTrades =
+                    ApiLedgerTrades(
+                        key = ValueExpr(listOf("trade.id", "buy.id", "sell.id", "advanced_trade_fill.order_id")),
+                        unpairedCounterAmountPath = "native_amount",
+                        unpairedFundingAccountName = "Coinbase Payment Methods",
+                    ),
                 // An Advanced Trade fill's commission is settled outside its legs, and both legs repeat it:
                 // book it once, on the leg in the pair's quote asset.
-                feeAmountField = "advanced_trade_fill.commission",
-                feeInstrumentField = "advanced_trade_fill.product_id",
-                unpairedTradeLegCounterAmountField = "native_amount",
-                unpairedTradeLegFundingAccountName = "Coinbase Payment Methods",
+                fee =
+                    FeeRule(
+                        amount = ValueExpr(listOf("advanced_trade_fill.commission")),
+                        // Charged once, on the leg in the pair's quote asset: what follows the symbol's last "-".
+                        chargedOnAsset = ValueExpr(listOf("advanced_trade_fill.product_id"), Extraction("^.*-(.*)$", "$1")),
+                    ),
             )
 
         return ApiImportStrategy(
@@ -1734,8 +1743,7 @@ object BuiltInApiStrategies {
                                         buyValues = setOf("Buy"),
                                         baseQuantityField = "execQty",
                                         quoteQuantityField = "execValue",
-                                        feeField = "execFee",
-                                        feeCurrencyField = "feeCurrency",
+                                        fee = FeeRule(amount = ValueExpr(listOf("execFee")), currency = ValueExpr(listOf("feeCurrency"))),
                                         timestampField = "execTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "execId",
@@ -1774,7 +1782,7 @@ object BuiltInApiStrategies {
                                         counterpartyAddressField = "toAddress",
                                         counterpartyNetworkField = "chain",
                                         txidField = "txID",
-                                        feeAmountField = "withdrawFee",
+                                        fee = FeeRule(amount = ValueExpr(listOf("withdrawFee"))),
                                         itemFilters = status("success"),
                                     ),
                                 counterpartyAccountName = "Bybit Funding",

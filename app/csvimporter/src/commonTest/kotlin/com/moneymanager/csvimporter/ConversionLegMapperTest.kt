@@ -13,29 +13,35 @@ import com.moneymanager.domain.model.csvstrategy.AccountRule
 import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Proves [ConversionConfig] is a generic, source-agnostic mechanism — nothing crypto.com-specific.
+ * Proves a through-account [LegGroupRule] is a generic, source-agnostic mechanism — nothing crypto.com-specific.
  * A synthetic strategy with its own column names, signal patterns, and counterparty account routes
  * both legs of a two-row conversion through the configured account and marks each leg's side.
  */
-class ConversionConfigMapperTest {
+class ConversionLegMapperTest {
     private val now = Clock.System.now()
 
     private val usd =
@@ -93,15 +99,23 @@ class ConversionConfigMapperTest {
                             TransferField.DESCRIPTION to
                                 DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Memo"))),
                         ),
-                    conversionConfig =
-                        ConversionConfig(
-                            signalColumn = "Kind",
-                            debitPattern = "^swap_out$",
-                            creditPattern = "^swap_in$",
-                            conversionAccountName = "Conversions",
-                            pairingKeyPattern = "^(swap)_",
-                            pairingWindowSeconds = 5,
-                            relationshipTypeName = "conversion",
+                    legGroups =
+                        listOf(
+                            LegGroupRule(
+                                legWhen =
+                                    listOf(
+                                        Condition("Kind", ConditionOp.MATCHES, "(?:^swap_out$)|(?:^swap_in$)"),
+                                        Condition("Kind", ConditionOp.NOT_BLANK),
+                                    ),
+                                side = LegSide.DebitWhen(listOf(Condition("Kind", ConditionOp.MATCHES, "^swap_out$"))),
+                                key = listOf(ValueExpr(listOf("Kind"), Extraction("^(swap)_", "$1"))),
+                                windowSeconds = 5,
+                                assembly =
+                                    LegAssembly.ThroughAccount(
+                                        accounts = listOf(AccountRule(value = ValueExpr(listOf("Kind")), name = "Conversions")),
+                                        relationshipTypeName = "conversion",
+                                    ),
+                            ),
                         ),
                 ),
             createdAt = now,
@@ -133,8 +147,8 @@ class ConversionConfigMapperTest {
         assertEquals(AccountId(-1), r.transfer.targetAccountId, "Conversions is a new account (placeholder id)")
         assertTrue(r.newAccounts.any { it.name == "Conversions" }, "the Conversions account is created on demand")
         assertTrue(r.newAccounts.none { it.name == "Counterparty" }, "the description-derived counterparty is not used")
-        val leg = assertIs<ConversionLegInfo>(r.conversionLeg)
-        assertEquals(ConversionSide.DEBIT, leg.side)
+        val leg = assertNotNull(r.groupLeg)
+        assertEquals(GroupLegSide.DEBIT, leg.side)
     }
 
     @Test
@@ -143,20 +157,20 @@ class ConversionConfigMapperTest {
         // Positive amount flips: the Conversions account is the source, Wallet receives the asset.
         assertEquals(AccountId(-1), r.transfer.sourceAccountId, "Conversions is a new account (placeholder id)")
         assertEquals(wallet.id, r.transfer.targetAccountId)
-        val leg = assertIs<ConversionLegInfo>(r.conversionLeg)
-        assertEquals(ConversionSide.CREDIT, leg.side)
+        val leg = assertNotNull(r.groupLeg)
+        assertEquals(GroupLegSide.CREDIT, leg.side)
     }
 
     @Test
     fun debitAndCreditLegs_shareAPairingKey() {
-        val debit = map(row("swap_out", "-5", "USD")).conversionLeg
-        val credit = map(row("swap_in", "5", "EUR")).conversionLeg
-        assertEquals(debit?.pairingKey, credit?.pairingKey, "both legs of the family pair on the same key")
+        val debit = map(row("swap_out", "-5", "USD")).groupLeg
+        val credit = map(row("swap_in", "5", "EUR")).groupLeg
+        assertEquals(debit?.key, credit?.key, "both legs of the family pair on the same key")
     }
 
     @Test
     fun nonConversionRow_hasNoConversionLeg() {
         val r = map(row("reward", "5", "USD"))
-        assertNull(r.conversionLeg)
+        assertNull(r.groupLeg)
     }
 }

@@ -4,8 +4,10 @@ import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.csvstrategy.TradeGroupConfig
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegGroupRule
 import com.moneymanager.importengineapi.LocalTradeKey
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -16,8 +18,8 @@ import kotlin.time.Instant
 const val CSV_TRADE_KEY_PREFIX = "csv-"
 
 /**
- * Rows a source split across one trade, bucketed by timestamp (see [TradeGroupConfig]). A group holds
- * only rows the mapper flagged as trade legs; fee rows are deliberately not part of it.
+ * Rows a source split across one trade, chained by timestamp (see [LegAssembly.Trade]). A group holds
+ * only rows the mapper flagged as legs of the rule; fee rows are deliberately not part of it.
  */
 data class TradeGroup(
     val debits: List<CsvTransferWithAttributes>,
@@ -53,45 +55,47 @@ fun AssembledTrade.tradeKey(csvImportId: CsvImportId): LocalTradeKey =
     LocalTradeKey("$CSV_TRADE_KEY_PREFIX${csvImportId.id}-${group.rowIndexes.min()}")
 
 /**
- * Splits [rows] into trade groups. Rows the mapper did not flag as a trade leg are ignored; the caller
- * still imports them as ordinary transfers.
- *
- * Grouping is a greedy chain over time: a leg joins the current group while it is within
- * [TradeGroupConfig.groupingWindowSeconds] of the group's **last** leg, so a group whose legs straddle
- * a second boundary still holds together while genuinely separate events (minutes or hours apart) stay
- * separate. A zero window means legs must share the exact instant.
+ * The legs of rule [ruleIndex] among [rows], split into events: within each key, a leg joins the current
+ * event while it is within [window] of the event's **last** leg, so an event whose legs straddle a second
+ * boundary still holds together while genuinely separate events (minutes or hours apart) stay separate. A
+ * zero window means legs must share the exact instant. Rows that are not legs of the rule are ignored;
+ * the caller still imports them as ordinary transfers.
  */
+fun chainGroupLegs(
+    rows: List<CsvTransferWithAttributes>,
+    ruleIndex: Int,
+    window: Duration,
+): List<List<CsvTransferWithAttributes>> =
+    rows
+        .filter { it.groupLeg?.ruleIndex == ruleIndex }
+        .groupBy { it.groupLeg!!.key }
+        .values
+        .flatMap { legsOfKey ->
+            val legs = legsOfKey.sortedWith(compareBy({ it.transfer.timestamp }, { it.rowIndex }))
+            val events = mutableListOf<MutableList<CsvTransferWithAttributes>>()
+            for (leg in legs) {
+                val current = events.lastOrNull()
+                if (current != null && leg.transfer.timestamp - current.last().transfer.timestamp <= window) {
+                    current += leg
+                } else {
+                    events += mutableListOf(leg)
+                }
+            }
+            events
+        }
+
+/** The trade groups of rule [ruleIndex]: its events split into debit and credit legs. */
 fun groupTradeLegs(
     rows: List<CsvTransferWithAttributes>,
-    config: TradeGroupConfig,
-): List<TradeGroup> {
-    val legs =
-        rows
-            .filter { it.tradeLeg != null }
-            .sortedWith(compareBy({ it.transfer.timestamp }, { it.rowIndex }))
-    if (legs.isEmpty()) return emptyList()
-
-    val window = config.groupingWindowSeconds.seconds
-    val groups = mutableListOf<MutableList<CsvTransferWithAttributes>>()
-    var current = mutableListOf(legs.first())
-    for (leg in legs.drop(1)) {
-        val previous = current.last().transfer.timestamp
-        if (leg.transfer.timestamp - previous <= window) {
-            current += leg
-        } else {
-            groups += current
-            current = mutableListOf(leg)
-        }
-    }
-    groups += current
-
-    return groups.map { group ->
+    ruleIndex: Int,
+    rule: LegGroupRule,
+): List<TradeGroup> =
+    chainGroupLegs(rows, ruleIndex, rule.windowSeconds.seconds).map { group ->
         TradeGroup(
-            debits = group.filter { it.tradeLeg?.side == TradeLegSide.DEBIT },
-            credits = group.filter { it.tradeLeg?.side == TradeLegSide.CREDIT },
+            debits = group.filter { it.groupLeg?.side == GroupLegSide.DEBIT },
+            credits = group.filter { it.groupLeg?.side == GroupLegSide.CREDIT },
         )
     }
-}
 
 /**
  * Folds a group into one trade, or returns null when it does not resolve — no legs on a side, more
@@ -103,7 +107,7 @@ fun groupTradeLegs(
  * debit leg has the owner as its source and a credit leg has it as its target.
  */
 @Suppress("ReturnCount")
-fun TradeGroup.assemble(config: TradeGroupConfig): AssembledTrade? {
+fun TradeGroup.assemble(assembly: LegAssembly.Trade): AssembledTrade? {
     if (debits.isEmpty() || credits.isEmpty()) return null
 
     val ownerAccountIds =
@@ -127,7 +131,7 @@ fun TradeGroup.assemble(config: TradeGroupConfig): AssembledTrade? {
         fromAmount = fromAmount,
         toAmount = toAmount,
         description =
-            config.descriptionTemplate
+            assembly.description
                 .replace("{from}", fromAsset.code)
                 .replace("{to}", toAsset.code),
     )

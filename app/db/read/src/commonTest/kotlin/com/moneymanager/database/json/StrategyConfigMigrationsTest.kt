@@ -2,6 +2,7 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
+import com.moneymanager.domain.model.apistrategy.ApiLedgerTrades
 import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.domain.model.csvstrategy.AccountRule
@@ -9,12 +10,16 @@ import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -111,7 +116,7 @@ class SharedRulesMigrationTest {
         assertEquals(ValueExpr(listOf("Currency")), (config.fieldMappings.getValue(TransferField.CURRENCY) as CurrencyLookupMapping).value)
         assertEquals(
             ValueExpr(listOf("Fee asset")),
-            (config.fieldMappings.getValue(TransferField.AMOUNT) as AmountParsingMapping).feeCurrency,
+            (config.fieldMappings.getValue(TransferField.AMOUNT) as AmountParsingMapping).fee?.currency,
         )
         assertEquals(listOf(Condition("Kind", ConditionOp.MATCHES, value = "^card$")), config.contentMatchRules)
         assertEquals(AssetCodeRules(aliases = mapOf("KNCL" to "KNC")), config.assetCodes)
@@ -399,5 +404,149 @@ class AccountRulesMigrationTest {
             direction(""", "signSource": "FIELD", "signField": "side", "creditValues": ["IN", "CREDIT"]"""),
         )
         assertEquals(null, direction(""", "signSource": "AMOUNT", "signField": "side""""))
+    }
+}
+
+class LegGroupsAndFeesMigrationTest {
+    private val csvPackage = "com.moneymanager.domain.model.csvstrategy"
+
+    @Test
+    fun `conversion and trade-group configs become leg rules, conversion first`() {
+        val legacy =
+            """
+            {
+              "configVersion": 2,
+              "identificationColumns": ["Kind"],
+              "fieldMappings": {},
+              "conversionConfig": {
+                "signalColumn": "Kind", "debitPattern": "^swap_out$", "creditPattern": "^swap_in$",
+                "conversionAccountName": "Conversions",
+                "conversionAccountRules": [{"column": "Asset", "pattern": "^DUST$", "accountName": "Dust"}],
+                "pairingKeyPattern": "^(swap)_", "pairingKeyColumns": ["Ref"],
+                "pairingWindowSeconds": 5, "relationshipTypeName": "conversion"
+              },
+              "tradeGroupConfig": {
+                "signalColumn": "Kind", "debitPattern": "^fill$", "creditPattern": "^fill$", "sideAmountColumn": "Amount",
+                "groupingWindowSeconds": 1, "descriptionTemplate": "Swap {from}/{to}", "reconcileWindowSeconds": 3
+              }
+            }
+            """.trimIndent()
+
+        val config = CsvStrategyJsonCodec.decode(legacy)
+
+        val (conversion, trade) = config.legGroups
+        assertEquals(
+            LegGroupRule(
+                legWhen =
+                    listOf(
+                        Condition("Kind", ConditionOp.MATCHES, "(?:^swap_out$)|(?:^swap_in$)"),
+                        Condition("Kind", ConditionOp.NOT_BLANK),
+                    ),
+                side = LegSide.DebitWhen(listOf(Condition("Kind", ConditionOp.MATCHES, "^swap_out$"))),
+                key = listOf(ValueExpr(listOf("Kind"), Extraction("^(swap)_", "$1")), ValueExpr(listOf("Ref"))),
+                windowSeconds = 5,
+                assembly =
+                    LegAssembly.ThroughAccount(
+                        accounts =
+                            listOf(
+                                AccountRule(
+                                    conditions = listOf(Condition("Asset", ConditionOp.MATCHES, "^DUST$")),
+                                    value = ValueExpr(listOf("Kind")),
+                                    name = "Dust",
+                                ),
+                                AccountRule(value = ValueExpr(listOf("Kind")), name = "Conversions"),
+                            ),
+                        relationshipTypeName = "conversion",
+                    ),
+            ),
+            conversion,
+        )
+        assertEquals(
+            LegGroupRule(
+                legWhen = listOf(Condition("Kind", ConditionOp.MATCHES, "^fill$")),
+                side = LegSide.Sign("Amount"),
+                windowSeconds = 1,
+                assembly = LegAssembly.Trade("Swap {from}/{to}"),
+                reconcileWindowSeconds = 3,
+            ),
+            trade,
+        )
+    }
+
+    @Test
+    fun `a csv fee column becomes a fee rule`() {
+        val legacy =
+            """
+            {
+              "configVersion": 2,
+              "identificationColumns": ["Amount"],
+              "fieldMappings": {
+                "AMOUNT": {"type": "$csvPackage.AmountParsingMapping", "fieldType": "AMOUNT", "mode": "SINGLE_COLUMN",
+                  "amountColumnName": "Amount", "feeColumnName": "Fee",
+                  "feeConditions": [{"path": "Dir", "op": "EQUALS", "value": "OUT"}],
+                  "feeCurrency": {"paths": ["Fee asset"]}}
+              }
+            }
+            """.trimIndent()
+
+        val amount = assertIs<AmountParsingMapping>(CsvStrategyJsonCodec.decode(legacy).fieldMappings[TransferField.AMOUNT])
+
+        assertEquals(
+            FeeRule(
+                amount = ValueExpr(listOf("Fee")),
+                currency = ValueExpr(listOf("Fee asset")),
+                conditions = listOf(Condition("Dir", ConditionOp.EQUALS, value = "OUT")),
+            ),
+            amount.fee,
+        )
+    }
+
+    @Test
+    fun `api fee fields and ledger grouping fields become a fee rule and ledger trades`() {
+        val legacy =
+            """
+            {
+              "configVersion": 3,
+              "baseUrl": "https://example.com",
+              "accounts": {"type": "single", "name": "X", "externalId": "x"},
+              "dataEndpoints": [
+                {"endpoint": {"path": "/ledger", "responseArrayKey": ""}, "kind": "DEPOSITS",
+                 "transactionMappings": {"amountField": "amount",
+                   "feeAmountField": "fill.commission", "feeDescriptionField": "note", "feeIncludedInAmount": true,
+                   "feeInstrumentField": "fill.product_id", "feeInstrumentSeparator": ".",
+                   "reconcileTradeAmountsField": "trade.id", "reconcileTradeAmountsFallbackFields": ["buy.id"],
+                   "unpairedTradeLegCounterAmountField": "native_amount", "unpairedTradeLegFundingAccountName": "Cards"}},
+                {"endpoint": {"path": "/trades", "responseArrayKey": ""}, "kind": "TRADES",
+                 "tradeMappings": {"instrumentField": "pair", "baseQuantityField": "qty", "timestampField": "t", "idField": "i",
+                   "feeField": "fee", "feeCurrencyField": "feeAsset"}}
+              ]
+            }
+            """.trimIndent()
+
+        val config = ApiStrategyJsonCodec.decode(legacy)
+
+        val (ledger, trades) = config.dataEndpoints
+        val mappings = checkNotNull(ledger.transactionMappings)
+        assertEquals(
+            FeeRule(
+                amount = ValueExpr(listOf("fill.commission")),
+                description = ValueExpr(listOf("note")),
+                includedInAmount = true,
+                chargedOnAsset = ValueExpr(listOf("fill.product_id"), Extraction("^.*\\.(.*)$", "$1")),
+            ),
+            mappings.fee,
+        )
+        assertEquals(
+            ApiLedgerTrades(
+                key = ValueExpr(listOf("trade.id", "buy.id")),
+                unpairedCounterAmountPath = "native_amount",
+                unpairedFundingAccountName = "Cards",
+            ),
+            mappings.ledgerTrades,
+        )
+        assertEquals(
+            FeeRule(amount = ValueExpr(listOf("fee")), currency = ValueExpr(listOf("feeAsset"))),
+            checkNotNull(trades.tradeMappings).fee,
+        )
     }
 }

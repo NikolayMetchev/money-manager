@@ -3,7 +3,9 @@ package com.moneymanager.domain.model.apistrategy
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.serialization.SortedListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
@@ -328,6 +330,36 @@ enum class ApiAmountFormat {
 }
 
 /**
+ * How a ledger's trade-type rows — the rows [ApiTransactionMappings.excludeWhen] drops as transfers —
+ * group back into trades: rows whose [key] agrees are one trade's legs.
+ *
+ * Each group's signed amounts are authoritative: a trade another endpoint reports with the same id (or,
+ * failing that, the same second and asset pair) takes its leg amounts from the group — Kraken's
+ * TradesHistory `cost` is a display-rounded price*volume for synthetic crypto/crypto pairs and can
+ * disagree with what the ledger actually settled — and a group no trade claims is booked as its own
+ * trade when its legs net to one asset out and one asset in, so no movement the ledger reports is ever
+ * silently dropped.
+ *
+ * @property key The trade a row belongs to — Kraken Ledgers `refid`; Coinbase `buy.id`, `sell.id` or
+ *   `trade.id` (the first non-blank of its paths).
+ * @property unpairedCounterAmountPath Dot-path to an amount object (`{amount, currency}`) giving the other
+ *   side of a group of only one leg — a purchase paid for straight from a card or bank, so no ledger row
+ *   records the money leaving (Coinbase `native_amount`). Such a group is booked as a trade against that
+ *   amount, plus a transfer of it between [unpairedFundingAccountName] and the exchange account so the
+ *   exchange's balance of that asset still nets to zero. Null drops single-leg groups.
+ * @property unpairedFundingAccountName The account such a trade is funded from (a purchase) or paid out
+ *   to (a sale); null uses the strategy-wide "<account> Funding".
+ */
+@Serializable
+data class ApiLedgerTrades(
+    val key: ValueExpr,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val unpairedCounterAmountPath: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val unpairedFundingAccountName: String? = null,
+)
+
+/**
  * JSON field names used to extract transaction data from an API response item. Defaults match the
  * Monzo response shape so existing strategies behave identically.
  *
@@ -352,18 +384,10 @@ enum class ApiAmountFormat {
  *                        `DECLINED`. Order is semantic (it picks the reason).
  * @property localAmountField Optional dot-path to a local/original amount (foreign transactions)
  * @property localCurrencyField Optional dot-path to a local/original currency code
- * @property feeAmountField Optional dot-path to a fee amount charged on the transaction. When present
- *                          and non-zero, the fee is imported as its own transfer linked to the main
- *                          transaction via a `fee` relationship. Encoded using [amountFormat].
- * @property feeCurrencyField Optional dot-path to the fee's currency code; defaults to the
- *                            transaction currency when absent.
- * @property feeDescriptionField Optional dot-path to a description for the fee transfer; defaults to
- *                               a generic "Fee" label when absent.
- * @property feeIncludedInAmount Whether [amountField] is GROSS (already includes the fee). When true the
- *                               fee is carved OUT of the main transfer (main = amount - fee) so the two
- *                               sum back to the original amount — Monzo's `atm_fees_detailed` shape, where
- *                               `amount = withdrawal_amount + fee_amount`. When false (default) the fee is
- *                               an additional movement on top of a net amount.
+ * @property fee A fee charged on the transaction, imported as its own transfer linked to it via a `fee`
+ *            relationship (see [FeeRule]); its amount is encoded using [amountFormat]. Monzo's
+ *            `atm_fees_detailed` is a fee [FeeRule.includedInAmount]: `amount = withdrawal + fee`.
+ * @property ledgerTrades How a ledger's trade-type rows group into trades (see [ApiLedgerTrades]).
  */
 @Serializable
 data class ApiTransactionMappings(
@@ -383,21 +407,8 @@ data class ApiTransactionMappings(
     val declinedWhen: List<Condition> = emptyList(),
     val localAmountField: String? = null,
     val localCurrencyField: String? = null,
-    val feeAmountField: String? = null,
-    val feeCurrencyField: String? = null,
-    val feeDescriptionField: String? = null,
-    val feeIncludedInAmount: Boolean = false,
-    /**
-     * Dot-path to a trading-pair symbol (e.g. Coinbase `advanced_trade_fill.product_id`, "BTC-GBP") for a
-     * ledger whose every leg of a fill repeats the fill's [feeAmountField], charged in the pair's quote
-     * asset. When set, the fee is booked only on the row in that quote asset (split off the symbol at
-     * [feeInstrumentSeparator]), so it is charged once rather than once per leg. Omitted from JSON when
-     * null so existing strategies keep their hash.
-     */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val feeInstrumentField: String? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val feeInstrumentSeparator: String = "-",
+    val fee: FeeRule? = null,
     @Serializable(with = SortedStringToStringMapSerializer::class)
     val customFields: Map<String, String> = emptyMap(),
     @Serializable(with = SortedStringSetSerializer::class)
@@ -446,42 +457,8 @@ data class ApiTransactionMappings(
      */
     @Serializable(with = SortedConditionListSerializer::class)
     val excludeWhen: List<Condition> = emptyList(),
-    /**
-     * Dot-path to a field identifying the trade this row belongs to (e.g. Kraken Ledgers `refid`, which
-     * equals the matching `TradesHistory` trade's own id). A group of more than two rows (an order's
-     * fills, each posting one row per asset) is booked as one trade when its rows net to one asset out
-     * and one asset in. When set on a row excluded via
-     * [excludeWhen] (a duplicate trade-type ledger entry), the row's signed amount is
-     * kept as an authoritative leg for reconciling that trade's booked amount — Kraken's TradesHistory
-     * `cost` is a display-rounded price*volume for synthetic crypto/crypto pairs and can disagree with
-     * what the ledger actually settled. A ledger group with no matching trade at all is booked as its
-     * own trade from the two legs, so no movement the ledger reports is ever silently dropped.
-     */
-    val reconcileTradeAmountsField: String? = null,
-    /**
-     * Further dot-paths tried, in order, when [reconcileTradeAmountsField] resolves to nothing — for a
-     * ledger whose rows name the trade they belong to under a field that depends on the row's type
-     * (Coinbase: `buy.id`, `sell.id` or `trade.id`). Order is semantic (first non-blank wins) - keeps
-     * default insertion-order serialization.
-     */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val reconcileTradeAmountsFallbackFields: List<String> = emptyList(),
-    /**
-     * Dot-path to an amount object (`{amount, currency}`, read via `.amount`/`.currency`) giving the other
-     * side of a trade-type ledger row whose group has only this one leg — a purchase paid for straight
-     * from a card or bank, so no ledger row records the money leaving (Coinbase `native_amount`). Such a
-     * group is booked as a trade against that amount, plus a transfer of it between
-     * [unpairedTradeLegFundingAccountName] and the exchange account so the exchange's balance of that
-     * asset still nets to zero. Null (the default) drops single-leg groups, as before.
-     */
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val unpairedTradeLegCounterAmountField: String? = null,
-    /**
-     * The account an [unpairedTradeLegCounterAmountField] trade is funded from (a purchase) or paid out
-     * to (a sale); null uses the strategy-wide "<synthetic account> Funding".
-     */
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val unpairedTradeLegFundingAccountName: String? = null,
+    val ledgerTrades: ApiLedgerTrades? = null,
     /**
      * Conditions that must all hold (logical AND) against the item's raw JSON for it to be imported at
      * all — the include-form counterpart of [excludeWhen] (e.g. Binance's
@@ -1113,7 +1090,7 @@ enum class InstrumentSplitMode {
  * @property baseQuantityField Dot-path to the base-asset quantity traded.
  * @property priceField Dot-path to the price (quote per base); quote amount = quantity × price.
  * @property quoteQuantityField Dot-path to an explicit quote amount (used instead of price when present).
- * @property feeField/feeCurrencyField Optional dot-paths to a trade fee and its asset code.
+ * @property fee The trade's fee and its asset (see [FeeRule]); the asset defaults to the quote asset.
  * @property timestampField/timestampFormat Dot-path + encoding of the fill timestamp.
  * @property idField Dot-path to the stable trade id (used for de-duplication).
  * @property orderIdField Optional dot-path to the owning order id (joins ORDERS metadata onto the trade).
@@ -1149,8 +1126,9 @@ data class ApiTradeMappings(
     val baseQuantityField: String,
     val priceField: String? = null,
     val quoteQuantityField: String? = null,
-    val feeField: String? = null,
-    val feeCurrencyField: String? = null,
+    /** The trade's fee; its currency defaults to the quote asset. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val fee: FeeRule? = null,
     val timestampField: String,
     val timestampFormat: TimestampFormat = TimestampFormat.EPOCH_MS,
     /** Pattern string for [TimestampFormat.PATTERN]; ignored for every other [timestampFormat]. */

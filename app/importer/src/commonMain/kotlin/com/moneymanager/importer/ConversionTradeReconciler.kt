@@ -35,7 +35,7 @@ data class ExistingConversionLeg(
  *
  * This is the mirror of `ConversionGroupReconciler` on the CSV side. A source that cannot say which
  * credit came from which debit books a conversion as linked debit/credit transfer legs through a
- * shared conversion account (see `ConversionConfig`); a source that does know the attribution — a
+ * shared conversion account (see `LegAssembly.ThroughAccount`); a source that does know the attribution — a
  * dust-sweep endpoint, say — books the same event as trades. Whichever arrives second must not book
  * it again, and [TradeReconciler] cannot see this case: it compares trades against trades.
  *

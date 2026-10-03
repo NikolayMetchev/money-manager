@@ -23,6 +23,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.rules.ColumnRecord
@@ -191,7 +192,7 @@ private fun collectCryptoCodes(
     val lookups = listOf(TransferField.CURRENCY, TransferField.TO_CURRENCY).mapNotNull { strategy.config.fieldMappings[it] }
     val codeExprs =
         lookups.filterIsInstance<CurrencyLookupMapping>().map { it.value } +
-            listOfNotNull((strategy.config.fieldMappings[TransferField.AMOUNT] as? AmountParsingMapping)?.feeCurrency)
+            listOfNotNull((strategy.config.fieldMappings[TransferField.AMOUNT] as? AmountParsingMapping)?.fee?.currency)
     val readableExprs = codeExprs.filter { expr -> expr.paths.any { it in indexByName } }
     if (readableExprs.isEmpty()) return emptySet()
 
@@ -362,7 +363,7 @@ suspend fun applyStagedCsv(
     // trade's exact-tuple idempotency makes re-emitting the group a no-op that resolves to DUPLICATE.
     // Transfers are still emitted only for the unprocessed rows (see [unprocessedRowIndexes] below), so
     // widening the mapped set changes what groups see and nothing else.
-    val rows = if (strategy.config.tradeGroupConfig != null) allRows else unprocessedRows
+    val rows = if (strategy.config.legGroups.any { it.assembly is LegAssembly.Trade }) allRows else unprocessedRows
     val unprocessedRowIndexes: Set<Long> = unprocessedRows.mapTo(mutableSetOf()) { it.rowIndex }
     if (unprocessedRows.isEmpty()) {
         // A genuinely empty file (a header-only export with no data rows) has nothing to import, but
@@ -845,10 +846,10 @@ suspend fun runCsvImport(
     // drop out of the transfer list. A group that does not resolve assembles to null and its rows stay
     // ordinary transfers, so nothing is ever dropped for want of a clean pairing.
     val assembledTrades =
-        strategy.config.tradeGroupConfig
-            ?.let { config ->
-                groupTradeLegs(finalPrep.validTransfers, config).mapNotNull { it.assemble(config) }
-            }.orEmpty()
+        strategy.config.legGroups.withIndex().flatMap { (index, rule) ->
+            val assembly = rule.assembly as? LegAssembly.Trade ?: return@flatMap emptyList()
+            groupTradeLegs(finalPrep.validTransfers, index, rule).mapNotNull { it.assemble(assembly) }
+        }
     val assembledRowIndexes: Set<Long> = assembledTrades.flatMapTo(mutableSetOf()) { it.group.rowIndexes }
 
     // Conversion groups another source already recorded as trades (Binance's dust API reports the same
@@ -911,7 +912,7 @@ suspend fun runCsvImport(
                 toAccount = AccountRef.Existing(feeAcct),
                 source = Source.Csv(csvImport.id),
                 timestamp = row.transfer.timestamp,
-                description = "${row.transfer.description} (fee)",
+                description = row.feeDescription ?: "${row.transfer.description} (fee)",
                 amount = fee,
                 attributes = attributesFor(uniqueAttributes) + exclusion,
                 ownedAttributes = ownedAttributes.filterKeys { it.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID },
@@ -923,30 +924,31 @@ suspend fun runCsvImport(
     // timestamp within the configured window) so the engine links them with the conversion
     // relationship. Handles both 1:1 swaps and N-debits -> 1-credit dust events (many debits share the
     // one credit). Debits with no in-window credit are left unlinked (still valid, balance-correct).
-    val conversionConfig = strategy.config.conversionConfig
     val conversionLinkByRow: Map<Long, BatchRelationship> =
-        if (conversionConfig == null) {
-            emptyMap()
-        } else {
-            val window = conversionConfig.pairingWindowSeconds.seconds
-            val credits = finalPrep.validTransfers.filter { it.conversionLeg?.side == ConversionSide.CREDIT }
-            finalPrep.validTransfers
-                .filter { it.conversionLeg?.side == ConversionSide.DEBIT }
-                .mapNotNull { debit ->
-                    val key = debit.conversionLeg!!.pairingKey
-                    val match =
-                        credits
-                            .filter { it.conversionLeg!!.pairingKey == key }
-                            .minByOrNull { (it.transfer.timestamp - debit.transfer.timestamp).absoluteValue }
-                            ?.takeIf { (it.transfer.timestamp - debit.transfer.timestamp).absoluteValue <= window }
-                            ?: return@mapNotNull null
-                    debit.rowIndex to
-                        BatchRelationship(
-                            relatedRowKey = ImportRowKey.CsvRow(match.rowIndex),
-                            typeName = conversionConfig.relationshipTypeName,
-                        )
-                }.toMap()
-        }
+        strategy.config.legGroups
+            .withIndex()
+            .flatMap { (index, rule) ->
+                val assembly = rule.assembly as? LegAssembly.ThroughAccount ?: return@flatMap emptyList()
+                val window = rule.windowSeconds.seconds
+                val legs = finalPrep.validTransfers.filter { it.groupLeg?.ruleIndex == index }
+                val credits = legs.filter { it.groupLeg!!.side == GroupLegSide.CREDIT }
+                legs
+                    .filter { it.groupLeg!!.side == GroupLegSide.DEBIT }
+                    .mapNotNull { debit ->
+                        val key = debit.groupLeg!!.key
+                        val match =
+                            credits
+                                .filter { it.groupLeg!!.key == key }
+                                .minByOrNull { (it.transfer.timestamp - debit.transfer.timestamp).absoluteValue }
+                                ?.takeIf { (it.transfer.timestamp - debit.transfer.timestamp).absoluteValue <= window }
+                                ?: return@mapNotNull null
+                        debit.rowIndex to
+                            BatchRelationship(
+                                relatedRowKey = ImportRowKey.CsvRow(match.rowIndex),
+                                typeName = assembly.relationshipTypeName,
+                            )
+                    }
+            }.toMap()
 
     val importTransfers =
         finalPrep.validTransfers
@@ -970,7 +972,7 @@ suspend fun runCsvImport(
                             source = AccountRef.Existing(row.transfer.sourceAccountId),
                             target = AccountRef.Existing(feeAccountId!!),
                             amount = feeMoney,
-                            description = "Fee",
+                            description = row.feeDescription ?: "Fee",
                             relationshipTypeId = RelationshipTypeId(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID),
                         )
                     }
@@ -1090,8 +1092,10 @@ suspend fun runCsvImport(
             // matches a group against the WHOLE in-window candidate set, so a wide window would drag a
             // later order's fills in and stop the sums matching at all.
             tradeDedupePolicy =
-                strategy.config.tradeGroupConfig
-                    ?.reconcileWindowSeconds
+                strategy.config.legGroups
+                    .filter { it.assembly is LegAssembly.Trade }
+                    .mapNotNull { it.reconcileWindowSeconds }
+                    .maxOrNull()
                     ?.let { TradeDedupePolicy.Fuzzy(window = it.seconds) }
                     ?: TradeDedupePolicy.ExactTupleOnly,
             dedupePolicy =

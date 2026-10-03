@@ -25,6 +25,7 @@ import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.rules.DirectionEditor
+import com.moneymanager.ui.components.rules.FeeRuleEditor
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
@@ -111,33 +112,16 @@ internal fun AmountDateTab(
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Fee column (optional)",
+            "A fee the row reports is imported as its own movement out of the account, linked to the transaction",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
-            "Added to the amount's magnitude when the conditions below hold",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        OptionalColumnDropdown(
-            columns = csvColumns,
-            selectedColumn = state.feeColumnName,
-            onColumnSelected = { state.feeColumnName = it },
-            label = "Column containing fee amount",
-            sampleValue = getSampleValue(csvColumns, firstRow, state.feeColumnName),
+        FeeRuleEditor(
+            fee = state.fee,
+            onFeeChanged = { state.fee = it },
+            pathField = columnPathField(csvColumns, firstRow, enabled),
             enabled = enabled,
         )
-        if (state.feeColumnName != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            RowConditionsEditor(
-                conditions = state.feeConditions,
-                onConditionsChanged = { state.feeConditions = it },
-                columns = csvColumns,
-                enabled = enabled,
-                title = "Apply fee when (all conditions match; none = always)",
-            )
-        }
 
         Spacer(modifier = Modifier.height(16.dp))
         Text("Currency", style = MaterialTheme.typography.titleSmall)

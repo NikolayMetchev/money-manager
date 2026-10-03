@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.EncodeDefault
@@ -162,11 +163,10 @@ data class DirectColumnMapping(
  * which swaps the source and target), [Direction.Outgoing] for unsigned amounts that always leave the
  * source, [Direction.Field] for a column naming the direction.
  *
- * When [feeColumnName] is set, that column's value (if non-blank) is imported as its own fee
- * transfer linked to the main transaction (via a `fee` relationship), whenever all [feeConditions]
- * hold (empty = always). This handles exports like Wise's, where the amount column is net of fees but
- * the fee also left the account (e.g. ATM withdrawals: 200.00 withdrawn + a 7.29 fee movement). The
- * fee is in the row's currency unless [feeCurrency] reads a non-blank asset code of its own.
+ * When [fee] is set and the row reports one, the fee is imported as its own transfer out of the source
+ * account, linked to the main transaction (via a `fee` relationship) — exports like Wise's, where the
+ * amount column is net of fees but the fee also left the account (an ATM withdrawal: 200.00 withdrawn
+ * plus a 7.29 fee movement).
  */
 @Serializable
 data class AmountParsingMapping(
@@ -176,11 +176,8 @@ data class AmountParsingMapping(
     val creditColumnName: String? = null,
     val debitColumnName: String? = null,
     val direction: Direction = Direction.Outgoing,
-    val feeColumnName: String? = null,
-    @Serializable(with = SortedConditionListSerializer::class)
-    val feeConditions: List<Condition> = emptyList(),
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val feeCurrency: ValueExpr? = null,
+    val fee: FeeRule? = null,
 ) : FieldMapping {
     init {
         when (mode) {

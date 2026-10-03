@@ -11,8 +11,9 @@ import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.JwtSigningConfig
 import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport
-import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegGroupRule
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.export.AccountRulesExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
@@ -59,7 +60,6 @@ class StrategyExportUnsortedCollectionGuardTest {
             // A JWT's header/claims serialise in list order; first non-blank trade-group field wins.
             JwtSigningConfig::class to "header",
             JwtSigningConfig::class to "claims",
-            ApiTransactionMappings::class to "reconcileTradeAmountsFallbackFields",
             // Order-carrying by design: readable composite-key construction / template substitution
             // order. Neither is authored through a row-based UI editor (built-in-strategy code only),
             // so the false-conflict risk the guard protects against doesn't apply.
@@ -74,8 +74,11 @@ class StrategyExportUnsortedCollectionGuardTest {
             ValueExpr::class to "paths",
             ApiTransactionMappings::class to "declinedWhen",
             RowPreprocessingRule::class to "columnSwaps",
-            ConversionConfig::class to "conversionAccountRules",
-            ConversionConfig::class to "pairingKeyColumns",
+            // A row is a leg of the first rule that claims it; a key's parts are joined in order; an
+            // intermediate account is named by the first applicable rule.
+            CsvStrategyConfig::class to "legGroups",
+            LegGroupRule::class to "key",
+            LegAssembly.ThroughAccount::class to "accounts",
             PassThroughExport::class to "rules",
         )
 
