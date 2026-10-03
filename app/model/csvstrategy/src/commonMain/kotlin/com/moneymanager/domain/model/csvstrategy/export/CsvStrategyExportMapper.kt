@@ -4,10 +4,8 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
-import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -16,8 +14,6 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
-import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
-import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 
 /**
@@ -53,43 +49,11 @@ object CsvStrategyExportMapper {
                     fieldType = fieldType,
                     accountName = accountNameById(accountId) ?: "Unknown Account",
                 )
-            is AccountLookupMapping ->
-                AccountLookupExport(
+            is AccountRulesMapping ->
+                AccountRulesExport(
                     fieldType = fieldType,
-                    columnName = columnName,
-                    fallbackColumns = fallbackColumns,
-                    defaultCategoryName = categoryNameById(defaultCategoryId) ?: Category.UNCATEGORIZED_NAME,
-                )
-            is RegexAccountMapping ->
-                RegexAccountExport(
-                    fieldType = fieldType,
-                    columnName = columnName,
                     rules = rules,
-                    fallbackColumns = fallbackColumns,
                     defaultCategoryName = categoryNameById(defaultCategoryId) ?: Category.UNCATEGORIZED_NAME,
-                )
-            is AttributeMatchAccountMapping ->
-                AttributeMatchAccountExport(
-                    fieldType = fieldType,
-                    columnName = columnName,
-                    attributeTypeName = attributeTypeName,
-                    defaultCategoryName = categoryNameById(defaultCategoryId) ?: Category.UNCATEGORIZED_NAME,
-                )
-            is TemplateAccountMapping ->
-                TemplateAccountExport(
-                    fieldType = fieldType,
-                    columnName = columnName,
-                    prefix = prefix,
-                    suffix = suffix,
-                    defaultCategoryName = categoryNameById(defaultCategoryId) ?: Category.UNCATEGORIZED_NAME,
-                    extraction = extraction,
-                )
-            is ConditionalAccountMapping ->
-                ConditionalAccountExport(
-                    fieldType = fieldType,
-                    conditions = conditions,
-                    whenTrue = whenTrue.toExport(accountNameById, currencyCodeById, categoryNameById),
-                    whenFalse = whenFalse.toExport(accountNameById, currencyCodeById, categoryNameById),
                 )
             is DateTimeParsingMapping ->
                 DateTimeParsingExport(
@@ -113,8 +77,7 @@ object CsvStrategyExportMapper {
                     amountColumnName = amountColumnName,
                     creditColumnName = creditColumnName,
                     debitColumnName = debitColumnName,
-                    negateValues = negateValues,
-                    flipAccountsOnPositive = flipAccountsOnPositive,
+                    direction = direction,
                     feeColumnName = feeColumnName,
                     feeConditions = feeConditions,
                     feeCurrency = feeCurrency,

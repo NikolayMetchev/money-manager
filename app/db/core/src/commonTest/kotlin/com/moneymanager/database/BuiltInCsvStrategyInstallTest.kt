@@ -2,12 +2,11 @@
 
 package com.moneymanager.database
 
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
-import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
-import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import kotlinx.coroutines.flow.first
@@ -61,13 +60,24 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
 
             // The new mapping types and row rules survive the JSON round trip through the database
             val source = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]
-            assertIs<TemplateAccountMapping>(source)
-            assertEquals("Wise: ", source.prefix)
-            assertEquals("Source currency", source.columnName)
+            assertIs<AccountRulesMapping>(source)
+            assertEquals("Wise: {value}", source.rules.single().name)
+            assertEquals(
+                "Source currency",
+                source.rules
+                    .single()
+                    .value.primaryPath,
+            )
 
             val target = strategy.config.fieldMappings[TransferField.TARGET_ACCOUNT]
-            assertIs<ConditionalAccountMapping>(target)
-            assertIs<TemplateAccountMapping>(target.whenTrue)
+            assertIs<AccountRulesMapping>(target)
+            assertTrue(
+                target.rules
+                    .first()
+                    .conditions
+                    .isNotEmpty(),
+                "the guarded template rule comes first",
+            )
 
             val timestamp = strategy.config.fieldMappings[TransferField.TIMESTAMP]
             assertIs<DateTimeParsingMapping>(timestamp)
@@ -137,7 +147,7 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
             // Positive amounts flow INTO the account, so credits flip source/target
             val amount = strategy.config.fieldMappings[TransferField.AMOUNT]
             assertIs<AmountParsingMapping>(amount)
-            assertTrue(amount.flipAccountsOnPositive)
+            assertEquals(Direction.AmountSign(), amount.direction)
 
             // The Monzo transaction ID drives duplicate detection on re-import
             val idMapping = strategy.config.attributeMappings.single { it.columnName == "Transaction ID" }
@@ -187,16 +197,16 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
             // unidentified placeholders — which is what lets a deposit reconcile against the API's
             // record of it, since the API names the on-chain address the export cannot.
             val target = strategy.config.fieldMappings[TransferField.TARGET_ACCOUNT]
-            assertIs<RegexAccountMapping>(target)
-            assertEquals("Operation", target.columnName)
+            assertIs<AccountRulesMapping>(target)
+            assertTrue(target.rules.all { it.value.primaryPath == "Operation" })
             assertTrue(
-                target.rules.first { it.accountName == "Binance Funding" }.counterpartyIsUnidentified,
+                target.rules.first { it.name == "Binance Funding" }.counterpartyIsUnidentified,
                 "a deposit/withdrawal counterparty is a placeholder, not an identity",
             )
 
             val amount = strategy.config.fieldMappings[TransferField.AMOUNT]
             assertIs<AmountParsingMapping>(amount)
-            assertTrue(amount.flipAccountsOnPositive, "a positive Change arrives into the Binance account")
+            assertEquals(Direction.AmountSign(), amount.direction, "a positive Change arrives into the Binance account")
 
             val timestamp = strategy.config.fieldMappings[TransferField.TIMESTAMP]
             assertIs<DateTimeParsingMapping>(timestamp)

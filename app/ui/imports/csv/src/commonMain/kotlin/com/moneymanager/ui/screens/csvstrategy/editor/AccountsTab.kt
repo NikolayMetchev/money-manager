@@ -14,15 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.components.AccountPicker
-import com.moneymanager.ui.screens.csvstrategy.findRowWithBlankColumn
-import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
  * Accounts tab: how the source and target accounts are resolved per row.
@@ -39,6 +36,7 @@ internal fun AccountsTab(
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
 ) {
+    val attributeTypeNames = existingAttributeTypes.map { it.name }
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
@@ -54,11 +52,14 @@ internal fun AccountsTab(
             )
             Text("Fixed Account", modifier = Modifier.padding(end = 16.dp))
             RadioButton(
-                selected = state.sourceAccountMode == SourceAccountMode.TEMPLATE,
-                onClick = { state.sourceAccountMode = SourceAccountMode.TEMPLATE },
+                selected = state.sourceAccountMode == SourceAccountMode.RULES,
+                onClick = {
+                    state.sourceAccountMode = SourceAccountMode.RULES
+                    if (state.sourceRules.isEmpty()) state.sourceRules = listOf(defaultAccountRule(csvColumns.firstOrNull()?.originalName))
+                },
                 enabled = enabled,
             )
-            Text("From Column (Template)")
+            Text("From the row (rules)")
         }
         when (state.sourceAccountMode) {
             SourceAccountMode.FIXED_ACCOUNT ->
@@ -71,16 +72,14 @@ internal fun AccountsTab(
                     personRepository = personRepository,
                     enabled = enabled,
                 )
-            SourceAccountMode.TEMPLATE ->
-                TemplateAccountMappingEditor(
-                    columnName = state.sourceTemplateColumnName,
-                    onColumnChanged = { state.sourceTemplateColumnName = it },
-                    prefix = state.sourceTemplatePrefix,
-                    onPrefixChanged = { state.sourceTemplatePrefix = it },
-                    suffix = state.sourceTemplateSuffix,
-                    onSuffixChanged = { state.sourceTemplateSuffix = it },
+            SourceAccountMode.RULES ->
+                AccountRulesEditor(
+                    rules = state.sourceRules,
+                    onRulesChanged = { state.sourceRules = it },
                     columns = csvColumns,
+                    rows = rows,
                     firstRow = firstRow,
+                    existingAttributeTypeNames = attributeTypeNames,
                     enabled = enabled,
                 )
         }
@@ -88,108 +87,18 @@ internal fun AccountsTab(
         Spacer(modifier = Modifier.height(16.dp))
         Text("Target Account", style = MaterialTheme.typography.titleSmall)
         Text(
-            "How the target account is resolved for each row",
+            "How the target (counterparty) account is named for each row",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TargetAccountModeSelector(
-            selected = state.targetAccountMode,
-            onSelected = { mode ->
-                state.targetAccountMode = mode
-                // Give the attribute-match mode a sensible default type on first entry so the field
-                // isn't blank; a non-attribute mode keeps its type null (so extract/save round-trips).
-                if (mode == TargetAccountMode.ATTRIBUTE_MATCH && state.targetAttributeTypeName.isNullOrBlank()) {
-                    state.targetAttributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME
-                }
-            },
+        AccountRulesEditor(
+            rules = state.targetRules,
+            onRulesChanged = { state.targetRules = it },
+            columns = csvColumns,
+            rows = rows,
+            firstRow = firstRow,
+            existingAttributeTypeNames = attributeTypeNames,
             enabled = enabled,
         )
-
-        when (state.targetAccountMode) {
-            TargetAccountMode.DIRECT_LOOKUP, TargetAccountMode.REGEX_MATCH -> {
-                Spacer(modifier = Modifier.height(4.dp))
-                ColumnDropdown(
-                    columns = csvColumns,
-                    selectedColumn = state.targetAccountColumnName,
-                    onColumnSelected = { state.targetAccountColumnName = it },
-                    label = "Column for payee/counterparty name",
-                    sampleValue = getSampleValue(csvColumns, firstRow, state.targetAccountColumnName),
-                    enabled = enabled,
-                    isError = state.targetAccountColumnName == null,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "Fallback column (when primary is empty)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                val fallbackSampleRow = findRowWithBlankColumn(csvColumns, rows, state.targetAccountColumnName)
-                OptionalColumnDropdown(
-                    columns = csvColumns,
-                    selectedColumn = state.targetAccountFallbackColumns.firstOrNull(),
-                    onColumnSelected = { selected ->
-                        state.targetAccountFallbackColumns = if (selected != null) listOf(selected) else emptyList()
-                    },
-                    label = "Fallback column for account name",
-                    sampleValue = getSampleValue(csvColumns, fallbackSampleRow, state.targetAccountFallbackColumns.firstOrNull()),
-                    enabled = enabled,
-                )
-
-                if (state.targetAccountMode == TargetAccountMode.REGEX_MATCH) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    RegexRulesEditor(
-                        rules = state.regexRules,
-                        onRulesChanged = { state.regexRules = it },
-                        columnName = state.targetAccountColumnName,
-                        columns = csvColumns,
-                        rows = rows,
-                        enabled = enabled,
-                    )
-                }
-            }
-            TargetAccountMode.ATTRIBUTE_MATCH -> {
-                Spacer(modifier = Modifier.height(4.dp))
-                AttributeMatchAccountMappingEditor(
-                    columnName = state.targetAccountColumnName,
-                    onColumnChanged = { state.targetAccountColumnName = it },
-                    columnLabel = "Column matched against account attribute",
-                    attributeTypeName = state.targetAttributeTypeName.orEmpty(),
-                    onAttributeTypeChanged = { state.targetAttributeTypeName = it },
-                    columns = csvColumns,
-                    firstRow = firstRow,
-                    existingAttributeTypeNames = existingAttributeTypes.map { it.name },
-                    enabled = enabled,
-                )
-            }
-            TargetAccountMode.TEMPLATE -> {
-                Spacer(modifier = Modifier.height(4.dp))
-                TemplateAccountMappingEditor(
-                    columnName = state.targetTemplateColumnName,
-                    onColumnChanged = { state.targetTemplateColumnName = it },
-                    prefix = state.targetTemplatePrefix,
-                    onPrefixChanged = { state.targetTemplatePrefix = it },
-                    suffix = state.targetTemplateSuffix,
-                    onSuffixChanged = { state.targetTemplateSuffix = it },
-                    columns = csvColumns,
-                    firstRow = firstRow,
-                    enabled = enabled,
-                )
-            }
-            TargetAccountMode.CONDITIONAL -> {
-                Spacer(modifier = Modifier.height(4.dp))
-                ConditionalAccountMappingEditor(
-                    conditions = state.targetConditions,
-                    onConditionsChanged = { state.targetConditions = it },
-                    whenTrue = state.targetWhenTrue,
-                    onWhenTrueChanged = { state.targetWhenTrue = it },
-                    whenFalse = state.targetWhenFalse,
-                    onWhenFalseChanged = { state.targetWhenFalse = it },
-                    columns = csvColumns,
-                    rows = rows,
-                    firstRow = firstRow,
-                    enabled = enabled,
-                )
-            }
-        }
     }
 }

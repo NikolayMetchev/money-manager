@@ -1,11 +1,11 @@
 package com.moneymanager.database.json
 
+import com.moneymanager.domain.model.csvstrategy.AccountRule
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
-import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
+import com.moneymanager.domain.model.csvstrategy.export.AccountRulesExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport
@@ -13,7 +13,7 @@ import com.moneymanager.domain.model.csvstrategy.export.DirectColumnExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedCurrencyExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport
-import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -71,10 +71,9 @@ class CsvStrategyExportCodecTest {
                                         accountName = "Source Account",
                                     ),
                                 TransferField.TARGET_ACCOUNT to
-                                    AccountLookupExport(
+                                    AccountRulesExport(
                                         fieldType = TransferField.TARGET_ACCOUNT,
-                                        columnName = "Payee",
-                                        fallbackColumns = listOf("Type"),
+                                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee", "Type")))),
                                         defaultCategoryName = "Uncategorized",
                                     ),
                                 TransferField.TIMESTAMP to
@@ -92,7 +91,7 @@ class CsvStrategyExportCodecTest {
                                         fieldType = TransferField.AMOUNT,
                                         mode = AmountMode.SINGLE_COLUMN,
                                         amountColumnName = "Amount",
-                                        negateValues = true,
+                                        direction = Direction.AmountSign(positiveIsIncoming = false),
                                     ),
                                 TransferField.CURRENCY to
                                     HardCodedCurrencyExport(
@@ -116,7 +115,7 @@ class CsvStrategyExportCodecTest {
         assertEquals(7, decoded.config.fieldMappings.size)
 
         assertIs<HardCodedAccountExport>(decoded.config.fieldMappings[TransferField.SOURCE_ACCOUNT])
-        assertIs<AccountLookupExport>(decoded.config.fieldMappings[TransferField.TARGET_ACCOUNT])
+        assertIs<AccountRulesExport>(decoded.config.fieldMappings[TransferField.TARGET_ACCOUNT])
         assertIs<DateTimeParsingExport>(decoded.config.fieldMappings[TransferField.TIMESTAMP])
         assertIs<DirectColumnExport>(decoded.config.fieldMappings[TransferField.DESCRIPTION])
         assertIs<AmountParsingExport>(decoded.config.fieldMappings[TransferField.AMOUNT])
@@ -136,15 +135,22 @@ class CsvStrategyExportCodecTest {
                         fieldMappings =
                             mapOf(
                                 TransferField.TARGET_ACCOUNT to
-                                    RegexAccountExport(
+                                    AccountRulesExport(
                                         fieldType = TransferField.TARGET_ACCOUNT,
-                                        columnName = "Description",
                                         rules =
                                             listOf(
-                                                RegexRule(pattern = ".*Grocery.*", accountName = "Food"),
-                                                RegexRule(pattern = ".*Amazon.*", accountName = "Shopping"),
+                                                AccountRule(
+                                                    value = ValueExpr(listOf("Description")),
+                                                    pattern = ".*Grocery.*",
+                                                    name = "Food",
+                                                ),
+                                                AccountRule(
+                                                    value = ValueExpr(listOf("Description")),
+                                                    pattern = ".*Amazon.*",
+                                                    name = "Shopping",
+                                                ),
+                                                AccountRule(value = ValueExpr(listOf("Description", "Name"))),
                                             ),
-                                        fallbackColumns = listOf("Name"),
                                         defaultCategoryName = "Other",
                                     ),
                             ),
@@ -155,12 +161,16 @@ class CsvStrategyExportCodecTest {
         val decoded = CsvStrategyExportCodec.decode(json)
 
         val mapping = decoded.config.fieldMappings[TransferField.TARGET_ACCOUNT]
-        assertIs<RegexAccountExport>(mapping)
-        assertEquals("Description", mapping.columnName)
-        assertEquals(2, mapping.rules.size)
+        assertIs<AccountRulesExport>(mapping)
+        assertEquals(3, mapping.rules.size)
         assertEquals(".*Grocery.*", mapping.rules[0].pattern)
-        assertEquals("Food", mapping.rules[0].accountName)
-        assertEquals(listOf("Name"), mapping.fallbackColumns)
+        assertEquals("Food", mapping.rules[0].name)
+        assertEquals(
+            listOf("Description", "Name"),
+            mapping.rules
+                .last()
+                .value.paths,
+        )
         assertEquals("Other", mapping.defaultCategoryName)
     }
 

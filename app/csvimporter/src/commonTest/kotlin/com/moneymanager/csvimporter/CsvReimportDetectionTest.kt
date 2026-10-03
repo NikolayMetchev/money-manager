@@ -16,7 +16,8 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -30,6 +31,7 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.PassThroughRule
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportProgress
@@ -79,9 +81,9 @@ class CsvReimportDetectionTest {
                                     accountId = sourceAccountId,
                                 ),
                             TransferField.TARGET_ACCOUNT to
-                                AccountLookupMapping(
+                                AccountRulesMapping(
                                     fieldType = TransferField.TARGET_ACCOUNT,
-                                    columnName = "Payee",
+                                    rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
                                 ),
                             TransferField.TIMESTAMP to
                                 DateTimeParsingMapping(
@@ -96,7 +98,7 @@ class CsvReimportDetectionTest {
                                     fieldType = TransferField.AMOUNT,
                                     mode = AmountMode.SINGLE_COLUMN,
                                     amountColumnName = "Amount",
-                                    flipAccountsOnPositive = flipAccountsOnPositive,
+                                    direction = if (flipAccountsOnPositive) Direction.AmountSign() else Direction.Outgoing,
                                 ),
                             TransferField.CURRENCY to
                                 HardCodedCurrencyMapping(

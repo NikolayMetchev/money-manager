@@ -9,6 +9,8 @@ import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
@@ -17,9 +19,8 @@ import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
-import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
-import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -56,15 +57,29 @@ class ConversionConfigMapperTest {
                     fieldMappings =
                         mapOf(
                             TransferField.SOURCE_ACCOUNT to
-                                RegexAccountMapping(TransferField.SOURCE_ACCOUNT, "Memo", listOf(RegexRule("^", "Wallet"))),
+                                AccountRulesMapping(
+                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                    rules =
+                                        listOf(
+                                            AccountRule(value = ValueExpr(listOf("Memo")), pattern = "^", name = "Wallet"),
+                                            AccountRule(value = ValueExpr(listOf("Memo"))),
+                                        ),
+                                ),
                             TransferField.TARGET_ACCOUNT to
-                                RegexAccountMapping(TransferField.TARGET_ACCOUNT, "Memo", listOf(RegexRule("^", "Counterparty"))),
+                                AccountRulesMapping(
+                                    fieldType = TransferField.TARGET_ACCOUNT,
+                                    rules =
+                                        listOf(
+                                            AccountRule(value = ValueExpr(listOf("Memo")), pattern = "^", name = "Counterparty"),
+                                            AccountRule(value = ValueExpr(listOf("Memo"))),
+                                        ),
+                                ),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
-                                    TransferField.AMOUNT,
+                                    fieldType = TransferField.AMOUNT,
                                     mode = AmountMode.SINGLE_COLUMN,
                                     amountColumnName = "Amount",
-                                    flipAccountsOnPositive = true,
+                                    direction = Direction.AmountSign(),
                                 ),
                             TransferField.CURRENCY to
                                 CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Asset"))),

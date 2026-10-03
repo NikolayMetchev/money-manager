@@ -28,7 +28,6 @@ import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
-import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import com.moneymanager.domain.model.apistrategy.RuleSign
@@ -36,6 +35,7 @@ import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Record
 import com.moneymanager.domain.model.rules.RuleEvaluator
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -2219,32 +2219,32 @@ private fun parseFeeAmount(
 }
 
 /**
- * Resolves the transaction sign (-1/0/1) from either the amount magnitude or a dedicated field.
- * Returns null when [ApiSignSource.FIELD] is configured but the sign field is absent: a missing
- * direction indicator is unexpected data, so the caller skips the item rather than silently
- * defaulting it to a debit. A present value that is simply not in `creditValues` is a debit.
+ * Resolves the transaction sign (-1/0/1) from the mappings' [Direction] (the amount's own sign by default).
+ * Returns null when a [Direction.Field] is configured but the field is absent: a missing direction
+ * indicator is unexpected data, so the caller skips the item rather than silently defaulting it to a
+ * debit. A present value that is simply not in `incomingValues` is a debit.
  */
 private fun resolveSign(
     obj: JsonObject,
     mappings: ApiTransactionMappings,
     magnitudeSign: Int,
 ): Int? =
-    when (mappings.signSource) {
-        ApiSignSource.EMBEDDED -> magnitudeSign
-        ApiSignSource.FIELD -> {
+    when (val direction = mappings.direction ?: Direction.AmountSign()) {
+        is Direction.AmountSign -> if (direction.positiveIsIncoming) magnitudeSign else -magnitudeSign
+        is Direction.Field ->
             if (magnitudeSign == 0) {
                 0
             } else {
-                when (val signValue = mappings.signField?.let { obj.resolveJsonPath(it) }) {
+                when (val value = obj.resolveJsonPath(direction.path)) {
                     null -> {
-                        logger.warn { "Sign field '${mappings.signField}' missing from transaction; skipping item" }
+                        logger.warn { "Direction field '${direction.path}' missing from transaction; skipping item" }
                         null
                     }
-                    in mappings.creditValues -> 1
+                    in direction.incomingValues -> 1
                     else -> -1
                 }
             }
-        }
+        Direction.Outgoing -> -magnitudeSign.absoluteValue
     }
 
 /** JSON path for the [index]-th item of a response array, accounting for a blank (root-array) key. */

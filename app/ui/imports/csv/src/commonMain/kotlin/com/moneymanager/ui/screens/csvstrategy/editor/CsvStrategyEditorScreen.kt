@@ -31,7 +31,9 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csvstrategy.AccountRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
@@ -171,8 +173,12 @@ fun CsvStrategyEditorScreen(
             if (state.amountColumnName == null) {
                 state.amountColumnName = ColumnDetector.suggestAmountColumn(csvColumns, sampleValues)
             }
-            if (state.targetAccountColumnName == null) {
-                state.targetAccountColumnName = ColumnDetector.suggestPayeeColumn(csvColumns)
+            if (state.targetRules.isEmpty()) {
+                // A payee column with its own fallbacks, named after its value: the common bank-export shape.
+                ColumnDetector.suggestPayeeColumn(csvColumns)?.let { payee ->
+                    val fallbacks = if (rows.isEmpty()) emptyList() else ColumnDetector.suggestFallbackColumns(payee, csvColumns, rows)
+                    state.targetRules = listOf(AccountRule(value = ValueExpr(listOf(payee) + fallbacks)))
+                }
             }
             if (state.currencyColumnName == null) {
                 state.currencyColumnName = ColumnDetector.suggestCurrencyColumn(csvColumns, sampleValues)
@@ -180,15 +186,6 @@ fun CsvStrategyEditorScreen(
                     state.currencyMode = CurrencyMode.FROM_COLUMN
                 }
             }
-        }
-    }
-
-    // Auto-detect fallback columns when the target column changes (not on initial edit load).
-    LaunchedEffect(state.targetAccountColumnName, rows) {
-        val primaryColumn = state.targetAccountColumnName
-        if (primaryColumn != null && primaryColumn != state.initialTargetAccountColumnName && rows.isNotEmpty()) {
-            state.targetAccountFallbackColumns =
-                ColumnDetector.suggestFallbackColumns(primaryColumn = primaryColumn, columns = csvColumns, rows = rows)
         }
     }
 
