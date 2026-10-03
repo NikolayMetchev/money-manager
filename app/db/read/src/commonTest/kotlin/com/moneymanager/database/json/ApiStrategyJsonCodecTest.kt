@@ -362,7 +362,7 @@ class ApiStrategyJsonCodecTest {
         val decoded = ApiStrategyJsonCodec.decode(legacyJson)
         val pagination = decoded.bankTransactions?.endpoint?.pagination
         // A legacy bank feed's default CURSOR mode is a before-cursor walk that always sent the page size.
-        assertEquals(ApiPaging.BeforeCursor(param = "before", positionField = "created"), pagination?.paging)
+        assertEquals(ApiPaging.BeforeCursor(), pagination?.paging)
         assertEquals(true, pagination?.sendLimitParam)
         assertEquals(100, pagination?.limitValue)
     }

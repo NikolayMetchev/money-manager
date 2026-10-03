@@ -58,7 +58,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -459,9 +458,6 @@ suspend fun downloadApiSessionExchange(
         incrementalSince = earliestIncrementalStart,
     )
 }
-
-/** The string content of a `JsonElement` if it is a `JsonPrimitive`, else null. */
-private fun JsonElement.jsonPrimitiveOrNull(): String? = (this as? JsonPrimitive)?.contentOrNullCompat()
 
 /**
  * Resolves an [ApiValueSet] to its concrete string values, given the value-endpoint and (non-fan-out)

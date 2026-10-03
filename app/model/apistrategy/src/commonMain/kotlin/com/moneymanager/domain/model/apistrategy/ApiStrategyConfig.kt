@@ -1367,7 +1367,7 @@ data class ApiStrategyConfig(
             dataEndpoints =
                 dataEndpoints.map { endpoint ->
                     if (endpoint.kind == ApiEndpointKind.BANK_TRANSACTIONS) {
-                        endpoint.copy(transactionMappings = (endpoint.transactionMappings ?: ApiTransactionMappings()).transform())
+                        endpoint.copy(transactionMappings = transform(endpoint.transactionMappings ?: ApiTransactionMappings()))
                     } else {
                         endpoint
                     }

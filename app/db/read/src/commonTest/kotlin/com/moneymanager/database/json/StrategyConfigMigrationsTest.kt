@@ -200,7 +200,7 @@ class OnePipelineMigrationTest {
         assertEquals("uid", accounts.mappings.idField)
         val feed = checkNotNull(bank.bankTransactions)
         assertEquals("amt", feed.transactionMappings?.amountField)
-        assertEquals(ApiPaging.BeforeCursor(param = "before", positionField = "created"), feed.endpoint.pagination?.paging)
+        assertEquals(ApiPaging.BeforeCursor(), feed.endpoint.pagination?.paging)
         assertEquals(true, feed.endpoint.pagination?.sendLimitParam)
         val trades = bank.dataEndpoints.single { it.kind == ApiEndpointKind.TRADES }
         assertEquals(ApiPaging.Offset(param = "ofs"), trades.endpoint.pagination?.paging)
