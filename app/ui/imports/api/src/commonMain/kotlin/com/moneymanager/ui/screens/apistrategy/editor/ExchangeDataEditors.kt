@@ -20,13 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
+import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
-import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
@@ -48,23 +49,13 @@ private val TRADE_KINDS = setOf(ApiEndpointKind.TRADES, ApiEndpointKind.ORDERS)
 /** Kinds that carry a fixed movement direction + external counterparty account. */
 internal val DIRECTIONAL_KINDS = setOf(ApiEndpointKind.DEPOSITS, ApiEndpointKind.WITHDRAWALS)
 
-/**
- * Editor for the optional [ApiSyntheticAccount]: an exchange strategy imports into one fixed account
- * holding all assets instead of enumerating an accounts endpoint.
- */
+/** Editor for a single-account source: an exchange imports into one fixed account holding all assets. */
 @Composable
-internal fun SyntheticAccountEditor(
-    account: ApiSyntheticAccount?,
-    onChange: (ApiSyntheticAccount?) -> Unit,
+internal fun SingleAccountEditor(
+    a: ApiAccountsSource.Single,
+    onChange: (ApiAccountsSource.Single) -> Unit,
     enabled: Boolean,
 ) {
-    ToggleRow(
-        label = "Single synthetic account (exchanges)",
-        checked = account != null,
-        onCheckedChange = { on -> onChange(if (on) ApiSyntheticAccount(name = "", externalId = "") else null) },
-        enabled = enabled,
-    )
-    val a = account ?: return
     TextFieldRow("Account name", a.name, { onChange(a.copy(name = it)) }, enabled, isError = a.name.isBlank())
     TextFieldRow("External id", a.externalId, { onChange(a.copy(externalId = it)) }, enabled, isError = a.externalId.isBlank())
 }
@@ -354,9 +345,11 @@ internal fun TradeMappingsEditor(
     enabled: Boolean,
 ) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextFieldRow("Instrument field", mappings.instrumentField, {
-            onChange(mappings.copy(instrumentField = it))
-        }, enabled, isError = mappings.instrumentField.isBlank())
+        if (mappings.splitMode != InstrumentSplitMode.EXPLICIT_FIELDS) {
+            TextFieldRow("Instrument field", mappings.instrumentField.orEmpty(), {
+                onChange(mappings.copy(instrumentField = it.ifBlank { null }))
+            }, enabled, isError = mappings.instrumentField.isNullOrBlank())
+        }
         EnumDropdown(
             label = "Instrument split mode",
             options = InstrumentSplitMode.entries,
@@ -637,7 +630,6 @@ private enum class FixedSide(
 
 private fun defaultTradeMappings(): ApiTradeMappings =
     ApiTradeMappings(
-        instrumentField = "",
         sideField = "",
         baseQuantityField = "",
         timestampField = "",
@@ -645,7 +637,7 @@ private fun defaultTradeMappings(): ApiTradeMappings =
     )
 
 private fun ApiTradeMappings.isValidForSave(): Boolean =
-    instrumentField.isNotBlank() &&
+    (splitMode == InstrumentSplitMode.EXPLICIT_FIELDS || !instrumentField.isNullOrBlank()) &&
         itemFilters.all { it.isComplete() } &&
         (!sideField.isNullOrBlank() || fixedSideBuy != null) &&
         baseQuantityField.isNotBlank() &&
@@ -683,7 +675,7 @@ private fun ApiEndpointConfig.isValidForSave(): Boolean {
     return path.isNotBlank() &&
         (successCodeField == null || !successCodeOkValue.isNullOrBlank()) &&
         // A non-positive limitValue would never advance the offset, looping on the same page forever.
-        (pagination?.offsetParam == null || pagination.limitValue > 0) &&
+        (pagination?.paging !is ApiPaging.Offset || pagination.limitValue > 0) &&
         requestCostWeight >= 1
 }
 
@@ -712,7 +704,7 @@ internal fun ApiInternalTransferReconcile.isValidForSave(): Boolean =
         amountTolerancePercent.isNonNegativeDecimal()
 
 /** Whether a synthetic-account config is complete enough to save. */
-internal fun ApiSyntheticAccount.isValidForSave(): Boolean = name.isNotBlank() && externalId.isNotBlank()
+internal fun ApiAccountsSource.Single.isValidForSave(): Boolean = name.isNotBlank() && externalId.isNotBlank()
 
 /**
  * Whether [this] parses as an exact non-negative decimal. Uses [BigDecimal] (parsed from the string)

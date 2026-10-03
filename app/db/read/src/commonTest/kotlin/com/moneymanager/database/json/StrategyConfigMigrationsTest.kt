@@ -1,5 +1,9 @@
 package com.moneymanager.database.json
 
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
+import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
+import com.moneymanager.domain.model.apistrategy.ApiPaging
+import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -20,6 +24,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class StrategyConfigMigrationsTest {
     @Test
@@ -141,7 +147,7 @@ class SharedRulesMigrationTest {
 
         val config = ApiStrategyJsonCodec.decode(legacy)
 
-        val mappings = config.transactionMappings
+        val mappings = checkNotNull(config.bankTransactions?.transactionMappings)
         assertEquals(
             listOf(Condition("decline_reason", ConditionOp.NOT_BLANK), Condition("status", ConditionOp.IN, value = "DECLINED,REVERSED")),
             mappings.declinedWhen,
@@ -160,5 +166,94 @@ class SharedRulesMigrationTest {
                 .toSet(),
         )
         assertEquals(AssetCodeRules(aliases = mapOf("XXBT" to "BTC"), stripSuffixes = setOf(".F")), config.assetCodes)
+    }
+}
+
+class OnePipelineMigrationTest {
+    private fun legacy(
+        synthetic: Boolean,
+        pagination: String,
+    ) = """
+        {
+          "configVersion": 1,
+          "baseUrl": "https://example.com",
+          "authType": "${if (synthetic) "SIGNED" else "BEARER_TOKEN"}",
+          "accountsEndpoint": {"path": "/accounts", "responseArrayKey": "accounts"},
+          "transactionsEndpoint": {"path": "/transactions", "responseArrayKey": "items", "pagination": $pagination},
+          "accountMappings": {"idField": "uid"},
+          "transactionMappings": {"amountField": "amt"},
+          ${if (synthetic) "\"syntheticAccount\": {\"name\": \"X\", \"externalId\": \"x\"}," else ""}
+          "dataEndpoints": [
+            {"endpoint": {"path": "/trades", "responseArrayKey": "", "pagination": $pagination}, "kind": "TRADES",
+             "tradeMappings": {"instrumentField": "unused", "splitMode": "EXPLICIT_FIELDS", "baseQuantityField": "q", "timestampField": "t", "idField": "i"}}
+          ]
+        }
+        """.trimIndent()
+
+    @Test
+    fun `a bank feed's default cursor mode becomes a before-cursor walk while an exchange endpoint's becomes offset paging`() {
+        val pagination =
+            """{"mode": "CURSOR", "offsetParam": "ofs", "limitValue": 50, "cursorParam": "before", "cursorResponseField": "created"}"""
+
+        val bank = ApiStrategyJsonCodec.decode(legacy(synthetic = false, pagination = pagination))
+        val accounts = assertIs<ApiAccountsSource.Downloaded>(bank.accounts)
+        assertEquals("uid", accounts.mappings.idField)
+        val feed = checkNotNull(bank.bankTransactions)
+        assertEquals("amt", feed.transactionMappings?.amountField)
+        assertEquals(ApiPaging.BeforeCursor(param = "before", positionField = "created"), feed.endpoint.pagination?.paging)
+        assertEquals(true, feed.endpoint.pagination?.sendLimitParam)
+        val trades = bank.dataEndpoints.single { it.kind == ApiEndpointKind.TRADES }
+        assertEquals(ApiPaging.Offset(param = "ofs"), trades.endpoint.pagination?.paging)
+        assertEquals(null, trades.tradeMappings?.instrumentField)
+
+        val exchange = ApiStrategyJsonCodec.decode(legacy(synthetic = true, pagination = pagination))
+        assertEquals(ApiAccountsSource.Single(name = "X", externalId = "x"), exchange.accounts)
+        assertTrue(exchange.dataEndpoints.none { it.kind == ApiEndpointKind.BANK_TRANSACTIONS })
+    }
+
+    @Test
+    fun `a bank date window always sent ISO bounds and never paged within a window`() {
+        val pagination = """{"mode": "DATE_WINDOW", "windowBoundFormat": "EPOCH_MS", "offsetParam": "ofs", "sendLimitParam": true}"""
+
+        val bank = ApiStrategyJsonCodec.decode(legacy(synthetic = false, pagination = pagination))
+        val feed = checkNotNull(bank.bankTransactions?.endpoint?.pagination)
+        assertEquals(WindowBoundFormat.ISO_8601, feed.window?.boundFormat)
+        assertEquals(ApiPaging.Single, feed.paging)
+        assertEquals(false, feed.sendLimitParam)
+
+        val trades =
+            checkNotNull(
+                bank.dataEndpoints
+                    .single { it.kind == ApiEndpointKind.TRADES }
+                    .endpoint.pagination,
+            )
+        assertEquals(WindowBoundFormat.EPOCH_MS, trades.window?.boundFormat)
+        assertEquals(ApiPaging.Offset(param = "ofs"), trades.paging)
+        assertEquals(true, trades.sendLimitParam)
+    }
+
+    @Test
+    fun `token modes keep their incremental position field only when unwindowed`() {
+        val token =
+            """{"mode": "TOKEN_CURSOR", "nextCursorField": "next", "cursorParam": "c", """ +
+                """"cursorResponseField": "created_at", "nextCursorUrlEncoded": true}"""
+        val exchange = ApiStrategyJsonCodec.decode(legacy(synthetic = true, pagination = token))
+        assertEquals(
+            ApiPaging.Token(tokenField = "next", param = "c", urlEncoded = true, positionField = "created_at"),
+            exchange.dataEndpoints
+                .single()
+                .endpoint.pagination
+                ?.paging,
+        )
+
+        val windowed = """{"mode": "DATE_WINDOW", "nextCursorField": "next", "cursorParam": "c"}"""
+        val windowedExchange = ApiStrategyJsonCodec.decode(legacy(synthetic = true, pagination = windowed))
+        assertEquals(
+            ApiPaging.Token(tokenField = "next", param = "c"),
+            windowedExchange.dataEndpoints
+                .single()
+                .endpoint.pagination
+                ?.paging,
+        )
     }
 }

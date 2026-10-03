@@ -2,8 +2,10 @@ package com.moneymanager.ui.screens.apistrategy
 
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
-import com.moneymanager.domain.model.apistrategy.ApiAuthType
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
+import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
+import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
@@ -27,11 +29,19 @@ class ApiConnectionsScreenLogicTest {
             config =
                 ApiStrategyConfig(
                     baseUrl = "https://api.$name.com",
-                    authType = ApiAuthType.BEARER_TOKEN,
-                    accountsEndpoint = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts"),
-                    transactionsEndpoint = ApiEndpointConfig(path = "/transactions", responseArrayKey = "transactions"),
-                    accountMappings = ApiAccountMappings(),
-                    transactionMappings = ApiTransactionMappings(),
+                    accounts =
+                        ApiAccountsSource.Downloaded(
+                            endpoint = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts"),
+                            mappings = ApiAccountMappings(),
+                        ),
+                    dataEndpoints =
+                        listOf(
+                            ApiDataEndpoint(
+                                endpoint = ApiEndpointConfig(path = "/transactions", responseArrayKey = "transactions"),
+                                kind = ApiEndpointKind.BANK_TRANSACTIONS,
+                                transactionMappings = ApiTransactionMappings(),
+                            ),
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,

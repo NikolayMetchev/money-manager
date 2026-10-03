@@ -2,17 +2,18 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
-import com.moneymanager.domain.model.apistrategy.ApiAuthType
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
+import com.moneymanager.domain.model.apistrategy.ApiDateWindowing
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
-import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.BodyFormat
@@ -20,7 +21,6 @@ import com.moneymanager.domain.model.apistrategy.FieldPlacement
 import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.NonceSpec
-import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SigFieldLocation
 import com.moneymanager.domain.model.apistrategy.SigPart
@@ -38,31 +38,45 @@ class ApiStrategyJsonCodecTest {
     private fun config(pagination: ApiPaginationConfig?) =
         ApiStrategyConfig(
             baseUrl = "https://example.com",
-            authType = ApiAuthType.BEARER_TOKEN,
-            accountsEndpoint = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts"),
-            transactionsEndpoint =
-                ApiEndpointConfig(
-                    path = "/transactions",
-                    responseArrayKey = "transactions",
-                    queryParams = listOf(ApiQueryParam(name = "account_id", dynamicSource = "account.id")),
-                    pagination = pagination,
+            accounts =
+                ApiAccountsSource.Downloaded(
+                    endpoint = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts"),
+                    mappings = ApiAccountMappings(),
                 ),
-            accountMappings = ApiAccountMappings(),
-            transactionMappings = ApiTransactionMappings(),
+            dataEndpoints =
+                listOf(
+                    ApiDataEndpoint(
+                        endpoint =
+                            ApiEndpointConfig(
+                                path = "/transactions",
+                                responseArrayKey = "transactions",
+                                queryParams = listOf(ApiQueryParam(name = "account_id", dynamicSource = "account.id")),
+                                pagination = pagination,
+                            ),
+                        kind = ApiEndpointKind.BANK_TRANSACTIONS,
+                        transactionMappings = ApiTransactionMappings(),
+                    ),
+                ),
         )
 
     @Test
     fun `cursor pagination round-trips`() {
-        val original = config(ApiPaginationConfig())
+        val original = config(ApiPaginationConfig(paging = ApiPaging.BeforeCursor(), sendLimitParam = true))
         val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
         assertEquals(original, decoded)
-        assertEquals(PaginationMode.CURSOR, decoded.transactionsEndpoint.pagination?.mode)
+        assertEquals(
+            ApiPaging.BeforeCursor(),
+            decoded.bankTransactions
+                ?.endpoint
+                ?.pagination
+                ?.paging,
+        )
     }
 
     @Test
     fun `people mappings ephemeral counterparty id prefixes round-trip`() {
         val original =
-            config(ApiPaginationConfig())
+            config(ApiPaginationConfig(paging = ApiPaging.BeforeCursor(), sendLimitParam = true))
                 .copy(peopleMappings = ApiPeopleMappings(ephemeralCounterpartyIdPrefixes = setOf("anonuser_")))
         val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
         assertEquals(original, decoded)
@@ -74,20 +88,26 @@ class ApiStrategyJsonCodecTest {
         val original =
             config(
                 ApiPaginationConfig(
-                    mode = PaginationMode.DATE_WINDOW,
+                    window = ApiDateWindowing(boundFormat = WindowBoundFormat.ISO_8601),
                     extraParams = listOf(ApiQueryParam(name = "type", value = "FLAT")),
                 ),
             )
         val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
         assertEquals(original, decoded)
-        assertEquals(PaginationMode.DATE_WINDOW, decoded.transactionsEndpoint.pagination?.mode)
+        assertEquals(
+            WindowBoundFormat.ISO_8601,
+            decoded.bankTransactions
+                ?.endpoint
+                ?.pagination
+                ?.window
+                ?.boundFormat,
+        )
     }
 
     @Test
     fun `exchange signing recipe and data endpoints round-trip`() {
         val original =
             config(null).copy(
-                authType = ApiAuthType.SIGNED,
                 requestSigning =
                     ApiRequestSigningConfig(
                         algorithm = SigningAlgorithm.HMAC_SHA512,
@@ -100,7 +120,7 @@ class ApiStrategyJsonCodecTest {
                         signature = FieldPlacement(SigFieldLocation.HEADER, "API-Sign"),
                         bodyFormat = BodyFormat.FORM_URLENCODED,
                     ),
-                syntheticAccount = ApiSyntheticAccount(name = "Crypto.com Exchange", externalId = "crypto-com-exchange"),
+                accounts = ApiAccountsSource.Single(name = "Crypto.com Exchange", externalId = "crypto-com-exchange"),
                 internalTransferReconcile =
                     ApiInternalTransferReconcile(
                         bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
@@ -153,7 +173,6 @@ class ApiStrategyJsonCodecTest {
     fun `kraken-shaped keyed-object, offset paging, enrichment and asset aliases round-trip`() {
         val original =
             config(null).copy(
-                authType = ApiAuthType.SIGNED,
                 requestSigning =
                     ApiRequestSigningConfig(
                         algorithm = SigningAlgorithm.HMAC_SHA512,
@@ -165,7 +184,7 @@ class ApiStrategyJsonCodecTest {
                         signature = FieldPlacement(SigFieldLocation.HEADER, "API-Sign"),
                         bodyFormat = BodyFormat.FORM_URLENCODED,
                     ),
-                syntheticAccount = ApiSyntheticAccount(name = "Kraken", externalId = "kraken"),
+                accounts = ApiAccountsSource.Single(name = "Kraken", externalId = "kraken"),
                 rateLimitMillis = 3_100L,
                 rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
                 rateLimitBackoffMillis = 5_000L,
@@ -214,13 +233,14 @@ class ApiStrategyJsonCodecTest {
                                     responseObjectValues = true,
                                     pagination =
                                         ApiPaginationConfig(
-                                            mode = PaginationMode.DATE_WINDOW,
-                                            startParam = "start",
-                                            endParam = "end",
-                                            windowBoundFormat = WindowBoundFormat.EPOCH_S,
-                                            offsetParam = "ofs",
+                                            window =
+                                                ApiDateWindowing(
+                                                    startParam = "start",
+                                                    endParam = "end",
+                                                    boundFormat = WindowBoundFormat.EPOCH_S,
+                                                ),
+                                            paging = ApiPaging.Offset(param = "ofs", totalCountField = "result.count"),
                                             limitValue = 50,
-                                            totalCountField = "result.count",
                                             incrementalOverlapDays = 3,
                                         ),
                                 ),
@@ -245,13 +265,14 @@ class ApiStrategyJsonCodecTest {
             WindowBoundFormat.EPOCH_S,
             decoded.dataEndpoints[2]
                 .endpoint.pagination
-                ?.windowBoundFormat,
+                ?.window
+                ?.boundFormat,
         )
         assertEquals(
-            "ofs",
+            ApiPaging.Offset(param = "ofs", totalCountField = "result.count"),
             decoded.dataEndpoints[2]
                 .endpoint.pagination
-                ?.offsetParam,
+                ?.paging,
         )
         assertTrue(decoded.dataEndpoints[2].endpoint.responseObjectValues)
         assertEquals("ledger_id", decoded.dataEndpoints[1].endpoint.itemKeyField)
@@ -263,7 +284,7 @@ class ApiStrategyJsonCodecTest {
     fun `nested items, fixed trade assets and a composite transfer id round-trip`() {
         val original =
             config(null).copy(
-                syntheticAccount = ApiSyntheticAccount(name = "Binance", externalId = "binance"),
+                accounts = ApiAccountsSource.Single(name = "Binance", externalId = "binance"),
                 // Canonical (sorted) order: DEPOSITS before TRADES.
                 dataEndpoints =
                     listOf(
@@ -339,10 +360,10 @@ class ApiStrategyJsonCodecTest {
             """.trimIndent()
 
         val decoded = ApiStrategyJsonCodec.decode(legacyJson)
-        val pagination = decoded.transactionsEndpoint.pagination
-        assertEquals(PaginationMode.CURSOR, pagination?.mode)
-        assertEquals("before", pagination?.cursorParam)
-        assertEquals("created", pagination?.cursorResponseField)
+        val pagination = decoded.bankTransactions?.endpoint?.pagination
+        // A legacy bank feed's default CURSOR mode is a before-cursor walk that always sent the page size.
+        assertEquals(ApiPaging.BeforeCursor(param = "before", positionField = "created"), pagination?.paging)
+        assertEquals(true, pagination?.sendLimitParam)
         assertEquals(100, pagination?.limitValue)
     }
 }

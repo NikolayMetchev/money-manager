@@ -44,11 +44,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.apistrategy.ApiDateWindowing
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.HttpMethodType
-import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.ui.components.rules.ConditionPathField
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
@@ -718,7 +719,29 @@ internal fun QueryParamsEditor(
     }
 }
 
-/** Edits an optional [ApiPaginationConfig]; a toggle enables/clears it. */
+/** The paging schemes offered in the editor, with how each starts out when picked. */
+private enum class PagingKind(
+    val label: String,
+    val initial: ApiPaging,
+) {
+    SINGLE("One request per window (or endpoint)", ApiPaging.Single),
+    OFFSET("Offset / page number", ApiPaging.Offset(param = "offset")),
+    BEFORE("Before-cursor, newest first (e.g. Monzo)", ApiPaging.BeforeCursor()),
+    FORWARD_ID("Forward by ascending id (e.g. Binance myTrades)", ApiPaging.ForwardId(param = "fromId", idField = "id")),
+    TOKEN("Next-page token", ApiPaging.Token(tokenField = "", param = "cursor")),
+}
+
+private val ApiPaging.kind: PagingKind
+    get() =
+        when (this) {
+            ApiPaging.Single -> PagingKind.SINGLE
+            is ApiPaging.Offset -> PagingKind.OFFSET
+            is ApiPaging.BeforeCursor -> PagingKind.BEFORE
+            is ApiPaging.ForwardId -> PagingKind.FORWARD_ID
+            is ApiPaging.Token -> PagingKind.TOKEN
+        }
+
+/** Edits an optional [ApiPaginationConfig]: an optional date-window split times a paging scheme. */
 @Composable
 internal fun PaginationEditor(
     pagination: ApiPaginationConfig?,
@@ -732,86 +755,99 @@ internal fun PaginationEditor(
         enabled = enabled,
     )
     val config = pagination ?: return
-    EnumDropdown(
-        label = "Mode",
-        options = PaginationMode.entries,
-        selected = config.mode,
-        onSelect = { onChange(config.copy(mode = it)) },
-        optionLabel = { it.name },
+    ToggleRow(
+        label = "Split history into date windows",
+        checked = config.window != null,
+        onCheckedChange = { onChange(config.copy(window = if (it) ApiDateWindowing() else null)) },
         enabled = enabled,
     )
-    TextFieldRow("Limit param", config.limitParam, { onChange(config.copy(limitParam = it)) }, enabled)
-    IntFieldRow("Limit value", config.limitValue, { onChange(config.copy(limitValue = it)) }, enabled)
-    when (config.mode) {
-        PaginationMode.CURSOR, PaginationMode.FORWARD_ID_CURSOR -> {
-            TextFieldRow("Cursor param", config.cursorParam, { onChange(config.copy(cursorParam = it)) }, enabled)
-            TextFieldRow("Cursor response field", config.cursorResponseField, { onChange(config.copy(cursorResponseField = it)) }, enabled)
-        }
-        PaginationMode.DATE_WINDOW -> {
-            TextFieldRow("Start param", config.startParam, { onChange(config.copy(startParam = it)) }, enabled)
-            TextFieldRow("End param", config.endParam, { onChange(config.copy(endParam = it)) }, enabled)
-            EnumDropdown(
-                label = "Window bound format",
-                options = WindowBoundFormat.entries,
-                selected = config.windowBoundFormat,
-                onSelect = { onChange(config.copy(windowBoundFormat = it)) },
-                optionLabel = { it.name },
+    config.window?.let { w ->
+        fun window(updated: ApiDateWindowing) = onChange(config.copy(window = updated))
+        TextFieldRow("Start param", w.startParam, { window(w.copy(startParam = it)) }, enabled)
+        TextFieldRow("End param", w.endParam, { window(w.copy(endParam = it)) }, enabled)
+        EnumDropdown(
+            label = "Window bound format",
+            options = WindowBoundFormat.entries,
+            selected = w.boundFormat,
+            onSelect = { window(w.copy(boundFormat = it)) },
+            optionLabel = { it.name },
+            enabled = enabled,
+        )
+        IntFieldRow("Window days", w.windowDays, { window(w.copy(windowDays = it)) }, enabled)
+        IntFieldRow("Lookback days", w.lookbackDays, { window(w.copy(lookbackDays = it)) }, enabled)
+        QueryParamsEditor(params = config.extraParams, onChange = { onChange(config.copy(extraParams = it)) }, enabled = enabled)
+    }
+    EnumDropdown(
+        label = "Paging",
+        options = PagingKind.entries,
+        selected = config.paging.kind,
+        onSelect = { kind -> if (kind != config.paging.kind) onChange(config.copy(paging = kind.initial)) },
+        optionLabel = { it.label },
+        enabled = enabled,
+    )
+
+    fun paging(updated: ApiPaging) = onChange(config.copy(paging = updated))
+    when (val p = config.paging) {
+        ApiPaging.Single -> Unit
+        is ApiPaging.Offset -> {
+            TextFieldRow("Offset param", p.param, { paging(p.copy(param = it)) }, enabled, isError = p.param.isBlank())
+            ToggleRow(
+                label = "Page numbers from 1 (not item offsets from 0)",
+                checked = p.pageNumbers,
+                onCheckedChange = { paging(p.copy(pageNumbers = it)) },
                 enabled = enabled,
             )
-            IntFieldRow("Window days", config.windowDays, { onChange(config.copy(windowDays = it)) }, enabled)
-            IntFieldRow("Lookback days", config.lookbackDays, { onChange(config.copy(lookbackDays = it)) }, enabled)
-            QueryParamsEditor(params = config.extraParams, onChange = { onChange(config.copy(extraParams = it)) }, enabled = enabled)
+            TextFieldRow("Total count field (optional)", p.totalCountField.orEmpty(), {
+                paging(p.copy(totalCountField = it.ifBlank { null }))
+            }, enabled)
         }
-        PaginationMode.TOKEN_CURSOR -> {
-            TextFieldRow("Cursor param", config.cursorParam, { onChange(config.copy(cursorParam = it)) }, enabled)
+        is ApiPaging.BeforeCursor -> {
+            TextFieldRow("Cursor param", p.param, { paging(p.copy(param = it)) }, enabled)
+            TextFieldRow("Item timestamp field", p.positionField, { paging(p.copy(positionField = it)) }, enabled)
+        }
+        is ApiPaging.ForwardId -> {
+            TextFieldRow("Cursor param", p.param, { paging(p.copy(param = it)) }, enabled)
+            TextFieldRow("Item id field", p.idField, { paging(p.copy(idField = it)) }, enabled)
+        }
+        is ApiPaging.Token -> {
             TextFieldRow(
-                "Item timestamp field (stops an incremental walk)",
-                config.cursorResponseField,
-                { onChange(config.copy(cursorResponseField = it)) },
+                "Next-page token field",
+                p.tokenField,
+                { paging(p.copy(tokenField = it)) },
+                enabled,
+                isError = p.tokenField.isBlank(),
+                supportingText = "Dot-path to the response's next-page token, sent back as the cursor param",
+            )
+            TextFieldRow("Cursor param", p.param, { paging(p.copy(param = it)) }, enabled)
+            ToggleRow(
+                label = "Token is already URL-encoded (e.g. Bybit)",
+                checked = p.urlEncoded,
+                onCheckedChange = { paging(p.copy(urlEncoded = it)) },
+                enabled = enabled,
+            )
+            TextFieldRow(
+                "Item timestamp field (optional; stops an incremental walk)",
+                p.positionField.orEmpty(),
+                { paging(p.copy(positionField = it.ifBlank { null })) },
                 enabled,
             )
         }
     }
-    TextFieldRow(
-        "Next-page token field (optional)",
-        config.nextCursorField.orEmpty(),
-        { onChange(config.copy(nextCursorField = it.ifBlank { null })) },
-        enabled,
-        supportingText = "Dot-path to the response's next-page token, sent back as the cursor param",
+    TextFieldRow("Limit param", config.limitParam, { onChange(config.copy(limitParam = it)) }, enabled)
+    IntFieldRow("Page size", config.limitValue, { onChange(config.copy(limitValue = it)) }, enabled)
+    ToggleRow(
+        label = "Send the page size as the limit param",
+        checked = config.sendLimitParam,
+        onCheckedChange = { onChange(config.copy(sendLimitParam = it)) },
+        enabled = enabled,
     )
-    if (config.nextCursorField != null && config.mode == PaginationMode.DATE_WINDOW) {
-        TextFieldRow("Cursor param", config.cursorParam, { onChange(config.copy(cursorParam = it)) }, enabled)
-    }
-    if (config.nextCursorField != null) {
-        ToggleRow(
-            label = "Next-page token is already URL-encoded (e.g. Bybit)",
-            checked = config.nextCursorUrlEncoded,
-            onCheckedChange = { onChange(config.copy(nextCursorUrlEncoded = it)) },
-            enabled = enabled,
-        )
-    }
-    // Applies to every mode: it clamps the date-window sweep and sets the cursor loop's stop point.
+    // Applies to every scheme: it clamps the date-window sweep and sets a newest-first walk's stop point.
     IntFieldRow(
         "Incremental overlap days",
         config.incrementalOverlapDays,
         { onChange(config.copy(incrementalOverlapDays = it)) },
         enabled,
     )
-    ToggleRow(
-        label = "Offset paging (e.g. Kraken \"ofs\")",
-        checked = config.offsetParam != null,
-        onCheckedChange = { onChange(config.copy(offsetParam = if (it) "ofs" else null)) },
-        enabled = enabled,
-    )
-    config.offsetParam?.let { offsetParam ->
-        TextFieldRow("Offset param", offsetParam, { onChange(config.copy(offsetParam = it)) }, enabled)
-        TextFieldRow(
-            "Total count field (optional)",
-            config.totalCountField.orEmpty(),
-            { onChange(config.copy(totalCountField = it.ifBlank { null })) },
-            enabled,
-        )
-    }
 }
 
 /** Edits a single [ApiEndpointConfig]: path, response array key, query params, pagination. */

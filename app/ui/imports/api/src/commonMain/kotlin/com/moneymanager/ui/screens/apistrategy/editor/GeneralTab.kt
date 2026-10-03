@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.apistrategy.ApiAuthType
 
 @Composable
 internal fun GeneralTab(
@@ -29,14 +28,6 @@ internal fun GeneralTab(
             enabled = enabled,
             placeholder = "https://api.example.com",
             isError = config.baseUrl.isBlank(),
-        )
-        EnumDropdown(
-            label = "Auth type",
-            options = ApiAuthType.entries,
-            selected = config.authType,
-            onSelect = { value -> state.updateConfig { copy(authType = value) } },
-            optionLabel = { it.name },
-            enabled = enabled,
         )
         TextFieldRow(
             label = "Person external-id attribute (optional)",

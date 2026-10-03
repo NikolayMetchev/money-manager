@@ -277,7 +277,7 @@ private fun JwtSigningEditor(
 }
 
 /**
- * Editor for the optional proactive [ApiRequestSigningConfig] (used when `authType == SIGNED`): the
+ * Editor for the optional proactive [ApiRequestSigningConfig] (its presence makes the strategy signed): the
  * complete provider-agnostic HMAC recipe (algorithm, message parts, field placements, body format), or
  * a JWT recipe in its place.
  */

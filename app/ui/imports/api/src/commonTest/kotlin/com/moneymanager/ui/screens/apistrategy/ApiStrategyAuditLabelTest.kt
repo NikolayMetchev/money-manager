@@ -12,7 +12,6 @@ class ApiStrategyAuditLabelTest {
     @Test
     fun `top-level fields read as prose with acronyms restored`() {
         assertEquals("Base URL", labelForPath("baseUrl"))
-        assertEquals("Auth type", labelForPath("authType"))
         assertEquals("Token page URL", labelForPath("tokenPageUrl"))
         assertEquals("Max rate limit retries", labelForPath("maxRateLimitRetries"))
         assertEquals("Person external ID attribute", labelForPath("personExternalIdAttribute"))
@@ -20,12 +19,16 @@ class ApiStrategyAuditLabelTest {
 
     @Test
     fun `a section prefixes every field beneath it`() {
-        assertEquals("Account ID field", labelForPath("accountMappings.idField"))
-        assertEquals("Account description field", labelForPath("accountMappings.descriptionField"))
-        assertEquals("Transaction amount field", labelForPath("transactionMappings.amountField"))
-        assertEquals("Transaction local currency field", labelForPath("transactionMappings.localCurrencyField"))
-        assertEquals("Accounts endpoint path", labelForPath("accountsEndpoint.path"))
-        assertEquals("Accounts endpoint pagination mode", labelForPath("accountsEndpoint.pagination.mode"))
+        assertEquals("Account ID field", labelForPath("accounts.mappings.idField"))
+        assertEquals("Account description field", labelForPath("accounts.mappings.descriptionField"))
+        assertEquals("Account name", labelForPath("accounts.name"))
+        assertEquals("Accounts endpoint path", labelForPath("accounts.endpoint.path"))
+        assertEquals("Accounts endpoint pagination paging param", labelForPath("accounts.endpoint.pagination.paging.param"))
+        assertEquals("Ancestor endpoint #2 path", labelForPath("accounts.ancestorEndpoints[1].path"))
+        assertEquals(
+            "Data endpoint #1 transaction mappings local currency field",
+            labelForPath("dataEndpoints[0].transactionMappings.localCurrencyField"),
+        )
         assertEquals("Request signing algorithm", labelForPath("requestSigning.algorithm"))
     }
 
@@ -52,8 +55,8 @@ class ApiStrategyAuditLabelTest {
 
     @Test
     fun `user-named map keys are left exactly as typed`() {
-        assertEquals("Account custom fields Monzo category", labelForPath("accountMappings.customFields.Monzo category"))
-        assertEquals("Asset aliases XXBT", labelForPath("assetAliases.XXBT"))
+        assertEquals("Account custom fields Monzo category", labelForPath("accounts.mappings.customFields.Monzo category"))
+        assertEquals("Asset codes aliases XXBT", labelForPath("assetCodes.aliases.XXBT"))
         assertEquals("Minor unit divisor overrides GBP", labelForPath("minorUnitDivisorOverrides.GBP"))
     }
 

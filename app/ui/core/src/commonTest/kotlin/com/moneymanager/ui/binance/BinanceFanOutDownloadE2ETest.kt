@@ -48,8 +48,9 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
         val dataEndpoints =
             strategy.config.dataEndpoints.map { data ->
                 val pagination = data.endpoint.pagination ?: return@map data
-                val lookbackDays = minOf(pagination.lookbackDays, TEST_LOOKBACK_DAYS)
-                data.copy(endpoint = data.endpoint.copy(pagination = pagination.copy(lookbackDays = lookbackDays)))
+                val window = pagination.window ?: return@map data
+                val windowed = pagination.copy(window = window.copy(lookbackDays = minOf(window.lookbackDays, TEST_LOOKBACK_DAYS)))
+                data.copy(endpoint = data.endpoint.copy(pagination = windowed))
             }
         return strategy.copy(config = strategy.config.copy(dataEndpoints = dataEndpoints))
     }
