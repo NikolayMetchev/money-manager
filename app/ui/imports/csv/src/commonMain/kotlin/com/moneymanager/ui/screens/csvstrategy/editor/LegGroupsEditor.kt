@@ -135,10 +135,9 @@ private fun LegGroupRuleEditor(
         label = "Window between legs of one event (seconds)",
         enabled = enabled,
     )
-    OptionalLongField(
+    ReconcileWindowField(
         value = rule.reconcileWindowSeconds,
         onValueChange = { onRuleChanged(rule.copy(reconcileWindowSeconds = it?.coerceAtLeast(0))) },
-        label = "Skip events another source already recorded within (seconds, optional)",
         enabled = enabled,
     )
     Spacer(modifier = Modifier.height(8.dp))
@@ -303,12 +302,11 @@ internal fun LongField(
     )
 }
 
-/** A [LongField] whose blank text means null. */
+/** The optional reconcile window, in seconds: blank means off. */
 @Composable
-private fun OptionalLongField(
+private fun ReconcileWindowField(
     value: Long?,
     onValueChange: (Long?) -> Unit,
-    label: String,
     enabled: Boolean,
 ) {
     var text by remember(value) { mutableStateOf(value?.toString().orEmpty()) }
@@ -319,7 +317,7 @@ private fun OptionalLongField(
             val trimmed = it.trim()
             if (trimmed.isEmpty()) onValueChange(null) else trimmed.toLongOrNull()?.let(onValueChange)
         },
-        label = { Text(label) },
+        label = { Text("Skip events another source already recorded within (seconds, optional)") },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         enabled = enabled,

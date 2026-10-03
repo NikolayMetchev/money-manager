@@ -23,7 +23,7 @@ import kotlin.uuid.Uuid
 /**
  * Covers the built-in Binance CSV strategy's row-level behaviour: which counterparty account each
  * `Operation` routes to, how the sign of `Change` sets the direction, and how trade and dust legs are
- * classified. Group assembly itself is covered by [CsvTradeGroupsTest].
+ * classified. Group assembly itself is covered by [CsvLegGroupsTest].
  */
 class BinanceCsvMapperTest {
     private val now = Clock.System.now()
