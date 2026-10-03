@@ -44,7 +44,7 @@ class RuleEvaluatorTest {
     fun `path comparisons compare two values of the record`() {
         assertTrue(holds(ConditionOp.EQUALS_PATH, path = "Name", otherPath = "Other"))
         assertFalse(holds(ConditionOp.NOT_EQUALS_PATH, path = "Name", otherPath = "Other"))
-        assertTrue(holds(ConditionOp.NOT_EQUALS_PATH, path = "Type", otherPath = "Name"))
+        assertTrue(holds(ConditionOp.NOT_EQUALS_PATH, otherPath = "Name"))
     }
 
     @Test

@@ -3418,10 +3418,8 @@ private fun RuleSign.matches(sign: Int): Boolean =
 internal fun JsonObject.matches(condition: Condition): Boolean = RuleEvaluator().matches(condition, JsonRecord(this))
 
 /** Whether every one of [conditions] holds for this item (true for none). */
-internal fun JsonObject.matchesAll(conditions: List<Condition>): Boolean {
-    if (conditions.isEmpty()) return true
-    return RuleEvaluator().all(conditions, JsonRecord(this))
-}
+internal fun JsonObject.matchesAll(conditions: List<Condition>): Boolean =
+    conditions.isEmpty() || RuleEvaluator().all(conditions, JsonRecord(this))
 
 /**
  * An API item as a rule [Record]: paths are dot-paths (with `[n]` array indexing for scalars). A field

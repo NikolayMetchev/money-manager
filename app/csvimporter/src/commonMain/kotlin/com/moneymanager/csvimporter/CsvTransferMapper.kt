@@ -44,7 +44,6 @@ import com.moneymanager.domain.model.rules.ColumnRecord
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.RuleEvaluator
-import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.rules.substituteTemplate
 import com.moneymanager.importengineapi.DESCRIPTION_SIMILARITY_THRESHOLD
 import com.moneymanager.importengineapi.PassThroughDetector

@@ -3,7 +3,6 @@ package com.moneymanager.domain.model.rules
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
 import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
@@ -26,7 +25,6 @@ data class Extraction(
  *
  * @property paths Tried in order until one yields a non-blank value — order is semantic.
  */
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class ValueExpr(
     val paths: List<String>,
@@ -55,7 +53,6 @@ data class ValueExpr(
  * first (Kraken's Earn holdings `XETH.F` → `XETH`), then [aliases] map what's left (Kraken `XXBT` →
  * `BTC`, Koinly `KNCL` → `KNC`). Codes are upper-cased and trimmed before both steps; keys are upper case.
  */
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class AssetCodeRules(
     @EncodeDefault(EncodeDefault.Mode.NEVER)

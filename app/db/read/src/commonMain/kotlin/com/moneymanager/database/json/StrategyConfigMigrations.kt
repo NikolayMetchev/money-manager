@@ -59,5 +59,5 @@ internal object StrategyConfigMigrations {
         version: Int,
     ): JsonObject = JsonObject(config.withoutVersion() + (VERSION_KEY to JsonPrimitive(version)))
 
-    private fun JsonObject.withoutVersion(): Map<String, JsonElement> = filterKeys { it != VERSION_KEY }
+    private fun JsonObject.withoutVersion(): Map<String, JsonElement> = this.filterKeys { it != VERSION_KEY }
 }

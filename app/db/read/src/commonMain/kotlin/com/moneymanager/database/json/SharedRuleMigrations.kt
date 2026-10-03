@@ -26,7 +26,7 @@ internal fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimit
 internal fun JsonObject.stringList(key: String): List<String> =
     (this[key] as? JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
 
-internal fun JsonObject.without(vararg keys: String): Map<String, JsonElement> = filterKeys { it !in keys }
+internal fun JsonObject.without(vararg keys: String): Map<String, JsonElement> = this.filterKeys { it !in keys }
 
 internal fun jsonString(value: String?): JsonElement = value?.let(::JsonPrimitive) ?: JsonNull
 
