@@ -1,7 +1,9 @@
 package com.moneymanager.database
 
+import com.moneymanager.apiimporter.discoverApiCounterpartiesToCreate
 import com.moneymanager.builtin.BuiltInApiStrategies
 import com.moneymanager.database.json.ApiStrategyExportCodec
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
@@ -40,6 +42,29 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertEquals(
                 setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken", "Binance", "Coinbase", "Bybit"),
                 names,
+            )
+        }
+
+    @Test
+    fun `an exchange strategy has no bank counterparties to suggest`() =
+        runTest {
+            repositories.installBuiltInApiStrategies()
+            val coinbase =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Coinbase" }
+
+            // The Import button asks every strategy for suggestions first, so one without a bank feed must
+            // answer "none" rather than fail.
+            assertEquals(
+                emptyList(),
+                discoverApiCounterpartiesToCreate(
+                    repositories.apiSessionRepository,
+                    repositories.accountAttributeRepository,
+                    ApiSessionId(1),
+                    coinbase,
+                ),
             )
         }
 

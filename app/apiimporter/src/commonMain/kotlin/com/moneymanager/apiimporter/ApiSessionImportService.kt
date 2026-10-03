@@ -1024,7 +1024,12 @@ suspend fun discoverApiCounterpartiesToCreate(
     strategy: ApiImportStrategy,
     onProgress: suspend (ImportProgress) -> Unit = {},
 ): List<ApiCounterpartySuggestion> {
-    val counterpartyIdField = strategy.config.bankFeedMappings().counterpartyIdField ?: return emptyList()
+    // Only a bank feed names counterparty ids; an exchange strategy has nothing to suggest.
+    val counterpartyIdField =
+        strategy.config.bankTransactions
+            ?.transactionMappings
+            ?.counterpartyIdField
+            ?: return emptyList()
     // Reported as sub-steps so the (potentially slow) preparation phase shows what it is doing rather than
     // a single opaque "Preparing import…". Left indeterminate (no fraction) so the bar does not fill and
     // then reset when the engine phases take over with their own 0–100% progress.

@@ -34,8 +34,8 @@ internal enum class EditorTab(
     ADVANCED("Advanced"),
 }
 
-private val DEFAULT_ACCOUNTS_ENDPOINT = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts")
-private val DEFAULT_TRANSACTIONS_ENDPOINT =
+internal val DEFAULT_ACCOUNTS_ENDPOINT = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts")
+internal val DEFAULT_TRANSACTIONS_ENDPOINT =
     ApiEndpointConfig(
         path = "/transactions",
         responseArrayKey = "transactions",

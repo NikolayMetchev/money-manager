@@ -52,13 +52,11 @@ internal fun EndpointsTab(
                     } else {
                         copy(
                             accounts =
-                                ApiAccountsSource.Downloaded(
-                                    endpoint = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts"),
-                                ),
+                                ApiAccountsSource.Downloaded(endpoint = DEFAULT_ACCOUNTS_ENDPOINT),
                             dataEndpoints =
                                 dataEndpoints +
                                     ApiDataEndpoint(
-                                        endpoint = ApiEndpointConfig(path = "/transactions", responseArrayKey = "transactions"),
+                                        endpoint = DEFAULT_TRANSACTIONS_ENDPOINT,
                                         kind = ApiEndpointKind.BANK_TRANSACTIONS,
                                         transactionMappings = ApiTransactionMappings(),
                                     ),
