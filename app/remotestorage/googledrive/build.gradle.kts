@@ -3,7 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.kotlin.serialization)
     id("moneymanager.kotlin-multiplatform-convention")
-    id("moneymanager.android-convention")
+    id("moneymanager.jvm-android-shared-convention")
 }
 
 // Google Drive remote-storage backend. The Drive REST API + OAuth are spoken over the shared KMP Ktor
@@ -22,18 +22,15 @@ kotlin {
         }
 
         // JVM and Android share the entire provider, OAuth, loopback receiver and account store.
-        val jvmAndroidMain =
-            create("jvmAndroidMain") {
-                dependsOn(commonMain.get())
-                dependencies {
-                    implementation(libs.kotlinx.coroutines.core)
-                    implementation(libs.kotlinx.serialization.json)
-                    implementation(libs.ktor.client.cio)
-                }
+        getByName("jvmAndroidMain") {
+            dependencies {
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.ktor.client.cio)
             }
+        }
 
         jvmMain {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 api(projects.app.importfilesource.core)
                 api(projects.app.remotestorage.core)
@@ -48,7 +45,6 @@ kotlin {
         }
 
         androidMain {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 api(projects.app.importfilesource.core)
                 api(projects.app.remotestorage.core)

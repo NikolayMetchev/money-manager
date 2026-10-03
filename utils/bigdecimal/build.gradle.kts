@@ -1,24 +1,11 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
-    id("moneymanager.android-convention")
+    // Shared jvmAndroidMain source set: both platforms have java.math.BigDecimal.
+    id("moneymanager.jvm-android-shared-convention")
 }
 
 kotlin {
     sourceSets {
-        // Shared source set for JVM and Android (both have access to java.math.BigDecimal)
-        val jvmAndroidMain =
-            create("jvmAndroidMain") {
-                dependsOn(commonMain.get())
-            }
-
-        jvmMain {
-            dependsOn(jvmAndroidMain)
-        }
-
-        androidMain {
-            dependsOn(jvmAndroidMain)
-        }
-
         commonTest {
             dependencies {
                 implementation(kotlin("test"))

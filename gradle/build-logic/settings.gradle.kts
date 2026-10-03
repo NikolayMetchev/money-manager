@@ -1,6 +1,13 @@
 pluginManagement {
     repositories {
-        google()
+        google {
+            // Google's Maven only hosts Android/Google artifacts; keep every other lookup off it.
+            content {
+                includeGroupByRegex("androidx.*")
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+            }
+        }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -14,12 +21,22 @@ plugins {
 
 dependencyResolutionManagement {
     repositories {
-        google()
+        google {
+            // Google's Maven only hosts Android/Google artifacts; keep every other lookup off it.
+            content {
+                includeGroupByRegex("androidx.*")
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+            }
+        }
         mavenCentral()
         gradlePluginPortal()
         // detekt 2.0.0-alpha.4's gradle plugin depends on
         // org.gradle.experimental:gradle-public-api, which is published only here.
-        maven("https://repo.gradle.org/gradle/libs-releases")
+        exclusiveContent {
+            forRepository { maven("https://repo.gradle.org/gradle/libs-releases") }
+            filter { includeGroup("org.gradle.experimental") }
+        }
     }
     // The `libs` version catalog is auto-imported from the parent build by the
     // typesafe-conventions plugin, so it must not be created here.

@@ -34,9 +34,6 @@ secrets/google-oauth.properties
 # SQLDelight generated files (keep in source control)
 # All generated files in build/ are already ignored above
 
-# Generated VERSION file (copied during build)
-app/main/android/src/main/assets/VERSION
-
 # Claude — commands/skills are shared; only local session state is ignored
 .claude/settings.local.json
 .claude/worktrees/

@@ -1,3 +1,4 @@
+import org.jetbrains.compose.desktop.application.tasks.AbstractProguardTask
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
@@ -205,10 +206,10 @@ val verifyProguardServiceProviders =
     tasks.register("verifyProguardServiceProviders") {
         description = "Checks every META-INF/services provider survived ProGuard shrinking."
         group = "verification"
-        dependsOn("proguardReleaseJars")
-        val proguardJarsDir = layout.buildDirectory.dir("compose/tmp/main-release/proguard")
+        // The task's own output directory, so the input carries the dependency on running ProGuard.
+        val proguardJarsDir = tasks.named<AbstractProguardTask>("proguardReleaseJars").flatMap { it.destinationDir }
         val reportFile = layout.buildDirectory.file("reports/proguard/service-providers.txt")
-        inputs.dir(proguardJarsDir)
+        inputs.dir(proguardJarsDir).withPropertyName("proguardJars").withPathSensitivity(PathSensitivity.RELATIVE)
         outputs.file(reportFile)
         doLast {
             val jars =
@@ -254,9 +255,11 @@ val verifyProguardServiceProviders =
         }
     }
 
-// Every release installer (packageRelease{Deb,Dmg,Msi}) is built from this distributable
-tasks.matching { it.name == "createReleaseDistributable" }.configureEach {
-    dependsOn(verifyProguardServiceProviders)
+// Check the shrunk jars whenever ProGuard produces them, so every release installer
+// (packageRelease{Deb,Dmg,Msi}) and runRelease is covered, and a missing provider fails the build.
+// matching, not named: the Compose plugin registers the ProGuard task after this script runs.
+tasks.matching { it.name == "proguardReleaseJars" }.configureEach {
+    finalizedBy(verifyProguardServiceProviders)
 }
 
 // Handle duplicate JARs in distribution tasks

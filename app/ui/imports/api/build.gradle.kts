@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.compose-ui-feature-convention")
     alias(libs.plugins.compose.compiler)
+    id("moneymanager.jvm-android-shared-convention")
 }
 
 kotlin {
@@ -28,17 +29,12 @@ kotlin {
                 implementation(libs.kotlinx.serialization.json)
             }
         }
-        val jvmAndroidMain =
-            create("jvmAndroidMain") {
-                dependsOn(getByName("commonMain"))
-            }
         getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
             }
         }
         getByName("androidMain") {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 api(libs.androidx.compose.foundation.layout)
                 api(libs.androidx.compose.runtime)
@@ -58,7 +54,6 @@ kotlin {
             }
         }
         getByName("jvmMain") {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 api(projects.app.apiimporter)
                 api(projects.app.importengineapi)

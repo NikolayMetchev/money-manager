@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.serialization)
     id("moneymanager.kotlin-multiplatform-convention")
-    id("moneymanager.android-convention")
+    id("moneymanager.jvm-android-shared-convention")
 }
 
 // The encrypted local credential vault (API tokens, Google sign-ins). Encryption is utils/archive's
@@ -19,20 +19,10 @@ kotlin {
             }
         }
 
-        val jvmAndroidMain =
-            create("jvmAndroidMain") {
-                dependsOn(commonMain.get())
-            }
-
         jvmMain {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 api(projects.utils.localsettings)
             }
-        }
-
-        androidMain {
-            dependsOn(jvmAndroidMain)
         }
 
         commonTest {

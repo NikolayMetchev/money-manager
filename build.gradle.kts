@@ -3,6 +3,7 @@ import dev.iurysouza.modulegraph.Orientation
 import dev.iurysouza.modulegraph.Theme
 import org.jetbrains.dokka.gradle.DokkaExtension
 import org.jetbrains.dokka.gradle.DokkaPlugin
+import org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask
 
 plugins {
     base
@@ -79,6 +80,9 @@ tasks.register("verifyUniquePackages") {
 
 tasks.named("check") {
     dependsOn("verifyUniquePackages")
+    // An included build's tasks never run as part of this build's lifecycle unless asked for, so pull
+    // build-logic's own tests (TestKit checks of the conventions and task types) into `check`.
+    dependsOn(gradle.includedBuild("build-logic").task(":check"))
 }
 
 // `createModuleGraph` writes a Mermaid module-dependency graph into this Markdown file.
@@ -148,10 +152,9 @@ if (providers.gradleProperty("enableDokka").orNull == "true") {
         group = "documentation"
         description = "Copy generated Dokka HTML into the published docs site (webpage/kdoc)"
 
-        dependsOn("dokkaGeneratePublicationHtml")
-
         // Sync mirrors the source, removing stale files (e.g. dropped/renamed modules and types).
-        from(layout.buildDirectory.dir("dokka/html"))
+        // Reading the generator's output property carries the dependency on running Dokka.
+        from(tasks.named<DokkaGenerateTask>("dokkaGeneratePublicationHtml").flatMap { it.outputDirectory })
         into(layout.projectDirectory.dir("webpage/kdoc"))
     }
 }

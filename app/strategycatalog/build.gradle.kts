@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.serialization)
     id("moneymanager.kotlin-multiplatform-convention")
-    id("moneymanager.android-convention")
+    id("moneymanager.jvm-android-shared-convention")
 }
 
 // Client for the central strategy catalog published on GitHub Pages: fetches the index.json manifest
@@ -24,19 +24,16 @@ kotlin {
 
         // A local-directory catalog source is plain java.io.File, shared by JVM and Android (no SAF
         // picker involved — it's a developer-entered path, not a user-picked folder).
-        val jvmAndroidMain =
-            create("jvmAndroidMain") {
-                dependsOn(commonMain.get())
-                dependencies {
-                    implementation(libs.kotlinx.coroutines.core)
-                }
+        getByName("jvmAndroidMain") {
+            dependencies {
+                implementation(libs.kotlinx.coroutines.core)
             }
+        }
 
         // buildHealth (KMP quirk): ABI/impl deps used by commonMain must also be declared on each
         // real platform source set. CIO itself is a pure runtime dependency — the engine-less
         // HttpClient() in createStrategyCatalogController discovers it from the runtime classpath.
         jvmMain {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 api(projects.app.model.csvstrategy)
                 api(projects.utils.localsettings)
@@ -51,7 +48,6 @@ kotlin {
         }
 
         androidMain {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 api(projects.app.model.csvstrategy)
                 api(projects.utils.localsettings)
