@@ -148,46 +148,23 @@ suspend fun executeApiReimport(
 
     bar.emit(base = RERUN_BASE, detail = "Re-importing")
     val rerun =
-        if (strategy.config.syntheticAccount != null) {
-            val exchangeResult =
-                importApiSessionExchange(
+        importApiSession(
+            reads =
+                ApiImportReads(
                     apiSessionRepository = apiSessionRepository,
                     accountRepository = accountRepository,
+                    accountAttributeRepository = accountAttributeRepository,
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,
-                    sessionId = session.id,
-                    strategy = strategy,
-                    importEngine = importEngine,
-                    onProgress = bar.sink(base = RERUN_BASE, span = RERUN_SPAN),
-                    engineBatchSize = if (onProgress == null) Int.MAX_VALUE else API_ENGINE_BATCH_SIZE,
-                )
-            RerunOutcome(transactions = exchangeResult.transfersImported, trades = exchangeResult.tradesImported)
-        } else {
-            // The bank path reports through a non-suspend `ApiSessionImportProgress` callback, which
-            // cannot drive this suspend bar; it stays on the phase message until that plumbing is
-            // made suspend like the exchange path's.
-            val transactionsResult =
-                importApiSessionTransactions(
-                    apiSessionRepository = apiSessionRepository,
-                    currencyRepository = currencyRepository,
-                    sessionId = session.id,
-                    strategy = strategy,
-                    importEngine = importEngine,
-                    counterpartyAccountNames = counterpartyAccountNames,
-                    passThroughAccounts = passThroughAccounts,
-                )
-            if (strategy.config.peopleDownload != null) {
-                importApiSessionPeople(
-                    apiSessionRepository = apiSessionRepository,
-                    accountAttributeRepository = accountAttributeRepository,
-                    importEngine = importEngine,
-                    sessionId = session.id,
-                    strategy = strategy,
-                    accountsSessionId = session.id,
-                )
-            }
-            RerunOutcome(transactions = transactionsResult.transactionCount, trades = 0)
-        }
+                ),
+            sessionId = session.id,
+            strategy = strategy,
+            importEngine = importEngine,
+            counterpartyAccountNames = counterpartyAccountNames,
+            passThroughAccounts = passThroughAccounts,
+            onProgress = bar.sink(base = RERUN_BASE, span = RERUN_SPAN),
+            engineBatchSize = if (onProgress == null) Int.MAX_VALUE else API_ENGINE_BATCH_SIZE,
+        )
 
     importEngine.markApiSessionImported(
         id = session.id,
@@ -212,15 +189,10 @@ suspend fun executeApiReimport(
 
     return ApiReimportResult(
         deletedEmptyAccounts = deletedEmptyAccounts,
-        transactionsImported = rerun.transactions,
-        tradesImported = rerun.trades,
+        transactionsImported = rerun.transactionCount,
+        tradesImported = rerun.tradeCount,
     )
 }
-
-private data class RerunOutcome(
-    val transactions: Int,
-    val trades: Int,
-)
 
 /** One session a bulk re-import could not complete; the run carried on with the rest. */
 data class ApiSessionReimportFailure(

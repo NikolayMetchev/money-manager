@@ -11,7 +11,7 @@ import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Edits [ApiAccountMappings] in place inside the strategy config. */
 private fun ApiStrategyEditorState.updateAccountMappings(block: ApiAccountMappings.() -> ApiAccountMappings) =
-    updateConfig { copy(accountMappings = accountMappings.block()) }
+    updateConfig { withAccountMappings(editedAccountMappings.block()) }
 
 @Composable
 internal fun AccountMappingsTab(
@@ -21,7 +21,7 @@ internal fun AccountMappingsTab(
     onRequestPick: PathPicker,
     enabled: Boolean,
 ) {
-    val mappings = state.config.accountMappings
+    val mappings = state.config.editedAccountMappings
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SessionDataStatus(paths = accountJsonPaths, loaded = accountSampleLoaded)
 

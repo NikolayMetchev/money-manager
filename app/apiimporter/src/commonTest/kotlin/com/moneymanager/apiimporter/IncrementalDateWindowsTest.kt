@@ -1,7 +1,7 @@
 package com.moneymanager.apiimporter
 
+import com.moneymanager.domain.model.apistrategy.ApiDateWindowing
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
-import com.moneymanager.domain.model.apistrategy.PaginationMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -14,9 +14,7 @@ class IncrementalDateWindowsTest {
 
     private val pagination =
         ApiPaginationConfig(
-            mode = PaginationMode.DATE_WINDOW,
-            windowDays = 7,
-            lookbackDays = 365,
+            window = ApiDateWindowing(windowDays = 7, lookbackDays = 365),
             incrementalOverlapDays = 5,
         )
 

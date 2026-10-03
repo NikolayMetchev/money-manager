@@ -9,24 +9,8 @@ import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
 import com.moneymanager.domain.model.serialization.SortedStringToLongMapSerializer
 import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-
-/**
- * Authentication mechanism for an API.
- */
-@Serializable
-enum class ApiAuthType {
-    /** HTTP Bearer token authentication (Authorization: Bearer <token>). */
-    BEARER_TOKEN,
-
-    /**
-     * Proactive per-request signing driven by [ApiStrategyConfig.requestSigning] — an HMAC signature
-     * computed over a configurable message and placed in a header/query/body field on every request.
-     * Used by exchange APIs (Crypto.com, and later Binance/Kraken) that authenticate with an
-     * api-key + secret rather than a bearer token.
-     */
-    SIGNED,
-}
 
 /** HTTP method for an API endpoint. */
 @Serializable
@@ -81,50 +65,12 @@ data class ApiQueryParam(
     override fun compareTo(other: ApiQueryParam): Int = compareValuesBy(this, other, { it.name }, { it.value }, { it.dynamicSource })
 }
 
-/** Selects which pagination scheme an endpoint uses. */
-@Serializable
-enum class PaginationMode {
-    /** Before-cursor paging (cursor extracted from the earliest item of each page). */
-    CURSOR,
-
-    /** Fixed-length date windows, one request per window. */
-    DATE_WINDOW,
-
-    /**
-     * A single (non-windowed) forward sweep paged by an ascending numeric id, for an endpoint whose own
-     * time-range parameters are too short-lived to sweep a full history in [DATE_WINDOW] windows
-     * (Binance `myTrades` caps `startTime`/`endTime` to 24h apart). Each page after the first sends
-     * [ApiPaginationConfig.cursorParam] = one past the maximum [ApiPaginationConfig.cursorResponseField]
-     * seen so far; the loop ends when a page returns fewer than [ApiPaginationConfig.limitValue] items.
-     *
-     * Unlike [DATE_WINDOW]/[CURSOR], this mode does **not** consult the incremental watermark (a time
-     * value can't seed a numeric id cursor without an extra lookup) — every download walks the id space
-     * from the start. Cheap because `ApiClient`'s per-page resume-skip still applies within one
-     * interrupted-and-retried session, and any cross-session overlap is absorbed by the import deduper.
-     */
-    FORWARD_ID_CURSOR,
-
-    /**
-     * A single (non-windowed) walk paged by an opaque next-page token the response itself supplies (at
-     * [ApiPaginationConfig.nextCursorField]), sent back as [ApiPaginationConfig.cursorParam] until the
-     * token comes back blank or absent — for an endpoint with no date filter at all (Coinbase's
-     * `v2/accounts/{id}/transactions`, newest first).
-     *
-     * Incremental: when an earlier download already covered a period, the walk stops once a page's
-     * oldest item (by [ApiPaginationConfig.cursorResponseField], an ISO-8601 or epoch timestamp) is older
-     * than that watermark minus [ApiPaginationConfig.incrementalOverlapDays] — so it relies on the
-     * endpoint returning newest items first.
-     */
-    TOKEN_CURSOR,
-}
-
 /**
- * How a [PaginationMode.DATE_WINDOW] window bound is encoded into the [ApiPaginationConfig.startParam]/
- * [ApiPaginationConfig.endParam] request parameters.
+ * How a [ApiDateWindowing] window bound is encoded into its start/end request parameters.
  *
  * [EPOCH_MS] — integer milliseconds since the epoch (Crypto.com).
  * [EPOCH_S] — integer whole seconds since the epoch (Kraken `start`/`end`).
- * [ISO_8601] — an ISO-8601 instant string.
+ * [ISO_8601] — an ISO-8601 instant string (Wise, Starling).
  */
 @Serializable
 enum class WindowBoundFormat {
@@ -134,104 +80,119 @@ enum class WindowBoundFormat {
 }
 
 /**
- * How [ApiPaginationConfig.offsetParam] advances between pages of the same window.
+ * Splits an endpoint's history into fixed-length date windows, one request unit per window, each bounded
+ * by [startParam]/[endParam] (also exposed to templating as `window.start`/`window.end`). Windows reach
+ * back [lookbackDays] and are anchored to fixed [windowDays] boundaries, so earlier windows produce
+ * stable, cacheable URLs; only the final window (ending "now") shifts across re-imports.
  *
- * [OFFSET] — starts at 0, advances by [ApiPaginationConfig.limitValue] each page (Kraken `ofs`).
- * [PAGE_NUMBER] — starts at 1, advances by 1 each page (Binance fiat `page`/`rows`).
+ * @property rangeErrorSubstrings Case-insensitive error-body substrings meaning "this particular window
+ *   is outside the range the provider will serve" (Binance `asset/transfer` only answers for the last 6
+ *   months; its Simple Earn history caps the span at 30 days). A window failing with one of these is
+ *   skipped and the newer ones still run, instead of abandoning the whole endpoint. Never encoded when
+ *   left at the default (which covers the Binance phrasings), so it is still applied to configs written
+ *   before it existed.
  */
 @Serializable
-enum class OffsetMode { OFFSET, PAGE_NUMBER }
-
-/**
- * Pagination strategy for an API endpoint. A single flat shape carries the parameters for both
- * schemes; [mode] selects which set applies. A flat (rather than sealed) shape keeps this model
- * module free of the serialization-json artifact and stays backward compatible: legacy configs
- * persisted before [mode] existed decode with the default [PaginationMode.CURSOR] and their
- * original cursor fields.
- *
- * Cursor fields: the cursor is the minimum [cursorResponseField] across a page, sent as [cursorParam].
- *
- * Date-window fields: history is fetched in [windowDays]-long windows back to [lookbackDays] ago,
- * each request bounded by [startParam]/[endParam] (also exposed to templating as window.start/end),
- * with [extraParams] appended. Windows are anchored to fixed boundaries so earlier windows produce
- * stable, cacheable URLs; only the final window (ending "now") shifts across re-imports. The bound
- * values are encoded per [windowBoundFormat].
- *
- * Offset sub-paging: when [offsetParam] is set, each date window (or the single non-windowed request)
- * is further paged by an integer offset that starts at 0 and advances by [limitValue] until a page
- * returns fewer than [limitValue] items — or, when [totalCountField] is set, until that many items
- * have been read. This covers APIs that cap results per response and page with an offset (Kraken `ofs`).
- *
- * Incremental downloads: when earlier sessions of the same credential already covered a period, the
- * download starts at that watermark minus [incrementalOverlapDays] rather than at [lookbackDays] ago,
- * so rows the provider posts with a backdated timestamp after a download are still picked up. The
- * overlap is re-fetched every time, and duplicates are absorbed by the import deduper.
- */
-@Serializable
-data class ApiPaginationConfig(
-    val mode: PaginationMode = PaginationMode.CURSOR,
-    val limitParam: String = "limit",
-    val limitValue: Int = 100,
-    val cursorParam: String = "before",
-    val cursorResponseField: String = "created",
+data class ApiDateWindowing(
     val startParam: String = "intervalStart",
     val endParam: String = "intervalEnd",
     val windowDays: Int = 469,
     val lookbackDays: Int = 365 * 6,
-    @Serializable(with = SortedQueryParamListSerializer::class)
-    val extraParams: List<ApiQueryParam> = emptyList(),
-    /** Encoding of the [startParam]/[endParam] window bounds; defaults to epoch-millis. */
-    val windowBoundFormat: WindowBoundFormat = WindowBoundFormat.EPOCH_MS,
-    /** When set, page each window by this offset parameter (page size = [limitValue]); e.g. Kraken "ofs". */
-    val offsetParam: String? = null,
-    /** How [offsetParam] advances between pages; see [OffsetMode]. */
-    val offsetMode: OffsetMode = OffsetMode.OFFSET,
-    /**
-     * When true, an offset-paged request also sends [limitParam] = [limitValue] on the wire (some APIs'
-     * default page size doesn't match [limitValue] unless told explicitly - Binance `rows`/`limit`).
-     * False (the default) preserves existing strategies, whose configured [limitValue] already matches
-     * the endpoint's fixed/default page size.
-     */
-    val sendLimitParam: Boolean = false,
-    /** Optional dot-path to a total-count field in the response envelope, used to bound the offset loop. */
-    val totalCountField: String? = null,
-    /** Days of already-downloaded history an incremental download re-fetches; see the class KDoc. */
-    val incrementalOverlapDays: Int = 7,
-    /**
-     * Case-insensitive error-body substrings that mean "this particular date window is outside the range
-     * the provider will serve" (e.g. Binance `asset/transfer` only answers for the last 6 months:
-     * "-5026 Start time query records range is too large"; its Simple Earn history caps the span at 30
-     * days: "-6021 Query time range too large"). When a windowed request fails with one of these, the
-     * engine skips just that window and carries on to the newer ones instead of abandoning the whole
-     * endpoint. The default covers the Binance phrasings; other providers can override.
-     *
-     * Never encoded when left at the default (the same trick CsvStrategyConfig.fundingAttributeMatch
-     * uses) so adding the field doesn't rehash every existing strategy on catalog/Drive sync; a config
-     * carrying the default still gets it applied on decode, so the fix reaches strategies already
-     * installed.
-     */
+    val boundFormat: WindowBoundFormat = WindowBoundFormat.EPOCH_MS,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     @Serializable(with = SortedStringListSerializer::class)
-    val windowRangeErrorSubstrings: List<String> = listOf("range is too large", "time range too large"),
+    val rangeErrorSubstrings: List<String> = listOf("range is too large", "time range too large"),
+)
+
+/**
+ * How one request unit (the whole endpoint, or one [ApiDateWindowing] window) is paged. Every scheme
+ * stops on an empty page; [ApiPaginationConfig.limitValue] is the provider's page size.
+ */
+@Serializable
+sealed interface ApiPaging {
+    /** One request per unit — the response holds everything (or the provider caps it and there is no more). */
+    @Serializable
+    @SerialName("single")
+    data object Single : ApiPaging
+
     /**
-     * Dot-path to an opaque next-page token in the response envelope (Coinbase v2
-     * `pagination.next_starting_after`, Advanced Trade `cursor`). When set, every request unit — each
-     * [PaginationMode.DATE_WINDOW] window, or the single [PaginationMode.TOKEN_CURSOR] walk — keeps
-     * requesting with [cursorParam] = that token until it comes back blank or absent.
-     *
-     * Same NEVER-encode rationale as [windowRangeErrorSubstrings].
+     * An integer [param] that starts at 0 and advances by the page size (Kraken `ofs`), or with
+     * [pageNumbers] starts at 1 and advances by 1 (Binance fiat `page`). Ends on a short page, or once
+     * [totalCountField] (a dot-path into the response envelope) items have been read.
      */
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val nextCursorField: String? = null,
+    @Serializable
+    @SerialName("offset")
+    data class Offset(
+        val param: String,
+        val pageNumbers: Boolean = false,
+        val totalCountField: String? = null,
+    ) : ApiPaging
+
     /**
-     * Whether the [nextCursorField] token arrives already percent-encoded and must reach the provider
-     * byte-for-byte (Bybit `nextPageCursor`, e.g. `123%3A2%2C123%3A2`). Request params are percent-encoded
-     * when the request is built, so such a token is decoded first; otherwise it would be sent double-encoded.
-     *
-     * Same NEVER-encode rationale as [windowRangeErrorSubstrings].
+     * Newest-first paging (Monzo): each page after the first sends [param] = the earliest
+     * [positionField] timestamp of the previous page. An incremental download stops once a page reaches
+     * back past what an earlier download covered.
      */
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val nextCursorUrlEncoded: Boolean = false,
+    @Serializable
+    @SerialName("before")
+    data class BeforeCursor(
+        val param: String = "before",
+        val positionField: String = "created",
+    ) : ApiPaging
+
+    /**
+     * A forward sweep by ascending numeric id, for an endpoint whose time-range parameters are too short
+     * to sweep a full history (Binance `myTrades` caps `startTime`/`endTime` to 24h apart): each page
+     * after the first sends [param] = one past the largest [idField] seen, until a short page. Ignores
+     * the incremental watermark — a time can't seed an id cursor — and every download walks the id space
+     * from the start; the import deduper absorbs the overlap.
+     */
+    @Serializable
+    @SerialName("forwardId")
+    data class ForwardId(
+        val param: String,
+        val idField: String,
+    ) : ApiPaging
+
+    /**
+     * An opaque next-page token the response supplies at [tokenField] (a dot-path into the envelope:
+     * Coinbase `pagination.next_starting_after`, Bybit `result.nextPageCursor`), sent back as [param]
+     * until it comes back blank. With [urlEncoded], the token arrives already percent-encoded and is
+     * decoded before sending (it would otherwise be double-encoded). Outside a date window, an
+     * incremental walk stops once a page's oldest [positionField] (ISO-8601 or epoch) predates what an
+     * earlier download covered — so that relies on newest-first order.
+     */
+    @Serializable
+    @SerialName("token")
+    data class Token(
+        val tokenField: String,
+        val param: String,
+        val urlEncoded: Boolean = false,
+        val positionField: String? = null,
+    ) : ApiPaging
+}
+
+/**
+ * Pagination for an endpoint: an optional [window] split of its history, times a [paging] scheme within
+ * each request unit. [limitValue] is the page size every scheme compares against; with [sendLimitParam]
+ * it is also sent as [limitParam] (some providers' default page size differs unless told explicitly).
+ * [extraParams] are added to every windowed request.
+ *
+ * Incremental downloads: when earlier sessions of the same credential already covered a period, the
+ * download starts at that watermark minus [incrementalOverlapDays] rather than at the window's lookback
+ * (or, for [ApiPaging.BeforeCursor]/[ApiPaging.Token] walks, stops there), so rows a provider posts with
+ * a backdated timestamp after a download are still picked up. The import deduper absorbs the overlap.
+ */
+@Serializable
+data class ApiPaginationConfig(
+    val window: ApiDateWindowing? = null,
+    val paging: ApiPaging = ApiPaging.Single,
+    val limitParam: String = "limit",
+    val limitValue: Int = 100,
+    val sendLimitParam: Boolean = false,
+    @Serializable(with = SortedQueryParamListSerializer::class)
+    val extraParams: List<ApiQueryParam> = emptyList(),
+    val incrementalOverlapDays: Int = 7,
 )
 
 /**
@@ -265,7 +226,7 @@ data class ApiPaginationConfig(
  *                          `userAssetDribbletDetails` array with one entry per asset swept into BNB). The
  *                          outer elements are then only containers and never mapped themselves. Because
  *                          flattening changes how many items a page appears to hold, it must not be combined
- *                          with [ApiPaginationConfig.offsetParam] paging, whose loop compares an item count
+ *                          with [ApiPaging.Offset] paging, whose loop compares an item count
  *                          against the page size.
  */
 @Serializable
@@ -687,7 +648,7 @@ data class ApiPersonImportConfig(
 )
 
 // ---------------------------------------------------------------------------------------------
-// Proactive request signing (ApiAuthType.SIGNED) — a generic, provider-agnostic HMAC recipe.
+// Proactive request signing (ApiStrategyConfig.requestSigning) — a generic, provider-agnostic HMAC recipe.
 // One config shape expresses Crypto.com, Binance and Kraken signing without any per-provider code.
 // ---------------------------------------------------------------------------------------------
 
@@ -1087,7 +1048,7 @@ data class ApiFanOut(
 /** What kind of imported record an [ApiDataEndpoint] produces. */
 @Serializable
 enum class ApiEndpointKind {
-    /** A bank-style single-asset transaction feed (the legacy [ApiStrategyConfig.transactionsEndpoint] shape). */
+    /** A bank-style single-asset transaction feed, fetched once per account of [ApiAccountsSource.Downloaded]. */
     BANK_TRANSACTIONS,
 
     /** Executed exchange fills — cross-asset trades (two legs). */
@@ -1159,7 +1120,8 @@ enum class InstrumentSplitMode {
  * BUY the quote leg leaves and the base leg arrives; a SELL reverses them. Both legs sit on the single
  * exchange account, so the movement is a cross-asset [com.moneymanager.domain.model.Trade].
  *
- * @property instrumentField Dot-path to the pair symbol (e.g. "instrument_name").
+ * @property instrumentField Dot-path to the pair symbol (e.g. "instrument_name"); unused (null) with
+ *   [InstrumentSplitMode.EXPLICIT_FIELDS].
  * @property splitMode How [instrumentField] is split into base/quote assets.
  * @property instrumentSeparator Separator for [InstrumentSplitMode.SEPARATOR] (default "_").
  * @property baseAssetField/quoteAssetField Dot-paths for [InstrumentSplitMode.EXPLICIT_FIELDS].
@@ -1176,7 +1138,7 @@ enum class InstrumentSplitMode {
  */
 @Serializable
 data class ApiTradeMappings(
-    val instrumentField: String,
+    val instrumentField: String? = null,
     val splitMode: InstrumentSplitMode = InstrumentSplitMode.SEPARATOR,
     val instrumentSeparator: String = "_",
     val baseAssetField: String? = null,
@@ -1240,15 +1202,41 @@ data class ApiTradeMappings(
 )
 
 /**
- * Declares that this strategy imports into a single fixed account holding all assets, instead of
- * enumerating accounts from an accounts endpoint (exchanges). When set, the accounts endpoint is not
- * fetched; the account is matched/created by [externalId] with display [name].
+ * Where a strategy's own accounts come from.
  */
 @Serializable
-data class ApiSyntheticAccount(
-    val name: String,
-    val externalId: String,
-)
+sealed interface ApiAccountsSource {
+    /**
+     * Enumerated from [endpoint] (bank APIs), read via [mappings].
+     *
+     * @property identifiersEndpoint Optional per-account endpoint fetched after accounts that returns an
+     *   account's own bank details (sort code + account number) when the accounts response omits them
+     *   (Starling's `/accounts/{account.id}/identifiers`), read with [mappings]' sort code/account number
+     *   fields.
+     * @property ancestorEndpoints Resource endpoints fetched before accounts whose items supply context
+     *   ids/fields for templating descendant endpoint paths and params (Wise "profiles"). Order is
+     *   semantic: they're referenced by position via `ancestor[N].` expressions.
+     */
+    @Serializable
+    @SerialName("downloaded")
+    data class Downloaded(
+        val endpoint: ApiEndpointConfig,
+        val mappings: ApiAccountMappings = ApiAccountMappings(),
+        val identifiersEndpoint: ApiEndpointConfig? = null,
+        val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
+    ) : ApiAccountsSource
+
+    /**
+     * One fixed account holding all assets (exchanges): nothing is enumerated; the account is
+     * matched/created by [externalId] with display [name].
+     */
+    @Serializable
+    @SerialName("single")
+    data class Single(
+        val name: String,
+        val externalId: String,
+    ) : ApiAccountsSource
+}
 
 /** A bridge to another (already-imported) account this strategy's transfers should reconcile against. */
 @Serializable
@@ -1290,31 +1278,21 @@ data class ApiInternalTransferReconcile(
  * shape it is persisted (`api_import_strategy.config_json`) and exported in. Holds no database entity
  * references (only URLs, JSON field paths and enums), so it is fully portable as-is.
  *
- * @property ancestorEndpoints Resource endpoints fetched before accounts whose items supply context
- *                             ids/fields for templating descendant endpoint paths and params
- *                             (e.g. Wise "profiles"). Empty for flat two-level APIs like Monzo.
+ * @property accounts Where the strategy's own accounts come from: enumerated from an endpoint (banks), or
+ *                   one fixed account holding every asset (exchanges).
+ * @property dataEndpoints The endpoints whose items are imported. A bank strategy has one
+ *                        [ApiEndpointKind.BANK_TRANSACTIONS] feed (fetched once per account); an exchange
+ *                        several (trades, orders, deposits, withdrawals).
  * @property builtInCounterpartyRules Declarative rules routing matching transactions to a single
  *                                    consolidated built-in counterparty account (e.g. ATM).
  */
 @Serializable
 data class ApiStrategyConfig(
     val baseUrl: String,
-    val authType: ApiAuthType,
-    val accountsEndpoint: ApiEndpointConfig,
-    val transactionsEndpoint: ApiEndpointConfig,
-    val accountMappings: ApiAccountMappings,
-    val transactionMappings: ApiTransactionMappings,
+    val accounts: ApiAccountsSource,
+    @Serializable(with = SortedDataEndpointListSerializer::class)
+    val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
     val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
-    /**
-     * Optional per-account endpoint fetched after accounts that returns the account's own bank details
-     * (sort code + account number) when they are not present on the accounts response itself (e.g.
-     * Starling's `/accounts/{account.id}/identifiers`). Those fields within its response are read using
-     * [accountMappings] sortCode/accountNumber.
-     */
-    val accountIdentifiersEndpoint: ApiEndpointConfig? = null,
-    // Order is semantic (referenced by position via "ancestor[N]." dynamicSource expressions) - keeps
-    // default insertion-order serialization.
-    val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
     // First-match-wins (see resolveBuiltInCounterpartyType) - order is semantic, keeps default
     // insertion-order serialization.
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
@@ -1327,14 +1305,11 @@ data class ApiStrategyConfig(
      * provider id backfilled. Null disables external-id storage.
      */
     val personExternalIdAttribute: String? = null,
-    /** Proactive per-request signing recipe; required when [authType] is [ApiAuthType.SIGNED]. */
-    val requestSigning: ApiRequestSigningConfig? = null,
     /**
-     * Multiple data endpoints (trades/orders/deposits/withdrawals) for exchange strategies. When
-     * non-empty this supersedes [transactionsEndpoint] for the download/import loop.
+     * Proactive per-request signing (an api key + secret; exchanges). Null authenticates with a bearer
+     * token instead (bank APIs).
      */
-    @Serializable(with = SortedDataEndpointListSerializer::class)
-    val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
+    val requestSigning: ApiRequestSigningConfig? = null,
     /**
      * Endpoints fetched (unpaged loop aside — each still runs its own pagination) before
      * [dataEndpoints], purely to supply values for an [ApiFanOut] (e.g. Binance `getUserAsset` for held
@@ -1344,8 +1319,6 @@ data class ApiStrategyConfig(
      */
     @Serializable(with = SortedValueEndpointListSerializer::class)
     val valueEndpoints: List<ApiEndpointConfig> = emptyList(),
-    /** When set, import into one fixed account holding all assets instead of enumerating accounts. */
-    val syntheticAccount: ApiSyntheticAccount? = null,
     /** Reconcile internal transfers against another owned account (e.g. the Crypto.com App account). */
     val internalTransferReconcile: ApiInternalTransferReconcile? = null,
     /**
@@ -1380,4 +1353,24 @@ data class ApiStrategyConfig(
      */
     @Serializable(with = SortedStringToLongMapSerializer::class)
     val minorUnitDivisorOverrides: Map<String, Long> = emptyMap(),
-)
+) {
+    /** Whether requests are signed with an api key + secret rather than sent with a bearer token. */
+    val isSigned: Boolean get() = requestSigning != null
+
+    /** The bank transaction feed, when this is a bank strategy (accounts enumerated from an endpoint). */
+    val bankTransactions: ApiDataEndpoint?
+        get() = dataEndpoints.firstOrNull { it.kind == ApiEndpointKind.BANK_TRANSACTIONS }
+
+    /** This config with the bank feed's transaction mappings replaced by [transform]'s result. */
+    fun mapBankTransactionMappings(transform: ApiTransactionMappings.() -> ApiTransactionMappings): ApiStrategyConfig =
+        copy(
+            dataEndpoints =
+                dataEndpoints.map { endpoint ->
+                    if (endpoint.kind == ApiEndpointKind.BANK_TRANSACTIONS) {
+                        endpoint.copy(transactionMappings = transform(endpoint.transactionMappings ?: ApiTransactionMappings()))
+                    } else {
+                        endpoint
+                    }
+                },
+        )
+}

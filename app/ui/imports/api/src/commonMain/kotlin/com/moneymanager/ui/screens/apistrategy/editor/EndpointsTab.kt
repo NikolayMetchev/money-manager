@@ -18,118 +18,58 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
+import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
+import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
+import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 
 @Composable
 internal fun EndpointsTab(
     state: ApiStrategyEditorState,
     enabled: Boolean,
 ) {
+    val accounts = state.config.accounts
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        SectionHeader("Synthetic account")
+        SectionHeader("Accounts")
         Text(
             text =
-                "For exchanges that hold all assets in one account instead of an accounts endpoint. " +
-                    "When enabled, the accounts endpoint below is not fetched.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SyntheticAccountEditor(
-            account = state.config.syntheticAccount,
-            onChange = { v -> state.updateConfig { copy(syntheticAccount = v) } },
-            enabled = enabled,
-        )
-
-        Spacer(Modifier.padding(top = 4.dp))
-        HorizontalDivider()
-        SectionHeader("Accounts endpoint")
-        EndpointEditor(
-            endpoint = state.config.accountsEndpoint,
-            onChange = { v -> state.updateConfig { copy(accountsEndpoint = v) } },
-            enabled = enabled,
-        )
-
-        Spacer(Modifier.padding(top = 4.dp))
-        HorizontalDivider()
-        SectionHeader("Transactions endpoint")
-        EndpointEditor(
-            endpoint = state.config.transactionsEndpoint,
-            onChange = { v -> state.updateConfig { copy(transactionsEndpoint = v) } },
-            enabled = enabled,
-        )
-
-        Spacer(Modifier.padding(top = 4.dp))
-        HorizontalDivider()
-        SectionHeader("Account-identifiers endpoint")
-        Text(
-            text =
-                "Optional per-account endpoint returning the account's own sort code / account number " +
-                    "(e.g. Starling's /accounts/{account.id}/identifiers).",
+                "Banks list their accounts from an endpoint and fetch a transaction feed per account; exchanges " +
+                    "hold every asset in one account and fetch their data endpoints instead.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ToggleRow(
-            label = "Enable account-identifiers endpoint",
-            checked = state.config.accountIdentifiersEndpoint != null,
-            onCheckedChange = { on ->
+            label = "Single account (exchanges)",
+            checked = accounts is ApiAccountsSource.Single,
+            onCheckedChange = { single ->
                 state.updateConfig {
-                    copy(
-                        accountIdentifiersEndpoint =
-                            if (on) {
-                                ApiEndpointConfig(path = "/accounts/{account.id}/identifiers", responseArrayKey = "")
-                            } else {
-                                null
-                            },
-                    )
+                    if (single) {
+                        copy(
+                            accounts = ApiAccountsSource.Single(name = "", externalId = ""),
+                            dataEndpoints = dataEndpoints.filter { it.kind != ApiEndpointKind.BANK_TRANSACTIONS },
+                        )
+                    } else {
+                        copy(
+                            accounts =
+                                ApiAccountsSource.Downloaded(endpoint = DEFAULT_ACCOUNTS_ENDPOINT),
+                            dataEndpoints =
+                                dataEndpoints +
+                                    ApiDataEndpoint(
+                                        endpoint = DEFAULT_TRANSACTIONS_ENDPOINT,
+                                        kind = ApiEndpointKind.BANK_TRANSACTIONS,
+                                        transactionMappings = ApiTransactionMappings(),
+                                    ),
+                        )
+                    }
                 }
             },
             enabled = enabled,
         )
-        state.config.accountIdentifiersEndpoint?.let { endpoint ->
-            EndpointEditor(
-                endpoint = endpoint,
-                onChange = { v -> state.updateConfig { copy(accountIdentifiersEndpoint = v) } },
-                enabled = enabled,
-            )
-        }
-
-        Spacer(Modifier.padding(top = 4.dp))
-        HorizontalDivider()
-        SectionHeader("Ancestor endpoints")
-        Text(
-            text =
-                "Resource endpoints fetched before accounts whose items supply ids/fields for " +
-                    "templating (e.g. Wise profiles). Order matters: referenced as ancestor[0], ancestor[1]…",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        state.config.ancestorEndpoints.forEachIndexed { index, endpoint ->
-            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors()) {
-                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    EditorCardHeader(
-                        title = "ancestor[$index]",
-                        onRemove = { state.updateConfig { copy(ancestorEndpoints = ancestorEndpoints.minusAt(index)) } },
-                        enabled = enabled,
-                    )
-                    EndpointEditor(
-                        endpoint = endpoint,
-                        onChange = { updated ->
-                            state.updateConfig { copy(ancestorEndpoints = ancestorEndpoints.replacingAt(index, updated)) }
-                        },
-                        enabled = enabled,
-                    )
-                }
-            }
-        }
-        TextButton(
-            onClick = {
-                state.updateConfig { copy(ancestorEndpoints = ancestorEndpoints + ApiEndpointConfig(path = "", responseArrayKey = "")) }
-            },
-            enabled = enabled,
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null)
-            Spacer(Modifier.width(4.dp))
-            Text("Add ancestor endpoint")
+        when (accounts) {
+            is ApiAccountsSource.Single ->
+                SingleAccountEditor(a = accounts, onChange = { v -> state.updateConfig { copy(accounts = v) } }, enabled = enabled)
+            is ApiAccountsSource.Downloaded -> DownloadedAccountsEditor(state, accounts, enabled)
         }
 
         Spacer(Modifier.padding(top = 4.dp))
@@ -137,15 +77,125 @@ internal fun EndpointsTab(
         SectionHeader("Data endpoints")
         Text(
             text =
-                "Additional endpoints an exchange exposes (trades, orders, deposits, withdrawals), each " +
-                    "producing a different kind of record.",
+                "Further endpoints whose items are imported (an exchange's trades, orders, deposits, withdrawals), " +
+                    "each producing a different kind of record.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        val bankFeed = state.config.dataEndpoints.filter { it.kind == ApiEndpointKind.BANK_TRANSACTIONS }
         DataEndpointsEditor(
-            endpoints = state.config.dataEndpoints,
-            onChange = { v -> state.updateConfig { copy(dataEndpoints = v) } },
+            endpoints = state.config.dataEndpoints.filter { it.kind != ApiEndpointKind.BANK_TRANSACTIONS },
+            onChange = { v -> state.updateConfig { copy(dataEndpoints = bankFeed + v) } },
             enabled = enabled,
         )
+    }
+}
+
+/** The accounts endpoint, identifiers and ancestors of a bank strategy, plus its transaction feed endpoint. */
+@Composable
+private fun DownloadedAccountsEditor(
+    state: ApiStrategyEditorState,
+    accounts: ApiAccountsSource.Downloaded,
+    enabled: Boolean,
+) {
+    fun update(block: ApiAccountsSource.Downloaded.() -> ApiAccountsSource.Downloaded) =
+        state.updateConfig { copy(accounts = (this.accounts as ApiAccountsSource.Downloaded).block()) }
+
+    SectionHeader("Accounts endpoint")
+    EndpointEditor(endpoint = accounts.endpoint, onChange = { v -> update { copy(endpoint = v) } }, enabled = enabled)
+
+    state.config.bankTransactions?.let { feed ->
+        Spacer(Modifier.padding(top = 4.dp))
+        HorizontalDivider()
+        SectionHeader("Transactions endpoint (fetched per account)")
+        EndpointEditor(
+            endpoint = feed.endpoint,
+            onChange = { v ->
+                state.updateConfig {
+                    copy(
+                        dataEndpoints =
+                            dataEndpoints.map {
+                                if (it.kind ==
+                                    ApiEndpointKind.BANK_TRANSACTIONS
+                                ) {
+                                    it.copy(endpoint = v)
+                                } else {
+                                    it
+                                }
+                            },
+                    )
+                }
+            },
+            enabled = enabled,
+        )
+    }
+
+    Spacer(Modifier.padding(top = 4.dp))
+    HorizontalDivider()
+    SectionHeader("Account-identifiers endpoint")
+    Text(
+        text =
+            "Optional per-account endpoint returning the account's own sort code / account number " +
+                "(e.g. Starling's /accounts/{account.id}/identifiers).",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    ToggleRow(
+        label = "Enable account-identifiers endpoint",
+        checked = accounts.identifiersEndpoint != null,
+        onCheckedChange = { on ->
+            update {
+                copy(
+                    identifiersEndpoint =
+                        if (on) {
+                            ApiEndpointConfig(
+                                path = "/accounts/{account.id}/identifiers",
+                                responseArrayKey = "",
+                            )
+                        } else {
+                            null
+                        },
+                )
+            }
+        },
+        enabled = enabled,
+    )
+    accounts.identifiersEndpoint?.let { endpoint ->
+        EndpointEditor(endpoint = endpoint, onChange = { v -> update { copy(identifiersEndpoint = v) } }, enabled = enabled)
+    }
+
+    Spacer(Modifier.padding(top = 4.dp))
+    HorizontalDivider()
+    SectionHeader("Ancestor endpoints")
+    Text(
+        text =
+            "Resource endpoints fetched before accounts whose items supply ids/fields for " +
+                "templating (e.g. Wise profiles). Order matters: referenced as ancestor[0], ancestor[1]…",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    accounts.ancestorEndpoints.forEachIndexed { index, endpoint ->
+        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors()) {
+            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                EditorCardHeader(
+                    title = "ancestor[$index]",
+                    onRemove = { update { copy(ancestorEndpoints = ancestorEndpoints.minusAt(index)) } },
+                    enabled = enabled,
+                )
+                EndpointEditor(
+                    endpoint = endpoint,
+                    onChange = { updated -> update { copy(ancestorEndpoints = ancestorEndpoints.replacingAt(index, updated)) } },
+                    enabled = enabled,
+                )
+            }
+        }
+    }
+    TextButton(
+        onClick = { update { copy(ancestorEndpoints = ancestorEndpoints + ApiEndpointConfig(path = "", responseArrayKey = "")) } },
+        enabled = enabled,
+    ) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(Modifier.width(4.dp))
+        Text("Add ancestor endpoint")
     }
 }

@@ -4,15 +4,17 @@ import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAccountNameRule
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
-import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
+import com.moneymanager.domain.model.apistrategy.ApiDateWindowing
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiFanOut
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
@@ -21,7 +23,6 @@ import com.moneymanager.domain.model.apistrategy.ApiServerTimeSync
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
-import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.ApiValueSet
@@ -35,8 +36,6 @@ import com.moneymanager.domain.model.apistrategy.JwtField
 import com.moneymanager.domain.model.apistrategy.JwtSigningConfig
 import com.moneymanager.domain.model.apistrategy.NonceFormat
 import com.moneymanager.domain.model.apistrategy.NonceSpec
-import com.moneymanager.domain.model.apistrategy.OffsetMode
-import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.ParamStringFormat
 import com.moneymanager.domain.model.apistrategy.RequestIdSpec
 import com.moneymanager.domain.model.apistrategy.RuleSign
@@ -77,53 +76,61 @@ object BuiltInApiStrategies {
             config =
                 ApiStrategyConfig(
                     baseUrl = "https://api.monzo.com",
-                    authType = ApiAuthType.BEARER_TOKEN,
-                    accountsEndpoint =
-                        ApiEndpointConfig(
-                            path = "/accounts",
-                            responseArrayKey = "accounts",
-                        ),
-                    transactionsEndpoint =
-                        ApiEndpointConfig(
-                            path = "/transactions",
-                            responseArrayKey = "transactions",
-                            queryParams =
-                                listOf(
-                                    ApiQueryParam(name = "account_id", dynamicSource = "account.id"),
+                    accounts =
+                        ApiAccountsSource.Downloaded(
+                            endpoint =
+                                ApiEndpointConfig(
+                                    path = "/accounts",
+                                    responseArrayKey = "accounts",
                                 ),
-                            pagination = ApiPaginationConfig(),
+                            mappings =
+                                ApiAccountMappings(
+                                    ownerNameField = "preferred_name",
+                                    // Monzo's account "description" is the account holder's own user id, not a
+                                    // display name — Monzo's API has no field meant for this, so use a fixed name
+                                    // ("Monzo Joint" for a joint account, detected by having more than one owner).
+                                    staticAccountName = "Monzo",
+                                    // Monzo's cashback/rewards opt-in is a pseudo-account with no bank details and (for
+                                    // most users) no activity — it would otherwise collide with the main "Monzo" name.
+                                    accountNameRules =
+                                        listOf(
+                                            ApiAccountNameRule(
+                                                suffix = "Rewards",
+                                                predicates = listOf(Condition("type", ConditionOp.EQUALS, value = "uk_rewards")),
+                                            ),
+                                        ),
+                                ),
                         ),
-                    accountMappings =
-                        ApiAccountMappings(
-                            ownerNameField = "preferred_name",
-                            // Monzo's account "description" is the account holder's own user id, not a
-                            // display name — Monzo's API has no field meant for this, so use a fixed name
-                            // ("Monzo Joint" for a joint account, detected by having more than one owner).
-                            staticAccountName = "Monzo",
-                            // Monzo's cashback/rewards opt-in is a pseudo-account with no bank details and (for
-                            // most users) no activity — it would otherwise collide with the main "Monzo" name.
-                            accountNameRules =
-                                listOf(
-                                    ApiAccountNameRule(
-                                        suffix = "Rewards",
-                                        predicates = listOf(Condition("type", ConditionOp.EQUALS, value = "uk_rewards")),
+                    dataEndpoints =
+                        listOf(
+                            ApiDataEndpoint(
+                                endpoint =
+                                    ApiEndpointConfig(
+                                        path = "/transactions",
+                                        responseArrayKey = "transactions",
+                                        queryParams =
+                                            listOf(
+                                                ApiQueryParam(name = "account_id", dynamicSource = "account.id"),
+                                            ),
+                                        pagination = ApiPaginationConfig(paging = ApiPaging.BeforeCursor(), sendLimitParam = true),
                                     ),
-                                ),
-                        ),
-                    transactionMappings =
-                        ApiTransactionMappings(
-                            merchantNameField = "merchant.name",
-                            counterpartyNameField = "counterparty.name",
-                            counterpartyIdField = "counterparty.id",
-                            declinedWhen = listOf(Condition("decline_reason", ConditionOp.NOT_BLANK)),
-                            localAmountField = "local_amount",
-                            localCurrencyField = "local_currency",
-                            // Foreign ATM withdrawals above the fee-free allowance carry a charge in
-                            // `atm_fees_detailed.fee_amount` (integer minor units; null/0 otherwise). Import it
-                            // as its own linked fee transfer. Monzo's `amount` is gross (= withdrawal_amount +
-                            // fee_amount), so the fee is carved out of the main transfer rather than added on top.
-                            feeAmountField = "atm_fees_detailed.fee_amount",
-                            feeIncludedInAmount = true,
+                                kind = ApiEndpointKind.BANK_TRANSACTIONS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        merchantNameField = "merchant.name",
+                                        counterpartyNameField = "counterparty.name",
+                                        counterpartyIdField = "counterparty.id",
+                                        declinedWhen = listOf(Condition("decline_reason", ConditionOp.NOT_BLANK)),
+                                        localAmountField = "local_amount",
+                                        localCurrencyField = "local_currency",
+                                        // Foreign ATM withdrawals above the fee-free allowance carry a charge in
+                                        // `atm_fees_detailed.fee_amount` (integer minor units; null/0 otherwise). Import it
+                                        // as its own linked fee transfer. Monzo's `amount` is gross (= withdrawal_amount +
+                                        // fee_amount), so the fee is carved out of the main transfer rather than added on top.
+                                        feeAmountField = "atm_fees_detailed.fee_amount",
+                                        feeIncludedInAmount = true,
+                                    ),
+                            ),
                         ),
                     // Monzo issues a throwaway `anonuser_…` user id for every bank transfer, so the same person
                     // would otherwise become one counterparty account per transaction. Mark the prefix ephemeral
@@ -192,53 +199,64 @@ object BuiltInApiStrategies {
             config =
                 ApiStrategyConfig(
                     baseUrl = "https://api.wise.com",
-                    authType = ApiAuthType.BEARER_TOKEN,
-                    ancestorEndpoints =
-                        listOf(
-                            ApiEndpointConfig(path = "/v1/profiles", responseArrayKey = ""),
-                        ),
-                    accountsEndpoint =
-                        ApiEndpointConfig(
-                            path = "/v4/profiles/{ancestor[0].id}/balances",
-                            responseArrayKey = "",
-                            queryParams = listOf(ApiQueryParam(name = "types", value = "STANDARD")),
-                        ),
-                    transactionsEndpoint =
-                        ApiEndpointConfig(
-                            path = "/v1/profiles/{ancestor[0].id}/balance-statements/{account.id}/statement.json",
-                            responseArrayKey = "transactions",
-                            queryParams =
-                                listOf(
-                                    ApiQueryParam(name = "currency", dynamicSource = "account.currency"),
-                                    ApiQueryParam(name = "type", value = "FLAT"),
+                    accounts =
+                        ApiAccountsSource.Downloaded(
+                            endpoint =
+                                ApiEndpointConfig(
+                                    path = "/v4/profiles/{ancestor[0].id}/balances",
+                                    responseArrayKey = "",
+                                    queryParams = listOf(ApiQueryParam(name = "types", value = "STANDARD")),
                                 ),
-                            // startParam/endParam/windowDays default to Wise's values (intervalStart,
-                            // intervalEnd, 469).
-                            pagination = ApiPaginationConfig(mode = PaginationMode.DATE_WINDOW),
+                            mappings =
+                                ApiAccountMappings(
+                                    // Balances only have a "name" when the user explicitly names them (null by
+                                    // default), which made account names fall back to the opaque balance id.
+                                    // Use the currency code instead so accounts are named "Wise: EUR" etc.,
+                                    // matching the accounts the built-in Wise CSV strategy resolves per-row.
+                                    descriptionField = "currency",
+                                    ownersArrayField = null,
+                                    currencyField = "currency",
+                                ),
+                            ancestorEndpoints =
+                                listOf(
+                                    ApiEndpointConfig(path = "/v1/profiles", responseArrayKey = ""),
+                                ),
                         ),
-                    accountMappings =
-                        ApiAccountMappings(
-                            // Balances only have a "name" when the user explicitly names them (null by
-                            // default), which made account names fall back to the opaque balance id.
-                            // Use the currency code instead so accounts are named "Wise: EUR" etc.,
-                            // matching the accounts the built-in Wise CSV strategy resolves per-row.
-                            descriptionField = "currency",
-                            ownersArrayField = null,
-                            currencyField = "currency",
-                        ),
-                    transactionMappings =
-                        ApiTransactionMappings(
-                            amountField = "amount.value",
-                            currencyField = "amount.currency",
-                            timestampField = "date",
-                            descriptionField = "details.description",
-                            amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                            signSource = ApiSignSource.FIELD,
-                            signField = "type",
-                            creditValues = setOf("CREDIT"),
-                            idField = "referenceNumber",
-                            merchantNameField = "details.merchant.name",
-                            counterpartyNameField = "details.senderName",
+                    dataEndpoints =
+                        listOf(
+                            ApiDataEndpoint(
+                                endpoint =
+                                    ApiEndpointConfig(
+                                        path = "/v1/profiles/{ancestor[0].id}/balance-statements/{account.id}/statement.json",
+                                        responseArrayKey = "transactions",
+                                        queryParams =
+                                            listOf(
+                                                ApiQueryParam(name = "currency", dynamicSource = "account.currency"),
+                                                ApiQueryParam(name = "type", value = "FLAT"),
+                                            ),
+                                        // startParam/endParam/windowDays default to Wise's values (intervalStart,
+                                        // intervalEnd, 469).
+                                        pagination =
+                                            ApiPaginationConfig(
+                                                window = ApiDateWindowing(boundFormat = WindowBoundFormat.ISO_8601),
+                                            ),
+                                    ),
+                                kind = ApiEndpointKind.BANK_TRANSACTIONS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        amountField = "amount.value",
+                                        currencyField = "amount.currency",
+                                        timestampField = "date",
+                                        descriptionField = "details.description",
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        signSource = ApiSignSource.FIELD,
+                                        signField = "type",
+                                        creditValues = setOf("CREDIT"),
+                                        idField = "referenceNumber",
+                                        merchantNameField = "details.merchant.name",
+                                        counterpartyNameField = "details.senderName",
+                                    ),
+                            ),
                         ),
                     // Wise balance statements are SCA-protected: a 403 returns an x-2fa-approval one-time
                     // token that must be signed with the credential's private key and replayed. Statements
@@ -290,69 +308,77 @@ object BuiltInApiStrategies {
             config =
                 ApiStrategyConfig(
                     baseUrl = "https://api.starlingbank.com",
-                    authType = ApiAuthType.BEARER_TOKEN,
-                    accountsEndpoint =
-                        ApiEndpointConfig(
-                            path = "/api/v2/accounts",
-                            responseArrayKey = "accounts",
-                        ),
-                    transactionsEndpoint =
-                        ApiEndpointConfig(
-                            // {account.defaultCategory} resolves the account's defaultCategory from its raw
-                            // JSON; the feed endpoint returns the full history in a single response.
-                            path = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
-                            responseArrayKey = "feedItems",
-                            // Starling requires a mandatory `changesSince` ISO-8601 bound; anchoring it to
-                            // the epoch returns the account's entire feed history in one response.
-                            queryParams =
-                                listOf(
-                                    ApiQueryParam(name = "changesSince", value = "1970-01-01T00:00:00.000Z"),
+                    accounts =
+                        ApiAccountsSource.Downloaded(
+                            endpoint =
+                                ApiEndpointConfig(
+                                    path = "/api/v2/accounts",
+                                    responseArrayKey = "accounts",
+                                ),
+                            mappings =
+                                ApiAccountMappings(
+                                    idField = "accountUid",
+                                    descriptionField = "name",
+                                    currencyField = "currency",
+                                    ownersArrayField = null,
+                                    // Starling's /accounts response omits bank details; they come from the
+                                    // account-identifiers endpoint below, where the sort code is `bankIdentifier`
+                                    // and the account number is `accountIdentifier`.
+                                    sortCodeField = "bankIdentifier",
+                                    accountNumberField = "accountIdentifier",
+                                ),
+                            identifiersEndpoint =
+                                ApiEndpointConfig(
+                                    path = "/api/v2/accounts/{account.id}/identifiers",
+                                    responseArrayKey = "",
                                 ),
                         ),
-                    accountMappings =
-                        ApiAccountMappings(
-                            idField = "accountUid",
-                            descriptionField = "name",
-                            currencyField = "currency",
-                            ownersArrayField = null,
-                            // Starling's /accounts response omits bank details; they come from the
-                            // account-identifiers endpoint below, where the sort code is `bankIdentifier`
-                            // and the account number is `accountIdentifier`.
-                            sortCodeField = "bankIdentifier",
-                            accountNumberField = "accountIdentifier",
+                    dataEndpoints =
+                        listOf(
+                            ApiDataEndpoint(
+                                endpoint =
+                                    ApiEndpointConfig(
+                                        // {account.defaultCategory} resolves the account's defaultCategory from its raw
+                                        // JSON; the feed endpoint returns the full history in a single response.
+                                        path = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
+                                        responseArrayKey = "feedItems",
+                                        // Starling requires a mandatory `changesSince` ISO-8601 bound; anchoring it to
+                                        // the epoch returns the account's entire feed history in one response.
+                                        queryParams =
+                                            listOf(
+                                                ApiQueryParam(name = "changesSince", value = "1970-01-01T00:00:00.000Z"),
+                                            ),
+                                    ),
+                                kind = ApiEndpointKind.BANK_TRANSACTIONS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        amountField = "amount.minorUnits",
+                                        currencyField = "amount.currency",
+                                        timestampField = "transactionTime",
+                                        descriptionField = "reference",
+                                        amountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
+                                        signSource = ApiSignSource.FIELD,
+                                        signField = "direction",
+                                        creditValues = setOf("IN"),
+                                        idField = "feedItemUid",
+                                        counterpartyNameField = "counterPartyName",
+                                        // counterPartyUid is the fallback counterparty-account id; bank details
+                                        // (sub-entity sort code + account number) take precedence where present, see
+                                        // peopleMappings.preferBankIdentity. A single real account can otherwise be
+                                        // split across uids (e.g. the same account as both a payee and a sender).
+                                        counterpartyIdField = "counterPartyUid",
+                                        // Declined feed items never moved money; import them but exclude from balances
+                                        // (same treatment as Monzo's `decline_reason`), keyed off Starling's status.
+                                        declinedWhen = listOf(Condition("status", ConditionOp.IN, value = "DECLINED")),
+                                        // Persist the feed item's stable id as a transaction attribute so each imported
+                                        // transfer is uniquely identifiable and re-imports dedupe on it.
+                                        customFields = mapOf("starling-transaction-id" to "feedItemUid"),
+                                        uniqueIdentifierFields = setOf("starling-transaction-id"),
+                                    ),
+                            ),
                         ),
                     // Per-account endpoint that returns the account's own sort code + account number, so the
                     // source account can be matched/merged with counterparties other providers create for it.
-                    accountIdentifiersEndpoint =
-                        ApiEndpointConfig(
-                            path = "/api/v2/accounts/{account.id}/identifiers",
-                            responseArrayKey = "",
-                        ),
-                    transactionMappings =
-                        ApiTransactionMappings(
-                            amountField = "amount.minorUnits",
-                            currencyField = "amount.currency",
-                            timestampField = "transactionTime",
-                            descriptionField = "reference",
-                            amountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
-                            signSource = ApiSignSource.FIELD,
-                            signField = "direction",
-                            creditValues = setOf("IN"),
-                            idField = "feedItemUid",
-                            counterpartyNameField = "counterPartyName",
-                            // counterPartyUid is the fallback counterparty-account id; bank details
-                            // (sub-entity sort code + account number) take precedence where present, see
-                            // peopleMappings.preferBankIdentity. A single real account can otherwise be
-                            // split across uids (e.g. the same account as both a payee and a sender).
-                            counterpartyIdField = "counterPartyUid",
-                            // Declined feed items never moved money; import them but exclude from balances
-                            // (same treatment as Monzo's `decline_reason`), keyed off Starling's status.
-                            declinedWhen = listOf(Condition("status", ConditionOp.IN, value = "DECLINED")),
-                            // Persist the feed item's stable id as a transaction attribute so each imported
-                            // transfer is uniquely identifiable and re-imports dedupe on it.
-                            customFields = mapOf("starling-transaction-id" to "feedItemUid"),
-                            uniqueIdentifierFields = setOf("starling-transaction-id"),
-                        ),
                     // Starling's counterparty fields are flat on the feed item (no nested object), so the
                     // counterparty object path is blank (the item itself). PAYEE/SENDER counterparties are
                     // people; MERCHANT/STARLING are not. counterPartyUid identifies the person.
@@ -403,24 +429,15 @@ object BuiltInApiStrategies {
      * connecting real keys (the shapes are covered by the db-level E2E test).
      */
     fun cryptoComExchange(now: Instant): ApiImportStrategy {
-        val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
         // get-deposit-history / get-withdrawal-history serve years of history, so page a long lookback.
         val historyWindow =
-            ApiPaginationConfig(
-                mode = PaginationMode.DATE_WINDOW,
-                startParam = "start_ts",
-                endParam = "end_ts",
-                windowDays = 90,
-            )
+            ApiPaginationConfig(window = ApiDateWindowing(startParam = "start_ts", endParam = "end_ts", windowDays = 90))
         // get-trades / get-order-history only serve the last 6 months (older trades come from the CSV
         // import) and cap the window at 7 days; unlike the deposit/withdrawal endpoints they take
         // start_time/end_time (start_ts/end_ts is silently ignored and defaults to the last 24h).
         val recentWindow =
-            historyWindow.copy(
-                startParam = "start_time",
-                endParam = "end_time",
-                windowDays = 7,
-                lookbackDays = 180,
+            ApiPaginationConfig(
+                window = ApiDateWindowing(startParam = "start_time", endParam = "end_time", windowDays = 7, lookbackDays = 180),
             )
 
         fun signed(
@@ -490,11 +507,6 @@ object BuiltInApiStrategies {
             config =
                 ApiStrategyConfig(
                     baseUrl = "https://api.crypto.com/exchange/v1",
-                    authType = ApiAuthType.SIGNED,
-                    accountsEndpoint = unused,
-                    transactionsEndpoint = unused,
-                    accountMappings = ApiAccountMappings(),
-                    transactionMappings = ApiTransactionMappings(),
                     requestSigning =
                         ApiRequestSigningConfig(
                             algorithm = SigningAlgorithm.HMAC_SHA256,
@@ -514,7 +526,7 @@ object BuiltInApiStrategies {
                             bodyFormat = BodyFormat.JSON_ENVELOPE,
                             paramsEnvelopeKey = "params",
                         ),
-                    syntheticAccount = ApiSyntheticAccount(name = "Crypto.com Exchange", externalId = "crypto-com-exchange"),
+                    accounts = ApiAccountsSource.Single(name = "Crypto.com Exchange", externalId = "crypto-com-exchange"),
                     dataEndpoints =
                         listOf(
                             ApiDataEndpoint(
@@ -573,20 +585,14 @@ object BuiltInApiStrategies {
      * keys (same caveat as the Crypto.com built-in).
      */
     fun kraken(now: Instant): ApiImportStrategy {
-        val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
         // Both TradesHistory and Ledgers page the same way: a date window (Kraken's start/end are whole
         // seconds, not millis) further paged by an offset ("ofs") in `limitValue`-sized chunks, bounded
         // by the response's total `result.count`.
         val historyWindow =
             ApiPaginationConfig(
-                mode = PaginationMode.DATE_WINDOW,
-                startParam = "start",
-                endParam = "end",
-                windowBoundFormat = WindowBoundFormat.EPOCH_S,
-                windowDays = 90,
-                offsetParam = "ofs",
+                window = ApiDateWindowing(startParam = "start", endParam = "end", windowDays = 90, boundFormat = WindowBoundFormat.EPOCH_S),
+                paging = ApiPaging.Offset(param = "ofs", totalCountField = "result.count"),
                 limitValue = 50,
-                totalCountField = "result.count",
             )
 
         fun signed(
@@ -728,11 +734,6 @@ object BuiltInApiStrategies {
             config =
                 ApiStrategyConfig(
                     baseUrl = "https://api.kraken.com",
-                    authType = ApiAuthType.SIGNED,
-                    accountsEndpoint = unused,
-                    transactionsEndpoint = unused,
-                    accountMappings = ApiAccountMappings(),
-                    transactionMappings = ApiTransactionMappings(),
                     requestSigning =
                         ApiRequestSigningConfig(
                             algorithm = SigningAlgorithm.HMAC_SHA512,
@@ -744,7 +745,7 @@ object BuiltInApiStrategies {
                             signature = FieldPlacement(SigFieldLocation.HEADER, "API-Sign"),
                             bodyFormat = BodyFormat.FORM_URLENCODED,
                         ),
-                    syntheticAccount = ApiSyntheticAccount(name = "Kraken", externalId = "kraken"),
+                    accounts = ApiAccountsSource.Single(name = "Kraken", externalId = "kraken"),
                     dataEndpoints =
                         listOf(
                             ApiDataEndpoint(
@@ -790,13 +791,11 @@ object BuiltInApiStrategies {
                                         "refid",
                                     ).copy(excludeWhen = listOf(Condition("type", ConditionOp.IN, value = "trade"))),
                             ),
-                            // Known limitation: Kraken paginates these funding-status endpoints with an opaque
-                            // cursor token (not the offset/date-window shapes the generic engine implements), so
-                            // only the first page is fetched here — enrichment (on-chain address/txid) beyond
-                            // that page is silently skipped, though the underlying deposit/withdrawal transfer
-                            // itself (from Ledgers, above) is unaffected. Extending PaginationMode.CURSOR to the
-                            // exchange engine to cover this needs the real cursor field verified against a live
-                            // response before it's worth adding.
+                            // Known limitation: Kraken pages these funding-status endpoints with an opaque cursor
+                            // token, so only the first page is fetched here — enrichment (on-chain address/txid)
+                            // beyond that page is silently skipped, though the underlying deposit/withdrawal
+                            // transfer itself (from Ledgers, above) is unaffected. ApiPaging.Token can express it,
+                            // but the cursor's field name needs verifying against a live response first.
                             ApiDataEndpoint(
                                 signed("0/private/DepositStatus", "result", pagination = null, requestCostWeight = 1),
                                 ApiEndpointKind.DEPOSITS,
@@ -851,23 +850,17 @@ object BuiltInApiStrategies {
      * payments, so a fully-disposed-of asset is still swept) with a static list of quote assets,
      * intersected against `exchangeInfo`'s real symbol universe so a nonexistent pair is never
      * requested. `myTrades` also caps `startTime`/`endTime` to 24h apart, so it pages by ascending trade
-     * id instead ([PaginationMode.FORWARD_ID_CURSOR]) rather than by date window.
+     * id instead ([ApiPaging.ForwardId]) rather than by date window.
      *
      * Field paths follow the Binance REST docs; verify against a live response when connecting real
      * keys (same caveat as the Kraken/Crypto.com built-ins).
      */
     fun binance(now: Instant): ApiImportStrategy {
-        val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
-
         // Deposit/withdrawal history: a date window further paged by "offset"/"limit" (max 1000/page).
         val cryptoHistoryWindow =
             ApiPaginationConfig(
-                mode = PaginationMode.DATE_WINDOW,
-                startParam = "startTime",
-                endParam = "endTime",
-                windowBoundFormat = WindowBoundFormat.EPOCH_MS,
-                windowDays = 90,
-                offsetParam = "offset",
+                window = ApiDateWindowing(startParam = "startTime", endParam = "endTime", windowDays = 90),
+                paging = ApiPaging.Offset(param = "offset"),
                 limitValue = 1_000,
                 sendLimitParam = true,
             )
@@ -876,45 +869,27 @@ object BuiltInApiStrategies {
         // bounded by the envelope's top-level "total".
         val fiatHistoryWindow =
             ApiPaginationConfig(
-                mode = PaginationMode.DATE_WINDOW,
-                startParam = "beginTime",
-                endParam = "endTime",
-                windowBoundFormat = WindowBoundFormat.EPOCH_MS,
-                windowDays = 90,
-                offsetParam = "page",
-                offsetMode = OffsetMode.PAGE_NUMBER,
+                window = ApiDateWindowing(startParam = "beginTime", endParam = "endTime", windowDays = 90),
+                paging = ApiPaging.Offset(param = "page", pageNumbers = true, totalCountField = "total"),
                 limitParam = "rows",
                 limitValue = 500,
                 sendLimitParam = true,
-                totalCountField = "total",
             )
 
         // Convert's tradeFlow enforces a hard 30-day max between startTime/endTime.
         val convertWindow =
-            ApiPaginationConfig(
-                mode = PaginationMode.DATE_WINDOW,
-                startParam = "startTime",
-                endParam = "endTime",
-                windowBoundFormat = WindowBoundFormat.EPOCH_MS,
-                windowDays = 30,
-            )
+            ApiPaginationConfig(window = ApiDateWindowing(startParam = "startTime", endParam = "endTime", windowDays = 30))
 
         // Simple Earn history: a date window (Binance's subscription/redemption/rewards history endpoints
         // reject a startTime/endTime span longer than 30 days with "-6021 Query time range too large")
         // further paged by 1-based "current"/"size" (max 100/page), bounded by the envelope's top-level "total".
         val earnHistoryWindow =
             ApiPaginationConfig(
-                mode = PaginationMode.DATE_WINDOW,
-                startParam = "startTime",
-                endParam = "endTime",
-                windowBoundFormat = WindowBoundFormat.EPOCH_MS,
-                windowDays = 30,
-                offsetParam = "current",
-                offsetMode = OffsetMode.PAGE_NUMBER,
+                window = ApiDateWindowing(startParam = "startTime", endParam = "endTime", windowDays = 30),
+                paging = ApiPaging.Offset(param = "current", pageNumbers = true, totalCountField = "total"),
                 // "size" caps at 100 a page, which is already ApiPaginationConfig's default limitValue.
                 limitParam = "size",
                 sendLimitParam = true,
-                totalCountField = "total",
             )
 
         // asset/transfer "Support query within the last 6 months only" - a startTime older than that is
@@ -923,26 +898,18 @@ object BuiltInApiStrategies {
         // rather than the default multi-year lookback. dateWindows anchors the first window's start down
         // to a windowDays-grid boundary, so it can reach ~windowDays before lookbackDays - 135 + 30 keeps
         // the earliest startTime the engine ever sends comfortably inside 6 months.
-        val universalTransferWindow = earnHistoryWindow.copy(windowDays = 30, lookbackDays = 135)
+        val universalTransferWindow = earnHistoryWindow.copy(window = earnHistoryWindow.window?.copy(lookbackDays = 135))
 
         // dribblet has no page/offset scheme at all, which is exactly what [nestedItemsKey] requires (a
         // flattened page's item count no longer matches the page size an offset loop compares against).
         val dustWindow =
-            ApiPaginationConfig(
-                mode = PaginationMode.DATE_WINDOW,
-                startParam = "startTime",
-                endParam = "endTime",
-                windowBoundFormat = WindowBoundFormat.EPOCH_MS,
-                windowDays = 30,
-            )
+            ApiPaginationConfig(window = ApiDateWindowing(startParam = "startTime", endParam = "endTime", windowDays = 30))
 
         // myTrades needs a symbol (see fan-out below) and caps startTime/endTime to 24h, so it walks
         // forward by trade id instead of by date window.
         val spotTradeCursor =
             ApiPaginationConfig(
-                mode = PaginationMode.FORWARD_ID_CURSOR,
-                cursorParam = "fromId",
-                cursorResponseField = "id",
+                paging = ApiPaging.ForwardId(param = "fromId", idField = "id"),
                 limitValue = 1_000,
                 sendLimitParam = true,
             )
@@ -1105,13 +1072,7 @@ object BuiltInApiStrategies {
             signed(
                 "sapi/v1/asset/assetDividend",
                 "rows",
-                earnHistoryWindow.copy(
-                    offsetParam = null,
-                    limitParam = "limit",
-                    limitValue = 500,
-                    sendLimitParam = false,
-                    totalCountField = null,
-                ),
+                ApiPaginationConfig(window = earnHistoryWindow.window, limitValue = 500),
                 queryParams = listOf(ApiQueryParam(name = "limit", value = "500")),
             )
 
@@ -1177,11 +1138,6 @@ object BuiltInApiStrategies {
             config =
                 ApiStrategyConfig(
                     baseUrl = "https://api.binance.com",
-                    authType = ApiAuthType.SIGNED,
-                    accountsEndpoint = unused,
-                    transactionsEndpoint = unused,
-                    accountMappings = ApiAccountMappings(),
-                    transactionMappings = ApiTransactionMappings(),
                     requestSigning =
                         ApiRequestSigningConfig(
                             algorithm = SigningAlgorithm.HMAC_SHA256,
@@ -1202,7 +1158,7 @@ object BuiltInApiStrategies {
                             // not a wider window. Measured once per download against Binance's own clock.
                             serverTimeSync = ApiServerTimeSync(path = "api/v3/time", field = "serverTime"),
                         ),
-                    syntheticAccount = ApiSyntheticAccount(name = "Binance", externalId = "binance"),
+                    accounts = ApiAccountsSource.Single(name = "Binance", externalId = "binance"),
                     valueEndpoints =
                         listOf(
                             signed("sapi/v3/asset/getUserAsset", "", pagination = null, method = HttpMethodType.POST),
@@ -1298,7 +1254,6 @@ object BuiltInApiStrategies {
                                 ApiEndpointKind.TRADES,
                                 tradeMappings =
                                     ApiTradeMappings(
-                                        instrumentField = "unused",
                                         splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
                                         baseAssetField = "cryptoCurrency",
                                         quoteAssetField = "fiatCurrency",
@@ -1320,7 +1275,6 @@ object BuiltInApiStrategies {
                                 ApiEndpointKind.TRADES,
                                 tradeMappings =
                                     ApiTradeMappings(
-                                        instrumentField = "unused",
                                         splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
                                         baseAssetField = "cryptoCurrency",
                                         quoteAssetField = "fiatCurrency",
@@ -1342,7 +1296,6 @@ object BuiltInApiStrategies {
                                 ApiEndpointKind.TRADES,
                                 tradeMappings =
                                     ApiTradeMappings(
-                                        instrumentField = "unused",
                                         splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
                                         baseAssetField = "toAsset",
                                         quoteAssetField = "fromAsset",
@@ -1433,7 +1386,6 @@ object BuiltInApiStrategies {
                                 ApiEndpointKind.TRADES,
                                 tradeMappings =
                                     ApiTradeMappings(
-                                        instrumentField = "unused",
                                         splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
                                         fixedBaseAsset = "BNB",
                                         quoteAssetField = "fromAsset",
@@ -1538,20 +1490,16 @@ object BuiltInApiStrategies {
      * (same caveat as the other exchange built-ins).
      */
     fun coinbase(now: Instant): ApiImportStrategy {
-        val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
-
         // Page size goes on the wire via the pagination config, not as a static query param, so each
         // endpoint's key stays its bare path (FromValueEndpoint below references "v2/accounts" by it).
         fun tokenPaging(
-            mode: PaginationMode,
             cursorParam: String,
             nextCursorField: String,
+            positionField: String? = null,
         ) = ApiPaginationConfig(
-            mode = mode,
+            paging = ApiPaging.Token(tokenField = nextCursorField, param = cursorParam, positionField = positionField),
             // Default page size ("limit" = 100), sent on the wire.
             sendLimitParam = true,
-            cursorParam = cursorParam,
-            nextCursorField = nextCursorField,
         )
 
         val ledgerMappings =
@@ -1589,11 +1537,6 @@ object BuiltInApiStrategies {
             config =
                 ApiStrategyConfig(
                     baseUrl = "https://api.coinbase.com",
-                    authType = ApiAuthType.SIGNED,
-                    accountsEndpoint = unused,
-                    transactionsEndpoint = unused,
-                    accountMappings = ApiAccountMappings(),
-                    transactionMappings = ApiTransactionMappings(),
                     requestSigning =
                         ApiRequestSigningConfig(
                             jwt =
@@ -1618,13 +1561,13 @@ object BuiltInApiStrategies {
                                         ),
                                 ),
                         ),
-                    syntheticAccount = ApiSyntheticAccount(name = "Coinbase", externalId = "coinbase"),
+                    accounts = ApiAccountsSource.Single(name = "Coinbase", externalId = "coinbase"),
                     valueEndpoints =
                         listOf(
                             ApiEndpointConfig(
                                 path = "v2/accounts",
                                 responseArrayKey = "data",
-                                pagination = tokenPaging(PaginationMode.TOKEN_CURSOR, "starting_after", "pagination.next_starting_after"),
+                                pagination = tokenPaging("starting_after", "pagination.next_starting_after", positionField = "created"),
                             ),
                         ),
                     dataEndpoints =
@@ -1636,8 +1579,7 @@ object BuiltInApiStrategies {
                                     // Newest first, so an incremental walk can stop at the watermark.
                                     queryParams = listOf(ApiQueryParam(name = "order", value = "desc")),
                                     pagination =
-                                        tokenPaging(PaginationMode.TOKEN_CURSOR, "starting_after", "pagination.next_starting_after")
-                                            .copy(cursorResponseField = "created_at"),
+                                        tokenPaging("starting_after", "pagination.next_starting_after", positionField = "created_at"),
                                     // Wallet ids are lowercase UUIDs, substituted into the path.
                                     fanOut =
                                         ApiFanOut(
@@ -1684,7 +1626,6 @@ object BuiltInApiStrategies {
      * `withdrawFee`, and whether reinvested Earn yield belongs on "Bybit Earn" rather than the Bybit account.
      */
     fun bybit(now: Instant): ApiImportStrategy {
-        val unused = ApiEndpointConfig(path = "unused", responseArrayKey = "")
         val recvWindowMillis = "20000"
 
         // Every list endpoint pages a date window by nextPageCursor. Requests reaching further back than an
@@ -1692,20 +1633,19 @@ object BuiltInApiStrategies {
         fun window(
             days: Int,
             limit: Int,
-            lookbackDays: Int = ApiPaginationConfig().lookbackDays,
+            lookbackDays: Int = ApiDateWindowing().lookbackDays,
         ) = ApiPaginationConfig(
-            mode = PaginationMode.DATE_WINDOW,
-            startParam = "startTime",
-            endParam = "endTime",
-            windowBoundFormat = WindowBoundFormat.EPOCH_MS,
-            windowDays = days,
-            lookbackDays = lookbackDays,
+            window =
+                ApiDateWindowing(
+                    startParam = "startTime",
+                    endParam = "endTime",
+                    windowDays = days,
+                    lookbackDays = lookbackDays,
+                    rangeErrorSubstrings = listOf("cannot exceed", "out of range", "range is too large", "time range too large"),
+                ),
+            paging = ApiPaging.Token(tokenField = "result.nextPageCursor", param = "cursor", urlEncoded = true),
             limitValue = limit,
             sendLimitParam = true,
-            cursorParam = "cursor",
-            nextCursorField = "result.nextPageCursor",
-            nextCursorUrlEncoded = true,
-            windowRangeErrorSubstrings = listOf("cannot exceed", "out of range", "range is too large", "time range too large"),
         )
 
         // The asset endpoints require endTime - startTime < 30 days; the engine already ends every
@@ -1772,11 +1712,6 @@ object BuiltInApiStrategies {
             config =
                 ApiStrategyConfig(
                     baseUrl = "https://api.bybit.com",
-                    authType = ApiAuthType.SIGNED,
-                    accountsEndpoint = unused,
-                    transactionsEndpoint = unused,
-                    accountMappings = ApiAccountMappings(),
-                    transactionMappings = ApiTransactionMappings(),
                     requestSigning =
                         ApiRequestSigningConfig(
                             algorithm = SigningAlgorithm.HMAC_SHA256,
@@ -1794,7 +1729,7 @@ object BuiltInApiStrategies {
                             // recv window forgives.
                             serverTimeSync = ApiServerTimeSync(path = "v5/market/time", field = "time"),
                         ),
-                    syntheticAccount = ApiSyntheticAccount(name = "Bybit", externalId = "bybit"),
+                    accounts = ApiAccountsSource.Single(name = "Bybit", externalId = "bybit"),
                     dataEndpoints =
                         listOf(
                             ApiDataEndpoint(
@@ -1885,8 +1820,7 @@ object BuiltInApiStrategies {
                                     "v5/asset/exchange/query-convert-history",
                                     "result.list",
                                     ApiPaginationConfig(
-                                        offsetParam = "index",
-                                        offsetMode = OffsetMode.PAGE_NUMBER,
+                                        paging = ApiPaging.Offset(param = "index", pageNumbers = true),
                                         // Bybit's maximum page of 100 is already the default limitValue.
                                         sendLimitParam = true,
                                     ),
@@ -1894,7 +1828,6 @@ object BuiltInApiStrategies {
                                 ApiEndpointKind.TRADES,
                                 tradeMappings =
                                     ApiTradeMappings(
-                                        instrumentField = "unused",
                                         splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
                                         baseAssetField = "toCoin",
                                         quoteAssetField = "fromCoin",
