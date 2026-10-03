@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
-    id("moneymanager.android-convention")
+    // Shared jvmAndroidMain source set: both platforms have java.text.NumberFormat.
+    id("moneymanager.jvm-android-shared-convention")
 }
 
 kotlin {
@@ -11,21 +12,10 @@ kotlin {
             }
         }
 
-        // Shared source set for JVM and Android (both have access to java.text.NumberFormat)
-        val jvmAndroidMain =
-            create("jvmAndroidMain") {
-                dependsOn(commonMain.get())
-            }
-
         jvmMain {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 api(projects.utils.bigdecimal)
             }
-        }
-
-        androidMain {
-            dependsOn(jvmAndroidMain)
         }
 
         commonTest {

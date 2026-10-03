@@ -54,4 +54,8 @@ dependencies {
     // convention plugin applies it via `alias(libs.plugins.*)`, so those manual entries are redundant.
     // sqldelight is applied directly in module build scripts (no convention plugin), so it stays.
     implementation(libs.sqldelight.gradle.plugin)
+
+    // TestKit functional tests run the convention plugins and task types against throwaway builds.
+    testImplementation(gradleTestKit())
+    testImplementation(kotlin("test"))
 }

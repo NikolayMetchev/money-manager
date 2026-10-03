@@ -1,8 +1,32 @@
+import org.gradle.work.DisableCachingByDefault
+
 plugins {
     id("moneymanager.android-application-convention")
 }
 
-val versionFile = rootDir.resolve("VERSION")
+/**
+ * Writes the project VERSION file into a generated assets directory, so the app can read it at runtime
+ * (VersionReader). Registered through the variant API below, which wires the task in front of every
+ * consumer of the assets — no dependsOn on AGP's internal tasks, and nothing written into src/.
+ */
+@DisableCachingByDefault(because = "Copying one small file is cheaper than a cache round-trip")
+abstract class GenerateVersionAsset : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val versionFile: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        outputDirectory
+            .file("VERSION")
+            .get()
+            .asFile
+            .writeText(versionFile.get().asFile.readText())
+    }
+}
 
 android {
     namespace = "com.moneymanager.android"
@@ -12,30 +36,19 @@ android {
         versionCode = 1
         versionName = "1.0.0"
     }
+}
 
-    sourceSets {
-        getByName("main") {
-            assets.directories.add("src/main/assets")
-        }
+val generateVersionAsset =
+    tasks.register<GenerateVersionAsset>("generateVersionAsset") {
+        group = "build"
+        description = "Copies the project VERSION file into the app's generated assets."
+        versionFile.set(layout.settingsDirectory.file("VERSION"))
     }
-}
 
-// Copy VERSION file to Android assets
-tasks.register<Copy>("copyVersionToAssets") {
-    description = "Copies the project VERSION file into Android assets."
-    from(versionFile)
-    into("src/main/assets")
-    inputs.file(versionFile)
-    outputs.file("src/main/assets/VERSION")
-}
-
-tasks.named("preBuild") {
-    dependsOn("copyVersionToAssets")
-}
-
-// Ensure explodeAssetSourceDebug runs after copyVersionToAssets
-tasks.matching { it.name.startsWith("explodeAssetSource") }.configureEach {
-    mustRunAfter("copyVersionToAssets")
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(generateVersionAsset, GenerateVersionAsset::outputDirectory)
+    }
 }
 
 dependencies {

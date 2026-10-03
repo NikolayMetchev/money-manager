@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.compose-multiplatform-convention")
     alias(libs.plugins.compose.compiler)
+    id("moneymanager.jvm-android-shared-convention")
 }
 
 kotlin {
@@ -50,10 +51,6 @@ kotlin {
                 implementation(libs.androidx.navigation3.runtime)
             }
         }
-        val jvmAndroidMain =
-            create("jvmAndroidMain") {
-                dependsOn(getByName("commonMain"))
-            }
         getByName("commonTest") {
             dependencies {
                 implementation(projects.test.app.db)
@@ -65,7 +62,6 @@ kotlin {
             }
         }
         getByName("androidMain") {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 api(projects.app.db.write)
                 api(projects.app.model.reconciliation)
@@ -93,7 +89,6 @@ kotlin {
             }
         }
         getByName("jvmMain") {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 api(projects.app.db.core)
                 api(projects.app.db.write)

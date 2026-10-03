@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.serialization)
-    id("moneymanager.android-convention")
+    id("moneymanager.jvm-android-shared-convention")
     id("moneymanager.kotlin-multiplatform-convention")
 }
 
@@ -22,18 +22,15 @@ kotlin {
         }
 
         // JVM and Android share the entire catalog loader + refresh service.
-        val jvmAndroidMain =
-            create("jvmAndroidMain") {
-                dependsOn(commonMain.get())
-                dependencies {
-                    implementation(libs.kotlinx.serialization.json)
-                    implementation(libs.ktor.client.cio)
-                    implementation(libs.ktor.client.core)
-                }
+        getByName("jvmAndroidMain") {
+            dependencies {
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.ktor.client.cio)
+                implementation(libs.ktor.client.core)
             }
+        }
 
         jvmMain {
-            dependsOn(jvmAndroidMain)
             resources.srcDir("src/commonResources")
             dependencies {
                 api(projects.app.model.core)
@@ -45,7 +42,6 @@ kotlin {
         }
 
         androidMain {
-            dependsOn(jvmAndroidMain)
             resources.srcDir("src/commonResources")
             dependencies {
                 api(projects.app.model.core)

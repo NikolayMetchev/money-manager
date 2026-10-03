@@ -11,14 +11,28 @@ gradle.beforeProject {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
-        google()
+        google {
+            // Google's Maven only hosts Android/Google artifacts; keep every other lookup off it.
+            content {
+                includeGroupByRegex("androidx.*")
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+            }
+        }
         mavenCentral()
     }
 }
 
 pluginManagement {
     repositories {
-        google()
+        google {
+            // Google's Maven only hosts Android/Google artifacts; keep every other lookup off it.
+            content {
+                includeGroupByRegex("androidx.*")
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+            }
+        }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -31,7 +45,14 @@ includeBuild("gradle/build-logic")
 
 buildscript {
     repositories {
-        google()
+        google {
+            // Google's Maven only hosts Android/Google artifacts; keep every other lookup off it.
+            content {
+                includeGroupByRegex("androidx.*")
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+            }
+        }
         mavenCentral()
     }
     dependencies {

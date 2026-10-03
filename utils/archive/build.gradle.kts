@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
-    id("moneymanager.android-convention")
+    // Shared jvmAndroidMain source set: both platforms expose java.util.zip for Deflate/Inflate.
+    id("moneymanager.jvm-android-shared-convention")
 }
 
 kotlin {
@@ -12,14 +13,7 @@ kotlin {
             }
         }
 
-        // Shared JVM+Android source set: both expose java.util.zip for Deflate/Inflate.
-        val jvmAndroidMain =
-            create("jvmAndroidMain") {
-                dependsOn(commonMain.get())
-            }
-
         jvmMain {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 // Provider is resolved at runtime via CryptographyProvider.Default (no compile usage).
                 runtimeOnly(libs.cryptography.provider.jdk)
@@ -27,7 +21,6 @@ kotlin {
         }
 
         androidMain {
-            dependsOn(jvmAndroidMain)
             dependencies {
                 runtimeOnly(libs.cryptography.provider.jdk)
             }
