@@ -11,9 +11,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.moneymanager.domain.model.csv.CsvColumn
-import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
  * Header row for an editable list item card: a title plus a remove button.
@@ -38,26 +35,4 @@ internal fun EditorCardHeader(
             Icon(Icons.Filled.Close, contentDescription = removeContentDescription)
         }
     }
-}
-
-/**
- * Column picker for an account-name lookup column, with sample preview and required-field error.
- */
-@Composable
-internal fun AccountNameColumnDropdown(
-    columnName: String,
-    onColumnChanged: (String) -> Unit,
-    columns: List<CsvColumn>,
-    firstRow: CsvRow?,
-    enabled: Boolean,
-) {
-    ColumnDropdown(
-        columns = columns,
-        selectedColumn = columnName.takeIf { it.isNotBlank() },
-        onColumnSelected = onColumnChanged,
-        label = "Column for account name",
-        sampleValue = getSampleValue(columns, firstRow, columnName),
-        enabled = enabled,
-        isError = columnName.isBlank(),
-    )
 }

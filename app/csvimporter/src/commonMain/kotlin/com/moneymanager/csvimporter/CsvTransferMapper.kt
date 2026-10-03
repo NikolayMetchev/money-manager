@@ -1289,12 +1289,6 @@ class CsvTransferMapper(
             .canonical(code)
             .let { existingCurrenciesByCode[it] ?: existingCryptoByCode[it] }
 
-    /** [value] cleaned through [extraction] when one is set and matches; otherwise [value] as-is. */
-    private fun extractedOrRaw(
-        value: String,
-        extraction: Extraction?,
-    ): String = extraction?.let { applyExtraction(value, it) } ?: value
-
     private fun getColumnValue(
         columnName: String,
         values: List<String>,

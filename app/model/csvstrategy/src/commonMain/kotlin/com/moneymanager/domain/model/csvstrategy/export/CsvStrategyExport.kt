@@ -3,7 +3,6 @@ package com.moneymanager.domain.model.csvstrategy.export
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.SortedAccountMappingListSerializer
 import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.TransferField
