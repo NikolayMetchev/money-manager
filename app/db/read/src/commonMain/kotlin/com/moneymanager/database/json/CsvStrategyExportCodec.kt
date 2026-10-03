@@ -55,10 +55,9 @@ private object FlatCsvStrategyExportSerializer : JsonTransformingSerializer<CsvS
             "accountMappings",
             "fileNamePattern",
             "crossSourceReconcileWindowSeconds",
-            "conversionConfig",
+            "legGroups",
             "fundingAttributeMatch",
             "worksheetName",
-            "tradeGroupConfig",
         )
 
     override fun transformSerialize(element: JsonElement): JsonElement {

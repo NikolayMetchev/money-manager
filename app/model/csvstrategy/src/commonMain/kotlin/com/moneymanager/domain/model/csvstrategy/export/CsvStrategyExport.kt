@@ -6,9 +6,8 @@ import com.moneymanager.domain.model.csvstrategy.AccountRule
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Direction
-import com.moneymanager.domain.model.rules.SortedConditionListSerializer
+import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
@@ -107,11 +106,8 @@ data class AmountParsingExport(
     val creditColumnName: String? = null,
     val debitColumnName: String? = null,
     val direction: Direction = Direction.Outgoing,
-    val feeColumnName: String? = null,
-    @Serializable(with = SortedConditionListSerializer::class)
-    val feeConditions: List<Condition> = emptyList(),
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val feeCurrency: ValueExpr? = null,
+    val fee: FeeRule? = null,
 ) : FieldMappingExport
 
 /**

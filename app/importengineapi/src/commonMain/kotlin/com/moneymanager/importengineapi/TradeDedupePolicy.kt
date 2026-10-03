@@ -36,13 +36,13 @@ sealed interface TradeDedupePolicy {
      *                            debited leg alone could describe two genuinely different trades.
      * @property conversionRelationshipTypeName Also match an incoming trade against an existing
      *                            **conversion transfer pair** carrying a relationship of this name —
-     *                            the legs a `ConversionConfig` source books when it cannot say which
+     *                            the legs a through-account leg rule books when it cannot say which
      *                            credit came from which debit. The other source describes the same
      *                            movement as a trade, so without this the two book it twice. The
      *                            debit leg (`id1`) is compared on account, asset, amount and window;
      *                            the credit leg (`id2`) only on its asset, because the two sources
      *                            disagree about the credited *amount* by the source's service charge.
-     *                            Defaults to the name every built-in `ConversionConfig` uses; name a
+     *                            Defaults to the name every built-in through-account leg rule uses; name a
      *                            different type for a source that links its legs with one, or null to
      *                            match trades against trades only.
      */

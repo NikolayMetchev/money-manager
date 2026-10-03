@@ -26,17 +26,20 @@ import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
+import com.moneymanager.domain.model.apistrategy.ApiLedgerTrades
 import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.rules.isComplete
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.rules.DirectionEditor
+import com.moneymanager.ui.components.rules.FeeRuleEditor
 import com.moneymanager.ui.components.rules.isComplete
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -237,15 +240,12 @@ internal fun TransactionMappingsFields(
             enabled = enabled,
             allowDefault = true,
         )
-        TextFieldRow(
-            "Fee amount field (optional)",
-            mappings.feeAmountField.orEmpty(),
-            { onChange(mappings.copy(feeAmountField = it.ifBlank { null })) },
-            enabled,
+        FeeRuleEditor(
+            fee = mappings.fee,
+            onFeeChanged = { onChange(mappings.copy(fee = it)) },
+            pathField = { label, value, onValueChange, isError -> TextFieldRow(label, value, onValueChange, enabled, isError = isError) },
+            enabled = enabled,
         )
-        TextFieldRow("Fee currency field (optional)", mappings.feeCurrencyField.orEmpty(), {
-            onChange(mappings.copy(feeCurrencyField = it.ifBlank { null }))
-        }, enabled)
         TextFieldRow(
             "Counterparty name field (optional)",
             mappings.counterpartyNameField.orEmpty(),
@@ -290,30 +290,36 @@ internal fun TransactionMappingsFields(
             valueLabel = "Account name",
             enabled = enabled,
         )
-        TextFieldRow(
-            "Trade group field (optional, on excluded trade-type rows)",
-            mappings.reconcileTradeAmountsField.orEmpty(),
-            { onChange(mappings.copy(reconcileTradeAmountsField = it.ifBlank { null })) },
-            enabled,
-        )
+        val ledgerTrades = mappings.ledgerTrades
         StringListEditor(
-            label = "Fallback trade group fields (first non-blank wins)",
-            items = mappings.reconcileTradeAmountsFallbackFields,
-            onChange = { onChange(mappings.copy(reconcileTradeAmountsFallbackFields = it)) },
+            label = "Trade group fields, on excluded trade-type rows (first non-blank wins)",
+            items = ledgerTrades?.key?.paths.orEmpty(),
+            onChange = { paths ->
+                onChange(
+                    mappings.copy(
+                        ledgerTrades =
+                            paths.takeIf { it.isNotEmpty() }?.let {
+                                ledgerTrades?.copy(key = ledgerTrades.key.copy(paths = it)) ?: ApiLedgerTrades(key = ValueExpr(it))
+                            },
+                    ),
+                )
+            },
             enabled = enabled,
         )
-        TextFieldRow(
-            "Single-leg trade counter amount (optional, an {amount, currency} object)",
-            mappings.unpairedTradeLegCounterAmountField.orEmpty(),
-            { onChange(mappings.copy(unpairedTradeLegCounterAmountField = it.ifBlank { null })) },
-            enabled,
-        )
-        TextFieldRow(
-            "Single-leg trade funding account (optional)",
-            mappings.unpairedTradeLegFundingAccountName.orEmpty(),
-            { onChange(mappings.copy(unpairedTradeLegFundingAccountName = it.ifBlank { null })) },
-            enabled,
-        )
+        if (ledgerTrades != null) {
+            TextFieldRow(
+                "Single-leg trade counter amount (optional, an {amount, currency} object)",
+                ledgerTrades.unpairedCounterAmountPath.orEmpty(),
+                { onChange(mappings.copy(ledgerTrades = ledgerTrades.copy(unpairedCounterAmountPath = it.ifBlank { null }))) },
+                enabled,
+            )
+            TextFieldRow(
+                "Single-leg trade funding account (optional)",
+                ledgerTrades.unpairedFundingAccountName.orEmpty(),
+                { onChange(mappings.copy(ledgerTrades = ledgerTrades.copy(unpairedFundingAccountName = it.ifBlank { null }))) },
+                enabled,
+            )
+        }
     }
 }
 
@@ -415,15 +421,13 @@ internal fun TradeMappingsEditor(
         TextFieldRow("Quote quantity field (optional)", mappings.quoteQuantityField.orEmpty(), {
             onChange(mappings.copy(quoteQuantityField = it.ifBlank { null }))
         }, enabled)
-        TextFieldRow(
-            "Fee field (optional)",
-            mappings.feeField.orEmpty(),
-            { onChange(mappings.copy(feeField = it.ifBlank { null })) },
-            enabled,
+        FeeRuleEditor(
+            fee = mappings.fee,
+            onFeeChanged = { onChange(mappings.copy(fee = it)) },
+            pathField = { label, value, onValueChange, isError -> TextFieldRow(label, value, onValueChange, enabled, isError = isError) },
+            enabled = enabled,
+            movementOptions = false,
         )
-        TextFieldRow("Fee currency field (optional)", mappings.feeCurrencyField.orEmpty(), {
-            onChange(mappings.copy(feeCurrencyField = it.ifBlank { null }))
-        }, enabled)
         TextFieldRow(
             "Timestamp field",
             mappings.timestampField,

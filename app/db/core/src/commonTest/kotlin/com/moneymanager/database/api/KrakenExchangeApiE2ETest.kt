@@ -362,9 +362,9 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // Kraken sometimes charges a same-asset settlement fee on a trade-type ledger row that never appears
     // in TradesHistory's own (quote-currency) fee field — confirmed against real account data by summing
     // every raw ledger row's (amount - fee) and matching it exactly to Kraken's own running "balance"
-    // checkpoint. Because feeAmountField previously wasn't read by the exchange engine at all, and the
+    // checkpoint. Because the fee previously wasn't read by the exchange engine at all, and the
     // row's excluded main amount discarded the whole row anyway, this fee was silently dropped, leaving a
-    // small but real balance short by exactly the missed fee — see ledgerMappings' feeAmountField.
+    // small but real balance short by exactly the missed fee — see ledgerMappings' fee.
     @Test
     fun `books a same-asset settlement fee from an excluded trade-type ledger row without duplicating its amount`() =
         runTest {

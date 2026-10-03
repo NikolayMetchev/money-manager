@@ -85,8 +85,8 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             val ledger = coinbase.config.dataEndpoints.first { it.endpoint.fanOut != null }
             assertTrue(assertNotNull(ledger.endpoint.fanOut).preserveCase, "wallet ids keep their case")
             assertEquals(
-                listOf("buy.id", "sell.id", "advanced_trade_fill.order_id"),
-                assertNotNull(ledger.transactionMappings).reconcileTradeAmountsFallbackFields,
+                listOf("trade.id", "buy.id", "sell.id", "advanced_trade_fill.order_id"),
+                assertNotNull(assertNotNull(ledger.transactionMappings).ledgerTrades).key.paths,
             )
         }
 

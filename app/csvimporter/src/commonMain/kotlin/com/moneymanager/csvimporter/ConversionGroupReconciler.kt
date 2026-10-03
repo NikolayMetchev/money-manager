@@ -3,6 +3,7 @@ package com.moneymanager.csvimporter
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.repository.TradeReadRepository
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -12,7 +13,7 @@ import kotlin.time.Duration.Companion.seconds
  * source recorded is not counted twice.
  *
  * A conversion group is emitted as transfers, not a trade, precisely because its credited amounts
- * cannot be attributed to its debited assets (see `ConversionConfig`). So it cannot be matched by the
+ * cannot be attributed to its debited assets (see `LegAssembly.ThroughAccount`). So it cannot be matched by the
  * engine's trade reconciler, and it has to be matched **as a whole**: suppressing only the debit legs
  * would leave the credits behind, double-counting the received asset and stranding a balance in the
  * conversion account.
@@ -75,7 +76,7 @@ class ConversionGroupReconciler(
 
 /**
  * Row index -> the trade it duplicates, for every leg of every conversion group another source already
- * recorded. Empty unless the strategy declares both a conversion config and a reconcile window and a
+ * recorded. Empty unless the strategy declares a through-account leg rule with a reconcile window and a
  * [TradeReadRepository] is available — reconciliation is opt-in, exactly like the transfer path's.
  */
 suspend fun reconcileConversionGroups(
@@ -83,11 +84,21 @@ suspend fun reconcileConversionGroups(
     rows: List<CsvTransferWithAttributes>,
     tradeRepository: TradeReadRepository?,
 ): Map<Long, TradeId> {
-    val conversionConfig = strategy.config.conversionConfig ?: return emptyMap()
-    val window = conversionConfig.reconcileWindowSeconds?.seconds ?: return emptyMap()
     val repository = tradeRepository ?: return emptyMap()
+    val reconciled = mutableMapOf<Long, TradeId>()
+    strategy.config.legGroups.forEachIndexed { index, rule ->
+        if (rule.assembly !is LegAssembly.ThroughAccount) return@forEachIndexed
+        val window = rule.reconcileWindowSeconds?.seconds ?: return@forEachIndexed
+        reconciled += reconcileGroups(chainGroupLegs(rows, index, rule.windowSeconds.seconds), window, repository)
+    }
+    return reconciled
+}
 
-    val groups = conversionGroups(rows, conversionConfig.pairingWindowSeconds.seconds)
+private suspend fun reconcileGroups(
+    groups: List<List<CsvTransferWithAttributes>>,
+    window: Duration,
+    repository: TradeReadRepository,
+): Map<Long, TradeId> {
     if (groups.isEmpty()) return emptyMap()
 
     val legs = groups.flatten()
@@ -104,41 +115,11 @@ suspend fun reconcileConversionGroups(
     val reconciler = ConversionGroupReconciler(window, existing)
     val reconciled = mutableMapOf<Long, TradeId>()
     for (group in groups) {
-        val debits = group.filter { it.conversionLeg?.side == ConversionSide.DEBIT }
+        val debits = group.filter { it.groupLeg?.side == GroupLegSide.DEBIT }
         val matched = reconciler.match(debits) ?: continue
         // Every leg of the group - debits and the credits paired with them - records the trade it
         // duplicates, so the rows read as duplicates of something rather than as silently missing.
         group.forEach { reconciled[it.rowIndex] = matched.first() }
     }
     return reconciled
-}
-
-/**
- * Groups a file's conversion legs into events: each debit paired with the credits nearest it in time,
- * mirroring how the applier links them. Returns one entry per debit-bearing event, with every leg that
- * belongs to it, so a caller can accept or reject the event as a unit.
- */
-fun conversionGroups(
-    rows: List<CsvTransferWithAttributes>,
-    pairingWindow: Duration,
-): List<List<CsvTransferWithAttributes>> {
-    val legs =
-        rows
-            .filter { it.conversionLeg != null }
-            .sortedWith(compareBy({ it.transfer.timestamp }, { it.rowIndex }))
-    if (legs.isEmpty()) return emptyList()
-
-    val groups = mutableListOf<MutableList<CsvTransferWithAttributes>>()
-    var current = mutableListOf(legs.first())
-    for (leg in legs.drop(1)) {
-        val previous = current.last().transfer.timestamp
-        if (leg.transfer.timestamp - previous <= pairingWindow) {
-            current += leg
-        } else {
-            groups += current
-            current = mutableListOf(leg)
-        }
-    }
-    groups += current
-    return groups
 }
