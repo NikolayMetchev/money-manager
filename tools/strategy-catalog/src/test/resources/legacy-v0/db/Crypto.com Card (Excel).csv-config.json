@@ -1,0 +1,157 @@
+{
+    "identificationColumns": [
+        "Amount Processed",
+        "Amount Requested",
+        "Available Balance",
+        "Card Acceptor Name",
+        "Currency ",
+        "Description",
+        "Merchant Category Code",
+        "Service Abbreviation",
+        "Transaction Date",
+        "Transaction Time"
+    ],
+    "fieldMappings": {
+        "AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.AmountParsingMapping",
+            "fieldType": "AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "Amount Processed",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": true,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping",
+            "fieldType": "CURRENCY",
+            "columnName": "Currency "
+        },
+        "DESCRIPTION": {
+            "type": "com.moneymanager.domain.model.csvstrategy.DirectColumnMapping",
+            "fieldType": "DESCRIPTION",
+            "columnName": "Card Acceptor Name",
+            "fallbackColumns": [
+                "Description"
+            ],
+            "extraction": {
+                "pattern": "^\\s*(\\S.*?)(?:\\s{2,}.*)?$",
+                "outputTemplate": "$1"
+            }
+        },
+        "SOURCE_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+            "fieldType": "SOURCE_ACCOUNT",
+            "columnName": "Service Abbreviation",
+            "rules": [
+                {
+                    "pattern": "^",
+                    "accountName": "Crypto.com Card",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                }
+            ],
+            "fallbackColumns": [],
+            "defaultCategoryId": -1
+        },
+        "TARGET_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping",
+            "fieldType": "TARGET_ACCOUNT",
+            "conditions": [
+                {
+                    "columnName": "Card Acceptor Name",
+                    "operator": "IS_BLANK",
+                    "value": null,
+                    "otherColumnName": null
+                }
+            ],
+            "whenTrue": {
+                "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+                "fieldType": "TARGET_ACCOUNT",
+                "columnName": "Service Abbreviation",
+                "rules": [
+                    {
+                        "pattern": "^",
+                        "accountName": "Crypto.com Card Top Up",
+                        "accountNameTemplate": null,
+                        "counterpartyIsPerson": false,
+                        "personNameTemplate": null,
+                        "counterpartyIsUnidentified": true
+                    }
+                ],
+                "fallbackColumns": [],
+                "defaultCategoryId": -1
+            },
+            "whenFalse": {
+                "type": "com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping",
+                "fieldType": "TARGET_ACCOUNT",
+                "conditions": [
+                    {
+                        "columnName": "Service Abbreviation",
+                        "operator": "EQUALS_VALUE",
+                        "value": "LdExtDbCr",
+                        "otherColumnName": null
+                    }
+                ],
+                "whenTrue": {
+                    "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+                    "fieldType": "TARGET_ACCOUNT",
+                    "columnName": "Service Abbreviation",
+                    "rules": [
+                        {
+                            "pattern": "^",
+                            "accountName": "Crypto.com Card Top Up",
+                            "accountNameTemplate": null,
+                            "counterpartyIsPerson": false,
+                            "personNameTemplate": null,
+                            "counterpartyIsUnidentified": true
+                        }
+                    ],
+                    "fallbackColumns": [],
+                    "defaultCategoryId": -1
+                },
+                "whenFalse": {
+                    "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+                    "fieldType": "TARGET_ACCOUNT",
+                    "columnName": "Card Acceptor Name",
+                    "rules": [
+                        {
+                            "pattern": "^\\s*(\\S.*?)(?:\\s{2,}.*)?$",
+                            "accountName": "Unknown Merchant",
+                            "accountNameTemplate": "$1",
+                            "counterpartyIsPerson": false,
+                            "personNameTemplate": null
+                        }
+                    ],
+                    "fallbackColumns": [],
+                    "defaultCategoryId": -1
+                }
+            }
+        },
+        "TIMESTAMP": {
+            "type": "com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping",
+            "fieldType": "TIMESTAMP",
+            "dateColumnName": "Transaction Date",
+            "dateFormat": "MM/dd/yyyy",
+            "timeColumnName": "Transaction Time",
+            "timeFormat": "HH:mm:ss",
+            "defaultTime": "12:00:00",
+            "dateTimeFormat": null
+        },
+        "TIMEZONE": {
+            "type": "com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping",
+            "fieldType": "TIMEZONE",
+            "timezoneId": "UTC"
+        }
+    },
+    "attributeMappings": [],
+    "rowPreprocessingRules": [],
+    "companionTransactionRules": [],
+    "contentMatchRules": [],
+    "fileNamePattern": "Card Transaction History",
+    "crossSourceReconcileWindowSeconds": 3600,
+    "conversionConfig": null
+}

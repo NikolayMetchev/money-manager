@@ -1,0 +1,162 @@
+{
+    "version": "",
+    "name": "Monzo CSV",
+    "identificationColumns": [
+        "Address",
+        "Amount",
+        "Category",
+        "Category split",
+        "Currency",
+        "Date",
+        "Description",
+        "Emoji",
+        "Local amount",
+        "Local currency",
+        "Money In",
+        "Money Out",
+        "Name",
+        "Notes and #tags",
+        "Receipt",
+        "Time",
+        "Transaction ID",
+        "Type"
+    ],
+    "fieldMappings": {
+        "AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport",
+            "fieldType": "AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "Amount",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": true,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.CurrencyLookupExport",
+            "fieldType": "CURRENCY",
+            "columnName": "Currency"
+        },
+        "DESCRIPTION": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.DirectColumnExport",
+            "fieldType": "DESCRIPTION",
+            "columnName": "Description",
+            "fallbackColumns": [
+                "Type"
+            ],
+            "extraction": null
+        },
+        "TARGET_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.ConditionalAccountExport",
+            "fieldType": "TARGET_ACCOUNT",
+            "conditions": [
+                {
+                    "columnName": "Type",
+                    "operator": "EQUALS_VALUE",
+                    "value": "Monzo-to-Monzo",
+                    "otherColumnName": null
+                }
+            ],
+            "whenTrue": {
+                "type": "com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport",
+                "fieldType": "TARGET_ACCOUNT",
+                "columnName": "Name",
+                "rules": [
+                    {
+                        "pattern": ".+",
+                        "accountName": "",
+                        "accountNameTemplate": "Monzo $0",
+                        "counterpartyIsPerson": true,
+                        "personNameTemplate": "$0"
+                    }
+                ],
+                "fallbackColumns": [],
+                "defaultCategoryName": "Uncategorized"
+            },
+            "whenFalse": {
+                "type": "com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport",
+                "fieldType": "TARGET_ACCOUNT",
+                "columnName": "Name",
+                "fallbackColumns": [
+                    "Type"
+                ],
+                "defaultCategoryName": "Uncategorized"
+            }
+        },
+        "TIMESTAMP": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport",
+            "fieldType": "TIMESTAMP",
+            "dateColumnName": "Date",
+            "dateFormat": "dd/MM/yyyy",
+            "timeColumnName": "Time",
+            "timeFormat": "HH:mm:ss",
+            "defaultTime": "12:00:00",
+            "dateTimeFormat": null
+        },
+        "TIMEZONE": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport",
+            "fieldType": "TIMEZONE",
+            "timezoneId": "UTC"
+        }
+    },
+    "attributeMappings": [
+        {
+            "columnName": "Address",
+            "attributeTypeName": "Address",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Category",
+            "attributeTypeName": "Monzo Category",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Emoji",
+            "attributeTypeName": "Emoji",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Notes and #tags",
+            "attributeTypeName": "Notes and #tags",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Receipt",
+            "attributeTypeName": "Receipt",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Transaction ID",
+            "attributeTypeName": "Monzo Transaction ID",
+            "isUniqueIdentifier": true,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Type",
+            "attributeTypeName": "Type",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        }
+    ],
+    "rowPreprocessingRules": [],
+    "companionTransactionRules": [],
+    "contentMatchRules": [],
+    "accountMappings": [],
+    "fileNamePattern": null,
+    "crossSourceReconcileWindowSeconds": 120,
+    "conversionConfig": null
+}

@@ -1,0 +1,226 @@
+{
+    "version": "",
+    "name": "Monzo",
+    "baseUrl": "https://api.monzo.com",
+    "authType": "BEARER_TOKEN",
+    "accountsEndpoint": {
+        "path": "/accounts",
+        "responseArrayKey": "accounts",
+        "queryParams": [],
+        "pagination": null,
+        "method": "GET",
+        "successCodeField": null,
+        "successCodeOkValue": null,
+        "errorArrayField": null,
+        "responseObjectValues": false,
+        "itemKeyField": null,
+        "nestedItemsKey": null,
+        "requestCostWeight": 1,
+        "fanOut": null,
+        "unsigned": false,
+        "storeResponse": true
+    },
+    "transactionsEndpoint": {
+        "path": "/transactions",
+        "responseArrayKey": "transactions",
+        "queryParams": [
+            {
+                "name": "account_id",
+                "value": null,
+                "dynamicSource": "account.id"
+            }
+        ],
+        "pagination": {
+            "mode": "CURSOR",
+            "limitParam": "limit",
+            "limitValue": 100,
+            "cursorParam": "before",
+            "cursorResponseField": "created",
+            "startParam": "intervalStart",
+            "endParam": "intervalEnd",
+            "windowDays": 469,
+            "lookbackDays": 2190,
+            "extraParams": [],
+            "windowBoundFormat": "EPOCH_MS",
+            "offsetParam": null,
+            "offsetMode": "OFFSET",
+            "sendLimitParam": false,
+            "totalCountField": null,
+            "incrementalOverlapDays": 7
+        },
+        "method": "GET",
+        "successCodeField": null,
+        "successCodeOkValue": null,
+        "errorArrayField": null,
+        "responseObjectValues": false,
+        "itemKeyField": null,
+        "nestedItemsKey": null,
+        "requestCostWeight": 1,
+        "fanOut": null,
+        "unsigned": false,
+        "storeResponse": true
+    },
+    "accountMappings": {
+        "idField": "id",
+        "descriptionField": "description",
+        "ownerNameField": "preferred_name",
+        "ownersArrayField": "owners",
+        "ownerUserIdField": "user_id",
+        "ownerNameFallbackField": "name",
+        "sortCodeField": "sort_code",
+        "accountNumberField": "account_number",
+        "currencyField": null,
+        "customFields": {},
+        "uniqueIdentifierFields": [],
+        "staticAccountName": "Monzo",
+        "accountNameRules": [
+            {
+                "suffix": "Rewards",
+                "predicates": [
+                    {
+                        "path": "type",
+                        "op": "EQUALS",
+                        "value": "uk_rewards"
+                    }
+                ]
+            }
+        ]
+    },
+    "transactionMappings": {
+        "amountField": "amount",
+        "timestampField": "created",
+        "timestampFormat": "ISO_8601",
+        "timestampPattern": null,
+        "currencyField": "currency",
+        "descriptionField": "description",
+        "amountFormat": "MINOR_UNITS_INTEGER",
+        "signSource": "EMBEDDED",
+        "signField": null,
+        "creditValues": [],
+        "idField": "id",
+        "merchantNameField": "merchant.name",
+        "counterpartyNameField": "counterparty.name",
+        "counterpartyIdField": "counterparty.id",
+        "declineReasonField": "decline_reason",
+        "declineStatusField": null,
+        "declinedStatusValues": [],
+        "localAmountField": "local_amount",
+        "localCurrencyField": "local_currency",
+        "feeAmountField": "atm_fees_detailed.fee_amount",
+        "feeCurrencyField": null,
+        "feeDescriptionField": null,
+        "feeIncludedInAmount": true,
+        "customFields": {},
+        "uniqueIdentifierFields": [],
+        "counterpartyAddressField": null,
+        "counterpartyNetworkField": null,
+        "txidField": null,
+        "counterpartyAliasField": null,
+        "counterpartyAccountAliases": {},
+        "joinKeyField": null,
+        "directionFromAmountSign": false,
+        "excludeField": null,
+        "excludeValues": [],
+        "reconcileTradeAmountsField": null,
+        "itemFilters": [],
+        "compositeIdFields": []
+    },
+    "peopleMappings": {
+        "counterpartyObjectField": "counterparty",
+        "beneficiaryAccountTypeField": "beneficiary_account_type",
+        "personalBeneficiaryAccountTypeValue": "Personal",
+        "personalBeneficiaryAccountTypeValues": [],
+        "counterpartyNameField": "name",
+        "counterpartyUserIdField": "user_id",
+        "counterpartySortCodeField": "sort_code",
+        "counterpartyAccountNumberField": "account_number",
+        "counterpartyServiceUserNumberField": "service_user_number",
+        "counterpartyAccountIdField": "account_id",
+        "ephemeralCounterpartyIdPrefixes": [
+            "anonuser_"
+        ],
+        "preferBankIdentity": false
+    },
+    "accountIdentifiersEndpoint": null,
+    "ancestorEndpoints": [],
+    "builtInCounterpartyRules": [
+        {
+            "name": "ATM",
+            "onlyWhenSign": "NEGATIVE",
+            "predicates": [
+                {
+                    "path": "atm_fees_detailed",
+                    "op": "EXISTS",
+                    "value": null
+                }
+            ]
+        },
+        {
+            "name": "ATM",
+            "onlyWhenSign": "NEGATIVE",
+            "predicates": [
+                {
+                    "path": "labels",
+                    "op": "ARRAY_ANY_STARTS_WITH",
+                    "value": "withdrawal.atm"
+                }
+            ]
+        },
+        {
+            "name": "ATM",
+            "onlyWhenSign": "NEGATIVE",
+            "predicates": [
+                {
+                    "path": "metadata.mcc",
+                    "op": "EQUALS",
+                    "value": "6011"
+                }
+            ]
+        },
+        {
+            "name": "ATM",
+            "onlyWhenSign": "NEGATIVE",
+            "predicates": [
+                {
+                    "path": "category",
+                    "op": "EQUALS_IGNORE_CASE",
+                    "value": "cash"
+                },
+                {
+                    "path": "counterparty",
+                    "op": "OBJECT_EMPTY",
+                    "value": null
+                },
+                {
+                    "path": "merchant",
+                    "op": "OBJECT_EMPTY",
+                    "value": null
+                }
+            ]
+        }
+    ],
+    "signing": null,
+    "peopleDownload": null,
+    "personExternalIdAttribute": "monzo-external-id",
+    "requestSigning": null,
+    "dataEndpoints": [],
+    "valueEndpoints": [],
+    "syntheticAccount": null,
+    "internalTransferReconcile": null,
+    "assetAliases": {},
+    "tokenPageUrl": "https://developers.monzo.com/",
+    "connectInstructions": [
+        "Open the Monzo Developer Playground in your browser.",
+        "Log in with your Monzo account credentials.",
+        "Monzo will send a magic link to your email or app. Approve the login.",
+        "Copy the access token shown on the playground page.",
+        "Paste the token below and save.",
+        "In the Monzo app, approve the API access notification so transactions can be read."
+    ],
+    "rateLimitMillis": null,
+    "rateLimitErrorSubstrings": [],
+    "rateLimitBackoffMillis": 5000,
+    "maxRateLimitRetries": 5,
+    "assetSuffixesToStrip": [],
+    "minorUnitDivisorOverrides": {}
+}

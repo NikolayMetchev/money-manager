@@ -1,0 +1,256 @@
+{
+    "version": "",
+    "name": "Binance CSV",
+    "identificationColumns": [
+        "Account",
+        "Change",
+        "Coin",
+        "Operation",
+        "Remark",
+        "UTC_Time",
+        "User_ID"
+    ],
+    "fieldMappings": {
+        "AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport",
+            "fieldType": "AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "Change",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": true,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.CurrencyLookupExport",
+            "fieldType": "CURRENCY",
+            "columnName": "Coin"
+        },
+        "DESCRIPTION": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.DirectColumnExport",
+            "fieldType": "DESCRIPTION",
+            "columnName": "Operation",
+            "fallbackColumns": [],
+            "extraction": null
+        },
+        "SOURCE_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport",
+            "fieldType": "SOURCE_ACCOUNT",
+            "columnName": "Account",
+            "rules": [
+                {
+                    "pattern": "^",
+                    "accountName": "Binance",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                }
+            ],
+            "fallbackColumns": [],
+            "defaultCategoryName": "Uncategorized"
+        },
+        "TARGET_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport",
+            "fieldType": "TARGET_ACCOUNT",
+            "columnName": "Operation",
+            "rules": [
+                {
+                    "pattern": "^(Fiat Deposit|Fiat Withdrawal)$",
+                    "accountName": "Binance Bank",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null,
+                    "counterpartyIsUnidentified": true
+                },
+                {
+                    "pattern": "^(Deposit|Withdraw)$",
+                    "accountName": "Binance Funding",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null,
+                    "counterpartyIsUnidentified": true
+                },
+                {
+                    "pattern": "^Simple Earn (Flexible|Locked) (Subscription|Redemption)$",
+                    "accountName": "Binance Earn",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^Simple Earn (Flexible (Interest|Airdrop)|Locked Rewards)$",
+                    "accountName": "Binance Earn Rewards",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^Staking (Purchase|Redemption)$",
+                    "accountName": "Binance Staking",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^Staking Rewards$",
+                    "accountName": "Binance Staking Rewards",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^BNB Vault Rewards$",
+                    "accountName": "Binance Vault Rewards",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^Launchpool Subscription/Redemption$",
+                    "accountName": "Binance Launchpool",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^Launchpool (Interest|Earnings Withdrawal)$",
+                    "accountName": "Binance Launchpool Rewards",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^Launchpad (Subscribe|Token Distribution)$",
+                    "accountName": "Binance Launchpad",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^(Distribution|Rewards Distribution)$",
+                    "accountName": "Binance Distribution",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^Commission (History|Rebate)$",
+                    "accountName": "Binance Commission",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^(Liquid Swap Add|Liquidity Farming Remove)$",
+                    "accountName": "Binance Liquid Swap",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^Dual Savings (Purchase|Settlement)$",
+                    "accountName": "Binance Dual Savings",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^(Fee|Transaction Fee)$",
+                    "accountName": "Binance Fees",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^Small Assets Exchange BNB( \\(Spot\\))?$",
+                    "accountName": "Binance Conversions",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^",
+                    "accountName": "Binance Trading",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                }
+            ],
+            "fallbackColumns": [],
+            "defaultCategoryName": "Uncategorized"
+        },
+        "TIMESTAMP": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport",
+            "fieldType": "TIMESTAMP",
+            "dateColumnName": "UTC_Time",
+            "dateFormat": "yyyy-MM-dd",
+            "timeColumnName": null,
+            "timeFormat": null,
+            "defaultTime": "12:00:00",
+            "dateTimeFormat": "yyyy-MM-dd HH:mm:ss"
+        },
+        "TIMEZONE": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport",
+            "fieldType": "TIMEZONE",
+            "timezoneId": "UTC"
+        }
+    },
+    "attributeMappings": [
+        {
+            "columnName": "Operation",
+            "attributeTypeName": "binance-operation",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Remark",
+            "attributeTypeName": "binance-remark",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "User_ID",
+            "attributeTypeName": "binance-user-id",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        }
+    ],
+    "rowPreprocessingRules": [],
+    "companionTransactionRules": [],
+    "contentMatchRules": [
+        {
+            "columnName": "User_ID",
+            "pattern": "^\\s*\\d+\\s*$"
+        }
+    ],
+    "accountMappings": [],
+    "fileNamePattern": null,
+    "crossSourceReconcileWindowSeconds": 3600,
+    "conversionConfig": {
+        "signalColumn": "Operation",
+        "debitPattern": "^Small Assets Exchange BNB( \\(Spot\\))?$",
+        "creditPattern": "^Small Assets Exchange BNB( \\(Spot\\))?$",
+        "conversionAccountName": "Binance Conversions",
+        "conversionAccountRules": [],
+        "pairingKeyPattern": null,
+        "pairingKeyColumns": [],
+        "pairingWindowSeconds": 2,
+        "relationshipTypeName": "conversion",
+        "sideAmountColumn": "Change",
+        "reconcileWindowSeconds": 5
+    },
+    "tradeGroupConfig": {
+        "signalColumn": "Operation",
+        "debitPattern": "^(Sell|Transaction (Spend|Sold))$",
+        "creditPattern": "^(Buy|Transaction (Buy|Revenue)|Binance Convert|Transaction Related)$",
+        "sideAmountColumn": "Change",
+        "groupingWindowSeconds": 0,
+        "descriptionTemplate": "Buy {to}/{from}",
+        "reconcileWindowSeconds": 5
+    }
+}

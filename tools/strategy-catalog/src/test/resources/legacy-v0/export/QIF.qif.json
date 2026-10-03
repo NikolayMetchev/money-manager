@@ -1,0 +1,76 @@
+{
+    "version": "",
+    "name": "QIF",
+    "identificationColumns": [
+        "Account",
+        "Amount",
+        "Category",
+        "Check Number",
+        "Cleared",
+        "Date",
+        "Memo",
+        "Payee",
+        "Transfer Account"
+    ],
+    "fieldMappings": {
+        "AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport",
+            "fieldType": "AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "Amount",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": true,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.HardCodedCurrencyExport",
+            "fieldType": "CURRENCY",
+            "currencyCode": "GBP"
+        },
+        "DESCRIPTION": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.DirectColumnExport",
+            "fieldType": "DESCRIPTION",
+            "columnName": "Payee",
+            "fallbackColumns": [
+                "Memo"
+            ],
+            "extraction": null
+        },
+        "TARGET_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport",
+            "fieldType": "TARGET_ACCOUNT",
+            "columnName": "Transfer Account",
+            "fallbackColumns": [
+                "Payee",
+                "Category"
+            ],
+            "defaultCategoryName": "Uncategorized"
+        },
+        "TIMESTAMP": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport",
+            "fieldType": "TIMESTAMP",
+            "dateColumnName": "Date",
+            "dateFormat": "dd/MM/yyyy",
+            "timeColumnName": null,
+            "timeFormat": null,
+            "defaultTime": "12:00:00",
+            "dateTimeFormat": null
+        },
+        "TIMEZONE": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport",
+            "fieldType": "TIMEZONE",
+            "timezoneId": "UTC"
+        }
+    },
+    "attributeMappings": [],
+    "rowPreprocessingRules": [],
+    "companionTransactionRules": [],
+    "contentMatchRules": [],
+    "accountMappings": [],
+    "fileNamePattern": null,
+    "crossSourceReconcileWindowSeconds": null,
+    "conversionConfig": null
+}
