@@ -279,8 +279,6 @@ private fun transactionMappingsOntoDirection(obj: JsonObject): JsonObject {
                 )
             else -> null
         }
-    return JsonObject(
-        obj.without("directionFromAmountSign", "signSource", "signField", "creditValues") +
-            listOfNotNull(direction?.let { "direction" to it }),
-    )
+    val rest = obj.without("directionFromAmountSign", "signSource", "signField", "creditValues")
+    return JsonObject(if (direction == null) rest else rest + ("direction" to direction))
 }

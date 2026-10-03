@@ -65,7 +65,7 @@ internal fun AccountRule.isComplete(): Boolean =
             RuleMatch.ALWAYS -> name.isNotBlank()
         }
 
-/** [rules] keeping only the columns the uploaded file still has; a rule left with none is dropped. */
+/** [this] rules keeping only the columns the uploaded file still has; a rule left with none is dropped. */
 internal fun List<AccountRule>.keepColumnsPresentIn(columns: Set<String>): List<AccountRule> =
     mapNotNull { rule ->
         val paths = rule.value.paths.filter { it in columns }
@@ -274,7 +274,7 @@ private fun AccountRuleEditor(
             singleLine = true,
             enabled = enabled,
             isError = rule.name.isBlank(),
-            supportingText = { Text("${AccountRule.VALUE_PLACEHOLDER} is the column value; \$1… are the pattern's captures") },
+            supportingText = { Text($$"$${AccountRule.VALUE_PLACEHOLDER} is the column value; $1… are the pattern's captures") },
         )
         if (rule.match == RuleMatch.PATTERN) {
             OutlinedTextField(
@@ -351,7 +351,7 @@ private fun ExtractionFields(
         OutlinedTextField(
             value = e.outputTemplate,
             onValueChange = { onRuleChanged(rule.copy(value = rule.value.copy(extraction = e.copy(outputTemplate = it)))) },
-            label = { Text("Cleaned value (\$0 whole match, \$1… groups)") },
+            label = { Text($$"Cleaned value ($0 whole match, $1… groups)") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = enabled,
