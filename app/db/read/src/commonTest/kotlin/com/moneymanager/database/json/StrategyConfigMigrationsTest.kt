@@ -279,8 +279,10 @@ class AccountRulesMigrationTest {
         }
         """.trimIndent()
 
-    private fun amountJson(flags: String) =
-        """{"type": "$csvPackage.AmountParsingMapping", "fieldType": "AMOUNT", "mode": "SINGLE_COLUMN", "amountColumnName": "Amount"$flags}"""
+    private fun amountJson(
+        flags: String,
+        columns: String = SINGLE_COLUMN,
+    ) = """{"type": "$csvPackage.AmountParsingMapping", "fieldType": "AMOUNT", $columns$flags}"""
 
     private fun targetRules(json: String): AccountRulesMapping =
         assertIs<AccountRulesMapping>(CsvStrategyJsonCodec.decode(json).fieldMappings[TransferField.TARGET_ACCOUNT])
@@ -353,8 +355,11 @@ class AccountRulesMigrationTest {
 
     @Test
     fun `amount flips become a direction`() {
-        fun direction(flags: String): Direction {
-            val amount = amountJson(flags)
+        fun direction(
+            flags: String,
+            columns: String = SINGLE_COLUMN,
+        ): Direction {
+            val amount = amountJson(flags, columns)
             val target = """{"type": "$csvPackage.AccountLookupMapping", "fieldType": "TARGET_ACCOUNT", "columnName": "Payee"}"""
             val config = CsvStrategyJsonCodec.decode(csvV1(target, amount))
             return assertIs<AmountParsingMapping>(config.fieldMappings[TransferField.AMOUNT]).direction
@@ -366,6 +371,11 @@ class AccountRulesMigrationTest {
         assertEquals(
             Direction.AmountSign(positiveIsIncoming = false),
             direction(""", "flipAccountsOnPositive": true, "negateValues": true"""),
+        )
+        // The legacy parser never negated credit/debit columns, so the flag must not reverse their direction.
+        assertEquals(
+            Direction.AmountSign(),
+            direction(""", "flipAccountsOnPositive": true, "negateValues": true""", CREDIT_DEBIT_COLUMNS),
         )
     }
 
@@ -401,3 +411,6 @@ class AccountRulesMigrationTest {
         assertEquals(null, direction(""", "signSource": "AMOUNT", "signField": "side""""))
     }
 }
+
+private const val SINGLE_COLUMN = """"mode": "SINGLE_COLUMN", "amountColumnName": "Amount""""
+private const val CREDIT_DEBIT_COLUMNS = """"mode": "CREDIT_DEBIT_COLUMNS", "creditColumnName": "In", "debitColumnName": "Out""""

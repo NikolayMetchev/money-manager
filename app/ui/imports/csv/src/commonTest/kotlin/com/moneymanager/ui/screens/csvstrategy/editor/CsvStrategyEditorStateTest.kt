@@ -11,10 +11,13 @@ import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -74,6 +77,21 @@ class CsvStrategyEditorStateTest {
         assertEquals("Amount", state.amountColumnName)
         assertEquals("Europe/London", state.selectedTimezone)
         assertNull(state.descriptionColumnName)
+    }
+
+    @Test
+    fun `a direction column needs its column and incoming values before saving`() {
+        val state = CsvStrategyEditorState(strategy = null, availableColumnNames = setOf("Amount", "Type"))
+        val baseline = state.amountDateHasError
+
+        state.direction = Direction.Field(path = "", incomingValues = setOf("IN"))
+        assertTrue(state.amountDateHasError)
+        assertFalse(state.isValid)
+        state.direction = Direction.Field(path = "Type", incomingValues = emptySet())
+        assertTrue(state.amountDateHasError)
+
+        state.direction = Direction.Field(path = "Type", incomingValues = setOf("IN"))
+        assertEquals(baseline, state.amountDateHasError)
     }
 
     @Test

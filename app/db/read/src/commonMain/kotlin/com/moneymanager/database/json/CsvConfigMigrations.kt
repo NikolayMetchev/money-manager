@@ -122,7 +122,8 @@ private val LEGACY_ACCOUNT_MAPPINGS =
 
 private fun amountOntoDirection(obj: JsonObject): JsonObject {
     val flip = obj.string("flipAccountsOnPositive") == "true"
-    val negate = obj.string("negateValues") == "true"
+    // The legacy parser only ever negated a single amount column; credit/debit columns ignored the flag.
+    val negate = obj.string("negateValues") == "true" && obj.string("mode") != "CREDIT_DEBIT_COLUMNS"
     val direction =
         if (flip) {
             JsonObject(mapOf("type" to JsonPrimitive("amountSign"), "positiveIsIncoming" to JsonPrimitive(!negate)))

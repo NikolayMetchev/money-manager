@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.isComplete
+import com.moneymanager.ui.components.rules.isComplete
 import kotlinx.datetime.TimeZone
 
 /**
@@ -299,6 +300,7 @@ internal class CsvStrategyEditorState(
     val amountDateHasError: Boolean
         get() =
             !amountValid ||
+                !direction.isComplete() ||
                 dateColumnName == null ||
                 !dateTimeFormatValid ||
                 !feeValid ||
@@ -333,6 +335,7 @@ internal class CsvStrategyEditorState(
                 dateTimeFormatValid &&
                 descriptionColumnName != null &&
                 amountValid &&
+                direction.isComplete() &&
                 feeValid &&
                 rowPreprocessingValid &&
                 companionRulesValid &&
