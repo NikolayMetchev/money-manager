@@ -866,7 +866,7 @@ class CsvTransferMapper(
             Direction.Outgoing -> false
         }
 
-    /** What a row's [FeeRule] came to. */
+    /** What a row's [com.moneymanager.domain.model.rules.FeeRule] came to. */
     private sealed interface FeeParse {
         data object None : FeeParse
 
@@ -881,7 +881,7 @@ class CsvTransferMapper(
     }
 
     /**
-     * The fee a row carries per the amount mapping's [FeeRule]: none when there is no rule, its conditions
+     * The fee a row carries per the amount mapping's [com.moneymanager.domain.model.rules.FeeRule]: none when there is no rule, its conditions
      * don't hold, it is charged on another asset, or the amount is blank or zero. Its sign is ignored — a
      * fee is a movement out of the transaction's source account. The fee is in [rowCurrency] unless the
      * rule's currency reads a non-blank code of its own.

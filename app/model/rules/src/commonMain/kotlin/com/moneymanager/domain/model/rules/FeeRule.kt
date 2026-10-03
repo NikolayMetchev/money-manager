@@ -1,7 +1,6 @@
 package com.moneymanager.domain.model.rules
 
 import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
@@ -23,7 +22,6 @@ import kotlinx.serialization.Serializable
  * A trade's fee is a field of the trade itself, so a trade mapping uses only [amount], [currency] and
  * [conditions].
  */
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class FeeRule(
     val amount: ValueExpr,

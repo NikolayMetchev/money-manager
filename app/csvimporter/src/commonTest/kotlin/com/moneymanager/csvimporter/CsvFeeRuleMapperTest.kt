@@ -149,6 +149,6 @@ class CsvFeeRuleMapperTest {
         val quote = fee.copy(chargedOnAsset = ValueExpr(listOf("Pair"), Extraction("^.*-(.*)$", "$1")))
         assertEquals(usd("1.5"), map(quote, pair = "BTC-USD").feeAmount)
         assertNull(map(quote, pair = "BTC-EUR").feeAmount)
-        assertNull(map(quote, pair = "").feeAmount, "a row naming no pair carries no fee")
+        assertNull(map(quote).feeAmount, "a row naming no pair carries no fee")
     }
 }
