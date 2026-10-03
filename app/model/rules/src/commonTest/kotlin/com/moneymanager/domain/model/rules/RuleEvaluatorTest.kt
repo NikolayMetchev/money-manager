@@ -73,6 +73,11 @@ class RuleEvaluatorTest {
     }
 
     @Test
+    fun `a blank suffix never hides a real one`() {
+        assertEquals("XETH", AssetCodeRules(stripSuffixes = setOf(" ", ".F")).canonical("xeth.f"))
+    }
+
+    @Test
     fun `switching op keeps only the operand the new op uses`() {
         val condition = Condition("Type", ConditionOp.EQUALS_PATH, otherPath = "Name")
         assertEquals(Condition("Type", ConditionOp.EQUALS, value = ""), condition.withOp(ConditionOp.EQUALS))

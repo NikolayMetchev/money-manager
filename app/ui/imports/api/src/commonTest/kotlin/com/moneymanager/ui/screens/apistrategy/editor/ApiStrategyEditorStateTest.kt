@@ -252,6 +252,21 @@ class ApiStrategyEditorStateTest {
     }
 
     @Test
+    fun `an incomplete exclusion or filter blocks saving`() {
+        val state = ApiStrategyEditorState(strategy = null)
+        state.name = "My API"
+        state.updateConfig { copy(baseUrl = "https://api.example.com") }
+        // A path-less "is blank" exclusion would hold for every item and exclude them all.
+        state.updateConfig { copy(transactionMappings = transactionMappings.copy(excludeWhen = listOf(Condition("", ConditionOp.BLANK)))) }
+        assertTrue(state.transactionMappingsHasError)
+        state.updateConfig { copy(transactionMappings = transactionMappings.copy(excludeWhen = emptyList())) }
+        state.updateConfig {
+            copy(transactionMappings = transactionMappings.copy(itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = ""))))
+        }
+        assertTrue(state.transactionMappingsHasError)
+    }
+
+    @Test
     fun `people download forbids owns-all-accounts together with ancestor expression`() {
         val state = ApiStrategyEditorState(strategy = null)
         state.name = "My API"

@@ -3431,23 +3431,14 @@ internal fun JsonObject.matchesAll(conditions: List<Condition>): Boolean {
 internal class JsonRecord(
     private val obj: JsonObject,
 ) : Record {
-    override fun exists(path: String): Boolean = obj.resolveJsonElementPath(path).let { it != null && it != JsonNull }
+    override fun exists(path: String): Boolean = obj.resolveJsonPathElement(path).let { it != null && it != JsonNull }
 
     override fun text(path: String): String? = obj.resolveJsonPath(path)
 
     override fun arrayTexts(path: String): List<String>? =
-        (obj.resolveJsonElementPath(path) as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        (obj.resolveJsonPathElement(path) as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
 
-    override fun objectSize(path: String): Int? = obj.resolveJsonObjectPath(path)?.size
-}
-
-/** Resolves a dot-notation path to its `JsonElement` (object, array, or primitive), or null. */
-internal fun JsonObject.resolveJsonElementPath(dotPath: String): JsonElement? {
-    var current: JsonElement = this
-    for (part in dotPath.split(".")) {
-        current = (current as? JsonObject)?.get(part) ?: return null
-    }
-    return current
+    override fun objectSize(path: String): Int? = (if (path.isBlank()) obj else obj.resolveJsonPathElement(path) as? JsonObject)?.size
 }
 
 private class AttributeTypeCache(

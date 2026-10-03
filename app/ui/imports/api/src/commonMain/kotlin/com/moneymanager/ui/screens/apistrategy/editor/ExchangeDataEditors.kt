@@ -32,6 +32,7 @@ import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.model.rules.isComplete
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -645,6 +646,7 @@ private fun defaultTradeMappings(): ApiTradeMappings =
 
 private fun ApiTradeMappings.isValidForSave(): Boolean =
     instrumentField.isNotBlank() &&
+        itemFilters.all { it.isComplete() } &&
         (!sideField.isNullOrBlank() || fixedSideBuy != null) &&
         baseQuantityField.isNotBlank() &&
         timestampField.isNotBlank() &&
@@ -666,7 +668,14 @@ private fun ApiTransactionMappings.isValidForSave(): Boolean =
         descriptionField.isNotBlank() &&
         // A row with no id of its own (Binance Simple Earn rewards) is identified by a composite key instead.
         (idField.isNotBlank() || compositeIdFields.isNotEmpty()) &&
-        (signSource != ApiSignSource.FIELD || !signField.isNullOrBlank())
+        (signSource != ApiSignSource.FIELD || !signField.isNullOrBlank()) &&
+        conditionsComplete()
+
+/**
+ * Whether every exclusion, filter and decline condition names its path and operand. An incomplete one
+ * is not inert: a path-less "is blank" exclusion holds for every item and would exclude them all.
+ */
+internal fun ApiTransactionMappings.conditionsComplete(): Boolean = (excludeWhen + itemFilters + declinedWhen).all { it.isComplete() }
 
 /** Whether an [ApiEndpointConfig] is complete enough to save, independent of what kind of record it produces. */
 private fun ApiEndpointConfig.isValidForSave(): Boolean {

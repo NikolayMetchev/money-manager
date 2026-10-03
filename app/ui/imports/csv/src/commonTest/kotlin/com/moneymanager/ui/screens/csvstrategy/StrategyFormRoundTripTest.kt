@@ -26,6 +26,7 @@ import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Extraction
@@ -329,7 +330,15 @@ class StrategyFormRoundTripTest {
                                             negateValues = true,
                                             flipAccountsOnPositive = true,
                                         ),
+                                    // A fallback currency column has no widget of its own.
+                                    TransferField.CURRENCY to
+                                        CurrencyLookupMapping(
+                                            fieldType = TransferField.CURRENCY,
+                                            value = ValueExpr(listOf("Source currency", "Target currency")),
+                                        ),
                                 ),
+                        // Neither do asset suffixes to strip.
+                        assetCodes = AssetCodeRules(aliases = mapOf("XXBT" to "BTC"), stripSuffixes = setOf(".F")),
                     ),
             )
         val availableColumns = columns.map { it.originalName }.toSet()
@@ -338,6 +347,7 @@ class StrategyFormRoundTripTest {
         val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
         assertEquals(original.config.fieldMappings, rebuilt.config.fieldMappings)
+        assertEquals(original.config.assetCodes, rebuilt.config.assetCodes)
         assertEquals(original.worksheetName, rebuilt.worksheetName)
 
         // Pin the extraction itself, not just that the mapping round-trips: a dropped extraction

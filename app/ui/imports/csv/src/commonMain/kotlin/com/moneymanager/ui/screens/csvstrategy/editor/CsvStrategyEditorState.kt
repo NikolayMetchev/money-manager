@@ -270,6 +270,14 @@ internal class CsvStrategyEditorState(
     val sourceTemplateExtraction = sourceTemplate?.extraction
     val targetTemplateExtraction = targetTemplate?.extraction
     val currencyExtraction = (currencyMapping as? CurrencyLookupMapping)?.value?.extraction
+    val currencyFallbackColumns =
+        (currencyMapping as? CurrencyLookupMapping)
+            ?.value
+            ?.paths
+            ?.drop(1)
+            ?.filter { it in availableColumnNames }
+            .orEmpty()
+    val assetSuffixesToStrip = config?.assetCodes?.stripSuffixes.orEmpty()
     val feeCurrency = amountMapping?.feeCurrency
 
     // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.

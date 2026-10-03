@@ -289,7 +289,11 @@ internal fun buildStrategyFromEditorState(
                     CurrencyMode.FROM_COLUMN ->
                         CurrencyLookupMapping(
                             fieldType = TransferField.CURRENCY,
-                            value = ValueExpr(listOf(state.currencyColumnName!!), extraction = state.currencyExtraction),
+                            value =
+                                ValueExpr(
+                                    listOf(state.currencyColumnName!!) + (state.currencyFallbackColumns - state.currencyColumnName!!),
+                                    extraction = state.currencyExtraction,
+                                ),
                         )
                 },
             )
@@ -334,7 +338,11 @@ internal fun buildStrategyFromEditorState(
                     state.reconciliationSourceName.trim().takeIf { it.isNotEmpty() }?.let { source ->
                         ReconciliationConfig(source, state.reconciliationLinkablePrefix.takeIf { it.isNotEmpty() })
                     },
-                assetCodes = AssetCodeRules(aliases = parseAssetAliases(state.assetAliasesText)),
+                assetCodes =
+                    AssetCodeRules(
+                        aliases = parseAssetAliases(state.assetAliasesText),
+                        stripSuffixes = state.assetSuffixesToStrip,
+                    ),
             ),
         worksheetName = state.worksheetName,
         createdAt = createdAt,

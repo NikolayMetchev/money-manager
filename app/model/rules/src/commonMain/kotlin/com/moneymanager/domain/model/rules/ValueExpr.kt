@@ -72,15 +72,20 @@ data class AssetCodeRules(
                 alias.trim().uppercase()
         }
 
+    // Normalised once, like the code they are matched against; a blank suffix would match every code and
+    // strip nothing, hiding any later suffix that should apply.
+    @Transient
+    private val normalisedSuffixes: List<String> = stripSuffixes.map { it.trim().uppercase() }.filter { it.isNotEmpty() }
+
     val isEmpty: Boolean get() = aliases.isEmpty() && stripSuffixes.isEmpty()
 
     /** [code] normalised: trimmed, upper-cased, a known suffix stripped, then aliased. */
     fun canonical(code: String): String {
         val normalised = code.trim().uppercase()
         val stripped =
-            stripSuffixes
-                .firstOrNull { normalised.endsWith(it.trim().uppercase()) }
-                ?.let { normalised.dropLast(it.trim().length) }
+            normalisedSuffixes
+                .firstOrNull { normalised.endsWith(it) }
+                ?.let { normalised.dropLast(it.length) }
                 ?: normalised
         return aliasesByUpperCode[stripped] ?: stripped
     }

@@ -114,7 +114,8 @@ internal class ApiStrategyEditorState(
                     mappings.currencyField.isBlank() ||
                     mappings.descriptionField.isBlank() ||
                     mappings.idField.isBlank() ||
-                    (mappings.signSource == ApiSignSource.FIELD && mappings.signField.isNullOrBlank())
+                    (mappings.signSource == ApiSignSource.FIELD && mappings.signField.isNullOrBlank()) ||
+                    !mappings.conditionsComplete()
             }
 
     val peopleHasError: Boolean
