@@ -1036,7 +1036,7 @@ suspend fun runCsvImport(
                 )
             }
 
-    // Personal counterparties (resolved via person-flagged strategy rules, e.g. a RegexRule with
+    // Personal counterparties (resolved via person-flagged strategy rules, e.g. an AccountRule with
     // counterpartyIsPerson) become People with an ownership link to their counterparty account, in
     // addition to the account itself. The engine dedups people by name key and ownerships by
     // (person, account), so repeats across rows/files and re-imports collapse. Mirrors the QIF importer,

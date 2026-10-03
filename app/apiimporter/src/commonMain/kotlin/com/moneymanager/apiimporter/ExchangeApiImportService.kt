@@ -19,13 +19,13 @@ import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -1489,16 +1489,15 @@ private fun parseExchangeTransfer(
         // preserves that net-zero.
         // An endpoint listing both directions with unsigned amounts (Bybit Earn's Stake/Redeem orders)
         // names the direction in a field instead, read like a bank feed's FIELD sign source.
-        val fieldDirection =
-            tm.signField
-                ?.takeIf { tm.signSource == ApiSignSource.FIELD }
-                ?.let { obj.str(it) }
-                ?.let { if (it in tm.creditValues) TransferDirection.IN else TransferDirection.OUT }
         val resolvedDirection =
-            when {
-                tm.directionFromAmountSign -> if (rawAmount < BigDecimal.ZERO) TransferDirection.OUT else TransferDirection.IN
-                fieldDirection != null -> fieldDirection
-                else -> direction
+            when (val configured = tm.direction) {
+                null -> direction
+                is Direction.AmountSign ->
+                    if ((rawAmount < BigDecimal.ZERO) == configured.positiveIsIncoming) TransferDirection.OUT else TransferDirection.IN
+                is Direction.Field ->
+                    obj.str(configured.path)?.let { if (it in configured.incomingValues) TransferDirection.IN else TransferDirection.OUT }
+                        ?: direction
+                Direction.Outgoing -> TransferDirection.OUT
             }
         val amount = rawAmount.abs()
         val description =

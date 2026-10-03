@@ -1,7 +1,8 @@
 package com.moneymanager.ui.screens.csvstrategy.editor
 
 import com.moneymanager.domain.model.CsvImportStrategyId
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -35,7 +36,10 @@ class CsvStrategyEditorStateTest {
                         fieldMappings =
                             mapOf(
                                 TransferField.TARGET_ACCOUNT to
-                                    AccountLookupMapping(TransferField.TARGET_ACCOUNT, "Payee"),
+                                    AccountRulesMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
+                                    ),
                                 TransferField.TIMESTAMP to
                                     DateTimeParsingMapping(
                                         fieldType = TransferField.TIMESTAMP,
@@ -64,8 +68,7 @@ class CsvStrategyEditorStateTest {
 
         assertEquals("Simple", state.name)
         assertEquals(setOf("Date", "Payee"), state.identificationColumns)
-        assertEquals("Payee", state.targetAccountColumnName)
-        assertEquals(TargetAccountMode.DIRECT_LOOKUP, state.targetAccountMode)
+        assertEquals(listOf(AccountRule(value = ValueExpr(listOf("Payee")))), state.targetRules)
         assertEquals("Date", state.dateColumnName)
         assertEquals("yyyy-MM-dd", state.dateFormat)
         assertEquals("Amount", state.amountColumnName)

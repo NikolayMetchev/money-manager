@@ -10,7 +10,8 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -175,10 +176,17 @@ class CsvImportErrorHandlingTest {
                                     accountId = testSourceAccountId,
                                 ),
                             TransferField.TARGET_ACCOUNT to
-                                AccountLookupMapping(
+                                AccountRulesMapping(
                                     fieldType = TransferField.TARGET_ACCOUNT,
-                                    columnName = "Name",
-                                    fallbackColumns = fallbackColumns,
+                                    rules =
+                                        listOf(
+                                            AccountRule(
+                                                value =
+                                                    ValueExpr(
+                                                        listOf("Name") + fallbackColumns,
+                                                    ),
+                                            ),
+                                        ),
                                 ),
                             TransferField.TIMESTAMP to
                                 DateTimeParsingMapping(

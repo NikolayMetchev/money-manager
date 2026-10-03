@@ -27,17 +27,17 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.apistrategy.ApiPaging
-import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
-import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.rules.isComplete
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.components.rules.DirectionEditor
+import com.moneymanager.ui.components.rules.isComplete
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
@@ -119,14 +119,11 @@ private fun DataEndpointEditor(
         label = "Kind",
         options = ApiEndpointKind.entries,
         selected = dataEndpoint.kind,
-        // Persist the direction the UI shows by default (IN) when switching to a directional kind,
-        // so a saved deposit/withdrawal endpoint never keeps a null direction the UI rendered as IN.
         // A trade/order endpoint has no transactionMappings, so enrichesTransfers (which needs one) can
         // never be valid there — clear it when switching to a trade kind.
         onSelect = { newKind ->
-            val direction = dataEndpoint.fixedDirection ?: TransferDirection.IN.takeIf { newKind in DIRECTIONAL_KINDS }
             val enriches = dataEndpoint.enrichesTransfers && newKind !in TRADE_KINDS
-            onChange(dataEndpoint.copy(kind = newKind, fixedDirection = direction, enrichesTransfers = enriches))
+            onChange(dataEndpoint.copy(kind = newKind, enrichesTransfers = enriches))
         },
         optionLabel = { it.name },
         enabled = enabled,
@@ -165,14 +162,6 @@ private fun DataEndpointEditor(
     }
 
     if (dataEndpoint.kind in DIRECTIONAL_KINDS && !dataEndpoint.enrichesTransfers) {
-        EnumDropdown(
-            label = "Fixed direction",
-            options = TransferDirection.entries,
-            selected = dataEndpoint.fixedDirection ?: TransferDirection.IN,
-            onSelect = { onChange(dataEndpoint.copy(fixedDirection = it)) },
-            optionLabel = { it.name },
-            enabled = enabled,
-        )
         TextFieldRow(
             label = "Counterparty account name (optional)",
             value = dataEndpoint.counterpartyAccountName.orEmpty(),
@@ -240,23 +229,14 @@ internal fun TransactionMappingsFields(
             optionLabel = { it.name },
             enabled = enabled,
         )
-        EnumDropdown(
-            label = "Sign source",
-            options = ApiSignSource.entries,
-            selected = mappings.signSource,
-            onSelect = { onChange(mappings.copy(signSource = it)) },
-            optionLabel = { it.name },
+        // A deposit endpoint's own direction is in, a withdrawal endpoint's out.
+        DirectionEditor(
+            direction = mappings.direction,
+            onDirectionChanged = { onChange(mappings.copy(direction = it)) },
+            pathField = { label, value, onValueChange, isError -> TextFieldRow(label, value, onValueChange, enabled, isError = isError) },
             enabled = enabled,
+            allowDefault = true,
         )
-        if (mappings.signSource == ApiSignSource.FIELD) {
-            TextFieldRow("Sign field", mappings.signField.orEmpty(), { onChange(mappings.copy(signField = it.ifBlank { null })) }, enabled)
-            StringSetEditor(
-                label = "Credit values (mean incoming/positive)",
-                values = mappings.creditValues,
-                onChange = { onChange(mappings.copy(creditValues = it)) },
-                enabled = enabled,
-            )
-        }
         TextFieldRow(
             "Fee amount field (optional)",
             mappings.feeAmountField.orEmpty(),
@@ -660,7 +640,7 @@ private fun ApiTransactionMappings.isValidForSave(): Boolean =
         descriptionField.isNotBlank() &&
         // A row with no id of its own (Binance Simple Earn rewards) is identified by a composite key instead.
         (idField.isNotBlank() || compositeIdFields.isNotEmpty()) &&
-        (signSource != ApiSignSource.FIELD || !signField.isNullOrBlank()) &&
+        direction.isComplete() &&
         conditionsComplete()
 
 /**
@@ -687,12 +667,11 @@ internal fun List<ApiDataEndpoint>.isValidForSave(): Boolean =
                 // An enrichment endpoint moves no money, so only its id field (the join index key) matters.
                 de.transactionMappings?.idField?.isNotBlank() ?: false
             } else {
-                (de.kind !in DIRECTIONAL_KINDS || de.fixedDirection != null) &&
-                    if (de.kind in TRADE_KINDS) {
-                        de.tradeMappings?.isValidForSave() ?: false
-                    } else {
-                        de.transactionMappings?.isValidForSave() ?: false
-                    }
+                if (de.kind in TRADE_KINDS) {
+                    de.tradeMappings?.isValidForSave() ?: false
+                } else {
+                    de.transactionMappings?.isValidForSave() ?: false
+                }
             }
     }
 

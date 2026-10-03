@@ -9,10 +9,8 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
-import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -21,14 +19,10 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
-import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
-import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
+import com.moneymanager.domain.model.csvstrategy.export.AccountRulesExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
-import com.moneymanager.domain.model.csvstrategy.export.AttributeMatchAccountExport
-import com.moneymanager.domain.model.csvstrategy.export.ConditionalAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExportMapper
 import com.moneymanager.domain.model.csvstrategy.export.CurrencyLookupExport
@@ -38,8 +32,6 @@ import com.moneymanager.domain.model.csvstrategy.export.FieldMappingExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedCurrencyExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport
-import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
-import com.moneymanager.domain.model.csvstrategy.export.TemplateAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.TimezoneLookupExport
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -176,18 +168,8 @@ class CsvStrategyExportService(
                     )
                 }
             }
-            is AccountLookupExport ->
+            is AccountRulesExport ->
                 addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
-            is RegexAccountExport ->
-                addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
-            is TemplateAccountExport ->
-                addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
-            is AttributeMatchAccountExport ->
-                addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
-            is ConditionalAccountExport -> {
-                collectUnresolvedReferences(mappingExport.whenTrue, fieldType, referenceData, unresolvedReferences)
-                collectUnresolvedReferences(mappingExport.whenFalse, fieldType, referenceData, unresolvedReferences)
-            }
             is HardCodedCurrencyExport -> {
                 if (referenceData.currenciesByCode[mappingExport.currencyCode] == null) {
                     unresolvedReferences.add(
@@ -423,51 +405,13 @@ class CsvStrategyExportService(
                         accountsByName[accountName]?.id
                             ?: error("Account not found: $accountName"),
                 )
-            is AccountLookupExport ->
-                AccountLookupMapping(
+            is AccountRulesExport ->
+                AccountRulesMapping(
                     fieldType = fieldType,
-                    columnName = columnName,
-                    fallbackColumns = fallbackColumns,
-                    defaultCategoryId =
-                        categoriesByName[defaultCategoryName]?.id
-                            ?: Category.UNCATEGORIZED_ID,
-                )
-            is RegexAccountExport ->
-                RegexAccountMapping(
-                    fieldType = fieldType,
-                    columnName = columnName,
                     rules = rules,
-                    fallbackColumns = fallbackColumns,
                     defaultCategoryId =
                         categoriesByName[defaultCategoryName]?.id
                             ?: Category.UNCATEGORIZED_ID,
-                )
-            is AttributeMatchAccountExport ->
-                AttributeMatchAccountMapping(
-                    fieldType = fieldType,
-                    columnName = columnName,
-                    attributeTypeName = attributeTypeName,
-                    defaultCategoryId =
-                        categoriesByName[defaultCategoryName]?.id
-                            ?: Category.UNCATEGORIZED_ID,
-                )
-            is TemplateAccountExport ->
-                TemplateAccountMapping(
-                    fieldType = fieldType,
-                    columnName = columnName,
-                    prefix = prefix,
-                    suffix = suffix,
-                    defaultCategoryId =
-                        categoriesByName[defaultCategoryName]?.id
-                            ?: Category.UNCATEGORIZED_ID,
-                    extraction = extraction,
-                )
-            is ConditionalAccountExport ->
-                ConditionalAccountMapping(
-                    fieldType = fieldType,
-                    conditions = conditions,
-                    whenTrue = whenTrue.toDomain(accountsByName, currenciesByCode, categoriesByName),
-                    whenFalse = whenFalse.toDomain(accountsByName, currenciesByCode, categoriesByName),
                 )
             is DateTimeParsingExport ->
                 DateTimeParsingMapping(
@@ -491,8 +435,7 @@ class CsvStrategyExportService(
                     amountColumnName = amountColumnName,
                     creditColumnName = creditColumnName,
                     debitColumnName = debitColumnName,
-                    negateValues = negateValues,
-                    flipAccountsOnPositive = flipAccountsOnPositive,
+                    direction = direction,
                     feeColumnName = feeColumnName,
                     feeConditions = feeConditions,
                     feeCurrency = feeCurrency,

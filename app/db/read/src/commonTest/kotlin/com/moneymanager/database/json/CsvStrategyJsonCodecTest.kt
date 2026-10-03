@@ -2,11 +2,11 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
-import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -15,14 +15,12 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
-import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
-import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
-import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,32 +50,27 @@ class CsvStrategyJsonCodecTest {
     @Test
     fun `encode and decode AccountLookupMapping`() {
         val mapping =
-            AccountLookupMapping(
-                fieldType = TransferField.TARGET_ACCOUNT,
-                columnName = "Payee",
-            )
+            AccountRulesMapping(fieldType = TransferField.TARGET_ACCOUNT, rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))))
         val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
 
         val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
         val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
-        assertIs<AccountLookupMapping>(decodedMapping)
-        assertEquals("Payee", decodedMapping.columnName)
+        assertEquals(mapping, decodedMapping)
     }
 
     @Test
     fun `encode and decode RegexAccountMapping`() {
         val mapping =
-            RegexAccountMapping(
+            AccountRulesMapping(
                 fieldType = TransferField.TARGET_ACCOUNT,
-                columnName = "Name",
                 rules =
                     listOf(
-                        RegexRule(pattern = ".*paxos.*", accountName = "Paxos"),
-                        RegexRule(pattern = ".*crypto\\.com.*", accountName = "Crypto.com"),
+                        AccountRule(value = ValueExpr(listOf("Name")), pattern = ".*paxos.*", name = "Paxos"),
+                        AccountRule(value = ValueExpr(listOf("Name")), pattern = ".*crypto\\.com.*", name = "Crypto.com"),
+                        AccountRule(value = ValueExpr(listOf("Name", "Type"))),
                     ),
-                fallbackColumns = listOf("Type"),
             )
         val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
 
@@ -85,14 +78,7 @@ class CsvStrategyJsonCodecTest {
         val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
-        assertIs<RegexAccountMapping>(decodedMapping)
-        assertEquals("Name", decodedMapping.columnName)
-        assertEquals(2, decodedMapping.rules.size)
-        assertEquals(".*paxos.*", decodedMapping.rules[0].pattern)
-        assertEquals("Paxos", decodedMapping.rules[0].accountName)
-        assertEquals(".*crypto\\.com.*", decodedMapping.rules[1].pattern)
-        assertEquals("Crypto.com", decodedMapping.rules[1].accountName)
-        assertEquals(listOf("Type"), decodedMapping.fallbackColumns)
+        assertEquals(mapping, decodedMapping)
     }
 
     @Test
@@ -140,8 +126,7 @@ class CsvStrategyJsonCodecTest {
                 fieldType = TransferField.AMOUNT,
                 mode = AmountMode.SINGLE_COLUMN,
                 amountColumnName = "Amount",
-                negateValues = true,
-                flipAccountsOnPositive = true,
+                direction = Direction.AmountSign(positiveIsIncoming = false),
             )
         val mappings = mapOf(TransferField.AMOUNT to mapping)
 
@@ -152,8 +137,7 @@ class CsvStrategyJsonCodecTest {
         assertIs<AmountParsingMapping>(decodedMapping)
         assertEquals(AmountMode.SINGLE_COLUMN, decodedMapping.mode)
         assertEquals("Amount", decodedMapping.amountColumnName)
-        assertEquals(true, decodedMapping.negateValues)
-        assertEquals(true, decodedMapping.flipAccountsOnPositive)
+        assertEquals(Direction.AmountSign(positiveIsIncoming = false), decodedMapping.direction)
     }
 
     @Test
@@ -220,9 +204,9 @@ class CsvStrategyJsonCodecTest {
                         accountId = AccountId(1),
                     ),
                 TransferField.TARGET_ACCOUNT to
-                    AccountLookupMapping(
+                    AccountRulesMapping(
                         fieldType = TransferField.TARGET_ACCOUNT,
-                        columnName = "Payee",
+                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
@@ -233,11 +217,7 @@ class CsvStrategyJsonCodecTest {
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Memo"))),
                 TransferField.AMOUNT to
-                    AmountParsingMapping(
-                        fieldType = TransferField.AMOUNT,
-                        mode = AmountMode.SINGLE_COLUMN,
-                        amountColumnName = "Amount",
-                    ),
+                    AmountParsingMapping(fieldType = TransferField.AMOUNT, mode = AmountMode.SINGLE_COLUMN, amountColumnName = "Amount"),
                 TransferField.CURRENCY to
                     HardCodedCurrencyMapping(
                         fieldType = TransferField.CURRENCY,
@@ -250,7 +230,7 @@ class CsvStrategyJsonCodecTest {
 
         assertEquals(6, decoded.size)
         assertIs<HardCodedAccountMapping>(decoded[TransferField.SOURCE_ACCOUNT])
-        assertIs<AccountLookupMapping>(decoded[TransferField.TARGET_ACCOUNT])
+        assertIs<AccountRulesMapping>(decoded[TransferField.TARGET_ACCOUNT])
         assertIs<DateTimeParsingMapping>(decoded[TransferField.TIMESTAMP])
         assertIs<DirectColumnMapping>(decoded[TransferField.DESCRIPTION])
         assertIs<AmountParsingMapping>(decoded[TransferField.AMOUNT])
@@ -332,10 +312,9 @@ class CsvStrategyJsonCodecTest {
     @Test
     fun `encode and decode TemplateAccountMapping`() {
         val mapping =
-            TemplateAccountMapping(
+            AccountRulesMapping(
                 fieldType = TransferField.SOURCE_ACCOUNT,
-                columnName = "Source currency",
-                prefix = "Wise: ",
+                rules = listOf(AccountRule(value = ValueExpr(listOf("Source currency")), trim = true, name = "Wise: {value}")),
             )
         val mappings = mapOf(TransferField.SOURCE_ACCOUNT to mapping)
 
@@ -343,16 +322,13 @@ class CsvStrategyJsonCodecTest {
         val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.SOURCE_ACCOUNT]
-        assertIs<TemplateAccountMapping>(decodedMapping)
-        assertEquals("Source currency", decodedMapping.columnName)
-        assertEquals("Wise: ", decodedMapping.prefix)
-        assertEquals("", decodedMapping.suffix)
+        assertEquals(mapping, decodedMapping)
     }
 
     @Test
     fun `encode and decode ConditionalAccountMapping with nested mappings`() {
         val mapping =
-            ConditionalAccountMapping(
+            AccountRulesMapping.conditional(
                 fieldType = TransferField.TARGET_ACCOUNT,
                 conditions =
                     listOf(
@@ -360,16 +336,14 @@ class CsvStrategyJsonCodecTest {
                         Condition("Source name", ConditionOp.NOT_BLANK),
                     ),
                 whenTrue =
-                    TemplateAccountMapping(
+                    AccountRulesMapping(
                         fieldType = TransferField.TARGET_ACCOUNT,
-                        columnName = "Target currency",
-                        prefix = "Wise: ",
+                        rules = listOf(AccountRule(value = ValueExpr(listOf("Target currency")), trim = true, name = "Wise: {value}")),
                     ),
                 whenFalse =
-                    AccountLookupMapping(
+                    AccountRulesMapping(
                         fieldType = TransferField.TARGET_ACCOUNT,
-                        columnName = "Target name",
-                        fallbackColumns = listOf("Source name"),
+                        rules = listOf(AccountRule(value = ValueExpr(listOf("Target name", "Source name")))),
                     ),
             )
         val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
@@ -378,11 +352,14 @@ class CsvStrategyJsonCodecTest {
         val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
         val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
-        assertIs<ConditionalAccountMapping>(decodedMapping)
-        assertEquals(2, decodedMapping.conditions.size)
-        assertEquals(ConditionOp.EQUALS_PATH, decodedMapping.conditions[0].op)
-        assertIs<TemplateAccountMapping>(decodedMapping.whenTrue)
-        assertIs<AccountLookupMapping>(decodedMapping.whenFalse)
+        assertEquals(mapping, decodedMapping)
+        assertEquals(
+            2,
+            assertIs<AccountRulesMapping>(decodedMapping)
+                .rules
+                .first()
+                .conditions.size,
+        )
     }
 
     @Test
