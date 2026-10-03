@@ -1,0 +1,141 @@
+{
+    "version": "",
+    "name": "Crypto.com Card",
+    "identificationColumns": [
+        "Amount",
+        "Currency",
+        "Native Amount",
+        "Native Amount (in USD)",
+        "Native Currency",
+        "Timestamp (UTC)",
+        "To Amount",
+        "To Currency",
+        "Transaction Description",
+        "Transaction Hash",
+        "Transaction Kind"
+    ],
+    "fieldMappings": {
+        "AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport",
+            "fieldType": "AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "Native Amount",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": true,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.CurrencyLookupExport",
+            "fieldType": "CURRENCY",
+            "columnName": "Native Currency"
+        },
+        "DESCRIPTION": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.DirectColumnExport",
+            "fieldType": "DESCRIPTION",
+            "columnName": "Transaction Description",
+            "fallbackColumns": [],
+            "extraction": null
+        },
+        "SOURCE_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport",
+            "fieldType": "SOURCE_ACCOUNT",
+            "columnName": "Transaction Description",
+            "rules": [
+                {
+                    "pattern": "^",
+                    "accountName": "Crypto.com Card",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                }
+            ],
+            "fallbackColumns": [],
+            "defaultCategoryName": "Uncategorized"
+        },
+        "TARGET_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport",
+            "fieldType": "TARGET_ACCOUNT",
+            "columnName": "Transaction Description",
+            "rules": [
+                {
+                    "pattern": "^[A-Z]{3,5} Deposit$",
+                    "accountName": "Crypto.com Card Top Up",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null,
+                    "counterpartyIsUnidentified": true
+                },
+                {
+                    "pattern": "^([A-Z]{3,5}) -> \\1$",
+                    "accountName": "Crypto.com Card Top Up",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null,
+                    "counterpartyIsUnidentified": true
+                }
+            ],
+            "fallbackColumns": [],
+            "defaultCategoryName": "Uncategorized"
+        },
+        "TIMESTAMP": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport",
+            "fieldType": "TIMESTAMP",
+            "dateColumnName": "Timestamp (UTC)",
+            "dateFormat": "yyyy-MM-dd",
+            "timeColumnName": null,
+            "timeFormat": null,
+            "defaultTime": "12:00:00",
+            "dateTimeFormat": "yyyy-MM-dd HH:mm:ss"
+        },
+        "TIMEZONE": {
+            "type": "com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport",
+            "fieldType": "TIMEZONE",
+            "timezoneId": "UTC"
+        }
+    },
+    "attributeMappings": [
+        {
+            "columnName": "Amount",
+            "attributeTypeName": "cryptocom-txn-amount",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Currency",
+            "attributeTypeName": "cryptocom-txn-currency",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Native Amount (in USD)",
+            "attributeTypeName": "cryptocom-usd-amount",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Transaction Hash",
+            "attributeTypeName": "cryptocom-hash",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        }
+    ],
+    "rowPreprocessingRules": [],
+    "companionTransactionRules": [],
+    "contentMatchRules": [
+        {
+            "columnName": "Transaction Kind",
+            "pattern": "^$"
+        }
+    ],
+    "accountMappings": [],
+    "fileNamePattern": "^card_transactions_record_",
+    "crossSourceReconcileWindowSeconds": 3600,
+    "conversionConfig": null
+}

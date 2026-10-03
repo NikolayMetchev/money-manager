@@ -1,0 +1,101 @@
+{
+    "identificationColumns": [
+        "",
+        "Created Date",
+        "Funding Card Last 4 Digits",
+        "Merchant MCC Code",
+        "Merchant Name",
+        "Txn Amount",
+        "Txn Currency"
+    ],
+    "fieldMappings": {
+        "AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.AmountParsingMapping",
+            "fieldType": "AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "Txn Amount",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": false,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping",
+            "fieldType": "CURRENCY",
+            "columnName": "Txn Currency"
+        },
+        "DESCRIPTION": {
+            "type": "com.moneymanager.domain.model.csvstrategy.DirectColumnMapping",
+            "fieldType": "DESCRIPTION",
+            "columnName": "Merchant Name",
+            "fallbackColumns": [],
+            "extraction": null
+        },
+        "SOURCE_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+            "fieldType": "SOURCE_ACCOUNT",
+            "columnName": "Merchant Name",
+            "rules": [
+                {
+                    "pattern": "^",
+                    "accountName": "Curve",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                }
+            ],
+            "fallbackColumns": [],
+            "defaultCategoryId": -1
+        },
+        "TARGET_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.AccountLookupMapping",
+            "fieldType": "TARGET_ACCOUNT",
+            "columnName": "Merchant Name",
+            "fallbackColumns": [],
+            "defaultCategoryId": -1
+        },
+        "TIMESTAMP": {
+            "type": "com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping",
+            "fieldType": "TIMESTAMP",
+            "dateColumnName": "Created Date",
+            "dateFormat": "yyyy-MM-dd",
+            "timeColumnName": null,
+            "timeFormat": null,
+            "defaultTime": "12:00:00",
+            "dateTimeFormat": null
+        },
+        "TIMEZONE": {
+            "type": "com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping",
+            "fieldType": "TIMEZONE",
+            "timezoneId": "UTC"
+        }
+    },
+    "attributeMappings": [
+        {
+            "columnName": "Funding Card Last 4 Digits",
+            "attributeTypeName": "curve-funding-card",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Merchant MCC Code",
+            "attributeTypeName": "curve-mcc",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        }
+    ],
+    "rowPreprocessingRules": [],
+    "companionTransactionRules": [],
+    "contentMatchRules": [],
+    "fileNamePattern": "^Transaction History",
+    "crossSourceReconcileWindowSeconds": 172800,
+    "conversionConfig": null,
+    "fundingAttributeMatch": {
+        "column": "Funding Card Last 4 Digits",
+        "attributeTypeName": "card-last4"
+    }
+}

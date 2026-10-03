@@ -1,0 +1,173 @@
+{
+    "identificationColumns": [
+        "Account Balance",
+        "Coin",
+        "Date & Time(UTC)",
+        "Description",
+        "QTY",
+        "Type",
+        "Uid"
+    ],
+    "fieldMappings": {
+        "AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.AmountParsingMapping",
+            "fieldType": "AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "QTY",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": true,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping",
+            "fieldType": "CURRENCY",
+            "columnName": "Coin"
+        },
+        "DESCRIPTION": {
+            "type": "com.moneymanager.domain.model.csvstrategy.DirectColumnMapping",
+            "fieldType": "DESCRIPTION",
+            "columnName": "Type",
+            "fallbackColumns": [
+                "Coin"
+            ],
+            "extraction": null
+        },
+        "SOURCE_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+            "fieldType": "SOURCE_ACCOUNT",
+            "columnName": "Uid",
+            "rules": [
+                {
+                    "pattern": "^",
+                    "accountName": "Bybit",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                }
+            ],
+            "fallbackColumns": [],
+            "defaultCategoryId": -1
+        },
+        "TARGET_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping",
+            "fieldType": "TARGET_ACCOUNT",
+            "conditions": [
+                {
+                    "columnName": "Type",
+                    "operator": "IS_BLANK",
+                    "value": null,
+                    "otherColumnName": null
+                }
+            ],
+            "whenTrue": {
+                "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+                "fieldType": "TARGET_ACCOUNT",
+                "columnName": "Uid",
+                "rules": [
+                    {
+                        "pattern": "^",
+                        "accountName": "Bybit Trading",
+                        "accountNameTemplate": null,
+                        "counterpartyIsPerson": false,
+                        "personNameTemplate": null
+                    }
+                ],
+                "fallbackColumns": [],
+                "defaultCategoryId": -1
+            },
+            "whenFalse": {
+                "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+                "fieldType": "TARGET_ACCOUNT",
+                "columnName": "Type",
+                "rules": [
+                    {
+                        "pattern": "^(Deposit|Withdraw)$",
+                        "accountName": "Bybit Funding",
+                        "accountNameTemplate": null,
+                        "counterpartyIsPerson": false,
+                        "personNameTemplate": null,
+                        "counterpartyIsUnidentified": true
+                    },
+                    {
+                        "pattern": "^Transfer (in|out)$",
+                        "accountName": "Bybit Internal Transfers",
+                        "accountNameTemplate": null,
+                        "counterpartyIsPerson": false,
+                        "personNameTemplate": null
+                    },
+                    {
+                        "pattern": "^",
+                        "accountName": "Bybit Trading",
+                        "accountNameTemplate": null,
+                        "counterpartyIsPerson": false,
+                        "personNameTemplate": null
+                    }
+                ],
+                "fallbackColumns": [],
+                "defaultCategoryId": -1
+            }
+        },
+        "TIMESTAMP": {
+            "type": "com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping",
+            "fieldType": "TIMESTAMP",
+            "dateColumnName": "Date & Time(UTC)",
+            "dateFormat": "yyyy-MM-dd",
+            "timeColumnName": null,
+            "timeFormat": null,
+            "defaultTime": "12:00:00",
+            "dateTimeFormat": "yyyy-MM-dd HH:mm:ss"
+        },
+        "TIMEZONE": {
+            "type": "com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping",
+            "fieldType": "TIMEZONE",
+            "timezoneId": "UTC"
+        }
+    },
+    "attributeMappings": [
+        {
+            "columnName": "Description",
+            "attributeTypeName": "bybit-description",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Type",
+            "attributeTypeName": "bybit-type",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Type",
+            "attributeTypeName": "excluded",
+            "isUniqueIdentifier": false,
+            "extraction": {
+                "pattern": "^Transfer (in|out)$",
+                "outputTemplate": "$0"
+            },
+            "emitWhenMatched": "Bybit internal wallet transfer"
+        },
+        {
+            "columnName": "Uid",
+            "attributeTypeName": "bybit-uid",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        }
+    ],
+    "rowPreprocessingRules": [],
+    "companionTransactionRules": [],
+    "contentMatchRules": [
+        {
+            "columnName": "Uid",
+            "pattern": "^\\s*\\d+\\s*$"
+        }
+    ],
+    "fileNamePattern": null,
+    "crossSourceReconcileWindowSeconds": 3600,
+    "conversionConfig": null
+}

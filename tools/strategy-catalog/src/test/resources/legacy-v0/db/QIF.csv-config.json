@@ -1,0 +1,73 @@
+{
+    "identificationColumns": [
+        "Account",
+        "Amount",
+        "Category",
+        "Check Number",
+        "Cleared",
+        "Date",
+        "Memo",
+        "Payee",
+        "Transfer Account"
+    ],
+    "fieldMappings": {
+        "AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.AmountParsingMapping",
+            "fieldType": "AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "Amount",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": true,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping",
+            "fieldType": "CURRENCY",
+            "currencyId": 1
+        },
+        "DESCRIPTION": {
+            "type": "com.moneymanager.domain.model.csvstrategy.DirectColumnMapping",
+            "fieldType": "DESCRIPTION",
+            "columnName": "Payee",
+            "fallbackColumns": [
+                "Memo"
+            ],
+            "extraction": null
+        },
+        "TARGET_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.AccountLookupMapping",
+            "fieldType": "TARGET_ACCOUNT",
+            "columnName": "Transfer Account",
+            "fallbackColumns": [
+                "Payee",
+                "Category"
+            ],
+            "defaultCategoryId": -1
+        },
+        "TIMESTAMP": {
+            "type": "com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping",
+            "fieldType": "TIMESTAMP",
+            "dateColumnName": "Date",
+            "dateFormat": "dd/MM/yyyy",
+            "timeColumnName": null,
+            "timeFormat": null,
+            "defaultTime": "12:00:00",
+            "dateTimeFormat": null
+        },
+        "TIMEZONE": {
+            "type": "com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping",
+            "fieldType": "TIMEZONE",
+            "timezoneId": "UTC"
+        }
+    },
+    "attributeMappings": [],
+    "rowPreprocessingRules": [],
+    "companionTransactionRules": [],
+    "contentMatchRules": [],
+    "fileNamePattern": null,
+    "crossSourceReconcileWindowSeconds": null,
+    "conversionConfig": null
+}

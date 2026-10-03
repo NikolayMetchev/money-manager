@@ -1,0 +1,360 @@
+{
+    "version": "",
+    "name": "Coinbase",
+    "baseUrl": "https://api.coinbase.com",
+    "authType": "SIGNED",
+    "accountsEndpoint": {
+        "path": "unused",
+        "responseArrayKey": "",
+        "queryParams": [],
+        "pagination": null,
+        "method": "GET",
+        "successCodeField": null,
+        "successCodeOkValue": null,
+        "errorArrayField": null,
+        "responseObjectValues": false,
+        "itemKeyField": null,
+        "nestedItemsKey": null,
+        "requestCostWeight": 1,
+        "fanOut": null,
+        "unsigned": false,
+        "storeResponse": true
+    },
+    "transactionsEndpoint": {
+        "path": "unused",
+        "responseArrayKey": "",
+        "queryParams": [],
+        "pagination": null,
+        "method": "GET",
+        "successCodeField": null,
+        "successCodeOkValue": null,
+        "errorArrayField": null,
+        "responseObjectValues": false,
+        "itemKeyField": null,
+        "nestedItemsKey": null,
+        "requestCostWeight": 1,
+        "fanOut": null,
+        "unsigned": false,
+        "storeResponse": true
+    },
+    "accountMappings": {
+        "idField": "id",
+        "descriptionField": "description",
+        "ownerNameField": null,
+        "ownersArrayField": "owners",
+        "ownerUserIdField": "user_id",
+        "ownerNameFallbackField": "name",
+        "sortCodeField": "sort_code",
+        "accountNumberField": "account_number",
+        "currencyField": null,
+        "customFields": {},
+        "uniqueIdentifierFields": [],
+        "staticAccountName": null,
+        "accountNameRules": []
+    },
+    "transactionMappings": {
+        "amountField": "amount",
+        "timestampField": "created",
+        "timestampFormat": "ISO_8601",
+        "timestampPattern": null,
+        "currencyField": "currency",
+        "descriptionField": "description",
+        "amountFormat": "MINOR_UNITS_INTEGER",
+        "signSource": "EMBEDDED",
+        "signField": null,
+        "creditValues": [],
+        "idField": "id",
+        "merchantNameField": null,
+        "counterpartyNameField": null,
+        "counterpartyIdField": null,
+        "declineReasonField": null,
+        "declineStatusField": null,
+        "declinedStatusValues": [],
+        "localAmountField": null,
+        "localCurrencyField": null,
+        "feeAmountField": null,
+        "feeCurrencyField": null,
+        "feeDescriptionField": null,
+        "feeIncludedInAmount": false,
+        "customFields": {},
+        "uniqueIdentifierFields": [],
+        "counterpartyAddressField": null,
+        "counterpartyNetworkField": null,
+        "txidField": null,
+        "counterpartyAliasField": null,
+        "counterpartyAccountAliases": {},
+        "joinKeyField": null,
+        "directionFromAmountSign": false,
+        "excludeField": null,
+        "excludeValues": [],
+        "reconcileTradeAmountsField": null,
+        "itemFilters": [],
+        "compositeIdFields": []
+    },
+    "peopleMappings": {
+        "counterpartyObjectField": "counterparty",
+        "beneficiaryAccountTypeField": "beneficiary_account_type",
+        "personalBeneficiaryAccountTypeValue": "Personal",
+        "personalBeneficiaryAccountTypeValues": [],
+        "counterpartyNameField": "name",
+        "counterpartyUserIdField": "user_id",
+        "counterpartySortCodeField": "sort_code",
+        "counterpartyAccountNumberField": "account_number",
+        "counterpartyServiceUserNumberField": "service_user_number",
+        "counterpartyAccountIdField": "account_id",
+        "ephemeralCounterpartyIdPrefixes": [],
+        "preferBankIdentity": false
+    },
+    "accountIdentifiersEndpoint": null,
+    "ancestorEndpoints": [],
+    "builtInCounterpartyRules": [],
+    "signing": null,
+    "peopleDownload": null,
+    "personExternalIdAttribute": null,
+    "requestSigning": {
+        "algorithm": "HMAC_SHA256",
+        "secretEncoding": "UTF8",
+        "signatureEncoding": "HEX",
+        "requestId": null,
+        "method": null,
+        "bodyFormat": "NONE",
+        "paramsEnvelopeKey": null,
+        "jwt": {
+            "algorithm": "DETECT",
+            "header": [
+                {
+                    "name": "alg",
+                    "template": "{alg}",
+                    "numeric": false
+                },
+                {
+                    "name": "kid",
+                    "template": "{apiKey}",
+                    "numeric": false
+                },
+                {
+                    "name": "nonce",
+                    "template": "{nonceHex}",
+                    "numeric": false
+                },
+                {
+                    "name": "typ",
+                    "template": "JWT",
+                    "numeric": false
+                }
+            ],
+            "claims": [
+                {
+                    "name": "iss",
+                    "template": "cdp",
+                    "numeric": false
+                },
+                {
+                    "name": "sub",
+                    "template": "{apiKey}",
+                    "numeric": false
+                },
+                {
+                    "name": "nbf",
+                    "template": "{now}",
+                    "numeric": true
+                },
+                {
+                    "name": "exp",
+                    "template": "{exp}",
+                    "numeric": true
+                },
+                {
+                    "name": "uri",
+                    "template": "{method} {host}{path}",
+                    "numeric": false
+                }
+            ],
+            "ttlSeconds": 120,
+            "placement": {
+                "location": "HEADER",
+                "name": "Authorization"
+            },
+            "prefix": "Bearer "
+        }
+    },
+    "dataEndpoints": [
+        {
+            "endpoint": {
+                "path": "v2/accounts/{fanOut}/transactions",
+                "responseArrayKey": "data",
+                "queryParams": [
+                    {
+                        "name": "order",
+                        "value": "desc",
+                        "dynamicSource": null
+                    }
+                ],
+                "pagination": {
+                    "mode": "TOKEN_CURSOR",
+                    "limitParam": "limit",
+                    "limitValue": 100,
+                    "cursorParam": "starting_after",
+                    "cursorResponseField": "created_at",
+                    "startParam": "intervalStart",
+                    "endParam": "intervalEnd",
+                    "windowDays": 469,
+                    "lookbackDays": 2190,
+                    "extraParams": [],
+                    "windowBoundFormat": "EPOCH_MS",
+                    "offsetParam": null,
+                    "offsetMode": "OFFSET",
+                    "sendLimitParam": true,
+                    "totalCountField": null,
+                    "incrementalOverlapDays": 7,
+                    "nextCursorField": "pagination.next_starting_after"
+                },
+                "method": "GET",
+                "successCodeField": null,
+                "successCodeOkValue": null,
+                "errorArrayField": null,
+                "responseObjectValues": false,
+                "itemKeyField": null,
+                "nestedItemsKey": null,
+                "requestCostWeight": 1,
+                "fanOut": {
+                    "param": null,
+                    "values": {
+                        "type": "com.moneymanager.domain.model.apistrategy.ApiValueSet.FromValueEndpoint",
+                        "endpointPath": "v2/accounts",
+                        "fields": [
+                            "id"
+                        ]
+                    },
+                    "validAgainst": null,
+                    "preserveCase": true
+                },
+                "unsigned": false,
+                "storeResponse": true
+            },
+            "kind": "DEPOSITS",
+            "transactionMappings": {
+                "amountField": "amount.amount",
+                "timestampField": "created_at",
+                "timestampFormat": "ISO_8601",
+                "timestampPattern": null,
+                "currencyField": "amount.currency",
+                "descriptionField": "details.title",
+                "amountFormat": "DECIMAL_MAJOR_UNITS",
+                "signSource": "EMBEDDED",
+                "signField": null,
+                "creditValues": [],
+                "idField": "id",
+                "merchantNameField": null,
+                "counterpartyNameField": null,
+                "counterpartyIdField": null,
+                "declineReasonField": null,
+                "declineStatusField": null,
+                "declinedStatusValues": [],
+                "localAmountField": null,
+                "localCurrencyField": null,
+                "feeAmountField": "advanced_trade_fill.commission",
+                "feeCurrencyField": null,
+                "feeDescriptionField": null,
+                "feeIncludedInAmount": false,
+                "feeInstrumentField": "advanced_trade_fill.product_id",
+                "customFields": {},
+                "uniqueIdentifierFields": [],
+                "counterpartyAddressField": "to.address",
+                "counterpartyNetworkField": "network.network_name",
+                "txidField": "network.hash",
+                "counterpartyAliasField": null,
+                "counterpartyAccountAliases": {},
+                "joinKeyField": null,
+                "directionFromAmountSign": true,
+                "excludeField": "type",
+                "excludeValues": [
+                    "advanced_trade_fill",
+                    "buy",
+                    "retail_simple_dust",
+                    "sell",
+                    "trade"
+                ],
+                "reconcileTradeAmountsField": "trade.id",
+                "reconcileTradeAmountsFallbackFields": [
+                    "buy.id",
+                    "sell.id",
+                    "advanced_trade_fill.order_id"
+                ],
+                "unpairedTradeLegCounterAmountField": "native_amount",
+                "unpairedTradeLegFundingAccountName": "Coinbase Payment Methods",
+                "itemFilters": [
+                    {
+                        "path": "status",
+                        "op": "EQUALS",
+                        "value": "completed"
+                    }
+                ],
+                "compositeIdFields": []
+            },
+            "tradeMappings": null,
+            "fixedDirection": null,
+            "counterpartyAccountName": null,
+            "enrichesTransfers": false
+        }
+    ],
+    "valueEndpoints": [
+        {
+            "path": "v2/accounts",
+            "responseArrayKey": "data",
+            "queryParams": [],
+            "pagination": {
+                "mode": "TOKEN_CURSOR",
+                "limitParam": "limit",
+                "limitValue": 100,
+                "cursorParam": "starting_after",
+                "cursorResponseField": "created",
+                "startParam": "intervalStart",
+                "endParam": "intervalEnd",
+                "windowDays": 469,
+                "lookbackDays": 2190,
+                "extraParams": [],
+                "windowBoundFormat": "EPOCH_MS",
+                "offsetParam": null,
+                "offsetMode": "OFFSET",
+                "sendLimitParam": true,
+                "totalCountField": null,
+                "incrementalOverlapDays": 7,
+                "nextCursorField": "pagination.next_starting_after"
+            },
+            "method": "GET",
+            "successCodeField": null,
+            "successCodeOkValue": null,
+            "errorArrayField": null,
+            "responseObjectValues": false,
+            "itemKeyField": null,
+            "nestedItemsKey": null,
+            "requestCostWeight": 1,
+            "fanOut": null,
+            "unsigned": false,
+            "storeResponse": true
+        }
+    ],
+    "syntheticAccount": {
+        "name": "Coinbase",
+        "externalId": "coinbase"
+    },
+    "internalTransferReconcile": null,
+    "assetAliases": {},
+    "tokenPageUrl": "https://portal.cdp.coinbase.com/projects/api-keys",
+    "connectInstructions": [
+        "Open the Coinbase Developer Platform API keys page in your browser and sign in with your Coinbase account.",
+        "Create a Secret API key (Ed25519, the default, or ECDSA) and grant only the View permission.",
+        "Paste the API key ID (or, for an older key, its name organizations/…/apiKeys/…) below as the API key.",
+        "Paste the API secret (or the whole downloaded key file) below as the API secret."
+    ],
+    "rateLimitMillis": 400,
+    "rateLimitErrorSubstrings": [
+        "Too Many Requests",
+        "rate_limit_exceeded"
+    ],
+    "rateLimitBackoffMillis": 5000,
+    "maxRateLimitRetries": 5,
+    "assetSuffixesToStrip": [],
+    "minorUnitDivisorOverrides": {}
+}

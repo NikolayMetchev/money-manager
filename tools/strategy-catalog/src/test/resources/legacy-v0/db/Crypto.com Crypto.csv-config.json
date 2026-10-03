@@ -1,0 +1,206 @@
+{
+    "identificationColumns": [
+        "Amount",
+        "Currency",
+        "Native Amount",
+        "Native Amount (in USD)",
+        "Native Currency",
+        "Timestamp (UTC)",
+        "To Amount",
+        "To Currency",
+        "Transaction Description",
+        "Transaction Hash",
+        "Transaction Kind"
+    ],
+    "fieldMappings": {
+        "AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.AmountParsingMapping",
+            "fieldType": "AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "Amount",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": true,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping",
+            "fieldType": "CURRENCY",
+            "columnName": "Currency"
+        },
+        "DESCRIPTION": {
+            "type": "com.moneymanager.domain.model.csvstrategy.DirectColumnMapping",
+            "fieldType": "DESCRIPTION",
+            "columnName": "Transaction Description",
+            "fallbackColumns": [],
+            "extraction": null
+        },
+        "SOURCE_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+            "fieldType": "SOURCE_ACCOUNT",
+            "columnName": "Transaction Kind",
+            "rules": [
+                {
+                    "pattern": "^viban_purchase$",
+                    "accountName": "Crypto.com Cash",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                },
+                {
+                    "pattern": "^",
+                    "accountName": "Crypto.com",
+                    "accountNameTemplate": null,
+                    "counterpartyIsPerson": false,
+                    "personNameTemplate": null
+                }
+            ],
+            "fallbackColumns": [],
+            "defaultCategoryId": -1
+        },
+        "TARGET_ACCOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping",
+            "fieldType": "TARGET_ACCOUNT",
+            "conditions": [
+                {
+                    "columnName": "To Currency",
+                    "operator": "IS_NOT_BLANK",
+                    "value": null,
+                    "otherColumnName": null
+                },
+                {
+                    "columnName": "Currency",
+                    "operator": "NOT_EQUALS_COLUMN",
+                    "value": null,
+                    "otherColumnName": "To Currency"
+                }
+            ],
+            "whenTrue": {
+                "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+                "fieldType": "TARGET_ACCOUNT",
+                "columnName": "Transaction Kind",
+                "rules": [
+                    {
+                        "pattern": "^crypto_viban_exchange$",
+                        "accountName": "Crypto.com Cash",
+                        "accountNameTemplate": null,
+                        "counterpartyIsPerson": false,
+                        "personNameTemplate": null
+                    },
+                    {
+                        "pattern": "^",
+                        "accountName": "Crypto.com",
+                        "accountNameTemplate": null,
+                        "counterpartyIsPerson": false,
+                        "personNameTemplate": null
+                    }
+                ],
+                "fallbackColumns": [],
+                "defaultCategoryId": -1
+            },
+            "whenFalse": {
+                "type": "com.moneymanager.domain.model.csvstrategy.RegexAccountMapping",
+                "fieldType": "TARGET_ACCOUNT",
+                "columnName": "Transaction Description",
+                "rules": [
+                    {
+                        "pattern": "App wallet",
+                        "accountName": "Crypto.com Exchange",
+                        "accountNameTemplate": null,
+                        "counterpartyIsPerson": false,
+                        "personNameTemplate": null
+                    }
+                ],
+                "fallbackColumns": [],
+                "defaultCategoryId": -1
+            }
+        },
+        "TIMESTAMP": {
+            "type": "com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping",
+            "fieldType": "TIMESTAMP",
+            "dateColumnName": "Timestamp (UTC)",
+            "dateFormat": "yyyy-MM-dd",
+            "timeColumnName": null,
+            "timeFormat": null,
+            "defaultTime": "12:00:00",
+            "dateTimeFormat": "yyyy-MM-dd HH:mm:ss"
+        },
+        "TIMEZONE": {
+            "type": "com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping",
+            "fieldType": "TIMEZONE",
+            "timezoneId": "UTC"
+        },
+        "TO_AMOUNT": {
+            "type": "com.moneymanager.domain.model.csvstrategy.AmountParsingMapping",
+            "fieldType": "TO_AMOUNT",
+            "mode": "SINGLE_COLUMN",
+            "amountColumnName": "To Amount",
+            "creditColumnName": null,
+            "debitColumnName": null,
+            "negateValues": false,
+            "flipAccountsOnPositive": false,
+            "feeColumnName": null,
+            "feeConditions": []
+        },
+        "TO_CURRENCY": {
+            "type": "com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping",
+            "fieldType": "TO_CURRENCY",
+            "columnName": "To Currency"
+        }
+    },
+    "attributeMappings": [
+        {
+            "columnName": "Native Amount",
+            "attributeTypeName": "cryptocom-native-amount",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Native Amount (in USD)",
+            "attributeTypeName": "cryptocom-usd-amount",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Native Currency",
+            "attributeTypeName": "cryptocom-native-currency",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Transaction Hash",
+            "attributeTypeName": "cryptocom-hash",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        },
+        {
+            "columnName": "Transaction Kind",
+            "attributeTypeName": "cryptocom-kind",
+            "isUniqueIdentifier": false,
+            "extraction": null,
+            "emitWhenMatched": null
+        }
+    ],
+    "rowPreprocessingRules": [],
+    "companionTransactionRules": [],
+    "contentMatchRules": [],
+    "fileNamePattern": "^crypto_transactions_record_",
+    "crossSourceReconcileWindowSeconds": 3600,
+    "conversionConfig": {
+        "signalColumn": "Transaction Kind",
+        "debitPattern": "^(dust_conversion|crypto_wallet_swap)_debited$",
+        "creditPattern": "^(dust_conversion|crypto_wallet_swap)_credited$",
+        "conversionAccountName": "Crypto.com Conversions",
+        "conversionAccountRules": [],
+        "pairingKeyPattern": "^(dust_conversion|crypto_wallet_swap)_",
+        "pairingKeyColumns": [],
+        "pairingWindowSeconds": 5,
+        "relationshipTypeName": "conversion"
+    }
+}
