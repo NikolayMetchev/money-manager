@@ -23,7 +23,7 @@ class VerificationTasksTest {
 
     @Test
     fun `verifyNoDbDependency passes when only allowed modules are on the classpath`() {
-        writeDbFixture(consumerDependencies = """implementation(project(":lib"))""", libDependencies = "")
+        writeDbFixture(libDependencies = "")
 
         val result = run("check")
 
@@ -32,10 +32,7 @@ class VerificationTasksTest {
 
     @Test
     fun `verifyNoDbDependency fails on a forbidden module reached transitively`() {
-        writeDbFixture(
-            consumerDependencies = """implementation(project(":lib"))""",
-            libDependencies = """api(project(":app:db:core"))""",
-        )
+        writeDbFixture(libDependencies = """api(project(":app:db:core"))""")
 
         val result = runAndFail("check")
 
@@ -68,10 +65,7 @@ class VerificationTasksTest {
     }
 
     /** `:consumer` applies the convention; `:lib` sits between it and the modules the convention forbids. */
-    private fun writeDbFixture(
-        consumerDependencies: String,
-        libDependencies: String,
-    ) {
+    private fun writeDbFixture(libDependencies: String) {
         write("settings.gradle.kts", """include(":app:db:core", ":lib", ":consumer")""")
         write("app/db/core/build.gradle.kts", "plugins { `java-library` }")
         write(
@@ -88,7 +82,7 @@ class VerificationTasksTest {
                 `java-library`
                 id("moneymanager.pure-importer-convention")
             }
-            dependencies { $consumerDependencies }
+            dependencies { implementation(project(":lib")) }
             """.trimIndent(),
         )
     }
