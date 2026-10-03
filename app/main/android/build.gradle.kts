@@ -58,7 +58,6 @@ dependencies {
     implementation(projects.app.ui.foundation)
     implementation(projects.utils.credentialvault)
     implementation(projects.utils.localsettings)
-    implementation(kotlin("stdlib"))
     implementation(libs.androidx.activity)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.runtime)

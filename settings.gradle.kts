@@ -82,8 +82,9 @@ val releaseSmokeTest = providers.gradleProperty("releaseSmokeTest").map(String::
 
 rootDir.walkTopDown()
     // Skip hidden directories (.git, .gradle, .idea, tooling dirs like .claude/worktrees that may hold
-    // a checked-out copy of the repo) so their build.gradle.kts files aren't registered as modules.
-    .onEnter { dir -> !dir.name.startsWith(".") }
+    // a checked-out copy of the repo) so their build.gradle.kts files aren't registered as modules, and
+    // build output directories, which hold no modules but are by far the largest trees to walk.
+    .onEnter { dir -> !dir.name.startsWith(".") && dir.name != "build" }
     .mapNotNull { file ->
         file.takeIf { it.name == "build.gradle.kts" }
             ?.parentFile
