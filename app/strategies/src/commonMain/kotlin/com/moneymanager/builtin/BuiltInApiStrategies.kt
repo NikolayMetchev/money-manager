@@ -20,7 +20,6 @@ import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiServerTimeSync
-import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
@@ -45,11 +44,11 @@ import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
-import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.Direction
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -249,9 +248,7 @@ object BuiltInApiStrategies {
                                         timestampField = "date",
                                         descriptionField = "details.description",
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                                        signSource = ApiSignSource.FIELD,
-                                        signField = "type",
-                                        creditValues = setOf("CREDIT"),
+                                        direction = Direction.Field(path = "type", incomingValues = setOf("CREDIT")),
                                         idField = "referenceNumber",
                                         merchantNameField = "details.merchant.name",
                                         counterpartyNameField = "details.senderName",
@@ -357,9 +354,7 @@ object BuiltInApiStrategies {
                                         timestampField = "transactionTime",
                                         descriptionField = "reference",
                                         amountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
-                                        signSource = ApiSignSource.FIELD,
-                                        signField = "direction",
-                                        creditValues = setOf("IN"),
+                                        direction = Direction.Field(path = "direction", incomingValues = setOf("IN")),
                                         idField = "feedItemUid",
                                         counterpartyNameField = "counterPartyName",
                                         // counterPartyUid is the fallback counterparty-account id; bank details
@@ -713,7 +708,7 @@ object BuiltInApiStrategies {
                 // with opposite-signed amounts (the debit and its reversal), netting to zero. Kraken's
                 // "amount" is signed (negative = out), so trust that sign instead of the endpoint's fixed
                 // direction, or the reversal double-books as a second real movement in the same direction.
-                directionFromAmountSign = true,
+                direction = Direction.AmountSign(),
                 // Only meaningful on the excluded `type=trade` rows (see excludeWhen
                 // below) — refid equals the matching TradesHistory trade's own id.
                 reconcileTradeAmountsField = "refid",
@@ -774,7 +769,7 @@ object BuiltInApiStrategies {
                             // Kraken balance by exactly the missed amount. `type=all` also returns `trade`-type
                             // entries that duplicate what TradesHistory already supplies, so those are dropped via
                             // excludeWhen. Direction comes from the signed `amount` field
-                            // (directionFromAmountSign), not the ledger `type`, so this single endpoint covers
+                            // (an amount-sign direction), not the ledger `type`, so this single endpoint covers
                             // every type without per-type direction mapping — including the historical "reward"
                             // vs "staking" naming inconsistency between Kraken account vintages.
                             ApiDataEndpoint(
@@ -1189,7 +1184,6 @@ object BuiltInApiStrategies {
                                         // withdraw, 7=wrong deposit, 8=waiting user confirm.
                                         itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "1")),
                                     ),
-                                fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = "Binance Funding",
                             ),
                             ApiDataEndpoint(
@@ -1210,7 +1204,6 @@ object BuiltInApiStrategies {
                                         // status 6 = completed (see the capital/withdraw/history docs).
                                         itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "6")),
                                     ),
-                                fixedDirection = TransferDirection.OUT,
                                 counterpartyAccountName = "Binance Funding",
                             ),
                             ApiDataEndpoint(
@@ -1225,7 +1218,6 @@ object BuiltInApiStrategies {
                                         idField = "orderNo",
                                         itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Successful")),
                                     ),
-                                fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = "Binance Bank",
                             ),
                             ApiDataEndpoint(
@@ -1246,7 +1238,6 @@ object BuiltInApiStrategies {
                                         feeAmountField = "totalFee",
                                         itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Successful")),
                                     ),
-                                fixedDirection = TransferDirection.OUT,
                                 counterpartyAccountName = "Binance Bank",
                             ),
                             ApiDataEndpoint(
@@ -1330,7 +1321,6 @@ object BuiltInApiStrategies {
                                         // Binance account here, so the whole amount moves as one leg.
                                         itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "SUCCESS")),
                                     ),
-                                fixedDirection = TransferDirection.OUT,
                                 counterpartyAccountName = binanceEarnAccount,
                             ),
                             ApiDataEndpoint(
@@ -1345,21 +1335,18 @@ object BuiltInApiStrategies {
                                         idField = "redeemId",
                                         itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "PAID")),
                                     ),
-                                fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = binanceEarnAccount,
                             ),
                             ApiDataEndpoint(
                                 spotToFundingEndpoint,
                                 ApiEndpointKind.WITHDRAWALS,
                                 transactionMappings = universalTransferMappings,
-                                fixedDirection = TransferDirection.OUT,
                                 counterpartyAccountName = binanceFundingWalletAccount,
                             ),
                             ApiDataEndpoint(
                                 fundingToSpotEndpoint,
                                 ApiEndpointKind.DEPOSITS,
                                 transactionMappings = universalTransferMappings,
-                                fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = binanceFundingWalletAccount,
                             ),
                             ApiDataEndpoint(
@@ -1374,7 +1361,6 @@ object BuiltInApiStrategies {
                                         descriptionField = "enInfo",
                                         idField = "tranId",
                                     ),
-                                fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = "Binance Distribution",
                             ),
                             // A dust conversion's detail rows are what actually moved: each swaps one small
@@ -1442,7 +1428,6 @@ object BuiltInApiStrategies {
                                             // one of the two would be dropped as a duplicate.
                                             compositeIdFields = listOf("asset", "projectId", "type", "time", "rewards"),
                                         ),
-                                    fixedDirection = TransferDirection.IN,
                                     counterpartyAccountName = "Binance Earn Rewards",
                                 )
                             },
@@ -1514,7 +1499,7 @@ object BuiltInApiStrategies {
                 counterpartyNetworkField = "network.network_name",
                 txidField = "network.hash",
                 // Every row is one wallet's own signed movement (negative = out).
-                directionFromAmountSign = true,
+                direction = Direction.AmountSign(),
                 itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "completed")),
                 // Buys/sells/converts and Advanced Trade fills: one row per wallet touched, grouped into a
                 // trade by the id of the buy/sell/convert (or the Advanced Trade order) they belong to
@@ -1693,7 +1678,7 @@ object BuiltInApiStrategies {
                     ApiTransactionMappings(
                         // change = cashFlow (realized PnL) + funding - fee: what the wallet actually moved.
                         amountField = "change",
-                        directionFromAmountSign = true,
+                        direction = Direction.AmountSign(),
                         descriptionField = "type",
                         timestampField = "transactionTime",
                         timestampFormat = TimestampFormat.EPOCH_MS,
@@ -1773,7 +1758,6 @@ object BuiltInApiStrategies {
                                         // status 3 = success.
                                         itemFilters = status("3"),
                                     ),
-                                fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = "Bybit Funding",
                             ),
                             ApiDataEndpoint(
@@ -1793,7 +1777,6 @@ object BuiltInApiStrategies {
                                         feeAmountField = "withdrawFee",
                                         itemFilters = status("success"),
                                     ),
-                                fixedDirection = TransferDirection.OUT,
                                 counterpartyAccountName = "Bybit Funding",
                             ),
                             // Transfers from another Bybit user (by email/phone/UID) never appear on-chain.
@@ -1811,7 +1794,6 @@ object BuiltInApiStrategies {
                                         // status 2 = success.
                                         itemFilters = status("2"),
                                     ),
-                                fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = "Bybit Funding",
                             ),
                             // Convert history has no time filter at all: one walk over 1-based "index" pages.
@@ -1862,9 +1844,7 @@ object BuiltInApiStrategies {
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                                         descriptionField = "orderType",
                                         idField = "orderId",
-                                        signSource = ApiSignSource.FIELD,
-                                        signField = "orderType",
-                                        creditValues = setOf("Redeem"),
+                                        direction = Direction.Field(path = "orderType", incomingValues = setOf("Redeem")),
                                         itemFilters = status("Success"),
                                     ),
                                 counterpartyAccountName = earnAccount,
@@ -1885,7 +1865,6 @@ object BuiltInApiStrategies {
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                                         itemFilters = status("Success"),
                                     ),
-                                fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = "Bybit Earn Rewards",
                             ),
                             derivativesLedger("linear"),

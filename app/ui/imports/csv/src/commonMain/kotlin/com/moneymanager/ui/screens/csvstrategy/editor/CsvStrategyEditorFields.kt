@@ -2,24 +2,19 @@ package com.moneymanager.ui.screens.csvstrategy.editor
 
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csv.CsvColumn
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
-import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
-import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
-import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
-import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
-import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AssetCodeRules
@@ -44,73 +39,12 @@ internal enum class TimezoneMode {
 }
 
 /**
- * Source account mapping mode for CSV import.
+ * How the source account is resolved: one fixed account, or account rules read off each row.
  */
 internal enum class SourceAccountMode {
     FIXED_ACCOUNT,
-    TEMPLATE,
+    RULES,
 }
-
-/**
- * Target account mapping mode for CSV import.
- */
-internal enum class TargetAccountMode {
-    DIRECT_LOOKUP,
-    REGEX_MATCH,
-    ATTRIBUTE_MATCH,
-    TEMPLATE,
-    CONDITIONAL,
-}
-
-/**
- * The non-conditional account mapping types offered as branches of a conditional
- * mapping. Excluding the conditional kind bounds nesting to a single level.
- */
-internal enum class LeafAccountKind {
-    LOOKUP,
-    REGEX,
-    TEMPLATE,
-}
-
-internal fun LeafAccountKind.label(): String =
-    when (this) {
-        LeafAccountKind.LOOKUP -> "Lookup"
-        LeafAccountKind.REGEX -> "Regex"
-        LeafAccountKind.TEMPLATE -> "Template"
-    }
-
-/**
- * Whether a conditional-branch account mapping is fully specified.
- */
-internal fun FieldMapping.isLeafAccountValid(): Boolean =
-    when (this) {
-        is AccountLookupMapping -> columnName.isNotBlank()
-        is RegexAccountMapping -> columnName.isNotBlank() && rules.isNotEmpty() && rules.all { it.accountName.isNotBlank() }
-        is TemplateAccountMapping -> columnName.isNotBlank()
-        is HardCodedAccountMapping -> true
-        else -> false
-    }
-
-internal fun defaultLeafAccountMapping(
-    kind: LeafAccountKind,
-    fieldType: TransferField,
-    existing: FieldMapping,
-): FieldMapping {
-    val column =
-        when (existing) {
-            is AccountLookupMapping -> existing.columnName
-            is RegexAccountMapping -> existing.columnName
-            is TemplateAccountMapping -> existing.columnName
-            else -> ""
-        }
-    return when (kind) {
-        LeafAccountKind.LOOKUP -> AccountLookupMapping(fieldType, columnName = column)
-        LeafAccountKind.REGEX -> RegexAccountMapping(fieldType, columnName = column, rules = emptyList())
-        LeafAccountKind.TEMPLATE -> TemplateAccountMapping(fieldType, columnName = column)
-    }
-}
-
-internal fun emptyTargetAccountMapping(): FieldMapping = AccountLookupMapping(TransferField.TARGET_ACCOUNT, columnName = "")
 
 internal fun attributeCandidateColumns(
     csvColumns: List<CsvColumn>,
@@ -126,26 +60,6 @@ internal fun String?.takeIfPresentIn(columns: Set<String>): String? = this?.take
 /** Drops conditions referencing columns absent from the uploaded CSV. */
 internal fun List<Condition>?.keepPresentIn(columns: Set<String>): List<Condition> =
     this.orEmpty().filter { it.path in columns && (it.otherPath == null || it.otherPath in columns) }
-
-/**
- * Clears column references on a conditional branch's leaf mapping when those columns no longer exist,
- * so stale references don't survive loading and get persisted again on save.
- */
-internal fun FieldMapping.withColumnsPresentIn(columns: Set<String>): FieldMapping =
-    when (this) {
-        is AccountLookupMapping ->
-            copy(
-                columnName = columnName.takeIfPresentIn(columns).orEmpty(),
-                fallbackColumns = fallbackColumns.mapNotNull { it.takeIfPresentIn(columns) },
-            )
-        is RegexAccountMapping ->
-            copy(
-                columnName = columnName.takeIfPresentIn(columns).orEmpty(),
-                fallbackColumns = fallbackColumns.mapNotNull { it.takeIfPresentIn(columns) },
-            )
-        is TemplateAccountMapping -> copy(columnName = columnName.takeIfPresentIn(columns).orEmpty())
-        else -> this
-    }
 
 /**
  * Builds a [CsvImportStrategy] from the editor's live state. Shared by the save handler and tests so
@@ -164,75 +78,29 @@ internal fun buildStrategyFromEditorState(
         buildMap {
             when (state.sourceAccountMode) {
                 SourceAccountMode.FIXED_ACCOUNT ->
-                    state.selectedAccountId
-                        ?.let { accountId ->
-                            put(
-                                TransferField.SOURCE_ACCOUNT,
-                                HardCodedAccountMapping(
-                                    fieldType = TransferField.SOURCE_ACCOUNT,
-                                    accountId = accountId,
-                                ),
-                            )
-                        }
-                        // No fixed account chosen: keep a source mapping the editor can't show.
-                        ?: state.unmodelledSourceMapping?.let { put(TransferField.SOURCE_ACCOUNT, it) }
-                SourceAccountMode.TEMPLATE ->
-                    state.sourceTemplateColumnName?.let { column ->
+                    state.selectedAccountId?.let { accountId ->
                         put(
                             TransferField.SOURCE_ACCOUNT,
-                            TemplateAccountMapping(
-                                fieldType = TransferField.SOURCE_ACCOUNT,
-                                columnName = column,
-                                prefix = state.sourceTemplatePrefix,
-                                suffix = state.sourceTemplateSuffix,
-                                defaultCategoryId = state.sourceDefaultCategoryId,
-                                extraction = state.sourceTemplateExtraction,
-                            ),
+                            HardCodedAccountMapping(fieldType = TransferField.SOURCE_ACCOUNT, accountId = accountId),
                         )
                     }
+                SourceAccountMode.RULES ->
+                    put(
+                        TransferField.SOURCE_ACCOUNT,
+                        AccountRulesMapping(
+                            fieldType = TransferField.SOURCE_ACCOUNT,
+                            rules = state.sourceRules,
+                            defaultCategoryId = state.sourceDefaultCategoryId,
+                        ),
+                    )
             }
             put(
                 TransferField.TARGET_ACCOUNT,
-                when (state.targetAccountMode) {
-                    TargetAccountMode.DIRECT_LOOKUP ->
-                        AccountLookupMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            columnName = state.targetAccountColumnName!!,
-                            fallbackColumns = state.targetAccountFallbackColumns,
-                            defaultCategoryId = state.targetDefaultCategoryId,
-                        )
-                    TargetAccountMode.REGEX_MATCH ->
-                        RegexAccountMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            columnName = state.targetAccountColumnName!!,
-                            rules = state.regexRules,
-                            fallbackColumns = state.targetAccountFallbackColumns,
-                            defaultCategoryId = state.targetDefaultCategoryId,
-                        )
-                    TargetAccountMode.ATTRIBUTE_MATCH ->
-                        AttributeMatchAccountMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            columnName = state.targetAccountColumnName!!,
-                            attributeTypeName = state.targetAttributeTypeName!!,
-                            defaultCategoryId = state.targetDefaultCategoryId,
-                        )
-                    TargetAccountMode.TEMPLATE ->
-                        TemplateAccountMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            columnName = state.targetTemplateColumnName!!,
-                            prefix = state.targetTemplatePrefix,
-                            suffix = state.targetTemplateSuffix,
-                            defaultCategoryId = state.targetDefaultCategoryId,
-                            extraction = state.targetTemplateExtraction,
-                        )
-                    TargetAccountMode.CONDITIONAL ->
-                        ConditionalAccountMapping(
-                            fieldType = TransferField.TARGET_ACCOUNT,
-                            conditions = state.targetConditions,
-                            whenTrue = state.targetWhenTrue,
-                            whenFalse = state.targetWhenFalse,
-                        )
-                },
+                AccountRulesMapping(
+                    fieldType = TransferField.TARGET_ACCOUNT,
+                    rules = state.targetRules,
+                    defaultCategoryId = state.targetDefaultCategoryId,
+                ),
             )
             // The two modes are mutually exclusive: a combined format ignores any separate time
             // column, so null it out to keep the saved mapping consistent with the chosen mode.
@@ -271,8 +139,7 @@ internal fun buildStrategyFromEditorState(
                     amountColumnName = if (singleColumn) state.amountColumnName else null,
                     creditColumnName = if (singleColumn) null else state.creditColumnName,
                     debitColumnName = if (singleColumn) null else state.debitColumnName,
-                    negateValues = state.negateValues,
-                    flipAccountsOnPositive = state.flipAccountsOnPositive,
+                    direction = state.direction,
                     feeColumnName = state.feeColumnName,
                     feeConditions = if (state.feeColumnName != null) state.feeConditions else emptyList(),
                     feeCurrency = state.feeCurrency.takeIf { state.feeColumnName != null },

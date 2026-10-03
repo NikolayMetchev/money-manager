@@ -21,7 +21,7 @@ interface AccountAttributeReadRepository {
     /**
      * Gets every account attribute across all types, ordered by attribute type name then account id.
      * Used to build the attribute-account matcher registry (keyed by type name) for strategies whose
-     * funding match or `AttributeMatchAccountMapping` may reference any attribute type.
+     * funding match or attribute-matching account rules may reference any attribute type.
      */
     fun getAll(): Flow<List<AccountAttribute>>
 }

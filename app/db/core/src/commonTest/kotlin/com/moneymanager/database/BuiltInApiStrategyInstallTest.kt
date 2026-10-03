@@ -8,13 +8,13 @@ import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiPaging
-import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInApiStrategies
 import kotlinx.coroutines.flow.first
@@ -134,7 +134,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                 "pre-encoded cursor flag persisted",
             )
             val earn = bybit.config.dataEndpoints.first { it.endpoint.path == "v5/earn/order" }
-            assertEquals(ApiSignSource.FIELD, assertNotNull(earn.transactionMappings).signSource)
+            assertIs<Direction.Field>(assertNotNull(earn.transactionMappings).direction)
             val ledgers = bybit.config.dataEndpoints.filter { it.endpoint.path == "v5/account/transaction-log" }
             assertEquals(2, ledgers.size, "linear and inverse ledgers share a path, disambiguated by category")
         }
@@ -335,9 +335,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             with(checkNotNull(starling.config.bankTransactions?.transactionMappings)) {
                 assertEquals("amount.minorUnits", amountField)
                 assertEquals(ApiAmountFormat.MINOR_UNITS_INTEGER, amountFormat)
-                assertEquals(ApiSignSource.FIELD, signSource)
-                assertEquals("direction", signField)
-                assertEquals(setOf("IN"), creditValues)
+                assertEquals(Direction.Field(path = "direction", incomingValues = setOf("IN")), direction)
                 assertEquals("feedItemUid", idField)
                 assertEquals(listOf(Condition("status", ConditionOp.IN, value = "DECLINED")), declinedWhen)
                 assertEquals("counterPartyUid", counterpartyIdField)

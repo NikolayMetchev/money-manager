@@ -2,6 +2,7 @@ package com.moneymanager.domain.model.apistrategy
 
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.serialization.SortedListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringListSerializer
@@ -326,16 +327,6 @@ enum class ApiAmountFormat {
     DECIMAL_MAJOR_UNITS,
 }
 
-/** Where the sign (incoming vs outgoing) of a transaction comes from. */
-@Serializable
-enum class ApiSignSource {
-    /** The amount value itself is signed (negative == outgoing). */
-    EMBEDDED,
-
-    /** A separate field (see [ApiTransactionMappings.signField]) carries the direction. */
-    FIELD,
-}
-
 /**
  * JSON field names used to extract transaction data from an API response item. Defaults match the
  * Monzo response shape so existing strategies behave identically.
@@ -345,9 +336,13 @@ enum class ApiSignSource {
  * @property currencyField Dot-path to the ISO-4217 currency code (e.g. "currency", "amount.currency")
  * @property descriptionField Dot-path to the transaction description
  * @property amountFormat How [amountField] is encoded; see [ApiAmountFormat]
- * @property signSource Where the transaction direction comes from; see [ApiSignSource]
- * @property signField Dot-path to the direction field when [signSource] is [ApiSignSource.FIELD]
- * @property creditValues Values of [signField] that mean "incoming/positive" (e.g. {"CREDIT"})
+ * @property direction Which way the money moves. Null takes the endpoint's own: a bank feed's signed
+ *                  amount ([Direction.AmountSign]), a deposit endpoint's in, a withdrawal endpoint's
+ *                  out. [Direction.Field] reads it from a field (Starling's `direction` = `IN`; Bybit
+ *                  Earn orders listing both directions), skipping a bank item whose field is missing.
+ *                  [Direction.AmountSign] on a deposit/withdrawal endpoint follows the raw amount's
+ *                  sign instead: Kraken books a failed deposit or withdrawal as a second ledger entry of
+ *                  the opposite sign, so the movement nets to zero rather than double-booking.
  * @property idField Dot-path to the transaction's stable id, used for de-duplication
  * @property merchantNameField Optional dot-path to a merchant name; preferred counterparty name
  * @property counterpartyNameField Optional dot-path to a counterparty name; fallback for merchant
@@ -380,10 +375,7 @@ data class ApiTransactionMappings(
     val currencyField: String = "currency",
     val descriptionField: String = "description",
     val amountFormat: ApiAmountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
-    val signSource: ApiSignSource = ApiSignSource.EMBEDDED,
-    val signField: String? = null,
-    @Serializable(with = SortedStringSetSerializer::class)
-    val creditValues: Set<String> = emptySet(),
+    val direction: Direction? = null,
     val idField: String = "id",
     val merchantNameField: String? = null,
     val counterpartyNameField: String? = null,
@@ -446,14 +438,6 @@ data class ApiTransactionMappings(
      * [counterpartyNetworkField] from the enrichment item. Null disables enrichment for this mapping.
      */
     val joinKeyField: String? = null,
-    /**
-     * When true, the endpoint's fixed direction (IN for DEPOSITS, OUT for WITHDRAWALS) is overridden
-     * by the sign of the raw [amountField] value: negative -> OUT, non-negative -> IN. Some exchanges
-     * (Kraken) report a failed/cancelled deposit or withdrawal as a second ledger entry sharing the
-     * same id with the opposite sign, so the movement nets to zero; treating every ledger row as
-     * unsigned and direction-by-endpoint double-books the reversal as an additional real movement.
-     */
-    val directionFromAmountSign: Boolean = false,
     /**
      * Conditions that, when all hold (and there is at least one), make the item produce no transfer and
      * no enrichment. Used when a single endpoint's response mixes record kinds that must be dropped —
@@ -1064,7 +1048,7 @@ enum class ApiEndpointKind {
     WITHDRAWALS,
 }
 
-/** Fixed movement direction for deposit/withdrawal endpoints (relative to the owning account). */
+/** Which way an exchange transfer moves relative to the exchange account. */
 @Serializable
 enum class TransferDirection {
     IN,
@@ -1077,7 +1061,6 @@ enum class TransferDirection {
  *
  * @property transactionMappings Field mappings for [ApiEndpointKind.BANK_TRANSACTIONS]/DEPOSITS/WITHDRAWALS.
  * @property tradeMappings Field mappings for [ApiEndpointKind.TRADES]/ORDERS.
- * @property fixedDirection For DEPOSITS/WITHDRAWALS, the movement direction (amounts are unsigned).
  * @property counterpartyAccountName For DEPOSITS/WITHDRAWALS, the fixed account the money comes from /
  *                                   goes to when the row carries neither a counterparty alias nor a wallet
  *                                   address (e.g. "Binance Earn" for a Simple Earn subscription, "Binance
@@ -1095,7 +1078,6 @@ data class ApiDataEndpoint(
     val kind: ApiEndpointKind,
     val transactionMappings: ApiTransactionMappings? = null,
     val tradeMappings: ApiTradeMappings? = null,
-    val fixedDirection: TransferDirection? = null,
     val counterpartyAccountName: String? = null,
     val enrichesTransfers: Boolean = false,
 )

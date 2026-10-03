@@ -3,6 +3,7 @@ package com.moneymanager.domain.model.rules
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
 import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
@@ -86,4 +87,38 @@ data class AssetCodeRules(
                 ?: normalised
         return aliasesByUpperCode[stripped] ?: stripped
     }
+}
+
+/**
+ * Which way a row's money moves relative to the account the row belongs to (the CSV statement account,
+ * the API account): one vocabulary for every source.
+ */
+@Serializable
+sealed interface Direction {
+    /**
+     * The amount's sign says: positive is money coming in, negative going out — or, with
+     * [positiveIsIncoming] false, the other way round (a source that reports spending as positive).
+     */
+    @Serializable
+    @SerialName("amountSign")
+    data class AmountSign(
+        val positiveIsIncoming: Boolean = true,
+    ) : Direction
+
+    /**
+     * A field says: the money is coming in when the value at [path] is one of [incomingValues]
+     * (e.g. Starling's `direction` = `IN`), going out for any other value.
+     */
+    @Serializable
+    @SerialName("field")
+    data class Field(
+        val path: String,
+        @Serializable(with = SortedStringSetSerializer::class)
+        val incomingValues: Set<String>,
+    ) : Direction
+
+    /** Always going out of the account (amounts are unsigned spending). */
+    @Serializable
+    @SerialName("outgoing")
+    data object Outgoing : Direction
 }

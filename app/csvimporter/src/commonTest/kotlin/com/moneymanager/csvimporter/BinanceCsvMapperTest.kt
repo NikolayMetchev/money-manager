@@ -142,7 +142,7 @@ class BinanceCsvMapperTest {
 
     @Test
     fun patternsAreAnchored_soNoOperationSwallowsAnother() {
-        // RegexRule matching is containsMatchIn: an unanchored "Deposit" would also claim "Fiat Deposit"
+        // account-rule patterns use containsMatchIn: an unanchored "Deposit" would also claim "Fiat Deposit"
         // and an unanchored "Buy" would claim "Transaction Buy".
         assertEquals("Binance Bank", counterpartyName(map(row("Fiat Deposit", "GBP", "1.00"))))
         assertEquals(TradeLegSide.CREDIT, map(row("Transaction Buy", "GBP", "1.00")).tradeLeg?.side)

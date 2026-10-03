@@ -14,9 +14,8 @@ import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
-import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
+import com.moneymanager.domain.model.csvstrategy.export.AccountRulesExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
-import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.Serializable
@@ -68,9 +67,8 @@ class StrategyExportUnsortedCollectionGuardTest {
             ApiTransactionMappings::class to "compositeIdFields",
             ApiValueSet.Union::class to "sets",
             CsvStrategyConfig::class to "rowPreprocessingRules",
-            RegexAccountExport::class to "rules",
-            RegexAccountExport::class to "fallbackColumns",
-            AccountLookupExport::class to "fallbackColumns",
+            // Account rules are first-applicable-wins.
+            AccountRulesExport::class to "rules",
             // A value's paths are tried in order until one is non-blank; decline conditions are
             // first-match-wins (the match picks the decline reason).
             ValueExpr::class to "paths",

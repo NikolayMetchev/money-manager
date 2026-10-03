@@ -7,11 +7,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.WellKnownIds
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
-import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -20,10 +18,9 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
-import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
-import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.isComplete
 import kotlinx.datetime.TimeZone
 
@@ -109,94 +106,34 @@ internal class CsvStrategyEditorState(
     var amountColumnName by mutableStateOf(amountMapping?.amountColumnName.takeIfPresentIn(availableColumnNames))
     var creditColumnName by mutableStateOf(amountMapping?.creditColumnName.takeIfPresentIn(availableColumnNames))
     var debitColumnName by mutableStateOf(amountMapping?.debitColumnName.takeIfPresentIn(availableColumnNames))
-    var negateValues by mutableStateOf(amountMapping?.negateValues ?: false)
-    var flipAccountsOnPositive by mutableStateOf(amountMapping?.flipAccountsOnPositive ?: true)
+
+    // A new strategy defaults to a signed amount (positive = money in): most bank statements are.
+    var direction: Direction by mutableStateOf(amountMapping?.direction ?: Direction.AmountSign())
     var feeColumnName by mutableStateOf(amountMapping?.feeColumnName.takeIfPresentIn(availableColumnNames))
     var feeConditions by
         mutableStateOf(if (feeColumnName == null) emptyList() else amountMapping?.feeConditions.keepPresentIn(availableColumnNames))
 
     private val sourceMapping = config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
 
-    // Source mappings the editor has no widget for (e.g. Koinly's conditional wallet/counterparty
-    // source): carried through verbatim unless the user picks a fixed account or a template instead.
-    val unmodelledSourceMapping: FieldMapping? =
-        sourceMapping?.takeUnless { it is HardCodedAccountMapping || it is TemplateAccountMapping }
-
     // The credited-leg mappings that turn a row into a trade (TO_AMOUNT/TO_CURRENCY) have no widget
     // either; carried through so saving an edited strategy keeps its trade detection.
     val tradeCreditMappings: Map<TransferField, FieldMapping> =
         config?.fieldMappings.orEmpty().filterKeys { it == TransferField.TO_AMOUNT || it == TransferField.TO_CURRENCY }
-    private val sourceTemplate = sourceMapping as? TemplateAccountMapping
+    private val sourceRulesMapping = sourceMapping as? AccountRulesMapping
     var sourceAccountMode by
-        mutableStateOf(if (sourceTemplate != null) SourceAccountMode.TEMPLATE else SourceAccountMode.FIXED_ACCOUNT)
+        mutableStateOf(if (sourceRulesMapping != null) SourceAccountMode.RULES else SourceAccountMode.FIXED_ACCOUNT)
     var selectedAccountId by mutableStateOf((sourceMapping as? HardCodedAccountMapping)?.accountId)
-    var sourceTemplateColumnName by mutableStateOf(sourceTemplate?.columnName.takeIfPresentIn(availableColumnNames))
-    var sourceTemplatePrefix by mutableStateOf(sourceTemplate?.prefix.orEmpty())
-    var sourceTemplateSuffix by mutableStateOf(sourceTemplate?.suffix.orEmpty())
+    var sourceRules by mutableStateOf(sourceRulesMapping?.rules.orEmpty().keepColumnsPresentIn(availableColumnNames))
 
     // The category given to accounts the mapping has to create. No widget yet, so it is carried
-    // verbatim; rebuilding it as UNCATEGORIZED would quietly re-file every account a future import
-    // creates. One field per side: all four target modes store it, so the value follows a mode switch.
-    var sourceDefaultCategoryId by mutableStateOf(sourceTemplate?.defaultCategoryId ?: Category.UNCATEGORIZED_ID)
+    // verbatim; rebuilding it as UNCATEGORIZED would quietly re-file every account a future import creates.
+    var sourceDefaultCategoryId by mutableStateOf(sourceRulesMapping?.defaultCategoryId ?: Category.UNCATEGORIZED_ID)
 
-    private val targetMapping = config?.fieldMappings?.get(TransferField.TARGET_ACCOUNT)
-    private val targetTemplate = targetMapping as? TemplateAccountMapping
-    private val targetConditional = targetMapping as? ConditionalAccountMapping
-    var targetAccountMode by
-        mutableStateOf(
-            when (targetMapping) {
-                is RegexAccountMapping -> TargetAccountMode.REGEX_MATCH
-                is AttributeMatchAccountMapping -> TargetAccountMode.ATTRIBUTE_MATCH
-                is TemplateAccountMapping -> TargetAccountMode.TEMPLATE
-                is ConditionalAccountMapping -> TargetAccountMode.CONDITIONAL
-                else -> TargetAccountMode.DIRECT_LOOKUP
-            },
-        )
+    private val targetRulesMapping = config?.fieldMappings?.get(TransferField.TARGET_ACCOUNT) as? AccountRulesMapping
+    var targetRules by mutableStateOf(targetRulesMapping?.rules.orEmpty().keepColumnsPresentIn(availableColumnNames))
 
-    // Only the column-carrying leaf modes populate the shared column/fallback fields; template and
-    // conditional targets keep their columns in their own fields below.
-    var targetAccountColumnName by
-        mutableStateOf(
-            when (targetMapping) {
-                is AccountLookupMapping -> targetMapping.columnName
-                is RegexAccountMapping -> targetMapping.columnName
-                is AttributeMatchAccountMapping -> targetMapping.columnName
-                else -> null
-            }.takeIfPresentIn(availableColumnNames),
-        )
-    var targetAccountFallbackColumns by
-        mutableStateOf(
-            when (targetMapping) {
-                is AccountLookupMapping -> targetMapping.fallbackColumns
-                is RegexAccountMapping -> targetMapping.fallbackColumns
-                else -> emptyList()
-            }.mapNotNull { it.takeIfPresentIn(availableColumnNames) },
-        )
-
-    /** See [sourceDefaultCategoryId]; every target mode but the conditional one persists this. */
-    var targetDefaultCategoryId by
-        mutableStateOf(
-            when (targetMapping) {
-                is AccountLookupMapping -> targetMapping.defaultCategoryId
-                is RegexAccountMapping -> targetMapping.defaultCategoryId
-                is AttributeMatchAccountMapping -> targetMapping.defaultCategoryId
-                is TemplateAccountMapping -> targetMapping.defaultCategoryId
-                else -> Category.UNCATEGORIZED_ID
-            },
-        )
-
-    // Nullable and seeded verbatim so a non-attribute target extracts/round-trips as null; the UI
-    // fills in the card-last4 default only when the user actually switches into attribute-match mode.
-    var targetAttributeTypeName by mutableStateOf((targetMapping as? AttributeMatchAccountMapping)?.attributeTypeName)
-    var regexRules by mutableStateOf((targetMapping as? RegexAccountMapping)?.rules.orEmpty())
-    var targetTemplateColumnName by mutableStateOf(targetTemplate?.columnName.takeIfPresentIn(availableColumnNames))
-    var targetTemplatePrefix by mutableStateOf(targetTemplate?.prefix.orEmpty())
-    var targetTemplateSuffix by mutableStateOf(targetTemplate?.suffix.orEmpty())
-    var targetConditions by mutableStateOf(targetConditional?.conditions.keepPresentIn(availableColumnNames))
-    var targetWhenTrue: FieldMapping by
-        mutableStateOf(targetConditional?.whenTrue?.withColumnsPresentIn(availableColumnNames) ?: emptyTargetAccountMapping())
-    var targetWhenFalse: FieldMapping by
-        mutableStateOf(targetConditional?.whenFalse?.withColumnsPresentIn(availableColumnNames) ?: emptyTargetAccountMapping())
+    /** See [sourceDefaultCategoryId]. */
+    var targetDefaultCategoryId by mutableStateOf(targetRulesMapping?.defaultCategoryId ?: Category.UNCATEGORIZED_ID)
 
     private val currencyMapping = config?.fieldMappings?.get(TransferField.CURRENCY)
     var currencyMode by
@@ -267,8 +204,6 @@ internal class CsvStrategyEditorState(
 
     // No editors of their own yet (set by built-in strategies); carried through so saving an edited
     // strategy doesn't silently drop them.
-    val sourceTemplateExtraction = sourceTemplate?.extraction
-    val targetTemplateExtraction = targetTemplate?.extraction
     val currencyExtraction = (currencyMapping as? CurrencyLookupMapping)?.value?.extraction
     val currencyFallbackColumns =
         (currencyMapping as? CurrencyLookupMapping)
@@ -280,27 +215,14 @@ internal class CsvStrategyEditorState(
     val assetSuffixesToStrip = config?.assetCodes?.stripSuffixes.orEmpty()
     val feeCurrency = amountMapping?.feeCurrency
 
-    // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.
-    val initialTargetAccountColumnName: String? = targetAccountColumnName
+    // Initial primary column, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialDescriptionColumnName: String? = descriptionColumnName
 
     private val targetAccountValid: Boolean
-        get() =
-            when (targetAccountMode) {
-                TargetAccountMode.DIRECT_LOOKUP -> targetAccountColumnName != null
-                TargetAccountMode.REGEX_MATCH ->
-                    targetAccountColumnName != null &&
-                        regexRules.isNotEmpty() &&
-                        regexRules.all { it.accountName.isNotBlank() }
-                TargetAccountMode.ATTRIBUTE_MATCH ->
-                    targetAccountColumnName != null && !targetAttributeTypeName.isNullOrBlank()
-                TargetAccountMode.TEMPLATE -> targetTemplateColumnName != null
-                TargetAccountMode.CONDITIONAL ->
-                    targetConditions.isNotEmpty() &&
-                        targetConditions.all { it.isComplete() } &&
-                        targetWhenTrue.isLeafAccountValid() &&
-                        targetWhenFalse.isLeafAccountValid()
-            }
+        get() = targetRules.isNotEmpty() && targetRules.all { it.isComplete() }
+
+    private val sourceAccountValid: Boolean
+        get() = sourceAccountMode != SourceAccountMode.RULES || (sourceRules.isNotEmpty() && sourceRules.all { it.isComplete() })
 
     /** Whether the columns the chosen [amountMode] requires have all been picked. */
     private val amountValid: Boolean
@@ -368,7 +290,7 @@ internal class CsvStrategyEditorState(
 
     /** Whether the Accounts tab has an unsatisfied required field. */
     val accountsHasError: Boolean
-        get() = !targetAccountValid
+        get() = !targetAccountValid || !sourceAccountValid
 
     private val dateTimeFormatValid: Boolean
         get() = if (dateTimeInOneColumn) dateTimeFormat.isNotBlank() else dateFormat.isNotBlank()
@@ -406,6 +328,7 @@ internal class CsvStrategyEditorState(
             name.isNotBlank() &&
                 identificationColumns.isNotEmpty() &&
                 targetAccountValid &&
+                sourceAccountValid &&
                 dateColumnName != null &&
                 dateTimeFormatValid &&
                 descriptionColumnName != null &&

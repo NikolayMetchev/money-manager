@@ -7,9 +7,10 @@ import com.moneymanager.csvimporter.bulkReimportCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
-import com.moneymanager.domain.model.csvstrategy.RegexRule
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
@@ -338,10 +339,17 @@ class CryptoComCryptoE2ETest : DbTest() {
                                     .filterKeys { it != TransferField.TO_CURRENCY && it != TransferField.TO_AMOUNT }
                                     .mapValues { (field, mapping) ->
                                         if (field == TransferField.TARGET_ACCOUNT) {
-                                            RegexAccountMapping(
+                                            AccountRulesMapping(
                                                 fieldType = TransferField.TARGET_ACCOUNT,
-                                                columnName = "Transaction Description",
-                                                rules = listOf(RegexRule(pattern = "App wallet", accountName = "Crypto.com Exchange")),
+                                                rules =
+                                                    listOf(
+                                                        AccountRule(
+                                                            value = ValueExpr(listOf("Transaction Description")),
+                                                            pattern = "App wallet",
+                                                            name = "Crypto.com Exchange",
+                                                        ),
+                                                        AccountRule(value = ValueExpr(listOf("Transaction Description"))),
+                                                    ),
                                             )
                                         } else {
                                             mapping

@@ -47,7 +47,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
         """.trimIndent()
 
     // Kraken reports a withdrawal's "amount" as negative; direction is derived from that sign
-    // (directionFromAmountSign), not just from which Ledgers endpoint the entry came from.
+    // (an amount-sign direction), not just from which Ledgers endpoint the entry came from.
     private val withdrawalLedgerJson =
         """
         {"error":[],"result":{"ledger":{

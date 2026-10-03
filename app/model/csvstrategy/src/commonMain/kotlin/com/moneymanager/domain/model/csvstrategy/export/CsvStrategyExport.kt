@@ -2,12 +2,13 @@ package com.moneymanager.domain.model.csvstrategy.export
 
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.SortedAccountMappingListSerializer
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
-import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.Condition
-import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.EncodeDefault
@@ -59,75 +60,15 @@ data class HardCodedAccountExport(
 ) : FieldMappingExport
 
 /**
- * Export format for [com.moneymanager.domain.model.csvstrategy.AccountLookupMapping].
- * Uses category name instead of category ID.
+ * Export format for [com.moneymanager.domain.model.csvstrategy.AccountRulesMapping].
+ * Uses category name instead of category ID; the rules themselves are already portable.
  */
 @Serializable
-data class AccountLookupExport(
+data class AccountRulesExport(
     override val fieldType: TransferField,
-    val columnName: String,
-    // Tried in order until one yields a non-blank value - order is semantic, keeps default
-    // insertion-order serialization.
-    val fallbackColumns: List<String> = emptyList(),
+    // First applicable rule wins - order is semantic, keeps default insertion-order serialization.
+    val rules: List<AccountRule>,
     val defaultCategoryName: String,
-) : FieldMappingExport
-
-/**
- * Export format for [com.moneymanager.domain.model.csvstrategy.RegexAccountMapping].
- * Uses category name instead of category ID.
- * RegexRule is already portable (uses account name strings).
- */
-@Serializable
-data class RegexAccountExport(
-    override val fieldType: TransferField,
-    val columnName: String,
-    // First-match-wins - order is semantic, keeps default insertion-order serialization.
-    val rules: List<RegexRule>,
-    // Tried in order until one yields a non-blank value - order is semantic, keeps default
-    // insertion-order serialization.
-    val fallbackColumns: List<String> = emptyList(),
-    val defaultCategoryName: String,
-) : FieldMappingExport
-
-/**
- * Export format for [com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping].
- * Uses category name instead of category ID; columnName + attributeTypeName are already portable.
- */
-@Serializable
-data class AttributeMatchAccountExport(
-    override val fieldType: TransferField,
-    val columnName: String,
-    val attributeTypeName: String,
-    val defaultCategoryName: String,
-) : FieldMappingExport
-
-/**
- * Export format for [com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping].
- * Uses category name instead of category ID.
- */
-@Serializable
-data class TemplateAccountExport(
-    override val fieldType: TransferField,
-    val columnName: String,
-    val prefix: String = "",
-    val suffix: String = "",
-    val defaultCategoryName: String,
-    // NEVER-encoded when null so adding it didn't rehash every existing strategy.
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val extraction: Extraction? = null,
-) : FieldMappingExport
-
-/**
- * Export format for [com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping].
- * Conditions are already portable (no IDs).
- */
-@Serializable
-data class ConditionalAccountExport(
-    override val fieldType: TransferField,
-    @Serializable(with = SortedConditionListSerializer::class)
-    val conditions: List<Condition>,
-    val whenTrue: FieldMappingExport,
-    val whenFalse: FieldMappingExport,
 ) : FieldMappingExport
 
 /**
@@ -166,8 +107,7 @@ data class AmountParsingExport(
     val amountColumnName: String? = null,
     val creditColumnName: String? = null,
     val debitColumnName: String? = null,
-    val negateValues: Boolean = false,
-    val flipAccountsOnPositive: Boolean = false,
+    val direction: Direction = Direction.Outgoing,
     val feeColumnName: String? = null,
     @Serializable(with = SortedConditionListSerializer::class)
     val feeConditions: List<Condition> = emptyList(),

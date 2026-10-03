@@ -4,7 +4,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.rules.Condition
-import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.EncodeDefault
@@ -30,145 +30,94 @@ data class HardCodedAccountMapping(
 ) : FieldMapping
 
 /**
- * Looks up an account by name from a CSV column.
+ * Names the account on one side of a row (the source or the target): the first of [rules] that applies
+ * names it, and the account is then found by that name (its current name, then a former one) or
+ * created under [defaultCategoryId]. Before naming, the value the rule read is checked against the
+ * user's persisted account mappings, which redirect it to the account they chose (renamed accounts,
+ * merchants mapped onto one account).
  *
- * When [fallbackColumns] is specified, if the primary [columnName] is empty,
- * each fallback column is tried in order until a non-empty value is found.
- * This is useful for bank exports where some transaction types (e.g., cheques)
- * have empty name columns but the transaction type can be used as a fallback.
+ * One rule list covers what used to be five mapping kinds: a plain lookup (one rule naming the account
+ * after the value), a prefixed template, regex rules with a fallback, an account-attribute match, and
+ * a conditional choice between two of those (rules with [AccountRule.conditions]).
  */
 @Serializable
-data class AccountLookupMapping(
+data class AccountRulesMapping(
     override val fieldType: TransferField,
-    val columnName: String,
-    val fallbackColumns: List<String> = emptyList(),
+    // First applicable rule wins - order is semantic, keeps default insertion-order serialization.
+    val rules: List<AccountRule>,
     val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
 ) : FieldMapping {
-    /**
-     * Returns all columns to check in priority order (primary first, then fallbacks).
-     */
-    val allColumns: List<String>
-        get() = listOf(columnName) + fallbackColumns
+    companion object {
+        /**
+         * [whenTrue]'s rules guarded by [conditions], then [whenFalse]'s: the first mapping's account when
+         * every condition holds, otherwise the second's. New accounts take [whenFalse]'s category.
+         */
+        fun conditional(
+            fieldType: TransferField,
+            conditions: List<Condition>,
+            whenTrue: AccountRulesMapping,
+            whenFalse: AccountRulesMapping,
+        ): AccountRulesMapping =
+            AccountRulesMapping(
+                fieldType = fieldType,
+                rules = whenTrue.rules.map { it.copy(conditions = conditions + it.conditions) } + whenFalse.rules,
+                defaultCategoryId = whenFalse.defaultCategoryId,
+            )
+    }
 }
 
 /**
- * A single regex rule that maps matched values to an account name.
+ * One way of naming an account from a row. A rule applies when all of its [conditions] hold and, when
+ * it has a [pattern], the pattern matches the value it reads — or, with an [attributeTypeName], exactly
+ * one account's attribute regexes match the value (that account is then the answer, whatever [name]
+ * says).
  *
- * When [accountNameTemplate] is null the fixed [accountName] is used (the original behaviour). When
- * set, the matched value is run through capture-group substitution (see [Extraction]) to derive
- * the account name from the matched text — e.g. pattern `CARD PAYMENT TO (?<cp>.+?),` with template
- * `${cp}` extracts the counterparty. [counterpartyIsPerson] marks the resolved counterparty as a
- * person, so the import additionally creates a Person + ownership link rather than just an account.
- *
- * @property personNameTemplate When [counterpartyIsPerson] is set and the account name isn't simply the
- *   person's own name (e.g. it's prefixed, like Monzo's "Monzo ${cp}"), this template derives the
- *   Person's name separately via the same capture-group substitution. Null falls back to the resolved
- *   account name (the original behaviour, correct whenever the two coincide, as for Santander's rules).
- * @property counterpartyIsUnidentified Set when the rule gives the counterparty a *name* but not an
- *   identity: the export says money arrived or left, not whose account it was (e.g. crypto.com's card
- *   statement records a top-up only as "GBP Deposit"). The named account is then a placeholder, and the
- *   import engine reconciles the row against a real record of the same movement if one exists — see
- *   `ImportTransfer.unidentifiedCounterpartyAccountId`. Rows that fall through every rule are
- *   unidentified anyway (their account is the raw column value); this flag extends that to rules that
- *   exist purely to name the placeholder well.
+ * @property value The row value the rule reads: the first of its columns holding a non-blank value. Its
+ *   extraction (if any) cleans the value before it is substituted into [name]; persisted account
+ *   mappings and [pattern] see it uncleaned.
+ * @property trim Whether the value is trimmed first (and again after extraction).
+ * @property pattern A regex (case-insensitive) the value must match for the rule to apply; its capture
+ *   groups can be substituted into [name] and [personName].
+ * @property name The account name. `{value}` is replaced by the (cleaned) value; `$0`/`$1`…`$9`/`${name}`
+ *   by [pattern]'s captures (a pattern-less rule substitutes only `{value}`). A name built from captures has
+ *   its whitespace runs collapsed. A blank result means no account unless [fallbackName] is set.
+ * @property fallbackName The name to use when [name] renders blank (a capture that came out empty).
+ * @property attributeTypeName Match the value against the regex tokens this account-attribute type
+ *   holds on every account (see [AttributeAccountMatch]); the rule applies when exactly one matches.
+ * @property counterpartyIsPerson The account belongs to a person: the import also creates the Person
+ *   (named [personName], else the account name) and an ownership link.
+ * @property counterpartyIsUnidentified The rule names the counterparty but not its identity: the export
+ *   says money arrived or left, not whose account it was (e.g. crypto.com's card statement records a
+ *   top-up only as "GBP Deposit"), so the import engine reconciles the row against a real record of
+ *   the same movement — see `ImportTransfer.unidentifiedCounterpartyAccountId`.
  */
 @Serializable
-data class RegexRule(
-    val pattern: String,
-    val accountName: String,
-    val accountNameTemplate: String? = null,
+data class AccountRule(
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @Serializable(with = SortedConditionListSerializer::class)
+    val conditions: List<Condition> = emptyList(),
+    val value: ValueExpr,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val trim: Boolean = false,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val pattern: String? = null,
+    val name: String = VALUE_PLACEHOLDER,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val fallbackName: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val attributeTypeName: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
     val counterpartyIsPerson: Boolean = false,
-    val personNameTemplate: String? = null,
-    // Omitted from JSON when false (the strategy codecs encode defaults) so ADDING this field does not
-    // change the canonical hash of every strategy that has regex rules — only a rule that actually sets
-    // it rehashes, avoiding a spurious "all strategies changed" on catalog/Drive sync. Same rationale as
-    // CsvStrategyConfig.fundingAttributeMatch.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val personName: String? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val counterpartyIsUnidentified: Boolean = false,
-)
-
-/**
- * Maps CSV column values to accounts using regex pattern matching.
- * Rules are evaluated in order; first match wins.
- * If no rules match, uses the raw column value for account lookup.
- * All matching is case-insensitive.
- *
- * When [fallbackColumns] is specified and no regex rules match, if the primary
- * [columnName] is empty, each fallback column is tried in order until a non-empty
- * value is found.
- */
-@Serializable
-data class RegexAccountMapping(
-    override val fieldType: TransferField,
-    val columnName: String,
-    val rules: List<RegexRule>,
-    val fallbackColumns: List<String> = emptyList(),
-    val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
-) : FieldMapping {
-    /**
-     * Returns all columns to check in priority order (primary first, then fallbacks).
-     */
-    val allColumns: List<String>
-        get() = listOf(columnName) + fallbackColumns
+) {
+    companion object {
+        /** In [name], the (cleaned) value the rule read. */
+        const val VALUE_PLACEHOLDER: String = "{value}"
+    }
 }
-
-/**
- * Resolves an account by matching a CSV column value against the regex patterns stored in a given
- * account-attribute type (see [AttributeAccountMatch] and the importer's attribute-account matcher).
- * Each account carries an attribute of [attributeTypeName] whose value holds one or more
- * whitespace/comma-separated regex tokens; the column value is tested (case-insensitively) against
- * every account's tokens and the single matching account wins. A value matching more than one account
- * is ambiguous; when nothing matches, the raw column value falls back to ordinary name lookup (as
- * [RegexAccountMapping] does). Unlike [RegexAccountMapping] the patterns live on the accounts, so the
- * same strategy routes to whatever accounts the user has tagged without editing the strategy.
- *
- * Persisted `CsvAccountMapping` overrides on the raw column value are applied first, so renamed
- * accounts keep matching.
- */
-@Serializable
-data class AttributeMatchAccountMapping(
-    override val fieldType: TransferField,
-    val columnName: String,
-    val attributeTypeName: String,
-    val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
-) : FieldMapping
-
-/**
- * Looks up an account by templating a CSV column value into an account name.
- * The looked-up name is `prefix + columnValue + suffix` (e.g. "Wise: " + "EUR").
- * Useful when one logical account exists per currency and the CSV only carries
- * the currency code.
- *
- * When [extraction] is set, the column value is first cleaned through it (e.g. Koinly's
- * `Binance;binance` wallet cell → `Binance`); a value the pattern doesn't match is used as-is.
- *
- * Persisted `CsvAccountMapping` overrides on the raw column value are applied first,
- * so renamed accounts keep matching.
- */
-@Serializable
-data class TemplateAccountMapping(
-    override val fieldType: TransferField,
-    val columnName: String,
-    val prefix: String = "",
-    val suffix: String = "",
-    val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val extraction: Extraction? = null,
-) : FieldMapping
-
-/**
- * Chooses between two account mappings based on row-level conditions.
- * All [conditions] must hold (AND) for [whenTrue] to be used; otherwise [whenFalse] applies.
- * Conditions are evaluated against the row values after any row preprocessing rules ran.
- */
-@Serializable
-data class ConditionalAccountMapping(
-    override val fieldType: TransferField,
-    @Serializable(with = SortedConditionListSerializer::class)
-    val conditions: List<Condition>,
-    val whenTrue: FieldMapping,
-    val whenFalse: FieldMapping,
-) : FieldMapping
 
 /**
  * Parses a date/time from one or two CSV columns.
@@ -206,11 +155,12 @@ data class DirectColumnMapping(
 
 /**
  * Parses a numeric amount from CSV columns.
- * Supports two modes: single column with +/- values, or separate credit/debit columns.
+ * Supports two modes: single column with +/- values, or separate credit/debit columns (credit - debit).
  *
- * When flipAccountsOnPositive is true and the parsed amount is positive,
- * the source and target accounts are swapped. This is useful for bank statements
- * where positive values indicate money flowing INTO the statement account.
+ * [direction] says whether the money moves out of the source (statement) account into the target, or
+ * the other way: [Direction.AmountSign] for statements whose signed amount says (positive = money in,
+ * which swaps the source and target), [Direction.Outgoing] for unsigned amounts that always leave the
+ * source, [Direction.Field] for a column naming the direction.
  *
  * When [feeColumnName] is set, that column's value (if non-blank) is imported as its own fee
  * transfer linked to the main transaction (via a `fee` relationship), whenever all [feeConditions]
@@ -225,8 +175,7 @@ data class AmountParsingMapping(
     val amountColumnName: String? = null,
     val creditColumnName: String? = null,
     val debitColumnName: String? = null,
-    val negateValues: Boolean = false,
-    val flipAccountsOnPositive: Boolean = false,
+    val direction: Direction = Direction.Outgoing,
     val feeColumnName: String? = null,
     @Serializable(with = SortedConditionListSerializer::class)
     val feeConditions: List<Condition> = emptyList(),

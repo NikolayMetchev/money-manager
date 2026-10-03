@@ -119,7 +119,6 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                                     fieldType = TransferField.AMOUNT,
                                     mode = AmountMode.SINGLE_COLUMN,
                                     amountColumnName = "Amount",
-                                    negateValues = true,
                                 ),
                             TransferField.CURRENCY to
                                 HardCodedCurrencyMapping(

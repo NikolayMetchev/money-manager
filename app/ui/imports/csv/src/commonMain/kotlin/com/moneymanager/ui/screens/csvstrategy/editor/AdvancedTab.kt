@@ -61,10 +61,9 @@ internal fun AdvancedTab(
                         state.amountColumnName,
                         state.creditColumnName,
                         state.debitColumnName,
-                        state.targetAccountColumnName,
                         state.currencyColumnName,
                         state.timezoneColumnName,
-                    ),
+                    ) + state.targetRules.map { it.value.primaryPath },
             )
 
         if (attributeColumns.isEmpty()) {

@@ -245,3 +245,42 @@ private fun pagingJson(
             }
         },
     )
+
+/**
+ * API config v2 → v3: one direction vocabulary, shared with CSV strategies.
+ * - Transaction mappings' `directionFromAmountSign` / `signSource` + `signField` + `creditValues` become
+ *   `direction`: the amount's sign, or a field's value; neither keeps the endpoint's own (a bank feed's
+ *   signed amount, a deposit endpoint's in, a withdrawal endpoint's out).
+ * - Data endpoints drop `fixedDirection`, which only ever restated their kind.
+ */
+internal val apiDirectionStep =
+    ConfigMigrationStep { config ->
+        config.rewriteObjects { obj ->
+            when {
+                "amountField" in obj -> transactionMappingsOntoDirection(obj)
+                "kind" in obj && "endpoint" in obj -> JsonObject(obj.without("fixedDirection"))
+                else -> obj
+            }
+        } as JsonObject
+    }
+
+private fun transactionMappingsOntoDirection(obj: JsonObject): JsonObject {
+    val signField = obj.string("signField")?.takeIf { obj.string("signSource") == "FIELD" }
+    val direction =
+        when {
+            obj.string("directionFromAmountSign") == "true" -> JsonObject(mapOf("type" to JsonPrimitive("amountSign")))
+            signField != null ->
+                JsonObject(
+                    mapOf(
+                        "type" to JsonPrimitive("field"),
+                        "path" to JsonPrimitive(signField),
+                        "incomingValues" to JsonArray(obj.stringList("creditValues").sorted().map(::JsonPrimitive)),
+                    ),
+                )
+            else -> null
+        }
+    return JsonObject(
+        obj.without("directionFromAmountSign", "signSource", "signField", "creditValues") +
+            listOfNotNull(direction?.let { "direction" to it }),
+    )
+}
