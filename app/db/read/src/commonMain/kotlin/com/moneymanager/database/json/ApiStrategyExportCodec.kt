@@ -34,11 +34,14 @@ private object FlatApiStrategyExportSerializer : JsonTransformingSerializer<ApiS
     private val OUTER = setOf("version", "name")
 
     override fun transformSerialize(element: JsonElement): JsonElement =
-        JsonObject(element.jsonObject.filterKeys { it in OUTER } + element.jsonObject.getValue("config").jsonObject)
+        JsonObject(
+            element.jsonObject.filterKeys { it in OUTER } +
+                StrategyConfigMigrations.stampApi(element.jsonObject.getValue("config").jsonObject),
+        )
 
     override fun transformDeserialize(element: JsonElement): JsonElement =
         JsonObject(
             element.jsonObject.filterKeys { it in OUTER } +
-                ("config" to JsonObject(element.jsonObject.filterKeys { it !in OUTER })),
+                ("config" to StrategyConfigMigrations.upgradeApi(JsonObject(element.jsonObject.filterKeys { it !in OUTER }))),
         )
 }
