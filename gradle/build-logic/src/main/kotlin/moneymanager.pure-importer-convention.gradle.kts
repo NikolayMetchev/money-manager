@@ -15,18 +15,17 @@ val verifyNoDbDependency =
         forbiddenModules.set(setOf(":app:db:core", ":app:di:core", ":app:ui:core"))
     }
 
-afterEvaluate {
-    configurations
-        .filter {
-            it.isCanBeResolved &&
-                (it.name.endsWith("CompileClasspath") || it.name.endsWith("RuntimeClasspath"))
-        }.forEach { configuration ->
-            verifyNoDbDependency.configure {
-                configurationNames.add(configuration.name)
-                rootComponents.add(configuration.incoming.resolutionResult.rootComponent)
-            }
+configurations
+    .matching {
+        it.isCanBeResolved &&
+            (it.name.endsWith("CompileClasspath") || it.name.endsWith("RuntimeClasspath"))
+    }.configureEach {
+        val configuration = this
+        verifyNoDbDependency.configure {
+            configurationNames.add(configuration.name)
+            rootComponents.add(configuration.incoming.resolutionResult.rootComponent)
         }
-}
+    }
 
 tasks.matching { it.name == "check" }.configureEach {
     dependsOn(verifyNoDbDependency)

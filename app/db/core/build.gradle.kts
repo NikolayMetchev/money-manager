@@ -150,7 +150,6 @@ val monzoEncryptedFixtureFile =
 tasks.register<JavaExec>("updateEncryptedMonzoApiSessionFixtures") {
     group = "verification"
     description = "Encrypts the Monzo API fixture directory into a zip archive."
-    dependsOn("compileTestKotlinJvm")
     mainClass.set(monzoApiFixtureArchiveToolClass)
     classpath = sourceSets["jvmTest"].runtimeClasspath
     args(
@@ -163,7 +162,6 @@ tasks.register<JavaExec>("updateEncryptedMonzoApiSessionFixtures") {
 tasks.register<JavaExec>("restoreMonzoApiSessionFixtures") {
     group = "verification"
     description = "Restores the Monzo API fixture directory from the encrypted archive when empty."
-    dependsOn("compileTestKotlinJvm")
     mainClass.set(monzoApiFixtureArchiveToolClass)
     classpath = sourceSets["jvmTest"].runtimeClasspath
     args(
@@ -176,7 +174,6 @@ tasks.register<JavaExec>("restoreMonzoApiSessionFixtures") {
 tasks.register<JavaExec>("exportMonzoApiSessionFixtures") {
     group = "verification"
     description = "Exports the API session transcript tables to JSON fixtures."
-    dependsOn("compileTestKotlinJvm")
     mainClass.set(monzoApiFixtureToolClass)
     classpath = sourceSets["jvmTest"].runtimeClasspath
     args(
@@ -189,7 +186,6 @@ tasks.register<JavaExec>("exportMonzoApiSessionFixtures") {
 tasks.register<JavaExec>("importMonzoApiSessionFixtures") {
     group = "verification"
     description = "Imports API session transcript JSON fixtures into a SQLite database."
-    dependsOn("compileTestKotlinJvm")
     mainClass.set(monzoApiFixtureToolClass)
     classpath = sourceSets["jvmTest"].runtimeClasspath
     args(
@@ -202,7 +198,6 @@ tasks.register<JavaExec>("importMonzoApiSessionFixtures") {
 tasks.register<JavaExec>("generateMonzoBalanceFixtures") {
     group = "verification"
     description = "Generates Monzo balances.json fixture from the default Money Manager database."
-    dependsOn("compileTestKotlinJvm")
     mainClass.set(monzoBalanceFixtureToolClass)
     classpath = sourceSets["jvmTest"].runtimeClasspath
     args(

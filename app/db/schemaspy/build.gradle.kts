@@ -8,99 +8,110 @@ dependencies {
     implementation(projects.app.model.core)
 }
 
-// SchemaSpy configuration for database documentation
-val schemaspyConfiguration: Configuration = configurations.create("schemaspyConfiguration")
-
-dependencies {
-    schemaspyConfiguration(libs.schemaspy)
-    schemaspyConfiguration(libs.sqldelight.sqlite.driver)
-}
-
-tasks.register<JavaExec>("createDatabaseForSchemaSpy") {
-    group = "documentation"
-    description = "Create a SQLite database file with the schema for SchemaSpy analysis"
-
-    val dbFile =
-        layout.buildDirectory
-            .file("schemaspy-temp.db")
-            .get()
-            .asFile
-
-    // Use the runtime classpath which includes SQLDelight generated code
-    classpath = sourceSets["main"].runtimeClasspath
-
-    // SchemaSpyDatabaseCreatorKt is the generated class for the top-level suspend main function
-    mainClass.set("com.moneymanager.schemaspy.SchemaSpyDatabaseCreatorKt")
-    args(dbFile.absolutePath)
-
-    // Depend on compilation to ensure the helper class and SQLDelight code are available
-    dependsOn(tasks.classes)
-
-    doFirst {
-        // Delete old database file if it exists
-        if (dbFile.exists()) {
-            dbFile.delete()
+// SchemaSpy's own classpath, kept off the module's compile/runtime classpaths. Declared through a
+// dependency scope plus a resolvable configuration carrying JVM-runtime attributes, so variant-aware
+// libraries resolve to their plain-JVM jars rather than leaving the selection to chance.
+val schemaspy = configurations.dependencyScope("schemaspy")
+val schemaspyClasspath =
+    configurations.resolvable("schemaspyClasspath") {
+        extendsFrom(schemaspy.get())
+        attributes {
+            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+            attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
+            attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.EXTERNAL))
+            attribute(
+                TargetJvmEnvironment.TARGET_JVM_ENVIRONMENT_ATTRIBUTE,
+                objects.named(TargetJvmEnvironment.STANDARD_JVM),
+            )
         }
     }
 
-    outputs.file(dbFile)
+dependencies {
+    schemaspy(libs.schemaspy)
+    schemaspy(libs.sqldelight.sqlite.driver)
 }
 
-tasks.register<JavaExec>("generateSchemaSpyDocs") {
-    group = "documentation"
-    description = "Generate HTML database documentation using SchemaSpy"
+val schemaspyDatabase = layout.buildDirectory.file("schemaspy-temp.db")
+val schemaspyOutputDir = layout.buildDirectory.dir("schemaspy")
 
-    dependsOn("createDatabaseForSchemaSpy")
+val createDatabaseForSchemaSpy =
+    tasks.register<JavaExec>("createDatabaseForSchemaSpy") {
+        group = "documentation"
+        description = "Create a SQLite database file with the schema for SchemaSpy analysis"
 
-    classpath = schemaspyConfiguration
-    mainClass.set("org.schemaspy.Main")
+        // Local copies so the task actions capture providers, not the build script, which the
+        // configuration cache cannot serialize.
+        val dbFile = schemaspyDatabase
 
-    val outputDir =
-        layout.buildDirectory
-            .dir("schemaspy")
-            .get()
-            .asFile
-    val dbFile =
-        layout.buildDirectory
-            .file("schemaspy-temp.db")
-            .get()
-            .asFile
+        // The runtime classpath includes the SQLDelight generated code and carries the build
+        // dependency on compiling it.
+        classpath = sourceSets["main"].runtimeClasspath
 
-    doFirst {
-        // Create output directory
-        outputDir.mkdirs()
-        println("Database location: ${dbFile.absolutePath}")
-        println("Documentation will be generated at: ${outputDir.absolutePath}")
+        // SchemaSpyDatabaseCreatorKt is the generated class for the top-level suspend main function
+        mainClass.set("com.moneymanager.schemaspy.SchemaSpyDatabaseCreatorKt")
+        argumentProviders.add(CommandLineArgumentProvider { listOf(dbFile.get().asFile.absolutePath) })
+
+        outputs.file(dbFile)
+
+        doFirst {
+            // Delete old database file if it exists
+            dbFile.get().asFile.delete()
+        }
     }
 
-    // Set PATH to include Graphviz
-    environment("PATH", "C:\\Program Files\\Graphviz\\bin;${System.getenv("PATH")}")
+val generateSchemaSpyDocs =
+    tasks.register<JavaExec>("generateSchemaSpyDocs") {
+        group = "documentation"
+        description = "Generate HTML database documentation using SchemaSpy"
 
-    args(
-        "-t",
-        "sqlite-xerial",
-        "-db",
-        dbFile.absolutePath,
-        "-o",
-        outputDir.absolutePath,
-        "-cat",
-        "%",
-        "-s",
-        "main",
-        "-u",
-        "",
-        "-sso",
-        "-norows",
-    )
+        val dbFile = schemaspyDatabase
+        val outputDir = schemaspyOutputDir
 
-    inputs.file(dbFile)
-    outputs.dir(outputDir)
+        classpath(schemaspyClasspath)
+        mainClass.set("org.schemaspy.Main")
 
-    doLast {
-        println("\nSchemaSpy documentation generated successfully!")
-        println("Open: ${outputDir.absolutePath}${File.separator}index.html")
+        inputs
+            .files(createDatabaseForSchemaSpy)
+            .withPropertyName("database")
+            .withPathSensitivity(PathSensitivity.NONE)
+        outputs.dir(outputDir)
+
+        // Set PATH to include Graphviz
+        environment("PATH", "C:\\Program Files\\Graphviz\\bin;${System.getenv("PATH")}")
+
+        argumentProviders.add(
+            CommandLineArgumentProvider {
+                listOf(
+                    "-t",
+                    "sqlite-xerial",
+                    "-db",
+                    dbFile.get().asFile.absolutePath,
+                    "-o",
+                    outputDir.get().asFile.absolutePath,
+                    "-cat",
+                    "%",
+                    "-s",
+                    "main",
+                    "-u",
+                    "",
+                    "-sso",
+                    "-norows",
+                )
+            },
+        )
+
+        doFirst {
+            outputDir.get().asFile.mkdirs()
+            println("Database location: ${dbFile.get().asFile.absolutePath}")
+            println("Documentation will be generated at: ${outputDir.get().asFile.absolutePath}")
+        }
+
+        doLast {
+            println("\nSchemaSpy documentation generated successfully!")
+            println("Open: ${outputDir.get().asFile.resolve("index.html").absolutePath}")
+        }
     }
-}
 
 val publishedDocsDir = layout.projectDirectory.dir("../../../webpage/database")
 
@@ -108,9 +119,7 @@ tasks.register<Sync>("publishSchemaSpyDocs") {
     group = "documentation"
     description = "Copy generated SchemaSpy HTML into the published docs site (webpage/database)"
 
-    dependsOn("generateSchemaSpyDocs")
-
     // Sync mirrors the source, removing stale files (e.g. dropped tables/views)
-    from(layout.buildDirectory.dir("schemaspy"))
+    from(generateSchemaSpyDocs)
     into(publishedDocsDir)
 }
