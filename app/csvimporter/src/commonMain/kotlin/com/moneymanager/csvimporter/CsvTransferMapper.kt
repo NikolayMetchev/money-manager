@@ -24,7 +24,6 @@ import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
-import com.moneymanager.domain.model.csvstrategy.ConversionAccountRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -34,6 +33,8 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.ColumnRecord
@@ -77,6 +78,8 @@ sealed interface MappingResult {
         val discoveredMappings: List<DiscoveredAccountMapping> = emptyList(),
         /** Fee charged on the row, imported as its own linked fee transfer; null when there is none. */
         val feeAmount: Money? = null,
+        /** The fee transfer's description; null uses a generic one. */
+        val feeDescription: String? = null,
         /**
          * The credited leg of a cross-asset conversion (from the TO_CURRENCY/TO_AMOUNT mappings). When
          * set, the row is a `trade`: [transfer]'s amount/source is the debited leg and this the credited
@@ -95,10 +98,8 @@ sealed interface MappingResult {
          * Null for ordinary rows.
          */
         val passThrough: CsvPassThrough? = null,
-        /** Set when the row is one leg of an asset conversion (see `ConversionConfig`); null otherwise. */
-        val conversionLeg: ConversionLegInfo? = null,
-        /** Set when the row is one leg of a row-group trade (see `TradeGroupConfig`); null otherwise. */
-        val tradeLeg: TradeLegInfo? = null,
+        /** Set when the row is one leg of a multi-row movement (see `LegGroupRule`); null otherwise. */
+        val groupLeg: GroupLeg? = null,
         /** Raw funding value from [CsvStrategyConfig.fundingAttributeMatch]'s column; null when unset/blank. */
         val fundingMatchValue: String? = null,
         /**
@@ -163,33 +164,22 @@ data class CsvPassThrough(
     val conduitName: String get() = conduitNames.first()
 }
 
-/** Which side of an asset conversion a row represents (see `ConversionConfig`). */
-enum class ConversionSide { DEBIT, CREDIT }
+/** Which side of its event a leg is on (see `LegGroupRule`). */
+enum class GroupLegSide { DEBIT, CREDIT }
 
 /**
- * Marks a mapped row as one leg of an asset conversion (see `ConversionConfig`). The applier pairs
- * each [ConversionSide.DEBIT] leg to a [ConversionSide.CREDIT] leg with the same [pairingKey] within
- * the config's time window and links them with the conversion relationship.
+ * Marks a mapped row as one leg of a movement the source split across several rows (see
+ * `LegGroupRule`). The applier puts legs of the same rule back together per its assembly; a group that
+ * does not resolve leaves its rows to import as ordinary transfers, so this marker never drops a row.
  *
+ * @property ruleIndex Index of the claiming rule in the strategy's `legGroups`.
  * @property side Whether this leg is the debit (asset leaving) or credit (asset received).
- * @property pairingKey Value that must match between a debit and credit leg of the same event.
+ * @property key The rule's key parts for this row, joined; legs of one event share it.
  */
-data class ConversionLegInfo(
-    val side: ConversionSide,
-    val pairingKey: String,
-)
-
-/** Which leg of a row-group trade a row represents (see `TradeGroupConfig`). */
-enum class TradeLegSide { DEBIT, CREDIT }
-
-/**
- * Marks a mapped row as one leg of a trade the source split across several rows (see
- * `TradeGroupConfig`). The applier buckets legs sharing a timestamp and folds each resolvable bucket
- * into one `trade`; a bucket that does not resolve leaves its rows to import as ordinary transfers,
- * so this marker never causes a row to be dropped.
- */
-data class TradeLegInfo(
-    val side: TradeLegSide,
+data class GroupLeg(
+    val ruleIndex: Int,
+    val side: GroupLegSide,
+    val key: String,
 )
 
 /**
@@ -212,16 +202,16 @@ data class CsvTransferWithAttributes(
     val discoveredMappings: List<DiscoveredAccountMapping> = emptyList(),
     /** Fee charged on the row, imported as its own linked fee transfer; null when there is none. */
     val feeAmount: Money? = null,
+    /** The fee transfer's description; null uses a generic one. */
+    val feeDescription: String? = null,
     /** Credited leg of a cross-asset conversion; when set the row is imported as a `trade`. */
     val tradeTo: Money? = null,
     /** Counterparty account name when it is a person (drives Person + ownership creation); else null. */
     val personalCounterpartyName: String? = null,
     /** Pass-through (conduit) routing for the row (e.g. Curve); null for ordinary rows. */
     val passThrough: CsvPassThrough? = null,
-    /** Set when the row is one leg of an asset conversion (see `ConversionConfig`); null otherwise. */
-    val conversionLeg: ConversionLegInfo? = null,
-    /** Set when the row is one leg of a row-group trade (see `TradeGroupConfig`); null otherwise. */
-    val tradeLeg: TradeLegInfo? = null,
+    /** Set when the row is one leg of a multi-row movement (see `LegGroupRule`); null otherwise. */
+    val groupLeg: GroupLeg? = null,
     /**
      * Raw value of the strategy's [CsvStrategyConfig.fundingAttributeMatch] column for this row (e.g. a
      * card's last-4 like "7721"); null when the strategy declares no funding match or the cell is blank.
@@ -354,28 +344,6 @@ class CsvTransferMapper(
             LocalTime.Format { byUnicodePattern(pattern) }
         }
 
-    // Precompiled conversion detection (null when the strategy declares no conversionConfig). Regexes
-    // are case-insensitive, matching the file's existing account/content-rule matching convention.
-    private val conversionDebitRegex: Regex? =
-        strategy.config.conversionConfig?.let { Regex(it.debitPattern, RegexOption.IGNORE_CASE) }
-    private val conversionCreditRegex: Regex? =
-        strategy.config.conversionConfig?.let { Regex(it.creditPattern, RegexOption.IGNORE_CASE) }
-    private val conversionPairingKeyRegex: Regex? =
-        strategy.config.conversionConfig
-            ?.pairingKeyPattern
-            ?.let { Regex(it, RegexOption.IGNORE_CASE) }
-    private val conversionAccountRuleRegexes: List<Pair<Regex, ConversionAccountRule>> =
-        strategy.config.conversionConfig
-            ?.conversionAccountRules
-            .orEmpty()
-            .map { Regex(it.pattern, RegexOption.IGNORE_CASE) to it }
-
-    // Precompiled row-group trade detection (null when the strategy declares no tradeGroupConfig).
-    private val tradeDebitRegex: Regex? =
-        strategy.config.tradeGroupConfig?.let { Regex(it.debitPattern, RegexOption.IGNORE_CASE) }
-    private val tradeCreditRegex: Regex? =
-        strategy.config.tradeGroupConfig?.let { Regex(it.creditPattern, RegexOption.IGNORE_CASE) }
-
     // Extract unique identifier column names from strategy
     private val uniqueIdentifierColumns: List<String> =
         strategy.config.attributeMappings
@@ -431,8 +399,8 @@ class CsvTransferMapper(
                             tradeTo = result.tradeTo,
                             personalCounterpartyName = result.personalCounterpartyName,
                             passThrough = result.passThrough,
-                            conversionLeg = result.conversionLeg,
-                            tradeLeg = result.tradeLeg,
+                            groupLeg = result.groupLeg,
+                            feeDescription = result.feeDescription,
                             fundingMatchValue = result.fundingMatchValue,
                             unidentifiedCounterpartyAccountId = result.unidentifiedCounterpartyAccountId,
                         ),
@@ -533,7 +501,8 @@ class CsvTransferMapper(
             // the debit and credit legs parse as valid single-asset transfers (owner account <-> conversion
             // account). The amount-sign flip below then places the owner on the correct side (owner is the
             // source of a debit, the target of a credit). The applier pairs and links the legs afterwards.
-            val conversionDetection = detectConversionLeg(values)
+            val legDetection = detectGroupLeg(values)
+            val conversionDetection = legDetection?.takeIf { it.throughAccountName != null }
             if (conversionDetection != null) {
                 targetAccountId = resolveExistingAccountId(conversionDetection.accountName) ?: UNRESOLVED_ACCOUNT_ID
             }
@@ -666,20 +635,25 @@ class CsvTransferMapper(
                     counterpartyAccountId.takeIf { isUnidentifiedCounterparty(targetMapping, values) }
                 }
 
-            // Create Money with absolute value (direction is indicated by source/target)
-            val amount = Money.fromDisplayValue(rawAmount.abs(), currency)
-
             // A fee is modelled as its own movement (linked to this transfer), not folded into the amount.
-            val feeMagnitude = parseFeeMagnitude(amountMapping, values)
-            val feeAmount =
-                if (feeMagnitude > BigDecimal.ZERO) {
-                    val feeCurrency =
-                        feeCurrencyFor(amountMapping, values, currency)
-                            ?: return MappingResult.Error(row.rowIndex, "Fee currency not found")
-                    Money.fromDisplayValue(feeMagnitude, feeCurrency)
-                } else {
-                    null
+            val rowFee =
+                when (val parsed = parseFee(amountMapping, values, currency)) {
+                    FeeParse.UnknownCurrency -> return MappingResult.Error(row.rowIndex, "Fee currency not found")
+                    is FeeParse.Charged -> parsed
+                    FeeParse.None -> null
                 }
+            val feeAmount = rowFee?.amount
+            // A gross amount already includes its fee: carve the fee out so the two sum back to it. Only a
+            // fee in the row's own asset can be carved out of it.
+            val netMagnitude =
+                if (rowFee?.includedInAmount == true && rowFee.amount.asset.id == currency.id) {
+                    rawAmount.abs() - rowFee.magnitude
+                } else {
+                    rawAmount.abs()
+                }
+
+            // Create Money with absolute value (direction is indicated by source/target)
+            val amount = Money.fromDisplayValue(netMagnitude, currency)
 
             // Placeholder ID - real ID generated by database
             val transfer =
@@ -750,9 +724,8 @@ class CsvTransferMapper(
                 tradeTo = tradeTo,
                 personalCounterpartyName = personalCounterpartyName,
                 passThrough = passThrough,
-                conversionLeg =
-                    conversionDetection?.let { ConversionLegInfo(side = it.side, pairingKey = it.pairingKey) },
-                tradeLeg = detectTradeLeg(originalValues),
+                groupLeg = legDetection?.leg,
+                feeDescription = rowFee?.description,
                 fundingMatchValue =
                     strategy.config.fundingAttributeMatch?.let {
                         getColumnValueOrNull(it.column, originalValues)?.trim()?.takeIf { v -> v.isNotBlank() }
@@ -796,89 +769,55 @@ class CsvTransferMapper(
         return values.getOrNull(index)
     }
 
-    /** A detected conversion leg: which side, the counterparty account name, and the pairing key. */
-    private data class ConversionDetection(
-        val side: ConversionSide,
-        val accountName: String,
-        val pairingKey: String,
-    )
-
-    /**
-     * Detects whether [values] is a leg of an asset conversion per [CsvStrategyConfig.conversionConfig].
-     * Returns null when the strategy has no conversion config, the signal column doesn't match a
-     * debit/credit pattern, or no counterparty account can be resolved.
-     */
-    private fun detectConversionLeg(values: List<String>): ConversionDetection? {
-        val config = strategy.config.conversionConfig ?: return null
-        val signal = getColumnValueOrNull(config.signalColumn, values)?.trim().orEmpty()
-        if (signal.isEmpty()) return null
-        val matchesFamily =
-            conversionDebitRegex?.containsMatchIn(signal) == true ||
-                conversionCreditRegex?.containsMatchIn(signal) == true
-        if (!matchesFamily) return null
-        // A source that names both legs identically (Binance's "Small Assets Exchange BNB" labels the
-        // swept asset and the BNB received the same) can only be told apart by the sign of its amount.
-        val side =
-            when (val sideColumn = config.sideAmountColumn) {
-                null ->
-                    when {
-                        conversionDebitRegex?.containsMatchIn(signal) == true -> ConversionSide.DEBIT
-                        else -> ConversionSide.CREDIT
-                    }
-                else -> {
-                    val amount =
-                        getColumnValueOrNull(sideColumn, values)
-                            ?.takeIf { it.isNotBlank() }
-                            ?.let { runCatching { parseBigDecimal(it) }.getOrNull() }
-                            ?: return null
-                    when {
-                        amount < BigDecimal.ZERO -> ConversionSide.DEBIT
-                        amount > BigDecimal.ZERO -> ConversionSide.CREDIT
-                        else -> return null
-                    }
-                }
-            }
-        val accountName =
-            conversionAccountRuleRegexes
-                .firstOrNull { (regex, rule) ->
-                    getColumnValueOrNull(rule.column, values)?.let { regex.containsMatchIn(it) } == true
-                }?.second
-                ?.accountName
-                ?: config.conversionAccountName
-                ?: return null
-        val base =
-            conversionPairingKeyRegex
-                ?.find(signal)
-                ?.groupValues
-                ?.getOrNull(1)
-                .orEmpty()
-        val extra = config.pairingKeyColumns.joinToString(PAIRING_KEY_SEPARATOR) { getColumnValueOrNull(it, values)?.trim().orEmpty() }
-        return ConversionDetection(side, accountName, "$base$PAIRING_KEY_SEPARATOR$extra")
+    /** A detected leg, plus the intermediate account a through-account leg routes via. */
+    private data class LegDetection(
+        val leg: GroupLeg,
+        val throughAccountName: String?,
+    ) {
+        val accountName: String get() = checkNotNull(throughAccountName)
     }
 
     /**
-     * Detects whether [values] is a leg of a row-group trade per [CsvStrategyConfig.tradeGroupConfig].
-     * Returns null when the strategy declares no trade-group config or the signal column matches
-     * neither the debit nor the credit pattern — including for a fee row, which the config leaves out
-     * on purpose so it imports as its own transfer.
+     * The leg [values] is of the first of the strategy's `legGroups` that claims it: its leg conditions hold
+     * (against trimmed cells), its side resolves, and — for a through-account rule — an account rule names
+     * the intermediate account. Null when no rule claims the row.
      */
-    private fun detectTradeLeg(values: List<String>): TradeLegInfo? {
-        val config = strategy.config.tradeGroupConfig ?: return null
-        // A blank signal is only a leg when a pattern explicitly admits it (Bybit's spot ledger leaves Type
-        // empty on both legs of a Convert); an ordinary anchored pattern never matches the empty string.
-        val signal = getColumnValueOrNull(config.signalColumn, values)?.trim().orEmpty()
-        val isDebitPattern = tradeDebitRegex?.containsMatchIn(signal) == true
-        if (!isDebitPattern && tradeCreditRegex?.containsMatchIn(signal) != true) return null
-        val sideColumn = config.sideAmountColumn ?: return TradeLegInfo(if (isDebitPattern) TradeLegSide.DEBIT else TradeLegSide.CREDIT)
-        val amount =
-            getColumnValueOrNull(sideColumn, values)
-                ?.takeIf { it.isNotBlank() }
-                ?.let { runCatching { parseBigDecimal(it) }.getOrNull() }
-                ?: return null
-        return when {
-            amount < BigDecimal.ZERO -> TradeLegInfo(TradeLegSide.DEBIT)
-            amount > BigDecimal.ZERO -> TradeLegInfo(TradeLegSide.CREDIT)
-            else -> null
+    private fun detectGroupLeg(values: List<String>): LegDetection? {
+        val record = ColumnRecord(values, columnIndexByName)
+        val trimmed = ColumnRecord(values.map { it.trim() }, columnIndexByName)
+        return strategy.config.legGroups.withIndex().firstNotNullOfOrNull { (index, rule) ->
+            if (!rules.all(rule.legWhen, trimmed)) return@firstNotNullOfOrNull null
+            val side =
+                when (val legSide = rule.side) {
+                    is LegSide.DebitWhen -> if (rules.all(legSide.conditions, trimmed)) GroupLegSide.DEBIT else GroupLegSide.CREDIT
+                    is LegSide.Sign -> {
+                        val amount =
+                            getColumnValueOrNull(legSide.path, values)
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let { runCatching { parseBigDecimal(it) }.getOrNull() }
+                        when {
+                            amount == null -> null
+                            amount < BigDecimal.ZERO -> GroupLegSide.DEBIT
+                            amount > BigDecimal.ZERO -> GroupLegSide.CREDIT
+                            else -> null
+                        }
+                    }
+                } ?: return@firstNotNullOfOrNull null
+            val throughAccountName =
+                when (val assembly = rule.assembly) {
+                    is LegAssembly.Trade -> null
+                    is LegAssembly.ThroughAccount ->
+                        assembly.accounts
+                            .firstNotNullOfOrNull { applyAccountRule(it, record, values) }
+                            ?.accountName
+                            ?.takeIf { it.isNotBlank() }
+                            ?: return@firstNotNullOfOrNull null
+                }
+            val key =
+                rule.key.joinToString(
+                    PAIRING_KEY_SEPARATOR,
+                ) { part -> rules.resolve(part) { getColumnValueOrNull(it, values)?.trim() } }
+            LegDetection(GroupLeg(index, side, key), throughAccountName)
         }
     }
 
@@ -927,37 +866,49 @@ class CsvTransferMapper(
             Direction.Outgoing -> false
         }
 
-    /**
-     * Returns the fee magnitude (unsigned) for a row, modelled as its own movement out of the
-     * transaction's source account rather than folded into the transaction amount. Zero when no fee
-     * column is configured, the value is blank, or the conditions don't hold.
-     */
-    private fun parseFeeMagnitude(
-        amountMapping: FieldMapping,
-        values: List<String>,
-    ): BigDecimal {
-        val mapping = amountMapping as? AmountParsingMapping ?: return BigDecimal.ZERO
-        val feeColumnName = mapping.feeColumnName ?: return BigDecimal.ZERO
-        if (!mapping.feeConditions.all { evaluateCondition(it, values) }) return BigDecimal.ZERO
-        val feeValue = getColumnValueOrNull(feeColumnName, values)?.trim()
-        if (feeValue.isNullOrBlank()) return BigDecimal.ZERO
-        return parseBigDecimal(feeValue).abs()
+    /** What a row's [FeeRule] came to. */
+    private sealed interface FeeParse {
+        data object None : FeeParse
+
+        data object UnknownCurrency : FeeParse
+
+        data class Charged(
+            val magnitude: BigDecimal,
+            val amount: Money,
+            val description: String?,
+            val includedInAmount: Boolean,
+        ) : FeeParse
     }
 
     /**
-     * The asset a row's fee is paid in: [rowCurrency] unless the amount mapping names a fee-currency
-     * column whose cell is non-blank, in which case that cell's asset — null when the code is unknown.
+     * The fee a row carries per the amount mapping's [FeeRule]: none when there is no rule, its conditions
+     * don't hold, it is charged on another asset, or the amount is blank or zero. Its sign is ignored — a
+     * fee is a movement out of the transaction's source account. The fee is in [rowCurrency] unless the
+     * rule's currency reads a non-blank code of its own.
      */
-    private fun feeCurrencyFor(
+    private fun parseFee(
         amountMapping: FieldMapping,
         values: List<String>,
         rowCurrency: Asset,
-    ): Asset? {
-        val mapping = amountMapping as? AmountParsingMapping ?: return rowCurrency
-        val feeCurrency = mapping.feeCurrency ?: return rowCurrency
-        val code = rules.resolve(feeCurrency) { getColumnValueOrNull(it, values)?.trim() }
-        if (code.isBlank()) return rowCurrency
-        return lookupAsset(code)
+    ): FeeParse {
+        val fee = (amountMapping as? AmountParsingMapping)?.fee ?: return FeeParse.None
+        val lookup = { path: String -> getColumnValueOrNull(path, values)?.trim() }
+        if (!rules.all(fee.conditions, ColumnRecord(values, columnIndexByName))) return FeeParse.None
+        if (fee.chargedOnAsset?.let { !rules.resolve(it, lookup).equals(rowCurrency.code, ignoreCase = true) } == true) {
+            return FeeParse.None
+        }
+        val feeValue = rules.resolve(fee.amount, lookup)
+        if (feeValue.isBlank()) return FeeParse.None
+        val magnitude = parseBigDecimal(feeValue).abs()
+        if (magnitude <= BigDecimal.ZERO) return FeeParse.None
+        val code = fee.currency?.let { rules.resolve(it, lookup) }.orEmpty()
+        val feeCurrency = if (code.isBlank()) rowCurrency else lookupAsset(code) ?: return FeeParse.UnknownCurrency
+        return FeeParse.Charged(
+            magnitude = magnitude,
+            amount = Money.fromDisplayValue(magnitude, feeCurrency),
+            description = fee.description?.let { rules.resolve(it, lookup) }?.takeIf { it.isNotBlank() },
+            includedInAmount = fee.includedInAmount,
+        )
     }
 
     /**

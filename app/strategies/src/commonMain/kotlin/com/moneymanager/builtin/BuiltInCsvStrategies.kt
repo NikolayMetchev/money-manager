@@ -11,7 +11,6 @@ import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
-import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -19,9 +18,11 @@ import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
-import com.moneymanager.domain.model.csvstrategy.TradeGroupConfig
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.domain.model.rules.AssetCodeRules
@@ -29,6 +30,7 @@ import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -82,7 +84,7 @@ object BuiltInCsvStrategies {
      * Counterparty account for crypto.com asset conversions that arrive as separate debited/credited
      * rows (dust conversions, wallet swaps). The dusted assets flow Crypto.com -> here and the received
      * asset flows here -> Crypto.com, so the Crypto.com balances stay exact and the (economically
-     * meaningless) mixed-asset residual is isolated in this one account. See [ConversionConfig].
+     * meaningless) mixed-asset residual is isolated in this one account. See [LegAssembly.ThroughAccount].
      */
     private const val CRYPTO_COM_CONVERSIONS_ACCOUNT = "Crypto.com Conversions"
 
@@ -184,7 +186,7 @@ object BuiltInCsvStrategies {
      * Counterparty for Binance's small-assets (dust) sweeps, which arrive as several debited rows and
      * several credited BNB rows that no column attributes to each other. Routing every leg through one
      * account keeps each asset balance exact and isolates the mixed-asset residual, exactly as
-     * [CRYPTO_COM_CONVERSIONS_ACCOUNT] does. See [ConversionConfig].
+     * [CRYPTO_COM_CONVERSIONS_ACCOUNT] does. See [LegAssembly.ThroughAccount].
      */
     private const val BINANCE_CONVERSIONS_ACCOUNT = "Binance Conversions"
 
@@ -858,17 +860,48 @@ object BuiltInCsvStrategies {
                     // patterns match ONLY these two families — one-sided *_credited kinds (supercharger/rewards/
                     // admin income) are deliberately excluded. Debit rows are negative and credit rows positive,
                     // so the AMOUNT flip-on-positive already places the Crypto.com wallet on the correct side.
-                    conversionConfig =
-                        ConversionConfig(
-                            signalColumn = "Transaction Kind",
-                            debitPattern = "^(dust_conversion|crypto_wallet_swap)_debited$",
-                            creditPattern = "^(dust_conversion|crypto_wallet_swap)_credited$",
-                            conversionAccountName = CRYPTO_COM_CONVERSIONS_ACCOUNT,
-                            // Group 1 (dust_conversion | crypto_wallet_swap) keeps the two families from pairing
-                            // across each other; the time window then separates individual events within a family.
-                            pairingKeyPattern = "^(dust_conversion|crypto_wallet_swap)_",
-                            pairingWindowSeconds = CRYPTO_COM_CONVERSION_PAIRING_WINDOW_SECONDS,
-                            relationshipTypeName = "conversion",
+                    legGroups =
+                        listOf(
+                            LegGroupRule(
+                                legWhen =
+                                    listOf(
+                                        Condition(
+                                            "Transaction Kind",
+                                            ConditionOp.MATCHES,
+                                            "(?:^(dust_conversion|crypto_wallet_swap)_debited$)|" +
+                                                "(?:^(dust_conversion|crypto_wallet_swap)_credited$)",
+                                        ),
+                                        Condition("Transaction Kind", ConditionOp.NOT_BLANK),
+                                    ),
+                                side =
+                                    LegSide.DebitWhen(
+                                        listOf(
+                                            Condition(
+                                                "Transaction Kind",
+                                                ConditionOp.MATCHES,
+                                                "^(dust_conversion|crypto_wallet_swap)_debited$",
+                                            ),
+                                        ),
+                                    ),
+                                // Group 1 (dust_conversion | crypto_wallet_swap) keeps the two families from pairing
+                                // across each other; the time window then separates individual events within a family.
+                                key =
+                                    listOf(
+                                        ValueExpr(listOf("Transaction Kind"), Extraction("^(dust_conversion|crypto_wallet_swap)_", "$1")),
+                                    ),
+                                windowSeconds = CRYPTO_COM_CONVERSION_PAIRING_WINDOW_SECONDS,
+                                assembly =
+                                    LegAssembly.ThroughAccount(
+                                        accounts =
+                                            listOf(
+                                                AccountRule(
+                                                    value = ValueExpr(listOf("Transaction Kind")),
+                                                    name = CRYPTO_COM_CONVERSIONS_ACCOUNT,
+                                                ),
+                                            ),
+                                        relationshipTypeName = "conversion",
+                                    ),
+                            ),
                         ),
                 ),
             createdAt = now,
@@ -1062,8 +1095,11 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Source amount (after fees)",
-                        feeColumnName = "Source fee amount",
-                        feeConditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
+                        fee =
+                            FeeRule(
+                                amount = ValueExpr(listOf("Source fee amount")),
+                                conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
+                            ),
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Source currency"))),
@@ -1630,7 +1666,7 @@ object BuiltInCsvStrategies {
      *
      * Trades are split across rows: Binance stamps every partial fill of both legs with the same second
      * (a single order can produce a dozen `Transaction Sold`/`Transaction Revenue` rows).
-     * [CsvStrategyConfig.tradeGroupConfig]
+     * A trade [LegGroupRule]
      * folds each such group into one `trade`. Fee rows stay out of the group on purpose — a `trade` row
      * has no fee field — and route to [BINANCE_FEES_ACCOUNT] as their own transfers, as the API does.
      *
@@ -1642,10 +1678,10 @@ object BuiltInCsvStrategies {
      * Dust sweeps are the one conversion that cannot be assembled: a sweep debits several assets and
      * credits several BNB amounts, and nothing in the file says which credit came from which debit
      * (their order does not correspond, and the credited amount is net of Binance's service charge
-     * while the debited amount is gross). They go through [CsvStrategyConfig.conversionConfig] instead,
+     * while the debited amount is gross). They go through a [LegAssembly.ThroughAccount] rule instead,
      * which keeps every
-     * balance exact without inventing a pairing. Both legs share one `Operation`, so
-     * [ConversionConfig.sideAmountColumn] classifies them by the sign of `Change`.
+     * balance exact without inventing a pairing. Both legs share one `Operation`, so a
+     * [LegSide.Sign] side classifies them by the sign of `Change`.
      */
     @Suppress("LongMethod")
     fun buildBinanceCsvStrategy(now: Instant): CsvImportStrategy {
@@ -1724,7 +1760,7 @@ object BuiltInCsvStrategies {
                     name = BINANCE_DUAL_SAVINGS_ACCOUNT,
                 ),
                 AccountRule(value = ValueExpr(listOf("Operation")), pattern = "^(Fee|Transaction Fee)$", name = BINANCE_FEES_ACCOUNT),
-                // Dust legs are re-routed to the conversion account by conversionConfig; this rule is
+                // Dust legs are re-routed to the conversion account by the dust leg rule; this rule is
                 // the home for a leg that somehow escapes detection (a zero Change).
                 AccountRule(
                     value = ValueExpr(listOf("Operation")),
@@ -1795,29 +1831,46 @@ object BuiltInCsvStrategies {
                     // filename match would win outright over content scoring and let a legacy file through.
                     contentMatchRules = listOf(Condition("User_ID", ConditionOp.MATCHES, "^\\s*\\d+\\s*$")),
                     crossSourceReconcileWindowSeconds = BINANCE_RECONCILE_WINDOW_SECONDS,
-                    conversionConfig =
-                        ConversionConfig(
-                            signalColumn = "Operation",
-                            debitPattern = "^Small Assets Exchange BNB( \\(Spot\\))?$",
-                            creditPattern = "^Small Assets Exchange BNB( \\(Spot\\))?$",
-                            sideAmountColumn = "Change",
-                            conversionAccountName = BINANCE_CONVERSIONS_ACCOUNT,
-                            pairingWindowSeconds = BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS,
-                            relationshipTypeName = "conversion",
-                            reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
-                        ),
-                    tradeGroupConfig =
-                        TradeGroupConfig(
-                            signalColumn = "Operation",
-                            debitPattern = "^(Sell|Transaction (Spend|Sold))$",
-                            creditPattern = "^(Buy|Transaction (Buy|Revenue)|Binance Convert|Transaction Related)$",
-                            // "Transaction Related" is the older name for *either* leg of a fill, so the sign of
-                            // Change - not the operation name - has to decide which side each row is.
-                            sideAmountColumn = "Change",
-                            // groupingWindowSeconds and descriptionTemplate keep their defaults: every leg of
-                            // one fill carries the identical second so no jitter needs tolerating, and the
-                            // default "Buy {to}/{from}" already matches the API importer's wording.
-                            reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
+                    legGroups =
+                        listOf(
+                            // Dust sweeps: both legs share one Operation, so Change's sign decides the side.
+                            LegGroupRule(
+                                legWhen =
+                                    listOf(
+                                        Condition("Operation", ConditionOp.MATCHES, "^Small Assets Exchange BNB( \\(Spot\\))?$"),
+                                        Condition("Operation", ConditionOp.NOT_BLANK),
+                                    ),
+                                side = LegSide.Sign("Change"),
+                                windowSeconds = BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS,
+                                assembly =
+                                    LegAssembly.ThroughAccount(
+                                        accounts =
+                                            listOf(
+                                                AccountRule(value = ValueExpr(listOf("Operation")), name = BINANCE_CONVERSIONS_ACCOUNT),
+                                            ),
+                                        relationshipTypeName = "conversion",
+                                    ),
+                                reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
+                            ),
+                            LegGroupRule(
+                                legWhen =
+                                    listOf(
+                                        Condition(
+                                            "Operation",
+                                            ConditionOp.MATCHES,
+                                            "(?:^(Sell|Transaction (Spend|Sold))$)|" +
+                                                "(?:^(Buy|Transaction (Buy|Revenue)|Binance Convert|Transaction Related)$)",
+                                        ),
+                                    ),
+                                // "Transaction Related" is the older name for *either* leg of a fill, so the sign of
+                                // Change - not the operation name - has to decide which side each row is.
+                                side = LegSide.Sign("Change"),
+                                // The window and description keep their defaults: every leg of one fill carries the
+                                // identical second so no jitter needs tolerating, and the default "Buy {to}/{from}"
+                                // already matches the API importer's wording.
+                                assembly = LegAssembly.Trade(),
+                                reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
+                            ),
                         ),
                 ),
             createdAt = now,
@@ -1968,7 +2021,7 @@ object BuiltInCsvStrategies {
      * moves to and from the other wallets. A Convert leaves `Type` blank on both of its legs.
      *
      * A trade is split into one row per fill per leg, every row of an order stamped with the same second
-     * (a convert's two legs may straddle a second boundary). [CsvStrategyConfig.tradeGroupConfig] folds
+     * (a convert's two legs may straddle a second boundary). A trade [LegGroupRule] folds
      * each group into one `trade`, classifying legs by the sign of `Amount`; fees stay their own
      * transfers to [BYBIT_FEES_ACCOUNT], which is also where the API books them.
      *
@@ -1999,15 +2052,16 @@ object BuiltInCsvStrategies {
                     attributeMappings = bybitAttributeMappings(internalTransfer),
                     contentMatchRules = listOf(bybitUidRule),
                     crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
-                    tradeGroupConfig =
-                        TradeGroupConfig(
-                            signalColumn = "Type",
-                            // An empty Type is a Convert leg; the pattern has to admit it explicitly.
-                            debitPattern = "^(trade)?$",
-                            creditPattern = "^(trade)?$",
-                            sideAmountColumn = "Amount",
-                            groupingWindowSeconds = 1,
-                            reconcileWindowSeconds = BYBIT_TRADE_RECONCILE_WINDOW_SECONDS,
+                    legGroups =
+                        listOf(
+                            LegGroupRule(
+                                // An empty Type is a Convert leg; the pattern has to admit it explicitly.
+                                legWhen = listOf(Condition("Type", ConditionOp.MATCHES, "^(trade)?$")),
+                                side = LegSide.Sign("Amount"),
+                                windowSeconds = 1,
+                                assembly = LegAssembly.Trade(),
+                                reconcileWindowSeconds = BYBIT_TRADE_RECONCILE_WINDOW_SECONDS,
+                            ),
                         ),
                 ),
             createdAt = now,
@@ -2202,8 +2256,11 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "From Amount",
-                        feeColumnName = "Fee Amount",
-                        feeCurrency = ValueExpr(listOf("Fee Currency"), KOINLY_NAME_EXTRACTION),
+                        fee =
+                            FeeRule(
+                                amount = ValueExpr(listOf("Fee Amount")),
+                                currency = ValueExpr(listOf("Fee Currency"), KOINLY_NAME_EXTRACTION),
+                            ),
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(

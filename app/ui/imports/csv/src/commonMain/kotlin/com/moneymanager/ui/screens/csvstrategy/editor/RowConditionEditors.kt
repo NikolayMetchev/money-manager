@@ -11,7 +11,7 @@ import com.moneymanager.ui.components.rules.FLAT_CONDITION_OPS
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /** Picks a condition's path among the file's columns, previewing the first row's value. */
-private fun columnPathField(
+internal fun columnPathField(
     columns: List<CsvColumn>,
     firstRow: CsvRow?,
     enabled: Boolean,

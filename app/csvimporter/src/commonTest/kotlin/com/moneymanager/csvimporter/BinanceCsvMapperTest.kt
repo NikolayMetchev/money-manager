@@ -140,20 +140,24 @@ class BinanceCsvMapperTest {
         )
     }
 
+    // The built-in lists its dust-sweep rule first and its trade rule second.
+    private val MappingResult.Success.conversionLeg: GroupLeg? get() = groupLeg?.takeIf { it.ruleIndex == 0 }
+    private val MappingResult.Success.tradeLeg: GroupLeg? get() = groupLeg?.takeIf { it.ruleIndex == 1 }
+
     @Test
     fun patternsAreAnchored_soNoOperationSwallowsAnother() {
         // account-rule patterns use containsMatchIn: an unanchored "Deposit" would also claim "Fiat Deposit"
         // and an unanchored "Buy" would claim "Transaction Buy".
         assertEquals("Binance Bank", counterpartyName(map(row("Fiat Deposit", "GBP", "1.00"))))
-        assertEquals(TradeLegSide.CREDIT, map(row("Transaction Buy", "GBP", "1.00")).tradeLeg?.side)
-        assertEquals(TradeLegSide.DEBIT, map(row("Transaction Sold", "GBP", "-1.00")).tradeLeg?.side)
+        assertEquals(GroupLegSide.CREDIT, map(row("Transaction Buy", "GBP", "1.00")).tradeLeg?.side)
+        assertEquals(GroupLegSide.DEBIT, map(row("Transaction Sold", "GBP", "-1.00")).tradeLeg?.side)
     }
 
     @Test
     fun tradeLegs_areClassifiedBySignForTheAmbiguousOperation() {
         // "Transaction Related" is the older name for *either* leg, so only the sign distinguishes them.
-        assertEquals(TradeLegSide.DEBIT, map(row("Transaction Related", "GBP", "-99.97")).tradeLeg?.side)
-        assertEquals(TradeLegSide.CREDIT, map(row("Transaction Related", "BNB", "0.008196")).tradeLeg?.side)
+        assertEquals(GroupLegSide.DEBIT, map(row("Transaction Related", "GBP", "-99.97")).tradeLeg?.side)
+        assertEquals(GroupLegSide.CREDIT, map(row("Transaction Related", "BNB", "0.008196")).tradeLeg?.side)
     }
 
     @Test
@@ -173,19 +177,19 @@ class BinanceCsvMapperTest {
     fun dustLegs_areClassifiedBySignBecauseBothShareOneOperation() {
         val debit = map(row("Small Assets Exchange BNB (Spot)", "BNB", "-90.89657258"))
         val credit = map(row("Small Assets Exchange BNB (Spot)", "BNB", "0.03251993"))
-        assertEquals(ConversionSide.DEBIT, debit.conversionLeg?.side)
-        assertEquals(ConversionSide.CREDIT, credit.conversionLeg?.side)
+        assertEquals(GroupLegSide.DEBIT, debit.conversionLeg?.side)
+        assertEquals(GroupLegSide.CREDIT, credit.conversionLeg?.side)
         assertTrue(
             debit.newAccounts.any { it.name == "Binance Conversions" },
             "both legs route through the shared conversion account",
         )
-        assertEquals(debit.conversionLeg?.pairingKey, credit.conversionLeg?.pairingKey)
+        assertEquals(debit.conversionLeg?.key, credit.conversionLeg?.key)
     }
 
     @Test
     fun dustLegs_areNotAlsoTradeLegs() {
         // A dust sweep's credits cannot be attributed to its debits, so it must never be assembled into
-        // a trade; it goes through ConversionConfig instead.
+        // a trade; it goes through a through-account leg rule instead.
         assertNull(map(row("Small Assets Exchange BNB (Spot)", "BNB", "-90.89657258")).tradeLeg)
     }
 

@@ -282,3 +282,85 @@ private fun transactionMappingsOntoDirection(obj: JsonObject): JsonObject {
     val rest = obj.without("directionFromAmountSign", "signSource", "signField", "creditValues")
     return JsonObject(if (direction == null) rest else rest + ("direction" to direction))
 }
+
+/**
+ * API config v3 → v4: one fee rule and one ledger-grouping setting.
+ * - A transaction mapping's `feeAmountField` family (currency, description, included-in-amount, and the
+ *   instrument whose quote asset carries a repeated fee) becomes a `fee` rule; so does a trade mapping's
+ *   `feeField` + `feeCurrencyField`.
+ * - `reconcileTradeAmountsField` (+ fallbacks) and the `unpairedTradeLeg*` fields become `ledgerTrades`.
+ */
+internal val apiFeeAndLedgerStep =
+    ConfigMigrationStep { config ->
+        config.rewriteObjects { obj ->
+            when {
+                "amountField" in obj -> transactionFeeAndLedger(obj)
+                "baseQuantityField" in obj -> tradeFee(obj)
+                else -> obj
+            }
+        } as JsonObject
+    }
+
+private fun transactionFeeAndLedger(obj: JsonObject): JsonObject {
+    val rest =
+        obj.without(
+            "feeAmountField",
+            "feeCurrencyField",
+            "feeDescriptionField",
+            "feeIncludedInAmount",
+            "feeInstrumentField",
+            "feeInstrumentSeparator",
+            "reconcileTradeAmountsField",
+            "reconcileTradeAmountsFallbackFields",
+            "unpairedTradeLegCounterAmountField",
+            "unpairedTradeLegFundingAccountName",
+        )
+    val fee =
+        obj.string("feeAmountField")?.let { amount ->
+            buildMap {
+                put("amount", valueExprJson(listOf(amount), null))
+                obj.string("feeCurrencyField")?.let { put("currency", valueExprJson(listOf(it), null)) }
+                obj.string("feeDescriptionField")?.let { put("description", valueExprJson(listOf(it), null)) }
+                if (obj.string("feeIncludedInAmount") == "true") put("includedInAmount", JsonPrimitive(true))
+                obj.string("feeInstrumentField")?.let { instrument ->
+                    // The quote asset is what follows the last separator; a symbol without one is all quote.
+                    val separator = escapeRegex(obj.string("feeInstrumentSeparator") ?: "-")
+                    val afterLast =
+                        JsonObject(
+                            mapOf(
+                                "pattern" to JsonPrimitive("^.*$separator(.*)$"),
+                                "outputTemplate" to JsonPrimitive("$1"),
+                            ),
+                        )
+                    put("chargedOnAsset", valueExprJson(listOf(instrument), afterLast))
+                }
+            }
+        }
+    val keyPaths = listOfNotNull(obj.string("reconcileTradeAmountsField")) + obj.stringList("reconcileTradeAmountsFallbackFields")
+    val ledgerTrades =
+        keyPaths.takeIf { it.isNotEmpty() }?.let { paths ->
+            buildMap {
+                put("key", valueExprJson(paths, null))
+                obj.string("unpairedTradeLegCounterAmountField")?.let { put("unpairedCounterAmountPath", JsonPrimitive(it)) }
+                obj.string("unpairedTradeLegFundingAccountName")?.let { put("unpairedFundingAccountName", JsonPrimitive(it)) }
+            }
+        }
+    return JsonObject(
+        rest + listOfNotNull(fee?.let { "fee" to JsonObject(it) }, ledgerTrades?.let { "ledgerTrades" to JsonObject(it) }),
+    )
+}
+
+private fun tradeFee(obj: JsonObject): JsonObject {
+    val rest = obj.without("feeField", "feeCurrencyField")
+    val amount = obj.string("feeField") ?: return JsonObject(rest)
+    val fee =
+        buildMap {
+            put("amount", valueExprJson(listOf(amount), null))
+            obj.string("feeCurrencyField")?.let { put("currency", valueExprJson(listOf(it), null)) }
+        }
+    return JsonObject(rest + ("fee" to JsonObject(fee)))
+}
+
+private const val REGEX_SPECIALS = "\\^$.|?*+()[]{}"
+
+private fun escapeRegex(literal: String): String = literal.map { if (it in REGEX_SPECIALS) "\\$it" else "$it" }.joinToString("")

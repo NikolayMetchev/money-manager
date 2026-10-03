@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -388,8 +389,11 @@ class CsvStrategyJsonCodecTest {
                 fieldType = TransferField.AMOUNT,
                 mode = AmountMode.SINGLE_COLUMN,
                 amountColumnName = "Source amount (after fees)",
-                feeColumnName = "Source fee amount",
-                feeConditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
+                fee =
+                    FeeRule(
+                        amount = ValueExpr(listOf("Source fee amount")),
+                        conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
+                    ),
             )
         val mappings = mapOf(TransferField.AMOUNT to mapping)
 
@@ -398,8 +402,7 @@ class CsvStrategyJsonCodecTest {
 
         val decodedMapping = decoded[TransferField.AMOUNT]
         assertIs<AmountParsingMapping>(decodedMapping)
-        assertEquals("Source fee amount", decodedMapping.feeColumnName)
-        assertEquals(ConditionOp.EQUALS, decodedMapping.feeConditions.single().op)
+        assertEquals(mapping.fee, decodedMapping.fee)
     }
 
     @Test

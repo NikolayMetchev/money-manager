@@ -5,6 +5,8 @@ package com.moneymanager.database
 import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.test.database.DbTest
@@ -14,7 +16,6 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -86,7 +87,7 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
             // OUT rows add the source fee to the debit (the amount column is net of fees)
             val amount = strategy.config.fieldMappings[TransferField.AMOUNT]
             assertIs<AmountParsingMapping>(amount)
-            assertEquals("Source fee amount", amount.feeColumnName)
+            assertEquals("Source fee amount", amount.fee?.amount?.primaryPath)
 
             val swapRule = strategy.config.rowPreprocessingRules.single()
             assertTrue(swapRule.flipSourceAndTarget)
@@ -182,16 +183,16 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
 
             // Trade-group assembly survives the round trip - without it the export's trade rows would
             // import as suspense transfers instead of trades.
-            val tradeGroup = assertNotNull(strategy.config.tradeGroupConfig)
-            assertEquals("Operation", tradeGroup.signalColumn)
-            assertEquals("Change", tradeGroup.sideAmountColumn, "the ambiguous leg name is resolved by sign")
-            assertEquals(0L, tradeGroup.groupingWindowSeconds)
+            val (conversion, tradeGroup) = strategy.config.legGroups
+            assertIs<LegAssembly.Trade>(tradeGroup.assembly)
+            assertEquals("Operation", tradeGroup.legWhen.single().path)
+            assertEquals(LegSide.Sign("Change"), tradeGroup.side, "the ambiguous leg name is resolved by sign")
+            assertEquals(0L, tradeGroup.windowSeconds)
 
-            // So does the dust conversion config, including the sign-based side classification.
-            val conversion = assertNotNull(strategy.config.conversionConfig)
-            assertEquals("Binance Conversions", conversion.conversionAccountName)
-            assertEquals("Change", conversion.sideAmountColumn)
-            assertEquals(conversion.debitPattern, conversion.creditPattern, "both dust legs share one Operation")
+            // So does the dust conversion rule, including the sign-based side classification.
+            val through = assertIs<LegAssembly.ThroughAccount>(conversion.assembly)
+            assertEquals("Binance Conversions", through.accounts.single().name)
+            assertEquals(LegSide.Sign("Change"), conversion.side, "both dust legs share one Operation")
 
             // The Operation column routes every row's counterparty, and the funding rules survive as
             // unidentified placeholders — which is what lets a deposit reconcile against the API's

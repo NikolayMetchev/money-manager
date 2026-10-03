@@ -67,9 +67,8 @@ private fun flattenConfig(config: CsvStrategyConfig<FieldMapping>): Map<String, 
         putIfNotEmpty("Content match rules", config.contentMatchRules)
         config.fileNamePattern?.let { put("File name pattern", it) }
         config.crossSourceReconcileWindowSeconds?.let { put("Cross-source reconcile window (seconds)", it.toString()) }
-        config.conversionConfig?.let { put("Conversion config", it.toString()) }
+        putIfNotEmpty("Leg groups", config.legGroups)
         config.fundingAttributeMatch?.let { put("Funding attribute match", it.toString()) }
-        config.tradeGroupConfig?.let { put("Trade group config", it.toString()) }
     }
 
 private fun MutableMap<String, String>.putIfNotEmpty(

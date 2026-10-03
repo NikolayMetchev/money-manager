@@ -36,8 +36,10 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.Record
 import com.moneymanager.domain.model.rules.RuleEvaluator
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -1904,7 +1906,8 @@ private suspend fun prepareValidTransactionItem(
         if (fee != null &&
             setup.strategy.config
                 .bankFeedMappings()
-                .feeIncludedInAmount &&
+                .fee
+                ?.includedInAmount == true &&
             fee.amount.asset.id == data.money.asset.id
         ) {
             Money((data.money.amount - fee.amount.amount).coerceAtLeast(BigInteger.ZERO), data.money.asset)
@@ -1990,7 +1993,7 @@ private suspend fun buildImportFee(
 ): ImportFee? {
     // Only fall back to the transaction currency when no fee currency was configured. If one WAS
     // provided but can't be resolved, skip the fee rather than persisting it under the wrong currency
-    // (which would also let a feeIncludedInAmount carve-out subtract a mismatched-currency amount).
+    // (which would also let an included-in-amount carve-out subtract a mismatched-currency amount).
     val feeCurrency =
         when (val code = item.feeCurrencyCode?.takeIf { it.isNotBlank() }) {
             null -> transactionCurrency
@@ -2012,7 +2015,9 @@ private suspend fun buildImportFee(
     val feeNodePath =
         setup.strategy.config
             .bankFeedMappings()
-            .feeAmountField
+            .fee
+            ?.amount
+            ?.primaryPath
             ?.substringBeforeLast('.', missingDelimiterValue = "")
             ?.takeIf { it.isNotBlank() }
     val feeJsonPath =
@@ -2121,9 +2126,10 @@ private fun parseTransactionsWithPath(
             val declineReason = resolveDeclineReason(obj, mappings)
             val localAmount = mappings.localAmountField?.let { obj.resolveJsonPath(it) }?.toLongOrNull()
             val localCurrency = mappings.localCurrencyField?.let { obj.resolveJsonPath(it) }
-            val fee = parseFeeAmount(obj, mappings)
-            val feeCurrency = mappings.feeCurrencyField?.let { obj.resolveJsonPath(it) }
-            val feeDescription = mappings.feeDescriptionField?.let { obj.resolveJsonPath(it) }
+            val feeRule = mappings.fee?.takeIf { obj.carriesFee(it, currency) }
+            val fee = feeRule?.let { parseFeeAmount(obj, it, mappings.amountFormat) }
+            val feeCurrency = feeRule?.currency?.let { obj.resolve(it) }
+            val feeDescription = feeRule?.description?.let { obj.resolve(it) }
             if (created != null && amount != null && currency != null) {
                 ApiTransactionPageItem(
                     amountMinorUnits = amount.minorUnits,
@@ -2194,17 +2200,17 @@ private fun parseAmount(
 }
 
 /**
- * Parses the optional fee amount per the strategy's [ApiAmountFormat], as a magnitude (sign is
- * irrelevant — a fee is always money out of the own account). Returns null when no fee field is
- * configured, the field is absent/unparseable, or the fee is zero.
+ * Parses [fee]'s amount per the strategy's [ApiAmountFormat], as a magnitude (sign is irrelevant — a
+ * fee is always money out of the own account). Returns null when the amount is absent, unparseable or
+ * zero.
  */
 private fun parseFeeAmount(
     obj: JsonObject,
-    mappings: ApiTransactionMappings,
+    fee: FeeRule,
+    amountFormat: ApiAmountFormat,
 ): ParsedAmount? {
-    val field = mappings.feeAmountField ?: return null
-    val raw = obj.resolveJsonPath(field) ?: return null
-    return when (mappings.amountFormat) {
+    val raw = obj.resolve(fee.amount).ifBlank { return null }
+    return when (amountFormat) {
         ApiAmountFormat.MINOR_UNITS_INTEGER -> {
             val value = raw.toLongOrNull() ?: return null
             if (value == 0L) return null
@@ -3417,6 +3423,20 @@ private fun RuleSign.matches(sign: Int): Boolean =
 
 /** Whether [condition] holds for this item (see [JsonRecord]). */
 internal fun JsonObject.matches(condition: Condition): Boolean = RuleEvaluator().matches(condition, JsonRecord(this))
+
+/** The value [expr] reads from this item: its first non-blank path, cleaned through its extraction. */
+internal fun JsonObject.resolve(expr: ValueExpr): String = RuleEvaluator().resolve(expr) { resolveJsonPath(it) }
+
+/**
+ * Whether this item carries [fee] at all: its conditions hold and, when the fee is charged on one asset,
+ * the item is in [itemAsset].
+ */
+internal fun JsonObject.carriesFee(
+    fee: FeeRule,
+    itemAsset: String?,
+): Boolean =
+    matchesAll(fee.conditions) &&
+        fee.chargedOnAsset?.let { itemAsset != null && resolve(it).equals(itemAsset, ignoreCase = true) } != false
 
 /** Whether every one of [conditions] holds for this item (true for none). */
 internal fun JsonObject.matchesAll(conditions: List<Condition>): Boolean =

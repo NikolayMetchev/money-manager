@@ -11,7 +11,11 @@ import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.csvstrategy.TradeGroupConfig
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.model.csvstrategy.LegSide
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -20,20 +24,28 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 
 /**
- * Covers assembling a trade out of the several rows a source splits it across (see [TradeGroupConfig]).
+ * Covers assembling a trade out of the several rows a source splits it across (see [LegAssembly.Trade]).
  * The cases are the real shapes a Binance export produces: a plain 1-fill swap, a many-fill order with
  * unequal counts per side, and the shapes that must NOT assemble.
  */
-class CsvTradeGroupsTest {
+class CsvLegGroupsTest {
     private val config =
-        TradeGroupConfig(
-            signalColumn = "Operation",
-            debitPattern = "^(Sell|Transaction (Spend|Sold))$",
-            creditPattern = "^(Buy|Transaction (Buy|Revenue))$",
-            sideAmountColumn = "Change",
-            // groupingWindowSeconds and descriptionTemplate keep their defaults (0 / "Buy {to}/{from}"),
-            // which is what the Binance strategy uses.
+        LegGroupRule(
+            legWhen =
+                listOf(
+                    Condition(
+                        "Operation",
+                        ConditionOp.MATCHES,
+                        "(?:^(Sell|Transaction (Spend|Sold))$)|(?:^(Buy|Transaction (Buy|Revenue))$)",
+                    ),
+                ),
+            side = LegSide.Sign("Change"),
+            // The window and description keep their defaults (0 / "Buy {to}/{from}"), which is what the
+            // Binance strategy uses.
+            assembly = LegAssembly.Trade(),
         )
+
+    private val trade = LegAssembly.Trade()
 
     private val binance = AccountId(1)
     private val trading = AccountId(2)
@@ -62,7 +74,7 @@ class CsvTradeGroupsTest {
      * accounts — a debit leaves the owner account, a credit arrives into it.
      */
     private fun leg(
-        side: TradeLegSide,
+        side: GroupLegSide,
         display: String,
         asset: Asset,
         at: String = "2022-11-14T20:32:54Z",
@@ -76,29 +88,29 @@ class CsvTradeGroupsTest {
                     id = TransferId(0),
                     timestamp = timestamp,
                     description = "leg",
-                    sourceAccountId = if (side == TradeLegSide.DEBIT) owner else trading,
-                    targetAccountId = if (side == TradeLegSide.DEBIT) trading else owner,
+                    sourceAccountId = if (side == GroupLegSide.DEBIT) owner else trading,
+                    targetAccountId = if (side == GroupLegSide.DEBIT) trading else owner,
                     amount = amount,
                 ),
             attributes = emptyList(),
             rowIndex = nextRowIndex++,
-            tradeLeg = TradeLegInfo(side),
+            groupLeg = GroupLeg(ruleIndex = 0, side = side, key = ""),
         )
     }
 
     /** A row the strategy did not flag as a trade leg (a fee, a deposit). */
-    private fun nonLeg(display: String = "0.001"): CsvTransferWithAttributes = leg(TradeLegSide.DEBIT, display, btc).copy(tradeLeg = null)
+    private fun nonLeg(display: String = "0.001"): CsvTransferWithAttributes = leg(GroupLegSide.DEBIT, display, btc).copy(groupLeg = null)
 
     @Test
     fun oneFillPerSide_assemblesASingleTrade() {
         val rows =
             listOf(
-                leg(TradeLegSide.DEBIT, "4.0", eth),
-                leg(TradeLegSide.CREDIT, "0.128228", btc),
+                leg(GroupLegSide.DEBIT, "4.0", eth),
+                leg(GroupLegSide.CREDIT, "0.128228", btc),
             )
-        val groups = groupTradeLegs(rows, config)
+        val groups = groupTradeLegs(rows, 0, config)
         assertEquals(1, groups.size)
-        val trade = assertNotNull(groups.single().assemble(config))
+        val trade = assertNotNull(groups.single().assemble(trade))
         assertEquals(binance, trade.ownerAccountId, "both legs of the trade sit on the owner account")
         assertEquals(money("4.0", eth), trade.fromAmount)
         assertEquals(money("0.128228", btc), trade.toAmount)
@@ -113,9 +125,9 @@ class CsvTradeGroupsTest {
         val gbpFills =
             listOf("186.70374170", "43.12694880", "12536.54297800", "60.96551580", "605.57925400", "386.67128880")
         val rows =
-            btcFills.map { leg(TradeLegSide.DEBIT, it, btc) } + gbpFills.map { leg(TradeLegSide.CREDIT, it, gbp) }
+            btcFills.map { leg(GroupLegSide.DEBIT, it, btc) } + gbpFills.map { leg(GroupLegSide.CREDIT, it, gbp) }
 
-        val trade = assertNotNull(groupTradeLegs(rows, config).single().assemble(config))
+        val trade = assertNotNull(groupTradeLegs(rows, 0, config).single().assemble(trade))
         assertEquals(money("1.00000000", btc), trade.fromAmount, "the six BTC fills sum to exactly 1 BTC")
         assertEquals(money("13819.5897271", gbp), trade.toAmount)
         assertEquals(12, trade.group.rowIndexes.size, "every leg belongs to the group, for status write-back")
@@ -125,38 +137,38 @@ class CsvTradeGroupsTest {
     fun distinctTimestamps_makeDistinctGroups() {
         val rows =
             listOf(
-                leg(TradeLegSide.DEBIT, "1.0", eth, at = "2022-11-14T20:31:00Z"),
-                leg(TradeLegSide.CREDIT, "0.03", btc, at = "2022-11-14T20:31:00Z"),
-                leg(TradeLegSide.DEBIT, "2.0", eth, at = "2022-11-14T20:39:53Z"),
-                leg(TradeLegSide.CREDIT, "0.06", btc, at = "2022-11-14T20:39:53Z"),
+                leg(GroupLegSide.DEBIT, "1.0", eth, at = "2022-11-14T20:31:00Z"),
+                leg(GroupLegSide.CREDIT, "0.03", btc, at = "2022-11-14T20:31:00Z"),
+                leg(GroupLegSide.DEBIT, "2.0", eth, at = "2022-11-14T20:39:53Z"),
+                leg(GroupLegSide.CREDIT, "0.06", btc, at = "2022-11-14T20:39:53Z"),
             )
-        val groups = groupTradeLegs(rows, config)
+        val groups = groupTradeLegs(rows, 0, config)
         assertEquals(2, groups.size, "orders seconds apart are separate trades, not one aggregate")
-        assertEquals(money("1.0", eth), assertNotNull(groups[0].assemble(config)).fromAmount)
-        assertEquals(money("2.0", eth), assertNotNull(groups[1].assemble(config)).fromAmount)
+        assertEquals(money("1.0", eth), assertNotNull(groups[0].assemble(trade)).fromAmount)
+        assertEquals(money("2.0", eth), assertNotNull(groups[1].assemble(trade)).fromAmount)
     }
 
     @Test
     fun aGroupingWindow_holdsTogetherLegsThatStraddleASecondBoundary() {
-        val windowed = config.copy(groupingWindowSeconds = 2)
+        val windowed = config.copy(windowSeconds = 2)
         val rows =
             listOf(
-                leg(TradeLegSide.DEBIT, "1.0", eth, at = "2021-01-01T09:43:33Z"),
-                leg(TradeLegSide.CREDIT, "0.03", btc, at = "2021-01-01T09:43:34Z"),
+                leg(GroupLegSide.DEBIT, "1.0", eth, at = "2021-01-01T09:43:33Z"),
+                leg(GroupLegSide.CREDIT, "0.03", btc, at = "2021-01-01T09:43:34Z"),
             )
-        assertEquals(1, groupTradeLegs(rows, windowed).size)
-        assertEquals(2, groupTradeLegs(rows, config).size, "with a zero window the same rows are two groups")
+        assertEquals(1, groupTradeLegs(rows, 0, windowed).size)
+        assertEquals(2, groupTradeLegs(rows, 0, config).size, "with a zero window the same rows are two groups")
     }
 
     @Test
     fun theTradeTakesTheGroupsEarliestTimestamp() {
-        val windowed = config.copy(groupingWindowSeconds = 2)
+        val windowed = config.copy(windowSeconds = 2)
         val rows =
             listOf(
-                leg(TradeLegSide.CREDIT, "0.03", btc, at = "2021-01-01T09:43:34Z"),
-                leg(TradeLegSide.DEBIT, "1.0", eth, at = "2021-01-01T09:43:33Z"),
+                leg(GroupLegSide.CREDIT, "0.03", btc, at = "2021-01-01T09:43:34Z"),
+                leg(GroupLegSide.DEBIT, "1.0", eth, at = "2021-01-01T09:43:33Z"),
             )
-        val trade = assertNotNull(groupTradeLegs(rows, windowed).single().assemble(windowed))
+        val trade = assertNotNull(groupTradeLegs(rows, 0, windowed).single().assemble(trade))
         assertEquals(Instant.parse("2021-01-01T09:43:33Z"), trade.timestamp)
     }
 
@@ -164,8 +176,8 @@ class CsvTradeGroupsTest {
     fun aOneSidedGroupDoesNotAssemble() {
         // A boundary spill or a truncated export: the rows stay ordinary transfers rather than becoming
         // a trade with an invented other side.
-        val rows = listOf(leg(TradeLegSide.DEBIT, "1.0", eth))
-        assertNull(groupTradeLegs(rows, config).single().assemble(config))
+        val rows = listOf(leg(GroupLegSide.DEBIT, "1.0", eth))
+        assertNull(groupTradeLegs(rows, 0, config).single().assemble(trade))
     }
 
     @Test
@@ -174,21 +186,21 @@ class CsvTradeGroupsTest {
         // side. Anything else cannot be folded into one trade without inventing a pairing.
         val rows =
             listOf(
-                leg(TradeLegSide.DEBIT, "1.0", eth),
-                leg(TradeLegSide.DEBIT, "0.5", btc),
-                leg(TradeLegSide.CREDIT, "100.0", gbp),
+                leg(GroupLegSide.DEBIT, "1.0", eth),
+                leg(GroupLegSide.DEBIT, "0.5", btc),
+                leg(GroupLegSide.CREDIT, "100.0", gbp),
             )
-        assertNull(groupTradeLegs(rows, config).single().assemble(config))
+        assertNull(groupTradeLegs(rows, 0, config).single().assemble(trade))
     }
 
     @Test
     fun aGroupWhoseSidesNameTheSameAssetDoesNotAssemble() {
         val rows =
             listOf(
-                leg(TradeLegSide.DEBIT, "1.0", eth),
-                leg(TradeLegSide.CREDIT, "1.0", eth),
+                leg(GroupLegSide.DEBIT, "1.0", eth),
+                leg(GroupLegSide.CREDIT, "1.0", eth),
             )
-        assertNull(groupTradeLegs(rows, config).single().assemble(config))
+        assertNull(groupTradeLegs(rows, 0, config).single().assemble(trade))
     }
 
     @Test
@@ -196,26 +208,26 @@ class CsvTradeGroupsTest {
         // Binance writes vanishing amounts as "0E-8"; a group of nothing but those is not a trade.
         val rows =
             listOf(
-                leg(TradeLegSide.DEBIT, "0E-8", eth),
-                leg(TradeLegSide.CREDIT, "0E-8", btc),
+                leg(GroupLegSide.DEBIT, "0E-8", eth),
+                leg(GroupLegSide.CREDIT, "0E-8", btc),
             )
-        assertNull(groupTradeLegs(rows, config).single().assemble(config))
+        assertNull(groupTradeLegs(rows, 0, config).single().assemble(trade))
     }
 
     @Test
     fun legsDisagreeingAboutTheOwnerAccountDoNotAssemble() {
         val rows =
             listOf(
-                leg(TradeLegSide.DEBIT, "1.0", eth, owner = binance),
-                leg(TradeLegSide.CREDIT, "0.03", btc, owner = AccountId(99)),
+                leg(GroupLegSide.DEBIT, "1.0", eth, owner = binance),
+                leg(GroupLegSide.CREDIT, "0.03", btc, owner = AccountId(99)),
             )
-        assertNull(groupTradeLegs(rows, config).single().assemble(config))
+        assertNull(groupTradeLegs(rows, 0, config).single().assemble(trade))
     }
 
     @Test
     fun rowsThatAreNotTradeLegsAreIgnoredEntirely() {
-        val rows = listOf(nonLeg(), leg(TradeLegSide.DEBIT, "1.0", eth), leg(TradeLegSide.CREDIT, "0.03", btc), nonLeg())
-        val group = groupTradeLegs(rows, config).single()
+        val rows = listOf(nonLeg(), leg(GroupLegSide.DEBIT, "1.0", eth), leg(GroupLegSide.CREDIT, "0.03", btc), nonLeg())
+        val group = groupTradeLegs(rows, 0, config).single()
         assertEquals(2, group.rows.size, "fee and other rows stay out of the group and import as transfers")
     }
 
@@ -225,12 +237,12 @@ class CsvTradeGroupsTest {
         // compares a non-negative absolute time difference against it, so nothing would ever match and
         // already-recorded trades would be booked a second time. Null is how you turn it off.
         assertFailsWith<IllegalArgumentException> { config.copy(reconcileWindowSeconds = -1) }
-        assertFailsWith<IllegalArgumentException> { config.copy(groupingWindowSeconds = -1) }
+        assertFailsWith<IllegalArgumentException> { config.copy(windowSeconds = -1) }
         assertEquals(null, config.copy(reconcileWindowSeconds = null).reconcileWindowSeconds)
     }
 
     @Test
     fun noLegsMeansNoGroups() {
-        assertEquals(emptyList(), groupTradeLegs(listOf(nonLeg(), nonLeg()), config))
+        assertEquals(emptyList(), groupTradeLegs(listOf(nonLeg(), nonLeg()), 0, config))
     }
 }

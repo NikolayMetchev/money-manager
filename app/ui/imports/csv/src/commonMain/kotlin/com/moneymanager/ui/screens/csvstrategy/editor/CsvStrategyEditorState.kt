@@ -110,9 +110,15 @@ internal class CsvStrategyEditorState(
 
     // A new strategy defaults to a signed amount (positive = money in): most bank statements are.
     var direction: Direction by mutableStateOf(amountMapping?.direction ?: Direction.AmountSign())
-    var feeColumnName by mutableStateOf(amountMapping?.feeColumnName.takeIfPresentIn(availableColumnNames))
-    var feeConditions by
-        mutableStateOf(if (feeColumnName == null) emptyList() else amountMapping?.feeConditions.keepPresentIn(availableColumnNames))
+
+    // A fee whose amount column the file lacks can't be read, so it is dropped; so are conditions on
+    // columns the file lacks.
+    var fee by mutableStateOf(
+        amountMapping
+            ?.fee
+            ?.takeIf { it.amount.primaryPath in availableColumnNames }
+            ?.let { it.copy(conditions = it.conditions.keepPresentIn(availableColumnNames)) },
+    )
 
     private val sourceMapping = config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
 
@@ -188,13 +194,8 @@ internal class CsvStrategyEditorState(
 
     // Carried through verbatim (like content-match/companion rules): its column references may name
     // columns absent from the uploaded sample, but dropping them would corrupt the strategy.
-    // Edited via ConversionConfigEditor (Advanced tab); null when the source has no such conversions.
-    var conversionConfig by mutableStateOf(config?.conversionConfig)
-
-    // Carried through verbatim, like conversionConfig above, but with no editor of its own yet: row-group
-    // trade assembly is configured only by built-in strategies. Held here so editing such a strategy in
-    // the UI round-trips it instead of silently dropping the trades it assembles.
-    val tradeGroupConfig = config?.tradeGroupConfig
+    // Edited via LegGroupsEditor (Advanced tab).
+    var legGroups by mutableStateOf(config?.legGroups.orEmpty())
 
     // Blank = an ordinary strategy; non-blank = a reconciliation source importing into shadow accounts.
     var reconciliationSourceName by mutableStateOf(config?.reconciliation?.sourceName.orEmpty())
@@ -214,7 +215,6 @@ internal class CsvStrategyEditorState(
             ?.filter { it in availableColumnNames }
             .orEmpty()
     val assetSuffixesToStrip = config?.assetCodes?.stripSuffixes.orEmpty()
-    val feeCurrency = amountMapping?.feeCurrency
 
     // Initial primary column, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialDescriptionColumnName: String? = descriptionColumnName
@@ -234,7 +234,7 @@ internal class CsvStrategyEditorState(
             }
 
     private val feeValid: Boolean
-        get() = feeColumnName == null || feeConditions.all { it.isComplete() }
+        get() = fee.isComplete()
 
     // A funding match is opt-in: valid when no column is chosen, otherwise its attribute type must be set.
     private val fundingMatchValid: Boolean
@@ -256,20 +256,8 @@ internal class CsvStrategyEditorState(
     private val contentMatchValid: Boolean
         get() = contentMatchRules.all { it.isComplete() }
 
-    // A conversion config is opt-in: valid when absent, otherwise its required scalars must be set, at
-    // least one of name/rules must resolve, and every routing rule must be fully specified.
-    private val conversionConfigValid: Boolean
-        get() =
-            conversionConfig?.let { c ->
-                c.signalColumn.isNotBlank() &&
-                    c.debitPattern.isNotBlank() &&
-                    c.creditPattern.isNotBlank() &&
-                    c.relationshipTypeName.isNotBlank() &&
-                    (!c.conversionAccountName.isNullOrBlank() || c.conversionAccountRules.isNotEmpty()) &&
-                    c.conversionAccountRules.all {
-                        it.column.isNotBlank() && it.pattern.isNotBlank() && it.accountName.isNotBlank()
-                    }
-            } ?: true
+    private val legGroupsValid: Boolean
+        get() = legGroups.all { it.isComplete() }
 
     private val currencyValid: Boolean
         get() =
@@ -314,7 +302,7 @@ internal class CsvStrategyEditorState(
                 !companionRulesValid ||
                 !fundingMatchValid ||
                 !contentMatchValid ||
-                !conversionConfigValid
+                !legGroupsValid
 
     fun tabHasError(tab: EditorTab): Boolean =
         when (tab) {
@@ -341,7 +329,7 @@ internal class CsvStrategyEditorState(
                 companionRulesValid &&
                 fundingMatchValid &&
                 contentMatchValid &&
-                conversionConfigValid &&
+                legGroupsValid &&
                 currencyValid &&
                 timezoneValid
 }
