@@ -24,6 +24,7 @@ kotlin {
         }
         getByName("androidMain") {
             dependencies {
+                api(projects.app.model.rules)
                 api(libs.androidx.compose.foundation.layout)
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
@@ -48,6 +49,7 @@ kotlin {
                 api(projects.app.model.csv)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.repository.read)
+                api(projects.app.model.rules)
                 api(projects.app.model.timeline)
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)

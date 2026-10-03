@@ -38,20 +38,6 @@ import com.moneymanager.domain.model.rules.isStructural
 import com.moneymanager.domain.model.rules.operand
 import com.moneymanager.domain.model.rules.withOp
 
-/**
- * How a strategy editor lets the user pick a [Condition.path]: a CSV editor offers its columns, an API
- * editor a JSON dot-path field. [label] is the field's label, [isError] flags a missing required value.
- */
-fun interface ConditionPathField {
-    @Composable
-    fun Field(
-        label: String,
-        value: String,
-        onValueChange: (String) -> Unit,
-        isError: Boolean,
-    )
-}
-
 /** The ops a flat row of columns supports — everything but the JSON-structure ops. */
 val FLAT_CONDITION_OPS: List<ConditionOp> = ConditionOp.entries.filterNot { it.isStructural }
 

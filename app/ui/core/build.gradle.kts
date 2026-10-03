@@ -140,6 +140,7 @@ kotlin {
                 implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.csv)
                 implementation(projects.app.model.repository.write)
+                implementation(projects.app.model.rules)
                 implementation(projects.app.qifimporter)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.credentialvault)
@@ -183,12 +184,19 @@ kotlin {
                 implementation(projects.app.importer)
                 implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.repository.write)
+                implementation(projects.app.model.rules)
                 implementation(projects.test.app.db)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.credentialvault)
                 implementation(libs.androidx.compose.runtime)
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+
+        getByName("androidDeviceTest") {
+            dependencies {
+                implementation(projects.app.model.rules)
             }
         }
     }

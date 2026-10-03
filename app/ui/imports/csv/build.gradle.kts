@@ -48,6 +48,7 @@ kotlin {
                 implementation(projects.app.db.read)
                 implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.passthrough)
+                implementation(projects.app.model.rules)
                 implementation(libs.androidx.compose.animation)
                 implementation(libs.androidx.compose.animation.core)
                 implementation(libs.androidx.compose.foundation)
@@ -79,6 +80,7 @@ kotlin {
                 implementation(projects.app.model.accountmapping)
                 implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.passthrough)
+                implementation(projects.app.model.rules)
                 implementation(projects.app.model.timeline)
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.animation.desktop)
@@ -95,6 +97,7 @@ kotlin {
         getByName("jvmTest") {
             dependencies {
                 implementation(projects.app.model.importdirectory)
+                implementation(projects.app.model.rules)
                 implementation(kotlin("test"))
                 implementation(compose.desktop.currentOs)
                 implementation(libs.compose.ui.test.desktop)
@@ -103,6 +106,7 @@ kotlin {
         getByName("androidDeviceTest") {
             dependencies {
                 implementation(projects.app.model.importdirectory)
+                implementation(projects.app.model.rules)
                 implementation(projects.app.strategies)
                 implementation(projects.test.app.ui)
                 implementation(libs.androidx.compose.ui.test)
@@ -111,6 +115,7 @@ kotlin {
 
         getByName("androidHostTest") {
             dependencies {
+                implementation(projects.app.model.rules)
                 implementation(projects.app.strategies)
             }
         }
