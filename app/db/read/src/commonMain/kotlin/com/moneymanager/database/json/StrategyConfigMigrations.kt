@@ -27,9 +27,9 @@ internal fun interface ConfigMigrationStep {
 internal object StrategyConfigMigrations {
     const val VERSION_KEY = "configVersion"
 
-    private val csvSteps: List<ConfigMigrationStep> = emptyList()
+    private val csvSteps: List<ConfigMigrationStep> = listOf(csvSharedRulesStep)
 
-    private val apiSteps: List<ConfigMigrationStep> = emptyList()
+    private val apiSteps: List<ConfigMigrationStep> = listOf(apiSharedRulesStep)
 
     val currentCsvVersion: Int get() = csvSteps.size
 

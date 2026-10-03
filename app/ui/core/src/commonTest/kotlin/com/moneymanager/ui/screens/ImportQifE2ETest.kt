@@ -30,6 +30,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifColumns
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.qif.QifParser
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.test.database.createAccount
@@ -101,7 +102,7 @@ class ImportQifE2ETest {
                                     dateFormat = "dd/MM/yyyy",
                                 ),
                             TransferField.DESCRIPTION to
-                                DirectColumnMapping(TransferField.DESCRIPTION, QifColumns.COL_PAYEE),
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf(QifColumns.COL_PAYEE))),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,

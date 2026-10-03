@@ -19,11 +19,12 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
-import com.moneymanager.domain.model.csvstrategy.RowCondition
-import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.AssetCodeRules
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
 
 /**
@@ -78,26 +79,6 @@ internal fun LeafAccountKind.label(): String =
         LeafAccountKind.TEMPLATE -> "Template"
     }
 
-internal fun RowConditionOperator.label(): String =
-    when (this) {
-        RowConditionOperator.EQUALS_VALUE -> "equals value"
-        RowConditionOperator.EQUALS_COLUMN -> "equals column"
-        RowConditionOperator.NOT_EQUALS_COLUMN -> "not equals column"
-        RowConditionOperator.IS_BLANK -> "is blank"
-        RowConditionOperator.IS_NOT_BLANK -> "is not blank"
-    }
-
-/**
- * Whether a condition has all the inputs its operator requires.
- */
-internal fun RowCondition.isComplete(): Boolean =
-    columnName.isNotBlank() &&
-        when (operator) {
-            RowConditionOperator.EQUALS_VALUE -> !value.isNullOrBlank()
-            RowConditionOperator.EQUALS_COLUMN, RowConditionOperator.NOT_EQUALS_COLUMN -> !otherColumnName.isNullOrBlank()
-            RowConditionOperator.IS_BLANK, RowConditionOperator.IS_NOT_BLANK -> true
-        }
-
 /**
  * Whether a conditional-branch account mapping is fully specified.
  */
@@ -143,8 +124,8 @@ internal fun attributeCandidateColumns(
 internal fun String?.takeIfPresentIn(columns: Set<String>): String? = this?.takeIf { it in columns }
 
 /** Drops conditions referencing columns absent from the uploaded CSV. */
-internal fun List<RowCondition>?.keepPresentIn(columns: Set<String>): List<RowCondition> =
-    this.orEmpty().filter { it.columnName in columns && (it.otherColumnName == null || it.otherColumnName in columns) }
+internal fun List<Condition>?.keepPresentIn(columns: Set<String>): List<Condition> =
+    this.orEmpty().filter { it.path in columns && (it.otherPath == null || it.otherPath in columns) }
 
 /**
  * Clears column references on a conditional branch's leaf mapping when those columns no longer exist,
@@ -272,9 +253,11 @@ internal fun buildStrategyFromEditorState(
                 TransferField.DESCRIPTION,
                 DirectColumnMapping(
                     fieldType = TransferField.DESCRIPTION,
-                    columnName = state.descriptionColumnName!!,
-                    fallbackColumns = state.descriptionFallbackColumns,
-                    extraction = state.descriptionExtraction,
+                    value =
+                        ValueExpr(
+                            listOf(state.descriptionColumnName!!) + state.descriptionFallbackColumns,
+                            extraction = state.descriptionExtraction,
+                        ),
                 ),
             )
             // The two amount modes are mutually exclusive, so only the chosen mode's columns are
@@ -292,8 +275,7 @@ internal fun buildStrategyFromEditorState(
                     flipAccountsOnPositive = state.flipAccountsOnPositive,
                     feeColumnName = state.feeColumnName,
                     feeConditions = if (state.feeColumnName != null) state.feeConditions else emptyList(),
-                    feeCurrencyColumnName = state.feeCurrencyColumnName.takeIf { state.feeColumnName != null },
-                    feeCurrencyExtraction = state.feeCurrencyExtraction.takeIf { state.feeColumnName != null },
+                    feeCurrency = state.feeCurrency.takeIf { state.feeColumnName != null },
                 ),
             )
             put(
@@ -307,8 +289,7 @@ internal fun buildStrategyFromEditorState(
                     CurrencyMode.FROM_COLUMN ->
                         CurrencyLookupMapping(
                             fieldType = TransferField.CURRENCY,
-                            columnName = state.currencyColumnName!!,
-                            extraction = state.currencyExtraction,
+                            value = ValueExpr(listOf(state.currencyColumnName!!), extraction = state.currencyExtraction),
                         )
                 },
             )
@@ -353,7 +334,7 @@ internal fun buildStrategyFromEditorState(
                     state.reconciliationSourceName.trim().takeIf { it.isNotEmpty() }?.let { source ->
                         ReconciliationConfig(source, state.reconciliationLinkablePrefix.takeIf { it.isNotEmpty() })
                     },
-                assetAliases = parseAssetAliases(state.assetAliasesText),
+                assetCodes = AssetCodeRules(aliases = parseAssetAliases(state.assetAliasesText)),
             ),
         worksheetName = state.worksheetName,
         createdAt = createdAt,

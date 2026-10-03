@@ -1027,20 +1027,10 @@ suspend fun importApiSessionExchange(
         }
     }
 
-    // Normalize legacy/provider-specific asset codes (e.g. Kraken "XXBT" -> "BTC") before any
-    // currency/crypto lookup, so an aliased code and its canonical form always resolve to one asset.
-    val aliases = strategy.config.assetAliases.mapKeys { it.key.uppercase() }
-
-    // Strip a suffix that marks a sub-holding of the same asset (e.g. Kraken's Earn positions
-    // "XETH.F"/"XETH.S") before alias/currency lookup — otherwise the suffixed code fails resolution
-    // and the item is silently dropped.
-    fun stripAssetSuffix(code: String): String =
-        strategy.config.assetSuffixesToStrip
-            .firstOrNull { code.endsWith(it, ignoreCase = true) }
-            ?.let { code.dropLast(it.length) }
-            ?: code
-
-    fun canonicalAsset(code: String): String = stripAssetSuffix(code).let { aliases[it.uppercase()] ?: it }
+    // Normalize provider-specific asset codes before any currency/crypto lookup — strip a sub-holding
+    // suffix (Kraken Earn "XETH.F" -> "XETH"), then alias legacy codes ("XXBT" -> "BTC") — so every
+    // form of one asset resolves to it instead of failing resolution and silently dropping the item.
+    fun canonicalAsset(code: String): String = strategy.config.assetCodes.canonical(code)
     val ledgerReconciled = reconcileTradesAgainstLedger(parsed.trades, parsed.ledgerTradeLegs, ::canonicalAsset)
     val trades = ledgerReconciled.trades
     // Enrichment endpoints (e.g. Kraken DepositStatus/WithdrawStatus) supply on-chain address/network/
@@ -1542,7 +1532,7 @@ private fun parseTrade(
     jsonPath: String,
     windowStart: Instant?,
 ): ParsedTrade? {
-    if (!tm.itemFilters.all { obj.evaluatePredicate(it) }) return null
+    if (!obj.matchesAll(tm.itemFilters)) return null
     val (baseCode, quoteCode) =
         if (tm.splitMode == InstrumentSplitMode.EXPLICIT_FIELDS) {
             // A constant asset stands in where the row never names it (Binance dust always credits BNB).
@@ -1624,7 +1614,7 @@ private fun parseExchangeTransfer(
     windowStart: Instant? = null,
     windowEnd: Instant? = null,
 ): List<ParsedExchangeTransfer> {
-    if (!tm.itemFilters.all { obj.evaluatePredicate(it) }) return emptyList()
+    if (!obj.matchesAll(tm.itemFilters)) return emptyList()
     val currency = obj.str(tm.currencyField) ?: return emptyList()
     val rawTimestamp = obj.str(tm.timestampField)
     val timestamp =
@@ -1637,8 +1627,7 @@ private fun parseExchangeTransfer(
             ?.joinToString("-")
             ?: obj.str(tm.idField)
             ?: return emptyList()
-    val excludeField = tm.excludeField
-    val excluded = excludeField != null && obj.str(excludeField) in tm.excludeValues
+    val excluded = tm.excludeWhen.isNotEmpty() && obj.matchesAll(tm.excludeWhen)
     val rawAmount = obj.str(tm.amountField)?.let { runCatching { BigDecimal(it) }.getOrNull() }
 
     val result = mutableListOf<ParsedExchangeTransfer>()

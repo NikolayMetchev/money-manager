@@ -482,9 +482,7 @@ class CsvStrategyExportService(
             is DirectColumnExport ->
                 DirectColumnMapping(
                     fieldType = fieldType,
-                    columnName = columnName,
-                    fallbackColumns = fallbackColumns,
-                    extraction = extraction,
+                    value = value,
                 )
             is AmountParsingExport ->
                 AmountParsingMapping(
@@ -497,8 +495,7 @@ class CsvStrategyExportService(
                     flipAccountsOnPositive = flipAccountsOnPositive,
                     feeColumnName = feeColumnName,
                     feeConditions = feeConditions,
-                    feeCurrencyColumnName = feeCurrencyColumnName,
-                    feeCurrencyExtraction = feeCurrencyExtraction,
+                    feeCurrency = feeCurrency,
                 )
             is HardCodedCurrencyExport ->
                 HardCodedCurrencyMapping(
@@ -510,8 +507,7 @@ class CsvStrategyExportService(
             is CurrencyLookupExport ->
                 CurrencyLookupMapping(
                     fieldType = fieldType,
-                    columnName = columnName,
-                    extraction = extraction,
+                    value = value,
                 )
             is HardCodedTimezoneExport ->
                 HardCodedTimezoneMapping(

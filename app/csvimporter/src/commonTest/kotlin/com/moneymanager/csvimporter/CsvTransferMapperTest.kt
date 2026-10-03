@@ -32,6 +32,7 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.PassThroughRule
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.PassThroughDetector
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
@@ -101,10 +102,7 @@ class CsvTransferMapperTest {
                                     dateFormat = "dd/MM/yyyy",
                                 ),
                             TransferField.DESCRIPTION to
-                                DirectColumnMapping(
-                                    fieldType = TransferField.DESCRIPTION,
-                                    columnName = "Description",
-                                ),
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,
@@ -577,10 +575,7 @@ class CsvTransferMapperTest {
                                         dateFormat = "dd/MM/yyyy",
                                     ),
                                 TransferField.DESCRIPTION to
-                                    DirectColumnMapping(
-                                        fieldType = TransferField.DESCRIPTION,
-                                        columnName = "Description",
-                                    ),
+                                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                                 TransferField.AMOUNT to
                                     AmountParsingMapping(
                                         fieldType = TransferField.AMOUNT,
@@ -588,10 +583,7 @@ class CsvTransferMapperTest {
                                         amountColumnName = "Amount",
                                     ),
                                 TransferField.CURRENCY to
-                                    CurrencyLookupMapping(
-                                        fieldType = TransferField.CURRENCY,
-                                        columnName = "Currency",
-                                    ),
+                                    CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Currency"))),
                             ),
                     ),
                 createdAt = now,
@@ -655,10 +647,7 @@ class CsvTransferMapperTest {
                                         dateFormat = "dd/MM/yyyy",
                                     ),
                                 TransferField.DESCRIPTION to
-                                    DirectColumnMapping(
-                                        fieldType = TransferField.DESCRIPTION,
-                                        columnName = "Description",
-                                    ),
+                                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                                 TransferField.AMOUNT to
                                     AmountParsingMapping(
                                         fieldType = TransferField.AMOUNT,
@@ -666,10 +655,7 @@ class CsvTransferMapperTest {
                                         amountColumnName = "Amount",
                                     ),
                                 TransferField.CURRENCY to
-                                    CurrencyLookupMapping(
-                                        fieldType = TransferField.CURRENCY,
-                                        columnName = "Currency",
-                                    ),
+                                    CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Currency"))),
                             ),
                     ),
                 createdAt = now,
@@ -723,10 +709,7 @@ class CsvTransferMapperTest {
                                         dateFormat = "dd/MM/yyyy",
                                     ),
                                 TransferField.DESCRIPTION to
-                                    DirectColumnMapping(
-                                        fieldType = TransferField.DESCRIPTION,
-                                        columnName = "Description",
-                                    ),
+                                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                                 TransferField.AMOUNT to
                                     AmountParsingMapping(
                                         fieldType = TransferField.AMOUNT,
@@ -807,10 +790,7 @@ class CsvTransferMapperTest {
                                         dateFormat = "dd/MM/yyyy",
                                     ),
                                 TransferField.DESCRIPTION to
-                                    DirectColumnMapping(
-                                        fieldType = TransferField.DESCRIPTION,
-                                        columnName = "Description",
-                                    ),
+                                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                                 TransferField.AMOUNT to
                                     AmountParsingMapping(
                                         fieldType = TransferField.AMOUNT,
@@ -887,10 +867,7 @@ class CsvTransferMapperTest {
                                         dateFormat = "dd/MM/yyyy",
                                     ),
                                 TransferField.DESCRIPTION to
-                                    DirectColumnMapping(
-                                        fieldType = TransferField.DESCRIPTION,
-                                        columnName = "Description",
-                                    ),
+                                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                                 TransferField.AMOUNT to
                                     AmountParsingMapping(
                                         fieldType = TransferField.AMOUNT,
@@ -1002,10 +979,7 @@ class CsvTransferMapperTest {
                                     dateFormat = "dd/MM/yyyy",
                                 ),
                             TransferField.DESCRIPTION to
-                                DirectColumnMapping(
-                                    fieldType = TransferField.DESCRIPTION,
-                                    columnName = "Description",
-                                ),
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,
@@ -1212,10 +1186,7 @@ class CsvTransferMapperTest {
                                     dateFormat = "dd/MM/yyyy",
                                 ),
                             TransferField.DESCRIPTION to
-                                DirectColumnMapping(
-                                    fieldType = TransferField.DESCRIPTION,
-                                    columnName = "Description",
-                                ),
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,

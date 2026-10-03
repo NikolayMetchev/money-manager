@@ -9,6 +9,7 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.model.core)
+                api(projects.app.model.rules)
             }
         }
 

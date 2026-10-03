@@ -95,8 +95,8 @@ internal fun AdvancedTab(
         )
         StringMapEditor(
             label = "Aliases (raw code -> canonical code)",
-            entries = state.config.assetAliases,
-            onChange = { v -> state.updateConfig { copy(assetAliases = v) } },
+            entries = state.config.assetCodes.aliases,
+            onChange = { v -> state.updateConfig { copy(assetCodes = assetCodes.copy(aliases = v)) } },
             keyLabel = "Raw code",
             valueLabel = "Canonical code",
             enabled = enabled,
@@ -110,8 +110,8 @@ internal fun AdvancedTab(
         )
         StringSetEditor(
             label = "Suffixes to strip",
-            values = state.config.assetSuffixesToStrip,
-            onChange = { v -> state.updateConfig { copy(assetSuffixesToStrip = v) } },
+            values = state.config.assetCodes.stripSuffixes,
+            onChange = { v -> state.updateConfig { copy(assetCodes = assetCodes.copy(stripSuffixes = v)) } },
             enabled = enabled,
         )
 

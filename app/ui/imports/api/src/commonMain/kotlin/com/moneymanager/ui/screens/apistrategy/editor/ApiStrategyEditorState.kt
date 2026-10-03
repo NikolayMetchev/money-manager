@@ -15,8 +15,8 @@ import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.domain.model.apistrategy.PredicateOp
 import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.model.rules.isComplete
 import kotlin.time.Instant
 
 /** Tabs of the API strategy editor screen. */
@@ -31,14 +31,6 @@ internal enum class EditorTab(
     RULES("Rules"),
     ADVANCED("Advanced"),
 }
-
-/** Whether `op` requires a [com.moneymanager.domain.model.apistrategy.RulePredicate.value] operand. */
-internal fun PredicateOp.requiresValue(): Boolean =
-    when (this) {
-        PredicateOp.EQUALS, PredicateOp.EQUALS_IGNORE_CASE, PredicateOp.STARTS_WITH, PredicateOp.ARRAY_ANY_STARTS_WITH -> true
-        PredicateOp.NOT_EQUALS, PredicateOp.IN -> true
-        PredicateOp.EXISTS, PredicateOp.OBJECT_EMPTY, PredicateOp.OBJECT_NON_EMPTY -> false
-    }
 
 private val DEFAULT_ACCOUNTS_ENDPOINT = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts")
 private val DEFAULT_TRANSACTIONS_ENDPOINT =
@@ -133,7 +125,7 @@ internal class ApiStrategyEditorState(
         get() =
             config.builtInCounterpartyRules.any { rule ->
                 rule.name.isBlank() ||
-                    rule.predicates.any { it.path.isBlank() || (it.op.requiresValue() && it.value.isNullOrBlank()) }
+                    rule.predicates.any { !it.isComplete() }
             }
 
     fun tabHasError(tab: EditorTab): Boolean =

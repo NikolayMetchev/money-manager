@@ -28,6 +28,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -112,10 +113,7 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                                     dateFormat = "dd/MM/yyyy",
                                 ),
                             TransferField.DESCRIPTION to
-                                DirectColumnMapping(
-                                    fieldType = TransferField.DESCRIPTION,
-                                    columnName = "Description",
-                                ),
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,

@@ -31,8 +31,8 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
-import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
+import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
@@ -270,8 +270,8 @@ internal fun LeafAccountMappingEditor(
  */
 @Composable
 internal fun ConditionalAccountMappingEditor(
-    conditions: List<RowCondition>,
-    onConditionsChanged: (List<RowCondition>) -> Unit,
+    conditions: List<Condition>,
+    onConditionsChanged: (List<Condition>) -> Unit,
     whenTrue: FieldMapping,
     onWhenTrueChanged: (FieldMapping) -> Unit,
     whenFalse: FieldMapping,

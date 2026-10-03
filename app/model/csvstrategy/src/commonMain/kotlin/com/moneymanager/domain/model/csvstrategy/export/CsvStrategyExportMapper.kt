@@ -104,9 +104,7 @@ object CsvStrategyExportMapper {
             is DirectColumnMapping ->
                 DirectColumnExport(
                     fieldType = fieldType,
-                    columnName = columnName,
-                    fallbackColumns = fallbackColumns,
-                    extraction = extraction,
+                    value = value,
                 )
             is AmountParsingMapping ->
                 AmountParsingExport(
@@ -119,8 +117,7 @@ object CsvStrategyExportMapper {
                     flipAccountsOnPositive = flipAccountsOnPositive,
                     feeColumnName = feeColumnName,
                     feeConditions = feeConditions,
-                    feeCurrencyColumnName = feeCurrencyColumnName,
-                    feeCurrencyExtraction = feeCurrencyExtraction,
+                    feeCurrency = feeCurrency,
                 )
             is HardCodedCurrencyMapping ->
                 HardCodedCurrencyExport(
@@ -130,8 +127,7 @@ object CsvStrategyExportMapper {
             is CurrencyLookupMapping ->
                 CurrencyLookupExport(
                     fieldType = fieldType,
-                    columnName = columnName,
-                    extraction = extraction,
+                    value = value,
                 )
             is HardCodedTimezoneMapping ->
                 HardCodedTimezoneExport(

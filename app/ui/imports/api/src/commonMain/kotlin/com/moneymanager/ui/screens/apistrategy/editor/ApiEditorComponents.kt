@@ -50,6 +50,7 @@ import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
+import com.moneymanager.ui.components.rules.ConditionPathField
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Requests the JSON-path picker dialog over `paths`, routing the chosen path to `setter`. */
@@ -942,3 +943,10 @@ internal fun JsonNodePickerDialog(
         confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+/** Picks a condition's JSON dot-path, offering [paths] from the loaded sample like any other path field. */
+internal fun jsonPathField(
+    paths: List<JsonPathEntry>,
+    onRequestPick: PathPicker,
+    enabled: Boolean,
+) = ConditionPathField { label, value, onValueChange, _ -> PathFieldRow(label, value, onValueChange, paths, onRequestPick, enabled) }

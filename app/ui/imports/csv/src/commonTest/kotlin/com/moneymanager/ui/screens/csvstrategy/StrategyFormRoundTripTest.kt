@@ -10,11 +10,9 @@ import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
-import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
-import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
 import com.moneymanager.domain.model.csvstrategy.ConversionAccountRule
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -25,11 +23,13 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
-import com.moneymanager.domain.model.csvstrategy.RowCondition
-import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorState
 import com.moneymanager.ui.screens.csvstrategy.editor.buildStrategyFromEditorState
 import kotlin.test.Test
@@ -80,12 +80,8 @@ class StrategyFormRoundTripTest {
                                     fieldType = TransferField.TARGET_ACCOUNT,
                                     conditions =
                                         listOf(
-                                            RowCondition(
-                                                "Source name",
-                                                RowConditionOperator.EQUALS_COLUMN,
-                                                otherColumnName = "Target name",
-                                            ),
-                                            RowCondition("Source name", RowConditionOperator.IS_NOT_BLANK),
+                                            Condition("Source name", ConditionOp.EQUALS_PATH, otherPath = "Target name"),
+                                            Condition("Source name", ConditionOp.NOT_BLANK),
                                         ),
                                     whenTrue =
                                         TemplateAccountMapping(
@@ -108,17 +104,17 @@ class StrategyFormRoundTripTest {
                                     dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
                                 ),
                             TransferField.DESCRIPTION to
-                                DirectColumnMapping(TransferField.DESCRIPTION, "Reference"),
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Reference"))),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,
                                     mode = AmountMode.SINGLE_COLUMN,
                                     amountColumnName = "Source amount (after fees)",
                                     feeColumnName = "Source fee amount",
-                                    feeConditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "OUT")),
+                                    feeConditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
                                 ),
                             TransferField.CURRENCY to
-                                CurrencyLookupMapping(TransferField.CURRENCY, "Source currency"),
+                                CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Source currency"))),
                             TransferField.TIMEZONE to
                                 HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                         ),
@@ -127,7 +123,7 @@ class StrategyFormRoundTripTest {
                     rowPreprocessingRules =
                         listOf(
                             RowPreprocessingRule(
-                                conditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "IN")),
+                                conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "IN")),
                                 columnSwaps =
                                     listOf(
                                         ColumnPairSwap("Source name", "Target name"),
@@ -198,7 +194,7 @@ class StrategyFormRoundTripTest {
                                         dateFormat = "yyyy-MM-dd",
                                     ),
                                 TransferField.DESCRIPTION to
-                                    DirectColumnMapping(TransferField.DESCRIPTION, "Reference"),
+                                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Reference"))),
                                 TransferField.AMOUNT to
                                     AmountParsingMapping(
                                         fieldType = TransferField.AMOUNT,
@@ -206,7 +202,7 @@ class StrategyFormRoundTripTest {
                                         amountColumnName = "Source amount (after fees)",
                                     ),
                                 TransferField.CURRENCY to
-                                    CurrencyLookupMapping(TransferField.CURRENCY, "Source currency"),
+                                    CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Source currency"))),
                                 TransferField.TIMEZONE to
                                     HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                             ),
@@ -236,8 +232,8 @@ class StrategyFormRoundTripTest {
                     advancedStrategy().config.copy(
                         contentMatchRules =
                             listOf(
-                                ContentMatchRule(columnName = "Direction", pattern = "OUT"),
-                                ContentMatchRule(columnName = "Reference", pattern = "CRV\\*"),
+                                Condition("Direction", ConditionOp.MATCHES, "OUT"),
+                                Condition("Reference", ConditionOp.MATCHES, "CRV\\*"),
                             ),
                         crossSourceReconcileWindowSeconds = 120,
                         conversionConfig =
@@ -319,8 +315,11 @@ class StrategyFormRoundTripTest {
                                     TransferField.DESCRIPTION to
                                         DirectColumnMapping(
                                             fieldType = TransferField.DESCRIPTION,
-                                            columnName = "Reference",
-                                            extraction = ColumnExtraction(pattern = "^(.*?),\\s*[0-9.]+$", outputTemplate = "$1"),
+                                            value =
+                                                ValueExpr(
+                                                    listOf("Reference"),
+                                                    extraction = Extraction(pattern = "^(.*?),\\s*[0-9.]+$", outputTemplate = "$1"),
+                                                ),
                                         ),
                                     TransferField.AMOUNT to
                                         AmountParsingMapping(
@@ -346,7 +345,7 @@ class StrategyFormRoundTripTest {
         // template, which is why the model's own `outputTemplate` default is written `"$0"`.
         val description = rebuilt.config.fieldMappings[TransferField.DESCRIPTION]
         assertIs<DirectColumnMapping>(description)
-        assertEquals("$1", description.extraction?.outputTemplate)
+        assertEquals("$1", description.value.extraction?.outputTemplate)
     }
 
     /** The same, for the target modes that each carry their own `defaultCategoryId`. */
@@ -459,7 +458,7 @@ class StrategyFormRoundTripTest {
 
         // The condition comparing against "Target name" is dropped; the IS_NOT_BLANK one stays.
         assertEquals(1, state.targetConditions.size)
-        assertEquals(RowConditionOperator.IS_NOT_BLANK, state.targetConditions.single().operator)
+        assertEquals(ConditionOp.NOT_BLANK, state.targetConditions.single().op)
         // The preprocessing rule referenced "Target name" in a swap, so the whole rule is dropped.
         assertEquals(emptyList(), state.rowPreprocessingRules)
         // The conditional's whenFalse branch looked up the now-missing "Target name" column, so

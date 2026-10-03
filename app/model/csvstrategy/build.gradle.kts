@@ -11,6 +11,7 @@ kotlin {
                 api(projects.app.model.accountmapping)
                 api(projects.app.model.core)
                 api(projects.app.model.qif)
+                api(projects.app.model.rules)
             }
         }
 

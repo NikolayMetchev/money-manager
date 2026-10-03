@@ -1,8 +1,10 @@
 package com.moneymanager.domain.model.csvstrategy
 
+import com.moneymanager.domain.model.rules.AssetCodeRules
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.serialization.SortedListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
-import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -28,8 +30,11 @@ import kotlinx.serialization.encoding.Encoder
  *                                 before field mappings run (see [RowPreprocessingRule])
  * @property companionTransactionRules Rules flagging imported transfers that require a manually
  *                                     entered companion transaction (see [CompanionTransactionRule])
- * @property contentMatchRules Rules that auto-detect this strategy from row content when the column
- *                             set is fixed and cannot distinguish formats (see [ContentMatchRule]).
+ * @property contentMatchRules Conditions that auto-detect this strategy from row content when the column
+ *                             set is fixed and cannot distinguish formats (e.g. QIF, where every file has
+ *                             the same columns): a sampled row content-matches when ANY of them holds. A
+ *                             strategy with none never positively content-matches and so acts as the
+ *                             fallback.
  * @property fileNamePattern Optional regex matched (case-insensitively, anywhere) against the
  *                           imported file's original name. The strongest selection signal for
  *                           sources whose exports share a column set but differ by filename
@@ -54,9 +59,9 @@ import kotlinx.serialization.encoding.Encoder
  *                            sharing a timestamp; the importer assembles each such group into a single
  *                            `trade` on the owner account (see [TradeGroupConfig]). Null when every
  *                            cross-asset movement already arrives on one row.
- * @property assetAliases Source asset code → the code Money Manager uses for the same asset, applied to
- *                        every currency column before lookup (e.g. Koinly's legacy `KNCL` → `KNC`), so the
- *                        source neither mints a duplicate asset nor fails to match. Keys are upper case.
+ * @property assetCodes How the source's asset codes map onto Money Manager's, applied to every currency
+ *                      column before lookup (e.g. Koinly's legacy `KNCL` → `KNC`), so the source neither
+ *                      mints a duplicate asset nor fails to match.
  * @property reconciliation When set, this strategy imports a reconciliation source into shadow
  *                          accounts only (see [ReconciliationConfig]). Null for ordinary strategies.
  */
@@ -73,8 +78,8 @@ data class CsvStrategyConfig<out M>(
     val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
     @Serializable(with = SortedCompanionTransactionRuleListSerializer::class)
     val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
-    @Serializable(with = SortedContentMatchRuleListSerializer::class)
-    val contentMatchRules: List<ContentMatchRule> = emptyList(),
+    @Serializable(with = SortedConditionListSerializer::class)
+    val contentMatchRules: List<Condition> = emptyList(),
     val fileNamePattern: String? = null,
     val crossSourceReconcileWindowSeconds: Long? = null,
     val conversionConfig: ConversionConfig? = null,
@@ -92,8 +97,7 @@ data class CsvStrategyConfig<out M>(
     val reconciliation: ReconciliationConfig? = null,
     // NEVER-encoded when empty, same rationale.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    @Serializable(with = SortedStringToStringMapSerializer::class)
-    val assetAliases: Map<String, String> = emptyMap(),
+    val assetCodes: AssetCodeRules = AssetCodeRules(),
 ) {
     /** This config with each field mapping replaced by [transform]'s result, everything else unchanged. */
     fun <N> mapFieldMappings(transform: (M) -> N): CsvStrategyConfig<N> =
@@ -110,7 +114,7 @@ data class CsvStrategyConfig<out M>(
             fundingAttributeMatch = fundingAttributeMatch,
             tradeGroupConfig = tradeGroupConfig,
             reconciliation = reconciliation,
-            assetAliases = assetAliases,
+            assetCodes = assetCodes,
         )
 }
 
