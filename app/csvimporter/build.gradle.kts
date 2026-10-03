@@ -38,6 +38,7 @@ kotlin {
                 api(libs.kotlinx.coroutines.core)
 
                 implementation(projects.app.model.qif)
+                implementation(projects.app.model.rules)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.parsers.csv)
                 implementation(projects.utils.parsers.qif)
@@ -51,6 +52,7 @@ kotlin {
                 api(projects.app.importfilesource.core)
                 api(libs.kotlinx.coroutines.core)
 
+                implementation(projects.app.model.rules)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.parsers.csv)
                 implementation(projects.utils.parsers.qif)
@@ -69,12 +71,14 @@ kotlin {
 
         getByName("jvmTest") {
             dependencies {
+                implementation(projects.app.model.rules)
                 implementation(projects.utils.bigdecimal)
             }
         }
 
         getByName("androidHostTest") {
             dependencies {
+                implementation(projects.app.model.rules)
                 implementation(projects.utils.bigdecimal)
             }
         }

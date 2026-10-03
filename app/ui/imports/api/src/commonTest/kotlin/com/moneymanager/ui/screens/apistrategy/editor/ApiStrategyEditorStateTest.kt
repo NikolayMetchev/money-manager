@@ -28,8 +28,6 @@ import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.NonceFormat
 import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.PaginationMode
-import com.moneymanager.domain.model.apistrategy.PredicateOp
-import com.moneymanager.domain.model.apistrategy.RulePredicate
 import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SigFieldLocation
@@ -38,6 +36,9 @@ import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
+import com.moneymanager.domain.model.rules.AssetCodeRules
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -85,8 +86,7 @@ class ApiStrategyEditorStateTest {
                             signSource = ApiSignSource.FIELD,
                             signField = "direction",
                             creditValues = setOf("CREDIT"),
-                            declineStatusField = "status",
-                            declinedStatusValues = setOf("DECLINED"),
+                            declinedWhen = listOf(Condition("status", ConditionOp.IN, value = "DECLINED")),
                             feeAmountField = "fee",
                             customFields = mapOf("note" to "reference"),
                             uniqueIdentifierFields = setOf("note"),
@@ -106,8 +106,8 @@ class ApiStrategyEditorStateTest {
                                 onlyWhenSign = RuleSign.NEGATIVE,
                                 predicates =
                                     listOf(
-                                        RulePredicate(path = "metadata.mcc", op = PredicateOp.EQUALS, value = "6011"),
-                                        RulePredicate(path = "scheme", op = PredicateOp.EXISTS),
+                                        Condition("metadata.mcc", ConditionOp.EQUALS, value = "6011"),
+                                        Condition("scheme", ConditionOp.EXISTS),
                                     ),
                             ),
                         ),
@@ -126,7 +126,7 @@ class ApiStrategyEditorStateTest {
                     rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
                     rateLimitBackoffMillis = 5_000L,
                     maxRateLimitRetries = 6,
-                    assetSuffixesToStrip = setOf(".F", ".S", ".M"),
+                    assetCodes = AssetCodeRules(aliases = mapOf("XXBT" to "BTC", "ZUSD" to "USD"), stripSuffixes = setOf(".F", ".S", ".M")),
                     minorUnitDivisorOverrides = mapOf("GBP" to 1000L),
                     // A Kraken-style recipe: exercises the recursive Sha256 SigPart nesting.
                     requestSigning =
@@ -208,7 +208,6 @@ class ApiStrategyEditorStateTest {
                             windowSeconds = 3600,
                             amountTolerancePercent = "0.5",
                         ),
-                    assetAliases = mapOf("XXBT" to "BTC", "ZUSD" to "USD"),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -250,6 +249,21 @@ class ApiStrategyEditorStateTest {
         assertTrue(state.transactionMappingsHasError)
         state.updateConfig { copy(transactionMappings = transactionMappings.copy(signField = "direction")) }
         assertFalse(state.transactionMappingsHasError)
+    }
+
+    @Test
+    fun `an incomplete exclusion or filter blocks saving`() {
+        val state = ApiStrategyEditorState(strategy = null)
+        state.name = "My API"
+        state.updateConfig { copy(baseUrl = "https://api.example.com") }
+        // A path-less "is blank" exclusion would hold for every item and exclude them all.
+        state.updateConfig { copy(transactionMappings = transactionMappings.copy(excludeWhen = listOf(Condition("", ConditionOp.BLANK)))) }
+        assertTrue(state.transactionMappingsHasError)
+        state.updateConfig { copy(transactionMappings = transactionMappings.copy(excludeWhen = emptyList())) }
+        state.updateConfig {
+            copy(transactionMappings = transactionMappings.copy(itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = ""))))
+        }
+        assertTrue(state.transactionMappingsHasError)
     }
 
     @Test

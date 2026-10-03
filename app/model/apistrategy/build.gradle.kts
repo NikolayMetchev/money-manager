@@ -9,6 +9,7 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.model.core)
+                api(projects.app.model.rules)
             }
         }
 
@@ -21,6 +22,7 @@ kotlin {
         getByName("jvmMain") {
             dependencies {
                 api(projects.app.model.core)
+                api(projects.app.model.rules)
                 api(libs.kotlinx.serialization.core)
             }
         }

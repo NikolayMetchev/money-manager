@@ -23,7 +23,6 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
-import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ConversionAccountRule
@@ -38,11 +37,14 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
-import com.moneymanager.domain.model.csvstrategy.RowCondition
-import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.ColumnRecord
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.RuleEvaluator
+import com.moneymanager.domain.model.rules.substituteTemplate
 import com.moneymanager.importengineapi.DESCRIPTION_SIMILARITY_THRESHOLD
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.StringSimilarity
@@ -329,11 +331,10 @@ class CsvTransferMapper(
 
     private val passThroughDetector: PassThroughDetector? = passThroughDetector.takeUnless { isReconciliationSource }
 
-    // Compiled once per pattern: account rules and column extractions run against every row, so
-    // compiling in place would dominate the mapping cost. Case-insensitive like all rule matching here.
-    private val patternCache = HashMap<String, Regex>()
+    // Holds the compiled-pattern cache: account rules, conditions and extractions run against every row.
+    private val rules = RuleEvaluator()
 
-    private fun compiledPattern(pattern: String): Regex = patternCache.getOrPut(pattern) { Regex(pattern, RegexOption.IGNORE_CASE) }
+    private fun compiledPattern(pattern: String): Regex = rules.regex(pattern)
 
     // Likewise for date/time formats: building a kotlinx-datetime Format compiles a parser, which is
     // far more expensive than the parse itself.
@@ -951,10 +952,10 @@ class CsvTransferMapper(
         rowCurrency: Asset,
     ): Asset? {
         val mapping = amountMapping as? AmountParsingMapping ?: return rowCurrency
-        val column = mapping.feeCurrencyColumnName ?: return rowCurrency
-        val raw = getColumnValueOrNull(column, values)?.trim()
-        if (raw.isNullOrBlank()) return rowCurrency
-        return lookupAsset(extractedOrRaw(raw, mapping.feeCurrencyExtraction))
+        val feeCurrency = mapping.feeCurrency ?: return rowCurrency
+        val code = rules.resolve(feeCurrency) { getColumnValueOrNull(it, values)?.trim() }
+        if (code.isBlank()) return rowCurrency
+        return lookupAsset(code)
     }
 
     /**
@@ -996,28 +997,9 @@ class CsvTransferMapper(
     }
 
     private fun evaluateCondition(
-        condition: RowCondition,
+        condition: Condition,
         values: List<String>,
-    ): Boolean {
-        val value = getColumnValueOrNull(condition.columnName, values)?.trim().orEmpty()
-        return when (condition.operator) {
-            RowConditionOperator.EQUALS_VALUE -> value == condition.value?.trim().orEmpty()
-            RowConditionOperator.EQUALS_COLUMN -> value == otherColumnValue(condition, values)
-            RowConditionOperator.NOT_EQUALS_COLUMN -> value != otherColumnValue(condition, values)
-            RowConditionOperator.IS_BLANK -> value.isBlank()
-            RowConditionOperator.IS_NOT_BLANK -> value.isNotBlank()
-        }
-    }
-
-    private fun otherColumnValue(
-        condition: RowCondition,
-        values: List<String>,
-    ): String {
-        val otherColumn =
-            condition.otherColumnName
-                ?: error("otherColumnName required for ${condition.operator}")
-        return getColumnValueOrNull(otherColumn, values)?.trim().orEmpty()
-    }
+    ): Boolean = rules.matches(condition, ColumnRecord(values, columnIndexByName))
 
     /**
      * Resolves a ConditionalAccountMapping to its active branch for the given row.
@@ -1282,7 +1264,7 @@ class CsvTransferMapper(
                     // capture-group substitution; otherwise use the fixed account name (legacy behaviour).
                     val accountName =
                         rule.accountNameTemplate
-                            ?.let { substituteExtractionTemplate(it, match).replace(WHITESPACE_RUN_REGEX, " ").trim() }
+                            ?.let { substituteTemplate(it, match).replace(WHITESPACE_RUN_REGEX, " ").trim() }
                             ?.takeIf { it.isNotBlank() }
                             ?: rule.accountName
                     return RegexAccountResult(
@@ -1330,7 +1312,7 @@ class CsvTransferMapper(
     ): String? {
         if (!rule.counterpartyIsPerson) return null
         return rule.personNameTemplate
-            ?.let { substituteExtractionTemplate(it, match).replace(WHITESPACE_RUN_REGEX, " ").trim() }
+            ?.let { substituteTemplate(it, match).replace(WHITESPACE_RUN_REGEX, " ").trim() }
             ?.takeIf { it.isNotBlank() }
             ?: accountName
     }
@@ -1403,23 +1385,12 @@ class CsvTransferMapper(
         }
 
     /**
-     * Gets the effective value from a DirectColumnMapping,
-     * trying the primary column first, then fallbacks in order.
-     * When an [DirectColumnMapping.extraction] is configured, the resolved value is cleaned through it
-     * (falling back to the raw value if the pattern doesn't match, so nothing is lost).
+     * The description a [DirectColumnMapping] reads (see [com.moneymanager.domain.model.rules.ValueExpr]).
      */
     private fun getDirectColumnValue(
         mapping: DirectColumnMapping,
         values: List<String>,
-    ): String {
-        val raw =
-            mapping.allColumns
-                .map { getColumnValue(it, values) }
-                .firstOrNull { it.isNotBlank() }
-                .orEmpty()
-        val extraction = mapping.extraction ?: return raw
-        return applyExtraction(raw, extraction) ?: raw
-    }
+    ): String = rules.resolve(mapping.value) { getColumnValue(it, values) }
 
     /**
      * Resolves whether the counterparty (target) account for this row is a person, returning its
@@ -1444,17 +1415,11 @@ class CsvTransferMapper(
             else -> null
         }
 
-    /**
-     * Runs [extraction]'s regex (case-insensitively) against [value] and substitutes its
-     * [ColumnExtraction.outputTemplate] from the match. Returns null when the pattern doesn't match.
-     */
+    /** [extraction] applied to [value], or null when its pattern doesn't match. */
     private fun applyExtraction(
         value: String,
-        extraction: ColumnExtraction,
-    ): String? {
-        val match = compiledPattern(extraction.pattern).find(value) ?: return null
-        return substituteExtractionTemplate(extraction.outputTemplate, match)
-    }
+        extraction: Extraction,
+    ): String? = rules.extract(value, extraction)
 
     private fun parseCurrency(
         mapping: FieldMapping,
@@ -1462,19 +1427,20 @@ class CsvTransferMapper(
     ): Asset? =
         when (mapping) {
             is HardCodedCurrencyMapping -> existingCurrencies[mapping.currencyId]
-            is CurrencyLookupMapping ->
-                lookupAsset(extractedOrRaw(getColumnValue(mapping.columnName, values).trim(), mapping.extraction))
+            is CurrencyLookupMapping -> lookupAsset(rules.resolve(mapping.value) { getColumnValue(it, values).trim() })
             else -> throw IllegalArgumentException("Invalid currency mapping type: ${mapping::class}")
         }
 
     // Fiat first; fall back to crypto so a strategy can denominate a leg in a crypto asset.
     private fun lookupAsset(code: String): Asset? =
-        strategy.config.resolveAssetCode(code).let { existingCurrenciesByCode[it] ?: existingCryptoByCode[it] }
+        strategy.config.assetCodes
+            .canonical(code)
+            .let { existingCurrenciesByCode[it] ?: existingCryptoByCode[it] }
 
     /** [value] cleaned through [extraction] when one is set and matches; otherwise [value] as-is. */
     private fun extractedOrRaw(
         value: String,
-        extraction: ColumnExtraction?,
+        extraction: Extraction?,
     ): String = extraction?.let { applyExtraction(value, it) } ?: value
 
     private fun getColumnValue(

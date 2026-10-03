@@ -3,12 +3,13 @@ package com.moneymanager.domain.model.csvstrategy.export
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.SortedAccountMappingListSerializer
 import com.moneymanager.domain.model.csvstrategy.AmountMode
-import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.RegexRule
-import com.moneymanager.domain.model.csvstrategy.RowCondition
-import com.moneymanager.domain.model.csvstrategy.SortedRowConditionListSerializer
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.SortedConditionListSerializer
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
@@ -113,18 +114,18 @@ data class TemplateAccountExport(
     val defaultCategoryName: String,
     // NEVER-encoded when null so adding it didn't rehash every existing strategy.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val extraction: ColumnExtraction? = null,
+    val extraction: Extraction? = null,
 ) : FieldMappingExport
 
 /**
  * Export format for [com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping].
- * RowCondition is already portable (no IDs).
+ * Conditions are already portable (no IDs).
  */
 @Serializable
 data class ConditionalAccountExport(
     override val fieldType: TransferField,
-    @Serializable(with = SortedRowConditionListSerializer::class)
-    val conditions: List<RowCondition>,
+    @Serializable(with = SortedConditionListSerializer::class)
+    val conditions: List<Condition>,
     val whenTrue: FieldMappingExport,
     val whenFalse: FieldMappingExport,
 ) : FieldMappingExport
@@ -151,11 +152,7 @@ data class DateTimeParsingExport(
 @Serializable
 data class DirectColumnExport(
     override val fieldType: TransferField,
-    val columnName: String,
-    // Tried in order until one yields a non-blank value - order is semantic, keeps default
-    // insertion-order serialization.
-    val fallbackColumns: List<String> = emptyList(),
-    val extraction: ColumnExtraction? = null,
+    val value: ValueExpr,
 ) : FieldMappingExport
 
 /**
@@ -172,12 +169,10 @@ data class AmountParsingExport(
     val negateValues: Boolean = false,
     val flipAccountsOnPositive: Boolean = false,
     val feeColumnName: String? = null,
-    @Serializable(with = SortedRowConditionListSerializer::class)
-    val feeConditions: List<RowCondition> = emptyList(),
+    @Serializable(with = SortedConditionListSerializer::class)
+    val feeConditions: List<Condition> = emptyList(),
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val feeCurrencyColumnName: String? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val feeCurrencyExtraction: ColumnExtraction? = null,
+    val feeCurrency: ValueExpr? = null,
 ) : FieldMappingExport
 
 /**
@@ -197,9 +192,7 @@ data class HardCodedCurrencyExport(
 @Serializable
 data class CurrencyLookupExport(
     override val fieldType: TransferField,
-    val columnName: String,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val extraction: ColumnExtraction? = null,
+    val value: ValueExpr,
 ) : FieldMappingExport
 
 /**

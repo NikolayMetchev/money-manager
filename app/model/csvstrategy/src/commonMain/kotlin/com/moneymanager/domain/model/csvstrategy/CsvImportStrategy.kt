@@ -1,27 +1,8 @@
 package com.moneymanager.domain.model.csvstrategy
 
 import com.moneymanager.domain.model.CsvImportStrategyId
-import com.moneymanager.domain.model.serialization.SortedListSerializer
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
-
-/**
- * A content-based match rule used to auto-detect a strategy from the data itself, for sources whose
- * column set is fixed and therefore cannot distinguish formats (e.g. QIF, where every file has the
- * same columns). A strategy is a content match for a file when a sampled row has a value in
- * [columnName] matching [pattern] (case-insensitively). A strategy with no content rules never
- * positively content-matches and so acts as the fallback.
- */
-@Serializable
-data class ContentMatchRule(
-    val columnName: String,
-    val pattern: String,
-) : Comparable<ContentMatchRule> {
-    override fun compareTo(other: ContentMatchRule): Int = compareValuesBy(this, other, { it.columnName }, { it.pattern })
-}
-
-/** Serializes content-match-rule lists sorted by natural order — a file matches if ANY rule hits, so list order carries no meaning. */
-object SortedContentMatchRuleListSerializer : SortedListSerializer<ContentMatchRule>(ContentMatchRule.serializer())
 
 /**
  * Selects an account by matching a CSV [column]'s value against the regex patterns held by a given

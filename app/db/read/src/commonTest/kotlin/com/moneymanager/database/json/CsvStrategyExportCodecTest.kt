@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.csvstrategy.export.HardCodedAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedCurrencyExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport
 import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -85,10 +86,7 @@ class CsvStrategyExportCodecTest {
                                         timeFormat = "HH:mm",
                                     ),
                                 TransferField.DESCRIPTION to
-                                    DirectColumnExport(
-                                        fieldType = TransferField.DESCRIPTION,
-                                        columnName = "Description",
-                                    ),
+                                    DirectColumnExport(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                                 TransferField.AMOUNT to
                                     AmountParsingExport(
                                         fieldType = TransferField.AMOUNT,

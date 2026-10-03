@@ -18,9 +18,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
-import com.moneymanager.domain.model.apistrategy.PredicateOp
-import com.moneymanager.domain.model.apistrategy.RulePredicate
 import com.moneymanager.domain.model.apistrategy.RuleSign
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.ui.components.rules.ConditionsEditor
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 @Composable
@@ -99,70 +100,14 @@ private fun RuleEditor(
         optionLabel = { it.name },
         enabled = enabled,
     )
-    Text("Predicates", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    rule.predicates.forEachIndexed { index, predicate ->
-        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), colors = CardDefaults.cardColors()) {
-            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                EditorCardHeader(
-                    title = "Predicate ${index + 1}",
-                    onRemove = { onChange(rule.copy(predicates = rule.predicates.toMutableList().also { it.removeAt(index) })) },
-                    enabled = enabled,
-                )
-                PathFieldRow(
-                    "Path",
-                    predicate.path,
-                    {
-                        onChange(
-                            rule.copy(
-                                predicates =
-                                    rule.predicates.toMutableList().also { l ->
-                                        l[index] = predicate.copy(path = it)
-                                    },
-                            ),
-                        )
-                    },
-                    txJsonPaths,
-                    onRequestPick,
-                    enabled,
-                )
-                EnumDropdown(
-                    label = "Operator",
-                    options = PredicateOp.entries,
-                    selected = predicate.op,
-                    onSelect = { op ->
-                        onChange(rule.copy(predicates = rule.predicates.toMutableList().also { it[index] = predicate.copy(op = op) }))
-                    },
-                    optionLabel = { it.name },
-                    enabled = enabled,
-                )
-                if (predicate.op.requiresValue()) {
-                    TextFieldRow(
-                        label = "Value",
-                        value = predicate.value.orEmpty(),
-                        onValueChange = { v ->
-                            onChange(
-                                rule.copy(
-                                    predicates =
-                                        rule.predicates.toMutableList().also {
-                                            it[index] =
-                                                predicate.copy(value = v.ifBlank { null })
-                                        },
-                                ),
-                            )
-                        },
-                        enabled = enabled,
-                        isError = predicate.value.isNullOrBlank(),
-                    )
-                }
-            }
-        }
-    }
-    TextButton(
-        onClick = { onChange(rule.copy(predicates = rule.predicates + RulePredicate(path = "", op = PredicateOp.EXISTS))) },
+    ConditionsEditor(
+        title = "Predicates (all must match)",
+        conditions = rule.predicates,
+        onConditionsChanged = { onChange(rule.copy(predicates = it)) },
+        pathField = jsonPathField(txJsonPaths, onRequestPick, enabled),
         enabled = enabled,
-    ) {
-        Icon(Icons.Default.Add, contentDescription = null)
-        Spacer(Modifier.width(4.dp))
-        Text("Add predicate")
-    }
+        newCondition = { Condition("", ConditionOp.EXISTS) },
+        pathLabel = "Path",
+        addLabel = "Add predicate",
+    )
 }

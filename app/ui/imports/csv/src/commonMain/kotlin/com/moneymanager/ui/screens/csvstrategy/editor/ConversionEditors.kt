@@ -28,72 +28,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
 import com.moneymanager.domain.model.csvstrategy.ConversionAccountRule
 import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
-
-/**
- * Editor for the strategy's list of [ContentMatchRule]s — content-based match rules that auto-detect
- * this strategy from a sampled row when the column set is fixed and cannot distinguish formats (QIF).
- */
-@Composable
-internal fun ContentMatchRulesEditor(
-    rules: List<ContentMatchRule>,
-    onRulesChanged: (List<ContentMatchRule>) -> Unit,
-    columns: List<CsvColumn>,
-    firstRow: CsvRow?,
-    enabled: Boolean,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        rules.forEachIndexed { index, rule ->
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            ) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    EditorCardHeader(
-                        title = "Rule ${index + 1}",
-                        removeContentDescription = "Remove content-match rule",
-                        onRemove = { onRulesChanged(rules.filterIndexed { i, _ -> i != index }) },
-                        enabled = enabled,
-                    )
-
-                    fun updateRule(transform: (ContentMatchRule) -> ContentMatchRule) {
-                        onRulesChanged(rules.mapIndexed { i, r -> if (i == index) transform(r) else r })
-                    }
-                    ColumnDropdown(
-                        columns = columns,
-                        selectedColumn = rule.columnName.takeIf { it.isNotBlank() },
-                        onColumnSelected = { selected -> updateRule { it.copy(columnName = selected) } },
-                        label = "Column",
-                        sampleValue = getSampleValue(columns, firstRow, rule.columnName),
-                        enabled = enabled,
-                        isError = rule.columnName.isBlank(),
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = rule.pattern,
-                        onValueChange = { newValue -> updateRule { it.copy(pattern = newValue) } },
-                        label = { Text("Match pattern (regex, case-insensitive)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = enabled,
-                        isError = rule.pattern.isBlank(),
-                        supportingText = { Text("A sampled row matching this value selects the strategy") },
-                    )
-                }
-            }
-        }
-        TextButton(
-            onClick = { onRulesChanged(rules + ContentMatchRule(columnName = "", pattern = "")) },
-            enabled = enabled,
-        ) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-            Text("Add Rule")
-        }
-    }
-}
 
 /**
  * Editor for the optional [ConversionConfig]: a switch that creates/clears the config, and — when on —

@@ -25,6 +25,8 @@ import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.model.rules.ColumnRecord
+import com.moneymanager.domain.model.rules.RuleEvaluator
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -183,29 +185,25 @@ private fun collectCryptoCodes(
     fiatCodes: Set<String>,
     existingCryptoCodes: Set<String>,
 ): Set<String> {
-    fun columnIndex(name: String): Int? = columns.firstOrNull { it.originalName == name }?.columnIndex
+    val indexByName = columns.associate { it.originalName to it.columnIndex }
 
-    // (column index, extraction) for each column holding an asset code: the currency lookups plus a fee
-    // paid in its own asset.
+    // Every value holding an asset code: the currency lookups plus a fee paid in its own asset.
     val lookups = listOf(TransferField.CURRENCY, TransferField.TO_CURRENCY).mapNotNull { strategy.config.fieldMappings[it] }
-    val currencyColumns =
-        lookups.filterIsInstance<CurrencyLookupMapping>().mapNotNull { m -> columnIndex(m.columnName)?.let { it to m.extraction } } +
-            listOfNotNull(
-                (strategy.config.fieldMappings[TransferField.AMOUNT] as? AmountParsingMapping)?.let { m ->
-                    m.feeCurrencyColumnName?.let(::columnIndex)?.let { it to m.feeCurrencyExtraction }
-                },
-            )
-    if (currencyColumns.isEmpty()) return emptySet()
+    val codeExprs =
+        lookups.filterIsInstance<CurrencyLookupMapping>().map { it.value } +
+            listOfNotNull((strategy.config.fieldMappings[TransferField.AMOUNT] as? AmountParsingMapping)?.feeCurrency)
+    val readableExprs = codeExprs.filter { expr -> expr.paths.any { it in indexByName } }
+    if (readableExprs.isEmpty()) return emptySet()
 
+    val rules = RuleEvaluator()
     val codes = mutableSetOf<String>()
     for (row in rows) {
-        for ((currencyCol, extraction) in currencyColumns) {
-            val code =
-                row.values
-                    .getOrNull(currencyCol)
-                    ?.trim()
-                    ?.let { strategy.config.resolveAssetCode(extractOrRaw(it, extraction)) }
-            if (!code.isNullOrEmpty() && code !in fiatCodes && code !in existingCryptoCodes) {
+        val record = ColumnRecord(row.values, indexByName)
+        for (expr in readableExprs) {
+            val raw = rules.resolve(expr) { record.text(it)?.trim() }
+            if (raw.isBlank()) continue
+            val code = strategy.config.assetCodes.canonical(raw)
+            if (code.isNotEmpty() && code !in fiatCodes && code !in existingCryptoCodes) {
                 codes += code
             }
         }

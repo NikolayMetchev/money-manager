@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -82,10 +83,7 @@ class CsvDuplicateDetectionTest {
                                     dateFormat = "dd/MM/yyyy",
                                 ),
                             TransferField.DESCRIPTION to
-                                DirectColumnMapping(
-                                    fieldType = TransferField.DESCRIPTION,
-                                    columnName = "Description",
-                                ),
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,
@@ -517,10 +515,7 @@ class CsvDuplicateDetectionTest {
                                         dateFormat = "dd/MM/yyyy",
                                     ),
                                 TransferField.DESCRIPTION to
-                                    DirectColumnMapping(
-                                        fieldType = TransferField.DESCRIPTION,
-                                        columnName = "Description",
-                                    ),
+                                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                                 TransferField.AMOUNT to
                                     AmountParsingMapping(
                                         fieldType = TransferField.AMOUNT,

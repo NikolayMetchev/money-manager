@@ -3,6 +3,10 @@ package com.moneymanager.domain.model.csvstrategy
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.SortedConditionListSerializer
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
@@ -48,23 +52,10 @@ data class AccountLookupMapping(
 }
 
 /**
- * A reusable regex extraction: a [pattern] matched (case-insensitively) against a column value, and
- * an [outputTemplate] producing the result from the match. Templates support `$0` (the whole match),
- * `$1`..`$9` (numbered groups) and `${name}` (named groups). When the pattern does not match the
- * caller decides the fallback. Used by regex account rules, attribute mappings and the description
- * mapping so capture-group extraction lives in one place.
- */
-@Serializable
-data class ColumnExtraction(
-    val pattern: String,
-    val outputTemplate: String = "$0",
-)
-
-/**
  * A single regex rule that maps matched values to an account name.
  *
  * When [accountNameTemplate] is null the fixed [accountName] is used (the original behaviour). When
- * set, the matched value is run through capture-group substitution (see [ColumnExtraction]) to derive
+ * set, the matched value is run through capture-group substitution (see [Extraction]) to derive
  * the account name from the matched text — e.g. pattern `CARD PAYMENT TO (?<cp>.+?),` with template
  * `${cp}` extracts the counterparty. [counterpartyIsPerson] marks the resolved counterparty as a
  * person, so the import additionally creates a Person + ownership link rather than just an account.
@@ -162,7 +153,7 @@ data class TemplateAccountMapping(
     val suffix: String = "",
     val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val extraction: ColumnExtraction? = null,
+    val extraction: Extraction? = null,
 ) : FieldMapping
 
 /**
@@ -173,7 +164,8 @@ data class TemplateAccountMapping(
 @Serializable
 data class ConditionalAccountMapping(
     override val fieldType: TransferField,
-    val conditions: List<RowCondition>,
+    @Serializable(with = SortedConditionListSerializer::class)
+    val conditions: List<Condition>,
     val whenTrue: FieldMapping,
     val whenFalse: FieldMapping,
 ) : FieldMapping
@@ -202,29 +194,15 @@ data class DateTimeParsingMapping(
 }
 
 /**
- * Directly copies a string value from a CSV column.
- * Used for the description field.
- *
- * When [fallbackColumns] is specified, if the primary [columnName] is empty,
- * each fallback column is tried in order until a non-empty value is found.
- *
- * When [extraction] is set, the resolved column value is run through it to derive a cleaned
- * description (e.g. stripping a trailing amount); if the pattern does not match, the raw value is
- * kept so nothing is lost.
+ * Copies a string value from the row (the description), read via [value]: the first of its columns
+ * holding a non-blank value, cleaned through its extraction when that matches (the raw value is kept
+ * otherwise, so nothing is lost).
  */
 @Serializable
 data class DirectColumnMapping(
     override val fieldType: TransferField,
-    val columnName: String,
-    val fallbackColumns: List<String> = emptyList(),
-    val extraction: ColumnExtraction? = null,
-) : FieldMapping {
-    /**
-     * Returns all columns to check in priority order (primary first, then fallbacks).
-     */
-    val allColumns: List<String>
-        get() = listOf(columnName) + fallbackColumns
-}
+    val value: ValueExpr,
+) : FieldMapping
 
 /**
  * Parses a numeric amount from CSV columns.
@@ -237,7 +215,8 @@ data class DirectColumnMapping(
  * When [feeColumnName] is set, that column's value (if non-blank) is imported as its own fee
  * transfer linked to the main transaction (via a `fee` relationship), whenever all [feeConditions]
  * hold (empty = always). This handles exports like Wise's, where the amount column is net of fees but
- * the fee also left the account (e.g. ATM withdrawals: 200.00 withdrawn + a 7.29 fee movement).
+ * the fee also left the account (e.g. ATM withdrawals: 200.00 withdrawn + a 7.29 fee movement). The
+ * fee is in the row's currency unless [feeCurrency] reads a non-blank asset code of its own.
  */
 @Serializable
 data class AmountParsingMapping(
@@ -249,11 +228,10 @@ data class AmountParsingMapping(
     val negateValues: Boolean = false,
     val flipAccountsOnPositive: Boolean = false,
     val feeColumnName: String? = null,
-    val feeConditions: List<RowCondition> = emptyList(),
+    @Serializable(with = SortedConditionListSerializer::class)
+    val feeConditions: List<Condition> = emptyList(),
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val feeCurrencyColumnName: String? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val feeCurrencyExtraction: ColumnExtraction? = null,
+    val feeCurrency: ValueExpr? = null,
 ) : FieldMapping {
     init {
         when (mode) {
@@ -283,16 +261,14 @@ data class HardCodedCurrencyMapping(
 ) : FieldMapping
 
 /**
- * Looks up a currency by code from a CSV column.
- * The column should contain ISO 4217 currency codes (e.g., "GBP", "USD", "EUR") or crypto codes.
- * When [extraction] is set the cell is first cleaned through it (e.g. Koinly's `BTC;1` → `BTC`).
+ * Looks up a currency by code, read via [value] (trimmed before its extraction runs). The value should be
+ * an ISO 4217 currency code (e.g., "GBP", "USD", "EUR") or a crypto code; an extraction cleans a
+ * decorated cell first (e.g. Koinly's `BTC;1` → `BTC`).
  */
 @Serializable
 data class CurrencyLookupMapping(
     override val fieldType: TransferField,
-    val columnName: String,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val extraction: ColumnExtraction? = null,
+    val value: ValueExpr,
 ) : FieldMapping
 
 /**

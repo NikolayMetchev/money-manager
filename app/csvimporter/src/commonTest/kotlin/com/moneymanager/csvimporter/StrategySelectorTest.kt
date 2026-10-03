@@ -9,13 +9,14 @@ import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -34,7 +35,7 @@ class StrategySelectorTest {
     private fun strategy(
         name: String,
         identificationColumns: Set<String> = headings,
-        contentMatchRules: List<ContentMatchRule> = emptyList(),
+        contentMatchRules: List<Condition> = emptyList(),
         fileNamePattern: String? = null,
     ): CsvImportStrategy {
         val now = Clock.System.now()
@@ -76,8 +77,8 @@ class StrategySelectorTest {
     private fun rows(vararg kinds: String): List<CsvRow> =
         kinds.mapIndexed { index, kind -> CsvRow(rowIndex = index + 1L, values = listOf("01/01/2026", "1.00", kind)) }
 
-    private val kindRule = ContentMatchRule("Kind", "^viban_")
-    private val blankKindRule = ContentMatchRule("Kind", "^$")
+    private val kindRule = Condition("Kind", ConditionOp.MATCHES, "^viban_")
+    private val blankKindRule = Condition("Kind", ConditionOp.MATCHES, "^$")
 
     @Test
     fun `column mismatch returns null even with matching filename`() {

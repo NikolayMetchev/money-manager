@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.isComplete
 import kotlinx.datetime.TimeZone
 
 /**
@@ -91,10 +92,17 @@ internal class CsvStrategyEditorState(
     // The description's cleanup regex has no widget yet, so it is carried verbatim rather than
     // reconstructed — dropping it would silently import raw, untrimmed descriptions.
     private val descriptionMapping = config?.fieldMappings?.get(TransferField.DESCRIPTION) as? DirectColumnMapping
-    var descriptionColumnName by mutableStateOf(descriptionMapping?.columnName.takeIfPresentIn(availableColumnNames))
+    var descriptionColumnName by mutableStateOf(descriptionMapping?.value?.primaryPath.takeIfPresentIn(availableColumnNames))
     var descriptionFallbackColumns by
-        mutableStateOf(descriptionMapping?.fallbackColumns.orEmpty().mapNotNull { it.takeIfPresentIn(availableColumnNames) })
-    var descriptionExtraction by mutableStateOf(descriptionMapping?.extraction)
+        mutableStateOf(
+            descriptionMapping
+                ?.value
+                ?.paths
+                .orEmpty()
+                .drop(1)
+                .mapNotNull { it.takeIfPresentIn(availableColumnNames) },
+        )
+    var descriptionExtraction by mutableStateOf(descriptionMapping?.value?.extraction)
 
     private val amountMapping = config?.fieldMappings?.get(TransferField.AMOUNT) as? AmountParsingMapping
     var amountMode by mutableStateOf(amountMapping?.mode ?: AmountMode.SINGLE_COLUMN)
@@ -194,7 +202,9 @@ internal class CsvStrategyEditorState(
     var currencyMode by
         mutableStateOf(if (currencyMapping is CurrencyLookupMapping) CurrencyMode.FROM_COLUMN else CurrencyMode.HARDCODED)
     var selectedCurrencyId by mutableStateOf((currencyMapping as? HardCodedCurrencyMapping)?.currencyId)
-    var currencyColumnName by mutableStateOf((currencyMapping as? CurrencyLookupMapping)?.columnName.takeIfPresentIn(availableColumnNames))
+    var currencyColumnName by mutableStateOf(
+        (currencyMapping as? CurrencyLookupMapping)?.value?.primaryPath.takeIfPresentIn(availableColumnNames),
+    )
 
     private val timezoneMapping = config?.fieldMappings?.get(TransferField.TIMEZONE)
     var timezoneMode by
@@ -252,16 +262,23 @@ internal class CsvStrategyEditorState(
     var reconciliationSourceName by mutableStateOf(config?.reconciliation?.sourceName.orEmpty())
     var reconciliationLinkablePrefix by mutableStateOf(config?.reconciliation?.linkableAccountPrefix.orEmpty())
 
-    // "FROM=TO" pairs, comma-separated (see CsvStrategyConfig.assetAliases).
-    var assetAliasesText by mutableStateOf(formatAssetAliases(config?.assetAliases.orEmpty()))
+    // "FROM=TO" pairs, comma-separated (see CsvStrategyConfig.assetCodes).
+    var assetAliasesText by mutableStateOf(formatAssetAliases(config?.assetCodes?.aliases.orEmpty()))
 
     // No editors of their own yet (set by built-in strategies); carried through so saving an edited
     // strategy doesn't silently drop them.
     val sourceTemplateExtraction = sourceTemplate?.extraction
     val targetTemplateExtraction = targetTemplate?.extraction
-    val currencyExtraction = (currencyMapping as? CurrencyLookupMapping)?.extraction
-    val feeCurrencyColumnName = amountMapping?.feeCurrencyColumnName
-    val feeCurrencyExtraction = amountMapping?.feeCurrencyExtraction
+    val currencyExtraction = (currencyMapping as? CurrencyLookupMapping)?.value?.extraction
+    val currencyFallbackColumns =
+        (currencyMapping as? CurrencyLookupMapping)
+            ?.value
+            ?.paths
+            ?.drop(1)
+            ?.filter { it in availableColumnNames }
+            .orEmpty()
+    val assetSuffixesToStrip = config?.assetCodes?.stripSuffixes.orEmpty()
+    val feeCurrency = amountMapping?.feeCurrency
 
     // Initial primary columns, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialTargetAccountColumnName: String? = targetAccountColumnName
@@ -314,7 +331,7 @@ internal class CsvStrategyEditorState(
             }
 
     private val contentMatchValid: Boolean
-        get() = contentMatchRules.all { it.columnName.isNotBlank() && it.pattern.isNotBlank() }
+        get() = contentMatchRules.all { it.isComplete() }
 
     // A conversion config is opt-in: valid when absent, otherwise its required scalars must be set, at
     // least one of name/rules must resolve, and every routing rule must be fully specified.

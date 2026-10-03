@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.model.qif.QifRecordSplit
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
@@ -73,7 +74,7 @@ class QifApplyIntegrationTest : DbTest() {
                                     dateFormat = "MM/dd/yyyy",
                                 ),
                             TransferField.DESCRIPTION to
-                                DirectColumnMapping(TransferField.DESCRIPTION, QifColumns.COL_PAYEE),
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf(QifColumns.COL_PAYEE))),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,

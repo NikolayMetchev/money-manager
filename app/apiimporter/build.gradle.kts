@@ -34,6 +34,7 @@ kotlin {
                 api(libs.kotlinx.serialization.json)
 
                 implementation(projects.app.model.csv)
+                implementation(projects.app.model.rules)
                 implementation(projects.utils.bigdecimal)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)
@@ -46,6 +47,7 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.serialization.json)
 
+                implementation(projects.app.model.rules)
                 implementation(projects.utils.bigdecimal)
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)
@@ -58,6 +60,18 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+
+        getByName("androidHostTest") {
+            dependencies {
+                implementation(projects.app.model.rules)
+            }
+        }
+
+        getByName("jvmTest") {
+            dependencies {
+                implementation(projects.app.model.rules)
             }
         }
     }

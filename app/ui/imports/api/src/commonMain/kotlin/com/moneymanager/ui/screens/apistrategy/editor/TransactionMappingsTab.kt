@@ -9,6 +9,9 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.ui.components.rules.ConditionsEditor
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Edits the top-level [ApiTransactionMappings] in place inside the strategy config. */
@@ -78,17 +81,31 @@ internal fun TransactionMappingsTab(
         path("Counterparty ID field (optional)", m.counterpartyIdField.orEmpty()) { v ->
             state.updateTransactionMappings { copy(counterpartyIdField = v.ifBlank { null }) }
         }
-        path("Decline reason field (optional)", m.declineReasonField.orEmpty()) { v ->
-            state.updateTransactionMappings { copy(declineReasonField = v.ifBlank { null }) }
-        }
-        path("Decline status field (optional)", m.declineStatusField.orEmpty()) { v ->
-            state.updateTransactionMappings { copy(declineStatusField = v.ifBlank { null }) }
-        }
-        StringSetEditor(
-            label = "Declined status values",
-            values = m.declinedStatusValues,
-            onChange = { v -> state.updateTransactionMappings { copy(declinedStatusValues = v) } },
+        val conditionPath = jsonPathField(txJsonPaths, onRequestPick, enabled)
+        ConditionsEditor(
+            title = "Declined when (the first that holds wins; its field's value is the decline reason)",
+            conditions = m.declinedWhen,
+            onConditionsChanged = { v -> state.updateTransactionMappings { copy(declinedWhen = v) } },
+            pathField = conditionPath,
             enabled = enabled,
+            newCondition = { Condition("", ConditionOp.NOT_BLANK) },
+            pathLabel = "Path",
+        )
+        ConditionsEditor(
+            title = "Only import items where (all must match; none = every item)",
+            conditions = m.itemFilters,
+            onConditionsChanged = { v -> state.updateTransactionMappings { copy(itemFilters = v) } },
+            pathField = conditionPath,
+            enabled = enabled,
+            pathLabel = "Path",
+        )
+        ConditionsEditor(
+            title = "Skip items where (all must match; none = skip nothing)",
+            conditions = m.excludeWhen,
+            onConditionsChanged = { v -> state.updateTransactionMappings { copy(excludeWhen = v) } },
+            pathField = conditionPath,
+            enabled = enabled,
+            pathLabel = "Path",
         )
         path("Local amount field (optional)", m.localAmountField.orEmpty()) { v ->
             state.updateTransactionMappings { copy(localAmountField = v.ifBlank { null }) }
