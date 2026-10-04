@@ -123,7 +123,6 @@ import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -345,27 +344,27 @@ fun ApiSessionsScreen(
         return result.displaySummary()
     }
 
-    // Completes with whether the import finished, so "Download & import all" can run imports one at a time.
+    // [onFinished] reports whether the import finished, so "Download & import all" can run imports one at a time.
     fun startImport(
         session: ApiSession,
         strategy: ApiImportStrategy,
         counterpartyAccountNames: Map<String, String>,
-    ): Deferred<Boolean> {
-        val imported = CompletableDeferred<Boolean>()
+        onFinished: (imported: Boolean) -> Unit = {},
+    ) {
         val started =
             backgroundTasks.startTask(
                 key = apiImportTaskKey(session.id),
                 title = "Import",
                 initialDetail = "Starting import for session #${session.id}.",
             ) {
+                var imported = false
                 try {
-                    runImport(session, strategy, counterpartyAccountNames).also { imported.complete(true) }
+                    runImport(session, strategy, counterpartyAccountNames).also { imported = true }
                 } finally {
-                    imported.complete(false)
+                    onFinished(imported)
                 }
             }
-        if (!started) imported.complete(false)
-        return imported
+        if (!started) onFinished(false)
     }
 
     // Downloads a new session for [credential] as its own background task, so its card shows the same progress
@@ -475,6 +474,15 @@ fun ApiSessionsScreen(
         return downloaded.await()
     }
 
+    suspend fun importAndAwait(
+        session: ApiSession,
+        strategy: ApiImportStrategy,
+    ): Boolean {
+        val imported = CompletableDeferred<Boolean>()
+        startImport(session, strategy, emptyMap(), onFinished = { imported.complete(it) })
+        return imported.await()
+    }
+
     // Downloads every credential in [targets] at once (different providers don't contend) and imports as the
     // downloads land: each credential's never-imported sessions join one import queue, oldest first, the
     // moment its own download finishes, and the queue is imported one session at a time, as a single Import
@@ -539,7 +547,7 @@ fun ApiSessionsScreen(
                             }
                         when {
                             counterparties.isNotEmpty() -> needsReviewCount++
-                            startImport(session, strategy, emptyMap()).await() -> importedCount++
+                            importAndAwait(session, strategy) -> importedCount++
                         }
                     }
                 }
