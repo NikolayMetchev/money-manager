@@ -121,6 +121,7 @@ import com.moneymanager.ui.util.currentCountryCode
 import com.moneymanager.ui.util.displayDate
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -137,9 +138,12 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
+
+private val logger = logging()
 
 @Composable
 fun ApiSessionsScreen(
@@ -518,16 +522,24 @@ fun ApiSessionsScreen(
                         targets
                             .map { credential ->
                                 async {
-                                    if (downloadCredential(credential, credential.id in forceFullIds) != null) downloadedCount++
+                                    // Each connection fails on its own: one provider's error mustn't cancel the
+                                    // other downloads or the import queue.
+                                    val downloaded =
+                                        isolatedBulkStep("Bulk download of credential ${credential.id}") {
+                                            downloadCredential(credential, credential.id in forceFullIds)
+                                        }
+                                    if (downloaded != null) downloadedCount++
                                     downloadsLeft--
                                     // Queued even when the download failed: sessions left from earlier downloads
                                     // still hold data the next download won't fetch again.
-                                    sessionsToImportInBulk(
-                                        sessions = apiSessionRepository.getSessionsByDevice(deviceId),
-                                        credentialIds = setOf(credential.id),
-                                        everImportedSessionIds =
-                                            apiSessionRepository.getImportedSessionRevisions().map { it.sessionId }.toSet(),
-                                    ).forEach { readyToImport.send(it) }
+                                    isolatedBulkStep("Queueing sessions of credential ${credential.id}") {
+                                        sessionsToImportInBulk(
+                                            sessions = apiSessionRepository.getSessionsByDevice(deviceId),
+                                            credentialIds = setOf(credential.id),
+                                            everImportedSessionIds =
+                                                apiSessionRepository.getImportedSessionRevisions().map { it.sessionId }.toSet(),
+                                        ).forEach { readyToImport.send(it) }
+                                    }
                                 }
                             }.awaitAll()
                         readyToImport.close()
@@ -536,18 +548,21 @@ fun ApiSessionsScreen(
                         val strategy = strategyByCredential[session.credentialId] ?: continue
                         sessionCount++
                         update("Importing session #${session.id}; $downloadsLeft download(s) still running.")
-                        val counterparties =
-                            withContext(Dispatchers.Default) {
-                                discoverApiCounterpartiesToCreate(
-                                    apiSessionRepository = apiSessionRepository,
-                                    accountAttributeRepository = accountAttributeRepository,
-                                    sessionId = session.id,
-                                    strategy = strategy,
-                                )
+                        // Counted as failed in the summary; the queue moves on to the next session.
+                        isolatedBulkStep("Bulk import of session ${session.id}") {
+                            val counterparties =
+                                withContext(Dispatchers.Default) {
+                                    discoverApiCounterpartiesToCreate(
+                                        apiSessionRepository = apiSessionRepository,
+                                        accountAttributeRepository = accountAttributeRepository,
+                                        sessionId = session.id,
+                                        strategy = strategy,
+                                    )
+                                }
+                            when {
+                                counterparties.isNotEmpty() -> needsReviewCount++
+                                importAndAwait(session, strategy) -> importedCount++
                             }
-                        when {
-                            counterparties.isNotEmpty() -> needsReviewCount++
-                            importAndAwait(session, strategy) -> importedCount++
                         }
                     }
                 }
@@ -2123,6 +2138,23 @@ internal fun splitSessionsByImportState(
     }
     return ApiSessionsSplit(outstandingByCredential = outstanding, importedByCredential = imported)
 }
+
+/**
+ * Runs one step of "Download & import all", logging its failure instead of letting it cancel the other
+ * downloads and the import queue. Null when it failed; cancellation still propagates.
+ */
+private suspend fun <T> isolatedBulkStep(
+    description: String,
+    step: suspend () -> T,
+): T? =
+    try {
+        step()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (expected: Exception) {
+        logger.error(expected) { "$description failed: ${expected.message}" }
+        null
+    }
 
 /**
  * The sessions "Download & import all" imports: every session of [credentialIds] that has never been
