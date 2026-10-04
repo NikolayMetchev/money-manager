@@ -1,7 +1,8 @@
 package com.moneymanager.ui.screens.csvstrategy.editor
 
 import com.moneymanager.domain.model.CsvImportStrategyId
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -10,10 +11,13 @@ import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -35,7 +39,10 @@ class CsvStrategyEditorStateTest {
                         fieldMappings =
                             mapOf(
                                 TransferField.TARGET_ACCOUNT to
-                                    AccountLookupMapping(TransferField.TARGET_ACCOUNT, "Payee"),
+                                    AccountRulesMapping(
+                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
+                                    ),
                                 TransferField.TIMESTAMP to
                                     DateTimeParsingMapping(
                                         fieldType = TransferField.TIMESTAMP,
@@ -64,13 +71,27 @@ class CsvStrategyEditorStateTest {
 
         assertEquals("Simple", state.name)
         assertEquals(setOf("Date", "Payee"), state.identificationColumns)
-        assertEquals("Payee", state.targetAccountColumnName)
-        assertEquals(TargetAccountMode.DIRECT_LOOKUP, state.targetAccountMode)
+        assertEquals(listOf(AccountRule(value = ValueExpr(listOf("Payee")))), state.targetRules)
         assertEquals("Date", state.dateColumnName)
         assertEquals("yyyy-MM-dd", state.dateFormat)
         assertEquals("Amount", state.amountColumnName)
         assertEquals("Europe/London", state.selectedTimezone)
         assertNull(state.descriptionColumnName)
+    }
+
+    @Test
+    fun `a direction column needs its column and incoming values before saving`() {
+        val state = CsvStrategyEditorState(strategy = null, availableColumnNames = setOf("Amount", "Type"))
+        val baseline = state.amountDateHasError
+
+        state.direction = Direction.Field(path = "", incomingValues = setOf("IN"))
+        assertTrue(state.amountDateHasError)
+        assertFalse(state.isValid)
+        state.direction = Direction.Field(path = "Type", incomingValues = emptySet())
+        assertTrue(state.amountDateHasError)
+
+        state.direction = Direction.Field(path = "Type", incomingValues = setOf("IN"))
+        assertEquals(baseline, state.amountDateHasError)
     }
 
     @Test

@@ -21,8 +21,10 @@ import com.moneymanager.csvimporter.DateFormatDetector
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AmountMode
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.ui.components.CurrencyPicker
+import com.moneymanager.ui.components.rules.DirectionEditor
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
@@ -90,28 +92,22 @@ internal fun AmountDateTab(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
-                checked = state.negateValues,
-                onCheckedChange = { state.negateValues = it },
-                enabled = enabled,
-            )
-            Text(
-                "Flip the sign of every parsed amount",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
-                checked = state.flipAccountsOnPositive,
-                onCheckedChange = { state.flipAccountsOnPositive = it },
-                enabled = enabled,
-            )
-            Text(
-                "Swap accounts when amount is positive",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
+        DirectionEditor(
+            direction = state.direction,
+            onDirectionChanged = { state.direction = it ?: Direction.AmountSign() },
+            pathField = { label, value, onValueChange, isError ->
+                ColumnDropdown(
+                    columns = csvColumns,
+                    selectedColumn = value.takeIf { it.isNotBlank() },
+                    onColumnSelected = onValueChange,
+                    label = label,
+                    sampleValue = getSampleValue(csvColumns, firstRow, value),
+                    enabled = enabled,
+                    isError = isError,
+                )
+            },
+            enabled = enabled,
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(

@@ -14,7 +14,6 @@ import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
-import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
@@ -31,11 +30,11 @@ import com.moneymanager.domain.model.apistrategy.SigFieldLocation
 import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
-import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.Direction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -99,7 +98,6 @@ class ApiStrategyEditorStateTest {
                                         counterpartyAliasField = "address",
                                         counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Crypto.com"),
                                     ),
-                                fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = "Crypto.com Exchange Funding",
                             ),
                             ApiDataEndpoint(
@@ -206,13 +204,19 @@ class ApiStrategyEditorStateTest {
     }
 
     @Test
-    fun `sign field is required when sign source is FIELD`() {
+    fun `a field direction needs its field and incoming values`() {
         val state = ApiStrategyEditorState(strategy = null)
         state.name = "My API"
         state.updateConfig { copy(baseUrl = "https://api.example.com") }
-        state.updateConfig { mapBankTransactionMappings { copy(signSource = ApiSignSource.FIELD, signField = null) } }
+        state.updateConfig { mapBankTransactionMappings { copy(direction = Direction.Field(path = "", incomingValues = setOf("IN"))) } }
         assertTrue(state.transactionMappingsHasError)
-        state.updateConfig { mapBankTransactionMappings { copy(signField = "direction") } }
+        state.updateConfig {
+            mapBankTransactionMappings {
+                copy(
+                    direction = Direction.Field(path = "direction", incomingValues = setOf("IN")),
+                )
+            }
+        }
         assertFalse(state.transactionMappingsHasError)
     }
 

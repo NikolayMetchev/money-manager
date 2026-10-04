@@ -99,7 +99,7 @@ fun groupTradeLegs(
  * A null is not an error: the caller leaves the group's rows to import as ordinary transfers, so the
  * residue lands somewhere visible instead of being silently reshaped or dropped.
  *
- * The owner account is read off the legs themselves: with the usual `flipAccountsOnPositive` mapping a
+ * The owner account is read off the legs themselves: with the usual amount-sign direction a
  * debit leg has the owner as its source and a credit leg has it as its target.
  */
 @Suppress("ReturnCount")

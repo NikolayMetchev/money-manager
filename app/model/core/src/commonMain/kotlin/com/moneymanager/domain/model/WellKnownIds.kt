@@ -36,7 +36,7 @@ object WellKnownIds {
      * last-4 digits) identifying the cards funded from this account. It is the default attribute type for
      * the generic attribute-account matcher: a CSV strategy with a
      * `com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig.fundingAttributeMatch` (or an
-     * `com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping` field) matches a column
+     * account rule with an `attributeTypeName`) matches a column
      * value against these tokens to route a conduit (e.g. Curve) spend to the funding account. Nothing in
      * code special-cases this id — it is just the built-in Curve strategy's chosen attribute type.
      */

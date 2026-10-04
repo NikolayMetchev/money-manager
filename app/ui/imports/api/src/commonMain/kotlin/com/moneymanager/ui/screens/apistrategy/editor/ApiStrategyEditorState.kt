@@ -14,11 +14,10 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
-import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.rules.isComplete
+import com.moneymanager.ui.components.rules.isComplete
 import kotlin.time.Instant
 
 /** Tabs of the API strategy editor screen. */
@@ -93,7 +92,7 @@ internal class ApiStrategyEditorState(
 
     var name by mutableStateOf(strategy?.name.orEmpty())
 
-    var config by mutableStateOf(strategy?.config?.withoutCustomFields()?.backfillDataEndpoints() ?: NEW_CONFIG)
+    var config by mutableStateOf(strategy?.config?.withoutCustomFields() ?: NEW_CONFIG)
 
     var accountCustomFields by mutableStateOf(strategy?.config?.editedAccountMappings.customFieldStates())
     var txCustomFields by mutableStateOf(strategy?.config?.editedTransactionMappings.customFieldStates())
@@ -143,7 +142,7 @@ internal class ApiStrategyEditorState(
                         mappings.currencyField.isBlank() ||
                         mappings.descriptionField.isBlank() ||
                         mappings.idField.isBlank() ||
-                        (mappings.signSource == ApiSignSource.FIELD && mappings.signField.isNullOrBlank()) ||
+                        !mappings.direction.isComplete() ||
                         !mappings.conditionsComplete()
                 }
 
@@ -219,25 +218,6 @@ private fun ApiPersonImportConfig.ownershipValid(): Boolean = !(ownsAllAccounts 
 private fun ApiStrategyConfig.withoutCustomFields(): ApiStrategyConfig =
     withAccountMappings(editedAccountMappings.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()))
         .withTransactionMappings(editedTransactionMappings.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()))
-
-/**
- * A directional (deposit/withdrawal) endpoint with a null fixedDirection displays as "IN" in the
- * Endpoints tab (a rendering fallback), but that fallback is never persisted on its own — so a
- * strategy saved before this field existed, or otherwise missing it, would show a fully-filled-in
- * form yet fail isValidForSave and permanently disable Save. Backfill it here, at load time, so the
- * fix applies without the user ever having to visit the Endpoints tab.
- */
-private fun ApiStrategyConfig.backfillDataEndpoints(): ApiStrategyConfig =
-    copy(
-        dataEndpoints =
-            dataEndpoints.map { endpoint ->
-                if (endpoint.kind in DIRECTIONAL_KINDS && !endpoint.enrichesTransfers && endpoint.fixedDirection == null) {
-                    endpoint.copy(fixedDirection = TransferDirection.IN)
-                } else {
-                    endpoint
-                }
-            },
-    )
 
 /** Projects a mapping's `customFields` map + `uniqueIdentifierFields` set onto editable rows. */
 private fun ApiAccountMappings?.customFieldStates(): List<CustomFieldState> =

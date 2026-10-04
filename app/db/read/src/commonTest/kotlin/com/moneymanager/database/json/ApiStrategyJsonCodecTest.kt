@@ -27,7 +27,6 @@ import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
-import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import kotlin.test.Test
@@ -214,7 +213,6 @@ class ApiStrategyJsonCodecTest {
                                     queryParams = listOf(ApiQueryParam(name = "type", value = "deposit")),
                                 ),
                             kind = ApiEndpointKind.DEPOSITS,
-                            fixedDirection = TransferDirection.IN,
                             transactionMappings =
                                 ApiTransactionMappings(
                                     idField = "ledger_id",
@@ -296,7 +294,6 @@ class ApiStrategyJsonCodecTest {
                                     queryParams = listOf(ApiQueryParam(name = "type", value = "BONUS")),
                                 ),
                             kind = ApiEndpointKind.DEPOSITS,
-                            fixedDirection = TransferDirection.IN,
                             counterpartyAccountName = "Binance Earn Rewards",
                             transactionMappings =
                                 ApiTransactionMappings(

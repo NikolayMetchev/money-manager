@@ -16,7 +16,8 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -457,9 +458,9 @@ class CsvReimportE2ETest {
                                     accountId = sourceAccountId,
                                 ),
                             TransferField.TARGET_ACCOUNT to
-                                AccountLookupMapping(
+                                AccountRulesMapping(
                                     fieldType = TransferField.TARGET_ACCOUNT,
-                                    columnName = "Payee",
+                                    rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
                                 ),
                             TransferField.TIMESTAMP to
                                 DateTimeParsingMapping(

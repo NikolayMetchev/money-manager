@@ -7,11 +7,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
-import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.ui.components.rules.ConditionsEditor
+import com.moneymanager.ui.components.rules.DirectionEditor
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Edits the top-level [ApiTransactionMappings] in place inside the strategy config. */
@@ -52,25 +52,14 @@ internal fun TransactionMappingsTab(
             optionLabel = { it.name },
             enabled = enabled,
         )
-        EnumDropdown(
-            label = "Sign source",
-            options = ApiSignSource.entries,
-            selected = m.signSource,
-            onSelect = { v -> state.updateTransactionMappings { copy(signSource = v) } },
-            optionLabel = { it.name },
+        // A bank feed's own direction is its signed amount.
+        DirectionEditor(
+            direction = m.direction,
+            onDirectionChanged = { v -> state.updateTransactionMappings { copy(direction = v) } },
+            pathField = jsonPathField(txJsonPaths, onRequestPick, enabled),
             enabled = enabled,
+            allowDefault = true,
         )
-        if (m.signSource == ApiSignSource.FIELD) {
-            path("Sign field", m.signField.orEmpty()) { v ->
-                state.updateTransactionMappings { copy(signField = v.ifBlank { null }) }
-            }
-            StringSetEditor(
-                label = "Credit values (mean incoming/positive)",
-                values = m.creditValues,
-                onChange = { v -> state.updateTransactionMappings { copy(creditValues = v) } },
-                enabled = enabled,
-            )
-        }
 
         path("Merchant name field (optional)", m.merchantNameField.orEmpty()) { v ->
             state.updateTransactionMappings { copy(merchantNameField = v.ifBlank { null }) }

@@ -2,14 +2,15 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingsExport
+import com.moneymanager.domain.model.csvstrategy.AccountRule
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
-import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.csvstrategy.export.AccountRulesExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.FieldMappingExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedAccountExport
-import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.strategy.StrategyKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,13 +20,13 @@ class StrategyArtifactCodecTest {
     private val sourceMapping =
         HardCodedAccountExport(fieldType = TransferField.SOURCE_ACCOUNT, accountName = "My Account")
     private val targetMapping =
-        RegexAccountExport(
+        AccountRulesExport(
             fieldType = TransferField.TARGET_ACCOUNT,
-            columnName = "Payee",
             rules =
                 listOf(
-                    RegexRule(pattern = "TESCO", accountName = "Tesco"),
-                    RegexRule(pattern = "T.*", accountName = "Other T"),
+                    AccountRule(value = ValueExpr(listOf("Payee")), pattern = "TESCO", name = "Tesco"),
+                    AccountRule(value = ValueExpr(listOf("Payee")), pattern = "T.*", name = "Other T"),
+                    AccountRule(value = ValueExpr(listOf("Payee"))),
                 ),
             defaultCategoryName = "Uncategorized",
         )

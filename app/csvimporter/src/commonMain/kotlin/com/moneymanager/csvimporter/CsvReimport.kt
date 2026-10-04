@@ -777,7 +777,7 @@ private fun Trade.sameConversionAs(other: Trade): Boolean =
 
 /**
  * Finds already-imported rows whose counterparty the current strategy treats as unidentified (see
- * [com.moneymanager.domain.model.csvstrategy.RegexRule.counterpartyIsUnidentified]) and whose persisted
+ * [com.moneymanager.domain.model.csvstrategy.AccountRule.counterpartyIsUnidentified]) and whose persisted
  * transfer no longer matches what importing them now would produce, either because
  *  - the strategy books that counterparty on a different account than the persisted transfer uses (the
  *    rule changed — e.g. card top-ups moved off the Cash wallet onto a top-up placeholder), or

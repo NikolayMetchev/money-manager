@@ -4,14 +4,16 @@ import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.json.Json
@@ -64,8 +66,8 @@ class SharedRulesMigrationTest {
                     {"columnName": "Memo", "operator": "IS_BLANK", "value": null, "otherColumnName": null},
                     {"columnName": "Kind", "operator": "IS_NOT_BLANK", "value": null, "otherColumnName": null}
                   ],
-                  "whenTrue": {"type": "com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping", "fieldType": "TARGET_ACCOUNT", "accountId": 7},
-                  "whenFalse": {"type": "com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping", "fieldType": "TARGET_ACCOUNT", "accountId": 8}
+                  "whenTrue": {"type": "com.moneymanager.domain.model.csvstrategy.AccountLookupMapping", "fieldType": "TARGET_ACCOUNT", "columnName": "Payee"},
+                  "whenFalse": {"type": "com.moneymanager.domain.model.csvstrategy.AccountLookupMapping", "fieldType": "TARGET_ACCOUNT", "columnName": "Memo"}
                 },
                 "DESCRIPTION": {
                   "type": "com.moneymanager.domain.model.csvstrategy.DirectColumnMapping",
@@ -86,7 +88,9 @@ class SharedRulesMigrationTest {
 
         val config = CsvStrategyJsonCodec.decode(legacy)
 
-        val target = config.fieldMappings.getValue(TransferField.TARGET_ACCOUNT) as ConditionalAccountMapping
+        val target = config.fieldMappings.getValue(TransferField.TARGET_ACCOUNT) as AccountRulesMapping
+        assertEquals(listOf(listOf("Payee"), listOf("Memo")), target.rules.map { it.value.paths })
+        assertEquals(emptyList(), target.rules.last().conditions)
         assertEquals(
             setOf(
                 Condition("Kind", ConditionOp.EQUALS, value = "card"),
@@ -95,7 +99,10 @@ class SharedRulesMigrationTest {
                 Condition("Memo", ConditionOp.BLANK),
                 Condition("Kind", ConditionOp.NOT_BLANK),
             ),
-            target.conditions.toSet(),
+            target.rules
+                .first()
+                .conditions
+                .toSet(),
         )
         assertEquals(
             ValueExpr(listOf("Payee", "Memo"), Extraction("^(.*?),", "$1")),
@@ -257,3 +264,153 @@ class OnePipelineMigrationTest {
         )
     }
 }
+
+class AccountRulesMigrationTest {
+    private val csvPackage = "com.moneymanager.domain.model.csvstrategy"
+
+    private fun csvV1(
+        target: String,
+        amount: String = amountJson(""),
+    ) = """
+        {
+          "configVersion": 1,
+          "identificationColumns": ["Payee"],
+          "fieldMappings": {"TARGET_ACCOUNT": $target, "AMOUNT": $amount}
+        }
+        """.trimIndent()
+
+    private fun amountJson(
+        flags: String,
+        columns: String = SINGLE_COLUMN,
+    ) = """{"type": "$csvPackage.AmountParsingMapping", "fieldType": "AMOUNT", $columns$flags}"""
+
+    private fun targetRules(json: String): AccountRulesMapping =
+        assertIs<AccountRulesMapping>(CsvStrategyJsonCodec.decode(json).fieldMappings[TransferField.TARGET_ACCOUNT])
+
+    @Test
+    fun `regex rules become pattern rules ahead of a fallback over the primary and fallback columns`() {
+        val mapping =
+            targetRules(
+                csvV1(
+                    """
+                    {"type": "$csvPackage.RegexAccountMapping", "fieldType": "TARGET_ACCOUNT", "columnName": "Payee",
+                     "fallbackColumns": ["Memo"], "defaultCategoryId": 4,
+                     "rules": [
+                       {"pattern": "^TESCO", "accountName": "Tesco"},
+                       {"pattern": "^PAY (.*)", "accountNameTemplate": "$1", "accountName": "Someone", "counterpartyIsPerson": true, "personNameTemplate": "$1"},
+                       {"pattern": "^Deposit$", "accountName": "Funding", "counterpartyIsUnidentified": true}
+                     ]}
+                    """.trimIndent(),
+                ),
+            )
+
+        val payee = ValueExpr(listOf("Payee"))
+        assertEquals(
+            AccountRulesMapping(
+                fieldType = TransferField.TARGET_ACCOUNT,
+                rules =
+                    listOf(
+                        AccountRule(value = payee, pattern = "^TESCO", name = "Tesco"),
+                        AccountRule(
+                            value = payee,
+                            pattern = "^PAY (.*)",
+                            name = "$1",
+                            fallbackName = "Someone",
+                            counterpartyIsPerson = true,
+                            personName = "$1",
+                        ),
+                        AccountRule(value = payee, pattern = "^Deposit$", name = "Funding", counterpartyIsUnidentified = true),
+                        AccountRule(value = ValueExpr(listOf("Payee", "Memo"))),
+                    ),
+                defaultCategoryId = 4,
+            ),
+            mapping,
+        )
+    }
+
+    @Test
+    fun `template and attribute-match mappings trim their value`() {
+        val template =
+            targetRules(
+                csvV1(
+                    """{"type": "$csvPackage.TemplateAccountMapping", "fieldType": "TARGET_ACCOUNT", "columnName": "Currency", "prefix": "Wise: ", "suffix": " pot"}""",
+                ),
+            )
+        assertEquals(listOf(AccountRule(value = ValueExpr(listOf("Currency")), trim = true, name = "Wise: {value} pot")), template.rules)
+
+        val attribute =
+            targetRules(
+                csvV1(
+                    """{"type": "$csvPackage.AttributeMatchAccountMapping", "fieldType": "TARGET_ACCOUNT", "columnName": "Card", "attributeTypeName": "card-last4"}""",
+                ),
+            )
+        assertEquals(
+            listOf(
+                AccountRule(value = ValueExpr(listOf("Card")), trim = true, attributeTypeName = "card-last4"),
+                AccountRule(value = ValueExpr(listOf("Card")), trim = true),
+            ),
+            attribute.rules,
+        )
+    }
+
+    @Test
+    fun `amount flips become a direction`() {
+        fun direction(
+            flags: String,
+            columns: String = SINGLE_COLUMN,
+        ): Direction {
+            val amount = amountJson(flags, columns)
+            val target = """{"type": "$csvPackage.AccountLookupMapping", "fieldType": "TARGET_ACCOUNT", "columnName": "Payee"}"""
+            val config = CsvStrategyJsonCodec.decode(csvV1(target, amount))
+            return assertIs<AmountParsingMapping>(config.fieldMappings[TransferField.AMOUNT]).direction
+        }
+
+        assertEquals(Direction.Outgoing, direction(""))
+        assertEquals(Direction.Outgoing, direction(""", "negateValues": true"""))
+        assertEquals(Direction.AmountSign(), direction(""", "flipAccountsOnPositive": true"""))
+        assertEquals(
+            Direction.AmountSign(positiveIsIncoming = false),
+            direction(""", "flipAccountsOnPositive": true, "negateValues": true"""),
+        )
+        // The legacy parser never negated credit/debit columns, so the flag must not reverse their direction.
+        assertEquals(
+            Direction.AmountSign(),
+            direction(""", "flipAccountsOnPositive": true, "negateValues": true""", CREDIT_DEBIT_COLUMNS),
+        )
+    }
+
+    @Test
+    fun `api sign settings become a direction and fixed endpoint directions are dropped`() {
+        fun mappings(fields: String) =
+            """
+            {
+              "configVersion": 2,
+              "baseUrl": "https://example.com",
+              "accounts": {"type": "single", "name": "X", "externalId": "x"},
+              "dataEndpoints": [
+                {"endpoint": {"path": "/deposits", "responseArrayKey": ""}, "kind": "DEPOSITS", "fixedDirection": "IN",
+                 "transactionMappings": {"amountField": "amount"$fields}}
+              ]
+            }
+            """.trimIndent()
+
+        fun direction(fields: String): Direction? =
+            ApiStrategyJsonCodec
+                .decode(mappings(fields))
+                .dataEndpoints
+                .single()
+                .transactionMappings
+                ?.direction
+
+        assertEquals(null, direction(""))
+        assertEquals(Direction.AmountSign(), direction(""", "directionFromAmountSign": true"""))
+        assertEquals(
+            Direction.Field(path = "side", incomingValues = setOf("CREDIT", "IN")),
+            direction(""", "signSource": "FIELD", "signField": "side", "creditValues": ["IN", "CREDIT"]"""),
+        )
+        assertEquals(null, direction(""", "signSource": "AMOUNT", "signField": "side""""))
+    }
+}
+
+private const val SINGLE_COLUMN = """"mode": "SINGLE_COLUMN", "amountColumnName": "Amount""""
+private const val CREDIT_DEBIT_COLUMNS = """"mode": "CREDIT_DEBIT_COLUMNS", "creditColumnName": "In", "debitColumnName": "Out""""

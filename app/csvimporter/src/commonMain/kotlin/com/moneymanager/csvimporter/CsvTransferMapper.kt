@@ -19,12 +19,11 @@ import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.AttributeMatchAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
-import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.ConversionAccountRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
@@ -35,13 +34,11 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
-import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
-import com.moneymanager.domain.model.csvstrategy.RegexRule
-import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.ColumnRecord
 import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.RuleEvaluator
 import com.moneymanager.domain.model.rules.substituteTemplate
@@ -270,10 +267,10 @@ data class ExistingTransferInfo(
  *
  * @property csvValue The actual value from the CSV that led to this account
  * @property targetAccountName The name of the account that will be/was created from this value.
- *           For AccountLookupMapping, this equals csvValue. For RegexAccountMapping, this is the
- *           extracted account name which may differ from csvValue.
- * @property matchedPattern The regex pattern that matched (for RegexAccountMapping with rules),
- *           or null if this was from AccountLookupMapping or RegexAccountMapping fallback logic.
+ *           For a rule without a pattern this equals csvValue; for a pattern rule it is the rule's
+ *           rendered name, which may differ from csvValue.
+ * @property matchedPattern The pattern of the account rule that matched, or null when a
+ *           pattern-less rule supplied the value.
  *           When non-null, this pattern should be used for the persisted mapping instead of
  *           creating an exact-match pattern for csvValue.
  */
@@ -311,7 +308,7 @@ class CsvTransferMapper(
     passThroughDetector: PassThroughDetector? = null,
     /**
      * Attribute-account matchers keyed by attribute-type name (see [AttributeAccountMatcher]). Consulted
-     * by [AttributeMatchAccountMapping] account fields to resolve an account from a column value's regex
+     * by account rules with an `attributeTypeName` to resolve an account from a column value's regex
      * match against account attributes. The applier uses the same registry for funding reconciliation.
      */
     private val attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
@@ -510,10 +507,7 @@ class CsvTransferMapper(
                 }
 
             // Determine if we need to flip accounts (sign-based flip XOR preprocessing flip)
-            val amountFlip =
-                amountMapping is AmountParsingMapping &&
-                    amountMapping.flipAccountsOnPositive &&
-                    rawAmount > BigDecimal.ZERO
+            val amountFlip = (amountMapping as? AmountParsingMapping)?.let { isIncoming(it.direction, rawAmount, values) } == true
             val flipAccounts = amountFlip xor rulesFlip
 
             // Resolve the source account: use override if provided, otherwise fall back to the
@@ -728,13 +722,7 @@ class CsvTransferMapper(
                     // the description-derived account the target mapping would discover, so skip it here.
                     if (passThroughMatch == null && conversionDetection == null) add(discoverNewAccount(targetMapping, values))
                 }
-            val targetCategoryId =
-                when (targetMapping) {
-                    is AccountLookupMapping -> targetMapping.defaultCategoryId
-                    is RegexAccountMapping -> targetMapping.defaultCategoryId
-                    is TemplateAccountMapping -> targetMapping.defaultCategoryId
-                    else -> Category.UNCATEGORIZED_ID
-                }
+            val targetCategoryId = (targetMapping as? AccountRulesMapping)?.defaultCategoryId ?: Category.UNCATEGORIZED_ID
             val newAccounts =
                 buildList {
                     addAll(discoveries.mapNotNull { it?.first })
@@ -905,8 +893,7 @@ class CsvTransferMapper(
                     val columnName =
                         mapping.amountColumnName
                             ?: error("amountColumnName required for SINGLE_COLUMN mode")
-                    val value = getColumnValue(columnName, values)
-                    if (mapping.negateValues) -parseBigDecimal(value) else parseBigDecimal(value)
+                    parseBigDecimal(getColumnValue(columnName, values))
                 }
                 AmountMode.CREDIT_DEBIT_COLUMNS -> {
                     val creditColumnName =
@@ -924,6 +911,21 @@ class CsvTransferMapper(
             }
         return baseAmount
     }
+
+    /**
+     * Whether the row's money comes INTO the source (statement) account per [direction], which swaps
+     * the source and target the mappings resolved.
+     */
+    private fun isIncoming(
+        direction: Direction,
+        rawAmount: BigDecimal,
+        values: List<String>,
+    ): Boolean =
+        when (direction) {
+            is Direction.AmountSign -> if (direction.positiveIsIncoming) rawAmount > BigDecimal.ZERO else rawAmount < BigDecimal.ZERO
+            is Direction.Field -> getColumnValueOrNull(direction.path, values)?.trim() in direction.incomingValues
+            Direction.Outgoing -> false
+        }
 
     /**
      * Returns the fee magnitude (unsigned) for a row, modelled as its own movement out of the
@@ -1002,28 +1004,94 @@ class CsvTransferMapper(
     ): Boolean = rules.matches(condition, ColumnRecord(values, columnIndexByName))
 
     /**
-     * Resolves a ConditionalAccountMapping to its active branch for the given row.
+     * How one side's [AccountRulesMapping] named the account for a row: the [rule] that applied, the
+     * [sourceValue] it read (what persisted account mappings match against), and the account it names —
+     * [attributeAccountId] when an attribute rule matched an account, otherwise [accountName] (blank when
+     * no rule applied or the value was blank).
      */
-    private fun resolveConditional(
-        mapping: ConditionalAccountMapping,
+    private data class AccountResolution(
+        val rule: AccountRule?,
+        val sourceValue: String,
+        val accountName: String,
+        val attributeAccountId: AccountId? = null,
+        val personName: String? = null,
+    )
+
+    // A row resolves each side several times (id, discovery, person, unidentified); the rules are
+    // re-evaluated only when the row (or side) changes.
+    private var lastResolution: Triple<List<String>, AccountRulesMapping, AccountResolution>? = null
+    private var previousResolution: Triple<List<String>, AccountRulesMapping, AccountResolution>? = null
+
+    private fun resolveAccount(
+        mapping: AccountRulesMapping,
         values: List<String>,
-    ): FieldMapping =
-        if (mapping.conditions.all { evaluateCondition(it, values) }) {
-            mapping.whenTrue
-        } else {
-            mapping.whenFalse
+    ): AccountResolution {
+        for (cached in listOfNotNull(lastResolution, previousResolution)) {
+            if (cached.first === values && cached.second === mapping) return cached.third
         }
+        val resolution = evaluateAccountRules(mapping, values)
+        previousResolution = lastResolution
+        lastResolution = Triple(values, mapping, resolution)
+        return resolution
+    }
+
+    private fun evaluateAccountRules(
+        mapping: AccountRulesMapping,
+        values: List<String>,
+    ): AccountResolution {
+        val record = ColumnRecord(values, columnIndexByName)
+        return mapping.rules.firstNotNullOfOrNull { rule -> applyAccountRule(rule, record, values) }
+            ?: AccountResolution(rule = null, sourceValue = "", accountName = "")
+    }
+
+    /** What [rule] resolves this row to, or null when the rule doesn't apply and the next one should be tried. */
+    private fun applyAccountRule(
+        rule: AccountRule,
+        record: ColumnRecord,
+        values: List<String>,
+    ): AccountResolution? {
+        if (!rules.all(rule.conditions, record)) return null
+        val read =
+            rule.value.paths
+                .asSequence()
+                .map { getColumnValue(it, values) }
+                .firstOrNull { it.isNotBlank() }
+                .orEmpty()
+        val value = if (rule.trim) read.trim() else read
+        val match = rule.pattern?.let { pattern -> value.takeIf { it.isNotBlank() }?.let { compiledPattern(pattern).find(it) } }
+        if (rule.pattern != null && match == null) return null
+        if (rule.attributeTypeName != null) {
+            val matched =
+                value.takeIf { it.isNotBlank() }?.let { attributeAccountMatchers[rule.attributeTypeName]?.match(it) } ?: return null
+            return AccountResolution(rule, value, value, attributeAccountId = matched)
+        }
+        val accountName = renderAccountName(rule, rule.name, value, match).ifBlank { rule.fallbackName.orEmpty() }
+        val personName =
+            if (rule.counterpartyIsPerson) {
+                rule.personName?.let { renderAccountName(rule, it, value, match) }?.takeIf { it.isNotBlank() } ?: accountName
+            } else {
+                null
+            }
+        return AccountResolution(rule, value, accountName, personName = personName)
+    }
 
     /**
-     * Builds the templated account name for a TemplateAccountMapping,
-     * or an empty string when the column value is blank.
+     * [template] rendered for [rule]: with a pattern, `$n`/`${name}` captures substituted (whitespace runs
+     * collapsed when any were); `{value}` replaced by the value cleaned through the rule's extraction. A
+     * pattern-less rule reading a blank value names nothing.
      */
-    private fun templatedAccountName(
-        mapping: TemplateAccountMapping,
-        csvValue: String,
+    private fun renderAccountName(
+        rule: AccountRule,
+        template: String,
+        value: String,
+        match: MatchResult?,
     ): String {
-        if (csvValue.isBlank()) return ""
-        return mapping.prefix + extractedOrRaw(csvValue, mapping.extraction).trim() + mapping.suffix
+        if (match == null && value.isBlank()) return ""
+        val cleaned =
+            (rule.value.extraction?.let { applyExtraction(value, it) } ?: value).let { if (rule.trim) it.trim() else it }
+        val substituted = match?.let { substituteTemplate(template, it) } ?: template
+        val named = substituted.replace(AccountRule.VALUE_PLACEHOLDER, cleaned)
+        return if (match != null && '$' in template) named.replace(WHITESPACE_RUN_REGEX, " ").trim() else named
     }
 
     /**
@@ -1037,98 +1105,41 @@ class CsvTransferMapper(
         mapping: FieldMapping,
         values: List<String>,
         applyPersistedMappings: Boolean = true,
-    ): AccountId {
-        // For hardcoded accounts, return immediately
-        if (mapping is HardCodedAccountMapping) {
-            return mapping.accountId
-        }
-
-        return when (mapping) {
-            is TemplateAccountMapping -> {
-                val csvValue = getColumnValue(mapping.columnName, values).trim()
-
-                // Check persisted mappings FIRST - this handles renamed accounts
-                if (applyPersistedMappings) {
-                    findPersistedMapping(csvValue)?.let { return it }
-                }
-
-                val name = templatedAccountName(mapping, csvValue)
-                resolveExistingAccountId(name)
-                    ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
-            }
-            is ConditionalAccountMapping -> parseAccount(resolveConditional(mapping, values), values, applyPersistedMappings)
-            is AttributeMatchAccountMapping -> {
-                val csvValue = getColumnValue(mapping.columnName, values).trim()
-
-                // Persisted mappings win first (renamed accounts), then the account-attribute regex match.
-                if (applyPersistedMappings) {
-                    findPersistedMapping(csvValue)?.let { return it }
-                }
-                attributeAccountMatchers[mapping.attributeTypeName]?.match(csvValue)?.let { return it }
-
-                // No attribute matched: fall back to ordinary name lookup on the raw value.
-                resolveExistingAccountId(csvValue)
-                    ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
-            }
-            is AccountLookupMapping -> {
-                val csvValue = getColumnValue(mapping.columnName, values)
-
-                // Check persisted mappings FIRST - this handles renamed accounts
-                if (applyPersistedMappings) {
-                    findPersistedMapping(csvValue)?.let { return it }
-                }
-
-                // Fall back to lookup by name (current, then historical for renamed accounts)
-                val name = getAccountName(mapping, values)
-                resolveExistingAccountId(name)
-                    ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
-            }
-            is RegexAccountMapping -> {
-                // For RegexAccountMapping, we need to determine which column/value
-                // will actually be used (could be fallback column)
-                val result = getAccountNameFromRegexWithPattern(mapping, values)
-
-                // Check persisted mappings using the ACTUAL value that was resolved
-                if (applyPersistedMappings) {
-                    findPersistedMapping(result.sourceColumnValue)?.let { return it }
-                }
-
-                // Fall back to lookup by name (current, then historical for renamed accounts)
-                resolveExistingAccountId(result.accountName)
+    ): AccountId =
+        when (mapping) {
+            is HardCodedAccountMapping -> mapping.accountId
+            is AccountRulesMapping -> {
+                val resolution = resolveAccount(mapping, values)
+                (if (applyPersistedMappings) findPersistedMapping(resolution.sourceValue) else null)
+                    ?: resolution.attributeAccountId
+                    ?: resolveExistingAccountId(resolution.accountName)
                     ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
             }
             else -> throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
         }
-    }
 
     /**
-     * True when the rule that resolved [mapping] for this row declares the counterparty unidentified (see
-     * [RegexRule.counterpartyIsUnidentified]) and no persisted mapping claimed the value — the user
-     * mapping the value to a real account is exactly what makes the counterparty known. The account is
-     * then a placeholder for an unknown other end; see `ImportTransfer.unidentifiedCounterpartyAccountId`.
+     * True when the rule that named [mapping]'s account for this row declares the counterparty
+     * unidentified (see [AccountRule.counterpartyIsUnidentified]) and no persisted mapping claimed the
+     * value — the user mapping the value to a real account is exactly what makes the counterparty known.
+     * The account is then a placeholder for an unknown other end; see
+     * `ImportTransfer.unidentifiedCounterpartyAccountId`.
      */
     private fun isUnidentifiedCounterparty(
         mapping: FieldMapping,
         values: List<String>,
-    ): Boolean =
-        when (mapping) {
-            is ConditionalAccountMapping -> isUnidentifiedCounterparty(resolveConditional(mapping, values), values)
-            is RegexAccountMapping -> {
-                val result = getAccountNameFromRegexWithPattern(mapping, values)
-                result.counterpartyIsUnidentified &&
-                    result.accountName.isNotBlank() &&
-                    findPersistedMapping(result.sourceColumnValue) == null
-            }
-            // Every other account mapping either names an account explicitly (a lookup/template) or
-            // resolves an identity (an attribute match), so its counterparty is not a placeholder.
-            else -> false
-        }
+    ): Boolean {
+        val resolution = (mapping as? AccountRulesMapping)?.let { resolveAccount(it, values) } ?: return false
+        return resolution.rule?.counterpartyIsUnidentified == true &&
+            resolution.accountName.isNotBlank() &&
+            findPersistedMapping(resolution.sourceValue) == null
+    }
 
     /**
      * Finds a persisted account mapping whose pattern matches the given account source value
-     * (the value the strategy's account field-mapping resolved for this row). First matching
-     * mapping wins: strategy-scoped mappings are tried before global ones, then id order — so
-     * mappings that share a pattern resolve deterministically.
+     * (the value the strategy's account rule read for this row). First matching mapping wins:
+     * strategy-scoped mappings are tried before global ones, then id order — so mappings that share a
+     * pattern resolve deterministically.
      *
      * @param value The value to match against
      * @return The mapped AccountId, or null if no match found
@@ -1143,178 +1154,28 @@ class CsvTransferMapper(
     /**
      * Determines whether resolving [mapping] for this row requires creating a new account.
      * Returns the account to create together with the discovered mapping for auto-capture,
-     * or null when no new account is needed (existing account, persisted mapping, or blank value).
+     * or null when no new account is needed (existing account, persisted mapping, attribute match, or a
+     * blank name).
      */
     private fun discoverNewAccount(
         mapping: FieldMapping,
         values: List<String>,
         applyPersistedMappings: Boolean = true,
-    ): Pair<NewAccount, DiscoveredAccountMapping>? =
-        when (mapping) {
-            is AccountLookupMapping -> {
-                val csvValue = getColumnValue(mapping.columnName, values)
-                // If a persisted mapping matched, don't create a new account
-                if (applyPersistedMappings && findPersistedMapping(csvValue) != null) {
-                    null
-                } else {
-                    val name = getAccountName(mapping, values)
-                    if (name.isNotBlank() && !accountExists(name)) {
-                        // For AccountLookupMapping, csvValue == name (account name)
-                        NewAccount(name, mapping.defaultCategoryId) to
-                            DiscoveredAccountMapping(csvValue, name)
-                    } else {
-                        null
-                    }
-                }
-            }
-            is RegexAccountMapping -> {
-                val result = getAccountNameFromRegexWithPattern(mapping, values)
-                // If a persisted mapping matched, don't create a new account
-                if (applyPersistedMappings && findPersistedMapping(result.sourceColumnValue) != null) {
-                    null
-                } else if (result.accountName.isNotBlank() && !accountExists(result.accountName)) {
-                    // For RegexAccountMapping, accountName differs from sourceColumnValue
-                    // (e.g., sourceColumnValue="Paxos Technology LTD", accountName="Paxos")
-                    NewAccount(result.accountName, mapping.defaultCategoryId) to
-                        DiscoveredAccountMapping(
-                            csvValue = result.sourceColumnValue,
-                            targetAccountName = result.accountName,
-                            matchedPattern = result.matchedPattern,
-                        )
-                } else {
-                    null
-                }
-            }
-            is TemplateAccountMapping -> {
-                val csvValue = getColumnValue(mapping.columnName, values).trim()
-                val name = templatedAccountName(mapping, csvValue)
-                if ((applyPersistedMappings && findPersistedMapping(csvValue) != null) ||
-                    name.isBlank() ||
-                    accountExists(name)
-                ) {
-                    null
-                } else {
-                    NewAccount(name, mapping.defaultCategoryId) to
-                        DiscoveredAccountMapping(csvValue, name)
-                }
-            }
-            is AttributeMatchAccountMapping -> {
-                val csvValue = getColumnValue(mapping.columnName, values).trim()
-                // No new account when a persisted mapping or an attribute regex resolves the value, or
-                // when the raw value is blank / already an existing account.
-                if ((applyPersistedMappings && findPersistedMapping(csvValue) != null) ||
-                    attributeAccountMatchers[mapping.attributeTypeName]?.match(csvValue) != null ||
-                    csvValue.isBlank() ||
-                    accountExists(csvValue)
-                ) {
-                    null
-                } else {
-                    NewAccount(csvValue, mapping.defaultCategoryId) to
-                        DiscoveredAccountMapping(csvValue, csvValue)
-                }
-            }
-            is ConditionalAccountMapping -> discoverNewAccount(resolveConditional(mapping, values), values, applyPersistedMappings)
-            else -> null
-        }
-
-    /**
-     * Gets the effective account name from an AccountLookupMapping,
-     * trying the primary column first, then fallbacks in order.
-     */
-    private fun getAccountName(
-        mapping: AccountLookupMapping,
-        values: List<String>,
-    ): String =
-        mapping.allColumns
-            .map { getColumnValue(it, values) }
-            .firstOrNull { it.isNotBlank() }
-            .orEmpty()
-
-    /**
-     * Result of resolving a RegexAccountMapping to an account name.
-     */
-    private data class RegexAccountResult(
-        val accountName: String,
-        val sourceColumnValue: String,
-        val matchedPattern: String?,
-        val counterpartyIsPerson: Boolean = false,
-        /** See [RegexRule.counterpartyIsUnidentified]. */
-        val counterpartyIsUnidentified: Boolean = false,
-        /** The counterparty's own name, when it differs from [accountName] (e.g. Monzo's "Monzo <name>" account). */
-        val personName: String? = null,
-    )
-
-    /**
-     * Gets the effective account name and the matched pattern from a RegexAccountMapping.
-     * Returns a pair of (accountName, matchedPattern) where matchedPattern is null if
-     * no regex rule matched (fallback logic was used).
-     */
-    private fun getAccountNameFromRegexWithPattern(
-        mapping: RegexAccountMapping,
-        values: List<String>,
-    ): RegexAccountResult {
-        val primaryValue = getColumnValue(mapping.columnName, values)
-
-        // Try each rule in order; first match wins
-        if (primaryValue.isNotBlank()) {
-            for (rule in mapping.rules) {
-                val match = compiledPattern(rule.pattern).find(primaryValue)
-                if (match != null) {
-                    // When a template is configured, derive the name from the matched text via
-                    // capture-group substitution; otherwise use the fixed account name (legacy behaviour).
-                    val accountName =
-                        rule.accountNameTemplate
-                            ?.let { substituteTemplate(it, match).replace(WHITESPACE_RUN_REGEX, " ").trim() }
-                            ?.takeIf { it.isNotBlank() }
-                            ?: rule.accountName
-                    return RegexAccountResult(
-                        accountName = accountName,
-                        sourceColumnValue = primaryValue,
-                        matchedPattern = rule.pattern,
-                        counterpartyIsPerson = rule.counterpartyIsPerson,
-                        counterpartyIsUnidentified = rule.counterpartyIsUnidentified,
-                        personName = personNameFor(rule, accountName, match),
+    ): Pair<NewAccount, DiscoveredAccountMapping>? {
+        val rulesMapping = mapping as? AccountRulesMapping ?: return null
+        val resolution = resolveAccount(rulesMapping, values)
+        return when {
+            applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null -> null
+            resolution.attributeAccountId != null -> null
+            resolution.accountName.isBlank() || accountExists(resolution.accountName) -> null
+            else ->
+                NewAccount(resolution.accountName, rulesMapping.defaultCategoryId) to
+                    DiscoveredAccountMapping(
+                        csvValue = resolution.sourceValue,
+                        targetAccountName = resolution.accountName,
+                        matchedPattern = resolution.rule?.pattern,
                     )
-                }
-            }
         }
-
-        // No rules matched - use fallback logic (try columns in order for non-empty value)
-        for (columnName in mapping.allColumns) {
-            val columnValue = getColumnValue(columnName, values)
-            if (columnValue.isNotBlank()) {
-                return RegexAccountResult(
-                    accountName = columnValue,
-                    sourceColumnValue = columnValue,
-                    matchedPattern = null,
-                )
-            }
-        }
-
-        // No value found in any column
-        return RegexAccountResult(
-            accountName = "",
-            sourceColumnValue = "",
-            matchedPattern = null,
-        )
-    }
-
-    /**
-     * The person's own name for a matched [rule], when it differs from the (possibly prefixed)
-     * [accountName] — falls back to [accountName], correct whenever the two coincide (e.g. Santander's
-     * rules, which never rename the counterparty's account). Null when [rule] doesn't flag its
-     * counterparty as a person.
-     */
-    private fun personNameFor(
-        rule: RegexRule,
-        accountName: String,
-        match: MatchResult,
-    ): String? {
-        if (!rule.counterpartyIsPerson) return null
-        return rule.personNameTemplate
-            ?.let { substituteTemplate(it, match).replace(WHITESPACE_RUN_REGEX, " ").trim() }
-            ?.takeIf { it.isNotBlank() }
-            ?: accountName
     }
 
     private fun parseTimestamp(
@@ -1393,27 +1254,18 @@ class CsvTransferMapper(
     ): String = rules.resolve(mapping.value) { getColumnValue(it, values) }
 
     /**
-     * Resolves whether the counterparty (target) account for this row is a person, returning its
-     * resolved account name when so (drives Person + ownership creation), or null otherwise.
+     * The person behind the counterparty (target) account for this row when its rule says it is one
+     * (drives Person + ownership creation); null otherwise, or when a persisted account mapping
+     * intentionally remaps the counterparty (e.g. onto an existing account).
      */
     private fun resolvePersonalCounterparty(
         mapping: FieldMapping,
         values: List<String>,
-    ): String? =
-        when (mapping) {
-            is RegexAccountMapping -> {
-                val result = getAccountNameFromRegexWithPattern(mapping, values)
-                when {
-                    !result.counterpartyIsPerson || result.personName.isNullOrBlank() -> null
-                    // A persisted account mapping intentionally remaps this counterparty (e.g. onto an
-                    // existing account), so don't auto-create a Person/ownership from the regex name.
-                    findPersistedMapping(result.sourceColumnValue) != null -> null
-                    else -> result.personName
-                }
-            }
-            is ConditionalAccountMapping -> resolvePersonalCounterparty(resolveConditional(mapping, values), values)
-            else -> null
-        }
+    ): String? {
+        val resolution = (mapping as? AccountRulesMapping)?.let { resolveAccount(it, values) } ?: return null
+        return resolution.personName
+            ?.takeIf { it.isNotBlank() && findPersistedMapping(resolution.sourceValue) == null }
+    }
 
     /** [extraction] applied to [value], or null when its pattern doesn't match. */
     private fun applyExtraction(
@@ -1436,12 +1288,6 @@ class CsvTransferMapper(
         strategy.config.assetCodes
             .canonical(code)
             .let { existingCurrenciesByCode[it] ?: existingCryptoByCode[it] }
-
-    /** [value] cleaned through [extraction] when one is set and matches; otherwise [value] as-is. */
-    private fun extractedOrRaw(
-        value: String,
-        extraction: Extraction?,
-    ): String = extraction?.let { applyExtraction(value, it) } ?: value
 
     private fun getColumnValue(
         columnName: String,
