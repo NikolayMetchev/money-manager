@@ -71,18 +71,7 @@ internal val ApiStrategyConfig.editedTransactionMappings: ApiTransactionMappings
 
 /** This config with [mappings] as its bank feed's mappings (unchanged without a bank feed). */
 internal fun ApiStrategyConfig.withTransactionMappings(mappings: ApiTransactionMappings): ApiStrategyConfig =
-    copy(
-        dataEndpoints =
-            dataEndpoints.map {
-                if (it.kind ==
-                    ApiEndpointKind.BANK_TRANSACTIONS
-                ) {
-                    it.copy(transactionMappings = mappings)
-                } else {
-                    it
-                }
-            },
-    )
+    mapBankTransactionMappings { mappings }
 
 /**
  * Full mutable editing state of the API strategy editor, held across tab switches. Seeded straight
