@@ -647,7 +647,7 @@ class CsvTransferMapper(
             // fee in the row's own asset can be carved out of it.
             val netMagnitude =
                 if (rowFee?.includedInAmount == true && rowFee.amount.asset.id == currency.id) {
-                    rawAmount.abs() - rowFee.magnitude
+                    (rawAmount.abs() - rowFee.magnitude).coerceAtLeast(BigDecimal.ZERO)
                 } else {
                     rawAmount.abs()
                 }
