@@ -195,6 +195,39 @@ class ApiSessionsScreenLogicTest {
     private val strategyA = ApiImportStrategyId(Uuid.parse("00000000-0000-0000-0000-00000000000a"))
     private val strategyB = ApiImportStrategyId(Uuid.parse("00000000-0000-0000-0000-00000000000b"))
 
+    @Test
+    fun sessionsToImportInBulk_takesNeverImportedSessionsOfTheTargetsOldestFirst() {
+        val target = ApiCredentialId(1)
+        val other = ApiCredentialId(2)
+        val newer = session(3, target).copy(createdAt = Instant.fromEpochSeconds(200))
+        val older = session(4, target).copy(createdAt = Instant.fromEpochSeconds(100))
+        val imported = session(5, target)
+        val otherCredential = session(6, other)
+
+        val toImport =
+            sessionsToImportInBulk(
+                sessions = listOf(newer, imported, otherCredential, older),
+                credentialIds = setOf(target),
+                everImportedSessionIds = setOf(imported.id),
+            )
+
+        assertEquals(listOf(older.id, newer.id), toImport.map { it.id })
+    }
+
+    @Test
+    fun bulkDownloadImportSummary_reportsReviewAndFailuresOnlyWhenPresent() {
+        assertEquals(
+            "Downloaded 2 of 2 connection(s). Imported 2 of 2 session(s).",
+            bulkDownloadImportSummary(credentialCount = 2, downloadedCount = 2, sessionCount = 2, importedCount = 2, needsReviewCount = 0),
+        )
+        assertEquals(
+            "Downloaded 1 of 3 connection(s). Imported 1 of 4 session(s). " +
+                "2 session(s) need new counterparties confirmed; import them from their cards. " +
+                "1 import(s) failed or were skipped; see their tasks.",
+            bulkDownloadImportSummary(credentialCount = 3, downloadedCount = 1, sessionCount = 4, importedCount = 1, needsReviewCount = 2),
+        )
+    }
+
     private fun credential(
         id: Long,
         strategyId: ApiImportStrategyId?,

@@ -79,13 +79,14 @@ class BackgroundTaskManager(
 
     fun isRunning(key: String): Boolean = tasks.any { task -> task.key == key && task.status == BackgroundTaskStatus.RUNNING }
 
+    /** Starts [block] as a task, or returns false (running nothing) while a task with [key] is still running. */
     fun startTask(
         key: String,
         title: String,
         initialDetail: String,
         block: suspend BackgroundTaskController.() -> String,
-    ) {
-        if (isRunning(key)) return
+    ): Boolean {
+        if (isRunning(key)) return false
 
         val taskId = nextTaskId++
         tasks.add(
@@ -139,6 +140,7 @@ class BackgroundTaskManager(
                 }
             }
         }
+        return true
     }
 
     private fun updateTask(
