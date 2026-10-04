@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiImportStrategyId
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
@@ -101,8 +102,12 @@ fun ApiStrategyEditorScreen(
     val accountJsonPaths = remember(accountSampleItem) { accountSampleItem?.let { extractJsonPaths(it) } ?: emptyList() }
     val txJsonPaths = remember(txSampleItem) { txSampleItem?.let { extractJsonPaths(it) } ?: emptyList() }
 
-    val accountsArrayKey = state.config.accountsEndpoint.responseArrayKey
-    val transactionsArrayKey = state.config.transactionsEndpoint.responseArrayKey
+    val accountsArrayKey = (state.config.accounts as? ApiAccountsSource.Downloaded)?.endpoint?.responseArrayKey.orEmpty()
+    val transactionsArrayKey =
+        state.config.bankTransactions
+            ?.endpoint
+            ?.responseArrayKey
+            .orEmpty()
 
     // Load sample JSON from the most recent session responses. Prefer credentials linked to this
     // strategy; fall back to all credentials so credentials created before linking still work.

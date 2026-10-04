@@ -1,10 +1,13 @@
 package com.moneymanager.database
 
+import com.moneymanager.apiimporter.discoverApiCounterpartiesToCreate
 import com.moneymanager.builtin.BuiltInApiStrategies
 import com.moneymanager.database.json.ApiStrategyExportCodec
+import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
-import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
+import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
@@ -18,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -42,6 +46,29 @@ class BuiltInApiStrategyInstallTest : DbTest() {
         }
 
     @Test
+    fun `an exchange strategy has no bank counterparties to suggest`() =
+        runTest {
+            repositories.installBuiltInApiStrategies()
+            val coinbase =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Coinbase" }
+
+            // The Import button asks every strategy for suggestions first, so one without a bank feed must
+            // answer "none" rather than fail.
+            assertEquals(
+                emptyList(),
+                discoverApiCounterpartiesToCreate(
+                    repositories.apiSessionRepository,
+                    repositories.accountAttributeRepository,
+                    ApiSessionId(1),
+                    coinbase,
+                ),
+            )
+        }
+
+    @Test
     fun `the Coinbase strategy installs with its JWT-signed exchange configuration`() =
         runTest {
             repositories.installBuiltInApiStrategies()
@@ -51,10 +78,10 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .first { it.name == "Coinbase" }
 
-            assertEquals(ApiAuthType.SIGNED, coinbase.config.authType)
+            assertTrue(coinbase.config.isSigned)
             val jwt = assertNotNull(coinbase.config.requestSigning?.jwt, "JWT signing recipe persisted")
             assertEquals(listOf("iss", "sub", "nbf", "exp", "uri"), jwt.claims.map { it.name })
-            assertEquals("Coinbase", assertNotNull(coinbase.config.syntheticAccount).name)
+            assertEquals("Coinbase", assertIs<ApiAccountsSource.Single>(coinbase.config.accounts).name)
             val ledger = coinbase.config.dataEndpoints.first { it.endpoint.fanOut != null }
             assertTrue(assertNotNull(ledger.endpoint.fanOut).preserveCase, "wallet ids keep their case")
             assertEquals(
@@ -97,12 +124,15 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .first { it.name == "Bybit" }
 
-            assertEquals(ApiAuthType.SIGNED, bybit.config.authType)
+            assertTrue(bybit.config.isSigned)
             val signing = assertNotNull(bybit.config.requestSigning, "signing recipe persisted")
             assertEquals(mapOf("X-BAPI-RECV-WINDOW" to "20000"), signing.staticHeaders)
-            assertEquals("Bybit", assertNotNull(bybit.config.syntheticAccount).name)
+            assertEquals("Bybit", assertIs<ApiAccountsSource.Single>(bybit.config.accounts).name)
             val trades = bybit.config.dataEndpoints.first { it.endpoint.path == "v5/execution/list" }
-            assertTrue(assertNotNull(trades.endpoint.pagination).nextCursorUrlEncoded, "pre-encoded cursor flag persisted")
+            assertTrue(
+                assertIs<ApiPaging.Token>(assertNotNull(trades.endpoint.pagination).paging).urlEncoded,
+                "pre-encoded cursor flag persisted",
+            )
             val earn = bybit.config.dataEndpoints.first { it.endpoint.path == "v5/earn/order" }
             assertEquals(ApiSignSource.FIELD, assertNotNull(earn.transactionMappings).signSource)
             val ledgers = bybit.config.dataEndpoints.filter { it.endpoint.path == "v5/account/transaction-log" }
@@ -127,7 +157,6 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             for (strategy in BuiltInApiStrategies.builtInApiStrategies(now).filter { it.name != "Bybit" }) {
                 val json = ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(strategy, "test"))
                 assertTrue("staticHeaders" !in json, "${strategy.name} must keep its hash")
-                assertTrue("nextCursorUrlEncoded" !in json, "${strategy.name} must keep its hash")
             }
         }
 
@@ -141,12 +170,12 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .first { it.name == "Kraken" }
 
-            assertEquals(ApiAuthType.SIGNED, kraken.config.authType)
+            assertTrue(kraken.config.isSigned)
             val signing = assertNotNull(kraken.config.requestSigning, "signing recipe persisted")
             assertEquals(SigningAlgorithm.HMAC_SHA512, signing.algorithm)
             assertEquals(SecretEncoding.BASE64, signing.secretEncoding)
             assertEquals(SignatureEncoding.BASE64, signing.signatureEncoding)
-            assertEquals("Kraken", assertNotNull(kraken.config.syntheticAccount).name)
+            assertEquals("Kraken", assertIs<ApiAccountsSource.Single>(kraken.config.accounts).name)
             assertTrue(kraken.config.dataEndpoints.isNotEmpty(), "data endpoints persisted")
             assertTrue(
                 kraken.config.assetCodes.aliases
@@ -170,10 +199,10 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .first { it.name == "Crypto.com Exchange" }
 
-            assertEquals(ApiAuthType.SIGNED, exchange.config.authType)
+            assertTrue(exchange.config.isSigned)
             // The generic signing recipe + single account + data endpoints survive the JSON round trip.
             assertNotNull(exchange.config.requestSigning, "signing recipe persisted")
-            assertEquals("Crypto.com Exchange", assertNotNull(exchange.config.syntheticAccount).name)
+            assertEquals("Crypto.com Exchange", assertIs<ApiAccountsSource.Single>(exchange.config.accounts).name)
             assertTrue(exchange.config.dataEndpoints.isNotEmpty(), "data endpoints persisted")
             assertNotNull(exchange.config.internalTransferReconcile, "internal-transfer reconciliation persisted")
             assertEquals(
@@ -206,12 +235,12 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     original.id,
                     now,
                 )
-            assertEquals(original.config.authType, rebuilt.config.authType)
+            assertEquals(original.config.isSigned, rebuilt.config.isSigned)
             assertEquals(original.config.requestSigning, rebuilt.config.requestSigning)
             // dataEndpoints round-trips through a canonical (sorted) order - see
             // SortedDataEndpointListSerializer - so compare as sets rather than ordered lists.
             assertEquals(original.config.dataEndpoints.toSet(), rebuilt.config.dataEndpoints.toSet())
-            assertEquals(original.config.syntheticAccount, rebuilt.config.syntheticAccount)
+            assertEquals(original.config.accounts, rebuilt.config.accounts)
             assertEquals(original.config.internalTransferReconcile, rebuilt.config.internalTransferReconcile)
         }
 
@@ -225,10 +254,10 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first()
                     .first { it.name == "Binance" }
 
-            assertEquals(ApiAuthType.SIGNED, binance.config.authType)
+            assertTrue(binance.config.isSigned)
             val signing = assertNotNull(binance.config.requestSigning, "signing recipe persisted")
             assertEquals(SigningAlgorithm.HMAC_SHA256, signing.algorithm)
-            assertEquals("Binance", assertNotNull(binance.config.syntheticAccount).name)
+            assertEquals("Binance", assertIs<ApiAccountsSource.Single>(binance.config.accounts).name)
             assertTrue(binance.config.valueEndpoints.isNotEmpty(), "value endpoints persisted")
             val myTrades = binance.config.dataEndpoints.first { it.endpoint.path == "api/v3/myTrades" }
             assertNotNull(myTrades.endpoint.fanOut, "spot-trade fan-out persisted")
@@ -255,9 +284,9 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             val original = BuiltInApiStrategies.binance(now)
             val json = ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(original, "test"))
             val rebuilt = ApiStrategyExportMapper.fromExport(ApiStrategyExportCodec.decode(json), original.id, now)
-            assertEquals(original.config.authType, rebuilt.config.authType)
+            assertEquals(original.config.isSigned, rebuilt.config.isSigned)
             assertEquals(original.config.requestSigning, rebuilt.config.requestSigning)
-            assertEquals(original.config.syntheticAccount, rebuilt.config.syntheticAccount)
+            assertEquals(original.config.accounts, rebuilt.config.accounts)
             assertEquals(original.config.dataEndpoints.size, rebuilt.config.dataEndpoints.size)
             assertEquals(original.config.valueEndpoints.size, rebuilt.config.valueEndpoints.size)
             val rebuiltMyTrades = rebuilt.config.dataEndpoints.first { it.endpoint.path == "api/v3/myTrades" }
@@ -282,27 +311,28 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .first { it.name == "Starling" }
 
             assertEquals("https://api.starlingbank.com", starling.config.baseUrl)
-            assertEquals("/api/v2/accounts", starling.config.accountsEndpoint.path)
-            assertEquals("accounts", starling.config.accountsEndpoint.responseArrayKey)
+            val starlingAccounts = assertIs<ApiAccountsSource.Downloaded>(starling.config.accounts)
+            assertEquals("/api/v2/accounts", starlingAccounts.endpoint.path)
+            assertEquals("accounts", starlingAccounts.endpoint.responseArrayKey)
             assertEquals(
                 "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
-                starling.config.transactionsEndpoint.path,
+                checkNotNull(starling.config.bankTransactions).endpoint.path,
             )
-            assertEquals("feedItems", starling.config.transactionsEndpoint.responseArrayKey)
+            assertEquals("feedItems", checkNotNull(starling.config.bankTransactions).endpoint.responseArrayKey)
             // Full history is returned in one response, so no pagination is configured.
-            assertEquals(null, starling.config.transactionsEndpoint.pagination)
+            assertEquals(null, checkNotNull(starling.config.bankTransactions).endpoint.pagination)
 
-            assertEquals("accountUid", starling.config.accountMappings.idField)
-            assertEquals("currency", starling.config.accountMappings.currencyField)
+            assertEquals("accountUid", starlingAccounts.mappings.idField)
+            assertEquals("currency", starlingAccounts.mappings.currencyField)
             // Own bank details come from the per-account identifiers endpoint, not the /accounts response.
-            assertEquals("bankIdentifier", starling.config.accountMappings.sortCodeField)
-            assertEquals("accountIdentifier", starling.config.accountMappings.accountNumberField)
+            assertEquals("bankIdentifier", starlingAccounts.mappings.sortCodeField)
+            assertEquals("accountIdentifier", starlingAccounts.mappings.accountNumberField)
             assertEquals(
                 "/api/v2/accounts/{account.id}/identifiers",
-                assertNotNull(starling.config.accountIdentifiersEndpoint, "Starling should configure an identifiers endpoint").path,
+                assertNotNull(starlingAccounts.identifiersEndpoint, "Starling should configure an identifiers endpoint").path,
             )
 
-            with(starling.config.transactionMappings) {
+            with(checkNotNull(starling.config.bankTransactions?.transactionMappings)) {
                 assertEquals("amount.minorUnits", amountField)
                 assertEquals(ApiAmountFormat.MINOR_UNITS_INTEGER, amountFormat)
                 assertEquals(ApiSignSource.FIELD, signSource)

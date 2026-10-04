@@ -2,23 +2,21 @@ package com.moneymanager.ui.screens.apistrategy.editor
 
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
-import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
-import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
-import com.moneymanager.domain.model.apistrategy.ApiAuthType
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
+import com.moneymanager.domain.model.apistrategy.ApiDateWindowing
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
-import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
-import com.moneymanager.domain.model.apistrategy.ApiSyntheticAccount
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.BodyFormat
@@ -27,7 +25,6 @@ import com.moneymanager.domain.model.apistrategy.FieldPlacement
 import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.NonceFormat
 import com.moneymanager.domain.model.apistrategy.NonceSpec
-import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SigFieldLocation
@@ -57,97 +54,10 @@ class ApiStrategyEditorStateTest {
             config =
                 ApiStrategyConfig(
                     baseUrl = "https://api.example.com",
-                    authType = ApiAuthType.BEARER_TOKEN,
-                    accountsEndpoint = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts"),
-                    transactionsEndpoint =
-                        ApiEndpointConfig(
-                            path = "/transactions",
-                            responseArrayKey = "transactions",
-                            queryParams = listOf(ApiQueryParam(name = "account_id", dynamicSource = "account.id")),
-                            pagination =
-                                ApiPaginationConfig(
-                                    mode = PaginationMode.DATE_WINDOW,
-                                    windowDays = 90,
-                                    lookbackDays = 720,
-                                    extraParams = listOf(ApiQueryParam(name = "currency", value = "GBP")),
-                                ),
-                        ),
-                    accountMappings =
-                        ApiAccountMappings(
-                            sortCodeField = "sortCode",
-                            accountNumberField = "accountNumber",
-                            currencyField = "currency",
-                            customFields = mapOf("kind" to "type"),
-                            uniqueIdentifierFields = setOf("kind"),
-                        ),
-                    transactionMappings =
-                        ApiTransactionMappings(
-                            amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                            signSource = ApiSignSource.FIELD,
-                            signField = "direction",
-                            creditValues = setOf("CREDIT"),
-                            declinedWhen = listOf(Condition("status", ConditionOp.IN, value = "DECLINED")),
-                            feeAmountField = "fee",
-                            customFields = mapOf("note" to "reference"),
-                            uniqueIdentifierFields = setOf("note"),
-                        ),
-                    peopleMappings =
-                        ApiPeopleMappings(
-                            personalBeneficiaryAccountTypeValues = setOf("PAYEE", "SENDER"),
-                            preferBankIdentity = true,
-                        ),
-                    accountIdentifiersEndpoint =
-                        ApiEndpointConfig(path = "/accounts/{account.id}/identifiers", responseArrayKey = ""),
-                    ancestorEndpoints = listOf(ApiEndpointConfig(path = "/profiles", responseArrayKey = "")),
-                    builtInCounterpartyRules =
-                        listOf(
-                            BuiltInCounterpartyRule(
-                                name = "ATM",
-                                onlyWhenSign = RuleSign.NEGATIVE,
-                                predicates =
-                                    listOf(
-                                        Condition("metadata.mcc", ConditionOp.EQUALS, value = "6011"),
-                                        Condition("scheme", ConditionOp.EXISTS),
-                                    ),
-                            ),
-                        ),
-                    signing = ApiSigningConfig(triggerStatus = 401, statementCountries = setOf("GB", "US")),
-                    peopleDownload =
-                        ApiPersonImportConfig(
-                            endpoint = ApiEndpointConfig(path = "/profiles", responseArrayKey = ""),
-                            firstNameField = "details.firstName",
-                            lastNameField = "details.lastName",
-                            ownsAllAccounts = true,
-                        ),
-                    personExternalIdAttribute = "example-external-id",
-                    tokenPageUrl = "https://example.com/developer/tokens",
-                    connectInstructions = listOf("Sign in.", "Create a token.", "Paste it below."),
-                    rateLimitMillis = 3_100L,
-                    rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
-                    rateLimitBackoffMillis = 5_000L,
-                    maxRateLimitRetries = 6,
-                    assetCodes = AssetCodeRules(aliases = mapOf("XXBT" to "BTC", "ZUSD" to "USD"), stripSuffixes = setOf(".F", ".S", ".M")),
-                    minorUnitDivisorOverrides = mapOf("GBP" to 1000L),
-                    // A Kraken-style recipe: exercises the recursive Sha256 SigPart nesting.
-                    requestSigning =
-                        ApiRequestSigningConfig(
-                            algorithm = SigningAlgorithm.HMAC_SHA512,
-                            secretEncoding = SecretEncoding.BASE64,
-                            signatureEncoding = SignatureEncoding.BASE64,
-                            message = listOf(SigPart.Path, SigPart.Sha256(listOf(SigPart.Nonce, SigPart.Body))),
-                            apiKey = FieldPlacement(SigFieldLocation.HEADER, "API-Key"),
-                            nonce =
-                                NonceSpec(
-                                    format = NonceFormat.EPOCH_MS,
-                                    placement = FieldPlacement(SigFieldLocation.BODY_FIELD, "nonce"),
-                                ),
-                            signature = FieldPlacement(SigFieldLocation.HEADER, "API-Sign"),
-                            bodyFormat = BodyFormat.FORM_URLENCODED,
-                        ),
+                    accounts = ApiAccountsSource.Single(name = "Crypto.com Exchange", externalId = "cryptocom-exchange"),
                     dataEndpoints =
                         listOf(
                             ApiDataEndpoint(
-                                // Kraken-shaped: keyed-object response, error-array success check, offset paging.
                                 endpoint =
                                     ApiEndpointConfig(
                                         path = "/private/get-trades",
@@ -161,10 +71,8 @@ class ApiStrategyEditorStateTest {
                                         requestCostWeight = 2,
                                         pagination =
                                             ApiPaginationConfig(
-                                                mode = PaginationMode.DATE_WINDOW,
-                                                windowBoundFormat = WindowBoundFormat.EPOCH_S,
-                                                offsetParam = "ofs",
-                                                totalCountField = "result.count",
+                                                window = ApiDateWindowing(boundFormat = WindowBoundFormat.EPOCH_S),
+                                                paging = ApiPaging.Offset(param = "ofs", totalCountField = "result.count"),
                                                 incrementalOverlapDays = 3,
                                             ),
                                     ),
@@ -201,7 +109,66 @@ class ApiStrategyEditorStateTest {
                                 enrichesTransfers = true,
                             ),
                         ),
-                    syntheticAccount = ApiSyntheticAccount(name = "Crypto.com Exchange", externalId = "cryptocom-exchange"),
+                    peopleMappings =
+                        ApiPeopleMappings(
+                            personalBeneficiaryAccountTypeValues = setOf("PAYEE", "SENDER"),
+                            preferBankIdentity = true,
+                        ),
+                    builtInCounterpartyRules =
+                        listOf(
+                            BuiltInCounterpartyRule(
+                                name = "ATM",
+                                onlyWhenSign = RuleSign.NEGATIVE,
+                                predicates =
+                                    listOf(
+                                        Condition("metadata.mcc", ConditionOp.EQUALS, value = "6011"),
+                                        Condition("scheme", ConditionOp.EXISTS),
+                                    ),
+                            ),
+                        ),
+                    signing = ApiSigningConfig(triggerStatus = 401, statementCountries = setOf("GB", "US")),
+                    peopleDownload =
+                        ApiPersonImportConfig(
+                            endpoint = ApiEndpointConfig(path = "/profiles", responseArrayKey = ""),
+                            firstNameField = "details.firstName",
+                            lastNameField = "details.lastName",
+                            ownsAllAccounts = true,
+                        ),
+                    personExternalIdAttribute = "example-external-id",
+                    tokenPageUrl = "https://example.com/developer/tokens",
+                    connectInstructions = listOf("Sign in.", "Create a token.", "Paste it below."),
+                    rateLimitMillis = 3_100L,
+                    rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
+                    rateLimitBackoffMillis = 5_000L,
+                    maxRateLimitRetries = 6,
+                    assetCodes =
+                        AssetCodeRules(
+                            aliases =
+                                mapOf(
+                                    "XXBT" to "BTC",
+                                    "ZUSD" to "USD",
+                                ),
+                            stripSuffixes = setOf(".F", ".S", ".M"),
+                        ),
+                    minorUnitDivisorOverrides =
+                        mapOf(
+                            "GBP" to 1000L,
+                        ),
+                    requestSigning =
+                        ApiRequestSigningConfig(
+                            algorithm = SigningAlgorithm.HMAC_SHA512,
+                            secretEncoding = SecretEncoding.BASE64,
+                            signatureEncoding = SignatureEncoding.BASE64,
+                            message = listOf(SigPart.Path, SigPart.Sha256(listOf(SigPart.Nonce, SigPart.Body))),
+                            apiKey = FieldPlacement(SigFieldLocation.HEADER, "API-Key"),
+                            nonce =
+                                NonceSpec(
+                                    format = NonceFormat.EPOCH_MS,
+                                    placement = FieldPlacement(SigFieldLocation.BODY_FIELD, "nonce"),
+                                ),
+                            signature = FieldPlacement(SigFieldLocation.HEADER, "API-Sign"),
+                            bodyFormat = BodyFormat.FORM_URLENCODED,
+                        ),
                     internalTransferReconcile =
                         ApiInternalTransferReconcile(
                             bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
@@ -243,11 +210,9 @@ class ApiStrategyEditorStateTest {
         val state = ApiStrategyEditorState(strategy = null)
         state.name = "My API"
         state.updateConfig { copy(baseUrl = "https://api.example.com") }
-        state.updateConfig {
-            copy(transactionMappings = transactionMappings.copy(signSource = ApiSignSource.FIELD, signField = null))
-        }
+        state.updateConfig { mapBankTransactionMappings { copy(signSource = ApiSignSource.FIELD, signField = null) } }
         assertTrue(state.transactionMappingsHasError)
-        state.updateConfig { copy(transactionMappings = transactionMappings.copy(signField = "direction")) }
+        state.updateConfig { mapBankTransactionMappings { copy(signField = "direction") } }
         assertFalse(state.transactionMappingsHasError)
     }
 
@@ -257,11 +222,16 @@ class ApiStrategyEditorStateTest {
         state.name = "My API"
         state.updateConfig { copy(baseUrl = "https://api.example.com") }
         // A path-less "is blank" exclusion would hold for every item and exclude them all.
-        state.updateConfig { copy(transactionMappings = transactionMappings.copy(excludeWhen = listOf(Condition("", ConditionOp.BLANK)))) }
+        state.updateConfig { mapBankTransactionMappings { copy(excludeWhen = listOf(Condition("", ConditionOp.BLANK))) } }
         assertTrue(state.transactionMappingsHasError)
-        state.updateConfig { copy(transactionMappings = transactionMappings.copy(excludeWhen = emptyList())) }
+        state.updateConfig { mapBankTransactionMappings { copy(excludeWhen = emptyList()) } }
+        assertFalse(state.transactionMappingsHasError)
         state.updateConfig {
-            copy(transactionMappings = transactionMappings.copy(itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = ""))))
+            mapBankTransactionMappings {
+                copy(
+                    itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "")),
+                )
+            }
         }
         assertTrue(state.transactionMappingsHasError)
     }

@@ -2,6 +2,7 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingsExport
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
@@ -50,7 +51,7 @@ class StrategyExportUnsortedCollectionGuardTest {
     private val orderedByDesign: Set<Pair<KClass<*>, String>> =
         setOf(
             // Positional ("ancestor[N]." expressions) / first-match-wins / sequential-mutation semantics.
-            ApiStrategyConfig::class to "ancestorEndpoints",
+            ApiAccountsSource.Downloaded::class to "ancestorEndpoints",
             ApiStrategyConfig::class to "builtInCounterpartyRules",
             ApiAccountMappings::class to "accountNameRules",
             ApiStrategyConfig::class to "connectInstructions",

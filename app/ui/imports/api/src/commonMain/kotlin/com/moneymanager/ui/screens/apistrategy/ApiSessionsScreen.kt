@@ -62,19 +62,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.apiimporter.API_ENGINE_BATCH_SIZE
 import com.moneymanager.apiimporter.ApiCounterpartySuggestion
+import com.moneymanager.apiimporter.ApiDownloadCredentials
+import com.moneymanager.apiimporter.ApiDownloadNotPossibleException
+import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.ApiSessionDownloadResult
-import com.moneymanager.apiimporter.ApiSessionImportProgress
 import com.moneymanager.apiimporter.ApiSessionImportResult
 import com.moneymanager.apiimporter.ApiTransactionsDownloadProgress
 import com.moneymanager.apiimporter.discoverApiCounterpartiesToCreate
 import com.moneymanager.apiimporter.displaySummary
-import com.moneymanager.apiimporter.downloadApiSessionAccountIdentifiers
-import com.moneymanager.apiimporter.downloadApiSessionAccounts
-import com.moneymanager.apiimporter.downloadApiSessionPeople
-import com.moneymanager.apiimporter.downloadApiSessionTransactions
-import com.moneymanager.apiimporter.importApiSessionExchange
-import com.moneymanager.apiimporter.importApiSessionPeople
-import com.moneymanager.apiimporter.importApiSessionTransactions
+import com.moneymanager.apiimporter.downloadApiSession
+import com.moneymanager.apiimporter.importApiSession
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.VaultState
@@ -104,6 +101,7 @@ import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
+import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.rest.ApiSessionTrafficRecorder
@@ -184,7 +182,7 @@ fun ApiSessionsScreen(
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
-    var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportProgress>>(emptyMap()) }
+    var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, ImportProgress>>(emptyMap()) }
     // Sessions whose import was clicked but whose background task has not yet registered — the gap covers
     // the counterparty-discovery scan and the engine's initial index build, both of which can run for
     // seconds on a large database with no progress callback. Tracking it here lets the button grey out and
@@ -296,93 +294,37 @@ fun ApiSessionsScreen(
             initialDetail = "Starting import for session #${session.id}.",
         ) {
             val importStartedAt = System.currentTimeMillis()
-
-            // Signed exchange strategies use the generic exchange import (trades + deposits/withdrawals)
-            // instead of the bank-shaped accounts→transactions→people path.
-            if (strategy.config.syntheticAccount != null) {
-                val exchangeResult =
-                    importApiSessionExchange(
-                        apiSessionRepository = apiSessionRepository,
-                        accountRepository = accountRepository,
-                        currencyRepository = currencyRepository,
-                        cryptoRepository = cryptoRepository,
-                        sessionId = session.id,
-                        strategy = strategy,
-                        importEngine = importEngine,
-                        onProgress = { progress ->
-                            // Joined, not fire-and-forget: the import runs off the Compose scope, so an
-                            // un-awaited update could land after the completion path clears this session
-                            // and leave a finished import showing progress forever.
-                            scope
-                                .launch {
-                                    importProgressBySession =
-                                        importProgressBySession +
-                                        (session.id to ApiSessionImportProgress(progress.detail, progress.fraction))
-                                }.join()
-                            update(progress.detail, progress.fraction)
-                        },
-                        engineBatchSize = API_ENGINE_BATCH_SIZE,
-                    )
-                importEngine.markApiSessionImported(
-                    id = session.id,
-                    revisionId = strategy.revisionId,
-                    importedAt = Clock.System.now(),
-                    importDurationMillis = System.currentTimeMillis() - importStartedAt,
-                )
-                // Rebuild balance materialized views so the imported transfers/trades show up (the
-                // bank path does this too); then surface the per-session result and refresh the list.
-                maintenance.refreshMaterializedViews()
-                importResultBySession =
-                    importResultBySession +
-                    (
-                        session.id to
-                            ApiSessionImportResult(
-                                accountCount = 0,
-                                transactionCount = exchangeResult.tradesImported + exchangeResult.transfersImported,
-                                duplicateCount = exchangeResult.duplicatesSkipped,
-                            )
-                    )
-                importProgressBySession = importProgressBySession - session.id
-                refresh()
-                onTransactionsImported()
-                return@startTask "Imported ${exchangeResult.tradesImported} trades and ${exchangeResult.transfersImported} transfers."
-            }
-
-            // Transactions import creates the accounts and the people derived from transactions/accounts.
-            val transactionsResult =
-                importApiSessionTransactions(
-                    apiSessionRepository = apiSessionRepository,
-                    currencyRepository = currencyRepository,
+            val outcome =
+                importApiSession(
+                    reads =
+                        ApiImportReads(
+                            apiSessionRepository = apiSessionRepository,
+                            accountRepository = accountRepository,
+                            accountAttributeRepository = accountAttributeRepository,
+                            currencyRepository = currencyRepository,
+                            cryptoRepository = cryptoRepository,
+                        ),
                     sessionId = session.id,
                     strategy = strategy,
                     importEngine = importEngine,
                     counterpartyAccountNames = counterpartyAccountNames,
                     passThroughAccounts = passThroughAccounts,
                     onProgress = { progress ->
-                        scope.launch {
-                            importProgressBySession = importProgressBySession + (session.id to progress)
-                        }
-                        update(progress.detail, progress.progress)
+                        // Joined, not fire-and-forget: the import runs off the Compose scope, so an
+                        // un-awaited update could land after the completion path clears this session
+                        // and leave a finished import showing progress forever.
+                        scope.launch { importProgressBySession = importProgressBySession + (session.id to progress) }.join()
+                        update(progress.detail, progress.fraction)
                     },
+                    engineBatchSize = API_ENGINE_BATCH_SIZE,
                 )
-            // The dedicated people endpoint (account holders) is imported afterwards so the accounts
-            // it links owners to already exist. No-op when the strategy has no people-download config.
-            val peopleResult =
-                if (strategy.config.peopleDownload != null) {
-                    importApiSessionPeople(
-                        apiSessionRepository = apiSessionRepository,
-                        accountAttributeRepository = accountAttributeRepository,
-                        importEngine = importEngine,
-                        sessionId = session.id,
-                        strategy = strategy,
-                        accountsSessionId = session.id,
-                    )
-                } else {
-                    null
-                }
             val result =
-                transactionsResult.copy(
-                    personCount = transactionsResult.personCount + (peopleResult?.personCount ?: 0),
+                ApiSessionImportResult(
+                    accountCount = outcome.accountCount,
+                    transactionCount = outcome.transactionCount + outcome.tradeCount,
+                    personCount = outcome.personCount,
+                    duplicateCount = outcome.duplicateCount,
+                    errorCount = outcome.errorCount,
                 )
             val importDurationMillis = System.currentTimeMillis() - importStartedAt
             importEngine.markApiSessionImported(
@@ -624,114 +566,33 @@ fun ApiSessionsScreen(
                                                         ),
                                                     engine = null,
                                                 )
-                                            // Signed exchange strategies download via the generic
-                                            // config-driven exchange path (signed POST/GET per endpoint).
-                                            if (strategy.config.syntheticAccount != null) {
-                                                // Fail with a clear message before making any signed request
-                                                // if the strategy is misconfigured or the credential has no
-                                                // secret (e.g. imported/migrated without one).
-                                                val requestSigning =
-                                                    strategy.config.requestSigning
-                                                        ?: return@startTask "This strategy is missing its request-signing config."
-                                                val apiSecret =
-                                                    credentialSecrets.apiSecret?.takeIf { it.isNotBlank() }
-                                                        ?: return@startTask "This credential has no API secret; reconnect it."
-                                                update("Downloading exchange data...")
-                                                val signer = com.moneymanager.rest.ApiRequestSigner(requestSigning)
-                                                val exchangeDownload =
-                                                    com.moneymanager.apiimporter.downloadApiSessionExchange(
-                                                        apiClient = apiClient,
-                                                        signer = signer,
-                                                        apiKey = credentialSecrets.token,
-                                                        apiSecret = apiSecret,
-                                                        apiSessionRepository = apiSessionRepository,
-                                                        sessionId = newSessionId,
-                                                        strategy = strategy,
-                                                        importEngine = importEngine,
-                                                        watermarks = watermarks,
-                                                        forceFullDownload = forceFull,
-                                                        onProgress = { progress ->
-                                                            downloadProgressByCredential =
-                                                                downloadProgressByCredential + (credential.id to progress)
-                                                            update(progress.downloadDetail())
-                                                        },
-                                                    )
-                                                val exchangeResult =
-                                                    ApiSessionDownloadResult(
-                                                        accounts = com.moneymanager.apiimporter.ApiAccountsDownloadResult(accountCount = 1),
-                                                        transactions = exchangeDownload,
-                                                        people = null,
-                                                    )
-                                                downloadResultByCredential =
-                                                    downloadResultByCredential + (credential.id to exchangeResult)
-                                                downloadProgressByCredential = downloadProgressByCredential - credential.id
-                                                refresh()
-                                                return@startTask exchangeResult.displaySummary()
-                                            }
-                                            val sca = scaParamsFor(strategy, credentialSecrets)
-                                            update("Downloading accounts...")
-                                            val accounts =
-                                                downloadApiSessionAccounts(
-                                                    token = credentialSecrets.token,
-                                                    apiClient = apiClient,
-                                                    apiSessionRepository = apiSessionRepository,
-                                                    sessionId = newSessionId,
-                                                    strategy = strategy,
-                                                    sca = sca,
-                                                )
-                                            if (strategy.config.accountIdentifiersEndpoint != null) {
-                                                update("Downloading account identifiers...")
-                                                downloadApiSessionAccountIdentifiers(
-                                                    token = credentialSecrets.token,
-                                                    apiClient = apiClient,
-                                                    apiSessionRepository = apiSessionRepository,
-                                                    sessionId = newSessionId,
-                                                    strategy = strategy,
-                                                    sca = sca,
-                                                )
-                                            }
-                                            val transactions =
-                                                if (transactionsBlocked) {
-                                                    null
-                                                } else {
-                                                    update("Downloading transactions...")
-                                                    downloadApiSessionTransactions(
-                                                        token = credentialSecrets.token,
-                                                        apiClient = apiClient,
-                                                        apiSessionRepository = apiSessionRepository,
-                                                        sessionId = newSessionId,
-                                                        strategy = strategy,
-                                                        sca = sca,
-                                                        importEngine = importEngine,
-                                                        watermarks = watermarks,
-                                                        forceFullDownload = forceFull,
-                                                        onProgress = { progress ->
-                                                            downloadProgressByCredential =
-                                                                downloadProgressByCredential + (credential.id to progress)
-                                                            update(progress.downloadDetail())
-                                                        },
-                                                    )
-                                                }
-                                            val people =
-                                                if (strategy.config.peopleDownload != null) {
-                                                    update("Downloading people...")
-                                                    downloadApiSessionPeople(
-                                                        token = credentialSecrets.token,
-                                                        apiClient = apiClient,
-                                                        apiSessionRepository = apiSessionRepository,
-                                                        sessionId = newSessionId,
-                                                        strategy = strategy,
-                                                        sca = sca,
-                                                    )
-                                                } else {
-                                                    null
-                                                }
                                             val result =
-                                                ApiSessionDownloadResult(
-                                                    accounts = accounts,
-                                                    transactions = transactions,
-                                                    people = people,
-                                                )
+                                                try {
+                                                    downloadApiSession(
+                                                        apiClient = apiClient,
+                                                        apiSessionRepository = apiSessionRepository,
+                                                        sessionId = newSessionId,
+                                                        strategy = strategy,
+                                                        importEngine = importEngine,
+                                                        credentials =
+                                                            ApiDownloadCredentials(
+                                                                token = credentialSecrets.token,
+                                                                apiSecret = credentialSecrets.apiSecret,
+                                                                sca = scaParamsFor(strategy, credentialSecrets),
+                                                            ),
+                                                        watermarks = watermarks,
+                                                        forceFullDownload = forceFull,
+                                                        transactionsBlocked = transactionsBlocked,
+                                                        onPhase = { update(it) },
+                                                        onProgress = { progress ->
+                                                            downloadProgressByCredential =
+                                                                downloadProgressByCredential + (credential.id to progress)
+                                                            update(progress.downloadDetail())
+                                                        },
+                                                    )
+                                                } catch (notPossible: ApiDownloadNotPossibleException) {
+                                                    return@startTask notPossible.message
+                                                }
                                             downloadResultByCredential =
                                                 downloadResultByCredential + (credential.id to result)
                                             downloadProgressByCredential = downloadProgressByCredential - credential.id
@@ -1003,7 +864,7 @@ private fun CredentialCard(
     downloadProgress: ApiTransactionsDownloadProgress?,
     importResultBySession: Map<ApiSessionId, ApiSessionImportResult>,
     importErrorBySession: Map<ApiSessionId, String>,
-    importProgressBySession: Map<ApiSessionId, ApiSessionImportProgress>,
+    importProgressBySession: Map<ApiSessionId, ImportProgress>,
     importedSessionRevisions: Set<ApiSessionImportRevision>,
     selectedStrategyRevision: Long?,
     isImportingSession: (ApiSessionId) -> Boolean,
@@ -1144,7 +1005,7 @@ private fun SessionRow(
     hasEverBeenImported: Boolean,
     importResult: ApiSessionImportResult?,
     importError: String?,
-    importProgress: ApiSessionImportProgress?,
+    importProgress: ImportProgress?,
     onImport: () -> Unit,
     onReimport: () -> Unit,
     onOpenTraffic: () -> Unit,
@@ -1211,7 +1072,7 @@ private fun SessionRow(
         }
 
         if (isImporting) {
-            val fraction = importProgress?.progress
+            val fraction = importProgress?.fraction
             // Before the first engine progress arrives, the import is still in the UI-side preparation
             // phase (resolving the strategy, scanning for counterparties, loading the session) — so label
             // it accurately as "Preparing import…" rather than the misleading "Importing…". Once progress

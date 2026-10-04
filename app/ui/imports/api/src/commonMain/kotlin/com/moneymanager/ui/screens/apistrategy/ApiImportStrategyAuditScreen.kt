@@ -95,18 +95,16 @@ private fun flattenInto(
  */
 private val sectionLabels =
     mapOf(
-        "accountMappings" to "Account",
-        "transactionMappings" to "Transaction",
+        "accounts.mappings" to "Account",
+        "accounts.endpoint" to "Accounts endpoint",
+        "accounts.identifiersEndpoint" to "Account identifiers endpoint",
+        "accounts.ancestorEndpoints" to "Ancestor endpoint",
+        "accounts" to "Account",
         "peopleMappings" to "",
-        "accountsEndpoint" to "Accounts endpoint",
-        "transactionsEndpoint" to "Transactions endpoint",
-        "accountIdentifiersEndpoint" to "Account identifiers endpoint",
-        "ancestorEndpoints" to "Ancestor endpoint",
         "builtInCounterpartyRules" to "Counterparty rule",
         "dataEndpoints" to "Data endpoint",
         "peopleDownload" to "People download",
         "requestSigning" to "Request signing",
-        "syntheticAccount" to "Synthetic account",
         "internalTransferReconcile" to "Internal transfer reconcile",
     )
 
@@ -132,10 +130,20 @@ private val arrayIndexSuffix = Regex("""\[(\d+)]$""")
 /** Turns a flattened JSON path into a display label, e.g. `accountMappings.idField` → "Account ID field". */
 internal fun labelForPath(path: String): String {
     val words = mutableListOf<String>()
-    path.split('.').forEachIndexed { depth, rawSegment ->
+    val segments = path.split('.')
+    // A section can be named by its first one or two segments ("accounts.mappings"); the longest wins.
+    val twoSegmentSection = segments.take(2).joinToString(".") { it.replace(arrayIndexSuffix, "") }
+    val sectionDepth = if (segments.size > 1 && twoSegmentSection in sectionLabels) 2 else 1
+    val section = if (sectionDepth == 2) twoSegmentSection else segments[0].replace(arrayIndexSuffix, "")
+    segments.forEachIndexed { depth, rawSegment ->
         val index = arrayIndexSuffix.find(rawSegment)?.groupValues?.get(1)
         val segment = index?.let { rawSegment.removeSuffix("[$it]") } ?: rawSegment
-        val label = if (depth == 0) sectionLabels[segment] ?: humanize(segment) else humanize(segment)
+        val label =
+            when {
+                depth == 0 -> sectionLabels[section] ?: humanize(segment)
+                depth < sectionDepth -> ""
+                else -> humanize(segment)
+            }
         if (label.isNotEmpty()) words += label
         // 1-based so "dataEndpoints[0]" reads as the first data endpoint, matching the editor's numbering.
         if (index != null) words += "#${index.toInt() + 1}"

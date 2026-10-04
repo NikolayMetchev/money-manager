@@ -16,7 +16,7 @@ import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Edits the top-level [ApiTransactionMappings] in place inside the strategy config. */
 private fun ApiStrategyEditorState.updateTransactionMappings(block: ApiTransactionMappings.() -> ApiTransactionMappings) =
-    updateConfig { copy(transactionMappings = transactionMappings.block()) }
+    updateConfig { mapBankTransactionMappings(block) }
 
 @Composable
 internal fun TransactionMappingsTab(
@@ -26,7 +26,7 @@ internal fun TransactionMappingsTab(
     onRequestPick: PathPicker,
     enabled: Boolean,
 ) {
-    val m = state.config.transactionMappings
+    val m = state.config.editedTransactionMappings
 
     @Composable
     fun path(

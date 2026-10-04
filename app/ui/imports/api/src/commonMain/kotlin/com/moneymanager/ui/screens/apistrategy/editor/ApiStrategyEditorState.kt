@@ -7,8 +7,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
-import com.moneymanager.domain.model.apistrategy.ApiAuthType
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
+import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
+import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
@@ -32,8 +34,8 @@ internal enum class EditorTab(
     ADVANCED("Advanced"),
 }
 
-private val DEFAULT_ACCOUNTS_ENDPOINT = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts")
-private val DEFAULT_TRANSACTIONS_ENDPOINT =
+internal val DEFAULT_ACCOUNTS_ENDPOINT = ApiEndpointConfig(path = "/accounts", responseArrayKey = "accounts")
+internal val DEFAULT_TRANSACTIONS_ENDPOINT =
     ApiEndpointConfig(
         path = "/transactions",
         responseArrayKey = "transactions",
@@ -44,12 +46,32 @@ private val DEFAULT_TRANSACTIONS_ENDPOINT =
 private val NEW_CONFIG =
     ApiStrategyConfig(
         baseUrl = "",
-        authType = ApiAuthType.BEARER_TOKEN,
-        accountsEndpoint = DEFAULT_ACCOUNTS_ENDPOINT,
-        transactionsEndpoint = DEFAULT_TRANSACTIONS_ENDPOINT,
-        accountMappings = ApiAccountMappings(),
-        transactionMappings = ApiTransactionMappings(),
+        accounts = ApiAccountsSource.Downloaded(endpoint = DEFAULT_ACCOUNTS_ENDPOINT),
+        dataEndpoints =
+            listOf(
+                ApiDataEndpoint(
+                    endpoint = DEFAULT_TRANSACTIONS_ENDPOINT,
+                    kind = ApiEndpointKind.BANK_TRANSACTIONS,
+                    transactionMappings = ApiTransactionMappings(),
+                ),
+            ),
     )
+
+/** The account mappings the Accounts tab edits: a downloaded-accounts source's, else the defaults. */
+internal val ApiStrategyConfig.editedAccountMappings: ApiAccountMappings
+    get() = (accounts as? ApiAccountsSource.Downloaded)?.mappings ?: ApiAccountMappings()
+
+/** This config with [mappings] as its downloaded-accounts source's mappings (unchanged for a single account). */
+internal fun ApiStrategyConfig.withAccountMappings(mappings: ApiAccountMappings): ApiStrategyConfig =
+    (accounts as? ApiAccountsSource.Downloaded)?.let { copy(accounts = it.copy(mappings = mappings)) } ?: this
+
+/** The transaction mappings the Transactions tab edits: the bank feed's, else the defaults. */
+internal val ApiStrategyConfig.editedTransactionMappings: ApiTransactionMappings
+    get() = bankTransactions?.transactionMappings ?: ApiTransactionMappings()
+
+/** This config with [mappings] as its bank feed's mappings (unchanged without a bank feed). */
+internal fun ApiStrategyConfig.withTransactionMappings(mappings: ApiTransactionMappings): ApiStrategyConfig =
+    mapBankTransactionMappings { mappings }
 
 /**
  * Full mutable editing state of the API strategy editor, held across tab switches. Seeded straight
@@ -73,8 +95,8 @@ internal class ApiStrategyEditorState(
 
     var config by mutableStateOf(strategy?.config?.withoutCustomFields()?.backfillDataEndpoints() ?: NEW_CONFIG)
 
-    var accountCustomFields by mutableStateOf(strategy?.config?.accountMappings.customFieldStates())
-    var txCustomFields by mutableStateOf(strategy?.config?.transactionMappings.customFieldStates())
+    var accountCustomFields by mutableStateOf(strategy?.config?.editedAccountMappings.customFieldStates())
+    var txCustomFields by mutableStateOf(strategy?.config?.editedTransactionMappings.customFieldStates())
 
     /** Replaces [config] with the result of [block] applied to its current value. */
     fun updateConfig(block: ApiStrategyConfig.() -> ApiStrategyConfig) {
@@ -91,12 +113,18 @@ internal class ApiStrategyEditorState(
 
     val endpointsHasError: Boolean
         get() =
-            config.accountsEndpoint.path.isBlank() ||
-                config.transactionsEndpoint.path.isBlank() ||
-                config.accountIdentifiersEndpoint?.path?.isBlank() == true ||
-                config.ancestorEndpoints.any { it.path.isBlank() } ||
-                config.syntheticAccount?.let { !it.isValidForSave() } == true ||
-                !config.dataEndpoints.isValidForSave()
+            when (val accounts = config.accounts) {
+                is ApiAccountsSource.Single -> !accounts.isValidForSave()
+                is ApiAccountsSource.Downloaded ->
+                    accounts.endpoint.path.isBlank() ||
+                        accounts.identifiersEndpoint?.path?.isBlank() == true ||
+                        accounts.ancestorEndpoints.any { it.path.isBlank() } ||
+                        config.bankTransactions
+                            ?.endpoint
+                            ?.path
+                            ?.isBlank() != false
+            } ||
+                !config.dataEndpoints.filter { it.kind != ApiEndpointKind.BANK_TRANSACTIONS }.isValidForSave()
 
     val advancedHasError: Boolean
         get() =
@@ -104,19 +132,20 @@ internal class ApiStrategyEditorState(
                 config.internalTransferReconcile?.let { !it.isValidForSave() } == true
 
     val accountMappingsHasError: Boolean
-        get() = config.accountMappings.idField.isBlank() || config.accountMappings.descriptionField.isBlank()
+        get() = config.editedAccountMappings.idField.isBlank() || config.editedAccountMappings.descriptionField.isBlank()
 
     val transactionMappingsHasError: Boolean
         get() =
-            config.transactionMappings.let { mappings ->
-                mappings.amountField.isBlank() ||
-                    mappings.timestampField.isBlank() ||
-                    mappings.currencyField.isBlank() ||
-                    mappings.descriptionField.isBlank() ||
-                    mappings.idField.isBlank() ||
-                    (mappings.signSource == ApiSignSource.FIELD && mappings.signField.isNullOrBlank()) ||
-                    !mappings.conditionsComplete()
-            }
+            config.bankTransactions != null &&
+                config.editedTransactionMappings.let { mappings ->
+                    mappings.amountField.isBlank() ||
+                        mappings.timestampField.isBlank() ||
+                        mappings.currencyField.isBlank() ||
+                        mappings.descriptionField.isBlank() ||
+                        mappings.idField.isBlank() ||
+                        (mappings.signSource == ApiSignSource.FIELD && mappings.signField.isNullOrBlank()) ||
+                        !mappings.conditionsComplete()
+                }
 
     val peopleHasError: Boolean
         get() =
@@ -160,23 +189,24 @@ internal class ApiStrategyEditorState(
             id = id,
             name = name.trim(),
             config =
-                config.copy(
-                    baseUrl = config.baseUrl.trim(),
-                    accountMappings =
-                        config.accountMappings.copy(
+                config
+                    .withAccountMappings(
+                        config.editedAccountMappings.copy(
                             customFields = accountCustomFields.toCustomFieldMap(),
                             uniqueIdentifierFields = accountCustomFields.toUniqueIdentifierFields(),
                         ),
-                    transactionMappings =
-                        config.transactionMappings.copy(
+                    ).withTransactionMappings(
+                        config.editedTransactionMappings.copy(
                             customFields = txCustomFields.toCustomFieldMap(),
                             uniqueIdentifierFields = txCustomFields.toUniqueIdentifierFields(),
                         ),
-                    personExternalIdAttribute = config.personExternalIdAttribute?.trim()?.ifBlank { null },
-                    tokenPageUrl = config.tokenPageUrl?.trim()?.ifBlank { null },
-                    connectInstructions = config.connectInstructions.map { it.trim() }.filter { it.isNotEmpty() },
-                    rateLimitErrorSubstrings = config.rateLimitErrorSubstrings.map { it.trim() }.filter { it.isNotEmpty() },
-                ),
+                    ).copy(
+                        baseUrl = config.baseUrl.trim(),
+                        personExternalIdAttribute = config.personExternalIdAttribute?.trim()?.ifBlank { null },
+                        tokenPageUrl = config.tokenPageUrl?.trim()?.ifBlank { null },
+                        connectInstructions = config.connectInstructions.map { it.trim() }.filter { it.isNotEmpty() },
+                        rateLimitErrorSubstrings = config.rateLimitErrorSubstrings.map { it.trim() }.filter { it.isNotEmpty() },
+                    ),
             createdAt = createdAt,
             updatedAt = updatedAt,
         )
@@ -187,10 +217,8 @@ private fun ApiPersonImportConfig.ownershipValid(): Boolean = !(ownsAllAccounts 
 
 /** Clears the two fields the editor projects onto [CustomFieldState] rows; `buildStrategy` puts them back. */
 private fun ApiStrategyConfig.withoutCustomFields(): ApiStrategyConfig =
-    copy(
-        accountMappings = accountMappings.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()),
-        transactionMappings = transactionMappings.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()),
-    )
+    withAccountMappings(editedAccountMappings.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()))
+        .withTransactionMappings(editedTransactionMappings.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()))
 
 /**
  * A directional (deposit/withdrawal) endpoint with a null fixedDirection displays as "IN" in the

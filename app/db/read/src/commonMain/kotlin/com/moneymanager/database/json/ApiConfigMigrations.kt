@@ -1,7 +1,9 @@
 package com.moneymanager.database.json
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * API config v0 → v1: onto the shared rule vocabulary.
@@ -78,3 +80,168 @@ private fun transactionMappingsOntoConditions(obj: JsonObject): JsonObject {
             mapOf("excludeWhen" to JsonArray(exclude), "declinedWhen" to JsonArray(declined)),
     )
 }
+
+/**
+ * API config v1 → v2: one config shape for bank and exchange strategies.
+ * - `authType` is dropped: a strategy with `requestSigning` signs, any other sends a bearer token.
+ * - `accounts`: `syntheticAccount` becomes `single`; otherwise `accountsEndpoint` + `accountMappings`
+ *   (+ `accountIdentifiersEndpoint`, `ancestorEndpoints`) become `downloaded`. An exchange's unused
+ *   placeholder accounts/transactions endpoints and mappings are dropped.
+ * - A bank strategy's `transactionsEndpoint` + `transactionMappings` become its `BANK_TRANSACTIONS` data
+ *   endpoint.
+ * - Pagination's flat `mode` + fields become an optional `window` times a `paging` scheme. The old modes
+ *   meant different things to the two download paths, which this resolves per endpoint:
+ *   - the bank feed walked any non-windowed mode as a before-cursor (always sending the page size), and
+ *     sent its window bounds as ISO-8601 whatever `windowBoundFormat` said, never offset/token paging;
+ *   - every other endpoint paged a window (or the single request) by offset if one was set, else by a
+ *     next-page token, else not at all; `FORWARD_ID_CURSOR` and `TOKEN_CURSOR` walks are unwindowed.
+ *   The page size is now sent whenever `sendLimitParam` is set, so it's cleared where nothing paged.
+ * - Trade mappings that read both assets from explicit fields drop their placeholder `instrumentField`.
+ */
+internal val apiOnePipelineStep =
+    ConfigMigrationStep { config ->
+        val synthetic = config["syntheticAccount"] as? JsonObject
+        val bankFeed =
+            (config["transactionsEndpoint"] as? JsonObject)
+                ?.takeIf { synthetic == null }
+                ?.let { endpoint -> endpoint.withPagination { paginationToV2(it, bankFeed = true) } }
+        val accounts =
+            if (synthetic != null) {
+                JsonObject(mapOf("type" to JsonPrimitive("single")) + synthetic)
+            } else {
+                JsonObject(
+                    buildMap {
+                        put("type", JsonPrimitive("downloaded"))
+                        put("endpoint", config.getValue("accountsEndpoint"))
+                        config["accountMappings"]?.let { put("mappings", it) }
+                        config["accountIdentifiersEndpoint"]?.takeUnless { it is JsonNull }?.let { put("identifiersEndpoint", it) }
+                        config["ancestorEndpoints"]?.let { put("ancestorEndpoints", it) }
+                    },
+                )
+            }
+        val dataEndpoints =
+            (config["dataEndpoints"] as? JsonArray).orEmpty() +
+                listOfNotNull(
+                    bankFeed?.let { endpoint ->
+                        JsonObject(
+                            mapOf(
+                                "endpoint" to endpoint,
+                                "kind" to JsonPrimitive("BANK_TRANSACTIONS"),
+                                "transactionMappings" to config.getValue("transactionMappings"),
+                            ),
+                        )
+                    },
+                )
+        val reshaped =
+            JsonObject(
+                config.without(
+                    "authType",
+                    "syntheticAccount",
+                    "accountsEndpoint",
+                    "accountMappings",
+                    "accountIdentifiersEndpoint",
+                    "ancestorEndpoints",
+                    "transactionsEndpoint",
+                    "transactionMappings",
+                    "dataEndpoints",
+                ) + mapOf("accounts" to accounts, "dataEndpoints" to JsonArray(dataEndpoints)),
+            )
+        // Every other endpoint's pagination; the bank feed's, already converted above, is left alone.
+        reshaped.rewriteObjects { obj ->
+            when {
+                "path" in obj && "responseArrayKey" in obj -> obj.withPagination { paginationToV2(it, bankFeed = false) }
+                // Trade mappings that read their assets from explicit fields carried a placeholder symbol path.
+                obj.string("splitMode") == "EXPLICIT_FIELDS" -> JsonObject(obj.without("instrumentField"))
+                else -> obj
+            }
+        } as JsonObject
+    }
+
+private fun JsonObject.withPagination(convert: (JsonObject) -> JsonObject): JsonObject {
+    val pagination = this["pagination"] as? JsonObject ?: return this
+    if ("paging" in pagination || "window" in pagination) return this
+    return JsonObject(this + ("pagination" to convert(pagination)))
+}
+
+private const val DEFAULT_PAGE_SIZE = 100
+
+private fun paginationToV2(
+    old: JsonObject,
+    bankFeed: Boolean,
+): JsonObject {
+    val mode = old.string("mode") ?: "CURSOR"
+    val limitValue = old["limitValue"]?.let { (it as JsonPrimitive).content.toInt() } ?: DEFAULT_PAGE_SIZE
+    val cursorParam = old.string("cursorParam") ?: "before"
+    val cursorResponseField = old.string("cursorResponseField") ?: "created"
+    val offsetParam = old.string("offsetParam")?.takeIf { limitValue > 0 }
+    val nextCursorField = old.string("nextCursorField")
+    val window =
+        if (mode != "DATE_WINDOW") {
+            null
+        } else {
+            JsonObject(
+                buildMap {
+                    old["startParam"]?.let { put("startParam", it) }
+                    old["endParam"]?.let { put("endParam", it) }
+                    old["windowDays"]?.let { put("windowDays", it) }
+                    old["lookbackDays"]?.let { put("lookbackDays", it) }
+                    val boundFormat = if (bankFeed) JsonPrimitive("ISO_8601") else old["windowBoundFormat"]
+                    boundFormat?.let { put("boundFormat", it) }
+                    old["windowRangeErrorSubstrings"]?.let { put("rangeErrorSubstrings", it) }
+                },
+            )
+        }
+    val paging: JsonObject =
+        when {
+            bankFeed && mode == "DATE_WINDOW" -> pagingJson("single")
+            bankFeed -> pagingJson("before", "param" to cursorParam, "positionField" to cursorResponseField)
+            mode == "FORWARD_ID_CURSOR" -> pagingJson("forwardId", "param" to cursorParam, "idField" to cursorResponseField)
+            offsetParam != null ->
+                pagingJson(
+                    "offset",
+                    "param" to offsetParam,
+                    "pageNumbers" to (old.string("offsetMode") == "PAGE_NUMBER"),
+                    "totalCountField" to old.string("totalCountField"),
+                )
+            nextCursorField != null ->
+                pagingJson(
+                    "token",
+                    "tokenField" to nextCursorField,
+                    "param" to cursorParam,
+                    "urlEncoded" to (old.string("nextCursorUrlEncoded") == "true"),
+                    "positionField" to cursorResponseField.takeIf { mode == "TOKEN_CURSOR" },
+                )
+            else -> pagingJson("single")
+        }
+    val pages = paging.string("type") != "single"
+    val sendLimit = bankFeed && pages || pages && old.string("sendLimitParam") == "true"
+    return JsonObject(
+        buildMap {
+            if (window != null) put("window", window)
+            put("paging", paging)
+            old["limitParam"]?.let { put("limitParam", it) }
+            old["limitValue"]?.let { put("limitValue", it) }
+            put("sendLimitParam", JsonPrimitive(sendLimit))
+            old["extraParams"]?.let { put("extraParams", it) }
+            old["incrementalOverlapDays"]?.let { put("incrementalOverlapDays", it) }
+        },
+    )
+}
+
+private fun pagingJson(
+    type: String,
+    vararg fields: Pair<String, Any?>,
+): JsonObject =
+    JsonObject(
+        buildMap {
+            put("type", JsonPrimitive(type))
+            fields.forEach { (key, value) ->
+                when (value) {
+                    null -> Unit
+                    is String -> put(key, JsonPrimitive(value))
+                    is Boolean -> put(key, JsonPrimitive(value))
+                    else -> error("unsupported $value")
+                }
+            }
+        },
+    )

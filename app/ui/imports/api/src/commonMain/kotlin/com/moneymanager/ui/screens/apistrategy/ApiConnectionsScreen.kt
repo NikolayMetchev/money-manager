@@ -35,7 +35,6 @@ import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.VaultState
 import com.moneymanager.domain.model.ApiImportStrategyId
-import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
@@ -213,7 +212,7 @@ private fun ApiConnectionRow(
                         text =
                             when {
                                 credential != null -> "Connected · ${maskToken(credential.token)}"
-                                strategy.config.authType == ApiAuthType.SIGNED -> "Needs an API key and secret"
+                                strategy.config.isSigned -> "Needs an API key and secret"
                                 else -> "Needs an access token"
                             },
                         style = MaterialTheme.typography.bodySmall,
@@ -293,7 +292,7 @@ private fun ApiCredentialForm(
     onSubmit: (token: String, secret: String?, onFailure: (String) -> Unit) -> Unit,
     onSkip: (() -> Unit)?,
 ) {
-    val isSigned = strategy.config.authType == ApiAuthType.SIGNED
+    val isSigned = strategy.config.isSigned
     var tokenInput by remember(strategy.id) { mutableStateOf("") }
     var secretInput by remember(strategy.id) { mutableStateOf("") }
     var isSaving by remember(strategy.id) { mutableStateOf(false) }

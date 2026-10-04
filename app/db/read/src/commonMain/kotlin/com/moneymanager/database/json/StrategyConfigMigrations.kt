@@ -29,7 +29,7 @@ internal object StrategyConfigMigrations {
 
     private val csvSteps: List<ConfigMigrationStep> = listOf(csvSharedRulesStep)
 
-    private val apiSteps: List<ConfigMigrationStep> = listOf(apiSharedRulesStep)
+    private val apiSteps: List<ConfigMigrationStep> = listOf(apiSharedRulesStep, apiOnePipelineStep)
 
     val currentCsvVersion: Int get() = csvSteps.size
 

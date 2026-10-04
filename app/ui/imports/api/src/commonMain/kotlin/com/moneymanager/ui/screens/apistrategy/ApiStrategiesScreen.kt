@@ -33,6 +33,7 @@ import com.moneymanager.compose.filepicker.rememberFilePicker
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.domain.model.ApiImportStrategyId
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
@@ -260,12 +261,18 @@ private fun StrategyCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "Auth: ${strategy.config.authType.name}",
+                text = "Auth: ${if (strategy.config.isSigned) "signed API key" else "bearer token"}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "Accounts: ${strategy.config.accountsEndpoint.path}  |  Transactions: ${strategy.config.transactionsEndpoint.path}",
+                text =
+                    when (val accounts = strategy.config.accounts) {
+                        is ApiAccountsSource.Single ->
+                            "Single account: ${accounts.name}  |  ${strategy.config.dataEndpoints.size} data endpoints"
+                        is ApiAccountsSource.Downloaded ->
+                            "Accounts: ${accounts.endpoint.path}  |  Transactions: ${strategy.config.bankTransactions?.endpoint?.path.orEmpty()}"
+                    },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
