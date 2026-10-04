@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.ui.components.rules.ConditionsEditor
 import com.moneymanager.ui.components.rules.DirectionEditor
+import com.moneymanager.ui.components.rules.FeeRuleEditor
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Edits the top-level [ApiTransactionMappings] in place inside the strategy config. */
@@ -102,19 +103,10 @@ internal fun TransactionMappingsTab(
         path("Local currency field (optional)", m.localCurrencyField.orEmpty()) { v ->
             state.updateTransactionMappings { copy(localCurrencyField = v.ifBlank { null }) }
         }
-        path("Fee amount field (optional)", m.feeAmountField.orEmpty()) { v ->
-            state.updateTransactionMappings { copy(feeAmountField = v.ifBlank { null }) }
-        }
-        path("Fee currency field (optional)", m.feeCurrencyField.orEmpty()) { v ->
-            state.updateTransactionMappings { copy(feeCurrencyField = v.ifBlank { null }) }
-        }
-        path("Fee description field (optional)", m.feeDescriptionField.orEmpty()) { v ->
-            state.updateTransactionMappings { copy(feeDescriptionField = v.ifBlank { null }) }
-        }
-        ToggleRow(
-            label = "Fee included in amount (carve out)",
-            checked = m.feeIncludedInAmount,
-            onCheckedChange = { v -> state.updateTransactionMappings { copy(feeIncludedInAmount = v) } },
+        FeeRuleEditor(
+            fee = m.fee,
+            onFeeChanged = { fee -> state.updateTransactionMappings { copy(fee = fee) } },
+            pathField = conditionPath,
             enabled = enabled,
         )
         CustomFieldsSection(

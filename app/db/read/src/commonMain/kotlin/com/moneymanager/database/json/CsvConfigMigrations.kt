@@ -2,6 +2,7 @@ package com.moneymanager.database.json
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -232,5 +233,142 @@ private fun rule(
             fallbackName?.let { put("fallbackName", JsonPrimitive(it)) }
             attributeTypeName?.let { put("attributeTypeName", JsonPrimitive(it)) }
             putAll(extras)
+        },
+    )
+
+/**
+ * CSV config v2 → v3: one grouping vocabulary and one fee rule.
+ * - `conversionConfig` and `tradeGroupConfig` become `legGroups`: a conversion is a leg rule assembled
+ *   through an account (its routing rules become account rules), a trade group one assembled into a
+ *   trade. A conversion's legs always needed a non-blank signal; a trade group's only when its patterns
+ *   said so.
+ * - The amount mapping's `feeColumnName` + `feeConditions` + `feeCurrency` become a `fee` rule.
+ */
+internal val csvLegGroupsStep =
+    ConfigMigrationStep { config ->
+        config.rewriteObjects { obj ->
+            when {
+                obj.isType("AmountParsingMapping", "AmountParsingExport") -> amountFeeOntoRule(obj)
+                "conversionConfig" in obj || "tradeGroupConfig" in obj -> groupingOntoLegGroups(obj)
+                else -> obj
+            }
+        } as JsonObject
+    }
+
+private fun amountFeeOntoRule(obj: JsonObject): JsonObject {
+    val column = obj.string("feeColumnName")
+    val rest = obj.without("feeColumnName", "feeConditions", "feeCurrency")
+    if (column == null) return JsonObject(rest)
+    val fee =
+        buildMap {
+            put("amount", valueExprJson(listOf(column), null))
+            obj["feeCurrency"]?.takeUnless { it is JsonNull }?.let { put("currency", it) }
+            (obj["feeConditions"] as? JsonArray)?.takeIf { it.isNotEmpty() }?.let { put("conditions", it) }
+        }
+    return JsonObject(rest + ("fee" to JsonObject(fee)))
+}
+
+private fun groupingOntoLegGroups(obj: JsonObject): JsonObject {
+    val conversion = obj["conversionConfig"] as? JsonObject
+    val trade = obj["tradeGroupConfig"] as? JsonObject
+    val rules = listOfNotNull(conversion?.let(::conversionLegRule), trade?.let(::tradeLegRule))
+    val rest = obj.without("conversionConfig", "tradeGroupConfig")
+    return JsonObject(if (rules.isEmpty()) rest else rest + ("legGroups" to JsonArray(rules)))
+}
+
+private fun conversionLegRule(config: JsonObject): JsonObject {
+    val signal = config.string("signalColumn")!!
+    val routing =
+        (config["conversionAccountRules"] as? JsonArray).orEmpty().map { element ->
+            val rule = element as JsonObject
+            accountRuleJson(
+                signal,
+                rule.string("accountName")!!,
+                listOf(conditionJson(rule.string("column")!!, "MATCHES", rule.string("pattern"))),
+            )
+        }
+    val fallback = listOfNotNull(config.string("conversionAccountName")?.let { accountRuleJson(signal, it, emptyList()) })
+    val key =
+        listOfNotNull(
+            config.string("pairingKeyPattern")?.let { pattern ->
+                valueExprJson(
+                    listOf(signal),
+                    JsonObject(mapOf("pattern" to JsonPrimitive(pattern), "outputTemplate" to JsonPrimitive("$1"))),
+                )
+            },
+        ) + config.stringList("pairingKeyColumns").map { valueExprJson(listOf(it), null) }
+    val assembly =
+        mapOf(
+            "type" to JsonPrimitive("throughAccount"),
+            "accounts" to JsonArray(routing + fallback),
+            "relationshipTypeName" to config.getValue("relationshipTypeName"),
+        )
+    return legRuleJson(
+        config,
+        extraLegConditions = listOf(conditionJson(signal, "NOT_BLANK")),
+        key = key,
+        windowKey = "pairingWindowSeconds",
+        assembly = assembly,
+    )
+}
+
+private fun tradeLegRule(config: JsonObject): JsonObject {
+    val assembly =
+        buildMap {
+            put("type", JsonPrimitive("trade"))
+            config["descriptionTemplate"]?.takeUnless { it is JsonNull }?.let { put("description", it) }
+        }
+    return legRuleJson(
+        config,
+        extraLegConditions = emptyList(),
+        key = emptyList(),
+        windowKey = "groupingWindowSeconds",
+        assembly = assembly,
+    )
+}
+
+/** The leg rule a legacy signal-column config amounts to: legs match either pattern; the side is a sign or the debit pattern. */
+private fun legRuleJson(
+    config: JsonObject,
+    extraLegConditions: List<JsonObject>,
+    key: List<JsonObject>,
+    windowKey: String,
+    assembly: Map<String, JsonElement>,
+): JsonObject {
+    val signal = config.string("signalColumn")!!
+    val debit = config.string("debitPattern")!!
+    val credit = config.string("creditPattern")!!
+    val legPattern = if (debit == credit) debit else "(?:$debit)|(?:$credit)"
+    val side =
+        config.string("sideAmountColumn")?.let { column ->
+            JsonObject(mapOf("type" to JsonPrimitive("sign"), "path" to JsonPrimitive(column)))
+        } ?: JsonObject(
+            mapOf(
+                "type" to JsonPrimitive("debitWhen"),
+                "conditions" to JsonArray(listOf(conditionJson(signal, "MATCHES", debit))),
+            ),
+        )
+    return JsonObject(
+        buildMap {
+            put("legWhen", JsonArray(listOf(conditionJson(signal, "MATCHES", legPattern)) + extraLegConditions))
+            put("side", side)
+            if (key.isNotEmpty()) put("key", JsonArray(key))
+            config.string(windowKey)?.takeIf { it != "0" }?.let { put("windowSeconds", config.getValue(windowKey)) }
+            put("assembly", JsonObject(assembly))
+            config["reconcileWindowSeconds"]?.takeUnless { it is JsonNull }?.let { put("reconcileWindowSeconds", it) }
+        },
+    )
+}
+
+private fun accountRuleJson(
+    valuePath: String,
+    name: String,
+    conditions: List<JsonObject>,
+): JsonObject =
+    JsonObject(
+        buildMap {
+            if (conditions.isNotEmpty()) put("conditions", JsonArray(conditions))
+            put("value", valueExprJson(listOf(valuePath), null))
+            put("name", JsonPrimitive(name))
         },
     )

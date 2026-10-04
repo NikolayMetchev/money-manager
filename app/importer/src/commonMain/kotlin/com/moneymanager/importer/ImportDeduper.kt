@@ -321,62 +321,35 @@ class ImportDeduper(
                     ?.first
         if (existingId != null) return Classified(transfer, ImportStatus.DUPLICATE, existingId)
 
-        // Another source booked this movement with only an approximate time; this record is precise.
-        classifyAsSupersedingApproximateLeg(
-            transfer,
-            policy.reconcileWindow,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
-
-        // Cross-source reconciliation: the same real movement seen from another provider. Keep this
-        // record but tag it excluded-and-linked so the movement is counted once (see ApiMultiKey docs).
-        classifyAsReconciled(
-            transfer,
-            policy.reconcileWindow,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
-
-        // This provider could only date the movement approximately, so a precise record another source
-        // already holds wins, whichever counterparty either names.
-        classifyApproximateAsReconciled(
-            transfer,
-            policy.reconcileWindow,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
+        // Cross-source reconciliation: the same real movement seen from another provider, counted once.
+        // An approximately-dated record yields to a precise one (either way round), and between equals the
+        // existing record stays (see ApiMultiKey docs).
+        for (rule in listOf(approximateTwin, sameAccounts, preciseTwin)) {
+            reconcile(
+                transfer,
+                rule,
+                policy.reconcileWindow,
+                policy.reconciledExclusionAttributeTypeId,
+                policy.reconciledRelationshipTypeId,
+            )?.let { return it }
+        }
 
         // Internal-transfer reconciliation between two owned accounts (e.g. Crypto.com App -> Exchange):
         // rewrite the incoming leg into one internal transfer and exclude the stale app-side leg.
         classifyAsInternalTransferReconciled(transfer, policy)?.let { return it }
 
-        // This provider names both owned ends of the movement (e.g. a bank resolving the far account by
-        // sort code + account number); exclude any placeholder leg an earlier export left for it.
-        classifyAsSupersedingUnidentifiedLeg(
-            transfer,
-            policy.unidentifiedCounterpartyWindow,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
-
-        // The reverse: this provider cannot name the far end (an exchange's "fiat deposit"), while an
-        // existing record (the bank's) does - this leg is the placeholder, so it is the one excluded.
-        classifyAsUnidentifiedCounterpartyReconciled(
-            transfer,
-            policy.unidentifiedCounterpartyWindow,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
-
-        // This feed splits a charge the other source folded into one gross row, so the amounts never
-        // match; pair them on the gross total instead and exclude that row.
-        classifyAsGrossNetReconciled(
-            transfer,
-            policy.unidentifiedCounterpartyWindow,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
+        // A record naming the far end (a bank resolving it by sort code + account number) beats a
+        // placeholder (an exchange's "fiat deposit"), either way round; a feed itemising a charge the other
+        // source folded into one gross row beats that gross row.
+        for (rule in listOf(placeholderTwin, identifiedTwin, grossTwin)) {
+            reconcile(
+                transfer,
+                rule,
+                policy.unidentifiedCounterpartyWindow,
+                policy.reconciledExclusionAttributeTypeId,
+                policy.reconciledRelationshipTypeId,
+            )?.let { return it }
+        }
 
         // ... then an earlier accepted transfer in this same batch (resolved to its created id later).
         val batchMatchIndex =
@@ -408,207 +381,193 @@ class ImportDeduper(
         existing: String?,
     ): Boolean = incoming != null && existing != null && incoming != existing
 
+    /** Which of two records of one movement stays counted; the other is imported or kept, but excluded. */
+    private enum class Keeps { EXISTING, INCOMING }
+
     /**
-     * Classifies [transfer] as a cross-source reconciliation of an existing transfer when the policy
-     * enables it and a same source+target+amount transfer from a different source exists within the
-     * reconcile window. The returned transfer carries a plain exclusion attribute (value "reconciled")
-     * so it is kept but excluded from balance totals, plus a `reconciled` relationship linking it
-     * (id1) to the existing transfer (id2). Null when reconciliation is disabled or no match is found.
-     *
-     * An existing leg that is itself already excluded is never matched: it represents no counted
-     * movement, so excluding this row against it would count the movement zero times (a third export of
-     * the same movement would otherwise chain-exclude the whole set).
-     *
-     * Known imperfection: matches are not consumed, so two identical incoming rows within the window
-     * both link to the same existing transfer. Balances stay correct (both are excluded).
+     * What a [ReconcileRule] found: the existing leg recording the same movement as the incoming one, and
+     * every existing leg the match claims (each may be the twin of at most one incoming row; see
+     * [consumedReconcileIds]).
      */
-    private fun classifyAsReconciled(
+    private data class Found(
+        val id: TransferId,
+        val existing: Transfer,
+        val claims: List<TransferId>,
+    )
+
+    /**
+     * One way an incoming leg and an existing record can describe the same movement — the one leg matcher
+     * behind every cross-source reconcile. Rules differ only in how they find the existing record (same
+     * accounts; the owned account and direction when one side's counterparty is a placeholder; overlapping
+     * time spans when one side is approximately dated; a gross amount against a net leg plus its fee) and
+     * in [keeps], which one ranking fixes per rule: a precisely-timed record beats an approximately-timed
+     * one, a record naming its counterparty beats a placeholder, an itemised (net + fee) record beats a
+     * gross one, and between equals the existing record — already counted — stays.
+     *
+     * A rule never claims anything itself: [reconcile] records [Found.claims] only once a rule matched, so
+     * a rule that declines leaves the batch's claims untouched.
+     */
+    private class ReconcileRule(
+        val keeps: Keeps,
+        val find: (transfer: ImportTransfer, window: Duration) -> Found?,
+    )
+
+    /**
+     * Applies [rule] to [transfer]: null when the policy leaves reconciliation off or the rule finds no
+     * twin; otherwise the incoming leg, linked to its twin via `reconciled`, with whichever record [rule]
+     * ranks lower excluded. The excluded record's fee goes with it: a duplicate's fee is itself a
+     * duplicate, and re-creating it would double-count.
+     */
+    private fun reconcile(
         transfer: ImportTransfer,
+        rule: ReconcileRule,
         window: Duration?,
         exclusionTypeId: AttributeTypeId?,
         relationshipTypeId: RelationshipTypeId?,
     ): Classified? {
         if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
-        val key = DirectedAmountKey(transfer.fromAccount.requireId(), transfer.toAccount.requireId(), transfer.amount)
-        val matchId =
+        // An excluded incoming leg counts nowhere, so it must never supersede — and exclude — a counted
+        // one: that would leave the movement counted zero times.
+        if (rule.keeps == Keeps.INCOMING && transfer.isExcluded(exclusionTypeId)) return null
+        val found = rule.find(transfer, window) ?: return null
+        consumedReconcileIds += found.claims
+        val relationships = transfer.relationships + NewRelationship(relatedTransferId = found.id, typeId = relationshipTypeId)
+        return when (rule.keeps) {
+            Keeps.EXISTING ->
+                Classified(
+                    transfer.copy(attributes = transfer.withExclusion(exclusionTypeId), relationships = relationships, fee = null),
+                    ImportStatus.IMPORTED,
+                    existing = null,
+                )
+            Keeps.INCOMING ->
+                Classified(
+                    transfer.copy(relationships = relationships),
+                    ImportStatus.IMPORTED,
+                    existing = null,
+                    excludeExisting = ExcludeExistingLeg(found.existing, exclusionTypeId),
+                )
+        }
+    }
+
+    /** The unclaimed leg of [candidates] nearest [timestamp] within [window], claimed by the match. */
+    private fun nearestUnclaimed(
+        candidates: List<Pair<TransferId, Transfer>>,
+        timestamp: Instant,
+        window: Duration,
+    ): Found? {
+        val id = selectNearestUnconsumedLeg(candidates, timestamp, window, consumedReconcileIds) ?: return null
+        return Found(id, candidates.first { it.first == id }.second, claims = listOf(id))
+    }
+
+    /**
+     * The same movement between the same two accounts, from a different source, within the window. Matches
+     * are not claimed, so two identical incoming rows within the window both link to the same existing
+     * transfer — balances stay correct, as both are excluded.
+     *
+     * An existing leg that is itself already excluded is never matched: it represents no counted movement,
+     * so excluding this row against it would count the movement zero times (a third export of the same
+     * movement would otherwise chain-exclude the whole set).
+     */
+    private val sameAccounts =
+        ReconcileRule(Keeps.EXISTING) { transfer, window ->
+            val key = DirectedAmountKey(transfer.fromAccount.requireId(), transfer.toAccount.requireId(), transfer.amount)
             reconcileCandidatesByDirectedAmount[key]
                 ?.firstOrNull { (id, existing) -> id !in existingExcludedLegs && reconcileMatches(transfer, existing, window) }
-                ?.first
-                ?: return null
-        val relationships = transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId)
-        return Classified(
-            // Drop any fee: a cross-source duplicate's fee is itself a duplicate, so it must not be
-            // re-created (it would double-count) — the original source's fee already covers it.
-            transfer.copy(attributes = transfer.withExclusion(exclusionTypeId), relationships = relationships, fee = null),
-            ImportStatus.IMPORTED,
-            existing = null,
-        )
-    }
-
-    /**
-     * Reconciles a conduit spend (e.g. a Curve export row, `conduit -> merchant`) against the funding
-     * leg that put the money into the conduit (`fundingAccount -> conduit`), when the row named its
-     * funding card and it resolved to [ImportTransfer.reconcileFundingAccountId]. Matches on
-     * amount+currency (via [Money] equality) and timestamp within the window, IGNORING the merchant —
-     * so it links across the merchant-naming differences that defeat [classifyAsReconciled]. Each
-     * funding leg is consumed at most once (repeated same-amount rows), preferring the nearest
-     * timestamp. The row is kept IMPORTED but excluded and linked to the funding leg, so the spend is
-     * counted once (the funding leg's own pass-through spend leg remains the merchant record).
-     */
-    private fun classifyAsFundingReconciled(
-        transfer: ImportTransfer,
-        window: Duration?,
-        exclusionTypeId: AttributeTypeId?,
-        relationshipTypeId: RelationshipTypeId?,
-    ): Classified? {
-        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
-        val fundingAccountId = transfer.reconcileFundingAccountId ?: return null
-        val timestamp = transfer.timestamp ?: return null
-        // Funding leg is fundingAccount -> conduit; the incoming row's source IS the conduit.
-        val key = DirectedAmountKey(fundingAccountId, transfer.fromAccount.requireId(), transfer.amount)
-        val matchId =
-            reconcileCandidatesByDirectedAmount[key]
-                ?.let { selectNearestUnconsumedLeg(it, timestamp, window, consumedReconcileIds) }
-                ?: return null
-        consumedReconcileIds += matchId
-        val relationships = transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId)
-        return Classified(
-            transfer.copy(attributes = transfer.withExclusion(exclusionTypeId), relationships = relationships, fee = null),
-            ImportStatus.IMPORTED,
-            existing = null,
-        )
-    }
-
-    /**
-     * Reconciles a leg whose counterparty is only a placeholder named after the row's own description
-     * ([ImportTransfer.unidentifiedCounterpartyAccountId]) against an existing leg that moves the same
-     * amount the same way through the *owned* account — ignoring the counterparty, which is precisely
-     * what this row could not resolve. That is what lets a bank export (which names the far account by
-     * sort code + account number) and an account's own export (which says only "GBP Deposit (via FPS)")
-     * record one deposit once.
-     *
-     * Only existing legs that are themselves identified are matched, so two placeholder legs are left to
-     * [classifyAsReconciled] (their accounts are equal, so it catches them). Each existing leg is claimed
-     * at most once, nearest timestamp first: an account topped up with the same round amount many times
-     * would otherwise collapse every row onto one bank debit.
-     */
-    private fun classifyAsUnidentifiedCounterpartyReconciled(
-        transfer: ImportTransfer,
-        window: Duration?,
-        exclusionTypeId: AttributeTypeId?,
-        relationshipTypeId: RelationshipTypeId?,
-    ): Classified? {
-        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
-        if (unidentifiedCounterpartyTypeId == null) return null
-        val placeholder = transfer.unidentifiedCounterpartyAccountId ?: return null
-        val timestamp = transfer.timestamp ?: return null
-        val from = transfer.fromAccount.requireId()
-        val to = transfer.toAccount.requireId()
-        // The owned account is whichever side the placeholder is not; money flows into it when the
-        // placeholder funds the row, out of it when the placeholder receives.
-        val (owned, inflow) =
-            when (placeholder) {
-                from -> to to true
-                to -> from to false
-                else -> return null
-            }
-        val candidates =
-            reconcileCandidatesByAccountFlow[AccountFlowKey(owned, inflow, transfer.amount)]
-                ?.filter { (id, existingTransfer) ->
-                    val counterparty = if (inflow) existingTransfer.sourceAccountId else existingTransfer.targetAccountId
-                    id !in existingUnidentifiedLegs &&
-                        id !in existingExcludedLegs &&
-                        id !in claimedReconcileTargets &&
-                        counterparty != placeholder &&
-                        counterparty !in ownBatchAccounts
-                }.orEmpty()
-        val matchId = selectNearestUnconsumedLeg(candidates, timestamp, window, consumedReconcileIds) ?: return null
-        consumedReconcileIds += matchId
-        return Classified(
-            transfer.copy(
-                attributes = transfer.withExclusion(exclusionTypeId),
-                relationships = transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId),
-                // A duplicate's fee is a duplicate too: re-creating it would double-count.
-                fee = null,
-            ),
-            ImportStatus.IMPORTED,
-            existing = null,
-        )
-    }
-
-    /**
-     * Reconciles a leg this source reports **net** of a charge it books separately against the single
-     * **gross** leg another source recorded for the same movement. A Binance withdrawal is the case:
-     * the API returns the amount that left the account and a `transactionFee`/`totalFee` beside it,
-     * which become two transfers, while the statement export has one row for the sum. Amount equality
-     * — which every other rule here rests on — can never pair those, so both are counted.
-     *
-     * The incoming pair is kept and the existing gross leg excluded, rather than the other way round:
-     * this source knows the fee and usually the real counterparty, and net + fee is exactly the gross,
-     * so no balance moves. Matching is counterparty-agnostic (the gross row typically named only a
-     * placeholder) and each existing leg is claimed once, nearest first.
-     *
-     * The opposite order — a gross row arriving against an existing net leg plus fee — is
-     * [classifyAsNetPlusFeeReconciled].
-     */
-    private fun classifyAsGrossNetReconciled(
-        transfer: ImportTransfer,
-        window: Duration?,
-        exclusionTypeId: AttributeTypeId?,
-        relationshipTypeId: RelationshipTypeId?,
-    ): Classified? {
-        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
-        if (transfer.isExcluded(exclusionTypeId)) return null
-        val gross = transfer.reconcileGrossAmount ?: return null
-        if (gross == transfer.amount) return null
-        val timestamp = transfer.timestamp ?: return null
-        val from = transfer.fromAccount.requireId()
-        val to = transfer.toAccount.requireId()
-        for ((owned, inflow) in listOf(to to true, from to false)) {
-            val candidates =
-                reconcileCandidatesByAccountFlow[AccountFlowKey(owned, inflow, gross)]
-                    ?.filter { (id, _) ->
-                        id !in existingExcludedLegs && id !in claimedReconcileTargets
-                    }.orEmpty()
-            val matchId = selectNearestUnconsumedLeg(candidates, timestamp, window, consumedReconcileIds) ?: continue
-            consumedReconcileIds += matchId
-            val existingTransfer = candidates.first { it.first == matchId }.second
-            return Classified(
-                transfer.copy(
-                    relationships =
-                        transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId),
-                ),
-                ImportStatus.IMPORTED,
-                existing = null,
-                excludeExisting = ExcludeExistingLeg(existingTransfer, exclusionTypeId),
-            )
+                ?.let { (id, existing) -> Found(id, existing, claims = emptyList()) }
         }
-        return null
-    }
 
     /**
-     * Reconciles a precisely-timed incoming leg against an existing leg of the same movement that another
-     * source could only date approximately ([ExistingTransferInfo.approximateUntil]): same amount, the
-     * same way through the same accounts — or, when this row's counterparty is only a placeholder,
-     * through the same owned account — at an instant inside the existing leg's span. The incoming record
-     * is kept and the approximate one excluded, so the movement is counted once and at its real time
-     * (which is what lets a third source, like a tax tool's export, line up with it). Each existing leg
-     * is claimed at most once, nearest span first.
+     * A conduit spend (e.g. a Curve export row, `conduit -> merchant`) against the funding leg that put the
+     * money into the conduit (`fundingAccount -> conduit`), when the row named its funding card and it
+     * resolved to [ImportTransfer.reconcileFundingAccountId]. Matches on amount+currency and time, ignoring
+     * the merchant — so it links across the merchant-naming differences that defeat [sameAccounts]. The
+     * funding leg's own pass-through spend leg remains the merchant record.
      */
-    private fun classifyAsSupersedingApproximateLeg(
-        transfer: ImportTransfer,
-        window: Duration?,
-        exclusionTypeId: AttributeTypeId?,
-        relationshipTypeId: RelationshipTypeId?,
-    ): Classified? {
-        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
-        if (transfer.isExcluded(exclusionTypeId)) return null
-        if (approximateCandidates.isEmpty() || transfer.approximateUntil != null) return null
-        val timestamp = transfer.timestamp ?: return null
-        val from = transfer.fromAccount.requireId()
-        val to = transfer.toAccount.requireId()
-        val placeholder = transfer.unidentifiedCounterpartyAccountId
-        val (id, existingTransfer) =
+    private val fundingLeg =
+        ReconcileRule(Keeps.EXISTING) { transfer, window ->
+            val fundingAccountId = transfer.reconcileFundingAccountId ?: return@ReconcileRule null
+            val timestamp = transfer.timestamp ?: return@ReconcileRule null
+            // Funding leg is fundingAccount -> conduit; the incoming row's source IS the conduit.
+            val key = DirectedAmountKey(fundingAccountId, transfer.fromAccount.requireId(), transfer.amount)
+            reconcileCandidatesByDirectedAmount[key]?.let { nearestUnclaimed(it, timestamp, window) }
+        }
+
+    /**
+     * This leg's counterparty is only a placeholder named after the row's own description
+     * ([ImportTransfer.unidentifiedCounterpartyAccountId]); an existing, identified leg moves the same amount
+     * the same way through the *owned* account — the counterparty, precisely what this row could not
+     * resolve, is ignored. That is what lets a bank export (which names the far account by sort code +
+     * account number) and an account's own export (which says only "GBP Deposit (via FPS)") record one
+     * deposit once. Two placeholder legs are left to [sameAccounts] (their accounts are equal).
+     */
+    private val identifiedTwin =
+        ReconcileRule(Keeps.EXISTING) { transfer, window ->
+            if (unidentifiedCounterpartyTypeId == null) return@ReconcileRule null
+            val placeholder = transfer.unidentifiedCounterpartyAccountId ?: return@ReconcileRule null
+            val timestamp = transfer.timestamp ?: return@ReconcileRule null
+            val from = transfer.fromAccount.requireId()
+            val to = transfer.toAccount.requireId()
+            // The owned account is whichever side the placeholder is not; money flows into it when the
+            // placeholder funds the row, out of it when the placeholder receives.
+            val (owned, inflow) =
+                when (placeholder) {
+                    from -> to to true
+                    to -> from to false
+                    else -> return@ReconcileRule null
+                }
+            val candidates =
+                reconcileCandidatesByAccountFlow[AccountFlowKey(owned, inflow, transfer.amount)]
+                    ?.filter { (id, existingTransfer) ->
+                        val counterparty = if (inflow) existingTransfer.sourceAccountId else existingTransfer.targetAccountId
+                        id !in existingUnidentifiedLegs &&
+                            id !in existingExcludedLegs &&
+                            id !in claimedReconcileTargets &&
+                            counterparty != placeholder &&
+                            counterparty !in ownBatchAccounts
+                    }.orEmpty()
+            nearestUnclaimed(candidates, timestamp, window)
+        }
+
+    /**
+     * The mirror of [identifiedTwin] for the opposite import order: this row names both ends of the
+     * movement, and an existing leg recorded the same movement against a description-derived placeholder.
+     */
+    private val placeholderTwin =
+        ReconcileRule(Keeps.INCOMING) { transfer, window ->
+            if (unidentifiedCounterpartyTypeId == null) return@ReconcileRule null
+            if (transfer.unidentifiedCounterpartyAccountId != null) return@ReconcileRule null
+            val timestamp = transfer.timestamp ?: return@ReconcileRule null
+            val from = transfer.fromAccount.requireId()
+            val to = transfer.toAccount.requireId()
+            // This row moves money out of `from` and into `to`; a placeholder leg for the same movement sits
+            // on one of those accounts, flowing the same way, with some other account as its far end.
+            listOf(Triple(to, true, from), Triple(from, false, to)).firstNotNullOfOrNull { (owned, inflow, counterparty) ->
+                val candidates =
+                    reconcileCandidatesByAccountFlow[AccountFlowKey(owned, inflow, transfer.amount)]
+                        ?.filter { (id, existingTransfer) ->
+                            id in existingUnidentifiedLegs &&
+                                id !in existingExcludedLegs &&
+                                id !in claimedReconcileTargets &&
+                                (if (inflow) existingTransfer.sourceAccountId else existingTransfer.targetAccountId) != counterparty
+                        }.orEmpty()
+                nearestUnclaimed(candidates, timestamp, window)
+            }
+        }
+
+    /**
+     * Another source could only date this movement approximately ([ExistingTransferInfo.approximateUntil]):
+     * an existing leg moving the same amount the same way through the same accounts — or, when this row's
+     * counterparty is only a placeholder, through the same owned account — at an instant inside its span.
+     * This record is kept, so the movement is counted once and at its real time (which is what lets a third
+     * source, like a tax tool's export, line up with it).
+     */
+    private val approximateTwin =
+        ReconcileRule(Keeps.INCOMING) { transfer, window ->
+            if (approximateCandidates.isEmpty() || transfer.approximateUntil != null) return@ReconcileRule null
+            val timestamp = transfer.timestamp ?: return@ReconcileRule null
+            val from = transfer.fromAccount.requireId()
+            val to = transfer.toAccount.requireId()
+            val placeholder = transfer.unidentifiedCounterpartyAccountId
             approximateCandidates
                 .filter { (id, existing) ->
                     val sameAccounts =
@@ -625,43 +584,25 @@ class ImportDeduper(
                         id !in consumedReconcileIds &&
                         spansMeet(timestamp, null, existing.timestamp, approximateUntilById[id], window)
                 }.minByOrNull { (_, existing) -> (timestamp - existing.timestamp).absoluteValue }
-                ?: return null
-        consumedReconcileIds += id
-        return Classified(
-            transfer.copy(
-                relationships = transfer.relationships + NewRelationship(relatedTransferId = id, typeId = relationshipTypeId),
-            ),
-            ImportStatus.IMPORTED,
-            existing = null,
-            excludeExisting = ExcludeExistingLeg(existingTransfer, exclusionTypeId),
-        )
-    }
+                ?.let { (id, existing) -> Found(id, existing, claims = listOf(id)) }
+        }
 
     /**
-     * The mirror of [classifyAsSupersedingApproximateLeg]: this leg is the approximately-dated one, and an
-     * existing leg moving the same amount the same way through one of this leg's accounts, inside its
-     * span, is the precise record of the movement. Counterparties are not compared — the precise source
-     * may only have a placeholder for the far end, or a different name for it. This leg is imported
-     * excluded and linked; each existing leg is claimed at most once, nearest first.
+     * The mirror of [approximateTwin]: this leg is the approximately-dated one, and an existing leg moving
+     * the same amount the same way through one of this leg's accounts, inside its span, is the precise
+     * record. Counterparties are not compared — the precise source may only have a placeholder for the far
+     * end, or a different name for it.
      */
-    private fun classifyApproximateAsReconciled(
-        transfer: ImportTransfer,
-        window: Duration?,
-        exclusionTypeId: AttributeTypeId?,
-        relationshipTypeId: RelationshipTypeId?,
-    ): Classified? {
-        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
-        if (transfer.isExcluded(exclusionTypeId)) return null
-        val until = transfer.approximateUntil ?: return null
-        val timestamp = transfer.timestamp ?: return null
-        val flows =
+    private val preciseTwin =
+        ReconcileRule(Keeps.EXISTING) { transfer, window ->
+            val exclusionTypeId = reconciledExclusionTypeId
+            if (exclusionTypeId != null && transfer.isExcluded(exclusionTypeId)) return@ReconcileRule null
+            val until = transfer.approximateUntil ?: return@ReconcileRule null
+            val timestamp = transfer.timestamp ?: return@ReconcileRule null
             listOf(
                 AccountFlowKey(transfer.toAccount.requireId(), inflow = true, transfer.amount),
                 AccountFlowKey(transfer.fromAccount.requireId(), inflow = false, transfer.amount),
-            )
-        val matchId =
-            flows
-                .flatMap { reconcileCandidatesByAccountFlow[it].orEmpty() }
+            ).flatMap { reconcileCandidatesByAccountFlow[it].orEmpty() }
                 .filter { (id, existing) ->
                     id !in existingExcludedLegs &&
                         id !in claimedReconcileTargets &&
@@ -669,60 +610,67 @@ class ImportDeduper(
                         id !in approximateUntilById &&
                         spansMeet(timestamp, until, existing.timestamp, null, window)
                 }.minByOrNull { (_, existing) -> (existing.timestamp - timestamp).absoluteValue }
-                ?.first
-                ?: return null
-        consumedReconcileIds += matchId
-        return Classified(
-            transfer.copy(
-                attributes = transfer.withExclusion(exclusionTypeId),
-                relationships = transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId),
-                fee = null,
-            ),
-            ImportStatus.IMPORTED,
-            existing = null,
-        )
-    }
+                ?.let { (id, existing) -> Found(id, existing, claims = listOf(id)) }
+        }
 
     /**
-     * The opposite order to [classifyAsGrossNetReconciled]: this row is the single **gross** leg and
-     * another source already booked the movement as a **net** leg plus a separate fee leg. A Bybit
-     * withdrawal is the case: the Funding ledger debits the coins that left plus the network fee in one
-     * row, while the API books the amount received and `withdrawFee` as two transfers.
+     * This source reports the movement **net** of a charge it books separately, and another source
+     * recorded it as one **gross** leg. A Binance withdrawal is the case: the API returns the amount that
+     * left the account and a `transactionFee`/`totalFee` beside it, which become two transfers, while the
+     * statement export has one row for the sum. Amount equality — which every other rule rests on — can
+     * never pair those, so the match is on [ImportTransfer.reconcileGrossAmount], counterparty-agnostic
+     * (the gross row typically named only a placeholder). Net + fee is exactly the gross, so no balance
+     * moves.
+     */
+    private val grossTwin =
+        ReconcileRule(Keeps.INCOMING) { transfer, window ->
+            val gross = transfer.reconcileGrossAmount ?: return@ReconcileRule null
+            if (gross == transfer.amount) return@ReconcileRule null
+            val timestamp = transfer.timestamp ?: return@ReconcileRule null
+            val from = transfer.fromAccount.requireId()
+            val to = transfer.toAccount.requireId()
+            listOf(to to true, from to false).firstNotNullOfOrNull { (owned, inflow) ->
+                val candidates =
+                    reconcileCandidatesByAccountFlow[AccountFlowKey(owned, inflow, gross)]
+                        ?.filter { (id, _) -> id !in existingExcludedLegs && id !in claimedReconcileTargets }
+                        .orEmpty()
+                nearestUnclaimed(candidates, timestamp, window)
+            }
+        }
+
+    /**
+     * The mirror of [grossTwin]: this row is the single **gross** leg and another source already booked
+     * the movement as a **net** leg plus a separate fee leg. A Bybit withdrawal is the case: the Funding
+     * ledger debits the coins that left plus the network fee in one row, while the API books the amount
+     * received and `withdrawFee` as two transfers.
      *
      * Only a placeholder row qualifies (its counterparty is unknown, which is why it cannot be the better
-     * record). The match is two identified, unexcluded legs leaving (or entering) the owned account at
-     * one shared instant within [window] whose amounts sum exactly to this row's; a coincidence that
-     * tight is not plausible for two unrelated movements. This row is imported excluded and linked to the
-     * larger (net) leg; both existing legs are claimed.
+     * record). The match is two identified, unexcluded legs leaving the owned account at one shared instant
+     * within the window whose amounts sum exactly to this row's; a coincidence that tight is not plausible
+     * for two unrelated movements. This row links to the larger (net) leg; both existing legs are claimed.
      */
-    private fun classifyAsNetPlusFeeReconciled(
-        transfer: ImportTransfer,
-        window: Duration?,
-        exclusionTypeId: AttributeTypeId?,
-        relationshipTypeId: RelationshipTypeId?,
-    ): Classified? {
-        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
-        if (unidentifiedCounterpartyTypeId == null) return null
-        val placeholder = transfer.unidentifiedCounterpartyAccountId ?: return null
-        val gross = transfer.amount ?: return null
-        val timestamp = transfer.timestamp ?: return null
-        // Only an outflow from the owned account: money leaves gross, arrives net, and the fee goes elsewhere.
-        if (placeholder != transfer.toAccount.requireId()) return null
-        val owned = transfer.fromAccount.requireId()
-        val usable =
-            reconcileCandidatesByOutflow[owned]
-                .orEmpty()
-                .filter { (id, existing) ->
-                    existing.amount.asset == gross.asset &&
-                        existing.amount.amount < gross.amount &&
-                        existing.targetAccountId != placeholder &&
-                        id !in existingUnidentifiedLegs &&
-                        id !in existingExcludedLegs &&
-                        id !in claimedReconcileTargets &&
-                        id !in consumedReconcileIds &&
-                        (timestamp - existing.timestamp).absoluteValue <= window
-                }
-        val pair =
+    private val itemisedTwin =
+        ReconcileRule(Keeps.EXISTING) { transfer, window ->
+            if (unidentifiedCounterpartyTypeId == null) return@ReconcileRule null
+            val placeholder = transfer.unidentifiedCounterpartyAccountId ?: return@ReconcileRule null
+            val gross = transfer.amount ?: return@ReconcileRule null
+            val timestamp = transfer.timestamp ?: return@ReconcileRule null
+            // Only an outflow from the owned account: money leaves gross, arrives net, and the fee goes elsewhere.
+            if (placeholder != transfer.toAccount.requireId()) return@ReconcileRule null
+            val owned = transfer.fromAccount.requireId()
+            val usable =
+                reconcileCandidatesByOutflow[owned]
+                    .orEmpty()
+                    .filter { (id, existing) ->
+                        existing.amount.asset == gross.asset &&
+                            existing.amount.amount < gross.amount &&
+                            existing.targetAccountId != placeholder &&
+                            id !in existingUnidentifiedLegs &&
+                            id !in existingExcludedLegs &&
+                            id !in claimedReconcileTargets &&
+                            id !in consumedReconcileIds &&
+                            (timestamp - existing.timestamp).absoluteValue <= window
+                    }
             usable
                 .groupBy { (_, existing) -> existing.timestamp }
                 .values
@@ -735,66 +683,8 @@ class ImportDeduper(
                     }
                 }.filter { (net, _) -> net.second.targetAccountId !in ownBatchAccounts }
                 .minByOrNull { (net, _) -> (timestamp - net.second.timestamp).absoluteValue }
-                ?: return null
-        val (net, fee) = pair
-        consumedReconcileIds += net.first
-        consumedReconcileIds += fee.first
-        return Classified(
-            transfer.copy(
-                attributes = transfer.withExclusion(exclusionTypeId),
-                relationships = transfer.relationships + NewRelationship(relatedTransferId = net.first, typeId = relationshipTypeId),
-                fee = null,
-            ),
-            ImportStatus.IMPORTED,
-            existing = null,
-        )
-    }
-
-    /**
-     * The mirror of [classifyAsUnidentifiedCounterpartyReconciled] for the opposite import order: this
-     * row names both ends of the movement, and an existing leg recorded the same movement against a
-     * description-derived placeholder. The incoming (better) record is kept and the placeholder leg is
-     * excluded, so either order leaves the movement counted once against real accounts.
-     */
-    private fun classifyAsSupersedingUnidentifiedLeg(
-        transfer: ImportTransfer,
-        window: Duration?,
-        exclusionTypeId: AttributeTypeId?,
-        relationshipTypeId: RelationshipTypeId?,
-    ): Classified? {
-        if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
-        if (transfer.isExcluded(exclusionTypeId)) return null
-        if (unidentifiedCounterpartyTypeId == null) return null
-        if (transfer.unidentifiedCounterpartyAccountId != null) return null
-        val timestamp = transfer.timestamp ?: return null
-        val from = transfer.fromAccount.requireId()
-        val to = transfer.toAccount.requireId()
-        // This row moves money out of `from` and into `to`; a placeholder leg for the same movement sits
-        // on one of those accounts, flowing the same way, with some other account as its far end.
-        for ((owned, inflow, counterparty) in listOf(Triple(to, true, from), Triple(from, false, to))) {
-            val candidates =
-                reconcileCandidatesByAccountFlow[AccountFlowKey(owned, inflow, transfer.amount)]
-                    ?.filter { (id, existingTransfer) ->
-                        id in existingUnidentifiedLegs &&
-                            id !in existingExcludedLegs &&
-                            id !in claimedReconcileTargets &&
-                            (if (inflow) existingTransfer.sourceAccountId else existingTransfer.targetAccountId) != counterparty
-                    }.orEmpty()
-            val matchId = selectNearestUnconsumedLeg(candidates, timestamp, window, consumedReconcileIds) ?: continue
-            consumedReconcileIds += matchId
-            val existingTransfer = candidates.first { it.first == matchId }.second
-            return Classified(
-                transfer.copy(
-                    relationships =
-                        transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId),
-                ),
-                ImportStatus.IMPORTED,
-                existing = null,
-                excludeExisting = ExcludeExistingLeg(existingTransfer, exclusionTypeId),
-            )
+                ?.let { (net, fee) -> Found(net.first, net.second, claims = listOf(net.first, fee.first)) }
         }
-        return null
-    }
 
     /**
      * True when this incoming leg already arrives excluded (the source marks it deleted, or an internal
@@ -964,8 +854,9 @@ class ImportDeduper(
 
         // Cross-source reconciliation: the same real movement seen from another provider/export under a
         // different unique id (e.g. Monzo issues a separate Transaction ID per account side of a transfer).
-        classifyAsReconciled(
+        reconcile(
             transfer,
+            sameAccounts,
             policy.reconcileWindow,
             policy.reconciledExclusionAttributeTypeId,
             policy.reconciledRelationshipTypeId,
@@ -987,23 +878,19 @@ class ImportDeduper(
                     if (attributesAreIdentical(transfer, existing)) ImportStatus.DUPLICATE else ImportStatus.UPDATED
                 return Classified(transfer, status, existing.transferId)
             }
-        // Before the fuzzy pass, which would drop this precisely-timed row as the duplicate: another
-        // source booked the movement with only an approximate time, so this row is the better record.
-        classifyAsSupersedingApproximateLeg(
-            transfer,
-            policy.reconcileWindow,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
-        // Funding-card reconcile (before fuzzy): a conduit spend whose funding card resolved to an
-        // account reconciles against that account's funding leg by amount+currency+window, ignoring the
-        // merchant — so it links (excluded) instead of dropping as a fuzzy duplicate or double-counting.
-        classifyAsFundingReconciled(
-            transfer,
-            policy.reconcileWindow,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
+        // Before the fuzzy pass, which would drop this row as a duplicate: another source booked the
+        // movement with only an approximate time (this row is the better record), or this is a conduit
+        // spend whose funding card resolved to an account (it links to that account's funding leg,
+        // ignoring the merchant, instead of dropping as a fuzzy duplicate or double-counting).
+        for (rule in listOf(approximateTwin, fundingLeg)) {
+            reconcile(
+                transfer,
+                rule,
+                policy.reconcileWindow,
+                policy.reconciledExclusionAttributeTypeId,
+                policy.reconciledRelationshipTypeId,
+            )?.let { return it }
+        }
         // Second pass: tolerate bank re-export drift (close date, similar description) — the amount
         // must still match exactly, so only that bucket needs scanning.
         transfer.amount?.let { amount ->
@@ -1014,37 +901,27 @@ class ImportDeduper(
                 }
             }
         }
-        // Third pass: cross-source reconciliation (opt-in per strategy) — the same real movement
-        // recorded by another export with a different description (e.g. a crypto.com top-up seen as
-        // "Top Up Card" in the fiat CSV and "GBP Deposit" in the card CSV). Imported but excluded+linked.
-        classifyAsReconciled(
-            transfer,
-            policy.reconcileWindow,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
-        // Fourth pass: the counterparty is only a description-derived placeholder, so match on the owned
-        // account + direction + amount alone — either dropping this row for an existing real record, or
-        // superseding an existing placeholder row with this one.
-        classifyAsUnidentifiedCounterpartyReconciled(
-            transfer,
-            policy.dateTolerance,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
-        classifyAsSupersedingUnidentifiedLeg(
-            transfer,
-            policy.dateTolerance,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
-        // Fifth pass: this placeholder row is a gross amount another source split into net + fee.
-        classifyAsNetPlusFeeReconciled(
-            transfer,
-            policy.reconcileWindow,
-            policy.reconciledExclusionAttributeTypeId,
-            policy.reconciledRelationshipTypeId,
-        )?.let { return it }
+        // Then cross-source reconciliation (opt-in per strategy): the same real movement recorded by
+        // another export with a different description (a crypto.com top-up seen as "Top Up Card" in the
+        // fiat CSV and "GBP Deposit" in the card CSV); a row whose counterparty is only a placeholder,
+        // matched on the owned account + direction + amount alone (either way round, within the date
+        // tolerance); and a placeholder row that is a gross amount another source split into net + fee.
+        val rules =
+            listOf(
+                sameAccounts to policy.reconcileWindow,
+                identifiedTwin to policy.dateTolerance,
+                placeholderTwin to policy.dateTolerance,
+                itemisedTwin to policy.reconcileWindow,
+            )
+        for ((rule, window) in rules) {
+            reconcile(
+                transfer,
+                rule,
+                window,
+                policy.reconciledExclusionAttributeTypeId,
+                policy.reconciledRelationshipTypeId,
+            )?.let { return it }
+        }
         return Classified(transfer, ImportStatus.IMPORTED, null)
     }
 

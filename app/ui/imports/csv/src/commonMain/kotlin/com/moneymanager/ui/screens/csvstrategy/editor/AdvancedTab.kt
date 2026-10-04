@@ -250,19 +250,21 @@ internal fun AdvancedTab(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Asset Conversions (Optional)", style = MaterialTheme.typography.titleSmall)
+        Text("Multi-Row Movements (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
-            "For sources that express a conversion as separate debited/credited rows (e.g. crypto.com " +
-                "\"Convert Dust\"): route both legs through a shared account and link them as one event.",
+            "For sources that split one movement across several rows: a trade's fills (Binance, Bybit), or a " +
+                "conversion's debited/credited rows (crypto.com \"Convert Dust\"), routed through a shared account " +
+                "and linked as one event.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(4.dp))
-        ConversionConfigEditor(
-            config = state.conversionConfig,
-            onConfigChanged = { state.conversionConfig = it },
+        LegGroupsEditor(
+            rules = state.legGroups,
+            onRulesChanged = { state.legGroups = it },
             columns = csvColumns,
             firstRow = firstRow,
+            existingAttributeTypeNames = existingAttributeTypes.map { it.name },
             enabled = enabled,
         )
 

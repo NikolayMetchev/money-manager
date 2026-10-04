@@ -102,7 +102,7 @@ object WellKnownIds {
     /**
      * "conversion" relationship type: id1 is the debit leg of an asset conversion and id2 the credit
      * leg it was paired with — the shape a source books when it cannot say which credit came from
-     * which debit (see `com.moneymanager.domain.model.csvstrategy.ConversionConfig`). Resolved by
+     * which debit (see `com.moneymanager.domain.model.csvstrategy.LegAssembly.ThroughAccount`). Resolved by
      * name (get-or-create), so a database seeded before the type existed self-heals on first use.
      */
     const val CONVERSION_RELATIONSHIP_TYPE_NAME: String = "conversion"

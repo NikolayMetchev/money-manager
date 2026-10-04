@@ -140,9 +140,7 @@ internal fun buildStrategyFromEditorState(
                     creditColumnName = if (singleColumn) null else state.creditColumnName,
                     debitColumnName = if (singleColumn) null else state.debitColumnName,
                     direction = state.direction,
-                    feeColumnName = state.feeColumnName,
-                    feeConditions = if (state.feeColumnName != null) state.feeConditions else emptyList(),
-                    feeCurrency = state.feeCurrency.takeIf { state.feeColumnName != null },
+                    fee = state.fee,
                 ),
             )
             put(
@@ -199,8 +197,7 @@ internal fun buildStrategyFromEditorState(
                     state.fundingMatchColumn
                         ?.takeIf { it.isNotBlank() }
                         ?.let { AttributeAccountMatch(column = it, attributeTypeName = state.fundingMatchAttributeTypeName) },
-                conversionConfig = state.conversionConfig,
-                tradeGroupConfig = state.tradeGroupConfig,
+                legGroups = state.legGroups,
                 reconciliation =
                     state.reconciliationSourceName.trim().takeIf { it.isNotEmpty() }?.let { source ->
                         ReconciliationConfig(source, state.reconciliationLinkablePrefix.takeIf { it.isNotEmpty() })

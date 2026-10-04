@@ -436,9 +436,7 @@ class CsvStrategyExportService(
                     creditColumnName = creditColumnName,
                     debitColumnName = debitColumnName,
                     direction = direction,
-                    feeColumnName = feeColumnName,
-                    feeConditions = feeConditions,
-                    feeCurrency = feeCurrency,
+                    fee = fee,
                 )
             is HardCodedCurrencyExport ->
                 HardCodedCurrencyMapping(

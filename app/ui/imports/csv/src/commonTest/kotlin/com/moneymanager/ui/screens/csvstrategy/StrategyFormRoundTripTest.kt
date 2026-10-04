@@ -12,14 +12,15 @@ import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
-import com.moneymanager.domain.model.csvstrategy.ConversionAccountRule
-import com.moneymanager.domain.model.csvstrategy.ConversionConfig
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AssetCodeRules
@@ -27,6 +28,7 @@ import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorState
 import com.moneymanager.ui.screens.csvstrategy.editor.buildStrategyFromEditorState
@@ -119,8 +121,11 @@ class StrategyFormRoundTripTest {
                                     fieldType = TransferField.AMOUNT,
                                     mode = AmountMode.SINGLE_COLUMN,
                                     amountColumnName = "Source amount (after fees)",
-                                    feeColumnName = "Source fee amount",
-                                    feeConditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
+                                    fee =
+                                        FeeRule(
+                                            amount = ValueExpr(listOf("Source fee amount")),
+                                            conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
+                                        ),
                                 ),
                             TransferField.CURRENCY to
                                 CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Source currency"))),
@@ -261,7 +266,7 @@ class StrategyFormRoundTripTest {
     }
 
     @Test
-    fun `conversion config plus content-match rules and cross-source window round-trip`() {
+    fun `leg groups plus content-match rules and cross-source window round-trip`() {
         val original =
             advancedStrategy().copy(
                 config =
@@ -272,20 +277,41 @@ class StrategyFormRoundTripTest {
                                 Condition("Reference", ConditionOp.MATCHES, "CRV\\*"),
                             ),
                         crossSourceReconcileWindowSeconds = 120,
-                        conversionConfig =
-                            ConversionConfig(
-                                signalColumn = "Direction",
-                                debitPattern = "(?i)_debited$",
-                                creditPattern = "(?i)_credited$",
-                                conversionAccountName = "Crypto.com Conversions",
-                                conversionAccountRules =
-                                    listOf(
-                                        ConversionAccountRule(column = "Source currency", pattern = "(?i)^DUST$", accountName = "Dust"),
-                                    ),
-                                pairingKeyPattern = "(?i)^(.*)_(?:debited|credited)$",
-                                pairingKeyColumns = listOf("Reference"),
-                                pairingWindowSeconds = 60,
-                                relationshipTypeName = "conversion",
+                        legGroups =
+                            listOf(
+                                LegGroupRule(
+                                    legWhen = listOf(Condition("Direction", ConditionOp.MATCHES, "(?i)_(debited|credited)$")),
+                                    side = LegSide.DebitWhen(listOf(Condition("Direction", ConditionOp.MATCHES, "(?i)_debited$"))),
+                                    key =
+                                        listOf(
+                                            ValueExpr(listOf("Direction"), Extraction("(?i)^(.*)_(?:debited|credited)$", "$1")),
+                                            ValueExpr(listOf("Reference")),
+                                        ),
+                                    windowSeconds = 60,
+                                    assembly =
+                                        LegAssembly.ThroughAccount(
+                                            accounts =
+                                                listOf(
+                                                    AccountRule(
+                                                        conditions =
+                                                            listOf(
+                                                                Condition("Source currency", ConditionOp.MATCHES, "(?i)^DUST$"),
+                                                            ),
+                                                        value = ValueExpr(listOf("Direction")),
+                                                        name = "Dust",
+                                                    ),
+                                                    AccountRule(value = ValueExpr(listOf("Direction")), name = "Crypto.com Conversions"),
+                                                ),
+                                            relationshipTypeName = "conversion",
+                                        ),
+                                    reconcileWindowSeconds = 5,
+                                ),
+                                LegGroupRule(
+                                    legWhen = listOf(Condition("Direction", ConditionOp.EQUALS, "TRADE")),
+                                    side = LegSide.Sign("Source amount (after fees)"),
+                                    windowSeconds = 1,
+                                    assembly = LegAssembly.Trade("Swap {from} for {to}"),
+                                ),
                             ),
                     ),
             )
@@ -296,7 +322,7 @@ class StrategyFormRoundTripTest {
 
         assertEquals(original.config.contentMatchRules, rebuilt.config.contentMatchRules)
         assertEquals(original.config.crossSourceReconcileWindowSeconds, rebuilt.config.crossSourceReconcileWindowSeconds)
-        assertEquals(original.config.conversionConfig, rebuilt.config.conversionConfig)
+        assertEquals(original.config.legGroups, rebuilt.config.legGroups)
     }
 
     /**
