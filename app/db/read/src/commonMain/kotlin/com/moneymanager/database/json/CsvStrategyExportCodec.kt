@@ -62,7 +62,8 @@ private object FlatCsvStrategyExportSerializer : JsonTransformingSerializer<CsvS
         )
 
     override fun transformSerialize(element: JsonElement): JsonElement {
-        val flat = element.jsonObject.filterKeys { it != "config" } + element.jsonObject.getValue("config").jsonObject
+        val config = StrategyConfigMigrations.stampCsv(element.jsonObject.getValue("config").jsonObject)
+        val flat = element.jsonObject.filterKeys { it != "config" } + config
         return JsonObject(
             flat.entries
                 .sortedBy { (key, _) -> PUBLISHED_KEY_ORDER.indexOf(key).takeIf { it >= 0 } ?: Int.MAX_VALUE }
@@ -73,6 +74,6 @@ private object FlatCsvStrategyExportSerializer : JsonTransformingSerializer<CsvS
     override fun transformDeserialize(element: JsonElement): JsonElement =
         JsonObject(
             element.jsonObject.filterKeys { it in OUTER } +
-                ("config" to JsonObject(element.jsonObject.filterKeys { it !in OUTER })),
+                ("config" to StrategyConfigMigrations.upgradeCsv(JsonObject(element.jsonObject.filterKeys { it !in OUTER }))),
         )
 }

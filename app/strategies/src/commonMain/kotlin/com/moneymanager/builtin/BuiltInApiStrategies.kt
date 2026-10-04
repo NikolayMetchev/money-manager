@@ -38,9 +38,7 @@ import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.OffsetMode
 import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.ParamStringFormat
-import com.moneymanager.domain.model.apistrategy.PredicateOp
 import com.moneymanager.domain.model.apistrategy.RequestIdSpec
-import com.moneymanager.domain.model.apistrategy.RulePredicate
 import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SigFieldLocation
@@ -50,6 +48,9 @@ import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
+import com.moneymanager.domain.model.rules.AssetCodeRules
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -105,7 +106,7 @@ object BuiltInApiStrategies {
                                 listOf(
                                     ApiAccountNameRule(
                                         suffix = "Rewards",
-                                        predicates = listOf(RulePredicate(path = "type", op = PredicateOp.EQUALS, value = "uk_rewards")),
+                                        predicates = listOf(Condition("type", ConditionOp.EQUALS, value = "uk_rewards")),
                                     ),
                                 ),
                         ),
@@ -114,7 +115,7 @@ object BuiltInApiStrategies {
                             merchantNameField = "merchant.name",
                             counterpartyNameField = "counterparty.name",
                             counterpartyIdField = "counterparty.id",
-                            declineReasonField = "decline_reason",
+                            declinedWhen = listOf(Condition("decline_reason", ConditionOp.NOT_BLANK)),
                             localAmountField = "local_amount",
                             localCurrencyField = "local_currency",
                             // Foreign ATM withdrawals above the fee-free allowance carry a charge in
@@ -154,26 +155,26 @@ object BuiltInApiStrategies {
             BuiltInCounterpartyRule(
                 name = "ATM",
                 onlyWhenSign = RuleSign.NEGATIVE,
-                predicates = listOf(RulePredicate(path = "atm_fees_detailed", op = PredicateOp.EXISTS)),
+                predicates = listOf(Condition("atm_fees_detailed", ConditionOp.EXISTS)),
             ),
             BuiltInCounterpartyRule(
                 name = "ATM",
                 onlyWhenSign = RuleSign.NEGATIVE,
-                predicates = listOf(RulePredicate(path = "labels", op = PredicateOp.ARRAY_ANY_STARTS_WITH, value = "withdrawal.atm")),
+                predicates = listOf(Condition("labels", ConditionOp.ANY_ELEMENT_STARTS_WITH, value = "withdrawal.atm")),
             ),
             BuiltInCounterpartyRule(
                 name = "ATM",
                 onlyWhenSign = RuleSign.NEGATIVE,
-                predicates = listOf(RulePredicate(path = "metadata.mcc", op = PredicateOp.EQUALS, value = "6011")),
+                predicates = listOf(Condition("metadata.mcc", ConditionOp.EQUALS, value = "6011")),
             ),
             BuiltInCounterpartyRule(
                 name = "ATM",
                 onlyWhenSign = RuleSign.NEGATIVE,
                 predicates =
                     listOf(
-                        RulePredicate(path = "category", op = PredicateOp.EQUALS_IGNORE_CASE, value = "cash"),
-                        RulePredicate(path = "merchant", op = PredicateOp.OBJECT_EMPTY),
-                        RulePredicate(path = "counterparty", op = PredicateOp.OBJECT_EMPTY),
+                        Condition("category", ConditionOp.EQUALS_IGNORE_CASE, value = "cash"),
+                        Condition("merchant", ConditionOp.EMPTY_OBJECT),
+                        Condition("counterparty", ConditionOp.EMPTY_OBJECT),
                     ),
             ),
         )
@@ -346,8 +347,7 @@ object BuiltInApiStrategies {
                             counterpartyIdField = "counterPartyUid",
                             // Declined feed items never moved money; import them but exclude from balances
                             // (same treatment as Monzo's `decline_reason`), keyed off Starling's status.
-                            declineStatusField = "status",
-                            declinedStatusValues = setOf("DECLINED"),
+                            declinedWhen = listOf(Condition("status", ConditionOp.IN, value = "DECLINED")),
                             // Persist the feed item's stable id as a transaction attribute so each imported
                             // transfer is uniquely identifiable and re-imports dedupe on it.
                             customFields = mapOf("starling-transaction-id" to "feedItemUid"),
@@ -708,7 +708,7 @@ object BuiltInApiStrategies {
                 // "amount" is signed (negative = out), so trust that sign instead of the endpoint's fixed
                 // direction, or the reversal double-books as a second real movement in the same direction.
                 directionFromAmountSign = true,
-                // Only meaningful on the excluded `type=trade` rows (see excludeField/excludeValues
+                // Only meaningful on the excluded `type=trade` rows (see excludeWhen
                 // below) — refid equals the matching TradesHistory trade's own id.
                 reconcileTradeAmountsField = "refid",
             )
@@ -772,7 +772,7 @@ object BuiltInApiStrategies {
                             // invisible to the importer — the account balance would silently drift from the true
                             // Kraken balance by exactly the missed amount. `type=all` also returns `trade`-type
                             // entries that duplicate what TradesHistory already supplies, so those are dropped via
-                            // excludeField/excludeValues. Direction comes from the signed `amount` field
+                            // excludeWhen. Direction comes from the signed `amount` field
                             // (directionFromAmountSign), not the ledger `type`, so this single endpoint covers
                             // every type without per-type direction mapping — including the historical "reward"
                             // vs "staking" naming inconsistency between Kraken account vintages.
@@ -785,7 +785,10 @@ object BuiltInApiStrategies {
                                     queryParams = listOf(ApiQueryParam(name = "type", value = "all")),
                                 ),
                                 ApiEndpointKind.DEPOSITS,
-                                transactionMappings = ledgerMappings("refid").copy(excludeField = "type", excludeValues = setOf("trade")),
+                                transactionMappings =
+                                    ledgerMappings(
+                                        "refid",
+                                    ).copy(excludeWhen = listOf(Condition("type", ConditionOp.IN, value = "trade"))),
                             ),
                             // Known limitation: Kraken paginates these funding-status endpoints with an opaque
                             // cursor token (not the offset/date-window shapes the generic engine implements), so
@@ -807,11 +810,10 @@ object BuiltInApiStrategies {
                                 enrichesTransfers = true,
                             ),
                         ),
-                    assetAliases = assetAliasMap,
                     // Kraken Earn holdings use a suffixed asset code for the same underlying asset (e.g. the
                     // "Flexible Earn" ETH position is "XETH.F", staked is "XETH.S"); strip it so the position's
                     // deposit/withdrawal ledger entries resolve to the ordinary "ETH" asset like any other.
-                    assetSuffixesToStrip = setOf(".F", ".S", ".M"),
+                    assetCodes = AssetCodeRules(aliases = assetAliasMap, stripSuffixes = setOf(".F", ".S", ".M")),
                     // Starter-tier decay is 0.33 counter/sec (Kraken's slowest verification tier), so 1 unit of
                     // cost needs ~3.03s to fully decay; 3100ms per unit keeps even the slowest tier clear of
                     // "EAPI:Rate limit exceeded" with a small margin. requestCostWeight above scales this per
@@ -1056,7 +1058,7 @@ object BuiltInApiStrategies {
                 timestampFormat = TimestampFormat.EPOCH_MS,
                 amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                 idField = "tranId",
-                itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "CONFIRMED")),
+                itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "CONFIRMED")),
             )
 
         // Simple Earn history costs 150 request-weight a call against Binance's ~6000/min budget, so it is
@@ -1229,7 +1231,7 @@ object BuiltInApiStrategies {
                                         txidField = "txId",
                                         // status: 0=pending, 1=success, 2=rejected, 6=credited but cannot
                                         // withdraw, 7=wrong deposit, 8=waiting user confirm.
-                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "1")),
+                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "1")),
                                     ),
                                 fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = "Binance Funding",
@@ -1250,7 +1252,7 @@ object BuiltInApiStrategies {
                                         // "amount" is net of the fee - transactionFee is booked separately.
                                         feeAmountField = "transactionFee",
                                         // status 6 = completed (see the capital/withdraw/history docs).
-                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "6")),
+                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "6")),
                                     ),
                                 fixedDirection = TransferDirection.OUT,
                                 counterpartyAccountName = "Binance Funding",
@@ -1265,7 +1267,7 @@ object BuiltInApiStrategies {
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                                         idField = "orderNo",
-                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "Successful")),
+                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Successful")),
                                     ),
                                 fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = "Binance Bank",
@@ -1286,7 +1288,7 @@ object BuiltInApiStrategies {
                                         // it. The deposit endpoint above needs no equivalent: Binance
                                         // returns totalFee "0" on every fiat deposit.
                                         feeAmountField = "totalFee",
-                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "Successful")),
+                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Successful")),
                                     ),
                                 fixedDirection = TransferDirection.OUT,
                                 counterpartyAccountName = "Binance Bank",
@@ -1310,7 +1312,7 @@ object BuiltInApiStrategies {
                                         timestampField = "createTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "orderNo",
-                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "Completed")),
+                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Completed")),
                                     ),
                             ),
                             ApiDataEndpoint(
@@ -1332,7 +1334,7 @@ object BuiltInApiStrategies {
                                         timestampField = "createTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "orderNo",
-                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "Completed")),
+                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Completed")),
                                     ),
                             ),
                             ApiDataEndpoint(
@@ -1352,7 +1354,7 @@ object BuiltInApiStrategies {
                                         idField = "orderId",
                                         itemFilters =
                                             listOf(
-                                                RulePredicate(path = "orderStatus", op = PredicateOp.EQUALS, value = "SUCCESS"),
+                                                Condition("orderStatus", ConditionOp.EQUALS, value = "SUCCESS"),
                                             ),
                                     ),
                             ),
@@ -1373,7 +1375,7 @@ object BuiltInApiStrategies {
                                         // A subscription can be funded partly from the Funding wallet
                                         // (amtFromSpot/amtFromFunding), but both wallets are the one
                                         // Binance account here, so the whole amount moves as one leg.
-                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "SUCCESS")),
+                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "SUCCESS")),
                                     ),
                                 fixedDirection = TransferDirection.OUT,
                                 counterpartyAccountName = binanceEarnAccount,
@@ -1388,7 +1390,7 @@ object BuiltInApiStrategies {
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                                         idField = "redeemId",
-                                        itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "PAID")),
+                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "PAID")),
                                     ),
                                 fixedDirection = TransferDirection.IN,
                                 counterpartyAccountName = binanceEarnAccount,
@@ -1565,13 +1567,12 @@ object BuiltInApiStrategies {
                 txidField = "network.hash",
                 // Every row is one wallet's own signed movement (negative = out).
                 directionFromAmountSign = true,
-                itemFilters = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = "completed")),
+                itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "completed")),
                 // Buys/sells/converts and Advanced Trade fills: one row per wallet touched, grouped into a
                 // trade by the id of the buy/sell/convert (or the Advanced Trade order) they belong to
                 // rather than booked as transfers. The rows carry the exact settled amounts, so no
                 // quantity is ever derived from a price.
-                excludeField = "type",
-                excludeValues = setOf("buy", "sell", "trade", "advanced_trade_fill", "retail_simple_dust"),
+                excludeWhen = listOf(Condition("type", ConditionOp.IN, value = "advanced_trade_fill,buy,retail_simple_dust,sell,trade")),
                 reconcileTradeAmountsField = "trade.id",
                 reconcileTradeAmountsFallbackFields = listOf("buy.id", "sell.id", "advanced_trade_fill.order_id"),
                 // An Advanced Trade fill's commission is settled outside its legs, and both legs repeat it:
@@ -1729,7 +1730,7 @@ object BuiltInApiStrategies {
             successCodeOkValue = "0",
         )
 
-        fun status(value: String) = listOf(RulePredicate(path = "status", op = PredicateOp.EQUALS, value = value))
+        fun status(value: String) = listOf(Condition("status", ConditionOp.EQUALS, value = value))
 
         // Longest-match-wins quote-asset suffixes for splitting a spot symbol ("BTCUSDT").
         val quoteAssets =
@@ -1759,7 +1760,7 @@ object BuiltInApiStrategies {
                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                         itemFilters =
                             listOf(
-                                RulePredicate(path = "type", op = PredicateOp.IN, value = "TRADE,SETTLEMENT,DELIVERY,LIQUIDATION,ADL"),
+                                Condition("type", ConditionOp.IN, value = "TRADE,SETTLEMENT,DELIVERY,LIQUIDATION,ADL"),
                             ),
                     ),
                 counterpartyAccountName = "Bybit Derivatives",
@@ -1819,7 +1820,7 @@ object BuiltInApiStrategies {
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "execId",
                                         orderIdField = "orderId",
-                                        itemFilters = listOf(RulePredicate(path = "execType", op = PredicateOp.EQUALS, value = "Trade")),
+                                        itemFilters = listOf(Condition("execType", ConditionOp.EQUALS, value = "Trade")),
                                     ),
                             ),
                             ApiDataEndpoint(
@@ -1905,7 +1906,7 @@ object BuiltInApiStrategies {
                                         idField = "exchangeTxId",
                                         itemFilters =
                                             listOf(
-                                                RulePredicate(path = "exchangeStatus", op = PredicateOp.EQUALS, value = "success"),
+                                                Condition("exchangeStatus", ConditionOp.EQUALS, value = "success"),
                                             ),
                                     ),
                             ),

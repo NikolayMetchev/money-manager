@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -42,7 +43,7 @@ class CsvStrategyEditorStateTest {
                                         dateFormat = "yyyy-MM-dd",
                                     ),
                                 TransferField.DESCRIPTION to
-                                    DirectColumnMapping(TransferField.DESCRIPTION, "Memo"),
+                                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Memo"))),
                                 TransferField.AMOUNT to
                                     AmountParsingMapping(
                                         fieldType = TransferField.AMOUNT,

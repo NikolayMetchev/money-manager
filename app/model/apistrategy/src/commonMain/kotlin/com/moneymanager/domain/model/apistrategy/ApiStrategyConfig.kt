@@ -1,5 +1,8 @@
 package com.moneymanager.domain.model.apistrategy
 
+import com.moneymanager.domain.model.rules.AssetCodeRules
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.serialization.SortedListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
@@ -387,14 +390,10 @@ enum class ApiSignSource {
  * @property idField Dot-path to the transaction's stable id, used for de-duplication
  * @property merchantNameField Optional dot-path to a merchant name; preferred counterparty name
  * @property counterpartyNameField Optional dot-path to a counterparty name; fallback for merchant
- * @property declineReasonField Optional dot-path to a decline reason for declined transactions.
- *                              Present-and-non-blank means declined (Monzo's `decline_reason` shape).
- * @property declineStatusField Optional dot-path to a status field whose value flags declines
- *                              (Starling's `status` shape, where the field is always present). When
- *                              the resolved value is in [declinedStatusValues] the transaction is
- *                              treated as declined — imported but excluded from balances — exactly
- *                              like a non-blank [declineReasonField].
- * @property declinedStatusValues Values of [declineStatusField] that mean "declined" (e.g. {"DECLINED"}).
+ * @property declinedWhen Conditions that each mark a transaction as declined — imported but excluded
+ *                        from balances. The first that holds wins, and the value at its path becomes the
+ *                        decline reason: Monzo's `decline_reason` NOT_BLANK, Starling's `status` IN
+ *                        `DECLINED`. Order is semantic (it picks the reason).
  * @property localAmountField Optional dot-path to a local/original amount (foreign transactions)
  * @property localCurrencyField Optional dot-path to a local/original currency code
  * @property feeAmountField Optional dot-path to a fee amount charged on the transaction. When present
@@ -428,10 +427,7 @@ data class ApiTransactionMappings(
     val merchantNameField: String? = null,
     val counterpartyNameField: String? = null,
     val counterpartyIdField: String? = null,
-    val declineReasonField: String? = null,
-    val declineStatusField: String? = null,
-    @Serializable(with = SortedStringSetSerializer::class)
-    val declinedStatusValues: Set<String> = emptySet(),
+    val declinedWhen: List<Condition> = emptyList(),
     val localAmountField: String? = null,
     val localCurrencyField: String? = null,
     val feeAmountField: String? = null,
@@ -498,20 +494,19 @@ data class ApiTransactionMappings(
      */
     val directionFromAmountSign: Boolean = false,
     /**
-     * Dot-path to a field whose value, if present in [excludeValues], causes the item to be skipped
-     * entirely (no transfer, no enrichment). Used when a single endpoint's response mixes record kinds
-     * that must be dropped — e.g. Kraken's Ledgers `type=all` includes `"trade"` entries that duplicate
-     * the trades already sourced from `TradesHistory`.
+     * Conditions that, when all hold (and there is at least one), make the item produce no transfer and
+     * no enrichment. Used when a single endpoint's response mixes record kinds that must be dropped —
+     * e.g. Kraken's Ledgers `type=all` includes `"trade"` entries that duplicate the trades already
+     * sourced from `TradesHistory`.
      */
-    val excludeField: String? = null,
-    @Serializable(with = SortedStringSetSerializer::class)
-    val excludeValues: Set<String> = emptySet(),
+    @Serializable(with = SortedConditionListSerializer::class)
+    val excludeWhen: List<Condition> = emptyList(),
     /**
      * Dot-path to a field identifying the trade this row belongs to (e.g. Kraken Ledgers `refid`, which
      * equals the matching `TradesHistory` trade's own id). A group of more than two rows (an order's
      * fills, each posting one row per asset) is booked as one trade when its rows net to one asset out
      * and one asset in. When set on a row excluded via
-     * [excludeField]/[excludeValues] (a duplicate trade-type ledger entry), the row's signed amount is
+     * [excludeWhen] (a duplicate trade-type ledger entry), the row's signed amount is
      * kept as an authoritative leg for reconciling that trade's booked amount — Kraken's TradesHistory
      * `cost` is a display-rounded price*volume for synthetic crypto/crypto pairs and can disagree with
      * what the ledger actually settled. A ledger group with no matching trade at all is booked as its
@@ -544,11 +539,11 @@ data class ApiTransactionMappings(
     val unpairedTradeLegFundingAccountName: String? = null,
     /**
      * Conditions that must all hold (logical AND) against the item's raw JSON for it to be imported at
-     * all — the include-form counterpart of [excludeField]/[excludeValues] (e.g. Binance's
+     * all — the include-form counterpart of [excludeWhen] (e.g. Binance's
      * `status == 1` on deposits, `status == 6` on withdrawals). Empty imposes no filter.
      */
-    @Serializable(with = SortedRulePredicateListSerializer::class)
-    val itemFilters: List<RulePredicate> = emptyList(),
+    @Serializable(with = SortedConditionListSerializer::class)
+    val itemFilters: List<Condition> = emptyList(),
     /**
      * Dot-paths joined (in list order, hyphen-separated) into the transfer's de-duplication id instead of
      * [idField], for an endpoint whose rows carry no id at all (Binance Simple Earn `rewardsRecord`, whose
@@ -601,56 +596,6 @@ data class ApiPeopleMappings(
 @Serializable
 enum class RuleSign { ANY, NEGATIVE, POSITIVE }
 
-/** Comparison operator for a [RulePredicate]. */
-@Serializable
-enum class PredicateOp {
-    /** The path resolves to any present value. */
-    EXISTS,
-
-    /** The resolved string equals [RulePredicate.value]. */
-    EQUALS,
-
-    /** The resolved string equals [RulePredicate.value], ignoring case. */
-    EQUALS_IGNORE_CASE,
-
-    /** The resolved string starts with [RulePredicate.value]. */
-    STARTS_WITH,
-
-    /** The resolved string does not equal [RulePredicate.value] (absent also counts as "not equal"). */
-    NOT_EQUALS,
-
-    /** The resolved string is one of [RulePredicate.value]'s comma-separated members. */
-    IN,
-
-    /** The path resolves to an array with any element starting with [RulePredicate.value]. */
-    ARRAY_ANY_STARTS_WITH,
-
-    /** The path resolves to an object that is empty (or absent). */
-    OBJECT_EMPTY,
-
-    /** The path resolves to a non-empty object. */
-    OBJECT_NON_EMPTY,
-}
-
-/**
- * A single condition evaluated against a transaction's raw JSON.
- *
- * @property path Dot-path into the transaction object (e.g. "metadata.mcc")
- * @property op The comparison to apply
- * @property value Comparison operand for ops that need one (EQUALS, STARTS_WITH, …)
- */
-@Serializable
-data class RulePredicate(
-    val path: String,
-    val op: PredicateOp,
-    val value: String? = null,
-) : Comparable<RulePredicate> {
-    override fun compareTo(other: RulePredicate): Int = compareValuesBy(this, other, { it.path }, { it.op.name }, { it.value })
-}
-
-/** Serializes predicate lists sorted by [RulePredicate]'s natural order — all must match (logical AND), so list order carries no meaning. */
-object SortedRulePredicateListSerializer : SortedListSerializer<RulePredicate>(RulePredicate.serializer())
-
 /**
  * A declarative rule that classifies a transaction as a well-known built-in counterparty (e.g.
  * "ATM"), so such transactions consolidate into a single account regardless of merchant details.
@@ -665,8 +610,8 @@ object SortedRulePredicateListSerializer : SortedListSerializer<RulePredicate>(R
 data class BuiltInCounterpartyRule(
     val name: String,
     val onlyWhenSign: RuleSign = RuleSign.ANY,
-    @Serializable(with = SortedRulePredicateListSerializer::class)
-    val predicates: List<RulePredicate> = emptyList(),
+    @Serializable(with = SortedConditionListSerializer::class)
+    val predicates: List<Condition> = emptyList(),
 )
 
 /**
@@ -682,8 +627,8 @@ data class BuiltInCounterpartyRule(
 @Serializable
 data class ApiAccountNameRule(
     val suffix: String,
-    @Serializable(with = SortedRulePredicateListSerializer::class)
-    val predicates: List<RulePredicate> = emptyList(),
+    @Serializable(with = SortedConditionListSerializer::class)
+    val predicates: List<Condition> = emptyList(),
 )
 
 /**
@@ -1290,8 +1235,8 @@ data class ApiTradeMappings(
      * Conditions that must all hold (logical AND) against the item's raw JSON for it to be imported at
      * all. Empty imposes no filter.
      */
-    @Serializable(with = SortedRulePredicateListSerializer::class)
-    val itemFilters: List<RulePredicate> = emptyList(),
+    @Serializable(with = SortedConditionListSerializer::class)
+    val itemFilters: List<Condition> = emptyList(),
 )
 
 /**
@@ -1404,13 +1349,12 @@ data class ApiStrategyConfig(
     /** Reconcile internal transfers against another owned account (e.g. the Crypto.com App account). */
     val internalTransferReconcile: ApiInternalTransferReconcile? = null,
     /**
-     * Maps a raw asset/currency code as it appears in the API response to its canonical code (e.g.
-     * Kraken's legacy `"XXBT" -> "BTC"`, `"ZUSD" -> "USD"`). Applied to every asset code resolved from
-     * a trade or transfer item before currency/crypto-asset lookup. Empty for providers that already
-     * use canonical codes.
+     * How raw asset codes in API responses map onto canonical codes: Earn-holding suffixes stripped
+     * (Kraken `XETH.F` → `XETH`), then legacy codes aliased (Kraken `XXBT` → `BTC`, `ZUSD` → `USD`).
+     * Applied to every asset code resolved from a trade or transfer item before currency/crypto-asset
+     * lookup; without it a suffixed code fails resolution and its transfer is dropped.
      */
-    @Serializable(with = SortedStringToStringMapSerializer::class)
-    val assetAliases: Map<String, String> = emptyMap(),
+    val assetCodes: AssetCodeRules = AssetCodeRules(),
     /** Deep-link to the provider's own page for creating/managing API tokens; null shows no button. */
     val tokenPageUrl: String? = null,
     /**
@@ -1428,13 +1372,6 @@ data class ApiStrategyConfig(
     val rateLimitBackoffMillis: Long = 5_000L,
     /** Maximum retries for a request repeatedly classified as rate-limited before giving up. */
     val maxRateLimitRetries: Int = 5,
-    /**
-     * Suffixes stripped from a raw asset code before [assetAliases]/currency lookup (e.g. Kraken's
-     * Earn-holding codes "XETH.F"/"XETH.S" -> "XETH"). Without this, a suffixed code fails asset
-     * resolution and its transfer is silently dropped.
-     */
-    @Serializable(with = SortedStringSetSerializer::class)
-    val assetSuffixesToStrip: Set<String> = emptySet(),
     /**
      * Overrides [com.moneymanager.domain.model.IsoMinorUnitDivisors]' per-currency divisor for
      * interpreting a [ApiAmountFormat.MINOR_UNITS_INTEGER] amount (a bank API's raw integer in its own

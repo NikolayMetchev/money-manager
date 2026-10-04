@@ -81,15 +81,35 @@ kotlin {
         }
         getByName("jvmTest") {
             dependencies {
+                implementation(projects.app.model.rules)
                 implementation(kotlin("test"))
             }
         }
         getByName("androidDeviceTest") {
             dependencies {
+                implementation(projects.app.model.rules)
                 // These are pure-logic tests (no Compose UI), so unlike the other feature
                 // modules nothing pulls in the instrumentation runner transitively; provide
                 // it explicitly so the device-test APK can launch AndroidJUnitRunner.
                 runtimeOnly(libs.androidx.test.runner)
+            }
+        }
+
+        getByName("androidHostTest") {
+            dependencies {
+                implementation(projects.app.model.rules)
+            }
+        }
+
+        getByName("androidMain") {
+            dependencies {
+                implementation(projects.app.model.rules)
+            }
+        }
+
+        getByName("jvmMain") {
+            dependencies {
+                implementation(projects.app.model.rules)
             }
         }
     }

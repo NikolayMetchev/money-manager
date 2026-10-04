@@ -167,7 +167,7 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
                 "User_ID",
                 strategy.config.contentMatchRules
                     .single()
-                    .columnName,
+                    .path,
             )
 
             // Trade-group assembly survives the round trip - without it the export's trade rows would

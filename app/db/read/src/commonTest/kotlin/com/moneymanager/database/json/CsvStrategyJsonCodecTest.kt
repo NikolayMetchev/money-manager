@@ -17,12 +17,13 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
-import com.moneymanager.domain.model.csvstrategy.RowCondition
-import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -121,10 +122,7 @@ class CsvStrategyJsonCodecTest {
     @Test
     fun `encode and decode DirectColumnMapping`() {
         val mapping =
-            DirectColumnMapping(
-                fieldType = TransferField.DESCRIPTION,
-                columnName = "Description",
-            )
+            DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description")))
         val mappings = mapOf(TransferField.DESCRIPTION to mapping)
 
         val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
@@ -132,7 +130,7 @@ class CsvStrategyJsonCodecTest {
 
         val decodedMapping = decoded[TransferField.DESCRIPTION]
         assertIs<DirectColumnMapping>(decodedMapping)
-        assertEquals("Description", decodedMapping.columnName)
+        assertEquals("Description", decodedMapping.value.primaryPath)
     }
 
     @Test
@@ -200,10 +198,7 @@ class CsvStrategyJsonCodecTest {
     @Test
     fun `encode and decode CurrencyLookupMapping`() {
         val mapping =
-            CurrencyLookupMapping(
-                fieldType = TransferField.CURRENCY,
-                columnName = "Currency",
-            )
+            CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Currency")))
         val mappings = mapOf(TransferField.CURRENCY to mapping)
 
         val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
@@ -211,7 +206,7 @@ class CsvStrategyJsonCodecTest {
 
         val decodedMapping = decoded[TransferField.CURRENCY]
         assertIs<CurrencyLookupMapping>(decodedMapping)
-        assertEquals("Currency", decodedMapping.columnName)
+        assertEquals("Currency", decodedMapping.value.primaryPath)
     }
 
     @Test
@@ -236,10 +231,7 @@ class CsvStrategyJsonCodecTest {
                         dateFormat = "yyyy-MM-dd",
                     ),
                 TransferField.DESCRIPTION to
-                    DirectColumnMapping(
-                        fieldType = TransferField.DESCRIPTION,
-                        columnName = "Memo",
-                    ),
+                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Memo"))),
                 TransferField.AMOUNT to
                     AmountParsingMapping(
                         fieldType = TransferField.AMOUNT,
@@ -364,8 +356,8 @@ class CsvStrategyJsonCodecTest {
                 fieldType = TransferField.TARGET_ACCOUNT,
                 conditions =
                     listOf(
-                        RowCondition("Source name", RowConditionOperator.EQUALS_COLUMN, otherColumnName = "Target name"),
-                        RowCondition("Source name", RowConditionOperator.IS_NOT_BLANK),
+                        Condition("Source name", ConditionOp.EQUALS_PATH, otherPath = "Target name"),
+                        Condition("Source name", ConditionOp.NOT_BLANK),
                     ),
                 whenTrue =
                     TemplateAccountMapping(
@@ -388,7 +380,7 @@ class CsvStrategyJsonCodecTest {
         val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
         assertIs<ConditionalAccountMapping>(decodedMapping)
         assertEquals(2, decodedMapping.conditions.size)
-        assertEquals(RowConditionOperator.EQUALS_COLUMN, decodedMapping.conditions[0].operator)
+        assertEquals(ConditionOp.EQUALS_PATH, decodedMapping.conditions[0].op)
         assertIs<TemplateAccountMapping>(decodedMapping.whenTrue)
         assertIs<AccountLookupMapping>(decodedMapping.whenFalse)
     }
@@ -420,7 +412,7 @@ class CsvStrategyJsonCodecTest {
                 mode = AmountMode.SINGLE_COLUMN,
                 amountColumnName = "Source amount (after fees)",
                 feeColumnName = "Source fee amount",
-                feeConditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "OUT")),
+                feeConditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
             )
         val mappings = mapOf(TransferField.AMOUNT to mapping)
 
@@ -430,7 +422,7 @@ class CsvStrategyJsonCodecTest {
         val decodedMapping = decoded[TransferField.AMOUNT]
         assertIs<AmountParsingMapping>(decodedMapping)
         assertEquals("Source fee amount", decodedMapping.feeColumnName)
-        assertEquals(RowConditionOperator.EQUALS_VALUE, decodedMapping.feeConditions.single().operator)
+        assertEquals(ConditionOp.EQUALS, decodedMapping.feeConditions.single().op)
     }
 
     @Test
@@ -438,7 +430,7 @@ class CsvStrategyJsonCodecTest {
         val rules =
             listOf(
                 RowPreprocessingRule(
-                    conditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "IN")),
+                    conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "IN")),
                     columnSwaps = listOf(ColumnPairSwap("Source name", "Target name")),
                     flipSourceAndTarget = true,
                 ),

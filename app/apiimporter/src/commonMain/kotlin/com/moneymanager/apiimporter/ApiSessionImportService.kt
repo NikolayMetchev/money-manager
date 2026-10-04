@@ -32,12 +32,13 @@ import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import com.moneymanager.domain.model.apistrategy.PaginationMode
-import com.moneymanager.domain.model.apistrategy.PredicateOp
-import com.moneymanager.domain.model.apistrategy.RulePredicate
 import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.Record
+import com.moneymanager.domain.model.rules.RuleEvaluator
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -2105,19 +2106,16 @@ private fun ApiTransactionPageItem.errorRecord(
     )
 
 /**
- * Resolves a transaction's decline reason, used downstream to exclude it from balances. Two shapes
- * are supported: a dedicated reason field that is only present when declined (Monzo's
- * `decline_reason`), and an always-present status field whose value flags the decline (Starling's
- * `status` == "DECLINED"). The status, when matched, doubles as the human-readable reason.
+ * Resolves a transaction's decline reason, used downstream to exclude it from balances: the value at
+ * the path of the first [ApiTransactionMappings.declinedWhen] condition that holds — Monzo's
+ * `decline_reason` itself, or Starling's `status` ("DECLINED"), which doubles as the reason.
  */
 private fun resolveDeclineReason(
     obj: JsonObject,
     mappings: ApiTransactionMappings,
 ): String? {
-    val reason = mappings.declineReasonField?.let { obj.resolveJsonPath(it) }
-    if (!reason.isNullOrBlank()) return reason
-    val status = mappings.declineStatusField?.let { obj.resolveJsonPath(it) }
-    return status?.takeIf { it in mappings.declinedStatusValues }
+    val matched = mappings.declinedWhen.firstOrNull { obj.matches(it) } ?: return null
+    return obj.resolveJsonPath(matched.path)?.takeIf { it.isNotBlank() } ?: matched.path
 }
 
 private fun parseTransactionsWithPath(
@@ -3077,7 +3075,7 @@ private fun ApiImportAccount.staticDisplayName(
 ): String {
     val ruleSuffix =
         rawJson
-            ?.let { json -> mappings.accountNameRules.firstOrNull { rule -> rule.predicates.all { json.evaluatePredicate(it) } } }
+            ?.let { json -> mappings.accountNameRules.firstOrNull { rule -> json.matchesAll(rule.predicates) } }
             ?.suffix
     val suffix = ruleSuffix ?: "Joint".takeIf { owners.size > 1 }
     return if (suffix != null) "$staticName $suffix" else staticName
@@ -3404,7 +3402,7 @@ private fun JsonObject.resolveBuiltInCounterpartyType(
 ): String? {
     for (rule in rules) {
         if (!rule.onlyWhenSign.matches(amountSign)) continue
-        if (rule.predicates.all { evaluatePredicate(it) }) return rule.name
+        if (matchesAll(rule.predicates)) return rule.name
     }
     return null
 }
@@ -3416,33 +3414,29 @@ private fun RuleSign.matches(sign: Int): Boolean =
         RuleSign.POSITIVE -> sign > 0
     }
 
-internal fun JsonObject.evaluatePredicate(predicate: RulePredicate): Boolean {
-    val operand = predicate.value.orEmpty()
-    return when (predicate.op) {
-        // A present-but-JSON-null field (e.g. Monzo sends `atm_fees_detailed: null` on every
-        // non-ATM transaction) does not count as existing, otherwise every transaction matches.
-        PredicateOp.EXISTS -> resolveJsonElementPath(predicate.path).let { it != null && it != JsonNull }
-        PredicateOp.EQUALS -> resolveJsonPath(predicate.path) == predicate.value
-        PredicateOp.EQUALS_IGNORE_CASE -> resolveJsonPath(predicate.path)?.equals(predicate.value, ignoreCase = true) == true
-        PredicateOp.STARTS_WITH -> resolveJsonPath(predicate.path)?.startsWith(operand) == true
-        PredicateOp.ARRAY_ANY_STARTS_WITH ->
-            (resolveJsonElementPath(predicate.path) as? JsonArray)?.any { element ->
-                element.jsonPrimitive.contentOrNull?.startsWith(operand, ignoreCase = true) == true
-            } == true
-        PredicateOp.OBJECT_EMPTY -> resolveJsonObjectPath(predicate.path).isNullOrEmpty()
-        PredicateOp.OBJECT_NON_EMPTY -> resolveJsonObjectPath(predicate.path)?.isNotEmpty() == true
-        PredicateOp.NOT_EQUALS -> resolveJsonPath(predicate.path) != predicate.value
-        PredicateOp.IN -> resolveJsonPath(predicate.path)?.let { it in operand.split(",") } == true
-    }
-}
+/** Whether [condition] holds for this item (see [JsonRecord]). */
+internal fun JsonObject.matches(condition: Condition): Boolean = RuleEvaluator().matches(condition, JsonRecord(this))
 
-/** Resolves a dot-notation path to its `JsonElement` (object, array, or primitive), or null. */
-internal fun JsonObject.resolveJsonElementPath(dotPath: String): JsonElement? {
-    var current: JsonElement = this
-    for (part in dotPath.split(".")) {
-        current = (current as? JsonObject)?.get(part) ?: return null
-    }
-    return current
+/** Whether every one of [conditions] holds for this item (true for none). */
+internal fun JsonObject.matchesAll(conditions: List<Condition>): Boolean =
+    conditions.isEmpty() || RuleEvaluator().all(conditions, JsonRecord(this))
+
+/**
+ * An API item as a rule [Record]: paths are dot-paths (with `[n]` array indexing for scalars). A field
+ * holding JSON `null` does not exist (Monzo sends `atm_fees_detailed: null` on every non-ATM
+ * transaction), and a blank path addresses the item itself.
+ */
+internal class JsonRecord(
+    private val obj: JsonObject,
+) : Record {
+    override fun exists(path: String): Boolean = obj.resolveJsonPathElement(path).let { it != null && it != JsonNull }
+
+    override fun text(path: String): String? = obj.resolveJsonPath(path)
+
+    override fun arrayTexts(path: String): List<String>? =
+        (obj.resolveJsonPathElement(path) as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+
+    override fun objectSize(path: String): Int? = (if (path.isBlank()) obj else obj.resolveJsonPathElement(path) as? JsonObject)?.size
 }
 
 private class AttributeTypeCache(

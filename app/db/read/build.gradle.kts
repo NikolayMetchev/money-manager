@@ -50,7 +50,14 @@ kotlin {
         }
         getByName("jvmTest") {
             dependencies {
+                implementation(projects.app.model.rules)
                 implementation(kotlin("reflect"))
+            }
+        }
+
+        getByName("androidHostTest") {
+            dependencies {
+                implementation(projects.app.model.rules)
             }
         }
     }

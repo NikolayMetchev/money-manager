@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -186,10 +187,7 @@ class CsvImportErrorHandlingTest {
                                     dateFormat = "dd/MM/yyyy",
                                 ),
                             TransferField.DESCRIPTION to
-                                DirectColumnMapping(
-                                    fieldType = TransferField.DESCRIPTION,
-                                    columnName = "Description",
-                                ),
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,

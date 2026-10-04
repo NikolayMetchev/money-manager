@@ -11,6 +11,7 @@ kotlin {
                 api(projects.app.model.accountmapping)
                 api(projects.app.model.core)
                 api(projects.app.model.qif)
+                api(projects.app.model.rules)
             }
         }
 
@@ -24,6 +25,7 @@ kotlin {
             dependencies {
                 api(projects.app.model.accountmapping)
                 api(projects.app.model.core)
+                api(projects.app.model.rules)
                 api(libs.kotlinx.serialization.core)
             }
         }

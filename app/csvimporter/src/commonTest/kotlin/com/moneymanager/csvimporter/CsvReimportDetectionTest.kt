@@ -30,6 +30,7 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.PassThroughRule
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.PassThroughDetector
@@ -89,10 +90,7 @@ class CsvReimportDetectionTest {
                                     dateFormat = "dd/MM/yyyy",
                                 ),
                             TransferField.DESCRIPTION to
-                                DirectColumnMapping(
-                                    fieldType = TransferField.DESCRIPTION,
-                                    columnName = "Description",
-                                ),
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,
@@ -642,10 +640,7 @@ class CsvReimportDetectionTest {
                         base.config.fieldMappings +
                             mapOf(
                                 TransferField.TO_CURRENCY to
-                                    CurrencyLookupMapping(
-                                        fieldType = TransferField.TO_CURRENCY,
-                                        columnName = "To Currency",
-                                    ),
+                                    CurrencyLookupMapping(fieldType = TransferField.TO_CURRENCY, value = ValueExpr(listOf("To Currency"))),
                                 TransferField.TO_AMOUNT to
                                     AmountParsingMapping(
                                         fieldType = TransferField.TO_AMOUNT,

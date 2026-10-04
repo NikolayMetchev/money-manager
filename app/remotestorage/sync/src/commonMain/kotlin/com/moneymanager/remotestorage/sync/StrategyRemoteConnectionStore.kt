@@ -78,7 +78,9 @@ class StrategyRemoteConnectionStore(
         // read back (they'd misreport artifacts as locally changed/conflicting), so the prefix bump
         // orphans them and the never-synced content-compare path adopts fresh baselines without spurious
         // uploads. Old "strategySync.f."/"strategySync.g." keys linger harmlessly.
-        const val KEY_BASELINE_PREFIX = "strategySync.h."
+        // "i" since strategy configs carry a `configVersion` stamp and were reshaped onto shared
+        // condition/value/account-rule vocabularies: every CSV and API strategy rehashed at once.
+        const val KEY_BASELINE_PREFIX = "strategySync.i."
 
         // Must be a printable, XML-safe character: on JVM these values live in java.util.prefs' prefs.xml,
         // where an XML-illegal character (e.g. U+0001) makes the whole node fail to flush, silently

@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
@@ -69,13 +70,16 @@ class CryptoTradeCsvE2ETest : DbTest() {
                             DateTimeParsingMapping(TransferField.TIMESTAMP, dateColumnName = "Date", dateFormat = "yyyy-MM-dd"),
                         TransferField.SOURCE_ACCOUNT to HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, cash),
                         TransferField.TARGET_ACCOUNT to HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, wallet),
-                        TransferField.DESCRIPTION to DirectColumnMapping(TransferField.DESCRIPTION, columnName = "Description"),
+                        TransferField.DESCRIPTION to
+                            DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
                         TransferField.AMOUNT to
                             AmountParsingMapping(TransferField.AMOUNT, mode = AmountMode.SINGLE_COLUMN, amountColumnName = "Amount"),
-                        TransferField.CURRENCY to CurrencyLookupMapping(TransferField.CURRENCY, columnName = "Currency"),
+                        TransferField.CURRENCY to
+                            CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Currency"))),
                         TransferField.TO_AMOUNT to
                             AmountParsingMapping(TransferField.TO_AMOUNT, mode = AmountMode.SINGLE_COLUMN, amountColumnName = "To Amount"),
-                        TransferField.TO_CURRENCY to CurrencyLookupMapping(TransferField.TO_CURRENCY, columnName = "To Currency"),
+                        TransferField.TO_CURRENCY to
+                            CurrencyLookupMapping(fieldType = TransferField.TO_CURRENCY, value = ValueExpr(listOf("To Currency"))),
                         TransferField.TIMEZONE to HardCodedTimezoneMapping(TransferField.TIMEZONE, "UTC"),
                     ),
             ),

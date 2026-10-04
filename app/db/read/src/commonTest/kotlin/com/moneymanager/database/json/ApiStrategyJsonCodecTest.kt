@@ -29,6 +29,7 @@ import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
+import com.moneymanager.domain.model.rules.AssetCodeRules
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -165,12 +166,11 @@ class ApiStrategyJsonCodecTest {
                         bodyFormat = BodyFormat.FORM_URLENCODED,
                     ),
                 syntheticAccount = ApiSyntheticAccount(name = "Kraken", externalId = "kraken"),
-                assetAliases = mapOf("XXBT" to "BTC", "ZUSD" to "USD"),
                 rateLimitMillis = 3_100L,
                 rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
                 rateLimitBackoffMillis = 5_000L,
                 maxRateLimitRetries = 6,
-                assetSuffixesToStrip = setOf(".F", ".S", ".M"),
+                assetCodes = AssetCodeRules(aliases = mapOf("XXBT" to "BTC", "ZUSD" to "USD"), stripSuffixes = setOf(".F", ".S", ".M")),
                 minorUnitDivisorOverrides = mapOf("GBP" to 1000L),
                 // dataEndpoints is decoded in canonical (sorted-by kind/path/responseArrayKey) order -
                 // see SortedDataEndpointListSerializer - so the entries are listed here in that same
@@ -240,7 +240,7 @@ class ApiStrategyJsonCodecTest {
             )
         val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
         assertEquals(original, decoded)
-        assertEquals(mapOf("XXBT" to "BTC", "ZUSD" to "USD"), decoded.assetAliases)
+        assertEquals(mapOf("XXBT" to "BTC", "ZUSD" to "USD"), decoded.assetCodes.aliases)
         assertEquals(
             WindowBoundFormat.EPOCH_S,
             decoded.dataEndpoints[2]

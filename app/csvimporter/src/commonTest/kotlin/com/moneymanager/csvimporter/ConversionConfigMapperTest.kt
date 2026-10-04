@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -65,7 +66,8 @@ class ConversionConfigMapperTest {
                                     amountColumnName = "Amount",
                                     flipAccountsOnPositive = true,
                                 ),
-                            TransferField.CURRENCY to CurrencyLookupMapping(TransferField.CURRENCY, "Asset"),
+                            TransferField.CURRENCY to
+                                CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Asset"))),
                             TransferField.TIMESTAMP to
                                 DateTimeParsingMapping(
                                     TransferField.TIMESTAMP,
@@ -73,7 +75,8 @@ class ConversionConfigMapperTest {
                                     dateFormat = "yyyy-MM-dd",
                                     dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
                                 ),
-                            TransferField.DESCRIPTION to DirectColumnMapping(TransferField.DESCRIPTION, "Memo"),
+                            TransferField.DESCRIPTION to
+                                DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Memo"))),
                         ),
                     conversionConfig =
                         ConversionConfig(

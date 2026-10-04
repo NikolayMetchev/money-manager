@@ -71,6 +71,7 @@ kotlin {
                 api(libs.sqldelight.runtime)
 
                 implementation(projects.app.db.seed)
+                implementation(projects.app.model.rules)
 
                 // No longer used directly (CachingJdbcSqliteDriver replaces JdbcSqliteDriver), but it
                 // supplies the xerial JDBC driver that DriverManager resolves the `jdbc:sqlite:` URL with.
@@ -84,6 +85,7 @@ kotlin {
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.read)
                 implementation(projects.app.importfilesource.core)
+                implementation(projects.app.model.rules)
                 implementation(libs.sqldelight.runtime)
             }
         }
@@ -94,6 +96,7 @@ kotlin {
                 api(libs.sqldelight.runtime)
 
                 implementation(projects.app.db.seed)
+                implementation(projects.app.model.rules)
                 implementation(libs.androidx.sqlite)
                 implementation(libs.sqldelight.android.driver)
             }
@@ -103,6 +106,7 @@ kotlin {
             dependencies {
                 implementation(projects.app.db.di)
                 implementation(projects.app.importfilesource.core)
+                implementation(projects.app.model.rules)
                 implementation(libs.sqldelight.runtime)
             }
         }
@@ -124,6 +128,12 @@ kotlin {
             // Include test packages from commonTest (not the expect declarations file)
             kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/repository")
             kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/audit")
+        }
+
+        getByName("androidDeviceTest") {
+            dependencies {
+                implementation(projects.app.model.rules)
+            }
         }
     }
 }

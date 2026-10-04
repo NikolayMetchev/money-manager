@@ -4,6 +4,8 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
+import com.moneymanager.domain.model.rules.ColumnRecord
+import com.moneymanager.domain.model.rules.RuleEvaluator
 
 /** Number of leading rows sampled when content-scoring a file against a strategy. */
 const val STRATEGY_CONTENT_SAMPLE_SIZE = 50
@@ -20,7 +22,7 @@ val byContentScoreThenNameThenId: Comparator<Pair<CsvImportStrategy, Int>> =
 
 /**
  * Counts sampled rows with a value matching any of this strategy's
- * [CsvStrategyConfig.contentMatchRules] (case-insensitive regex per named column). Shared by the
+ * [CsvStrategyConfig.contentMatchRules] (any of them holding counts the row). Shared by the
  * CSV selector below and the QIF selector. A strategy with no content rules scores 0.
  */
 fun CsvImportStrategy.contentScore(
@@ -28,12 +30,10 @@ fun CsvImportStrategy.contentScore(
     columnIndexByName: Map<String, Int>,
 ): Int {
     if (config.contentMatchRules.isEmpty()) return 0
-    val compiled = config.contentMatchRules.map { it.columnName to Regex(it.pattern, RegexOption.IGNORE_CASE) }
+    val rules = RuleEvaluator()
     return sample.count { row ->
-        compiled.any { (columnName, regex) ->
-            val idx = columnIndexByName[columnName] ?: return@any false
-            row.values.getOrNull(idx)?.let { regex.containsMatchIn(it) } == true
-        }
+        val record = ColumnRecord(row.values, columnIndexByName)
+        rules.firstMatching(config.contentMatchRules, record) != null
     }
 }
 

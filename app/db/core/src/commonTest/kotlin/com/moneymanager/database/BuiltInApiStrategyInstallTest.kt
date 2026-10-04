@@ -10,6 +10,8 @@ import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInApiStrategies
 import kotlinx.coroutines.flow.first
@@ -146,7 +148,11 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertEquals(SignatureEncoding.BASE64, signing.signatureEncoding)
             assertEquals("Kraken", assertNotNull(kraken.config.syntheticAccount).name)
             assertTrue(kraken.config.dataEndpoints.isNotEmpty(), "data endpoints persisted")
-            assertTrue(kraken.config.assetAliases.containsKey("XXBT"), "asset aliases persisted")
+            assertTrue(
+                kraken.config.assetCodes.aliases
+                    .containsKey("XXBT"),
+                "asset aliases persisted",
+            )
             val trades = kraken.config.dataEndpoints.first { it.kind == ApiEndpointKind.TRADES }
             assertTrue(trades.endpoint.responseObjectValues, "trades response is a keyed object")
             assertEquals("error", trades.endpoint.errorArrayField)
@@ -303,8 +309,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                 assertEquals("direction", signField)
                 assertEquals(setOf("IN"), creditValues)
                 assertEquals("feedItemUid", idField)
-                assertEquals("status", declineStatusField)
-                assertEquals(setOf("DECLINED"), declinedStatusValues)
+                assertEquals(listOf(Condition("status", ConditionOp.IN, value = "DECLINED")), declinedWhen)
                 assertEquals("counterPartyUid", counterpartyIdField)
                 assertEquals(mapOf("starling-transaction-id" to "feedItemUid"), customFields)
                 assertEquals(setOf("starling-transaction-id"), uniqueIdentifierFields)
