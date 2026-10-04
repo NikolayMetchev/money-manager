@@ -279,8 +279,9 @@ version, so a retired field can still be read after its Kotlin property is gone.
 **both** persisted shapes: the DB form (ids) and the export/catalog form (names). Configs in old databases,
 on Drive and in the published catalog keep working. To reshape a config, add a step and bump the version.
 `LegacyStrategyUpgradeTest` (`tools/strategy-catalog`) decodes the `legacy-v0` snapshots of every built-in
-and checks each upgrades to the current built-in. When you rewrite a built-in, make it equal the migration
-output.
+CSV and API strategy (DB and export form) and checks each upgrades to the current built-in. Pass-through
+rules (`.passthrough.json`) aren't versioned, so the test skips them. When you rewrite a built-in, make it
+equal the migration output.
 
 **Changing the engine:** the contract is that every built-in strategy imports exactly as before. Don't edit
 an expected test result to make a refactor pass; report the divergence instead. Built-in configs don't
