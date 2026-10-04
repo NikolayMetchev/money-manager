@@ -127,7 +127,7 @@ class CsvFeeRuleMapperTest {
 
     @Test
     fun aFeeLargerThanTheGrossAmountLeavesNothingRatherThanANegativeAmount() {
-        val r = map(fee.copy(includedInAmount = true), amount = "1", feeValue = "1.5")
+        val r = map(fee.copy(includedInAmount = true), amount = "1")
         assertEquals(usd("0"), r.transfer.amount)
         assertEquals(usd("1.5"), r.feeAmount)
     }
