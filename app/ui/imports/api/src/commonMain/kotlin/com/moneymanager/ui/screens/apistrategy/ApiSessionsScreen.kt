@@ -73,6 +73,7 @@ import com.moneymanager.apiimporter.displaySummary
 import com.moneymanager.apiimporter.downloadApiSession
 import com.moneymanager.apiimporter.importApiSession
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.VaultState
 import com.moneymanager.domain.Maintenance
@@ -108,6 +109,7 @@ import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.ScaParams
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.ui.api.sca.signScaChallenge
+import com.moneymanager.ui.background.BackgroundTaskController
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.formatElapsedTime
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
@@ -119,19 +121,29 @@ import com.moneymanager.ui.util.currentCountryCode
 import com.moneymanager.ui.util.displayDate
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
+
+private val logger = logging()
 
 @Composable
 fun ApiSessionsScreen(
@@ -283,62 +295,285 @@ fun ApiSessionsScreen(
         }
     }
 
+    suspend fun BackgroundTaskController.runImport(
+        session: ApiSession,
+        strategy: ApiImportStrategy,
+        counterpartyAccountNames: Map<String, String>,
+    ): String {
+        val importStartedAt = System.currentTimeMillis()
+        val outcome =
+            importApiSession(
+                reads =
+                    ApiImportReads(
+                        apiSessionRepository = apiSessionRepository,
+                        accountRepository = accountRepository,
+                        accountAttributeRepository = accountAttributeRepository,
+                        currencyRepository = currencyRepository,
+                        cryptoRepository = cryptoRepository,
+                    ),
+                sessionId = session.id,
+                strategy = strategy,
+                importEngine = importEngine,
+                counterpartyAccountNames = counterpartyAccountNames,
+                passThroughAccounts = passThroughAccounts,
+                onProgress = { progress ->
+                    // Joined, not fire-and-forget: the import runs off the Compose scope, so an
+                    // un-awaited update could land after the completion path clears this session
+                    // and leave a finished import showing progress forever.
+                    scope.launch { importProgressBySession = importProgressBySession + (session.id to progress) }.join()
+                    update(progress.detail, progress.fraction)
+                },
+                engineBatchSize = API_ENGINE_BATCH_SIZE,
+            )
+        val result =
+            ApiSessionImportResult(
+                accountCount = outcome.accountCount,
+                transactionCount = outcome.transactionCount + outcome.tradeCount,
+                personCount = outcome.personCount,
+                duplicateCount = outcome.duplicateCount,
+                errorCount = outcome.errorCount,
+            )
+        val importDurationMillis = System.currentTimeMillis() - importStartedAt
+        importEngine.markApiSessionImported(
+            id = session.id,
+            revisionId = strategy.revisionId,
+            importedAt = Clock.System.now(),
+            importDurationMillis = importDurationMillis,
+        )
+        maintenance.refreshMaterializedViews()
+        importResultBySession = importResultBySession + (session.id to result)
+        importProgressBySession = importProgressBySession - session.id
+        refresh()
+        onTransactionsImported()
+        return result.displaySummary()
+    }
+
+    // [onFinished] reports whether the import finished, so "Download & import all" can run imports one at a time.
     fun startImport(
         session: ApiSession,
         strategy: ApiImportStrategy,
         counterpartyAccountNames: Map<String, String>,
+        onFinished: (imported: Boolean) -> Unit = {},
     ) {
-        backgroundTasks.startTask(
-            key = apiImportTaskKey(session.id),
-            title = "Import",
-            initialDetail = "Starting import for session #${session.id}.",
-        ) {
-            val importStartedAt = System.currentTimeMillis()
-            val outcome =
-                importApiSession(
-                    reads =
-                        ApiImportReads(
-                            apiSessionRepository = apiSessionRepository,
-                            accountRepository = accountRepository,
-                            accountAttributeRepository = accountAttributeRepository,
-                            currencyRepository = currencyRepository,
-                            cryptoRepository = cryptoRepository,
-                        ),
-                    sessionId = session.id,
-                    strategy = strategy,
-                    importEngine = importEngine,
-                    counterpartyAccountNames = counterpartyAccountNames,
-                    passThroughAccounts = passThroughAccounts,
-                    onProgress = { progress ->
-                        // Joined, not fire-and-forget: the import runs off the Compose scope, so an
-                        // un-awaited update could land after the completion path clears this session
-                        // and leave a finished import showing progress forever.
-                        scope.launch { importProgressBySession = importProgressBySession + (session.id to progress) }.join()
-                        update(progress.detail, progress.fraction)
-                    },
-                    engineBatchSize = API_ENGINE_BATCH_SIZE,
-                )
-            val result =
-                ApiSessionImportResult(
-                    accountCount = outcome.accountCount,
-                    transactionCount = outcome.transactionCount + outcome.tradeCount,
-                    personCount = outcome.personCount,
-                    duplicateCount = outcome.duplicateCount,
-                    errorCount = outcome.errorCount,
-                )
-            val importDurationMillis = System.currentTimeMillis() - importStartedAt
-            importEngine.markApiSessionImported(
-                id = session.id,
-                revisionId = strategy.revisionId,
-                importedAt = Clock.System.now(),
-                importDurationMillis = importDurationMillis,
+        val started =
+            backgroundTasks.startTask(
+                key = apiImportTaskKey(session.id),
+                title = "Import",
+                initialDetail = "Starting import for session #${session.id}.",
+            ) {
+                var imported = false
+                try {
+                    runImport(session, strategy, counterpartyAccountNames).also { imported = true }
+                } finally {
+                    onFinished(imported)
+                }
+            }
+        if (!started) onFinished(false)
+    }
+
+    // Downloads a new session for [credential] as its own background task, so its card shows the same progress
+    // as a single Download. Returns the session once the download succeeds; null when it was skipped or
+    // failed, with the reason left in the task panel.
+    suspend fun downloadCredential(
+        credential: ApiCredential,
+        forceFull: Boolean,
+    ): ApiSessionId? {
+        if (backgroundTasks.isRunning(apiDownloadTaskKey(credential.id))) return null
+        downloadResultByCredential = downloadResultByCredential - credential.id
+        downloadProgressByCredential = downloadProgressByCredential - credential.id
+        val transactionsBlocked = transactionsBlockReasonByCredential[credential.id] != null
+        val resolvedStrategy = resolveStrategy(credential)
+        // Fetch the secrets before creating a session, so a locked or empty vault doesn't leave an empty
+        // session behind.
+        val secrets =
+            try {
+                resolvedStrategy?.let { vault.downloadSecretsFor(it) }
+            } catch (blocked: MissingApiSecretsException) {
+                backgroundTasks.startTask(
+                    key = apiDownloadTaskKey(credential.id),
+                    title = "Download",
+                    initialDetail = "Fetching credentials.",
+                ) {
+                    blocked.message.orEmpty()
+                }
+                return null
+            }
+        val newSessionId =
+            importEngine.createApiSession(
+                deviceId = deviceId,
+                createdAt = Clock.System.now(),
+                credentialId = credential.id,
             )
-            maintenance.refreshMaterializedViews()
-            importResultBySession = importResultBySession + (session.id to result)
-            importProgressBySession = importProgressBySession - session.id
-            refresh()
-            onTransactionsImported()
-            result.displaySummary()
+        // How far earlier sessions of this credential already reached, so this download only fetches the
+        // tail. Read before any request is recorded into the new session, and skipped entirely when the user
+        // asked for a full re-download.
+        val watermarks =
+            if (forceFull) {
+                emptyMap()
+            } else {
+                apiSessionRepository.getDownloadWatermarks(credential.id, newSessionId)
+            }
+        refresh()
+        val downloaded = CompletableDeferred<ApiSessionId?>()
+        val started =
+            backgroundTasks.startTask(
+                key = apiDownloadTaskKey(credential.id),
+                title = "Download",
+                initialDetail = "Starting download for session #$newSessionId.",
+            ) {
+                try {
+                    // An orphaned credential (its strategy was deleted, or it was never linked) has nothing to
+                    // download with.
+                    val strategy =
+                        resolvedStrategy
+                            ?: return@startTask "No import strategy is linked to this credential; reconnect it."
+                    val credentialSecrets = requireNotNull(secrets)
+                    // One client/session for accounts, transactions and people.
+                    val apiClient =
+                        createApiClient(
+                            trafficRecorder =
+                                ApiSessionTrafficRecorder(
+                                    sessionId = newSessionId,
+                                    importEngine = importEngine,
+                                ),
+                            engine = null,
+                        )
+                    val result =
+                        try {
+                            downloadApiSession(
+                                apiClient = apiClient,
+                                apiSessionRepository = apiSessionRepository,
+                                sessionId = newSessionId,
+                                strategy = strategy,
+                                importEngine = importEngine,
+                                credentials =
+                                    ApiDownloadCredentials(
+                                        token = credentialSecrets.token,
+                                        apiSecret = credentialSecrets.apiSecret,
+                                        sca = scaParamsFor(strategy, credentialSecrets),
+                                    ),
+                                watermarks = watermarks,
+                                forceFullDownload = forceFull,
+                                transactionsBlocked = transactionsBlocked,
+                                onPhase = { update(it) },
+                                onProgress = { progress ->
+                                    downloadProgressByCredential =
+                                        downloadProgressByCredential + (credential.id to progress)
+                                    update(progress.downloadDetail())
+                                },
+                            )
+                        } catch (notPossible: ApiDownloadNotPossibleException) {
+                            return@startTask notPossible.message
+                        }
+                    downloadResultByCredential = downloadResultByCredential + (credential.id to result)
+                    downloadProgressByCredential = downloadProgressByCredential - credential.id
+                    refresh()
+                    downloaded.complete(newSessionId)
+                    result.displaySummary()
+                } finally {
+                    downloaded.complete(null)
+                }
+            }
+        if (!started) downloaded.complete(null)
+        return downloaded.await()
+    }
+
+    suspend fun importAndAwait(
+        session: ApiSession,
+        strategy: ApiImportStrategy,
+    ): Boolean {
+        val imported = CompletableDeferred<Boolean>()
+        startImport(session, strategy, emptyMap(), onFinished = { imported.complete(it) })
+        return imported.await()
+    }
+
+    // Downloads every credential in [targets] at once (different providers don't contend) and imports as the
+    // downloads land: each credential's never-imported sessions join one import queue, oldest first, the
+    // moment its own download finishes, and the queue is imported one session at a time, as a single Import
+    // would. A session whose import needs counterparty names confirmed is left outstanding rather than
+    // imported with unconfirmed names; a session imported under an older strategy revision is left for
+    // Re-import.
+    fun downloadAndImportAll(targets: List<ApiCredential>) {
+        val forceFullIds = forceFullDownloadByCredential.intersect(targets.map { it.id }.toSet())
+        forceFullDownloadByCredential = forceFullDownloadByCredential - forceFullIds
+        scope.launch {
+            // Unlock once up front, so the parallel downloads below don't each raise a prompt.
+            try {
+                vault.requireUnlocked("Download all APIs")
+            } catch (_: CredentialVaultLockedException) {
+                return@launch
+            }
+            backgroundTasks.startTask(
+                key = API_DOWNLOAD_IMPORT_ALL_TASK_KEY,
+                title = "Download & import all",
+                initialDetail = "Downloading ${targets.size} API connection(s).",
+            ) {
+                val strategyByCredential = targets.associate { it.id to resolveStrategy(it) }
+                val readyToImport = Channel<ApiSession>(Channel.UNLIMITED)
+                var downloadsLeft = targets.size
+                var downloadedCount = 0
+                var sessionCount = 0
+                var importedCount = 0
+                var needsReviewCount = 0
+                // One thread for the coordination only: the downloads and imports run as their own tasks, and
+                // this keeps the task registrations and counters here from racing each other.
+                withContext(Dispatchers.Default.limitedParallelism(1)) {
+                    launch {
+                        targets
+                            .map { credential ->
+                                async {
+                                    // Each connection fails on its own: one provider's error mustn't cancel the
+                                    // other downloads or the import queue.
+                                    val downloaded =
+                                        isolatedBulkStep("Bulk download of credential ${credential.id}") {
+                                            downloadCredential(credential, credential.id in forceFullIds)
+                                        }
+                                    if (downloaded != null) downloadedCount++
+                                    downloadsLeft--
+                                    // Queued even when the download failed: sessions left from earlier downloads
+                                    // still hold data the next download won't fetch again.
+                                    isolatedBulkStep("Queueing sessions of credential ${credential.id}") {
+                                        sessionsToImportInBulk(
+                                            sessions = apiSessionRepository.getSessionsByDevice(deviceId),
+                                            credentialIds = setOf(credential.id),
+                                            everImportedSessionIds =
+                                                apiSessionRepository.getImportedSessionRevisions().map { it.sessionId }.toSet(),
+                                        ).forEach { readyToImport.send(it) }
+                                    }
+                                }
+                            }.awaitAll()
+                        readyToImport.close()
+                    }
+                    for (session in readyToImport) {
+                        val strategy = strategyByCredential[session.credentialId] ?: continue
+                        sessionCount++
+                        update("Importing session #${session.id}; $downloadsLeft download(s) still running.")
+                        // Counted as failed in the summary; the queue moves on to the next session.
+                        isolatedBulkStep("Bulk import of session ${session.id}") {
+                            val counterparties =
+                                withContext(Dispatchers.Default) {
+                                    discoverApiCounterpartiesToCreate(
+                                        apiSessionRepository = apiSessionRepository,
+                                        accountAttributeRepository = accountAttributeRepository,
+                                        sessionId = session.id,
+                                        strategy = strategy,
+                                    )
+                                }
+                            when {
+                                counterparties.isNotEmpty() -> needsReviewCount++
+                                importAndAwait(session, strategy) -> importedCount++
+                            }
+                        }
+                    }
+                }
+                bulkDownloadImportSummary(
+                    credentialCount = targets.size,
+                    downloadedCount = downloadedCount,
+                    sessionCount = sessionCount,
+                    importedCount = importedCount,
+                    needsReviewCount = needsReviewCount,
+                )
+            }
         }
     }
 
@@ -397,11 +632,24 @@ fun ApiSessionsScreen(
                         importedSessionRevisions = importedSessionRevisions,
                     )
 
-                StrategyFilterDropdown(
-                    strategies = strategies,
-                    selectedStrategyId = selectedStrategyId,
-                    onStrategySelected = { selectedStrategyId = it },
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    StrategyFilterDropdown(
+                        strategies = strategies,
+                        selectedStrategyId = selectedStrategyId,
+                        onStrategySelected = { selectedStrategyId = it },
+                        modifier = Modifier.weight(1f),
+                    )
+                    // Follows the strategy filter, so the same button can refresh just one provider's sessions.
+                    Button(
+                        onClick = { downloadAndImportAll(filteredCredentials) },
+                        enabled = !backgroundTasks.isRunning(API_DOWNLOAD_IMPORT_ALL_TASK_KEY),
+                    ) {
+                        Text("Download & import all (${filteredCredentials.size})")
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -506,100 +754,9 @@ fun ApiSessionsScreen(
                                         }
                                 },
                                 onDownload = {
-                                    downloadResultByCredential = downloadResultByCredential - credential.id
-                                    downloadProgressByCredential = downloadProgressByCredential - credential.id
-                                    val transactionsBlocked = transactionsBlockReasonByCredential[credential.id] != null
                                     val forceFull = credential.id in forceFullDownloadByCredential
                                     forceFullDownloadByCredential = forceFullDownloadByCredential - credential.id
-                                    scope.launch {
-                                        val resolvedStrategy = resolveStrategy(credential)
-                                        // Fetch the secrets before creating a session, so a locked or empty
-                                        // vault doesn't leave an empty session behind.
-                                        val secrets =
-                                            try {
-                                                resolvedStrategy?.let { vault.downloadSecretsFor(it) }
-                                            } catch (blocked: MissingApiSecretsException) {
-                                                backgroundTasks.startTask(
-                                                    key = apiDownloadTaskKey(credential.id),
-                                                    title = "Download",
-                                                    initialDetail = "Fetching credentials.",
-                                                ) {
-                                                    blocked.message.orEmpty()
-                                                }
-                                                return@launch
-                                            }
-                                        val newSessionId =
-                                            importEngine.createApiSession(
-                                                deviceId = deviceId,
-                                                createdAt = Clock.System.now(),
-                                                credentialId = credential.id,
-                                            )
-                                        // How far earlier sessions of this credential already reached, so
-                                        // this download only fetches the tail. Read before any request is
-                                        // recorded into the new session, and skipped entirely when the user
-                                        // asked for a full re-download.
-                                        val watermarks =
-                                            if (forceFull) {
-                                                emptyMap()
-                                            } else {
-                                                apiSessionRepository.getDownloadWatermarks(credential.id, newSessionId)
-                                            }
-                                        refresh()
-                                        backgroundTasks.startTask(
-                                            key = apiDownloadTaskKey(credential.id),
-                                            title = "Download",
-                                            initialDetail = "Starting download for session #$newSessionId.",
-                                        ) {
-                                            // An orphaned credential (its strategy was deleted, or it was
-                                            // never linked) has nothing to download with.
-                                            val strategy =
-                                                resolvedStrategy
-                                                    ?: return@startTask "No import strategy is linked to this credential; reconnect it."
-                                            val credentialSecrets = requireNotNull(secrets)
-                                            // One client/session for accounts, transactions and people.
-                                            val apiClient =
-                                                createApiClient(
-                                                    trafficRecorder =
-                                                        ApiSessionTrafficRecorder(
-                                                            sessionId = newSessionId,
-                                                            importEngine = importEngine,
-                                                        ),
-                                                    engine = null,
-                                                )
-                                            val result =
-                                                try {
-                                                    downloadApiSession(
-                                                        apiClient = apiClient,
-                                                        apiSessionRepository = apiSessionRepository,
-                                                        sessionId = newSessionId,
-                                                        strategy = strategy,
-                                                        importEngine = importEngine,
-                                                        credentials =
-                                                            ApiDownloadCredentials(
-                                                                token = credentialSecrets.token,
-                                                                apiSecret = credentialSecrets.apiSecret,
-                                                                sca = scaParamsFor(strategy, credentialSecrets),
-                                                            ),
-                                                        watermarks = watermarks,
-                                                        forceFullDownload = forceFull,
-                                                        transactionsBlocked = transactionsBlocked,
-                                                        onPhase = { update(it) },
-                                                        onProgress = { progress ->
-                                                            downloadProgressByCredential =
-                                                                downloadProgressByCredential + (credential.id to progress)
-                                                            update(progress.downloadDetail())
-                                                        },
-                                                    )
-                                                } catch (notPossible: ApiDownloadNotPossibleException) {
-                                                    return@startTask notPossible.message
-                                                }
-                                            downloadResultByCredential =
-                                                downloadResultByCredential + (credential.id to result)
-                                            downloadProgressByCredential = downloadProgressByCredential - credential.id
-                                            refresh()
-                                            result.displaySummary()
-                                        }
-                                    }
+                                    scope.launch { downloadCredential(credential, forceFull) }
                                 },
                                 onImport = { session ->
                                     importResultBySession = importResultBySession - session.id
@@ -1982,17 +2139,66 @@ internal fun splitSessionsByImportState(
     return ApiSessionsSplit(outstandingByCredential = outstanding, importedByCredential = imported)
 }
 
+/**
+ * Runs one step of "Download & import all", logging its failure instead of letting it cancel the other
+ * downloads and the import queue. Null when it failed; cancellation still propagates.
+ */
+private suspend fun <T> isolatedBulkStep(
+    description: String,
+    step: suspend () -> T,
+): T? =
+    try {
+        step()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (expected: Exception) {
+        logger.error(expected) { "$description failed: ${expected.message}" }
+        null
+    }
+
+/**
+ * The sessions "Download & import all" imports: every session of [credentialIds] that has never been
+ * imported, oldest first, so overlapping sessions land in the order they were downloaded.
+ */
+internal fun sessionsToImportInBulk(
+    sessions: List<ApiSession>,
+    credentialIds: Set<ApiCredentialId>,
+    everImportedSessionIds: Set<ApiSessionId>,
+): List<ApiSession> =
+    sessions
+        .filter { it.credentialId in credentialIds && it.id !in everImportedSessionIds }
+        .sortedWith(compareBy<ApiSession> { it.createdAt }.thenBy { it.id.id })
+
+internal fun bulkDownloadImportSummary(
+    credentialCount: Int,
+    downloadedCount: Int,
+    sessionCount: Int,
+    importedCount: Int,
+    needsReviewCount: Int,
+): String =
+    buildList {
+        add("Downloaded $downloadedCount of $credentialCount connection(s).")
+        add("Imported $importedCount of $sessionCount session(s).")
+        if (needsReviewCount > 0) {
+            add("$needsReviewCount session(s) need new counterparties confirmed; import them from their cards.")
+        }
+        val failedCount = sessionCount - importedCount - needsReviewCount
+        if (failedCount > 0) add("$failedCount import(s) failed or were skipped; see their tasks.")
+    }.joinToString(" ")
+
 @Composable
 private fun StrategyFilterDropdown(
     strategies: List<ApiImportStrategy>,
     selectedStrategyId: ApiImportStrategyId?,
     onStrategySelected: (ApiImportStrategyId?) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selectedName = strategies.firstOrNull { it.id == selectedStrategyId }?.name ?: ALL_STRATEGIES_LABEL
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it },
+        modifier = modifier,
     ) {
         OutlinedTextField(
             value = selectedName,
@@ -2033,6 +2239,8 @@ private fun StrategyFilterDropdown(
 private const val ALL_STRATEGIES_LABEL = "All strategies"
 
 private fun apiDownloadTaskKey(credentialId: ApiCredentialId): String = "api-download-cred-${credentialId.id}"
+
+private const val API_DOWNLOAD_IMPORT_ALL_TASK_KEY = "api-download-import-all"
 
 private fun apiImportTaskKey(sessionId: ApiSessionId): String = "api-import-${sessionId.id}"
 

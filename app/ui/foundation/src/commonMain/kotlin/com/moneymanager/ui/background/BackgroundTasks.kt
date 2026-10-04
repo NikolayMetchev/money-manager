@@ -32,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
+import kotlin.jvm.Synchronized
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -79,13 +80,19 @@ class BackgroundTaskManager(
 
     fun isRunning(key: String): Boolean = tasks.any { task -> task.key == key && task.status == BackgroundTaskStatus.RUNNING }
 
+    /**
+     * Starts [block] as a task, or returns false (running nothing) while a task with [key] is still running.
+     * Synchronized because callers register from background threads too: the key check, id allocation and
+     * insertion must happen as one step, or two callers could both start the same key.
+     */
+    @Synchronized
     fun startTask(
         key: String,
         title: String,
         initialDetail: String,
         block: suspend BackgroundTaskController.() -> String,
-    ) {
-        if (isRunning(key)) return
+    ): Boolean {
+        if (isRunning(key)) return false
 
         val taskId = nextTaskId++
         tasks.add(
@@ -139,6 +146,7 @@ class BackgroundTaskManager(
                 }
             }
         }
+        return true
     }
 
     private fun updateTask(
