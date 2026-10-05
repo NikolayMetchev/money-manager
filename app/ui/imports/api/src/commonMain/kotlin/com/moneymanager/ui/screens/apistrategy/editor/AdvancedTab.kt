@@ -78,7 +78,6 @@ internal fun AdvancedTab(
                 entries = exchange.formParams,
                 onChange = { v -> state.updateTokenExchange { copy(formParams = v) } },
                 keyLabel = "Name",
-                valueLabel = "Value",
                 enabled = enabled,
             )
             TextFieldRow(

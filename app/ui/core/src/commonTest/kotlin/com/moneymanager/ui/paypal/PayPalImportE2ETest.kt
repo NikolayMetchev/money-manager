@@ -112,8 +112,8 @@ class PayPalImportE2ETest : DbTest() {
     ) = MockEngine { request ->
         val url = request.url
         val json =
-            when {
-                url.encodedPath == "/v1/oauth2/token" -> {
+            when (url.encodedPath) {
+                "/v1/oauth2/token" -> {
                     captured.tokenRequests += request
                     if (tokenStatus != HttpStatusCode.OK) {
                         return@MockEngine respond(
@@ -124,11 +124,11 @@ class PayPalImportE2ETest : DbTest() {
                     }
                     """{ "scope": "https://uri.paypal.com/services/reporting/search/read", "access_token": "$ACCESS_TOKEN", "token_type": "Bearer", "expires_in": 32400 }"""
                 }
-                url.encodedPath == "/v1/reporting/balances" -> {
+                "/v1/reporting/balances" -> {
                     captured.bearerHeaders += request.headers[HttpHeaders.Authorization]
                     BALANCES_JSON
                 }
-                url.encodedPath == "/v1/reporting/transactions" -> {
+                "/v1/reporting/transactions" -> {
                     captured.bearerHeaders += request.headers[HttpHeaders.Authorization]
                     captured.transactionUrls += url.toString()
                     val start = Instant.parse(url.parameters["start_date"]!!)
