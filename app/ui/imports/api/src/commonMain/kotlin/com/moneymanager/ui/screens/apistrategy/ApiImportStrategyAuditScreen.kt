@@ -105,6 +105,7 @@ private val sectionLabels =
         "dataEndpoints" to "Data endpoint",
         "peopleDownload" to "People download",
         "requestSigning" to "Request signing",
+        "tokenExchange" to "Token exchange",
         "internalTransferReconcile" to "Internal transfer reconcile",
     )
 

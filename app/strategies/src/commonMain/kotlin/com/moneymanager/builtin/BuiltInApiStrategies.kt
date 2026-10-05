@@ -23,6 +23,7 @@ import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiServerTimeSync
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
+import com.moneymanager.domain.model.apistrategy.ApiTokenExchange
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.ApiValueSet
@@ -56,7 +57,7 @@ import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-/** Built-in API import strategy definitions (Monzo/Wise/Starling). db-free domain objects. */
+/** Built-in API import strategy definitions. db-free domain objects. */
 object BuiltInApiStrategies {
     val monzoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000001")
     val wiseStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000002")
@@ -66,10 +67,21 @@ object BuiltInApiStrategies {
     val binanceStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
     val coinbaseStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000c")
     val bybitStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000d")
+    val payPalStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000e")
 
     /** All built-in API import strategies. */
     fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> =
-        listOf(monzo(now), wise(now), starling(now), cryptoComExchange(now), kraken(now), binance(now), coinbase(now), bybit(now))
+        listOf(
+            monzo(now),
+            wise(now),
+            starling(now),
+            cryptoComExchange(now),
+            kraken(now),
+            binance(now),
+            coinbase(now),
+            bybit(now),
+            payPal(now),
+        )
 
     /** The built-in Monzo API import strategy. */
     fun monzo(now: Instant): ApiImportStrategy =
@@ -149,6 +161,125 @@ object BuiltInApiStrategies {
                             "Copy the access token shown on the playground page.",
                             "Paste the token below and save.",
                             "In the Monzo app, approve the API access notification so transactions can be read.",
+                        ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+
+    /**
+     * The built-in PayPal API import strategy (Transaction Search). The credential is a REST app's client
+     * id + secret, exchanged for a bearer token before every download. Each currency balance becomes its
+     * own account; a balance carries nothing but its `currency`, so its stored id is prefixed to keep it
+     * from matching another provider's account. Amounts are signed decimals with the fee (negative) beside
+     * the gross amount, and history is fetched in PayPal's maximum 31-day windows.
+     */
+    fun payPal(now: Instant): ApiImportStrategy =
+        ApiImportStrategy(
+            id = ApiImportStrategyId(payPalStrategyId),
+            name = "PayPal API",
+            config =
+                ApiStrategyConfig(
+                    baseUrl = "https://api-m.paypal.com",
+                    tokenExchange = ApiTokenExchange(),
+                    accounts =
+                        ApiAccountsSource.Downloaded(
+                            endpoint = ApiEndpointConfig(path = "/v1/reporting/balances", responseArrayKey = "balances"),
+                            mappings =
+                                ApiAccountMappings(
+                                    idField = "currency",
+                                    descriptionField = "currency",
+                                    ownersArrayField = null,
+                                    currencyField = "currency",
+                                    idExtraction = Extraction(pattern = "^(.+)$", outputTemplate = "paypal:$1"),
+                                    descriptionExtraction = Extraction(pattern = "^(.+)$", outputTemplate = "PayPal $1"),
+                                ),
+                        ),
+                    dataEndpoints =
+                        listOf(
+                            ApiDataEndpoint(
+                                endpoint =
+                                    ApiEndpointConfig(
+                                        path = "/v1/reporting/transactions",
+                                        responseArrayKey = "transaction_details",
+                                        queryParams =
+                                            listOf(
+                                                // The balance's raw id is its currency; passing it as `account.id`
+                                                // is what ties each response back to its account.
+                                                ApiQueryParam(name = "transaction_currency", dynamicSource = "account.id"),
+                                                ApiQueryParam(name = "fields", value = "all"),
+                                                ApiQueryParam(name = "balance_affecting_records_only", value = "Y"),
+                                            ),
+                                        pagination =
+                                            ApiPaginationConfig(
+                                                // Windows start on a 31-day boundary at or before the lookback, so
+                                                // the lookback stays a window short of PayPal's three-year history.
+                                                window =
+                                                    ApiDateWindowing(
+                                                        startParam = "start_date",
+                                                        endParam = "end_date",
+                                                        windowDays = 31,
+                                                        lookbackDays = 1060,
+                                                        boundFormat = WindowBoundFormat.ISO_8601,
+                                                    ),
+                                                paging =
+                                                    ApiPaging.Offset(
+                                                        param = "page",
+                                                        pageNumbers = true,
+                                                        totalCountField = "total_items",
+                                                    ),
+                                                limitParam = "page_size",
+                                                limitValue = 500,
+                                                sendLimitParam = true,
+                                            ),
+                                    ),
+                                kind = ApiEndpointKind.BANK_TRANSACTIONS,
+                                transactionMappings =
+                                    ApiTransactionMappings(
+                                        idField = "transaction_info.transaction_id",
+                                        amountField = "transaction_info.transaction_amount.value",
+                                        currencyField = "transaction_info.transaction_amount.currency_code",
+                                        timestampField = "transaction_info.transaction_initiation_date",
+                                        descriptionField = "transaction_info.transaction_subject",
+                                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                                        direction = Direction.AmountSign(),
+                                        counterpartyNameField = "payer_info.payer_name.alternate_full_name",
+                                        declinedWhen =
+                                            listOf(
+                                                Condition("transaction_info.transaction_status", ConditionOp.EQUALS, value = "D"),
+                                            ),
+                                        // The amount is gross; PayPal's fee (negative) comes off on top of it.
+                                        fee =
+                                            FeeRule(
+                                                amount = ValueExpr.of("transaction_info.fee_amount.value"),
+                                                currency = ValueExpr.of("transaction_info.fee_amount.currency_code"),
+                                            ),
+                                        customFields =
+                                            mapOf(
+                                                "paypal-event-code" to "transaction_info.transaction_event_code",
+                                                "paypal-payer-email" to "payer_info.email_address",
+                                            ),
+                                    ),
+                            ),
+                        ),
+                    // Event codes T02xx are currency conversions: one item per currency, both routed through
+                    // one account so the pair nets out.
+                    builtInCounterpartyRules =
+                        listOf(
+                            BuiltInCounterpartyRule(
+                                name = "PayPal Currency Conversion",
+                                predicates =
+                                    listOf(Condition("transaction_info.transaction_event_code", ConditionOp.STARTS_WITH, value = "T02")),
+                            ),
+                        ),
+                    tokenPageUrl = "https://developer.paypal.com/dashboard/applications/live",
+                    connectInstructions =
+                        listOf(
+                            "Open the PayPal Developer Dashboard and log in with your PayPal account. Live REST apps need a " +
+                                "PayPal business account (upgrading a personal account is free).",
+                            "Under Apps & Credentials, switch to Live and create an app (type: Merchant).",
+                            "In the app's features, tick Transaction Search and save. PayPal can take a few hours to grant it.",
+                            "Copy the app's Client ID and Secret, paste them below and save.",
                         ),
                 ),
             createdAt = now,

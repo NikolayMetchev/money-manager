@@ -3,6 +3,7 @@ package com.moneymanager.domain.model.apistrategy
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.rules.ValueExpr
@@ -288,6 +289,12 @@ data class ApiEndpointConfig(
  * @property accountNumberField Account/owner field holding a bank account number.
  * @property currencyField Optional account-level currency field (e.g. Wise "currency"); exposed to
  *                         templating as account.currency.
+ * @property idExtraction Rewrites the [idField] value into the account's stored external id. External ids
+ *                        are matched across every provider, so an id that is only unique within the
+ *                        provider (PayPal's per-currency balances carry nothing but `currency`) needs a
+ *                        provider prefix (`paypal:$0`). Requests still use the raw id.
+ * @property descriptionExtraction Rewrites the [descriptionField] value into the account name
+ *                                 (`PayPal $0`). Kept when its pattern doesn't match.
  */
 @Serializable
 data class ApiAccountMappings(
@@ -317,6 +324,10 @@ data class ApiAccountMappings(
      * first match winning. Only used when [staticAccountName] is set.
      */
     val accountNameRules: List<ApiAccountNameRule> = emptyList(),
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val idExtraction: Extraction? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val descriptionExtraction: Extraction? = null,
 )
 
 /** How a transaction amount value is encoded in the API response. */
@@ -1234,6 +1245,25 @@ data class ApiInternalTransferReconcile(
 )
 
 /**
+ * Trades a long-lived client id + secret for a short-lived bearer token before a download (the OAuth2
+ * client-credentials grant, e.g. PayPal). The credential's token is the client id and its api secret the
+ * client secret; they are sent as HTTP Basic auth (RFC 6749's default client authentication) with
+ * [formParams] as an `application/x-www-form-urlencoded` POST to [path], and [accessTokenField] of the JSON
+ * response is used as the bearer token for every request of that download.
+ */
+@Serializable
+data class ApiTokenExchange(
+    /** Token endpoint, relative to [ApiStrategyConfig.baseUrl]. */
+    val path: String = "/v1/oauth2/token",
+    @Serializable(with = SortedStringToStringMapSerializer::class)
+    val formParams: Map<String, String> = mapOf("grant_type" to "client_credentials"),
+    /** Dot-path of the access token in the token response. */
+    val accessTokenField: String = "access_token",
+) {
+    fun isValidForSave(): Boolean = path.isNotBlank() && accessTokenField.isNotBlank()
+}
+
+/**
  * Decoded, domain-level view of an API import strategy's full configuration — and the portable JSON
  * shape it is persisted (`api_import_strategy.config_json`) and exported in. Holds no database entity
  * references (only URLs, JSON field paths and enums), so it is fully portable as-is.
@@ -1270,6 +1300,14 @@ data class ApiStrategyConfig(
      * token instead (bank APIs).
      */
     val requestSigning: ApiRequestSigningConfig? = null,
+    /**
+     * Exchanges the credential's client id + secret for a bearer token before each download (OAuth2
+     * client credentials). Null sends the credential's token itself as the bearer. Omitted from JSON when
+     * null (@EncodeDefault NEVER) so adding it did not change the canonical hash of every existing API
+     * strategy.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val tokenExchange: ApiTokenExchange? = null,
     /**
      * Endpoints fetched (unpaged loop aside — each still runs its own pagination) before
      * [dataEndpoints], purely to supply values for an [ApiFanOut] (e.g. Binance `getUserAsset` for held
@@ -1316,6 +1354,9 @@ data class ApiStrategyConfig(
 ) {
     /** Whether requests are signed with an api key + secret rather than sent with a bearer token. */
     val isSigned: Boolean get() = requestSigning != null
+
+    /** Whether a credential needs a secret besides its token: an api secret to sign with, or a client secret. */
+    val needsApiSecret: Boolean get() = isSigned || tokenExchange != null
 
     /** The bank transaction feed, when this is a bank strategy (accounts enumerated from an endpoint). */
     val bankTransactions: ApiDataEndpoint?

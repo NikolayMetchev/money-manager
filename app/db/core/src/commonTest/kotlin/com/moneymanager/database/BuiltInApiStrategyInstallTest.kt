@@ -40,7 +40,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .map { it.name }
                     .toSet()
             assertEquals(
-                setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken", "Binance", "Coinbase", "Bybit"),
+                setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken", "Binance", "Coinbase", "Bybit", "PayPal API"),
                 names,
             )
         }

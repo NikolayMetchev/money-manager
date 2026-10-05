@@ -261,7 +261,13 @@ private fun StrategyCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "Auth: ${if (strategy.config.isSigned) "signed API key" else "bearer token"}",
+                text =
+                    "Auth: " +
+                        when {
+                            strategy.config.isSigned -> "signed API key"
+                            strategy.config.tokenExchange != null -> "OAuth client credentials"
+                            else -> "bearer token"
+                        },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

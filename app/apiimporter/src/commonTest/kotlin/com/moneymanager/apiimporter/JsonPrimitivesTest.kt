@@ -158,4 +158,18 @@ class JsonPrimitivesTest {
         )
         assertNull(parseApiTimestamp("not-a-number", TimestampFormat.EPOCH_MS))
     }
+
+    @Test
+    fun `parses iso timestamps with a basic-format offset`() {
+        // PayPal writes offsets without a colon.
+        assertEquals(
+            parseApiTimestamp("2024-01-15T10:11:12+00:00", TimestampFormat.ISO_8601),
+            parseApiTimestamp("2024-01-15T10:11:12+0000", TimestampFormat.ISO_8601),
+        )
+        assertEquals(
+            parseApiTimestamp("2024-01-15T12:41:12Z", TimestampFormat.ISO_8601),
+            parseApiTimestamp("2024-01-15T05:11:12-0730", TimestampFormat.ISO_8601),
+        )
+        assertNull(parseApiTimestamp("2024-01-15", TimestampFormat.ISO_8601))
+    }
 }

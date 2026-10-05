@@ -463,6 +463,7 @@ fun ApiSessionsScreen(
                                 },
                             )
                         } catch (notPossible: ApiDownloadNotPossibleException) {
+                            logger.warn { "Download for '${strategy.name}' (session #$newSessionId) not possible: ${notPossible.message}" }
                             return@startTask notPossible.message
                         }
                     downloadResultByCredential = downloadResultByCredential + (credential.id to result)

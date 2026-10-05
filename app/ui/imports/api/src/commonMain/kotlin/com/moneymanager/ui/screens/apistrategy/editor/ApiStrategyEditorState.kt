@@ -128,6 +128,7 @@ internal class ApiStrategyEditorState(
     val advancedHasError: Boolean
         get() =
             config.requestSigning?.let { !it.isValidForSave() } == true ||
+                config.tokenExchange?.let { !it.isValidForSave() } == true ||
                 config.internalTransferReconcile?.let { !it.isValidForSave() } == true
 
     val accountMappingsHasError: Boolean

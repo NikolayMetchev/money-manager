@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
+import com.moneymanager.ui.components.rules.ExtractionEditor
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Edits [ApiAccountMappings] in place inside the strategy config. */
@@ -40,6 +41,18 @@ internal fun AccountMappingsTab(
             accountJsonPaths,
             onRequestPick,
             enabled,
+        )
+        ExtractionEditor(
+            label = "Rewrite the stored account ID (e.g. prefix an ID only unique within this provider)",
+            extraction = mappings.idExtraction,
+            onChange = { value -> state.updateAccountMappings { copy(idExtraction = value) } },
+            enabled = enabled,
+        )
+        ExtractionEditor(
+            label = "Rewrite the description into the account name",
+            extraction = mappings.descriptionExtraction,
+            onChange = { value -> state.updateAccountMappings { copy(descriptionExtraction = value) } },
+            enabled = enabled,
         )
         TextFieldRow(
             label = "Static account name (optional)",
