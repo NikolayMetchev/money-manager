@@ -212,6 +212,7 @@ private fun ApiConnectionRow(
                         text =
                             when {
                                 credential != null -> "Connected · ${maskToken(credential.token)}"
+                                strategy.config.tokenExchange != null -> "Needs a client ID and secret"
                                 strategy.config.isSigned -> "Needs an API key and secret"
                                 else -> "Needs an access token"
                             },
@@ -292,7 +293,8 @@ private fun ApiCredentialForm(
     onSubmit: (token: String, secret: String?, onFailure: (String) -> Unit) -> Unit,
     onSkip: (() -> Unit)?,
 ) {
-    val isSigned = strategy.config.isSigned
+    val needsSecret = strategy.config.needsApiSecret
+    val usesTokenExchange = strategy.config.tokenExchange != null
     var tokenInput by remember(strategy.id) { mutableStateOf("") }
     var secretInput by remember(strategy.id) { mutableStateOf("") }
     var isSaving by remember(strategy.id) { mutableStateOf(false) }
@@ -316,7 +318,15 @@ private fun ApiCredentialForm(
                 tokenInput = it
                 errorMessage = null
             },
-            label = { Text(if (isSigned) "API key" else "Access token") },
+            label = {
+                Text(
+                    when {
+                        usesTokenExchange -> "Client ID"
+                        needsSecret -> "API key"
+                        else -> "Access token"
+                    },
+                )
+            },
             placeholder = {
                 Text(if (credential == null) "Paste it here" else "Paste the replacement here")
             },
@@ -326,14 +336,14 @@ private fun ApiCredentialForm(
             isError = errorMessage != null,
         )
 
-        if (isSigned) {
+        if (needsSecret) {
             OutlinedTextField(
                 value = secretInput,
                 onValueChange = {
                     secretInput = it
                     errorMessage = null
                 },
-                label = { Text("API secret") },
+                label = { Text(if (usesTokenExchange) "Client secret" else "API secret") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
@@ -355,12 +365,12 @@ private fun ApiCredentialForm(
                     }
                     isSaving = true
                     errorMessage = null
-                    onSubmit(token, secretInput.trim().takeIf { isSigned }) { message ->
+                    onSubmit(token, secretInput.trim().takeIf { needsSecret }) { message ->
                         isSaving = false
                         errorMessage = message
                     }
                 },
-                enabled = !isSaving && tokenInput.isNotBlank() && (!isSigned || secretInput.isNotBlank()),
+                enabled = !isSaving && tokenInput.isNotBlank() && (!needsSecret || secretInput.isNotBlank()),
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)

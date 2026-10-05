@@ -17,7 +17,10 @@ import kotlinx.serialization.Transient
 data class Extraction(
     val pattern: String,
     val outputTemplate: String = "$0",
-)
+) {
+    /** Whether [pattern] compiles; an editor must not save one that doesn't. */
+    val isValid: Boolean get() = runCatching { Regex(pattern) }.isSuccess
+}
 
 /**
  * How a value is read from a [Record]: the first of [paths] holding a non-blank value, cleaned through

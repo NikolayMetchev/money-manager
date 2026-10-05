@@ -36,6 +36,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.Record
 import com.moneymanager.domain.model.rules.RuleEvaluator
@@ -592,7 +593,7 @@ private suspend fun buildProfileAccountMap(
                 ?.get(ancestorExpr)
         if (profileId != null) {
             for (account in parseAccounts(response.json, strategy)) {
-                accountIdByExternalId[account.id]?.let { result.getOrPut(profileId) { mutableListOf() }.add(it) }
+                accountIdByExternalId[account.externalId]?.let { result.getOrPut(profileId) { mutableListOf() }.add(it) }
             }
         }
     }
@@ -614,7 +615,7 @@ private suspend fun loadSessionAccountIds(
         val isAccountsResponse = requestsById[response.requestId]?.isAccountsRequest(strategy) == true
         if (isAccountsResponse) {
             for (account in parseAccounts(response.json, strategy)) {
-                accountIdByExternalId[account.id]?.let { result.add(it) }
+                accountIdByExternalId[account.externalId]?.let { result.add(it) }
             }
         }
     }
@@ -808,6 +809,7 @@ private suspend fun setupImportSession(
         accountOnlyResponses
             .flatMap { response -> parseAccounts(response.json, strategy) }
             .associateBy { it.id }
+    requireDistinctExternalIds(parsedAccountsById.values, strategy)
     // Fold in per-account bank details fetched from the account-identifiers endpoint (e.g. Starling),
     // whose responses live alongside the transaction/account traffic of either session.
     val identifierResponsePairs =
@@ -863,7 +865,7 @@ private suspend fun addCustomAccountFieldAttributes(setup: ImportSetup) {
         for ((fieldName, jsonPath) in customAccountFields) {
             val value = rawJson.resolveJsonPath(jsonPath) ?: continue
             val typeId = setup.attributeTypeCache.getOrCreate(fieldName)
-            setup.accountResolver.addSourceAttribute(account.id, NewAttribute(typeId = typeId, value = value))
+            setup.accountResolver.addSourceAttribute(account.externalId, NewAttribute(typeId = typeId, value = value))
         }
     }
 }
@@ -1005,7 +1007,7 @@ private suspend fun resolveOwnAccountKey(
 ): LocalAccountKey {
     val (sortCode, accountNumber) = account.bankDetails()
     return setup.accountResolver.resolveSourceAccount(
-        externalId = account.id,
+        externalId = account.externalId,
         name =
             account.displayName(
                 setup.strategy.config
@@ -1233,7 +1235,10 @@ class ApiSessionImportException(
 ) : Exception(message)
 
 private data class ApiImportAccount(
+    /** The provider's id, as requests carry it (`{account.id}`). */
     val id: String,
+    /** The id stored on (and matched against) the account: [id] through [ApiAccountMappings.idExtraction]. */
+    val externalId: String = id,
     val description: String,
     val owners: List<ApiImportAccountOwner> = emptyList(),
     val source: AccountApiSource? = null,
@@ -1350,6 +1355,42 @@ private fun parseAccounts(
         emptyList()
     }
 
+/**
+ * [value] through [extraction]; kept as is when there is no extraction, the pattern doesn't match or the
+ * result is blank (a blank external id would merge every account onto one).
+ *
+ * @throws ApiSessionImportException when the persisted pattern doesn't compile.
+ */
+private fun rewriteAccountValue(
+    value: String,
+    extraction: Extraction?,
+    what: String,
+    strategy: ApiImportStrategy,
+): String {
+    if (extraction == null || value.isBlank()) return value
+    if (!extraction.isValid) {
+        throw ApiSessionImportException("Strategy '${strategy.name}' has an invalid $what rewrite pattern: ${extraction.pattern}")
+    }
+    return RuleEvaluator().extract(value, extraction)?.takeIf { it.isNotBlank() } ?: value
+}
+
+/**
+ * Fails when [ApiAccountMappings.idExtraction] gives two distinct provider accounts the same stored id:
+ * they would be imported as one account.
+ */
+private fun requireDistinctExternalIds(
+    accounts: Collection<ApiImportAccount>,
+    strategy: ApiImportStrategy,
+) {
+    val collision = accounts.groupBy { it.externalId }.entries.firstOrNull { (_, group) -> group.map { it.id }.distinct().size > 1 }
+    if (collision != null) {
+        throw ApiSessionImportException(
+            "Strategy '${strategy.name}' rewrites accounts ${collision.value.map { it.id }.distinct()} to the same ID " +
+                "'${collision.key}'; fix its account ID rewrite.",
+        )
+    }
+}
+
 private fun accountsItemJsonPath(
     strategy: ApiImportStrategy,
     index: Int,
@@ -1409,9 +1450,11 @@ private fun parseAccount(
 ): ApiImportAccount? {
     val mappings = strategy.config.downloadedAccounts().mappings
     val id = account.resolveJsonPath(mappings.idField) ?: return null
+    val description = account.resolveJsonPath(mappings.descriptionField).orEmpty()
     return ApiImportAccount(
         id = id,
-        description = account.resolveJsonPath(mappings.descriptionField).orEmpty(),
+        externalId = rewriteAccountValue(id, mappings.idExtraction, "account ID", strategy),
+        description = rewriteAccountValue(description, mappings.descriptionExtraction, "description", strategy),
         owners = parseAccountOwners(account, strategy, accountJsonPath),
         sortCode = account.stringOrNull(mappings.sortCodeField),
         accountNumber = account.stringOrNull(mappings.accountNumberField),
@@ -3222,7 +3265,7 @@ internal fun parseApiTimestamp(
     pattern: String? = null,
 ): Instant? =
     when (format) {
-        TimestampFormat.ISO_8601 -> runCatching { Instant.parse(value) }.getOrNull()
+        TimestampFormat.ISO_8601 -> parseIsoInstant(value)
         TimestampFormat.EPOCH_MS -> value.toLongOrNull()?.let { Instant.fromEpochMilliseconds(it) }
         TimestampFormat.EPOCH_S -> value.toLongOrNull()?.let { Instant.fromEpochSeconds(it) }
         TimestampFormat.EPOCH_S_FLOAT ->
@@ -3232,6 +3275,19 @@ internal fun parseApiTimestamp(
             }
         TimestampFormat.PATTERN -> pattern?.let { parsePatternedTimestamp(value, it) }
     }
+
+/**
+ * An ISO-8601 instant, also in the basic offset form (`+0000`, PayPal) that [Instant.parse] only accepts
+ * extended (`+00:00`).
+ */
+private fun parseIsoInstant(value: String): Instant? =
+    runCatching { Instant.parse(value) }.getOrNull()
+        ?: basicOffset.find(value)?.let { offset ->
+            val (hours, minutes) = offset.destructured
+            runCatching { Instant.parse(value.substring(0, offset.range.first) + "$hours:$minutes") }.getOrNull()
+        }
+
+private val basicOffset = Regex("([+-]\\d{2})(\\d{2})$")
 
 /**
  * Parses [value] against a small vocabulary of date-time tokens in [pattern] — `yyyy`, `MM`, `dd`,

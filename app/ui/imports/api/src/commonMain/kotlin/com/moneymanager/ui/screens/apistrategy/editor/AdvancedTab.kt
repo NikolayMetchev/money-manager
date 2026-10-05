@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
+import com.moneymanager.domain.model.apistrategy.ApiTokenExchange
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -17,6 +18,10 @@ import com.moneymanager.domain.repository.PersonReadRepository
 /** Edits the challenge-response [ApiSigningConfig] in place; a no-op while signing is disabled. */
 private fun ApiStrategyEditorState.updateSigning(block: ApiSigningConfig.() -> ApiSigningConfig) =
     updateConfig { copy(signing = signing?.block()) }
+
+/** Edits the [ApiTokenExchange] in place; a no-op while token exchange is disabled. */
+private fun ApiStrategyEditorState.updateTokenExchange(block: ApiTokenExchange.() -> ApiTokenExchange) =
+    updateConfig { copy(tokenExchange = tokenExchange?.block()) }
 
 @Composable
 internal fun AdvancedTab(
@@ -48,6 +53,38 @@ internal fun AdvancedTab(
                 values = signing.statementCountries,
                 onChange = { v -> state.updateSigning { copy(statementCountries = v) } },
                 enabled = enabled,
+            )
+        }
+
+        HorizontalDivider()
+        SectionHeader("Token exchange (OAuth client credentials)")
+        Text(
+            text =
+                "Trades the credential's client ID + secret for a short-lived bearer token before each " +
+                    "download (e.g. PayPal). The connect screen then asks for a client ID and secret.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ToggleRow(
+            label = "Enable token exchange",
+            checked = state.config.tokenExchange != null,
+            onCheckedChange = { on -> state.updateConfig { copy(tokenExchange = if (on) ApiTokenExchange() else null) } },
+            enabled = enabled,
+        )
+        state.config.tokenExchange?.let { exchange ->
+            TextFieldRow("Token path", exchange.path, { v -> state.updateTokenExchange { copy(path = v) } }, enabled)
+            StringMapEditor(
+                label = "Form parameters",
+                entries = exchange.formParams,
+                onChange = { v -> state.updateTokenExchange { copy(formParams = v) } },
+                keyLabel = "Name",
+                enabled = enabled,
+            )
+            TextFieldRow(
+                "Access token field",
+                exchange.accessTokenField,
+                { v -> state.updateTokenExchange { copy(accessTokenField = v) } },
+                enabled,
             )
         }
 

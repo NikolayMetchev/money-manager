@@ -21,6 +21,9 @@ import kotlin.time.Instant
 class LegacyStrategyUpgradeTest {
     private val epoch = Instant.fromEpochMilliseconds(0)
 
+    // Built-ins first published after configs were versioned: they never had a legacy-v0 form to upgrade.
+    private val addedAfterVersioning = setOf("PayPal API")
+
     private fun resource(path: String): String =
         requireNotNull(javaClass.classLoader.getResource("legacy-v0/$path")) { "missing fixture legacy-v0/$path" }.readText()
 
@@ -28,7 +31,7 @@ class LegacyStrategyUpgradeTest {
     fun `published legacy artifacts upgrade to the current built-ins`() {
         for ((key, current) in builtInArtifacts()) {
             val fileName = StrategyFileNaming.fileName(key)
-            if (fileName.endsWith(".passthrough.json")) continue
+            if (fileName.endsWith(".passthrough.json") || key.name in addedAfterVersioning) continue
             val legacy = resource("export/$fileName")
             assertEquals(
                 StrategyArtifactCodec.canonicalHash(key.kind, current),
@@ -53,7 +56,7 @@ class LegacyStrategyUpgradeTest {
 
     @Test
     fun `legacy database api configs upgrade to the current built-ins`() {
-        for (strategy in BuiltInApiStrategies.builtInApiStrategies(epoch)) {
+        for (strategy in BuiltInApiStrategies.builtInApiStrategies(epoch).filter { it.name !in addedAfterVersioning }) {
             val legacy = ApiStrategyJsonCodec.decode(resource("db/${strategy.name}.api-config.json"))
             assertEquals(
                 ApiStrategyJsonCodec.encode(strategy.config),

@@ -3,6 +3,7 @@ package com.moneymanager.apiimporter
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.apistrategy.ApiTokenExchange
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -25,9 +26,9 @@ import kotlin.time.Instant
 
 /** The secrets a download authenticates with. */
 class ApiDownloadCredentials(
-    /** The bearer token, or for a signed strategy its api key. */
+    /** The bearer token, or for a signed strategy its api key, or for a token-exchange strategy its client id. */
     val token: String,
-    /** A signed strategy's api secret. */
+    /** A signed strategy's api secret, or a token-exchange strategy's client secret. */
     val apiSecret: String? = null,
     /** Strong-customer-authentication signing for providers that challenge some requests (Wise). */
     val sca: ScaParams? = null,
@@ -44,7 +45,8 @@ class ApiDownloadNotPossibleException(
  * [transactionsBlocked] skips a bank's transaction feed (e.g. Wise outside its statement countries).
  *
  * @throws ApiDownloadNotPossibleException before any request, when a signed strategy has no signing
- *   recipe or the credential no api secret.
+ *   recipe or the credential no api secret (or client secret, for a token exchange), or when the token
+ *   exchange is rejected.
  */
 suspend fun downloadApiSession(
     apiClient: ApiClient,
@@ -85,13 +87,14 @@ suspend fun downloadApiSession(
             ApiSessionDownloadResult(accounts = ApiAccountsDownloadResult(accountCount = 1), transactions = transactions, people = null)
         }
         is ApiAccountsSource.Downloaded -> {
+            val token = bearerToken(apiClient, strategy, credentials, onPhase)
             onPhase("Downloading accounts...")
             val accounts =
-                downloadApiSessionAccounts(credentials.token, apiClient, apiSessionRepository, sessionId, strategy, credentials.sca)
+                downloadApiSessionAccounts(token, apiClient, apiSessionRepository, sessionId, strategy, credentials.sca)
             if (strategy.config.downloadedAccounts().identifiersEndpoint != null) {
                 onPhase("Downloading account identifiers...")
                 downloadApiSessionAccountIdentifiers(
-                    credentials.token,
+                    token,
                     apiClient,
                     apiSessionRepository,
                     sessionId,
@@ -105,7 +108,7 @@ suspend fun downloadApiSession(
                 } else {
                     onPhase("Downloading transactions...")
                     downloadApiSessionTransactions(
-                        token = credentials.token,
+                        token = token,
                         apiClient = apiClient,
                         apiSessionRepository = apiSessionRepository,
                         sessionId = sessionId,
@@ -120,11 +123,29 @@ suspend fun downloadApiSession(
             val people =
                 strategy.config.peopleDownload?.let {
                     onPhase("Downloading people...")
-                    downloadApiSessionPeople(credentials.token, apiClient, apiSessionRepository, sessionId, strategy, credentials.sca)
+                    downloadApiSessionPeople(token, apiClient, apiSessionRepository, sessionId, strategy, credentials.sca)
                 }
             ApiSessionDownloadResult(accounts = accounts, transactions = transactions, people = people)
         }
     }
+
+/**
+ * The bearer token a bank-shaped download sends: the credential's own token, or one exchanged for it when
+ * the strategy has an [ApiTokenExchange].
+ */
+private suspend fun bearerToken(
+    apiClient: ApiClient,
+    strategy: ApiImportStrategy,
+    credentials: ApiDownloadCredentials,
+    onPhase: (String) -> Unit,
+): String {
+    val exchange = strategy.config.tokenExchange ?: return credentials.token
+    val clientSecret =
+        credentials.apiSecret?.takeIf { it.isNotBlank() }
+            ?: throw ApiDownloadNotPossibleException("This credential has no client secret; reconnect it.")
+    onPhase("Requesting access token...")
+    return exchangeBearerToken(apiClient, strategy.config.baseUrl, exchange, credentials.token, clientSecret)
+}
 
 /** What importing one API session produced. */
 data class ApiSessionImportOutcome(

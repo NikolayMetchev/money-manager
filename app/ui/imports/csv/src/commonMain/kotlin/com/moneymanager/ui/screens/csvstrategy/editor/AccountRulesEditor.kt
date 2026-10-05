@@ -29,9 +29,9 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.rules.isComplete
+import com.moneymanager.ui.components.rules.ExtractionEditor
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /** How a rule decides it applies, beyond its conditions. */
@@ -325,39 +325,12 @@ private fun ExtractionFields(
     rule: AccountRule,
     onRuleChanged: (AccountRule) -> Unit,
     enabled: Boolean,
-) {
-    val extraction = rule.value.extraction
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(
-            checked = extraction != null,
-            onCheckedChange = { on ->
-                onRuleChanged(
-                    rule.copy(value = rule.value.copy(extraction = if (on) Extraction(pattern = "(.*)", outputTemplate = "$1") else null)),
-                )
-            },
-            enabled = enabled,
-        )
-        Text("Clean the value with a regex first", style = MaterialTheme.typography.bodySmall)
-    }
-    extraction?.let { e ->
-        OutlinedTextField(
-            value = e.pattern,
-            onValueChange = { onRuleChanged(rule.copy(value = rule.value.copy(extraction = e.copy(pattern = it)))) },
-            label = { Text("Cleanup pattern") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            enabled = enabled,
-        )
-        OutlinedTextField(
-            value = e.outputTemplate,
-            onValueChange = { onRuleChanged(rule.copy(value = rule.value.copy(extraction = e.copy(outputTemplate = it)))) },
-            label = { Text($$"Cleaned value ($0 whole match, $1… groups)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            enabled = enabled,
-        )
-    }
-}
+) = ExtractionEditor(
+    label = "Clean the value with a regex first",
+    extraction = rule.value.extraction,
+    onChange = { onRuleChanged(rule.copy(value = rule.value.copy(extraction = it))) },
+    enabled = enabled,
+)
 
 /** How many rows a pattern rule's column matches, and a few of the matched values. */
 @Composable
