@@ -132,7 +132,13 @@ internal class ApiStrategyEditorState(
                 config.internalTransferReconcile?.let { !it.isValidForSave() } == true
 
     val accountMappingsHasError: Boolean
-        get() = config.editedAccountMappings.idField.isBlank() || config.editedAccountMappings.descriptionField.isBlank()
+        get() =
+            config.editedAccountMappings.let { mappings ->
+                mappings.idField.isBlank() ||
+                    mappings.descriptionField.isBlank() ||
+                    mappings.idExtraction?.isValid == false ||
+                    mappings.descriptionExtraction?.isValid == false
+            }
 
     val transactionMappingsHasError: Boolean
         get() =

@@ -36,6 +36,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.Record
 import com.moneymanager.domain.model.rules.RuleEvaluator
@@ -808,6 +809,7 @@ private suspend fun setupImportSession(
         accountOnlyResponses
             .flatMap { response -> parseAccounts(response.json, strategy) }
             .associateBy { it.id }
+    requireDistinctExternalIds(parsedAccountsById.values, strategy)
     // Fold in per-account bank details fetched from the account-identifiers endpoint (e.g. Starling),
     // whose responses live alongside the transaction/account traffic of either session.
     val identifierResponsePairs =
@@ -1353,6 +1355,42 @@ private fun parseAccounts(
         emptyList()
     }
 
+/**
+ * [value] through [extraction]; kept as is when there is no extraction, the pattern doesn't match or the
+ * result is blank (a blank external id would merge every account onto one).
+ *
+ * @throws ApiSessionImportException when the persisted pattern doesn't compile.
+ */
+private fun rewriteAccountValue(
+    value: String,
+    extraction: Extraction?,
+    what: String,
+    strategy: ApiImportStrategy,
+): String {
+    if (extraction == null || value.isBlank()) return value
+    if (!extraction.isValid) {
+        throw ApiSessionImportException("Strategy '${strategy.name}' has an invalid $what rewrite pattern: ${extraction.pattern}")
+    }
+    return RuleEvaluator().extract(value, extraction)?.takeIf { it.isNotBlank() } ?: value
+}
+
+/**
+ * Fails when [ApiAccountMappings.idExtraction] gives two distinct provider accounts the same stored id:
+ * they would be imported as one account.
+ */
+private fun requireDistinctExternalIds(
+    accounts: Collection<ApiImportAccount>,
+    strategy: ApiImportStrategy,
+) {
+    val collision = accounts.groupBy { it.externalId }.entries.firstOrNull { (_, group) -> group.map { it.id }.distinct().size > 1 }
+    if (collision != null) {
+        throw ApiSessionImportException(
+            "Strategy '${strategy.name}' rewrites accounts ${collision.value.map { it.id }.distinct()} to the same ID " +
+                "'${collision.key}'; fix its account ID rewrite.",
+        )
+    }
+}
+
 private fun accountsItemJsonPath(
     strategy: ApiImportStrategy,
     index: Int,
@@ -1413,12 +1451,10 @@ private fun parseAccount(
     val mappings = strategy.config.downloadedAccounts().mappings
     val id = account.resolveJsonPath(mappings.idField) ?: return null
     val description = account.resolveJsonPath(mappings.descriptionField).orEmpty()
-    val rules = RuleEvaluator()
     return ApiImportAccount(
         id = id,
-        externalId = mappings.idExtraction?.let { rules.extract(id, it) } ?: id,
-        description =
-            mappings.descriptionExtraction?.takeIf { description.isNotBlank() }?.let { rules.extract(description, it) } ?: description,
+        externalId = rewriteAccountValue(id, mappings.idExtraction, "account ID", strategy),
+        description = rewriteAccountValue(description, mappings.descriptionExtraction, "description", strategy),
         owners = parseAccountOwners(account, strategy, accountJsonPath),
         sortCode = account.stringOrNull(mappings.sortCodeField),
         accountNumber = account.stringOrNull(mappings.accountNumberField),

@@ -2,10 +2,14 @@ package com.moneymanager.ui.paypal
 
 import com.moneymanager.apiimporter.ApiDownloadCredentials
 import com.moneymanager.apiimporter.ApiDownloadNotPossibleException
+import com.moneymanager.apiimporter.ApiSessionImportException
 import com.moneymanager.apiimporter.downloadApiSession
 import com.moneymanager.apiimporter.importApiSessionTransactions
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
@@ -109,6 +113,7 @@ class PayPalImportE2ETest : DbTest() {
     private fun mockEngine(
         captured: Captured,
         tokenStatus: HttpStatusCode = HttpStatusCode.OK,
+        tokenErrorBody: String = """{ "error": "invalid_client", "error_description": "Client Authentication failed" }""",
     ) = MockEngine { request ->
         val url = request.url
         val json =
@@ -117,7 +122,7 @@ class PayPalImportE2ETest : DbTest() {
                     captured.tokenRequests += request
                     if (tokenStatus != HttpStatusCode.OK) {
                         return@MockEngine respond(
-                            content = """{ "error": "invalid_client", "error_description": "Client Authentication failed" }""",
+                            content = tokenErrorBody,
                             status = tokenStatus,
                             headers = headersOf(HttpHeaders.ContentType, "application/json"),
                         )
@@ -265,5 +270,79 @@ class PayPalImportE2ETest : DbTest() {
                 }
             assertTrue("Client Authentication failed" in failure.message, failure.message)
             assertTrue(captured.bearerHeaders.isEmpty(), "no data request after a failed exchange")
+        }
+
+    private suspend fun downloadSession(
+        strategy: ApiImportStrategy,
+        engine: MockEngine,
+    ): ApiSessionId {
+        val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+        val sessionId = repositories.apiSessionRepository.createSession(deviceId, Clock.System.now(), null)
+        downloadApiSession(
+            apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
+                    engine = engine,
+                ),
+            apiSessionRepository = repositories.apiSessionRepository,
+            sessionId = sessionId,
+            strategy = strategy,
+            importEngine = repositories.importEngine,
+            credentials = ApiDownloadCredentials(token = CLIENT_ID, apiSecret = CLIENT_SECRET),
+        )
+        return sessionId
+    }
+
+    @Test
+    fun `an account id rewrite that merges two accounts fails the import instead of merging them`() =
+        runTest {
+            val paypal = payPal()
+            val accounts = paypal.config.accounts as ApiAccountsSource.Downloaded
+            val merging =
+                paypal.copy(
+                    config =
+                        paypal.config.copy(
+                            accounts =
+                                accounts.copy(
+                                    mappings =
+                                        accounts.mappings.copy(
+                                            idExtraction = Extraction(pattern = "^(.+)$", outputTemplate = "paypal"),
+                                        ),
+                                ),
+                        ),
+                )
+            val sessionId = downloadSession(merging, mockEngine(Captured()))
+
+            val failure =
+                assertFailsWith<ApiSessionImportException> {
+                    importApiSessionTransactions(
+                        apiSessionRepository = repositories.apiSessionRepository,
+                        currencyRepository = repositories.currencyRepository,
+                        sessionId = sessionId,
+                        strategy = merging,
+                        importEngine = repositories.importEngine,
+                    )
+                }
+            assertTrue("'paypal'" in failure.message.orEmpty(), failure.message)
+            assertTrue(
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .none { it.name.startsWith("PayPal") },
+            )
+        }
+
+    @Test
+    fun `an unrecognised token error body stays out of the failure message`() =
+        runTest {
+            val failure =
+                assertFailsWith<ApiDownloadNotPossibleException> {
+                    downloadSession(
+                        payPal(),
+                        mockEngine(Captured(), tokenStatus = HttpStatusCode.Unauthorized, tokenErrorBody = "<html>secret-ish page</html>"),
+                    )
+                }
+            assertTrue("secret-ish" !in failure.message, failure.message)
+            assertTrue("HTTP 401" in failure.message, failure.message)
         }
 }

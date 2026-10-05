@@ -37,6 +37,7 @@ fun ExtractionEditor(
             label = { Text("Pattern") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            isError = !e.isValid,
             enabled = enabled,
         )
         OutlinedTextField(

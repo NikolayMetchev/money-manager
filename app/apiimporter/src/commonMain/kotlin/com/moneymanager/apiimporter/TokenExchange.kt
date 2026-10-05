@@ -40,7 +40,11 @@ internal suspend fun exchangeBearerToken(
         )
     val json = runCatching { Json.parseToJsonElement(response.body) as? JsonObject }.getOrNull()
     if (response.statusCode != HTTP_OK) {
-        val reason = json?.resolveJsonPath("error_description") ?: json?.resolveJsonPath("error") ?: response.body.take(200)
+        // Only the provider's named error fields: an unrecognised body could carry anything, so it stays out
+        // of the log and the task message.
+        val reason =
+            json?.resolveJsonPath("error_description") ?: json?.resolveJsonPath("error")
+                ?: "no error detail in the response (${response.body.length} chars)"
         logger.warn { "Token request to $url failed with HTTP ${response.statusCode}: $reason" }
         throw ApiDownloadNotPossibleException("Token request failed (HTTP ${response.statusCode}): $reason")
     }
