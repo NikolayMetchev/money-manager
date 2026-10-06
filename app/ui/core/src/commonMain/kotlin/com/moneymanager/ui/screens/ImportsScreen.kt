@@ -12,8 +12,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.executeCsvUnimport
 import com.moneymanager.csvimporter.planCsvUnimport
+import com.moneymanager.csvimporter.rerunFundingReconciles
 import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
@@ -56,9 +58,11 @@ import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
 import com.moneymanager.ui.screens.csv.CsvImportsScreen
 import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesScreen
 import com.moneymanager.ui.screens.qif.QifImportsScreen
+import com.moneymanager.ui.screens.reconciliation.CardLast4Screen
 import com.moneymanager.ui.screens.reconciliation.ReconciliationScreen
 import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
 import com.moneymanager.ui.screens.transactions.ManualEntriesScreen
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun ImportsScreen(
@@ -236,8 +240,6 @@ fun ImportsScreen(
                 )
             ImportTab.MISC ->
                 MiscImportsTab(
-                    csvImportStrategyRepository = csvImportStrategyRepository,
-                    transactionRepository = transactionRepository,
                     passThroughAccountRepository = passThroughAccountRepository,
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
@@ -246,8 +248,6 @@ fun ImportsScreen(
                     accountMappingExportService = accountMappingExportService,
                     appVersion = appVersion,
                     importEngine = importEngine,
-                    maintenance = maintenance,
-                    onTransactionsImported = onTransactionsImported,
                     onBrowsePassThroughCatalog = onBrowsePassThroughCatalog,
                 )
             ImportTab.TIMELINE ->
@@ -259,22 +259,98 @@ fun ImportsScreen(
                     onOpenFile = onTimelineFileClick,
                 )
             ImportTab.RECONCILIATION ->
-                ReconciliationScreen(
-                    reconciliationRepository = reconciliationRepository,
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    personRepository = personRepository,
-                    onOpenLeg = onReconciliationLegClick,
+                ReconciliationImportsTab(
+                    reconciliation = {
+                        ReconciliationScreen(
+                            reconciliationRepository = reconciliationRepository,
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            onOpenLeg = onReconciliationLegClick,
+                        )
+                    },
+                    manualEntries = {
+                        ManualEntriesScreen(
+                            csvImportStrategyRepository = csvImportStrategyRepository,
+                            transactionRepository = transactionRepository,
+                            maintenance = maintenance,
+                            onTransactionsImported = onTransactionsImported,
+                        )
+                    },
+                    cards = {
+                        CardLast4Screen(
+                            csvImportRepository = csvImportRepository,
+                            csvImportStrategyRepository = csvImportStrategyRepository,
+                            accountAttributeRepository = accountAttributeRepository,
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            rerunFundingReconciles = { imports ->
+                                rerunFundingReconciles(
+                                    imports = imports,
+                                    strategies = csvImportStrategyRepository.getAllStrategies().first(),
+                                    currencies = currencyRepository.getAllCurrencies().first(),
+                                    cryptoAssets = cryptoRepository.getAllCryptoAssets().first(),
+                                    passThroughAccounts = passThroughAccountRepository.getAll().first(),
+                                    attributeAccountMatchers =
+                                        AttributeAccountMatcher.registry(
+                                            accountAttributeRepository.getAll().first(),
+                                        ),
+                                    accountMappingRepository = accountMappingRepository,
+                                    accountRepository = accountRepository,
+                                    csvImportRepository = csvImportRepository,
+                                    transactionRepository = transactionRepository,
+                                    relationshipRepository = transferRelationshipRepository,
+                                    transferSourceRepository = transferSourceRepository,
+                                    tradeRepository = tradeRepository,
+                                    maintenance = maintenance,
+                                    importEngine = importEngine,
+                                ).also { if (it > 0) onTransactionsImported() }
+                            },
+                        )
+                    },
                 )
         }
     }
 }
 
-/** Sub-tabs under the "Misc" import tab: manual transaction entry, and pass-through (conduit) config. */
+private enum class ReconciliationSubTab(
+    val label: String,
+) {
+    EXTERNAL("External Account Reconciliation"),
+    MANUAL("Manual Entries"),
+    CARDS("Card Last-4"),
+}
+
+/**
+ * Sub-tabs under the "Reconciliation" import tab — everything an import leaves for a person to resolve:
+ * comparing against an external source's shadow accounts, companion transactions to enter by hand, and
+ * card references no account owns yet.
+ */
+@Composable
+private fun ReconciliationImportsTab(
+    reconciliation: @Composable () -> Unit,
+    manualEntries: @Composable () -> Unit,
+    cards: @Composable () -> Unit,
+) {
+    var subTab by remember { mutableStateOf(ReconciliationSubTab.EXTERNAL) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        SecondaryTabRow(selectedTabIndex = subTab.ordinal) {
+            ReconciliationSubTab.entries.forEach { entry ->
+                Tab(selected = subTab == entry, onClick = { subTab = entry }, text = { Text(entry.label) })
+            }
+        }
+        when (subTab) {
+            ReconciliationSubTab.EXTERNAL -> reconciliation()
+            ReconciliationSubTab.MANUAL -> manualEntries()
+            ReconciliationSubTab.CARDS -> cards()
+        }
+    }
+}
+
+/** Sub-tabs under the "Misc" import tab: pass-through (conduit) config and account mappings. */
 @Composable
 private fun MiscImportsTab(
-    csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    transactionRepository: TransactionReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
@@ -283,26 +359,16 @@ private fun MiscImportsTab(
     accountMappingExportService: AccountMappingExportService,
     appVersion: AppVersion,
     importEngine: ImportEngine,
-    maintenance: Maintenance,
-    onTransactionsImported: () -> Unit,
     onBrowsePassThroughCatalog: () -> Unit,
 ) {
     var subTab by remember { mutableStateOf(0) }
     Column(modifier = Modifier.fillMaxSize()) {
         SecondaryTabRow(selectedTabIndex = subTab) {
-            Tab(selected = subTab == 0, onClick = { subTab = 0 }, text = { Text("Manual Entries") })
-            Tab(selected = subTab == 1, onClick = { subTab = 1 }, text = { Text("Pass-through") })
-            Tab(selected = subTab == 2, onClick = { subTab = 2 }, text = { Text("Account Mappings") })
+            Tab(selected = subTab == 0, onClick = { subTab = 0 }, text = { Text("Pass-through") })
+            Tab(selected = subTab == 1, onClick = { subTab = 1 }, text = { Text("Account Mappings") })
         }
         when (subTab) {
             0 ->
-                ManualEntriesScreen(
-                    csvImportStrategyRepository = csvImportStrategyRepository,
-                    transactionRepository = transactionRepository,
-                    maintenance = maintenance,
-                    onTransactionsImported = onTransactionsImported,
-                )
-            1 ->
                 PassThroughAccountsScreen(
                     passThroughAccountRepository = passThroughAccountRepository,
                     importEngine = importEngine,

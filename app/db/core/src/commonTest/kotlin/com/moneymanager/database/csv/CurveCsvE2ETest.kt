@@ -5,9 +5,12 @@ package com.moneymanager.database.csv
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.CsvBulkResult
+import com.moneymanager.csvimporter.addAttributeToken
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.executeCsvReimport
+import com.moneymanager.csvimporter.findUnmatchedFundingReferences
 import com.moneymanager.csvimporter.planCsvReimport
+import com.moneymanager.csvimporter.rerunFundingReconciles
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AttributeTypeId
@@ -16,6 +19,8 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.createAccountMapping
+import com.moneymanager.importengineapi.getOrCreateAttributeType
+import com.moneymanager.importengineapi.setAccountAttributeValue
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -331,6 +336,101 @@ class CurveCsvE2ETest : DbTest() {
             val aldi = transfersBetween("Curve", "ALDI").single()
             assertTrue(aldi.attributes.none { it.attributeType.name == "excluded" }, "unregistered-card row is not reconciled")
         }
+
+    @Test
+    fun assigningUnmatchedCard_addsItToTheAccountSet_andReconcilesTheCurveSpend() =
+        runTest {
+            val card =
+                stage(
+                    "card_transactions_record_20231120_210200.csv",
+                    cardHeaders,
+                    listOf(cardRow("2023-11-19 21:15:00", "Crv*Sainsburys London", "-22.93")),
+                )
+            assertEquals(1, applyAll(listOf(card)).filesImported)
+            // The card account already owns another card, which the assignment must keep.
+            registerCard("Crypto.com Card", "9999")
+
+            val curve =
+                stage(
+                    "Transaction History 2023-11-19.csv",
+                    curveHeaders,
+                    listOf(
+                        curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93", fundingCard = "7721"),
+                        curveRow("2", "2023-11-19", "ALDI", "GBP", "31.25", fundingCard = "1142"),
+                        curveRow("3", "2023-11-20", "TESCO", "GBP", "4.10", fundingCard = "1142"),
+                    ),
+                )
+            assertEquals(1, applyAll(listOf(curve)).filesImported)
+
+            val unmatched = unmatchedFundingReferences()
+            assertEquals(listOf("7721" to 1, "1142" to 2), unmatched.map { it.value to it.rowCount })
+            val reference = unmatched.first { it.value == "7721" }
+            assertEquals(listOf(curve.id), reference.imports)
+            assertEquals(listOf("Curve CSV"), reference.strategyNames)
+
+            val cardAccountId =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .first { it.name == "Crypto.com Card" }
+                    .id
+            val typeId = repositories.importEngine.getOrCreateAttributeType(reference.attributeTypeName)
+            val existing =
+                repositories.accountAttributeRepository
+                    .getByAccount(cardAccountId)
+                    .first()
+                    .single { it.attributeType.id == typeId }
+            repositories.importEngine.setAccountAttributeValue(
+                accountId = cardAccountId,
+                typeId = typeId,
+                value = addAttributeToken(existing.value, reference.value),
+                existingAttributeId = existing.id,
+            )
+            val reconciled =
+                rerunFundingReconciles(
+                    imports = reference.imports,
+                    strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
+                    currencies = repositories.currencyRepository.getAllCurrencies().first(),
+                    cryptoAssets = repositories.cryptoRepository.getAllCryptoAssets().first(),
+                    passThroughAccounts = repositories.passThroughAccountRepository.getAll().first(),
+                    attributeAccountMatchers =
+                        AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first()),
+                    accountMappingRepository = repositories.accountMappingRepository,
+                    accountRepository = repositories.accountRepository,
+                    csvImportRepository = repositories.csvImportRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    relationshipRepository = repositories.transferRelationshipRepository,
+                    transferSourceRepository = repositories.transferSourceRepository,
+                    tradeRepository = repositories.tradeRepository,
+                    maintenance = maintenance,
+                    importEngine = repositories.importEngine,
+                )
+            assertEquals(1, reconciled)
+
+            val cardAttributes =
+                repositories.accountAttributeRepository
+                    .getByAccount(cardAccountId)
+                    .first()
+                    .filter { it.attributeType.id == typeId }
+            assertEquals(listOf("9999 7721"), cardAttributes.map { it.value }, "the card joins the account set")
+            assertEquals(listOf("1142"), unmatchedFundingReferences().map { it.value })
+
+            repositories.maintenanceService.refreshMaterializedViews()
+            val sainsburys = transfersBetween("Curve", "SAINSBURYS").single()
+            assertTrue(
+                sainsburys.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
+                "the 7721 Curve spend is reconciled once its card is assigned",
+            )
+            assertEquals(1, transfersBetween("Crypto.com Card", "Curve").size)
+        }
+
+    private suspend fun unmatchedFundingReferences() =
+        findUnmatchedFundingReferences(
+            imports = repositories.csvImportRepository.getAllImports().first(),
+            strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
+            csvImportRepository = repositories.csvImportRepository,
+            attributeAccountMatchers = AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first()),
+        )
 
     @Test
     fun reimport_retroactivelyReconciles_afterCardRegistered() =
