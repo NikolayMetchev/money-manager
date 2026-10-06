@@ -189,7 +189,8 @@ private fun FundingReferenceCard(
                 accountRepository = accountRepository,
                 categoryRepository = categoryRepository,
                 personRepository = personRepository,
-                enabled = enabled,
+                // Another claimant can't resolve an ambiguous card; it has to be removed from the others first.
+                enabled = enabled && !reference.ambiguous,
             )
         }
     }
