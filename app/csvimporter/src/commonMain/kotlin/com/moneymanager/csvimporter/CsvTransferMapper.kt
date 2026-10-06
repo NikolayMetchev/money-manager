@@ -547,6 +547,14 @@ class CsvTransferMapper(
                 sourceAccountId != UNRESOLVED_ACCOUNT_ID
             ) {
                 targetAccountId = parseAccount(targetMapping, values, applyPersistedMappings = false)
+                // A broad mapping (".*") can claim a blank counterparty; without it the rules name nothing
+                // to create, so the placeholder would never resolve.
+                if (targetAccountId == UNRESOLVED_ACCOUNT_ID &&
+                    targetMapping is AccountRulesMapping &&
+                    resolveAccount(targetMapping, values).accountName.isBlank()
+                ) {
+                    return MappingResult.Error(row.rowIndex, "Failed to resolve target account")
+                }
                 targetUsedPersistedMappings = false
             }
 

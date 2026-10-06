@@ -836,6 +836,15 @@ class CsvAccountMappingTest {
         )
     }
 
+    @Test
+    fun `a blank counterparty a broad mapping put on the own account is an error row`() {
+        // ".*" also matches a blank payee; once it is ignored the rules name no account to create.
+        val mapper = mapperWith(listOf(createAccountMapping(1, ".*", testSourceAccountId)))
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Transfer", "-50.00", ""))
+
+        assertIs<MappingResult.Error>(mapper.mapRow(row))
+    }
+
     // ============= Column-Agnostic Mappings =============
 
     @Test
