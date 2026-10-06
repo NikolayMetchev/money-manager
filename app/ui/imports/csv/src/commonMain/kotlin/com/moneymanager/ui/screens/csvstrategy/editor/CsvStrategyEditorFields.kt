@@ -141,6 +141,7 @@ internal fun buildStrategyFromEditorState(
                     debitColumnName = if (singleColumn) null else state.debitColumnName,
                     direction = state.direction,
                     fee = state.fee,
+                    foreignAmount = state.foreignAmount,
                 ),
             )
             put(
@@ -175,6 +176,7 @@ internal fun buildStrategyFromEditorState(
                         TimezoneLookupMapping(
                             fieldType = TransferField.TIMEZONE,
                             columnName = state.timezoneColumnName!!,
+                            aliases = parseAliases(state.timezoneAliasesText, upperCaseValues = false),
                         )
                 },
             )
@@ -204,7 +206,7 @@ internal fun buildStrategyFromEditorState(
                     },
                 assetCodes =
                     AssetCodeRules(
-                        aliases = parseAssetAliases(state.assetAliasesText),
+                        aliases = parseAliases(state.assetAliasesText, upperCaseValues = true),
                         stripSuffixes = state.assetSuffixesToStrip,
                     ),
             ),
@@ -214,15 +216,23 @@ internal fun buildStrategyFromEditorState(
     )
 }
 
-/** Renders asset aliases as the editor's `FROM=TO, …` text. */
-internal fun formatAssetAliases(aliases: Map<String, String>): String =
+/** Renders aliases (asset codes, timezone abbreviations) as the editor's `FROM=TO, …` text. */
+internal fun formatAliases(aliases: Map<String, String>): String =
     aliases.entries.sortedBy { it.key }.joinToString(", ") { "${it.key}=${it.value}" }
 
-/** Parses `FROM=TO, …` (upper-cased; malformed entries dropped) into asset aliases. */
-internal fun parseAssetAliases(text: String): Map<String, String> =
+/**
+ * Parses `FROM=TO, …` into aliases, dropping malformed entries. Keys are upper-cased; values only when
+ * [upperCaseValues] (asset codes are, but a zone id like `Europe/London` is case-sensitive).
+ */
+internal fun parseAliases(
+    text: String,
+    upperCaseValues: Boolean,
+): Map<String, String> =
     text
         .split(',', '\n')
         .mapNotNull { entry ->
-            val parts = entry.split('=').map { it.trim().uppercase() }
-            parts.takeIf { it.size == 2 && it.all(String::isNotEmpty) }?.let { it[0] to it[1] }
+            val parts = entry.split('=').map { it.trim() }
+            parts.takeIf { it.size == 2 && it.all(String::isNotEmpty) }?.let {
+                it[0].uppercase() to if (upperCaseValues) it[1].uppercase() else it[1]
+            }
         }.toMap()

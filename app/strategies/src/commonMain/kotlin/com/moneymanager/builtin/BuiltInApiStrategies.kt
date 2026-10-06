@@ -53,6 +53,7 @@ import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -136,8 +137,13 @@ object BuiltInApiStrategies {
                                         counterpartyNameField = "counterparty.name",
                                         counterpartyIdField = "counterparty.id",
                                         declinedWhen = listOf(Condition("decline_reason", ConditionOp.NOT_BLANK)),
-                                        localAmountField = "local_amount",
-                                        localCurrencyField = "local_currency",
+                                        // A card payment abroad: Monzo settles in GBP and reports what the merchant
+                                        // was paid alongside, so the spend is booked in that currency.
+                                        foreignAmount =
+                                            ForeignAmount(
+                                                amount = ValueExpr(listOf("local_amount")),
+                                                currency = ValueExpr(listOf("local_currency")),
+                                            ),
                                         // Foreign ATM withdrawals above the fee-free allowance carry a charge in
                                         // `atm_fees_detailed.fee_amount` (integer minor units; null/0 otherwise). Import it
                                         // as its own linked fee transfer. Monzo's `amount` is gross (= withdrawal_amount +

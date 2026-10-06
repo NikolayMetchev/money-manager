@@ -19,7 +19,9 @@ class CsvParser {
             return CsvParseResult(headers = emptyList(), rows = emptyList())
         }
 
-        val parsedLines = parseLines(content, options)
+        // A UTF-8 byte-order mark (PayPal's exports open with one) would otherwise become part of the
+        // first header's name, so no strategy naming that column could ever match the file.
+        val parsedLines = parseLines(content.removePrefix(BYTE_ORDER_MARK), options)
         val lines = if (options.hasHeaders) parsedLines.drop(preambleLength(parsedLines)) else parsedLines
         if (lines.isEmpty()) {
             return CsvParseResult(headers = emptyList(), rows = emptyList())
@@ -224,5 +226,6 @@ class CsvParser {
         private const val LINES_TO_ANALYZE = 5
         private const val MAX_PREAMBLE_ROWS = 3
         private const val CONSISTENCY_MULTIPLIER = 10
+        private const val BYTE_ORDER_MARK = "\uFEFF"
     }
 }

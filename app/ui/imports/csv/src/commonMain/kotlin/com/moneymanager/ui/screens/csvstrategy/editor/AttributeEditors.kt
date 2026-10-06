@@ -12,12 +12,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +36,7 @@ import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
+import com.moneymanager.ui.components.rules.ExtractionEditor
 import com.moneymanager.ui.components.transactions.AttributeTypeField
 
 /**
@@ -142,12 +148,16 @@ internal fun IdentificationColumnsSelector(
 }
 
 /**
- * Editor for attribute column mappings.
- * Allows mapping CSV columns to attribute types (existing or new).
+ * Editor for attribute column mappings. Ticking a column maps it to an attribute type; a column can carry
+ * several mappings (e.g. its raw value as one attribute, and a fixed `excluded` label when a pattern
+ * matches), each with its own optional extraction, fixed value and row conditions.
  */
 @Composable
 internal fun AttributeMappingsEditor(
     columns: List<CsvColumn>,
+    // Every column of the file: a mapping's row conditions may test any of them, not only the columns
+    // offered as attributes.
+    conditionColumns: List<CsvColumn>,
     mappings: List<AttributeColumnMapping>,
     onMappingsChanged: (List<AttributeColumnMapping>) -> Unit,
     existingAttributeTypes: List<AttributeType>,
@@ -196,10 +206,9 @@ internal fun AttributeMappingsEditor(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 columns.sortedBy { it.columnIndex }.forEach { column ->
                     val columnName = column.originalName
-                    val mapping = mappings.find { it.columnName == columnName }
-                    val isEnabled = mapping != null
-                    val attributeTypeName = mapping?.attributeTypeName ?: columnName
-                    val isUniqueIdentifier = mapping?.isUniqueIdentifier ?: false
+                    // Indices into [mappings], so an edit changes exactly one mapping even when the column
+                    // carries several.
+                    val columnMappings = mappings.withIndex().filter { it.value.columnName == columnName }
                     val sampleValue =
                         firstRow
                             ?.values
@@ -209,46 +218,26 @@ internal fun AttributeMappingsEditor(
                     AttributeColumnMappingRow(
                         columnName = columnName,
                         sampleValue = sampleValue,
-                        isEnabled = isEnabled,
-                        attributeTypeName = attributeTypeName,
-                        isUniqueIdentifier = isUniqueIdentifier,
+                        columnMappings = columnMappings,
+                        columns = conditionColumns,
                         existingAttributeTypes = existingAttributeTypes,
                         enabled = enabled,
                         onEnabledChanged = { checked ->
                             if (checked) {
                                 onMappingsChanged(
-                                    mappings +
-                                        AttributeColumnMapping(
-                                            columnName = columnName,
-                                            attributeTypeName = columnName,
-                                        ),
+                                    mappings + AttributeColumnMapping(columnName = columnName, attributeTypeName = columnName),
                                 )
                             } else {
                                 onMappingsChanged(mappings.filter { it.columnName != columnName })
                             }
                         },
-                        onAttributeTypeChanged = { newTypeName ->
-                            onMappingsChanged(
-                                mappings.map {
-                                    if (it.columnName == columnName) {
-                                        it.copy(attributeTypeName = newTypeName)
-                                    } else {
-                                        it
-                                    }
-                                },
-                            )
+                        onAddMapping = {
+                            onMappingsChanged(mappings + AttributeColumnMapping(columnName = columnName, attributeTypeName = columnName))
                         },
-                        onUniqueIdentifierChanged = { isUnique ->
-                            onMappingsChanged(
-                                mappings.map {
-                                    if (it.columnName == columnName) {
-                                        it.copy(isUniqueIdentifier = isUnique)
-                                    } else {
-                                        it
-                                    }
-                                },
-                            )
+                        onMappingChanged = { index, updated ->
+                            onMappingsChanged(mappings.mapIndexed { i, m -> if (i == index) updated else m })
                         },
+                        onMappingRemoved = { index -> onMappingsChanged(mappings.filterIndexed { i, _ -> i != index }) },
                     )
                 }
             }
@@ -257,20 +246,20 @@ internal fun AttributeMappingsEditor(
 }
 
 /**
- * Single row for mapping a CSV column to an attribute type.
+ * One CSV column's attribute mappings: a checkbox that maps the column, then one block per mapping.
  */
 @Composable
 private fun AttributeColumnMappingRow(
     columnName: String,
     sampleValue: String,
-    isEnabled: Boolean,
-    attributeTypeName: String,
-    isUniqueIdentifier: Boolean,
+    columnMappings: List<IndexedValue<AttributeColumnMapping>>,
+    columns: List<CsvColumn>,
     existingAttributeTypes: List<AttributeType>,
     enabled: Boolean,
     onEnabledChanged: (Boolean) -> Unit,
-    onAttributeTypeChanged: (String) -> Unit,
-    onUniqueIdentifierChanged: (Boolean) -> Unit,
+    onAddMapping: () -> Unit,
+    onMappingChanged: (Int, AttributeColumnMapping) -> Unit,
+    onMappingRemoved: (Int) -> Unit,
 ) {
     Column(
         modifier =
@@ -283,7 +272,7 @@ private fun AttributeColumnMappingRow(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Checkbox(
-                checked = isEnabled,
+                checked = columnMappings.isNotEmpty(),
                 onCheckedChange = onEnabledChanged,
                 enabled = enabled,
             )
@@ -306,45 +295,114 @@ private fun AttributeColumnMappingRow(
             }
         }
 
-        // Show attribute type selector and unique identifier checkbox when enabled
         AnimatedVisibility(
-            visible = isEnabled,
+            visible = columnMappings.isNotEmpty(),
             enter = expandVertically(),
             exit = shrinkVertically(),
         ) {
             Column(modifier = Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp)) {
-                AttributeTypeField(
-                    value = attributeTypeName,
-                    onValueChange = onAttributeTypeChanged,
-                    existingTypes = existingAttributeTypes,
-                    enabled = enabled,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Unique identifier checkbox
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Checkbox(
-                        checked = isUniqueIdentifier,
-                        onCheckedChange = onUniqueIdentifierChanged,
+                columnMappings.forEach { (index, mapping) ->
+                    AttributeMappingDetails(
+                        mapping = mapping,
+                        onChanged = { onMappingChanged(index, it) },
+                        onRemoved = { onMappingRemoved(index) }.takeIf { columnMappings.size > 1 },
+                        columns = columns,
+                        existingAttributeTypes = existingAttributeTypes,
                         enabled = enabled,
                     )
-                    Column {
-                        Text(
-                            text = "Use as unique identifier",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(
-                            text = "Detects duplicates across multiple imports",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
+                TextButton(onClick = onAddMapping, enabled = enabled) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                    Text("Add another attribute from this column")
+                }
+            }
+        }
+    }
+}
+
+/** One mapping: its attribute type, unique-identifier flag and (collapsed by default) value rules. */
+@Composable
+private fun AttributeMappingDetails(
+    mapping: AttributeColumnMapping,
+    onChanged: (AttributeColumnMapping) -> Unit,
+    onRemoved: (() -> Unit)?,
+    columns: List<CsvColumn>,
+    existingAttributeTypes: List<AttributeType>,
+    enabled: Boolean,
+) {
+    val hasRules = mapping.extraction != null || mapping.emitWhenMatched != null || mapping.conditions.isNotEmpty()
+    var showRules by remember { mutableStateOf(hasRules) }
+    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            AttributeTypeField(
+                value = mapping.attributeTypeName,
+                onValueChange = { onChanged(mapping.copy(attributeTypeName = it)) },
+                existingTypes = existingAttributeTypes,
+                enabled = enabled,
+                modifier = Modifier.weight(1f),
+            )
+            if (onRemoved != null) {
+                IconButton(onClick = onRemoved, enabled = enabled) {
+                    Icon(Icons.Filled.Close, contentDescription = "Remove attribute mapping")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Checkbox(
+                checked = mapping.isUniqueIdentifier,
+                onCheckedChange = { onChanged(mapping.copy(isUniqueIdentifier = it)) },
+                enabled = enabled,
+            )
+            Column {
+                Text(
+                    text = "Use as unique identifier",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    text = "Detects duplicates across multiple imports",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = showRules, onCheckedChange = { showRules = it }, enabled = enabled)
+            Text("Only for some rows / transform the value", style = MaterialTheme.typography.bodySmall)
+        }
+        if (showRules) {
+            Column(modifier = Modifier.padding(start = 16.dp)) {
+                ExtractionEditor(
+                    label = "Extract with a pattern (rows it doesn't match get no attribute)",
+                    extraction = mapping.extraction,
+                    // The fixed value only applies to an extraction's matches, so it goes with the extraction.
+                    onChange = { extraction ->
+                        val fixedValue = if (extraction == null) null else mapping.emitWhenMatched
+                        onChanged(mapping.copy(extraction = extraction, emitWhenMatched = fixedValue))
+                    },
+                    enabled = enabled,
+                )
+                OutlinedTextField(
+                    value = mapping.emitWhenMatched.orEmpty(),
+                    onValueChange = { onChanged(mapping.copy(emitWhenMatched = it.ifEmpty { null })) },
+                    label = { Text("Fixed value instead (blank = the extracted text)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = enabled && mapping.extraction != null,
+                )
+                RowConditionsEditor(
+                    conditions = mapping.conditions,
+                    onConditionsChanged = { onChanged(mapping.copy(conditions = it)) },
+                    columns = columns,
+                    enabled = enabled,
+                    title = "Only on rows where (all must match)",
+                )
             }
         }
     }

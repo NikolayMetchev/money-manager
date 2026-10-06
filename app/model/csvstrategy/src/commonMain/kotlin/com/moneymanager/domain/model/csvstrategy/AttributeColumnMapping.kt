@@ -1,6 +1,9 @@
 package com.moneymanager.domain.model.csvstrategy
 
+import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.SortedConditionListSerializer
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
@@ -20,6 +23,9 @@ import kotlinx.serialization.Serializable
  * @property emitWhenMatched When set (and [extraction] matches), this fixed value is emitted as the
  *                           attribute value instead of the extracted text. Lets a label such as
  *                           `CARD_PAYMENT` be tagged whenever a transaction-type pattern matches.
+ * @property conditions All must hold for the row to carry this attribute at all (empty = always) — for
+ *                      a label that depends on more than one column, e.g. `excluded` only on a
+ *                      withdrawal whose status is `Completed`.
  */
 @Serializable
 data class AttributeColumnMapping(
@@ -28,6 +34,10 @@ data class AttributeColumnMapping(
     val isUniqueIdentifier: Boolean = false,
     val extraction: Extraction? = null,
     val emitWhenMatched: String? = null,
+    // NEVER-encoded when empty so adding it did not rehash every existing strategy.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @Serializable(with = SortedConditionListSerializer::class)
+    val conditions: List<Condition> = emptyList(),
 ) : Comparable<AttributeColumnMapping> {
     // Natural order for canonical export serialization: (columnName, attributeTypeName) is the
     // mapping's identity; entries tying on both sort stably, which is deterministic enough because

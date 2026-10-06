@@ -1,6 +1,7 @@
 package com.moneymanager.importer
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Money
@@ -59,6 +60,30 @@ data class Classified(
      * the rewritten [transfer]. The engine adds the exclusion attribute to it during the update phase.
      */
     val excludeExisting: ExcludeExistingLeg? = null,
+    /**
+     * Existing pass-through legs a conduit's own statement makes redundant: the chain's inferred account
+     * of what the conduit did with money its statement records itself (see [ConduitStatementMatch]). The
+     * engine tags each excluded during the update phase, like [excludeExisting].
+     */
+    val supersededLegs: List<ExcludeExistingLeg> = emptyList(),
+    /** Set when this pass-through row's chain runs through a conduit whose own statement is already imported. */
+    val conduitStatement: ConduitStatementMatch? = null,
+)
+
+/**
+ * A pass-through chain whose conduit [conduitIndex] already has its own statement imported: an existing
+ * placeholder leg ([statementLegId], e.g. a PayPal export's "General Credit Card Deposit", which cannot
+ * name the card) records the same money arriving in (or, for a refund, leaving) the conduit as the chain's
+ * movement into it — the main transfer for conduit 0, spend leg `conduitIndex - 1` otherwise. The engine
+ * links that movement to [statementLegId] (`reconciled`), and creates every spend leg from the conduit
+ * onward excluded: those legs are the card statement's guess at what the conduit did with the money, and
+ * the conduit's statement records what it actually did (the real payee, a currency conversion first, …).
+ */
+data class ConduitStatementMatch(
+    val conduitIndex: Int,
+    val statementLegId: TransferId,
+    val relationshipTypeId: RelationshipTypeId,
+    val exclusionTypeId: AttributeTypeId,
 )
 
 /** An existing transfer to tag excluded (its [transfer] carries the real id + fields to preserve). */
@@ -121,6 +146,18 @@ class ImportDeduper(
      * counterparty-agnostic rule must not pair the two.
      */
     private val ownBatchAccounts: Set<AccountId> = emptySet(),
+    /**
+     * For each existing pass-through leg, the legs that follow it along its chain towards the merchant (via
+     * `pass-through` relationships), in order. When a conduit's own statement reconciles against the
+     * chain's movement into the conduit, these onward legs are what the statement supersedes.
+     */
+    private val passThroughOnward: Map<TransferId, List<Transfer>> = emptyMap(),
+    /**
+     * Existing transfers the batch's own file created earlier. Never another source's record of a
+     * movement — so no cross-source rule may pair a row with one, even when a re-import re-runs only a few
+     * of the file's rows and [ownBatchAccounts] no longer covers the rest of the file.
+     */
+    private val ownSourceLegs: Set<TransferId> = emptySet(),
 ) {
     /**
      * Exact-match key over a transfer's core fields. Incoming-side fields are nullable, so an
@@ -163,6 +200,7 @@ class ImportDeduper(
         existing.groupBy { it.transfer.coreKey() }
     private val existingByAmount: Map<Money, List<ExistingTransferInfo>> =
         existing.groupBy { it.transfer.amount }
+    private val existingById: Map<TransferId, ExistingTransferInfo> = existing.associateBy { it.transferId }
 
     // The reconciliation exclusion attribute type (when the policy enables cross-source reconciliation),
     // ignored in attribute comparison so a reconciled transfer still dedupes cleanly on re-import.
@@ -196,7 +234,16 @@ class ImportDeduper(
     // (apiId == null) — i.e. transfers from a different source — so genuine repeats from the same
     // provider (which carry an apiId) are never reconciled away.
     private val reconcileCandidates: List<Pair<TransferId, Transfer>> =
-        existing.filter { it.apiId == null }.map { it.transferId to it.transfer }
+        existing.filter { it.apiId == null && it.transferId !in ownSourceLegs }.map { it.transferId to it.transfer }
+
+    /**
+     * The merchant-side end of every existing pass-through chain (`conduit -> merchant`, or the merchant's
+     * refund back into the conduit). Its counterparty is the merchant, so it is never the movement a
+     * placeholder on the conduit — the conduit's record of a card funding it or taking a refund back —
+     * stands for.
+     */
+    private val chainMerchantLegs: Set<TransferId> =
+        passThroughOnward.values.mapNotNullTo(mutableSetOf()) { it.lastOrNull()?.id }
 
     // reconcileMatches needs exact source+target+amount (only the timestamp window varies), so bucket
     // the reconcile candidates by that triple.
@@ -235,6 +282,7 @@ class ImportDeduper(
         when (policy) {
             is DedupePolicy.FuzzyAllFields -> policy.unidentifiedCounterpartyAttributeTypeId
             is DedupePolicy.ApiMultiKey -> policy.unidentifiedCounterpartyAttributeTypeId
+            is DedupePolicy.UniqueIdentifier -> policy.unidentifiedCounterpartyAttributeTypeId
             else -> null
         }
 
@@ -245,10 +293,15 @@ class ImportDeduper(
      * alone is a loose enough match for this to happen: a £100 withdrawal and an excluded £100 card
      * top-up days apart both move £100 out of the same wallet.)
      */
-    private val existingExcludedLegs: Set<TransferId> =
-        reconciledExclusionTypeId
-            ?.let { typeId -> existing.filter { typeId in it.attributes }.map { it.transferId }.toSet() }
-            .orEmpty()
+    private val existingExcludedLegs: MutableSet<TransferId> =
+        // A unique-id policy keeps the exclusion type out of [reconciledExclusionTypeId] (its attribute
+        // comparison is unchanged), but its placeholder and conduit rules need the excluded legs all the same.
+        (reconciledExclusionTypeId ?: (policy as? DedupePolicy.UniqueIdentifier)?.reconciledExclusionAttributeTypeId)
+            ?.let { typeId -> existing.filter { typeId in it.attributes }.mapTo(mutableSetOf()) { it.transferId } }
+            ?: mutableSetOf()
+
+    /** Existing legs some row of this batch was matched or reconciled against; never superseded afterwards. */
+    private val pairedInBatch = mutableSetOf<TransferId>()
 
     /** Existing legs carrying [unidentifiedCounterpartyTypeId]: placeholder records a real one supersedes. */
     private val existingUnidentifiedLegs: Set<TransferId> =
@@ -293,8 +346,299 @@ class ImportDeduper(
      */
     private val matchedExistingIds = mutableSetOf<TransferId>()
 
-    fun classify(transfers: List<ImportTransfer>): List<Classified> =
-        transfers.mapIndexed { index, transfer -> classifyOne(index, transfer) }
+    fun classify(transfers: List<ImportTransfer>): List<Classified> {
+        val classified = transfers.mapIndexed { index, transfer -> classifyOne(index, transfer) }.toMutableList()
+        reconcileSplitConduitMovements(classified)
+        return classified
+    }
+
+    /** What the placeholder rules need from the policy, or null when it leaves them off. */
+    private class PlaceholderSettings(
+        val window: Duration,
+        val exclusionTypeId: AttributeTypeId,
+        val relationshipTypeId: RelationshipTypeId,
+    )
+
+    private val placeholderSettings: PlaceholderSettings? =
+        run {
+            if (unidentifiedCounterpartyTypeId == null) return@run null
+            val (window, exclusion, relationship) =
+                when (policy) {
+                    is DedupePolicy.FuzzyAllFields ->
+                        Triple(policy.dateTolerance, policy.reconciledExclusionAttributeTypeId, policy.reconciledRelationshipTypeId)
+                    is DedupePolicy.ApiMultiKey ->
+                        Triple(
+                            policy.unidentifiedCounterpartyWindow,
+                            policy.reconciledExclusionAttributeTypeId,
+                            policy.reconciledRelationshipTypeId,
+                        )
+                    is DedupePolicy.UniqueIdentifier ->
+                        Triple(
+                            policy.unidentifiedCounterpartyWindow,
+                            policy.reconciledExclusionAttributeTypeId,
+                            policy.reconciledRelationshipTypeId,
+                        )
+                    DedupePolicy.None -> return@run null
+                }
+            if (window == null || exclusion == null || relationship == null) null else PlaceholderSettings(window, exclusion, relationship)
+        }
+
+    /**
+     * One movement of a pass-through chain into a conduit (or, for a refund, out of it): an existing leg
+     * whose onward legs end at [merchant], or a pass-through row of this batch at one of its conduits.
+     */
+    private class ChainMovement(
+        val conduit: AccountId,
+        val merchant: AccountId,
+        val inflow: Boolean,
+        val amount: Money,
+        val timestamp: Instant,
+        val existing: Transfer? = null,
+        val batchIndex: Int? = null,
+        val conduitIndex: Int = 0,
+    )
+
+    /** A placeholder leg on a conduit: the conduit's own statement, which cannot name the card. */
+    private class PlaceholderMovement(
+        val conduit: AccountId,
+        val inflow: Boolean,
+        val amount: Money,
+        val timestamp: Instant,
+        val existing: Transfer? = null,
+        val batchIndex: Int? = null,
+    )
+
+    /**
+     * A conduit's statement records one movement where the card statement split it into several: Uber
+     * authorises £21.58 on the card, tops it up by £0.27 the next day, and PayPal records one £21.85
+     * deposit — or charges £107.84 and refunds £0.03 against PayPal's £107.81. The single-amount rules
+     * cannot pair those, so the merchant would be paid twice (once per statement).
+     *
+     * Runs after every row is classified, over what they left unmatched: a placeholder leg on a conduit
+     * pairs with two to [MAX_SPLIT_LEGS] chain movements through that conduit to the **same merchant**,
+     * within the placeholder window, whose amounts — charges plus, refunds minus — sum to it exactly. The
+     * outcome is the single-movement one, applied to every movement of the set: the placeholder is
+     * excluded, each chain movement is linked to it and kept, and each chain's legs beyond the conduit are
+     * excluded. Either import order works: a placeholder of this batch pairs with existing chain legs, and
+     * an existing placeholder pairs with a set holding at least one chain row of this batch.
+     */
+    private fun reconcileSplitConduitMovements(classified: MutableList<Classified>) {
+        val settings = placeholderSettings ?: return
+        val chains = existingChainMovements() + batchChainMovements(classified, settings)
+        if (chains.isEmpty()) return
+        val conduits = chains.mapTo(mutableSetOf()) { it.conduit }
+        val used = mutableSetOf<ChainMovement>()
+        for (placeholder in batchPlaceholders(classified, settings) + existingPlaceholders(conduits)) {
+            val set = splitSetFor(placeholder, chains.filter { it !in used }, settings.window) ?: continue
+            used += set
+            if (placeholder.batchIndex != null) {
+                applyToBatchPlaceholder(classified, placeholder.batchIndex, set, settings)
+            } else {
+                applyToExistingPlaceholder(classified, requireNotNull(placeholder.existing), set, settings)
+            }
+        }
+    }
+
+    private fun existingChainMovements(): List<ChainMovement> =
+        passThroughOnward.mapNotNull { (id, onward) ->
+            val leg = existingById[id]?.transfer ?: return@mapNotNull null
+            val first = onward.firstOrNull() ?: return@mapNotNull null
+            val inflow =
+                when {
+                    first.touches(leg.targetAccountId) -> true
+                    first.touches(leg.sourceAccountId) -> false
+                    else -> return@mapNotNull null
+                }
+            val unusable =
+                id in ownSourceLegs ||
+                    id in existingExcludedLegs ||
+                    id in claimedReconcileTargets ||
+                    id in consumedReconcileIds ||
+                    id in pairedInBatch ||
+                    first.id in existingExcludedLegs
+            if (unusable) return@mapNotNull null
+            ChainMovement(
+                conduit = if (inflow) leg.targetAccountId else leg.sourceAccountId,
+                merchant = if (inflow) onward.last().targetAccountId else onward.last().sourceAccountId,
+                inflow = inflow,
+                amount = leg.amount,
+                timestamp = leg.timestamp,
+                existing = leg,
+            )
+        }
+
+    private fun batchChainMovements(
+        classified: List<Classified>,
+        settings: PlaceholderSettings,
+    ): List<ChainMovement> =
+        classified.withIndex().flatMap { (index, c) ->
+            val passThrough = c.transfer.passThrough
+            val timestamp = c.transfer.timestamp
+            if (passThrough == null || timestamp == null || !c.isUnmatchedImport(settings)) return@flatMap emptyList()
+            passThrough.conduits.mapIndexed { conduitIndex, conduit ->
+                ChainMovement(
+                    conduit = conduit.requireId(),
+                    merchant = passThrough.merchantTarget.requireId(),
+                    inflow = !passThrough.incoming,
+                    amount = passThrough.amount,
+                    timestamp = timestamp,
+                    batchIndex = index,
+                    conduitIndex = conduitIndex,
+                )
+            }
+        }
+
+    private fun batchPlaceholders(
+        classified: List<Classified>,
+        settings: PlaceholderSettings,
+    ): List<PlaceholderMovement> =
+        classified.withIndex().mapNotNull { (index, c) ->
+            val t = c.transfer
+            val placeholder = t.unidentifiedCounterpartyAccountId ?: return@mapNotNull null
+            if (!c.isUnmatchedImport(settings)) return@mapNotNull null
+            val from = t.fromAccount.requireId()
+            PlaceholderMovement(
+                conduit = if (placeholder == from) t.toAccount.requireId() else from,
+                inflow = placeholder == from,
+                amount = t.amount ?: return@mapNotNull null,
+                timestamp = t.timestamp ?: return@mapNotNull null,
+                batchIndex = index,
+            )
+        }
+
+    private fun existingPlaceholders(conduits: Set<AccountId>): List<PlaceholderMovement> =
+        existingUnidentifiedLegs.mapNotNull { id ->
+            if (id in ownSourceLegs ||
+                id in existingExcludedLegs ||
+                id in claimedReconcileTargets ||
+                id in consumedReconcileIds ||
+                id in pairedInBatch
+            ) {
+                return@mapNotNull null
+            }
+            val leg = existingById[id]?.transfer ?: return@mapNotNull null
+            val inflow =
+                when {
+                    leg.targetAccountId in conduits -> true
+                    leg.sourceAccountId in conduits -> false
+                    else -> return@mapNotNull null
+                }
+            PlaceholderMovement(
+                conduit = if (inflow) leg.targetAccountId else leg.sourceAccountId,
+                inflow = inflow,
+                amount = leg.amount,
+                timestamp = leg.timestamp,
+                existing = leg,
+            )
+        }
+
+    /** An IMPORTED row no rule paired with anything, and that is not itself excluded. */
+    private fun Classified.isUnmatchedImport(settings: PlaceholderSettings): Boolean =
+        status == ImportStatus.IMPORTED &&
+            excludeExisting == null &&
+            conduitStatement == null &&
+            supersededLegs.isEmpty() &&
+            !transfer.isExcluded(settings.exclusionTypeId) &&
+            transfer.relationships.none { it.typeId == settings.relationshipTypeId }
+
+    /**
+     * The chain movements of one merchant, near [placeholder], that sum to it — the closest-in-time such
+     * set over all merchants. A placeholder already imported needs at least one movement of this batch:
+     * otherwise this import has nothing to change.
+     */
+    private fun splitSetFor(
+        placeholder: PlaceholderMovement,
+        chains: List<ChainMovement>,
+        window: Duration,
+    ): List<ChainMovement>? {
+        val target = placeholder.amount.amount
+        return chains
+            .filter { chain ->
+                chain.conduit == placeholder.conduit &&
+                    chain.amount.asset == placeholder.amount.asset &&
+                    (chain.timestamp - placeholder.timestamp).absoluteValue <= window &&
+                    (placeholder.batchIndex == null || chain.existing != null)
+            }.groupBy { it.merchant }
+            .values
+            .mapNotNull { group ->
+                val nearest = group.sortedBy { (it.timestamp - placeholder.timestamp).absoluteValue }.take(MAX_SPLIT_CANDIDATES)
+                subsetsOf(nearest)
+                    .filter { set -> placeholder.batchIndex != null || set.any { it.batchIndex != null } }
+                    .firstOrNull { set ->
+                        set.fold(BigInteger.ZERO) { sum, chain ->
+                            if (chain.inflow == placeholder.inflow) sum + chain.amount.amount else sum - chain.amount.amount
+                        } == target
+                    }
+            }.minByOrNull { set -> set.maxOf { (it.timestamp - placeholder.timestamp).absoluteValue } }
+    }
+
+    /** Every subset of [items] with 2 to [MAX_SPLIT_LEGS] members, smallest first. */
+    private fun <T> subsetsOf(items: List<T>): List<List<T>> =
+        (1 until (1 shl items.size))
+            .map { mask -> items.filterIndexed { i, _ -> mask and (1 shl i) != 0 } }
+            .filter { it.size in 2..MAX_SPLIT_LEGS }
+            .sortedBy { it.size }
+
+    /** The conduit's statement row is in this batch: it is excluded and linked to every chain movement. */
+    private fun applyToBatchPlaceholder(
+        classified: MutableList<Classified>,
+        index: Int,
+        set: List<ChainMovement>,
+        settings: PlaceholderSettings,
+    ) {
+        val legs = set.map { requireNotNull(it.existing) }
+        legs.forEach {
+            consumedReconcileIds += it.id
+            pairedInBatch += it.id
+        }
+        val superseded = set.flatMap { onwardLegsFrom(requireNotNull(it.existing).id, it.conduit) }
+        supersede(superseded)
+        val transfer = classified[index].transfer
+        classified[index] =
+            classified[index].copy(
+                transfer =
+                    transfer.copy(
+                        attributes = transfer.withExclusion(settings.exclusionTypeId),
+                        relationships =
+                            transfer.relationships +
+                                (legs + superseded).map { NewRelationship(it.id, settings.relationshipTypeId) },
+                        fee = null,
+                    ),
+                supersededLegs = superseded.map { ExcludeExistingLeg(it, settings.exclusionTypeId) },
+            )
+    }
+
+    /**
+     * The conduit's statement row was imported earlier: it is excluded (carried by the first chain row of
+     * this batch in the set), each chain row of this batch is linked to it with its onward legs created
+     * excluded, and the onward legs of any existing chain leg in the set are excluded too.
+     */
+    private fun applyToExistingPlaceholder(
+        classified: MutableList<Classified>,
+        placeholder: Transfer,
+        set: List<ChainMovement>,
+        settings: PlaceholderSettings,
+    ) {
+        consumedReconcileIds += placeholder.id
+        pairedInBatch += placeholder.id
+        val existingLegs = set.mapNotNull { it.existing }
+        existingLegs.forEach { pairedInBatch += it.id }
+        val superseded = set.filter { it.existing != null }.flatMap { onwardLegsFrom(requireNotNull(it.existing).id, it.conduit) }
+        supersede(superseded)
+        val batchMovements = set.filter { it.batchIndex != null }
+        batchMovements.forEachIndexed { i, movement ->
+            val index = requireNotNull(movement.batchIndex)
+            classified[index] =
+                classified[index].copy(
+                    excludeExisting = if (i == 0) ExcludeExistingLeg(placeholder, settings.exclusionTypeId) else null,
+                    supersededLegs = if (i == 0) superseded.map { ExcludeExistingLeg(it, settings.exclusionTypeId) } else emptyList(),
+                    conduitStatement =
+                        ConduitStatementMatch(movement.conduitIndex, placeholder.id, settings.relationshipTypeId, settings.exclusionTypeId),
+                )
+        }
+    }
+
+    private fun Transfer.touches(account: AccountId): Boolean = sourceAccountId == account || targetAccountId == account
 
     private fun classifyOne(
         index: Int,
@@ -337,6 +681,13 @@ class ImportDeduper(
         // Internal-transfer reconciliation between two owned accounts (e.g. Crypto.com App -> Exchange):
         // rewrite the incoming leg into one internal transfer and exclude the stale app-side leg.
         classifyAsInternalTransferReconciled(transfer, policy)?.let { return it }
+
+        classifyAsConduitStatement(
+            transfer,
+            policy.unidentifiedCounterpartyWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
 
         // A record naming the far end (a bank resolving it by sort code + account number) beats a
         // placeholder (an exchange's "fiat deposit"), either way round; a feed itemising a charge the other
@@ -393,6 +744,7 @@ class ImportDeduper(
         val id: TransferId,
         val existing: Transfer,
         val claims: List<TransferId>,
+        val supersedes: List<Transfer> = emptyList(),
     )
 
     /**
@@ -431,13 +783,20 @@ class ImportDeduper(
         if (rule.keeps == Keeps.INCOMING && transfer.isExcluded(exclusionTypeId)) return null
         val found = rule.find(transfer, window) ?: return null
         consumedReconcileIds += found.claims
-        val relationships = transfer.relationships + NewRelationship(relatedTransferId = found.id, typeId = relationshipTypeId)
+        pairedInBatch += found.id
+        supersede(found.supersedes)
+        // Superseded legs are linked too, so the exclusion they take on stays explained — and is lifted by
+        // `reconciledPartnerUnhideUpdates` if this row is ever deleted.
+        val relationships =
+            transfer.relationships + NewRelationship(relatedTransferId = found.id, typeId = relationshipTypeId) +
+                found.supersedes.map { NewRelationship(relatedTransferId = it.id, typeId = relationshipTypeId) }
         return when (rule.keeps) {
             Keeps.EXISTING ->
                 Classified(
                     transfer.copy(attributes = transfer.withExclusion(exclusionTypeId), relationships = relationships, fee = null),
                     ImportStatus.IMPORTED,
                     existing = null,
+                    supersededLegs = found.supersedes.map { ExcludeExistingLeg(it, exclusionTypeId) },
                 )
             Keeps.INCOMING ->
                 Classified(
@@ -522,11 +881,75 @@ class ImportDeduper(
                         id !in existingUnidentifiedLegs &&
                             id !in existingExcludedLegs &&
                             id !in claimedReconcileTargets &&
+                            id !in chainMerchantLegs &&
                             counterparty != placeholder &&
                             counterparty !in ownBatchAccounts
                     }.orEmpty()
-            nearestUnclaimed(candidates, timestamp, window)
+            nearestUnclaimed(candidates, timestamp, window)?.let { it.copy(supersedes = onwardLegsFrom(it.id, owned)) }
         }
+
+    /**
+     * The pass-through legs that follow [legId] along its chain, when the chain continues from [conduit] —
+     * i.e. [legId] moved money into or out of the conduit whose own statement is being imported. The
+     * statement records what the conduit really did with that money, so these inferred legs are redundant.
+     * Legs already excluded, or that another row of this batch already paired with, are left alone.
+     */
+    private fun onwardLegsFrom(
+        legId: TransferId,
+        conduit: AccountId,
+    ): List<Transfer> {
+        val onward = passThroughOnward[legId].orEmpty()
+        val first = onward.firstOrNull() ?: return emptyList()
+        if (first.sourceAccountId != conduit && first.targetAccountId != conduit) return emptyList()
+        return onward.filter { it.id !in existingExcludedLegs && it.id !in pairedInBatch && it.id !in matchedExistingIds }
+    }
+
+    /**
+     * Marks legs this batch supersedes (see [Classified.supersededLegs]) as excluded, so no later rule treats
+     * one as a counted record and the fuzzy pass never drops a row as its duplicate.
+     */
+    private fun supersede(legs: List<Transfer>) {
+        legs.forEach { existingExcludedLegs += it.id }
+    }
+
+    /**
+     * This pass-through row's chain runs through a conduit whose own statement is already imported: an
+     * existing placeholder leg moves the chain's amount the same way through that conduit (into it for a
+     * charge, out of it for a refund) — see [ConduitStatementMatch]. The chain's movement into the conduit
+     * is the better record of that money (it names the card), so the placeholder is excluded; the chain's
+     * legs beyond the conduit are the worse record of what happened next, so they are created excluded.
+     * The outermost conduit with a match wins.
+     */
+    private fun classifyAsConduitStatement(
+        transfer: ImportTransfer,
+        window: Duration?,
+        exclusionTypeId: AttributeTypeId?,
+        relationshipTypeId: RelationshipTypeId?,
+    ): Classified? {
+        val passThrough = transfer.passThrough ?: return null
+        if (window == null || exclusionTypeId == null || relationshipTypeId == null || unidentifiedCounterpartyTypeId == null) return null
+        if (transfer.isExcluded(exclusionTypeId)) return null
+        val timestamp = transfer.timestamp ?: return null
+        val inflow = !passThrough.incoming
+        return passThrough.conduits.withIndex().firstNotNullOfOrNull { (conduitIndex, conduit) ->
+            val candidates =
+                reconcileCandidatesByAccountFlow[AccountFlowKey(conduit.requireId(), inflow, passThrough.amount)]
+                    ?.filter { (id, _) ->
+                        id in existingUnidentifiedLegs && id !in existingExcludedLegs && id !in claimedReconcileTargets
+                    }.orEmpty()
+            nearestUnclaimed(candidates, timestamp, window)?.let { found ->
+                consumedReconcileIds += found.claims
+                pairedInBatch += found.id
+                Classified(
+                    transfer,
+                    ImportStatus.IMPORTED,
+                    existing = null,
+                    excludeExisting = ExcludeExistingLeg(found.existing, exclusionTypeId),
+                    conduitStatement = ConduitStatementMatch(conduitIndex, found.id, relationshipTypeId, exclusionTypeId),
+                )
+            }
+        }
+    }
 
     /**
      * The mirror of [identifiedTwin] for the opposite import order: this row names both ends of the
@@ -862,6 +1285,13 @@ class ImportDeduper(
             policy.reconciledRelationshipTypeId,
         )?.let { return it }
 
+        classifyAsConduitStatement(
+            transfer,
+            policy.unidentifiedCounterpartyWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
+
         return Classified(transfer, ImportStatus.IMPORTED, null)
     }
 
@@ -895,7 +1325,12 @@ class ImportDeduper(
         // must still match exactly, so only that bucket needs scanning.
         transfer.amount?.let { amount ->
             existingByAmount[amount]?.forEach { existing ->
-                if (existing.transferId !in matchedExistingIds && isFuzzyDuplicate(transfer, existing.transfer, policy)) {
+                // An excluded leg counts nowhere, so a row dropped as its duplicate would count nowhere either —
+                // unless the leg is this same file's earlier record of the row, which keeps its exclusion.
+                if (existing.transferId !in matchedExistingIds &&
+                    (existing.transferId !in existingExcludedLegs || existing.transferId in ownSourceLegs) &&
+                    isFuzzyDuplicate(transfer, existing.transfer, policy)
+                ) {
                     matchedExistingIds += existing.transferId
                     return Classified(transfer, ImportStatus.DUPLICATE, existing.transferId)
                 }
@@ -906,9 +1341,22 @@ class ImportDeduper(
         // fiat CSV and "GBP Deposit" in the card CSV); a row whose counterparty is only a placeholder,
         // matched on the owned account + direction + amount alone (either way round, within the date
         // tolerance); and a placeholder row that is a gross amount another source split into net + fee.
+        reconcile(
+            transfer,
+            sameAccounts,
+            policy.reconcileWindow,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
+        // Matched within the date tolerance, like the placeholder rules below it is one of.
+        classifyAsConduitStatement(
+            transfer,
+            policy.dateTolerance,
+            policy.reconciledExclusionAttributeTypeId,
+            policy.reconciledRelationshipTypeId,
+        )?.let { return it }
         val rules =
             listOf(
-                sameAccounts to policy.reconcileWindow,
                 identifiedTwin to policy.dateTolerance,
                 placeholderTwin to policy.dateTolerance,
                 itemisedTwin to policy.reconcileWindow,
@@ -979,3 +1427,9 @@ class ImportDeduper(
             null -> error("ImportDeduper requires a resolved account reference; got null")
         }
 }
+
+/** Most chain movements a conduit's single statement row can be split across (an authorisation plus adjustments). */
+private const val MAX_SPLIT_LEGS = 4
+
+/** Chain movements per merchant considered for one split, nearest first; bounds the subset search at 2^8. */
+private const val MAX_SPLIT_CANDIDATES = 8

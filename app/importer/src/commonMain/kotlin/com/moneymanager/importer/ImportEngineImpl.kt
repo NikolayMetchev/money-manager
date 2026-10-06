@@ -26,6 +26,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.TransferRelationship
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
@@ -98,6 +99,9 @@ import kotlin.uuid.Uuid
 
 /** Emit a delete-phase progress update every N rows rather than per row — one delete is cheap. */
 private const val DELETE_PROGRESS_EVERY_ROWS = 50
+
+/** Upper bound on the legs walked along one pass-through chain; real chains are a few hops (card → Curve → PayPal → merchant). */
+private const val MAX_PASS_THROUGH_CHAIN_LEGS = 16
 
 /**
  * Attribute types that tie an account to a specific real bank account/counterparty identity. An
@@ -569,12 +573,17 @@ class ImportEngineImpl(
 
         onProgress?.invoke(ImportProgress("Detecting duplicates"))
         val existing = loadExisting(resolvedTransfers, batch)
+        val existingRelationships = existingRelationships(existing)
         val classified =
             ImportDeduper(
                 batch.dedupePolicy,
                 existing,
-                claimedReconcileTargets(existing),
+                existingRelationships
+                    .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
+                    .mapTo(mutableSetOf()) { it.id2 },
                 ownBatchAccounts = resolvedTransfers.flatMapTo(mutableSetOf()) { listOf(it.fromAccount, it.toAccount).map(::requireId) },
+                passThroughOnward = passThroughOnward(existing, existingRelationships),
+                ownSourceLegs = ownSourceLegs(resolvedTransfers),
             ).classify(resolvedTransfers)
 
         val toImport = resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })
@@ -593,6 +602,7 @@ class ImportEngineImpl(
                 else -> null
             }
         val createdIds = writeTransfers(toImport, toUpdate, batchSize, onProgress, engineOwnedTypeId)
+        writeConversionTrades(toImport)
 
         val createdTransferIds = toImport.zip(createdIds).associate { (c, id) -> requireNotNull(c.transfer.rowKey) to id }
 
@@ -624,6 +634,42 @@ class ImportEngineImpl(
             rowOutcomes = rowOutcomes,
             orderedRowOutcomes = orderedRowOutcomes,
         )
+    }
+
+    /**
+     * Books each created transfer's [conversion][ImportTransfer.conversion] as a trade on its own account: settled → foreign for
+     * a payment, foreign → settled for a refund. Only created transfers get one (a DUPLICATE's trade already
+     * exists), and a trade is excluded with its transfer, whether the source excluded the row or a
+     * reconcile did — otherwise the conversion of money that was never spent would still move balances.
+     * Identical conversions within the batch get distinct occurrences, as the trade writer requires.
+     */
+    private suspend fun writeConversionTrades(toImport: List<Classified>) {
+        val occurrences = mutableMapOf<List<Any>, Int>()
+        for (classified in toImport) {
+            val transfer = classified.transfer
+            val conversion = transfer.conversion ?: continue
+            val amount = requireNotNull(transfer.amount)
+            val timestamp = requireNotNull(transfer.timestamp)
+            val account = requireId(if (conversion.incoming) transfer.toAccount else transfer.fromAccount)
+            val (from, to) = if (conversion.incoming) amount to conversion.settled else conversion.settled to amount
+            // Keyed on the persisted millisecond, as createTrade matches on it (see the leg-group trade loop).
+            val key = listOf(timestamp.toEpochMilliseconds(), account, from, to)
+            val occurrence = occurrences.getOrDefault(key, 0)
+            occurrences[key] = occurrence + 1
+            val trade =
+                tradeRepository.createTrade(
+                    timestamp = timestamp,
+                    description = "Convert ${from.asset.code} to ${to.asset.code}",
+                    fromAccountId = account,
+                    fromAmount = from,
+                    toAccountId = account,
+                    toAmount = to,
+                    source = transfer.source.forRow(requireNotNull(transfer.rowKey)),
+                    occurrence = occurrence,
+                )
+            val exclusion = transfer.attributes.filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
+            if (exclusion.isNotEmpty()) tradeRepository.upsertAttributes(trade.id, exclusion)
+        }
     }
 
     /**
@@ -1288,18 +1334,52 @@ class ImportEngineImpl(
 
     // region Transfers
 
+    /** Transfers the batch's own CSV files created on an earlier import (see [ImportDeduper]'s `ownSourceLegs`). */
+    private suspend fun ownSourceLegs(transfers: List<ImportTransfer>): Set<TransferId> =
+        transfers
+            .mapNotNullTo(mutableSetOf()) { (it.source as? Source.Csv)?.importId }
+            .flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it) }
+
     /**
-     * The subset of [existing] some other record already reconciled against — the `id2` of a `reconciled`
-     * relationship. A leg only ever stands for one movement, so a second row must not be excused against
-     * it (that would drop a genuine movement from the balances).
+     * The relationships touching [existing], loaded once for the deduper. Among them: the `reconciled`
+     * links whose `id2` another record already reconciled against (a leg only ever stands for one movement,
+     * so a second row must not be excused against it — that would drop a genuine movement from the
+     * balances), and the `pass-through` links that chain a conduit's legs together.
      */
-    private suspend fun claimedReconcileTargets(existing: List<ExistingTransferInfo>): Set<TransferId> {
-        val repository = transferRelationshipRepository ?: return emptySet()
-        if (existing.isEmpty()) return emptySet()
-        return repository
-            .getByTransfers(existing.map { it.transferId })
-            .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-            .mapTo(mutableSetOf()) { it.id2 }
+    private suspend fun existingRelationships(existing: List<ExistingTransferInfo>): List<TransferRelationship> {
+        val repository = transferRelationshipRepository ?: return emptyList()
+        if (existing.isEmpty()) return emptyList()
+        return repository.getByTransfers(existing.map { it.transferId })
+    }
+
+    /**
+     * For every existing leg that a `pass-through` relationship continues, the legs after it along its
+     * chain (main -> leg 1 -> leg 2 …), in order — see [ImportDeduper]'s `passThroughOnward`. A chain's
+     * onward legs start at the conduit the batch's own legs touch, so they are almost always among
+     * [existing]; any that are not are fetched by id.
+     */
+    private suspend fun passThroughOnward(
+        existing: List<ExistingTransferInfo>,
+        relationships: List<TransferRelationship>,
+    ): Map<TransferId, List<Transfer>> {
+        val next =
+            relationships
+                .filter { it.relationshipType.id.id == WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID }
+                .associate { it.id1 to it.id2 }
+        if (next.isEmpty()) return emptyMap()
+        val known = existing.associate { it.transferId to it.transfer }
+        val missing = next.values.filterNot { it in known }
+        val transfers = if (missing.isEmpty()) known else known + transactionRepository.getTransactionsByIds(missing)
+        return next.keys.associateWith { start ->
+            buildList {
+                var id = next[start]
+                // A chain is a handful of hops; the bound only guards against a malformed cycle.
+                while (id != null && size < MAX_PASS_THROUGH_CHAIN_LEGS) {
+                    add(transfers[id] ?: break)
+                    id = next[id]
+                }
+            }
+        }
     }
 
     /**
@@ -1391,7 +1471,13 @@ class ImportEngineImpl(
                 .flatMap {
                     // Include any funding-card reconcile account: the funding leg lives on it (and on the
                     // conduit), so load its history even when the batch never moves money to/from it.
-                    listOfNotNull(requireId(it.fromAccount), requireId(it.toAccount), it.reconcileFundingAccountId)
+                    listOfNotNull(requireId(it.fromAccount), requireId(it.toAccount), it.reconcileFundingAccountId) +
+                        // Every conduit of a pass-through chain: an inner one (PayPal behind Curve) is never the
+                        // main transfer's account, yet its own statement's legs are what the chain reconciles with.
+                        it.passThrough
+                            ?.conduits
+                            .orEmpty()
+                            .map(::requireId)
                 }.toSet()
 
         val rawTransfers =
@@ -1627,6 +1713,9 @@ class ImportEngineImpl(
                     if (passThrough != null && spendTempIds != null) {
                         add(NewRelationship(relatedTransferId = spendTempIds.first(), typeId = passThrough.relationshipTypeId))
                     }
+                    classified.conduitStatement?.takeIf { it.conduitIndex == 0 }?.let {
+                        add(NewRelationship(relatedTransferId = it.statementLegId, typeId = it.relationshipTypeId))
+                    }
                     // Link to sibling transfers created in this batch (this chunk's temp id, or an
                     // earlier chunk's real id). Targets that weren't created (deduped/errored) resolve
                     // to null and are skipped.
@@ -1707,13 +1796,25 @@ class ImportEngineImpl(
                         passThrough.amount,
                         passThrough.rowKey,
                     )
-                    if (exclusion.isNotEmpty()) newAttributes[spendTempId] = exclusion
+                    val conduitStatement = classified.conduitStatement
+                    if (exclusion.isNotEmpty()) {
+                        newAttributes[spendTempId] = exclusion
+                    } else if (conduitStatement != null && legIndex >= conduitStatement.conduitIndex) {
+                        // Beyond a conduit whose own statement is imported: that statement is the record.
+                        newAttributes[spendTempId] = listOf(NewAttribute(conduitStatement.exclusionTypeId, "reconciled"))
+                    }
                     val legKey = LegKey(chunkStartIndex + chunkIndex, legIndex)
                     spendTempIdByLeg[legKey] = spendTempId
                     spendResultIndices[legKey] = transfersToCreate.lastIndex
                     val legRelationships = mutableListOf<NewRelationship>()
                     if (legIndex < spendTempIds.lastIndex) {
                         legRelationships += NewRelationship(spendTempIds[legIndex + 1], passThrough.relationshipTypeId)
+                    }
+                    // The chain's movement into the conduit whose statement it reconciled with, and every leg the
+                    // statement supersedes beyond it, link to that statement row: the exclusions stay explained,
+                    // and are lifted (reconciledPartnerUnhideUpdates) if either side is ever deleted.
+                    if (conduitStatement != null && legIndex >= conduitStatement.conduitIndex - 1) {
+                        legRelationships += NewRelationship(conduitStatement.statementLegId, conduitStatement.relationshipTypeId)
                     }
                     // Reversal pairing: this spend leg (id1) reverses an earlier one (id2) — an existing
                     // transfer, an earlier row's spend leg in this chunk (temp id), or an earlier
@@ -1745,7 +1846,7 @@ class ImportEngineImpl(
      */
     private fun internalReconcileExclusions(classified: List<Classified>): List<Classified> =
         classified
-            .mapNotNull { it.excludeExisting }
+            .flatMap { listOfNotNull(it.excludeExisting) + it.supersededLegs }
             .distinctBy { it.transfer.id }
             .map { ex ->
                 Classified(

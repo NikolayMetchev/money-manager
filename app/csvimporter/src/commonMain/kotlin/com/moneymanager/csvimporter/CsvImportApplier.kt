@@ -1032,6 +1032,7 @@ suspend fun runCsvImport(
                     ownedAttributes = ownedAttributes,
                     fee = fee,
                     passThrough = passThrough,
+                    conversion = row.conversion,
                     batchRelationships = listOfNotNull(conversionLinkByRow[row.rowIndex]),
                     reconcileFundingAccountId = fundingAccountId,
                     unidentifiedCounterpartyAccountId = row.unidentifiedCounterpartyAccountId,
@@ -1124,6 +1125,10 @@ suspend fun runCsvImport(
                             reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
                         reconciledRelationshipTypeId =
                             reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
+                        unidentifiedCounterpartyAttributeTypeId = reconcileWindow?.let { unidentifiedCounterpartyTypeId },
+                        // A placeholder match has only account, direction and amount to go on, so it uses the
+                        // fuzzy policy's date tolerance rather than this strategy's exact-pair window.
+                        unidentifiedCounterpartyWindow = reconcileWindow?.let { DedupePolicy.FuzzyAllFields().dateTolerance },
                     )
                 },
             uniqueKeyExtractor =

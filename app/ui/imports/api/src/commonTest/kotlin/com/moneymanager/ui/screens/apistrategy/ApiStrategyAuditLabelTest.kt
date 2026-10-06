@@ -26,8 +26,8 @@ class ApiStrategyAuditLabelTest {
         assertEquals("Accounts endpoint pagination paging param", labelForPath("accounts.endpoint.pagination.paging.param"))
         assertEquals("Ancestor endpoint #2 path", labelForPath("accounts.ancestorEndpoints[1].path"))
         assertEquals(
-            "Data endpoint #1 transaction mappings local currency field",
-            labelForPath("dataEndpoints[0].transactionMappings.localCurrencyField"),
+            "Data endpoint #1 transaction mappings merchant name field",
+            labelForPath("dataEndpoints[0].transactionMappings.merchantNameField"),
         )
         assertEquals("Request signing algorithm", labelForPath("requestSigning.algorithm"))
     }

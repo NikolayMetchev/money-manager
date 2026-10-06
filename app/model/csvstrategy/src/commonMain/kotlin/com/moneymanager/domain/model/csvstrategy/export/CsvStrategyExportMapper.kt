@@ -79,6 +79,7 @@ object CsvStrategyExportMapper {
                     debitColumnName = debitColumnName,
                     direction = direction,
                     fee = fee,
+                    foreignAmount = foreignAmount,
                 )
             is HardCodedCurrencyMapping ->
                 HardCodedCurrencyExport(
@@ -99,6 +100,7 @@ object CsvStrategyExportMapper {
                 TimezoneLookupExport(
                     fieldType = fieldType,
                     columnName = columnName,
+                    aliases = aliases,
                 )
         }
 }

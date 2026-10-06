@@ -17,6 +17,7 @@ dependencies {
     implementation(projects.app.strategies)
     implementation(projects.app.strategycatalog)
 
+    testImplementation(projects.app.model.rules)
     testImplementation(kotlin("test"))
 }
 

@@ -45,6 +45,13 @@ sealed interface DedupePolicy {
         val reconcileWindow: Duration? = null,
         val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
         val reconciledRelationshipTypeId: RelationshipTypeId? = null,
+        /**
+         * Marks placeholder legs, as on [FuzzyAllFields]. Only used here to recognise a conduit's own
+         * statement (a PayPal export's card deposit) when a pass-through row reaches the conduit after it.
+         */
+        val unidentifiedCounterpartyAttributeTypeId: AttributeTypeId? = null,
+        /** Window for [unidentifiedCounterpartyAttributeTypeId]; see [ApiMultiKey.unidentifiedCounterpartyWindow]. */
+        val unidentifiedCounterpartyWindow: Duration? = null,
     ) : DedupePolicy
 
     /**

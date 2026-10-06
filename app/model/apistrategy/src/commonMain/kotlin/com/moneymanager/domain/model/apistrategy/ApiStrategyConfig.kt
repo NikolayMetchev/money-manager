@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.serialization.SortedListSerializer
@@ -393,8 +394,9 @@ data class ApiLedgerTrades(
  *                        from balances. The first that holds wins, and the value at its path becomes the
  *                        decline reason: Monzo's `decline_reason` NOT_BLANK, Starling's `status` IN
  *                        `DECLINED`. Order is semantic (it picks the reason).
- * @property localAmountField Optional dot-path to a local/original amount (foreign transactions)
- * @property localCurrencyField Optional dot-path to a local/original currency code
+ * @property foreignAmount What the counterparty was paid when the account settled in another currency
+ *                       (a card abroad), parsed with [amountFormat]: the movement is booked in that
+ *                       currency and the account's conversion as a trade (see [ForeignAmount]).
  * @property fee A fee charged on the transaction, imported as its own transfer linked to it via a `fee`
  *            relationship (see [FeeRule]); its amount is encoded using [amountFormat]. Monzo's
  *            `atm_fees_detailed` is a fee [FeeRule.includedInAmount]: `amount = withdrawal + fee`.
@@ -416,8 +418,8 @@ data class ApiTransactionMappings(
     val counterpartyNameField: String? = null,
     val counterpartyIdField: String? = null,
     val declinedWhen: List<Condition> = emptyList(),
-    val localAmountField: String? = null,
-    val localCurrencyField: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val foreignAmount: ForeignAmount? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val fee: FeeRule? = null,
     @Serializable(with = SortedStringToStringMapSerializer::class)

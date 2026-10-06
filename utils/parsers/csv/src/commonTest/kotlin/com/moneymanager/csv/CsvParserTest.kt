@@ -21,6 +21,16 @@ class CsvParserTest {
     }
 
     @Test
+    fun parse_leadingByteOrderMark_isNotPartOfTheFirstHeader() {
+        val csv = "\uFEFFDate,Name\n01/02/2025,Alice"
+
+        val result = parser.parse(csv)
+
+        assertEquals(listOf("Date", "Name"), result.headers)
+        assertEquals(listOf("01/02/2025", "Alice"), result.rows[0])
+    }
+
+    @Test
     fun parse_semicolonDelimiter_parsesCorrectly() {
         val csv = "name;age;city\nAlice;30;New York\nBob;25;Los Angeles"
 

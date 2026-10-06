@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.ui.components.rules.ConditionsEditor
 import com.moneymanager.ui.components.rules.DirectionEditor
 import com.moneymanager.ui.components.rules.FeeRuleEditor
+import com.moneymanager.ui.components.rules.ForeignAmountEditor
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Edits the top-level [ApiTransactionMappings] in place inside the strategy config. */
@@ -97,12 +98,11 @@ internal fun TransactionMappingsTab(
             enabled = enabled,
             pathLabel = "Path",
         )
-        path("Local amount field (optional)", m.localAmountField.orEmpty()) { v ->
-            state.updateTransactionMappings { copy(localAmountField = v.ifBlank { null }) }
-        }
-        path("Local currency field (optional)", m.localCurrencyField.orEmpty()) { v ->
-            state.updateTransactionMappings { copy(localCurrencyField = v.ifBlank { null }) }
-        }
+        ForeignAmountEditor(
+            foreignAmount = m.foreignAmount,
+            onForeignAmountChanged = { foreign -> state.updateTransactionMappings { copy(foreignAmount = foreign) } },
+            pathField = conditionPath,
+        )
         FeeRuleEditor(
             fee = m.fee,
             onFeeChanged = { fee -> state.updateTransactionMappings { copy(fee = fee) } },

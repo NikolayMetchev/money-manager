@@ -368,6 +368,21 @@ data class ImportFee(
 )
 
 /**
+ * The account this transfer's money belongs to settled it in another currency (see
+ * `com.moneymanager.domain.model.rules.ForeignAmount`): the transfer moves the foreign amount, and the
+ * account converted [settled] into it first — or, when [incoming], converted what it received into
+ * [settled]. The account is the transfer's `fromAccount`, or its `toAccount` when [incoming].
+ *
+ * The engine books the conversion as a trade on that account when it creates the transfer, excluded
+ * whenever the transfer is created excluded, so the two are counted (or not) together. A later re-import
+ * that only changes the transfer's exclusion does not reach the trade.
+ */
+data class ImportConversion(
+    val settled: Money,
+    val incoming: Boolean,
+)
+
+/**
  * A charge routed through a chain of conduit accounts (e.g. card → Curve → PayPal → merchant),
  * modelled as linked movements of the same amount: a funding leg (the transfer's own `fromAccount` →
  * first conduit, built by the producer) and one spend leg per adjacent pair of the chain
@@ -488,6 +503,8 @@ data class ImportTransfer(
     val reconcileGrossAmount: Money? = null,
     /** An optional conduit pass-through (e.g. Curve), expanded by the engine into a linked spend leg. */
     val passThrough: ImportPassThrough? = null,
+    /** Set when the own account settled this movement in another currency; see [ImportConversion]. */
+    val conversion: ImportConversion? = null,
     /**
      * When set (a conduit-spend import like Curve that named its funding card), the account that must
      * hold the matching funding leg (funding → this transfer's source conduit). Enables the

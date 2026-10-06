@@ -1,6 +1,7 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.importer
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -21,6 +22,7 @@ import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCategoryIntent
+import com.moneymanager.importengineapi.ImportConversion
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOrderIntent
 import com.moneymanager.importengineapi.ImportOwnershipIntent
@@ -44,6 +46,7 @@ import com.moneymanager.importengineapi.personalCounterpartyKey
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
+import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -954,6 +957,84 @@ class ImportEngineDbTest : DbTest() {
                     .first()
             engine().import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
             assertTrue(repositories.accountRepository.getAccountById(dropId).first() != null)
+        }
+
+    @Test
+    fun conversion_isBookedAsATradeOnTheOwnAccount_excludedWithItsTransfer_andOnlyOnce() =
+        runTest {
+            val checkingId = createSourceAccount()
+            val gbp = gbp()
+            repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val usd =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .first { it.code == "USD" }
+            val excluded = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
+
+            // A USD 13.84 purchase the GBP account settled as GBP 10.98, and a declined one.
+            fun payment(
+                row: Long,
+                declined: Boolean,
+            ) = ImportTransfer(
+                rowKey = ImportRowKey.CsvRow(row),
+                fromAccount = AccountRef.Existing(checkingId),
+                toAccount = AccountRef.Local(LocalAccountKey("uber")),
+                source = Source.SampleGenerator,
+                timestamp = baseTime + row.hours,
+                description = "Uber",
+                amount = Money.fromDisplayValue(BigDecimal("13.84"), usd),
+                attributes = if (declined) listOf(NewAttribute(excluded, "declined")) else emptyList(),
+                conversion = ImportConversion(settled = Money.fromDisplayValue(BigDecimal("10.98"), gbp), incoming = false),
+            )
+
+            suspend fun importBoth() =
+                engine().import(
+                    ImportBatch(
+                        transfers = listOf(payment(0, declined = false), payment(1, declined = true)),
+                        accountsToCreate =
+                            listOf(
+                                ImportAccountIntent(
+                                    key = LocalAccountKey("uber"),
+                                    match = AccountMatchKey.ByName("Uber"),
+                                    name = "Uber",
+                                    openingDate = baseTime,
+                                    source = Source.SampleGenerator,
+                                ),
+                            ),
+                        dedupePolicy = DedupePolicy.FuzzyAllFields(),
+                    ),
+                )
+            importBoth()
+            importBoth()
+
+            val trades =
+                repositories.tradeRepository
+                    .getTradesByAccount(checkingId)
+                    .first()
+                    .sortedBy { it.timestamp }
+            assertEquals(2, trades.size, "one conversion per payment, and none again for the re-imported duplicates")
+            trades.forEach {
+                assertEquals(checkingId, it.fromAccountId)
+                assertEquals(checkingId, it.toAccountId)
+                assertEquals("GBP", it.from.asset.code)
+                assertEquals("USD", it.to.asset.code)
+            }
+            assertTrue(
+                repositories.tradeRepository
+                    .getAttributes(trades[0].id)
+                    .first()
+                    .none { it.attributeType.id == excluded },
+            )
+            assertEquals(
+                "declined",
+                repositories.tradeRepository
+                    .getAttributes(trades[1].id)
+                    .first()
+                    .single { it.attributeType.id == excluded }
+                    .value,
+                "the declined payment's conversion is excluded with it",
+            )
         }
 
     @Test
