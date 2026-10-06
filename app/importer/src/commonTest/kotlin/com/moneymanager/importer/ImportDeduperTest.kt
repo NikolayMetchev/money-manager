@@ -713,6 +713,56 @@ class ImportDeduperTest {
     }
 
     @Test
+    fun conduitStatement_refundAndItsFundingRowPairWithTheSameChain() {
+        // A card statement booked two equal refunds through the wallet (one later reversed), so there are
+        // two refund chains: merchant -> wallet -> card. The wallet's export records the refund (merchant ->
+        // wallet) and, at the same second, the money sent on to the card (a placeholder withdrawal). Taking
+        // the first fuzzy candidate in id order paired the refund with the farther chain A, while the
+        // withdrawal reconciled the nearer chain B and superseded B's refund leg: counted nowhere.
+        val chainA = existing(40, description = "Paypal *Fashion Web", timestamp = baseTime + 26.hours, src = wallet, tgt = bank)
+        val refundA = existing(41, description = "Fashion Web", timestamp = baseTime + 26.hours, src = payee, tgt = wallet)
+        val chainB = existing(42, description = "Paypal *Fashion Web", timestamp = baseTime + 23.hours, src = wallet, tgt = bank)
+        val refundB = existing(43, description = "Fashion Web", timestamp = baseTime + 23.hours, src = payee, tgt = wallet)
+        val deduper =
+            ImportDeduper(
+                unidentifiedPolicy,
+                existing = listOf(chainA, refundA, chainB, refundB),
+                passThroughOnward =
+                    mapOf(TransferId(40) to listOf(refundA.transfer), TransferId(42) to listOf(refundB.transfer)),
+            )
+        val refund = importTransfer(0, description = "Fashion Web", src = payee, tgt = wallet)
+        val withdrawal =
+            importTransfer(
+                1,
+                description = "General Credit Card Withdrawal",
+                src = wallet,
+                tgt = placeholder,
+                attributes = listOf(NewAttribute(AttributeTypeId(-9), "true")),
+            ).copy(unidentifiedCounterpartyAccountId = placeholder)
+        val result = deduper.classify(listOf(refund, withdrawal))
+        assertEquals(ImportStatus.DUPLICATE, result[0].status)
+        assertEquals(TransferId(43), result[0].existing, "the refund is the nearer chain's refund leg")
+        assertEquals(
+            listOf(TransferId(42)),
+            result[1].transfer.relationships.map { it.relatedTransferId },
+            "the withdrawal reconciles that same chain",
+        )
+        assertTrue(result[1].supersededLegs.isEmpty(), "and supersedes nothing, so the refund still counts once")
+    }
+
+    @Test
+    fun fuzzy_prefersTheNearestOfSeveralCandidates() {
+        val deduper =
+            ImportDeduper(
+                reconcilingFuzzyPolicy,
+                existing = listOf(existing(9, timestamp = baseTime + 2.days), existing(10, timestamp = baseTime + 1.hours)),
+            )
+        val result = deduper.classify(listOf(importTransfer(0))).single()
+        assertEquals(ImportStatus.DUPLICATE, result.status)
+        assertEquals(TransferId(10), result.existing)
+    }
+
+    @Test
     fun conduitStatement_chainImportedAfterTheStatementMatchesItsInnerConduit() {
         // The card statement arrives second: card -> bank (main) -> wallet -> merchant. The wallet's
         // placeholder deposit is already there, so the chain's leg into the wallet (conduit 1) reconciles

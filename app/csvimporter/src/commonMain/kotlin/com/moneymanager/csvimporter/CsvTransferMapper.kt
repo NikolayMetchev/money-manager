@@ -535,6 +535,20 @@ class CsvTransferMapper(
                     sourceUsedPersistedMappings = false
                 }
             }
+            // The mirror case: the source is the strategy's own account and a persisted mapping sends the
+            // counterparty onto it too — a global mapping made for another source's spelling of a name
+            // ("^PAYPAL$" for a card export's merchant) also matching this export's own corrections, which
+            // it attributes to itself ("PayPal"). A mapping cannot sensibly make a row a self-transfer, so
+            // the strategy's own rule decides the counterparty instead.
+            var targetUsedPersistedMappings = true
+            if (tradeTo == null &&
+                conversionDetection == null &&
+                sourceAccountId == targetAccountId &&
+                sourceAccountId != UNRESOLVED_ACCOUNT_ID
+            ) {
+                targetAccountId = parseAccount(targetMapping, values, applyPersistedMappings = false)
+                targetUsedPersistedMappings = false
+            }
 
             // The counterparty is the account the TARGET_ACCOUNT mapping resolved, on whichever side the
             // flip below puts it.
@@ -628,7 +642,7 @@ class CsvTransferMapper(
                 if (passThroughMatch != null || conversionDetection != null) {
                     null
                 } else {
-                    resolvePersonalCounterparty(targetMapping, values)
+                    resolvePersonalCounterparty(targetMapping, values, targetUsedPersistedMappings)
                 }
 
             // A counterparty the strategy could not identify — no rule matched, no persisted mapping, so
@@ -641,7 +655,7 @@ class CsvTransferMapper(
                 if (passThroughMatch != null || conversionDetection != null || tradeTo != null) {
                     null
                 } else {
-                    counterpartyAccountId.takeIf { isUnidentifiedCounterparty(targetMapping, values) }
+                    counterpartyAccountId.takeIf { isUnidentifiedCounterparty(targetMapping, values, targetUsedPersistedMappings) }
                 }
 
             // A fee is modelled as its own movement (linked to this transfer), not folded into the amount.
@@ -715,7 +729,11 @@ class CsvTransferMapper(
                     }
                     // A conversion leg's counterparty is the shared conversion account (added below), not
                     // the description-derived account the target mapping would discover, so skip it here.
-                    if (passThroughMatch == null && conversionDetection == null) add(discoverNewAccount(targetMapping, values))
+                    if (passThroughMatch == null &&
+                        conversionDetection == null
+                    ) {
+                        add(discoverNewAccount(targetMapping, values, applyPersistedMappings = targetUsedPersistedMappings))
+                    }
                 }
             val targetCategoryId = (targetMapping as? AccountRulesMapping)?.defaultCategoryId ?: Category.UNCATEGORIZED_ID
             val newAccounts =
@@ -1104,9 +1122,10 @@ class CsvTransferMapper(
     /**
      * Resolves a field mapping to an account id. Persisted account mappings (the user's "map this CSV
      * value to that account" choices) are consulted first — they redirect a **counterparty** and handle
-     * renamed accounts. [applyPersistedMappings] can be set false to bypass them when re-resolving the
-     * **source** leg after a persisted counterparty mapping hijacked it into a self-transfer (both legs
-     * read the same column, so a merchant mapping can match the source too); see [mapRow].
+     * renamed accounts. [applyPersistedMappings] can be set false to bypass them when re-resolving a leg
+     * a persisted mapping turned into a self-transfer: the **source** when a merchant mapping matched it
+     * too (both legs read the same column), or the **counterparty** when a mapping sent it onto the
+     * source's own account; see [mapRow].
      */
     private fun parseAccount(
         mapping: FieldMapping,
@@ -1135,11 +1154,12 @@ class CsvTransferMapper(
     private fun isUnidentifiedCounterparty(
         mapping: FieldMapping,
         values: List<String>,
+        applyPersistedMappings: Boolean = true,
     ): Boolean {
         val resolution = (mapping as? AccountRulesMapping)?.let { resolveAccount(it, values) } ?: return false
         return resolution.rule?.counterpartyIsUnidentified == true &&
             resolution.accountName.isNotBlank() &&
-            findPersistedMapping(resolution.sourceValue) == null
+            !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null)
     }
 
     /**
@@ -1272,10 +1292,11 @@ class CsvTransferMapper(
     private fun resolvePersonalCounterparty(
         mapping: FieldMapping,
         values: List<String>,
+        applyPersistedMappings: Boolean = true,
     ): String? {
         val resolution = (mapping as? AccountRulesMapping)?.let { resolveAccount(it, values) } ?: return null
         return resolution.personName
-            ?.takeIf { it.isNotBlank() && findPersistedMapping(resolution.sourceValue) == null }
+            ?.takeIf { it.isNotBlank() && !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null) }
     }
 
     /** [extraction] applied to [value], or null when its pattern doesn't match. */

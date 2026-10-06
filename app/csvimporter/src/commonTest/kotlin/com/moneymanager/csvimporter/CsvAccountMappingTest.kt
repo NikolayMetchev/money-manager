@@ -770,8 +770,8 @@ class CsvAccountMappingTest {
     @Test
     fun `a row that genuinely resolves to one account on both legs is an error row not a crash`() {
         val card = Account(id = AccountId(70), name = "My Card", openingDate = Clock.System.now())
-        // The persisted mapping maps the merchant onto the card itself, so even after re-resolving the
-        // source there is no distinct counterparty — the row can't be a transfer and must error, not crash.
+        // The strategy's own rules name the card on both legs, so with or without persisted mappings
+        // there is no distinct counterparty — the row can't be a transfer and must error, not crash.
         val mapper =
             CsvTransferMapper(
                 strategy = createStrategySharingDescriptionColumn(),
@@ -779,12 +779,61 @@ class CsvAccountMappingTest {
                 existingAccounts = mapOf("My Card" to card),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
                 existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
-                accountMappings = listOf(createAccountMapping(1, "Weird", card.id)),
             )
-        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Weird row", "-10.00", "", ""))
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "My Card", "-10.00", "", ""))
 
         val result = mapper.mapRow(row)
         assertIs<MappingResult.Error>(result)
+    }
+
+    @Test
+    fun `a persisted mapping that would make the counterparty the own account yields to the strategy rule`() {
+        // A global mapping made for another export's spelling ("^MY CARD$" for a merchant elsewhere) also
+        // matches this export's own corrections, which it attributes to itself. The strategy sends those to
+        // an adjustments account; the mapping would make them self-transfers, so the rule decides instead.
+        val card = Account(id = AccountId(70), name = "My Card", openingDate = Clock.System.now())
+        val adjustments = Account(id = AccountId(72), name = "Card Adjustments", openingDate = Clock.System.now())
+        val base = createStrategySharingDescriptionColumn()
+        val strategy =
+            base.copy(
+                config =
+                    base.config.copy(
+                        fieldMappings =
+                            base.config.fieldMappings +
+                                (
+                                    TransferField.TARGET_ACCOUNT to
+                                        AccountRulesMapping(
+                                            fieldType = TransferField.TARGET_ACCOUNT,
+                                            rules =
+                                                listOf(
+                                                    AccountRule(
+                                                        value = ValueExpr(listOf("Description")),
+                                                        pattern = "^My Card$",
+                                                        name = "Card Adjustments",
+                                                    ),
+                                                    AccountRule(value = ValueExpr(listOf("Description"))),
+                                                ),
+                                        )
+                                ),
+                    ),
+            )
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts = mapOf("My Card" to card, "Card Adjustments" to adjustments),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+                accountMappings = listOf(createAccountMapping(1, "^MY CARD$", card.id)),
+            )
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "My Card", "2.00", "", ""))
+
+        val result = mapper.mapRow(row)
+        assertIs<MappingResult.Success>(result)
+        assertEquals(
+            setOf(card.id, adjustments.id),
+            setOf(result.transfer.sourceAccountId, result.transfer.targetAccountId),
+        )
     }
 
     // ============= Column-Agnostic Mappings =============
