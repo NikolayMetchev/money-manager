@@ -383,7 +383,7 @@ class ImportDeduper(
 
     /**
      * One movement of a pass-through chain into a conduit (or, for a refund, out of it): an existing leg
-     * with the legs onward from it, or a pass-through row of this batch at one of its conduits.
+     * whose onward legs end at [merchant], or a pass-through row of this batch at one of its conduits.
      */
     private class ChainMovement(
         val conduit: AccountId,
@@ -392,7 +392,6 @@ class ImportDeduper(
         val amount: Money,
         val timestamp: Instant,
         val existing: Transfer? = null,
-        val onward: List<Transfer> = emptyList(),
         val batchIndex: Int? = null,
         val conduitIndex: Int = 0,
     )
@@ -463,7 +462,6 @@ class ImportDeduper(
                 amount = leg.amount,
                 timestamp = leg.timestamp,
                 existing = leg,
-                onward = onward,
             )
         }
 

@@ -660,12 +660,11 @@ class ImportDeduperTest {
     private val payee = AccountId(33)
 
     /** The chain's spend leg out of the conduit: wallet -> the card statement's guess at the merchant. */
-    private fun chainSpendLeg(id: Long) =
-        existing(id, description = "Ubertrip 3", timestamp = baseTime + 1.hours, src = wallet, tgt = payee)
+    private fun chainSpendLeg() = existing(41, description = "Ubertrip 3", timestamp = baseTime + 1.hours, src = wallet, tgt = payee)
 
     @Test
     fun conduitStatement_depositSupersedesTheChainsOnwardLegs() {
-        val spend = chainSpendLeg(41)
+        val spend = chainSpendLeg()
         val deduper =
             ImportDeduper(
                 unidentifiedPolicy,
@@ -682,7 +681,7 @@ class ImportDeduperTest {
     fun conduitStatement_aSupersededLegIsNoDuplicateForALaterRow() {
         // The deposit supersedes the chain's spend leg; the wallet's payment row that follows must then be
         // imported, not dropped as a fuzzy duplicate of the leg that no longer counts.
-        val spend = chainSpendLeg(41)
+        val spend = chainSpendLeg()
         val deduper =
             ImportDeduper(
                 unidentifiedPolicy,
@@ -700,7 +699,7 @@ class ImportDeduperTest {
     fun conduitStatement_keepsAnOnwardLegAnEarlierRowAlreadyMatched() {
         // The payment row came first and matched the spend leg as a duplicate, so that leg is the payment's
         // record: superseding it now would count the payment zero times.
-        val spend = chainSpendLeg(41)
+        val spend = chainSpendLeg()
         val deduper =
             ImportDeduper(
                 unidentifiedPolicy,
@@ -769,7 +768,7 @@ class ImportDeduperTest {
         // the same amount back into the wallet (payee -> wallet). The wallet's card deposit is the charge's
         // funding, never the merchant's refund.
         val charge = bankCredit(40, timestamp = baseTime + 2.hours)
-        val chargeSpend = chainSpendLeg(41)
+        val chargeSpend = chainSpendLeg()
         val refundToCard = existing(50, timestamp = baseTime + 1.hours, src = wallet, tgt = bank)
         val refundFromMerchant = existing(51, timestamp = baseTime + 1.hours, src = payee, tgt = wallet)
         val deduper =

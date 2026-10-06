@@ -637,7 +637,7 @@ class ImportEngineImpl(
     }
 
     /**
-     * Books each created transfer's [ImportConversion] as a trade on its own account: settled → foreign for
+     * Books each created transfer's [conversion][ImportTransfer.conversion] as a trade on its own account: settled → foreign for
      * a payment, foreign → settled for a refund. Only created transfers get one (a DUPLICATE's trade already
      * exists), and a trade is excluded with its transfer, whether the source excluded the row or a
      * reconcile did — otherwise the conversion of money that was never spent would still move balances.
