@@ -161,13 +161,16 @@ class CurveCsvE2ETest : DbTest() {
     }
 
     /** Re-imports an already-imported file (plan + execute), threading the funding-card index. */
-    private suspend fun reimport(importId: CsvImportId) {
+    private suspend fun reimport(
+        importId: CsvImportId,
+        strategyName: String = "Curve CSV",
+    ) {
         val current = repositories.csvImportRepository.getImport(importId).first()!!
         val strategy =
             repositories.csvImportStrategyRepository
                 .getAllStrategies()
                 .first()
-                .first { it.name == "Curve CSV" }
+                .first { it.name == strategyName }
         val currencies = repositories.currencyRepository.getAllCurrencies().first()
         val passThroughAccounts = repositories.passThroughAccountRepository.getAll().first()
         val attributeMatchers =
@@ -335,6 +338,110 @@ class CurveCsvE2ETest : DbTest() {
             // The 1142 spend has no registered card, so it imports as an ordinary (non-excluded) spend.
             val aldi = transfersBetween("Curve", "ALDI").single()
             assertTrue(aldi.attributes.none { it.attributeType.name == "excluded" }, "unregistered-card row is not reconciled")
+        }
+
+    private val transactionsHeaders =
+        listOf(
+            "Export Format",
+            "Date (YYYY-MM-DD as UTC)",
+            "Time (HH:MM:SS as UTC)",
+            "Merchant",
+            "Txn Amount (Funding Card)",
+            "Txn Currency (Funding Card)",
+            "Txn Amount (Foreign Spend)",
+            "Txn Currency (Foreign Spend)",
+            "Card Name",
+            "Card Last 4 Digits",
+            "Type",
+            "Category",
+            "Notes",
+            "Fees",
+        )
+
+    private fun transactionsRow(
+        dateTime: String,
+        merchant: String,
+        amount: String,
+        currency: String = "GBP",
+        cardName: String = "Visa Debit",
+        last4: String = "7721",
+        type: String = "Personal",
+        foreign: Pair<String, String>? = null,
+        fees: String = "",
+    ): List<String> {
+        val (date, time) = dateTime.split(" ")
+        return listOf(
+            "CSV",
+            date,
+            time,
+            merchant,
+            amount,
+            currency,
+            foreign?.first.orEmpty(),
+            foreign?.second.orEmpty(),
+            cardName,
+            last4,
+            type,
+            "General",
+            "",
+            fees,
+        )
+    }
+
+    @Test
+    fun curveTransactionsExport_reconcilesByCard_tracksCurveCash_andSkipsOverlap() =
+        runTest {
+            val card =
+                stage(
+                    "card_transactions_record_20260510_100000.csv",
+                    cardHeaders,
+                    listOf(cardRow("2026-05-02 11:05:08", "Crv*Lastpasscom London", "-32.31")),
+                )
+            assertEquals(1, applyAll(listOf(card)).filesImported)
+
+            val rows =
+                listOf(
+                    transactionsRow(
+                        "2026-05-02 11:05:01",
+                        "Lastpass.com",
+                        "32.31",
+                        foreign = "43.2" to "USD",
+                        fees = "Weekend Currency Conversion Fee: £0.48",
+                    ),
+                    transactionsRow("2026-05-03 09:00:00", "Curve Cash: Deliveroo", "25", "CPT", "Curve Cash", last4 = "", type = ""),
+                    transactionsRow("2026-05-04 09:00:00", "Amazon", "208", "CPT", "Curve Cash", last4 = "", foreign = "2.08" to "GBP"),
+                )
+            val first = stage("Transactions 20260101-20260505.csv", transactionsHeaders, rows)
+            // A later export covering the same period repeats every row.
+            val overlap = stage("Transactions 20260101-20260601.csv", transactionsHeaders, rows.reversed())
+            val result = applyAll(listOf(first, overlap))
+            assertEquals(0, result.filesSkippedNoStrategy, "both files match the Curve Transactions strategy")
+            assertEquals(0, result.filesFailed)
+
+            // The card is unassigned, so the Card Last-4 tab lists it and the spend is not reconciled yet.
+            assertEquals(listOf("7721" to 2), unmatchedFundingReferences().map { it.value to it.rowCount })
+            val lastpass = transfersBetween("Curve", "Lastpass.com").single()
+            assertEquals("32.31", lastpass.amount.toDisplayValue().toString())
+            assertEquals("GBP", lastpass.amount.asset.code)
+            assertTrue(lastpass.attributes.any { it.attributeType.name == "curve-fee" })
+
+            // Curve Cash is tracked in points: earned from Curve Cashback, then spent on a merchant.
+            val earned = transfersBetween("Curve Cashback", "Curve Cash").single()
+            assertEquals("CURVECASH", earned.amount.asset.code)
+            assertEquals("25", earned.amount.toDisplayValue().toString())
+            val spent = transfersBetween("Curve Cash", "Amazon").single()
+            assertEquals("208", spent.amount.toDisplayValue().toString())
+
+            // Assigning the card reconciles the spend against the card's funding leg.
+            registerCard("Crypto.com Card", "7721")
+            reimport(first.id, strategyName = "Curve CSV (Transactions)")
+            repositories.maintenanceService.refreshMaterializedViews()
+            assertTrue(unmatchedFundingReferences().isEmpty())
+            val reconciled = transfersBetween("Curve", "Lastpass.com").single()
+            assertTrue(
+                reconciled.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
+                "the Curve spend reconciles once its card is known",
+            )
         }
 
     @Test
