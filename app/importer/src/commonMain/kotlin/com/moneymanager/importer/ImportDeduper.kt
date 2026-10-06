@@ -1322,19 +1322,23 @@ class ImportDeduper(
             )?.let { return it }
         }
         // Second pass: tolerate bank re-export drift (close date, similar description) — the amount
-        // must still match exactly, so only that bucket needs scanning.
+        // must still match exactly, so only that bucket needs scanning. Of several equal candidates the
+        // nearest in time is this row's record: taking the first in id order can pair a statement row with
+        // one chain while its same-second funding row reconciles another, counting the movement nowhere.
         transfer.amount?.let { amount ->
-            existingByAmount[amount]?.forEach { existing ->
-                // An excluded leg counts nowhere, so a row dropped as its duplicate would count nowhere either —
-                // unless the leg is this same file's earlier record of the row, which keeps its exclusion.
-                if (existing.transferId !in matchedExistingIds &&
-                    (existing.transferId !in existingExcludedLegs || existing.transferId in ownSourceLegs) &&
-                    isFuzzyDuplicate(transfer, existing.transfer, policy)
-                ) {
+            val timestamp = requireNotNull(transfer.timestamp)
+            existingByAmount[amount]
+                ?.filter { existing ->
+                    // An excluded leg counts nowhere, so a row dropped as its duplicate would count nowhere either —
+                    // unless the leg is this same file's earlier record of the row, which keeps its exclusion.
+                    existing.transferId !in matchedExistingIds &&
+                        (existing.transferId !in existingExcludedLegs || existing.transferId in ownSourceLegs) &&
+                        isFuzzyDuplicate(transfer, existing.transfer, policy)
+                }?.minByOrNull { (it.transfer.timestamp - timestamp).absoluteValue }
+                ?.let { existing ->
                     matchedExistingIds += existing.transferId
                     return Classified(transfer, ImportStatus.DUPLICATE, existing.transferId)
                 }
-            }
         }
         // Then cross-source reconciliation (opt-in per strategy): the same real movement recorded by
         // another export with a different description (a crypto.com top-up seen as "Top Up Card" in the
