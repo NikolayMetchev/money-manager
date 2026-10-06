@@ -574,7 +574,7 @@ private fun MatchRow(
  * [runCatching] that lets cancellation propagate. A write here routinely updates the very flows its
  * effect is keyed on, restarting (so cancelling) it before `import()` returns; that is not a failure.
  */
-private inline fun <T> runCatchingUnlessCancelled(block: () -> T): Result<T> =
+internal inline fun <T> runCatchingUnlessCancelled(block: () -> T): Result<T> =
     runCatching(block).onFailure { if (it is CancellationException) throw it }
 
 private fun formatDelta(delta: Duration): String = delta.absoluteValue.toString().let { if (delta.isNegative()) "-$it" else "+$it" }

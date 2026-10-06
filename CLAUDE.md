@@ -316,6 +316,13 @@ source** (built-in: Koinly). Its data never touches real accounts:
 - Shadow accounts are hidden by default in the Accounts screen and in `AccountPicker` (tickbox to show).
 - Keep it source-agnostic: no Koinly-specific code outside the built-in strategy's config.
 
+**The Reconciliation tab** (Imports → Reconciliation) holds everything an import leaves for a person to
+resolve, as sub-tabs: External Account Reconciliation (the sources above), Manual Entries (companion
+transaction rules), and Card Last-4. Card Last-4 lists funding references that no account owns: values in
+any CSV strategy's `fundingAttributeMatch` column that its attribute type doesn't resolve. Assigning one
+adds the value to the account's token set (`addAttributeToken`, so an account can own several cards) and
+re-runs only the re-import plan's funding reconciles (`rerunFundingReconciles`).
+
 ## Dependency Injection
 
 **Metro** provides compile-time DI. The graphs live in `app/di/core` (`AppComponent`,

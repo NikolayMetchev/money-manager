@@ -13,6 +13,7 @@ kotlin {
                 api(projects.app.reconciliation)
                 api(libs.kotlinx.datetime)
 
+                implementation(projects.app.csvimporter)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
             }
@@ -33,6 +34,8 @@ kotlin {
                 api(libs.androidx.compose.ui)
 
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.model.csv)
+                implementation(projects.app.model.csvstrategy)
                 implementation(libs.androidx.compose.material3)
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
@@ -51,6 +54,8 @@ kotlin {
                 api(libs.compose.foundation.layout.desktop)
 
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.model.csv)
+                implementation(projects.app.model.csvstrategy)
                 implementation(libs.compose.material3.desktop)
                 implementation(libs.compose.ui.desktop)
                 implementation(libs.compose.ui.graphics.desktop)
@@ -62,6 +67,9 @@ kotlin {
         getByName("jvmTest") {
             dependencies {
                 implementation(projects.app.model.core)
+                implementation(projects.app.model.csv)
+                implementation(projects.app.model.csvstrategy)
+                implementation(projects.app.model.rules)
                 implementation(kotlin("test"))
                 implementation(libs.compose.ui.test.desktop)
                 implementation(libs.kotlinx.coroutines.core)
@@ -73,6 +81,9 @@ kotlin {
         getByName("androidDeviceTest") {
             dependencies {
                 implementation(projects.app.model.core)
+                implementation(projects.app.model.csv)
+                implementation(projects.app.model.csvstrategy)
+                implementation(projects.app.model.rules)
                 implementation(projects.test.app.ui)
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.coroutines.core)
@@ -82,6 +93,9 @@ kotlin {
         getByName("androidHostTest") {
             dependencies {
                 implementation(projects.app.model.core)
+                implementation(projects.app.model.csv)
+                implementation(projects.app.model.csvstrategy)
+                implementation(projects.app.model.rules)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.mokkery.core)
             }

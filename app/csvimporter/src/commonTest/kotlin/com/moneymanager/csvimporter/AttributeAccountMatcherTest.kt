@@ -6,7 +6,9 @@ import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class AttributeAccountMatcherTest {
     private var nextId = 1L
@@ -89,5 +91,30 @@ class AttributeAccountMatcherTest {
         assertEquals(AccountId(60), registry.getValue("card-last4").match("7721"))
         assertEquals(AccountId(61), registry.getValue("merchant-key").match("ACME LTD"))
         assertNull(registry["card-last4"]?.match("acme"))
+    }
+
+    @Test
+    fun `a value claimed by two accounts matches several and resolves to none`() {
+        val matcher = AttributeAccountMatcher.from(listOf(attribute(accountId = 1, value = "7721"), attribute(accountId = 2, value = "77")))
+
+        assertNull(matcher.match("7721"))
+        assertTrue(matcher.matchesSeveral("7721"))
+        assertFalse(matcher.matchesSeveral("1234"))
+    }
+
+    @Test
+    fun `adding a token appends it to the set`() {
+        assertEquals("9999 7721", addAttributeToken("9999", "7721"))
+    }
+
+    @Test
+    fun `adding a token already in the set keeps the set unchanged`() {
+        assertEquals("7721 9999", addAttributeToken("7721, 9999", " 9999 "))
+    }
+
+    @Test
+    fun `adding a token to no existing value yields just the token`() {
+        assertEquals("7721", addAttributeToken(null, "7721"))
+        assertEquals("7721", addAttributeToken("", "7721"))
     }
 }

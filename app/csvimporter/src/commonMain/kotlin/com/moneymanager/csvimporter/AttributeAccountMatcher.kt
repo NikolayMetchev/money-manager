@@ -23,10 +23,13 @@ class AttributeAccountMatcher private constructor(
     private val patterns: List<Pair<Regex, AccountId>>,
 ) {
     /** The single account whose pattern matches [value], or null when none or more than one does. */
-    fun match(value: String): AccountId? {
-        val accounts = patterns.mapNotNull { (regex, accountId) -> accountId.takeIf { regex.containsMatchIn(value) } }.toSet()
-        return accounts.singleOrNull()
-    }
+    fun match(value: String): AccountId? = matchingAccounts(value).singleOrNull()
+
+    /** True when more than one account's pattern matches [value], which is why [match] declines it. */
+    fun matchesSeveral(value: String): Boolean = matchingAccounts(value).size > 1
+
+    private fun matchingAccounts(value: String): Set<AccountId> =
+        patterns.mapNotNull { (regex, accountId) -> accountId.takeIf { regex.containsMatchIn(value) } }.toSet()
 
     companion object {
         /** Splits an attribute value into its individual pattern tokens (whitespace/comma-separated). */

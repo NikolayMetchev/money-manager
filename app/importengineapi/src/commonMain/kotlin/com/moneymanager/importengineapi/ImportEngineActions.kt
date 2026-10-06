@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import kotlin.time.Instant
@@ -167,3 +168,31 @@ suspend fun ImportEngine.createAccount(
     source: Source,
     shadowSource: String? = null,
 ): AccountId = createAccounts(listOf(account), shadowSource) { source }.single()
+
+/**
+ * Sets [accountId]'s ungrouped attribute of [typeId] to [value]: rewrites [existingAttributeId] when the
+ * account already holds one, otherwise adds it. Grouped attributes of the same type are left alone.
+ */
+suspend fun ImportEngine.setAccountAttributeValue(
+    accountId: AccountId,
+    typeId: AttributeTypeId,
+    value: String,
+    existingAttributeId: Long?,
+) {
+    val attribute = NewAttribute(typeId, value)
+    import(
+        ImportBatch.manualEdits(
+            accounts =
+                listOf(
+                    ImportAccountIntent(
+                        key = LocalAccountKey("set-attribute"),
+                        source = Source.Manual,
+                        operation = ImportOperation.UPDATE,
+                        existingId = accountId,
+                        updatedAttributes = existingAttributeId?.let { mapOf(it to attribute) } ?: emptyMap(),
+                        attributes = if (existingAttributeId == null) listOf(attribute) else emptyList(),
+                    ),
+                ),
+        ),
+    )
+}
