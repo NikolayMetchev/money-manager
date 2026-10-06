@@ -294,7 +294,9 @@ class ImportDeduper(
      * top-up days apart both move £100 out of the same wallet.)
      */
     private val existingExcludedLegs: MutableSet<TransferId> =
-        reconciledExclusionTypeId
+        // A unique-id policy keeps the exclusion type out of [reconciledExclusionTypeId] (its attribute
+        // comparison is unchanged), but its placeholder and conduit rules need the excluded legs all the same.
+        (reconciledExclusionTypeId ?: (policy as? DedupePolicy.UniqueIdentifier)?.reconciledExclusionAttributeTypeId)
             ?.let { typeId -> existing.filter { typeId in it.attributes }.mapTo(mutableSetOf()) { it.transferId } }
             ?: mutableSetOf()
 
@@ -1323,9 +1325,10 @@ class ImportDeduper(
         // must still match exactly, so only that bucket needs scanning.
         transfer.amount?.let { amount ->
             existingByAmount[amount]?.forEach { existing ->
-                // An excluded leg counts nowhere, so a row dropped as its duplicate would count nowhere either.
+                // An excluded leg counts nowhere, so a row dropped as its duplicate would count nowhere either —
+                // unless the leg is this same file's earlier record of the row, which keeps its exclusion.
                 if (existing.transferId !in matchedExistingIds &&
-                    existing.transferId !in existingExcludedLegs &&
+                    (existing.transferId !in existingExcludedLegs || existing.transferId in ownSourceLegs) &&
                     isFuzzyDuplicate(transfer, existing.transfer, policy)
                 ) {
                     matchedExistingIds += existing.transferId

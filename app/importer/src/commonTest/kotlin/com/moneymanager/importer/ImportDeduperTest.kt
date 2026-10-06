@@ -763,6 +763,62 @@ class ImportDeduperTest {
     }
 
     @Test
+    fun fuzzyPass_stillMatchesAnExcludedLegOfTheSameFile() {
+        // Re-running a row whose earlier import was excluded as reconciled: that leg is this file's own record
+        // of the row, which stays excluded, so the row is its duplicate rather than a second, counted copy.
+        val earlierImport =
+            existing(
+                41,
+                description = "gerard farnolle",
+                src = wallet,
+                tgt = payee,
+                attributes = mapOf(AttributeTypeId(-1) to "reconciled"),
+            )
+        val deduper = ImportDeduper(unidentifiedPolicy, existing = listOf(earlierImport), ownSourceLegs = setOf(TransferId(41)))
+        val row = importTransfer(0, description = "gerard farnolle", timestamp = baseTime + 2.days, src = wallet, tgt = payee)
+        assertEquals(ImportStatus.DUPLICATE, deduper.classify(listOf(row)).single().status)
+    }
+
+    @Test
+    fun conduitStatement_uniqueIdPolicyNeverPairsWithAnExcludedDeposit() {
+        // A unique-id card import (Monzo CSV) reaching PayPal after its export: PayPal's deposit there is already
+        // excluded (a refused deposit), so it records no counted movement for the chain to reconcile with.
+        val card = AccountId(34)
+        val deposit =
+            existing(
+                50,
+                description = "General Credit Card Deposit",
+                src = placeholder,
+                tgt = wallet,
+                attributes = mapOf(AttributeTypeId(-9) to "true", AttributeTypeId(-1) to "Refused"),
+            )
+        val policy =
+            DedupePolicy.UniqueIdentifier(
+                reconcileWindow = 60.minutes,
+                reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+                reconciledRelationshipTypeId = RelationshipTypeId(1),
+                unidentifiedCounterpartyAttributeTypeId = AttributeTypeId(-9),
+                unidentifiedCounterpartyWindow = 3.days,
+            )
+        val charge =
+            importTransfer(0, description = "PAYPAL *UBERTRIP 3", uniqueKey = mapOf("txid" to "tx_1"), src = card, tgt = wallet)
+                .copy(
+                    passThrough =
+                        ImportPassThrough(
+                            conduits = listOf(AccountRef.Existing(wallet)),
+                            merchantTarget = AccountRef.Existing(payee),
+                            amount = money(5),
+                            spendDescriptions = listOf("UBERTRIP 3"),
+                            relationshipTypeId = RelationshipTypeId(3),
+                        ),
+                )
+        val result = ImportDeduper(policy, existing = listOf(deposit)).classify(listOf(charge)).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertEquals(null, result.conduitStatement)
+        assertEquals(null, result.excludeExisting)
+    }
+
+    @Test
     fun placeholder_neverPairsWithTheMerchantEndOfAChain() {
         // A charge chain (bank -> wallet -> payee) and, nearer in time, a refund chain whose merchant end pays
         // the same amount back into the wallet (payee -> wallet). The wallet's card deposit is the charge's

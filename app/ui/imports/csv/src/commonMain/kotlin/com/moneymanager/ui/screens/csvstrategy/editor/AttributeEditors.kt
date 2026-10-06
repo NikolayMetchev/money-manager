@@ -381,7 +381,11 @@ private fun AttributeMappingDetails(
                 ExtractionEditor(
                     label = "Extract with a pattern (rows it doesn't match get no attribute)",
                     extraction = mapping.extraction,
-                    onChange = { onChanged(mapping.copy(extraction = it)) },
+                    // The fixed value only applies to an extraction's matches, so it goes with the extraction.
+                    onChange = { extraction ->
+                        val fixedValue = if (extraction == null) null else mapping.emitWhenMatched
+                        onChanged(mapping.copy(extraction = extraction, emitWhenMatched = fixedValue))
+                    },
                     enabled = enabled,
                 )
                 OutlinedTextField(

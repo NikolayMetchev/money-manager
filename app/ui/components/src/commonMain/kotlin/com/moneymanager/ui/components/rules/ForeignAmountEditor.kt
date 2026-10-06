@@ -22,8 +22,8 @@ fun ForeignAmountEditor(
     onForeignAmountChanged: (ForeignAmount?) -> Unit,
     pathField: ConditionPathField,
 ) {
-    var amount by remember { mutableStateOf(foreignAmount?.amount) }
-    var currency by remember { mutableStateOf(foreignAmount?.currency) }
+    var amount by remember(foreignAmount) { mutableStateOf(foreignAmount?.amount) }
+    var currency by remember(foreignAmount) { mutableStateOf(foreignAmount?.currency) }
 
     fun emit() {
         val a = amount

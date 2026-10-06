@@ -39,8 +39,10 @@ import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.ReconciledPartnerUnhide
 import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import com.moneymanager.importengineapi.reconciledPartnerUnhideUpdates
+import com.moneymanager.importengineapi.reconciledPartnerUnhides
 import com.moneymanager.importengineapi.selectNearestUnconsumedLeg
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
@@ -242,6 +244,12 @@ data class ReimportPlan(
     val staleDuplicates: List<ReimportStaleDuplicate> = emptyList(),
     /** Already-imported conduit spends that will reconcile against a funding leg once re-run. */
     val fundingReconciles: List<ReimportFundingReconcile> = emptyList(),
+    /**
+     * Reconcile exclusions that no single rewrite or trade conversion lifts, because the transfer is
+     * reconciled against several of them (a PayPal deposit split across two card charges). Each is applied
+     * after the per-row batches, once the ones that succeeded have deleted all its counterparts.
+     */
+    val sharedUnhides: List<ReconciledPartnerUnhide> = emptyList(),
 ) {
     val isEmpty: Boolean
         get() =
@@ -611,7 +619,21 @@ suspend fun planCsvReimport(
         duplicateTrades = duplicateTrades,
         staleDuplicates = staleDuplicates,
         fundingReconciles = fundingReconciles,
+        sharedUnhides = sharedUnhides(rewrites, tradeConversions, relationshipRepository, transactionRepository),
     )
+}
+
+/** The [ReimportPlan.sharedUnhides] for these per-row batches: ones no single batch's deletes orphan. */
+private suspend fun sharedUnhides(
+    rewrites: List<ReimportRewrite>,
+    tradeConversions: List<ReimportTradeConversion>,
+    relationshipRepository: TransferRelationshipReadRepository,
+    transactionRepository: TransactionReadRepository,
+): List<ReconciledPartnerUnhide> {
+    val deleteSets = rewrites.map { it.transferIdsToDelete.toSet() } + tradeConversions.map { it.transferIdsToDelete.toSet() }
+    val allDeleted = deleteSets.flatMapTo(mutableSetOf()) { it }
+    return reconciledPartnerUnhides(allDeleted, relationshipRepository, transactionRepository)
+        .filter { unhide -> unhide.isOrphanedBy(allDeleted) && deleteSets.none { unhide.isOrphanedBy(it) } }
 }
 
 /**
@@ -1350,6 +1372,25 @@ suspend fun executeCsvReimport(
                     accountId = null,
                     accountName = conversion.description,
                     detail = skipDetail("Trade conversion failed", expected.message),
+                )
+        }
+    }
+
+    // Transfers reconciled against several of the rows above: lifted only once every one of those rows'
+    // deletes went through, and before the re-run below, so the rebuilt rows can reconcile with them anew.
+    val deletedTransferIds =
+        (rewritten.flatMap { it.transferIdsToDelete } + converted.flatMap { it.transferIdsToDelete }).toSet()
+    val sharedUnhides = plan.sharedUnhides.filter { it.isOrphanedBy(deletedTransferIds) }
+    if (sharedUnhides.isNotEmpty()) {
+        try {
+            importEngine.import(ImportBatch(transfers = sharedUnhides.map { it.update }, dedupePolicy = DedupePolicy.None))
+        } catch (expected: Exception) {
+            logger.warn(expected) { "Re-import un-hide of ${sharedUnhides.size} shared reconciled transfer(s) failed" }
+            skipped +=
+                ReimportSkippedAccount(
+                    accountId = null,
+                    accountName = "${sharedUnhides.size} transfer(s) reconciled against several rows",
+                    detail = skipDetail("Un-hide failed", expected.message),
                 )
         }
     }

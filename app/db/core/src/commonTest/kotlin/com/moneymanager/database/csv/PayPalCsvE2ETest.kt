@@ -539,6 +539,24 @@ class PayPalCsvE2ETest : DbTest() {
             assertEquals(3, deposits.size, "PayPal's three card deposits survive the card file's re-import")
         }
 
+    @Test
+    fun reimportingSplitCardCharges_afterThePayPalExport_countsEachPaymentOnce() =
+        runTest {
+            // Each PayPal deposit is reconciled against two card rows, so no single row's rewrite explains it
+            // away: re-importing must still lift its exclusion once both rows' chains are deleted.
+            importPayPal(splitPayPalFile)
+            val card = stage("card_transactions_record_20251116_103317.csv", cardHeaders, splitCardFile)
+            applyAll(listOf(card))
+            reimport(card) { config ->
+                config.copy(
+                    fieldMappings =
+                        config.fieldMappings +
+                            (TransferField.TIMEZONE to HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London")),
+                )
+            }
+            assertSplitPaymentsCountedOnce()
+        }
+
     private suspend fun reimport(
         csvImport: CsvImport,
         changeConfig: (CsvStrategyConfig<FieldMapping>) -> CsvStrategyConfig<FieldMapping>,

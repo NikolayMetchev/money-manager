@@ -652,7 +652,8 @@ class ImportEngineImpl(
             val timestamp = requireNotNull(transfer.timestamp)
             val account = requireId(if (conversion.incoming) transfer.toAccount else transfer.fromAccount)
             val (from, to) = if (conversion.incoming) amount to conversion.settled else conversion.settled to amount
-            val key = listOf(timestamp, account, from, to)
+            // Keyed on the persisted millisecond, as createTrade matches on it (see the leg-group trade loop).
+            val key = listOf(timestamp.toEpochMilliseconds(), account, from, to)
             val occurrence = occurrences.getOrDefault(key, 0)
             occurrences[key] = occurrence + 1
             val trade =
