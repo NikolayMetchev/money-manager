@@ -11,6 +11,8 @@ import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.rules.ForeignAmount
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
@@ -1787,7 +1789,7 @@ class MonzoImportE2ETest : DbTest() {
         }
 
     @Test
-    fun `foreign currency transactions use local amount and local currency when configured`() =
+    fun `a foreign currency spend is booked in the local currency with the conversion as a trade`() =
         runTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
@@ -1835,8 +1837,11 @@ class MonzoImportE2ETest : DbTest() {
                             config =
                                 baseStrategy.config.mapBankTransactionMappings {
                                     copy(
-                                        localAmountField = "local_amount",
-                                        localCurrencyField = "local_currency",
+                                        foreignAmount =
+                                            ForeignAmount(
+                                                amount = ValueExpr(listOf("local_amount")),
+                                                currency = ValueExpr(listOf("local_currency")),
+                                            ),
                                     )
                                 },
                         )
@@ -1878,16 +1883,22 @@ class MonzoImportE2ETest : DbTest() {
                     .first()
             assertEquals(2, transfers.size)
 
-            // API import mirrors CSV semantics: transfer money remains in account currency.
+            // The merchant is paid what it asked for (EUR 14.47); the GBP 12.50 Monzo settled is its conversion.
             val foreignTransfer = transfers.single { it.description == "FOREIGN SPEND" }
-            assertEquals("GBP", foreignTransfer.amount.asset.code, "Foreign transfer should remain in account currency")
-            assertTrue(
-                foreignTransfer.amount.hasDisplayValue("12.50"),
-                "Foreign transfer should use the main GBP amount",
-            )
+            assertEquals("EUR", foreignTransfer.amount.asset.code, "Foreign transfer is booked in the local currency")
+            assertTrue(foreignTransfer.amount.hasDisplayValue("14.47"), "Foreign transfer should use the local amount")
+            val conversion =
+                repositories.tradeRepository
+                    .getTradesByAccount(monzoAccount.id)
+                    .first()
+                    .single()
+            assertEquals(monzoAccount.id, conversion.fromAccountId)
+            assertEquals(monzoAccount.id, conversion.toAccountId)
+            assertTrue(conversion.from.hasDisplayValue("12.50") && conversion.from.asset.code == "GBP")
+            assertTrue(conversion.to.hasDisplayValue("14.47") && conversion.to.asset.code == "EUR")
 
             val domesticTransfer = transfers.single { it.description == "DOMESTIC SPEND" }
-            assertEquals("GBP", domesticTransfer.amount.asset.code, "Domestic transfer should remain in account currency")
+            assertEquals("GBP", domesticTransfer.amount.asset.code, "A same-currency local amount changes nothing")
             assertTrue(
                 domesticTransfer.amount.hasDisplayValue("50.00"),
                 "Domestic transfer should use the main GBP amount",

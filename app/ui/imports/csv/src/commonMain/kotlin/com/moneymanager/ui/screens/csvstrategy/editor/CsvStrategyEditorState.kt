@@ -120,6 +120,13 @@ internal class CsvStrategyEditorState(
             ?.let { it.copy(conditions = it.conditions.keepPresentIn(availableColumnNames)) },
     )
 
+    // Dropped when either column is missing from the file, like the fee.
+    var foreignAmount by mutableStateOf(
+        amountMapping?.foreignAmount?.takeIf {
+            it.amount.primaryPath in availableColumnNames && it.currency.primaryPath in availableColumnNames
+        },
+    )
+
     private val sourceMapping = config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
 
     // The credited-leg mappings that turn a row into a trade (TO_AMOUNT/TO_CURRENCY) have no widget
@@ -156,6 +163,7 @@ internal class CsvStrategyEditorState(
     var selectedTimezone by
         mutableStateOf((timezoneMapping as? HardCodedTimezoneMapping)?.timezoneId ?: TimeZone.currentSystemDefault().id)
     var timezoneColumnName by mutableStateOf((timezoneMapping as? TimezoneLookupMapping)?.columnName.takeIfPresentIn(availableColumnNames))
+    var timezoneAliasesText by mutableStateOf(formatAliases((timezoneMapping as? TimezoneLookupMapping)?.aliases.orEmpty()))
 
     var attributeMappings by mutableStateOf(config?.attributeMappings.orEmpty().filter { it.columnName in availableColumnNames })
 
@@ -202,7 +210,7 @@ internal class CsvStrategyEditorState(
     var reconciliationLinkablePrefix by mutableStateOf(config?.reconciliation?.linkableAccountPrefix.orEmpty())
 
     // "FROM=TO" pairs, comma-separated (see CsvStrategyConfig.assetCodes).
-    var assetAliasesText by mutableStateOf(formatAssetAliases(config?.assetCodes?.aliases.orEmpty()))
+    var assetAliasesText by mutableStateOf(formatAliases(config?.assetCodes?.aliases.orEmpty()))
 
     // No editors of their own yet (set by built-in strategies); carried through so saving an edited
     // strategy doesn't silently drop them.

@@ -8,7 +8,9 @@ import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.ValueExpr
+import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
@@ -108,6 +110,8 @@ data class AmountParsingExport(
     val direction: Direction = Direction.Outgoing,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val fee: FeeRule? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val foreignAmount: ForeignAmount? = null,
 ) : FieldMappingExport
 
 /**
@@ -148,4 +152,7 @@ data class HardCodedTimezoneExport(
 data class TimezoneLookupExport(
     override val fieldType: TransferField,
     val columnName: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @Serializable(with = SortedStringToStringMapSerializer::class)
+    val aliases: Map<String, String> = emptyMap(),
 ) : FieldMappingExport

@@ -6,8 +6,10 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.rules.ValueExpr
+import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
@@ -167,6 +169,10 @@ data class DirectColumnMapping(
  * account, linked to the main transaction (via a `fee` relationship) — exports like Wise's, where the
  * amount column is net of fees but the fee also left the account (an ATM withdrawal: 200.00 withdrawn
  * plus a 7.29 fee movement).
+ *
+ * When [foreignAmount] is set and the row reports a different currency there, the parsed amount is what
+ * the statement account settled, and the movement itself is booked in the foreign currency (see
+ * [ForeignAmount]).
  */
 @Serializable
 data class AmountParsingMapping(
@@ -178,6 +184,8 @@ data class AmountParsingMapping(
     val direction: Direction = Direction.Outgoing,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val fee: FeeRule? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val foreignAmount: ForeignAmount? = null,
 ) : FieldMapping {
     init {
         when (mode) {
@@ -228,11 +236,15 @@ data class HardCodedTimezoneMapping(
 ) : FieldMapping
 
 /**
- * Looks up a timezone by IANA timezone ID from a CSV column.
- * The column should contain valid timezone IDs (e.g., "Europe/London", "America/New_York").
+ * Looks up a timezone from a CSV column holding an IANA timezone ID (e.g. "Europe/London") or an offset
+ * ("+01:00"). [aliases] translate what a source writes instead (keys compared upper-cased): PayPal's export
+ * says "GMT"/"BST", which are no zone ids, so its strategy maps them to their offsets.
  */
 @Serializable
 data class TimezoneLookupMapping(
     override val fieldType: TransferField,
     val columnName: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @Serializable(with = SortedStringToStringMapSerializer::class)
+    val aliases: Map<String, String> = emptyMap(),
 ) : FieldMapping

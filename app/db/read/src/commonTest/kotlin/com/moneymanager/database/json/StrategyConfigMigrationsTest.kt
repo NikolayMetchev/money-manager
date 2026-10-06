@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -558,6 +559,32 @@ class LegGroupsAndFeesMigrationTest {
             FeeRule(amount = ValueExpr(listOf("fee")), currency = ValueExpr(listOf("feeAsset"))),
             checkNotNull(trades.tradeMappings).fee,
         )
+    }
+
+    @Test
+    fun `api local amount and currency fields become a foreign amount`() {
+        val legacy =
+            """
+            {
+              "configVersion": 4,
+              "baseUrl": "https://example.com",
+              "accounts": {"type": "single", "name": "X", "externalId": "x"},
+              "dataEndpoints": [
+                {"endpoint": {"path": "/a", "responseArrayKey": ""}, "kind": "BANK_TRANSACTIONS",
+                 "transactionMappings": {"amountField": "amount", "localAmountField": "local_amount", "localCurrencyField": "local_currency"}},
+                {"endpoint": {"path": "/b", "responseArrayKey": ""}, "kind": "BANK_TRANSACTIONS",
+                 "transactionMappings": {"amountField": "amount", "localAmountField": null, "localCurrencyField": null}}
+              ]
+            }
+            """.trimIndent()
+
+        val (withLocal, withoutLocal) = ApiStrategyJsonCodec.decode(legacy).dataEndpoints
+
+        assertEquals(
+            ForeignAmount(amount = ValueExpr(listOf("local_amount")), currency = ValueExpr(listOf("local_currency"))),
+            checkNotNull(withLocal.transactionMappings).foreignAmount,
+        )
+        assertEquals(null, checkNotNull(withoutLocal.transactionMappings).foreignAmount)
     }
 }
 

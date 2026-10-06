@@ -74,7 +74,7 @@ fun FeeRuleEditor(
 }
 
 /** This value reading [path] first instead, or null for a blank path. */
-private fun ValueExpr?.withPrimaryPath(path: String): ValueExpr? =
+internal fun ValueExpr?.withPrimaryPath(path: String): ValueExpr? =
     when {
         path.isBlank() -> null
         this == null -> ValueExpr(listOf(path))

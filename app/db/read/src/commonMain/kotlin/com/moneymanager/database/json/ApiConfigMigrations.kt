@@ -364,3 +364,30 @@ private fun tradeFee(obj: JsonObject): JsonObject {
 private const val REGEX_SPECIALS = "\\^$.|?*+()[]{}"
 
 private fun escapeRegex(literal: String): String = literal.map { if (it in REGEX_SPECIALS) "\\$it" else "$it" }.joinToString("")
+
+/**
+ * API config v4 → v5: a transaction mapping's `localAmountField` + `localCurrencyField` become one
+ * `foreignAmount` (the shared `ForeignAmount`), which books a foreign purchase in its own currency.
+ * Before, the pair was only ever read for custom attributes, so a mapping naming just one of them had
+ * nothing to convert and loses the field.
+ */
+internal val apiForeignAmountStep =
+    ConfigMigrationStep { config ->
+        config.rewriteObjects { obj ->
+            if ("amountField" in obj) transactionForeignAmount(obj) else obj
+        } as JsonObject
+    }
+
+private fun transactionForeignAmount(obj: JsonObject): JsonObject {
+    val rest = obj.without("localAmountField", "localCurrencyField")
+    val amount = obj.string("localAmountField") ?: return JsonObject(rest)
+    val currency = obj.string("localCurrencyField") ?: return JsonObject(rest)
+    val foreign =
+        JsonObject(
+            mapOf(
+                "amount" to valueExprJson(listOf(amount), null),
+                "currency" to valueExprJson(listOf(currency), null),
+            ),
+        )
+    return JsonObject(rest + ("foreignAmount" to foreign))
+}

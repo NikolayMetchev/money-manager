@@ -437,6 +437,7 @@ class CsvStrategyExportService(
                     debitColumnName = debitColumnName,
                     direction = direction,
                     fee = fee,
+                    foreignAmount = foreignAmount,
                 )
             is HardCodedCurrencyExport ->
                 HardCodedCurrencyMapping(
@@ -459,6 +460,7 @@ class CsvStrategyExportService(
                 TimezoneLookupMapping(
                     fieldType = fieldType,
                     columnName = columnName,
+                    aliases = aliases,
                 )
         }
 }

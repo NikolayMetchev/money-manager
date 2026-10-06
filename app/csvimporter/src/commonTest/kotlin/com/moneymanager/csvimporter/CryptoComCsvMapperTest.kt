@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.importengineapi.ImportConversion
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -38,6 +39,8 @@ class CryptoComCsvMapperTest {
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
+    private val usd =
+        Currency(id = CurrencyId(2), code = "USD", name = "US Dollar", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
     private val card = Account(id = AccountId(1), name = "Crypto.com Card", openingDate = now)
     private val cash = Account(id = AccountId(2), name = "Crypto.com Cash", openingDate = now)
     private val cryptoWallet = Account(id = AccountId(3), name = "Crypto.com", openingDate = now)
@@ -77,8 +80,8 @@ class CryptoComCsvMapperTest {
                     // account; the fiat tests keep it absent so they can assert it gets discovered.
                     if (cryptoWalletExists) put(cryptoWallet.name, cryptoWallet)
                 },
-            existingCurrencies = mapOf(gbp.id to gbp),
-            existingCurrenciesByCode = mapOf(gbp.code to gbp),
+            existingCurrencies = mapOf(gbp.id to gbp, usd.id to usd),
+            existingCurrenciesByCode = mapOf(gbp.code to gbp, usd.code to usd),
             existingCryptoByCode = mapOf(tgbp.code to tgbp, cro.code to cro),
         )
 
@@ -189,10 +192,32 @@ class CryptoComCsvMapperTest {
     }
 
     @Test
-    fun `card cross-currency spend uses the Native amount and currency`() {
+    fun `card cross-currency spend pays the merchant in its currency and converts the Native amount`() {
         val r = map(cardStrategy, row("Of", "USD", "-3.97", "GBP", "-3.03", "-3.03", ""))
         assertEquals(card.id, r.transfer.sourceAccountId)
+        assertEquals(Money.fromDisplayValue(BigDecimal("3.97"), usd), r.transfer.amount)
+        assertEquals(ImportConversion(settled = Money.fromDisplayValue(BigDecimal("3.03"), gbp), incoming = false), r.conversion)
+    }
+
+    @Test
+    fun `card cross-currency refund converts what the card received`() {
+        val r = map(cardStrategy, row("Refund: Of", "USD", "3.97", "", "", "3.03", ""))
+        assertEquals(card.id, r.transfer.targetAccountId)
+        assertEquals(Money.fromDisplayValue(BigDecimal("3.97"), usd), r.transfer.amount)
+        assertEquals(true, r.conversion?.incoming)
+    }
+
+    @Test
+    fun `card spend in the card's own currency has no conversion`() {
+        val r = map(cardStrategy, row("Tesco", "GBP", "-3.03", "", "", "-3.03", ""))
         assertEquals(Money.fromDisplayValue(BigDecimal("3.03"), gbp), r.transfer.amount)
+        assertNull(r.conversion)
+    }
+
+    @Test
+    fun `card spend in an unknown foreign currency is an error, not a silently mispriced row`() {
+        val result = mapper(cardStrategy).mapRow(row("Somewhere", "XYZ", "-3.97", "", "", "-3.03", ""))
+        assertTrue(result is MappingResult.Error)
     }
 
     @Test

@@ -75,6 +75,7 @@ internal fun AdvancedTab(
         } else {
             AttributeMappingsEditor(
                 columns = attributeColumns,
+                conditionColumns = csvColumns,
                 mappings = state.attributeMappings,
                 onMappingsChanged = { state.attributeMappings = it },
                 existingAttributeTypes = existingAttributeTypes,

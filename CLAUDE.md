@@ -269,6 +269,14 @@ parallel ones (see **Design Principle**):
 Shared editors (`ConditionsEditor`, `DirectionEditor`, the account-rules, fee and leg-group editors) serve
 both the CSV and API strategy screens.
 
+**Pass-through chains and conduit statements:** when a conduit's own export (PayPal) records money arriving
+from or leaving to an unidentified card (a placeholder leg) and that matches a pass-through chain's leg into
+the conduit, the chain's legs *beyond* the conduit are excluded (`Classified.supersededLegs` /
+`ConduitStatementMatch`), because the conduit's statement names the real payee and currency. Both import
+orders reach the same result. A post-pass (`reconcileSplitConduitMovements`) also pairs one placeholder with
+2–4 chain movements to the same merchant that sum to it (Uber authorises £21.58, tops up £0.27; PayPal records
+£21.85). Curve's export has no deposit rows, so it keeps its own funding-card rule (`fundingAttributeMatch`).
+
 **Still separate, on purpose:** `TradeReconciler`, `ConversionTradeReconciler` and `ConversionGroupReconciler`
 use genuinely different assignment rules, and `app/reconciliation`'s `LegMatcher` is a read-only report.
 Merging any of them would change built-in outcomes.

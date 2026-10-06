@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.importengineapi.AccountBridge
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import kotlin.test.Test
@@ -651,6 +652,155 @@ class ImportDeduperTest {
         val result = deduper.classify(listOf(placeholderDeposit(0), placeholderDeposit(1, timestamp = baseTime + 1.days)))
         assertTrue(result[0].transfer.attributes.any { it.typeId == AttributeTypeId(-1) }, "first reconciles")
         assertTrue(result[1].transfer.attributes.none { it.typeId == AttributeTypeId(-1) }, "second is a plain import")
+    }
+
+    // Conduit statements: [wallet] is a conduit (PayPal) and [bank] the card side of a pass-through chain
+    // (card -> bank -> wallet -> merchant) another import already booked. The wallet's own export records
+    // the funding as a placeholder deposit, and the payment to the payee it really went to.
+    private val payee = AccountId(33)
+
+    /** The chain's spend leg out of the conduit: wallet -> the card statement's guess at the merchant. */
+    private fun chainSpendLeg(id: Long) =
+        existing(id, description = "Ubertrip 3", timestamp = baseTime + 1.hours, src = wallet, tgt = payee)
+
+    @Test
+    fun conduitStatement_depositSupersedesTheChainsOnwardLegs() {
+        val spend = chainSpendLeg(41)
+        val deduper =
+            ImportDeduper(
+                unidentifiedPolicy,
+                existing = listOf(bankCredit(40, timestamp = baseTime + 1.hours), spend),
+                passThroughOnward = mapOf(TransferId(40) to listOf(spend.transfer)),
+            )
+        val result = deduper.classify(listOf(placeholderDeposit(0))).single()
+        // Linked to the leg into the conduit it reconciles with, and to the onward leg it supersedes.
+        assertEquals(listOf(TransferId(40), TransferId(41)), result.transfer.relationships.map { it.relatedTransferId })
+        assertEquals(listOf(TransferId(41)), result.supersededLegs.map { it.transfer.id })
+    }
+
+    @Test
+    fun conduitStatement_aSupersededLegIsNoDuplicateForALaterRow() {
+        // The deposit supersedes the chain's spend leg; the wallet's payment row that follows must then be
+        // imported, not dropped as a fuzzy duplicate of the leg that no longer counts.
+        val spend = chainSpendLeg(41)
+        val deduper =
+            ImportDeduper(
+                unidentifiedPolicy,
+                existing = listOf(bankCredit(40, timestamp = baseTime + 1.hours), spend),
+                passThroughOnward = mapOf(TransferId(40) to listOf(spend.transfer)),
+            )
+        val payment = importTransfer(1, description = "Ubertrip 3", src = wallet, tgt = payee)
+        val result = deduper.classify(listOf(placeholderDeposit(0), payment))
+        assertEquals(listOf(TransferId(41)), result[0].supersededLegs.map { it.transfer.id })
+        assertEquals(ImportStatus.IMPORTED, result[1].status)
+        assertTrue(result[1].transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun conduitStatement_keepsAnOnwardLegAnEarlierRowAlreadyMatched() {
+        // The payment row came first and matched the spend leg as a duplicate, so that leg is the payment's
+        // record: superseding it now would count the payment zero times.
+        val spend = chainSpendLeg(41)
+        val deduper =
+            ImportDeduper(
+                unidentifiedPolicy,
+                existing = listOf(bankCredit(40, timestamp = baseTime + 1.hours), spend),
+                passThroughOnward = mapOf(TransferId(40) to listOf(spend.transfer)),
+            )
+        val payment = importTransfer(1, description = "Ubertrip 3", timestamp = baseTime + 1.hours, src = wallet, tgt = payee)
+        val result = deduper.classify(listOf(payment, placeholderDeposit(0)))
+        assertEquals(ImportStatus.DUPLICATE, result[0].status)
+        assertTrue(result[1].supersededLegs.isEmpty())
+    }
+
+    @Test
+    fun conduitStatement_chainImportedAfterTheStatementMatchesItsInnerConduit() {
+        // The card statement arrives second: card -> bank (main) -> wallet -> merchant. The wallet's
+        // placeholder deposit is already there, so the chain's leg into the wallet (conduit 1) reconciles
+        // with it and the chain's legs from the wallet on will be created excluded.
+        val card = AccountId(34)
+        val deposit = existing(50, description = "General Credit Card Deposit", src = placeholder, tgt = wallet)
+        val deduper =
+            ImportDeduper(
+                unidentifiedPolicy,
+                existing = listOf(deposit.copy(attributes = mapOf(AttributeTypeId(-9) to "true"))),
+            )
+        val charge =
+            importTransfer(0, description = "Crv*Paypal *Ubertrip 3", timestamp = baseTime + 1.hours, src = card, tgt = bank)
+                .copy(
+                    passThrough =
+                        ImportPassThrough(
+                            conduits = listOf(AccountRef.Existing(bank), AccountRef.Existing(wallet)),
+                            merchantTarget = AccountRef.Existing(payee),
+                            amount = money(5),
+                            spendDescriptions = listOf("Paypal *Ubertrip 3", "Ubertrip 3"),
+                            relationshipTypeId = RelationshipTypeId(3),
+                        ),
+                )
+        val result = deduper.classify(listOf(charge)).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertEquals(1, result.conduitStatement?.conduitIndex)
+        assertEquals(TransferId(50), result.excludeExisting?.transfer?.id)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) }, "the card's charge stays counted")
+    }
+
+    @Test
+    fun fuzzyPass_neverDropsARowAsTheDuplicateOfAnExcludedLeg() {
+        // Another export's copy of the payment ("Gerardfarnoll") is already excluded as reconciled. PayPal's
+        // own "gerard farnolle" row is similar enough to be its fuzzy duplicate, but dropping it would leave
+        // the payment counted nowhere.
+        val excludedCopy =
+            existing(
+                41,
+                description = "Gerardfarnoll",
+                src = wallet,
+                tgt = payee,
+                attributes = mapOf(AttributeTypeId(-1) to "reconciled"),
+            )
+        val deduper = ImportDeduper(unidentifiedPolicy, existing = listOf(excludedCopy))
+        val result = deduper.classify(listOf(importTransfer(0, description = "gerard farnolle", src = wallet, tgt = payee))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun placeholder_neverPairsWithTheMerchantEndOfAChain() {
+        // A charge chain (bank -> wallet -> payee) and, nearer in time, a refund chain whose merchant end pays
+        // the same amount back into the wallet (payee -> wallet). The wallet's card deposit is the charge's
+        // funding, never the merchant's refund.
+        val charge = bankCredit(40, timestamp = baseTime + 2.hours)
+        val chargeSpend = chainSpendLeg(41)
+        val refundToCard = existing(50, timestamp = baseTime + 1.hours, src = wallet, tgt = bank)
+        val refundFromMerchant = existing(51, timestamp = baseTime + 1.hours, src = payee, tgt = wallet)
+        val deduper =
+            ImportDeduper(
+                unidentifiedPolicy,
+                existing = listOf(charge, chargeSpend, refundToCard, refundFromMerchant),
+                passThroughOnward =
+                    mapOf(TransferId(40) to listOf(chargeSpend.transfer), TransferId(50) to listOf(refundFromMerchant.transfer)),
+            )
+        val result = deduper.classify(listOf(placeholderDeposit(0))).single()
+        assertEquals(
+            TransferId(40),
+            result.transfer.relationships
+                .first()
+                .relatedTransferId,
+        )
+    }
+
+    @Test
+    fun reconcile_neverPairsARowWithALegOfItsOwnFile() {
+        // Re-running a few rows of a file: the rest of the file is already in the database, and its legs are
+        // the same statement, not another source's record of the movement.
+        val deduper =
+            ImportDeduper(
+                unidentifiedPolicy,
+                existing = listOf(bankCredit(40, timestamp = baseTime + 1.hours)),
+                ownSourceLegs = setOf(TransferId(40)),
+            )
+        val result = deduper.classify(listOf(placeholderDeposit(0))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
     }
 
     @Test

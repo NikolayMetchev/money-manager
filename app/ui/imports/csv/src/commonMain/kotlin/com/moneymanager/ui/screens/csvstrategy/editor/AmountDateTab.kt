@@ -26,6 +26,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.rules.DirectionEditor
 import com.moneymanager.ui.components.rules.FeeRuleEditor
+import com.moneymanager.ui.components.rules.ForeignAmountEditor
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
@@ -123,6 +124,19 @@ internal fun AmountDateTab(
             enabled = enabled,
         )
 
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "When the account settled a payment in another currency (a card abroad), the movement is booked in " +
+                "that currency and the account's conversion as a trade",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ForeignAmountEditor(
+            foreignAmount = state.foreignAmount,
+            onForeignAmountChanged = { state.foreignAmount = it },
+            pathField = columnPathField(csvColumns, firstRow, enabled),
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
         Text("Currency", style = MaterialTheme.typography.titleSmall)
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -189,7 +203,7 @@ internal fun AmountDateTab(
                     onTimezoneSelected = { state.selectedTimezone = it },
                     enabled = enabled,
                 )
-            TimezoneMode.FROM_COLUMN ->
+            TimezoneMode.FROM_COLUMN -> {
                 ColumnDropdown(
                     columns = csvColumns,
                     selectedColumn = state.timezoneColumnName,
@@ -199,6 +213,14 @@ internal fun AmountDateTab(
                     enabled = enabled,
                     isError = state.timezoneColumnName == null,
                 )
+                OutlinedTextField(
+                    value = state.timezoneAliasesText,
+                    onValueChange = { state.timezoneAliasesText = it },
+                    label = { Text("Abbreviations (e.g. BST=+01:00, GMT=UTC)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = enabled,
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

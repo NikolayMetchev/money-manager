@@ -53,6 +53,7 @@ import com.moneymanager.importengineapi.ExistingApiIdExtractor
 import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportConversion
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportOwnershipIntent
@@ -1529,8 +1530,9 @@ private data class ApiTransactionPageItem(
     val counterpartyName: String?,
     val declineReason: String?,
     val rawJson: JsonObject? = null,
-    val localAmountMinorUnits: Long? = null,
-    val localCurrencyCode: String? = null,
+    // What the counterparty was paid when the own account settled in another currency (magnitude only).
+    val foreignAmount: ParsedAmount? = null,
+    val foreignCurrencyCode: String? = null,
     // Fee charged on the transaction (magnitude only; a fee is always money out of the own account).
     val feeAmountMinorUnits: Long? = null,
     val feeAmountDecimalMajor: BigDecimal? = null,
@@ -1578,6 +1580,7 @@ private data class PreparedApiTransaction(
     val uniqueKey: Map<String, String>?,
     val fee: ImportFee? = null,
     val passThrough: ImportPassThrough? = null,
+    val conversion: ImportConversion? = null,
 )
 
 /** Every [LocalAccountKey] this prepared transaction moves money through (main legs, fee, pass-through). */
@@ -1718,6 +1721,7 @@ private suspend fun runImportEngine(
                 excludedFromBalances = !p.item.declineReason.isNullOrBlank(),
                 fee = p.fee,
                 passThrough = p.passThrough,
+                conversion = p.conversion,
             )
         }
 
@@ -1958,6 +1962,33 @@ private suspend fun prepareValidTransactionItem(
             data.money
         }
 
+    // A purchase the own account settled in another currency (a GBP card paying USD) moves the foreign
+    // amount; what the account settled becomes its conversion. An unknown foreign currency keeps the
+    // settled amount rather than inventing one.
+    val foreignMoney =
+        if (item.isZeroAmount) {
+            null
+        } else {
+            item.foreignCurrencyCode
+                ?.let { setup.currencyCache.getCurrency(it) }
+                ?.takeIf { it.id != currency.id }
+                ?.let { foreignCurrency ->
+                    val parsed = item.foreignAmount ?: return@let null
+                    when {
+                        parsed.minorUnits != null ->
+                            minorUnitsToMoney(
+                                parsed.minorUnits.absoluteValue,
+                                foreignCurrency,
+                                setup.strategy.config.minorUnitDivisorOverrides,
+                            )
+                        parsed.decimalMajor != null -> Money.fromDisplayValue(parsed.decimalMajor, foreignCurrency)
+                        else -> null
+                    }
+                }
+        }
+    val conversion = foreignMoney?.let { ImportConversion(settled = amount, incoming = data.isIncoming) }
+    val movedAmount = foreignMoney ?: amount
+
     val passThrough =
         passThroughMatch?.let { match ->
             val source = counterpartyApiSource.toSource()
@@ -1972,7 +2003,7 @@ private suspend fun prepareValidTransactionItem(
                     ImportPassThrough(
                         conduits = conduitRefs,
                         merchantTarget = merchantRef,
-                        amount = amount,
+                        amount = movedAmount,
                         spendDescriptions = match.hops.map { it.merchantText },
                         relationshipTypeId = RelationshipTypeId(match.accounts.first().relationshipTypeId),
                         incoming = data.isIncoming,
@@ -2002,7 +2033,7 @@ private suspend fun prepareValidTransactionItem(
             },
         timestamp = item.created,
         description = data.description,
-        amount = amount,
+        amount = movedAmount,
         attributes =
             buildApiTransferAttributes(
                 item = item,
@@ -2013,6 +2044,7 @@ private suspend fun prepareValidTransactionItem(
         uniqueKey = uniqueKey,
         fee = fee,
         passThrough = passThrough?.passThrough,
+        conversion = conversion,
     )
 }
 
@@ -2086,24 +2118,9 @@ private suspend fun buildApiTransferAttributes(
         }
         if (customTxFields.isNotEmpty() && item.rawJson != null) {
             for ((fieldName, jsonPath) in customTxFields) {
-                if (jsonPath != "local_amount" && jsonPath != "local_currency") {
-                    val value = item.rawJson.resolveJsonPath(jsonPath) ?: continue
-                    add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
-                }
+                val value = item.rawJson.resolveJsonPath(jsonPath) ?: continue
+                add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
             }
-        }
-        val localAmountAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_amount")
-        if (item.localAmountMinorUnits != null && localAmountAttributeName != null) {
-            add(
-                NewAttribute(
-                    typeId = attributeTypeCache.getOrCreate(localAmountAttributeName),
-                    value = item.localAmountMinorUnits.toString(),
-                ),
-            )
-        }
-        val localCurrencyAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_currency")
-        if (!item.localCurrencyCode.isNullOrBlank() && localCurrencyAttributeName != null) {
-            add(NewAttribute(typeId = attributeTypeCache.getOrCreate(localCurrencyAttributeName), value = item.localCurrencyCode))
         }
     }
 
@@ -2167,10 +2184,10 @@ private fun parseTransactionsWithPath(
             val amount = parseAmount(obj, mappings)
             val currency = obj.resolveJsonPath(mappings.currencyField)
             val declineReason = resolveDeclineReason(obj, mappings)
-            val localAmount = mappings.localAmountField?.let { obj.resolveJsonPath(it) }?.toLongOrNull()
-            val localCurrency = mappings.localCurrencyField?.let { obj.resolveJsonPath(it) }
+            val foreignAmount = mappings.foreignAmount?.let { parseMagnitude(obj, it.amount, mappings.amountFormat) }
+            val foreignCurrency = mappings.foreignAmount?.let { obj.resolve(it.currency) }?.takeIf { it.isNotBlank() }
             val feeRule = mappings.fee?.takeIf { obj.carriesFee(it, currency) }
-            val fee = feeRule?.let { parseFeeAmount(obj, it, mappings.amountFormat) }
+            val fee = feeRule?.let { parseMagnitude(obj, it.amount, mappings.amountFormat) }
             val feeCurrency = feeRule?.currency?.let { obj.resolve(it) }
             val feeDescription = feeRule?.description?.let { obj.resolve(it) }
             if (created != null && amount != null && currency != null) {
@@ -2192,8 +2209,8 @@ private fun parseTransactionsWithPath(
                     counterpartyName = mappings.counterpartyNameField?.let { obj.resolveJsonPath(it) },
                     declineReason = declineReason,
                     rawJson = obj,
-                    localAmountMinorUnits = localAmount,
-                    localCurrencyCode = localCurrency?.uppercase(),
+                    foreignAmount = foreignAmount,
+                    foreignCurrencyCode = foreignCurrency?.uppercase(),
                     feeAmountMinorUnits = fee?.minorUnits,
                     feeAmountDecimalMajor = fee?.decimalMajor,
                     feeCurrencyCode = feeCurrency?.uppercase(),
@@ -2243,16 +2260,16 @@ private fun parseAmount(
 }
 
 /**
- * Parses [fee]'s amount per the strategy's [ApiAmountFormat], as a magnitude (sign is irrelevant — a
- * fee is always money out of the own account). Returns null when the amount is absent, unparseable or
- * zero.
+ * Parses the amount at [amount] per the strategy's [ApiAmountFormat], as a magnitude — for a fee (always
+ * money out of the own account) or a foreign amount (whose direction is the settled amount's). Returns
+ * null when the amount is absent, unparseable or zero.
  */
-private fun parseFeeAmount(
+private fun parseMagnitude(
     obj: JsonObject,
-    fee: FeeRule,
+    amount: ValueExpr,
     amountFormat: ApiAmountFormat,
 ): ParsedAmount? {
-    val raw = obj.resolve(fee.amount).ifBlank { return null }
+    val raw = obj.resolve(amount).ifBlank { return null }
     return when (amountFormat) {
         ApiAmountFormat.MINOR_UNITS_INTEGER -> {
             val value = raw.toLongOrNull() ?: return null
@@ -3213,11 +3230,6 @@ private fun ApiTransactionPageItem.toTransferData(
         isIncoming = isIncoming,
     )
 }
-
-private fun strategyAttributeNameForJsonPath(
-    customTxFields: Map<String, String>,
-    strategyPath: String,
-): String? = customTxFields.entries.firstOrNull { it.value == strategyPath }?.key
 
 private fun JsonObject.stringOrNull(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 

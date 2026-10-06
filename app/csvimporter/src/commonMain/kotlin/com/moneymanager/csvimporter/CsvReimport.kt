@@ -40,6 +40,7 @@ import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
+import com.moneymanager.importengineapi.reconciledPartnerUnhideUpdates
 import com.moneymanager.importengineapi.selectNearestUnconsumedLeg
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
@@ -102,6 +103,12 @@ data class ReimportRewrite(
     val conduitNames: List<String>,
     /** The clean merchant the final spend leg pays. */
     val merchantName: String,
+    /**
+     * Lifts the `reconciled` exclusion of transfers from other sources that only the deleted ones explained
+     * (see `reconciledPartnerUnhideUpdates`), applied in the same batch as the deletes: a PayPal export's
+     * deposit a card chain reconciled with must count again until the rebuilt chain reconciles it anew.
+     */
+    val unhide: List<ImportTransfer> = emptyList(),
 )
 
 /**
@@ -170,6 +177,12 @@ data class ReimportTradeConversion(
     val transferIdsToDelete: List<TransferId>,
     /** The row's statement description, for the preview. */
     val description: String,
+    /**
+     * Lifts the `reconciled` exclusion of transfers from other sources that only the deleted ones explained
+     * (see `reconciledPartnerUnhideUpdates`), applied in the same batch as the deletes: a PayPal export's
+     * deposit a card chain reconciled with must count again until the rebuilt chain reconciles it anew.
+     */
+    val unhide: List<ImportTransfer> = emptyList(),
 )
 
 /**
@@ -474,7 +487,7 @@ suspend fun planCsvReimport(
     val rewrites =
         computeReimportRewrites(allRows, mappedPrep, relationshipRepository, onProgress) { transferId ->
             existingTransfers[transferId]
-        }
+        }.map { it.copy(unhide = unhideFor(it.transferIdsToDelete, relationshipRepository, transactionRepository)) }
     val tradeConversions =
         computeReimportTradeConversions(
             allRows = allRows,
@@ -483,6 +496,7 @@ suspend fun planCsvReimport(
             relationshipRepository = relationshipRepository,
             onProgress = onProgress,
         ) { transferId -> existingTransfers[transferId] }
+            .map { it.copy(unhide = unhideFor(it.transferIdsToDelete, relationshipRepository, transactionRepository)) }
     val reversalRowIndexes = reversals.flatMapTo(mutableSetOf()) { it.rowIndexes }
     val loadTransfersTouchingAccount: suspend (AccountId, Instant, Instant) -> List<Transfer> =
         { accountId, startDate, endDate ->
@@ -1131,10 +1145,12 @@ private class LinkedLegs(
 )
 
 /**
- * For each root in [rootIds], collects the root plus every transfer reachable through FORWARD
- * relationships (this transfer as id1): fee legs and pass-through spend legs, transitively.
- * Reversal links are not followed — their id2 is another row's leg and must never be deleted with
- * that row. All roots are walked together, one batched relationship query per BFS depth, instead
+ * For each root in [rootIds], collects the root plus the legs the import derived from it: every
+ * transfer reachable through FORWARD `fee` and `pass-through` relationships (this transfer as id1),
+ * transitively. No other link is followed — a `reversal`, `reconciled` or `conversion` link's id2 is
+ * another row's transfer (often another source's: a PayPal export's deposit a card chain reconciled
+ * with), which must never be deleted with this row, nor have its own links walked as if they were this
+ * row's chain. All roots are walked together, one batched relationship query per BFS depth, instead
  * of one query per transfer — on large files those thousands of single-id round trips used to
  * dominate the pass-through and trade-conversion scans.
  */
@@ -1158,7 +1174,7 @@ private suspend fun collectLinkedLegs(
         val forwardById =
             relationshipRepository
                 .getByTransfers(frontier.map { it.second })
-                .filterNot { it.relationshipType.name == WellKnownIds.REVERSAL_RELATIONSHIP_TYPE_NAME }
+                .filter { it.relationshipType.id.id in DERIVED_LEG_RELATIONSHIP_TYPE_IDS }
                 .groupBy { it.id1 }
         val next = mutableListOf<Pair<TransferId, TransferId>>()
         for ((root, id) in frontier) {
@@ -1274,13 +1290,14 @@ suspend fun executeCsvReimport(
             importEngine.import(
                 ImportBatch(
                     transfers =
-                        rewrite.transferIdsToDelete.map { id ->
-                            ImportTransfer(
-                                source = Source.Csv(csvImport.id),
-                                operation = ImportOperation.DELETE,
-                                existingId = id,
-                            )
-                        },
+                        rewrite.unhide +
+                            rewrite.transferIdsToDelete.map { id ->
+                                ImportTransfer(
+                                    source = Source.Csv(csvImport.id),
+                                    operation = ImportOperation.DELETE,
+                                    existingId = id,
+                                )
+                            },
                     dedupePolicy = DedupePolicy.None,
                     csvImportMutations = listOf(CsvImportMutation.ResetRowStatuses(csvImport.id, listOf(rewrite.rowIndex))),
                 ),
@@ -1313,13 +1330,14 @@ suspend fun executeCsvReimport(
             importEngine.import(
                 ImportBatch(
                     transfers =
-                        conversion.transferIdsToDelete.map { id ->
-                            ImportTransfer(
-                                source = Source.Csv(csvImport.id),
-                                operation = ImportOperation.DELETE,
-                                existingId = id,
-                            )
-                        },
+                        conversion.unhide +
+                            conversion.transferIdsToDelete.map { id ->
+                                ImportTransfer(
+                                    source = Source.Csv(csvImport.id),
+                                    operation = ImportOperation.DELETE,
+                                    existingId = id,
+                                )
+                            },
                     dedupePolicy = DedupePolicy.None,
                     csvImportMutations = listOf(CsvImportMutation.ResetRowStatuses(csvImport.id, listOf(conversion.rowIndex))),
                 ),
@@ -1723,3 +1741,13 @@ private data class BulkCsvReimportContext(
     val cryptoAssets: List<CryptoAsset>,
     val historicalSourceAccounts: Map<CsvImportId, AccountId>,
 )
+
+/** The links from a row's transfer to the legs the import derived from it (and from those to theirs). */
+private val DERIVED_LEG_RELATIONSHIP_TYPE_IDS =
+    setOf(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID, WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
+
+private suspend fun unhideFor(
+    deleted: List<TransferId>,
+    relationshipRepository: TransferRelationshipReadRepository,
+    transactionRepository: TransactionReadRepository,
+): List<ImportTransfer> = reconciledPartnerUnhideUpdates(deleted.toSet(), relationshipRepository, transactionRepository)
