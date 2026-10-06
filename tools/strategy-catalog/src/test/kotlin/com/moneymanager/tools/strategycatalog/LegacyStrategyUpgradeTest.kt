@@ -27,7 +27,7 @@ class LegacyStrategyUpgradeTest {
     private val epoch = Instant.fromEpochMilliseconds(0)
 
     // Built-ins first published after configs were versioned: they never had a legacy-v0 form to upgrade.
-    private val addedAfterVersioning = setOf("PayPal API", "PayPal CSV", "PayPal CSV (legacy)")
+    private val addedAfterVersioning = setOf("PayPal API", "PayPal CSV", "PayPal CSV (legacy)", "Curve CSV (Transactions)")
 
     /**
      * A built-in as it stood at the legacy-v0 snapshot, for the few deliberately changed since in a way no

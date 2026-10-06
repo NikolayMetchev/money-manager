@@ -57,6 +57,7 @@ object BuiltInCsvStrategies {
     val bybitUnifiedCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000010")
     val payPalCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000011")
     val payPalLegacyCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000012")
+    val curveTransactionsCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000013")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -141,6 +142,18 @@ object BuiltInCsvStrategies {
      * still gated on an exact same-merchant-account + same amount + same currency match.
      */
     private const val CURVE_RECONCILE_WINDOW_SECONDS = 172_800L
+
+    /** Curve Cash, Curve's rewards balance, held in points ([CURVE_CASH_ASSET]) rather than money. */
+    private const val CURVE_CASH_ACCOUNT = "Curve Cash"
+
+    /** Where the Curve Cash points earned on a purchase come from. */
+    private const val CURVE_CASHBACK_ACCOUNT = "Curve Cashback"
+
+    /**
+     * Money Manager's code for Curve Cash points. Curve's export calls them `CPT`, which the crypto catalog
+     * already uses for an unrelated token, so the export's code is aliased onto this one.
+     */
+    private const val CURVE_CASH_ASSET = "CURVECASH"
 
     /**
      * The PayPal account, holding one balance per currency. Matches
@@ -312,6 +325,7 @@ object BuiltInCsvStrategies {
             buildCryptoComFiatStrategy(now),
             buildCryptoComCryptoStrategy(now),
             buildCurveCsvStrategy(now),
+            buildCurveTransactionsCsvStrategy(now),
             buildCryptoComCardXlsxStrategy(now),
             buildBinanceCsvStrategy(now),
             buildKoinlyCsvStrategy(now),
@@ -1090,6 +1104,125 @@ object BuiltInCsvStrategies {
                             column = "Funding Card Last 4 Digits",
                             attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
                         ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in strategy for Curve's newer "Transactions <dates>.csv" export, which replaced the
+     * [buildCurveCsvStrategy] layout. Real-card rows work the same way: each is a spend leg
+     * [CURVE_CONDUIT_ACCOUNT] -> merchant, reconciled against the underlying card's funding leg through the
+     * `Card Last 4 Digits` funding match. Unlike the old export, this one gives the amount the funding card
+     * was charged (`Txn Amount (Funding Card)`, which includes any Curve fee) alongside the merchant-side
+     * foreign spend, so the spend is booked in what the card paid: that is what the card statement's funding
+     * leg holds, foreign purchases included. The foreign spend and the fee are kept as attributes.
+     *
+     * Curve Cash rows have no card. Their amounts are points (`CPT`, booked as [CURVE_CASH_ASSET]):
+     *  - a row with no Type is points earned on a purchase: [CURVE_CASHBACK_ACCOUNT] -> [CURVE_CASH_ACCOUNT];
+     *  - a row paid with the "Curve Cash" card spends points: [CURVE_CASH_ACCOUNT] -> merchant.
+     */
+    fun buildCurveTransactionsCsvStrategy(now: Instant): CsvImportStrategy {
+        val earned = listOf(Condition("Card Name", ConditionOp.EQUALS, "Curve Cash"), Condition("Type", ConditionOp.BLANK))
+        val fieldMappings =
+            mapOf(
+                TransferField.SOURCE_ACCOUNT to
+                    AccountRulesMapping(
+                        fieldType = TransferField.SOURCE_ACCOUNT,
+                        rules =
+                            listOf(
+                                AccountRule(
+                                    conditions = earned,
+                                    value = ValueExpr(listOf("Merchant")),
+                                    pattern = "^",
+                                    name = CURVE_CASHBACK_ACCOUNT,
+                                ),
+                                AccountRule(
+                                    conditions = listOf(Condition("Card Name", ConditionOp.EQUALS, "Curve Cash")),
+                                    value = ValueExpr(listOf("Merchant")),
+                                    pattern = "^",
+                                    name = CURVE_CASH_ACCOUNT,
+                                ),
+                                AccountRule(value = ValueExpr(listOf("Merchant")), pattern = "^", name = CURVE_CONDUIT_ACCOUNT),
+                            ),
+                    ),
+                TransferField.TARGET_ACCOUNT to
+                    AccountRulesMapping(
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        rules =
+                            listOf(
+                                AccountRule(
+                                    conditions = earned,
+                                    value = ValueExpr(listOf("Merchant")),
+                                    pattern = "^",
+                                    name = CURVE_CASH_ACCOUNT,
+                                ),
+                                AccountRule(value = ValueExpr(listOf("Merchant"))),
+                            ),
+                    ),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = "Date (YYYY-MM-DD as UTC)",
+                        dateFormat = "yyyy-MM-dd",
+                        timeColumnName = "Time (HH:MM:SS as UTC)",
+                        timeFormat = "HH:mm:ss",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Merchant"))),
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "Txn Amount (Funding Card)",
+                    ),
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Txn Currency (Funding Card)"))),
+                TransferField.TIMEZONE to HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
+            )
+        val attributeMappings =
+            listOf(
+                AttributeColumnMapping("Card Last 4 Digits", "curve-funding-card"),
+                AttributeColumnMapping("Card Name", "curve-card-name"),
+                AttributeColumnMapping("Category", "curve-category"),
+                AttributeColumnMapping("Fees", "curve-fee"),
+                AttributeColumnMapping("Txn Amount (Foreign Spend)", "curve-foreign-amount"),
+                AttributeColumnMapping("Txn Currency (Foreign Spend)", "curve-foreign-currency"),
+                AttributeColumnMapping("Notes", "curve-notes"),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(curveTransactionsCsvStrategyId),
+            name = "Curve CSV (Transactions)",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns =
+                        setOf(
+                            "Export Format",
+                            "Date (YYYY-MM-DD as UTC)",
+                            "Time (HH:MM:SS as UTC)",
+                            "Merchant",
+                            "Txn Amount (Funding Card)",
+                            "Txn Currency (Funding Card)",
+                            "Txn Amount (Foreign Spend)",
+                            "Txn Currency (Foreign Spend)",
+                            "Card Name",
+                            "Card Last 4 Digits",
+                            "Type",
+                            "Category",
+                            "Notes",
+                            "Fees",
+                        ),
+                    fieldMappings = fieldMappings,
+                    attributeMappings = attributeMappings,
+                    fileNamePattern = "^Transactions",
+                    crossSourceReconcileWindowSeconds = CURVE_RECONCILE_WINDOW_SECONDS,
+                    fundingAttributeMatch =
+                        AttributeAccountMatch(
+                            column = "Card Last 4 Digits",
+                            attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
+                        ),
+                    assetCodes = AssetCodeRules(aliases = mapOf("CPT" to CURVE_CASH_ASSET)),
                 ),
             createdAt = now,
             updatedAt = now,
