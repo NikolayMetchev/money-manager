@@ -260,7 +260,8 @@ parallel ones (see **Design Principle**):
 | Asset tickers | `AssetCodeRules`: aliases + suffix handling | separate CSV and API alias/suffix settings |
 | Direction | `Direction` (amount sign / field / always outgoing) | `flipAccountsOnPositive`, `negateValues`, `signSource`/`signField`/`creditValues`, … |
 | Account resolution | `AccountRulesMapping`, an ordered, **first-match-wins** `AccountRule` list | lookup/template/regex/attribute/conditional account mappings |
-| Multi-row grouping | `LegGroupRule` with `Trade` or `ThroughAccount` assembly | `ConversionConfig`, `TradeGroupConfig` |
+| Multi-row grouping | `LegGroupRule` with `Trade` or `ThroughAccount` assembly (no accounts + `fundingWhen` = link two rows as one pass-through, e.g. PayPal's card deposit → payment) | `ConversionConfig`, `TradeGroupConfig` |
+| "Every row runs through a conduit" | `StrategyConduit` (`CsvStrategyConfig.conduit`): a row `funder → payee` becomes the chain `funder → conduit → payee` (Curve's own export) | single `Curve → merchant` rows that left the conduit unbalanced |
 | Fees | `FeeRule` (CSV, API transfers and API trades) | three separate sets of fee fields |
 | API fetching | One pipeline: `ApiAccountsSource` (`Downloaded`/`Single`) × `ApiDateWindowing` × `ApiPaging` (single/offset/before-cursor/forward-id/token), walked by one `PageWalker` | separate bank vs exchange paths and three hand-written pagination loops |
 | API ledger trades | `ApiLedgerTrades` | `reconcileTradeAmounts*`, `unpairedTradeLeg*` |
@@ -275,7 +276,11 @@ the conduit, the chain's legs *beyond* the conduit are excluded (`Classified.sup
 `ConduitStatementMatch`), because the conduit's statement names the real payee and currency. Both import
 orders reach the same result. A post-pass (`reconcileSplitConduitMovements`) also pairs one placeholder with
 2–4 chain movements to the same merchant that sum to it (Uber authorises £21.58, tops up £0.27; PayPal records
-£21.85). Curve's export has no deposit rows, so it keeps its own funding-card rule (`fundingAttributeMatch`).
+£21.85). Curve's export has no deposit rows, so each row is its own chain (`StrategyConduit`), funded by a
+per-card placeholder (`Curve card 7721`) that reconciles against the card's movement into Curve: by its
+`fundingAttributeMatch` card, or by the unidentified-counterparty rule. Whenever a conduit's record of a payment
+reconciles its movement into the conduit, the conduit's onward legs stay counted and supersede the card chain's
+guessed ones, in either import order, so a conduit always nets to zero.
 
 **Still separate, on purpose:** `TradeReconciler`, `ConversionTradeReconciler` and `ConversionGroupReconciler`
 use genuinely different assignment rules, and `app/reconciliation`'s `LegMatcher` is a read-only report.

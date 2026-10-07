@@ -2,6 +2,7 @@
 
 package com.moneymanager.database.csv
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.CsvBulkResult
@@ -18,9 +19,9 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
-import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.setAccountAttributeValue
+import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -220,8 +221,34 @@ class CurveCsvE2ETest : DbTest() {
             .filter { it.sourceAccountId == sourceId && it.targetAccountId == targetId }
     }
 
+    private fun Transfer.isExcluded(): Boolean = attributes.any { it.attributeType.name == "excluded" }
+
+    /** The account's balance in [assetCode] over its counted (non-excluded) transfers. */
+    private suspend fun countedBalance(
+        accountName: String,
+        assetCode: String = "GBP",
+    ): BigDecimal {
+        val account =
+            repositories.accountRepository
+                .getAllAccounts()
+                .first()
+                .firstOrNull { it.name == accountName } ?: return BigDecimal.ZERO
+        return repositories.transactionRepository
+            .getTransactionsByAccount(account.id)
+            .first()
+            .filter { !it.isExcluded() && it.amount.asset.code == assetCode }
+            .fold(BigDecimal.ZERO) { sum, t ->
+                val amount = t.amount.toDisplayValue()
+                if (t.targetAccountId == account.id) sum + amount else sum - amount
+            }
+    }
+
+    private suspend fun assertCurveNetsToZero(assetCode: String = "GBP") {
+        assertEquals(0, countedBalance("Curve", assetCode).compareTo(BigDecimal.ZERO), "Curve nets to zero in $assetCode")
+    }
+
     @Test
-    fun curveCsvSpend_reconcilesWithMappedCardMerchant_andForeignRowStandsAlone() =
+    fun curveCsvRow_isAChainThroughCurve_supersedingTheCardsGuessedMerchant_andForeignRowStandsAlone() =
         runTest {
             // Underlying card statement: a Curve payment forwarded to the crypto.com card. The
             // pass-through detector expands it into Crypto.com Card -> Curve (funding) and
@@ -235,25 +262,14 @@ class CurveCsvE2ETest : DbTest() {
             assertEquals(1, applyAll(listOf(card)).filesImported)
             assertEquals(1, transfersBetween("Curve", "Amazon").size, "card import creates the spend leg")
 
-            // Map Curve's differently-worded merchant onto the same account, so the two spend legs
-            // resolve to the same account but keep distinct descriptions — the realistic reconcile case
-            // (identical text would instead be a plain fuzzy duplicate).
-            val amazonId =
-                repositories.accountRepository
-                    .getAllAccounts()
-                    .first()
-                    .first { it.name == "Amazon" }
-                    .id
-            repositories.importEngine.createAccountMapping(Regex("(?i)^Prime Video$"), amazonId)
-
-            // Curve's own export: the same GBP spend under a different name (reconciles) plus a
-            // foreign-currency spend (no GBP card counterpart, so it stands alone).
+            // Curve's own export: the same GBP spend under its own merchant name, plus a foreign-currency
+            // spend with no card counterpart. The card isn't registered to any account.
             val curve =
                 stage(
                     "Transaction History 2023-11-19.csv",
                     curveHeaders,
                     listOf(
-                        curveRow("1", "2023-11-19", "Prime Video", "GBP", "12.99"),
+                        curveRow("1", "2023-11-19", "AMZN Mktp UK", "GBP", "12.99"),
                         curveRow("2", "2023-11-18", "Mavroni", "EUR", "50.00"),
                     ),
                 )
@@ -261,36 +277,38 @@ class CurveCsvE2ETest : DbTest() {
             assertEquals(1, result.filesImported)
             assertEquals(0, result.filesSkippedNoStrategy, "the Curve file matches the Curve CSV strategy")
             assertEquals(0, result.filesFailed)
-
-            // Both Curve -> Amazon legs are kept, but exactly one is excluded + reconciled-linked.
             repositories.maintenanceService.refreshMaterializedViews()
-            val amazonLegs = transfersBetween("Curve", "Amazon")
-            assertEquals(2, amazonLegs.size, "both the card-derived and Curve-derived spend legs are kept")
-            val excluded =
-                amazonLegs.filter { t -> t.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" } }
-            assertEquals(1, excluded.size, "exactly one Amazon leg is excluded as reconciled")
-            val original = amazonLegs.single { it.id != excluded.single().id }
-            val reconciledLink =
-                repositories.transferRelationshipRepository
-                    .getByTransfer(excluded.single().id)
-                    .first()
-                    .single { it.relationshipType.name == "reconciled" }
-            assertEquals(excluded.single().id, reconciledLink.id1)
-            assertEquals(original.id, reconciledLink.id2)
 
-            // The foreign-currency row imports as a standalone Curve -> Mavroni EUR spend (no card
-            // counterpart to reconcile against), keeping Curve's real FX amount.
+            // The Curve row is the chain "Curve card 7721" -> Curve -> AMZN Mktp UK. Its movement into Curve is
+            // the card's funding leg again, so it is excluded and linked to it; its merchant leg names the
+            // real merchant and supersedes the card's guess, which is excluded.
+            val placeholderLeg = transfersBetween("Curve card 7721", "Curve").single { it.amount.asset.code == "GBP" }
+            assertTrue(placeholderLeg.isExcluded(), "the card's funding leg stays the record of the money into Curve")
+            val fundingLeg = transfersBetween("Crypto.com Card", "Curve").single()
+            assertTrue(!fundingLeg.isExcluded())
+            val link =
+                repositories.transferRelationshipRepository
+                    .getByTransfer(placeholderLeg.id)
+                    .first()
+                    .filter { it.relationshipType.name == "reconciled" }
+            assertTrue(link.any { it.id2 == fundingLeg.id }, "the placeholder leg is linked to the card's funding leg")
+            assertTrue(!transfersBetween("Curve", "AMZN Mktp UK").single().isExcluded(), "Curve's merchant leg is counted")
+            assertTrue(transfersBetween("Curve", "Amazon").single().isExcluded(), "the card's guessed merchant leg is superseded")
+            assertCurveNetsToZero()
+            assertEquals(0, countedBalance("Crypto.com Card").compareTo(BigDecimal("-12.99")))
+
+            // The foreign-currency row has no card counterpart, so its placeholder funds it — in EUR, keeping
+            // Curve's real FX amount — and Curve still nets to zero.
             val mavroni = transfersBetween("Curve", "Mavroni").single()
             assertEquals("EUR", mavroni.amount.asset.code)
             assertEquals("50", mavroni.amount.toDisplayValue().toString())
-            assertTrue(
-                mavroni.attributes.none { it.attributeType.name == "excluded" },
-                "the foreign-currency spend is not reconciled/excluded",
-            )
+            assertTrue(!mavroni.isExcluded(), "the foreign-currency spend is counted")
+            assertTrue(!transfersBetween("Curve card 7721", "Curve").single { it.amount.asset.code == "EUR" }.isExcluded())
+            assertCurveNetsToZero("EUR")
         }
 
     @Test
-    fun curveCsvSpend_reconcilesAgainstFundingLegByCardNumber_evenWhenMerchantDiffers() =
+    fun curveCsvRow_reconcilesAgainstFundingLegByCardNumber_evenWhenMerchantDiffers() =
         runTest {
             // The card statement records the Curve charge as "Crv*Sainsburys London"; the pass-through
             // makes a funding leg (Crypto.com Card -> Curve) and a spend leg (Curve -> "Sainsburys London").
@@ -304,9 +322,7 @@ class CurveCsvE2ETest : DbTest() {
             // Register the funding card's last-4 on the Crypto.com Card account (as a user would).
             registerCard("Crypto.com Card", "7721")
 
-            // Curve's export names the merchant differently ("SAINSBURYS") — merchant reconcile can't
-            // match — but the funding card 7721 identifies the funding leg to reconcile against. A second
-            // row is funded by an unregistered card (1142) and must import as a normal new spend.
+            // A second row is funded by an unregistered card (1142) with no counterpart anywhere.
             val curve =
                 stage(
                     "Transaction History 2023-11-19.csv",
@@ -319,26 +335,77 @@ class CurveCsvE2ETest : DbTest() {
             assertEquals(1, applyAll(listOf(curve)).filesImported)
             repositories.maintenanceService.refreshMaterializedViews()
 
-            // The 7721 spend reconciled against the funding leg (excluded + linked), despite the merchant
-            // name differing from the card's "Sainsburys London".
-            val sainsburys = transfersBetween("Curve", "SAINSBURYS").single()
-            assertTrue(
-                sainsburys.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
-                "the 7721 Curve spend is reconciled",
-            )
+            // The 7721 row's movement into Curve reconciled against the funding leg identified by the card
+            // number; its merchant leg supersedes the card's.
+            val placeholderLeg = transfersBetween("Curve card 7721", "Curve").single()
+            assertTrue(placeholderLeg.isExcluded(), "the 7721 row's funding is the card's funding leg")
             val fundingLeg = transfersBetween("Crypto.com Card", "Curve").single()
             val link =
                 repositories.transferRelationshipRepository
-                    .getByTransfer(sainsburys.id)
+                    .getByTransfer(placeholderLeg.id)
                     .first()
-                    .single { it.relationshipType.name == "reconciled" }
-            assertEquals(sainsburys.id, link.id1)
-            assertEquals(fundingLeg.id, link.id2, "linked to the funding leg identified by the card number")
+                    .first { it.relationshipType.name == "reconciled" && it.id2 == fundingLeg.id }
+            assertEquals(placeholderLeg.id, link.id1)
+            assertTrue(!transfersBetween("Curve", "SAINSBURYS").single().isExcluded())
+            assertTrue(transfersBetween("Curve", "Sainsburys London").single().isExcluded())
 
-            // The 1142 spend has no registered card, so it imports as an ordinary (non-excluded) spend.
-            val aldi = transfersBetween("Curve", "ALDI").single()
-            assertTrue(aldi.attributes.none { it.attributeType.name == "excluded" }, "unregistered-card row is not reconciled")
+            // The 1142 row has no counterpart: its placeholder funds it, and the spend counts.
+            assertTrue(!transfersBetween("Curve card 1142", "Curve").single().isExcluded())
+            assertTrue(!transfersBetween("Curve", "ALDI").single().isExcluded(), "unregistered-card row is counted")
+            assertEquals(0, countedBalance("Curve card 1142").compareTo(BigDecimal("-31.25")))
+            assertEquals(0, countedBalance("Crypto.com Card").compareTo(BigDecimal("-22.93")), "the card account is untouched")
+            assertCurveNetsToZero()
         }
+
+    @Test
+    fun curveCsvImportedFirst_thenTheCard_reachesTheSameResult() =
+        runTest {
+            registerCardAccount()
+            val curve =
+                stage(
+                    "Transaction History 2023-11-19.csv",
+                    curveHeaders,
+                    listOf(
+                        curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93", fundingCard = "7721"),
+                        curveRow("2", "2023-11-19", "ALDI", "GBP", "31.25", fundingCard = "1142"),
+                    ),
+                )
+            assertEquals(1, applyAll(listOf(curve)).filesImported)
+            // No funding leg exists yet, so even the registered card's row is funded by its placeholder,
+            // leaving the card account as its own statement says (only the warm-up row's -3.00).
+            assertEquals(0, countedBalance("Crypto.com Card").compareTo(BigDecimal("-3.00")))
+            assertCurveNetsToZero()
+
+            val card =
+                stage(
+                    "card_transactions_record_20231120_210200.csv",
+                    cardHeaders,
+                    listOf(cardRow("2023-11-19 21:15:00", "Crv*Sainsburys London", "-22.93")),
+                )
+            assertEquals(1, applyAll(listOf(card)).filesImported)
+            repositories.maintenanceService.refreshMaterializedViews()
+
+            // The card's funding leg replaces the placeholder; Curve's merchant leg stays the record.
+            assertTrue(transfersBetween("Curve card 7721", "Curve").single().isExcluded())
+            assertTrue(!transfersBetween("Crypto.com Card", "Curve").single().isExcluded())
+            assertTrue(!transfersBetween("Curve", "SAINSBURYS").single().isExcluded())
+            assertTrue(transfersBetween("Curve", "Sainsburys London").single().isExcluded())
+            assertTrue(!transfersBetween("Curve card 1142", "Curve").single().isExcluded())
+            assertEquals(0, countedBalance("Crypto.com Card").compareTo(BigDecimal("-25.93")))
+            assertCurveNetsToZero()
+        }
+
+    /** Creates the Crypto.com Card account owning card 7721 before any card statement is imported. */
+    private suspend fun registerCardAccount() {
+        val warmup =
+            stage(
+                "card_transactions_record_20230101_000000.csv",
+                cardHeaders,
+                listOf(cardRow("2023-01-01 10:00:00", "Coffee", "-3.00")),
+            )
+        applyAll(listOf(warmup))
+        registerCard("Crypto.com Card", "7721")
+    }
 
     private val transactionsHeaders =
         listOf(
@@ -418,12 +485,18 @@ class CurveCsvE2ETest : DbTest() {
             assertEquals(0, result.filesSkippedNoStrategy, "both files match the Curve Transactions strategy")
             assertEquals(0, result.filesFailed)
 
-            // The card is unassigned, so the Card Last-4 tab lists it and the spend is not reconciled yet.
+            // The card is unassigned, so the Card Last-4 tab lists it — but the card's movement into Curve
+            // already reconciles the row on its own, and Curve's merchant leg supersedes the card's guess.
             assertEquals(listOf("7721" to 2), unmatchedFundingReferences().map { it.value to it.rowCount })
             val lastpass = transfersBetween("Curve", "Lastpass.com").single()
             assertEquals("32.31", lastpass.amount.toDisplayValue().toString())
             assertEquals("GBP", lastpass.amount.asset.code)
-            assertTrue(lastpass.attributes.any { it.attributeType.name == "curve-fee" })
+            assertTrue(!lastpass.isExcluded())
+            val funding = transfersBetween("Curve card 7721", "Curve").single()
+            assertTrue(funding.isExcluded())
+            assertTrue(funding.attributes.any { it.attributeType.name == "curve-fee" })
+            assertTrue(transfersBetween("Curve", "Lastpasscom London").single().isExcluded())
+            assertCurveNetsToZero()
 
             // Curve Cash is tracked in points: earned from Curve Cashback, then spent on a merchant.
             val earned = transfersBetween("Curve Cashback", "Curve Cash").single()
@@ -431,17 +504,18 @@ class CurveCsvE2ETest : DbTest() {
             assertEquals("25", earned.amount.toDisplayValue().toString())
             val spent = transfersBetween("Curve Cash", "Amazon").single()
             assertEquals("208", spent.amount.toDisplayValue().toString())
+            // Points never pass through the Curve conduit.
+            assertEquals(0, countedBalance("Curve", "CURVECASH").compareTo(BigDecimal.ZERO))
+            assertEquals(0, countedBalance("Curve Cash", "CURVECASH").compareTo(BigDecimal("-183")))
 
-            // Assigning the card reconciles the spend against the card's funding leg.
+            // Assigning the card changes nothing more: the row is already reconciled.
             registerCard("Crypto.com Card", "7721")
             reimport(first.id, strategyName = "Curve CSV (Transactions)")
             repositories.maintenanceService.refreshMaterializedViews()
             assertTrue(unmatchedFundingReferences().isEmpty())
-            val reconciled = transfersBetween("Curve", "Lastpass.com").single()
-            assertTrue(
-                reconciled.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
-                "the Curve spend reconciles once its card is known",
-            )
+            assertTrue(!transfersBetween("Curve", "Lastpass.com").single().isExcluded())
+            assertTrue(transfersBetween("Curve card 7721", "Curve").single().isExcluded())
+            assertCurveNetsToZero()
         }
 
     @Test
@@ -512,7 +586,8 @@ class CurveCsvE2ETest : DbTest() {
                     maintenance = maintenance,
                     importEngine = repositories.importEngine,
                 )
-            assertEquals(1, reconciled)
+            // The 7721 row already reconciled against the card's movement into Curve when it was imported.
+            assertEquals(0, reconciled)
 
             val cardAttributes =
                 repositories.accountAttributeRepository
@@ -523,12 +598,10 @@ class CurveCsvE2ETest : DbTest() {
             assertEquals(listOf("1142"), unmatchedFundingReferences().map { it.value })
 
             repositories.maintenanceService.refreshMaterializedViews()
-            val sainsburys = transfersBetween("Curve", "SAINSBURYS").single()
-            assertTrue(
-                sainsburys.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
-                "the 7721 Curve spend is reconciled once its card is assigned",
-            )
+            assertTrue(transfersBetween("Curve card 7721", "Curve").single().isExcluded(), "the 7721 row is reconciled")
+            assertTrue(!transfersBetween("Curve", "SAINSBURYS").single().isExcluded())
             assertEquals(1, transfersBetween("Crypto.com Card", "Curve").size)
+            assertCurveNetsToZero()
         }
 
     private suspend fun unmatchedFundingReferences() =
@@ -540,11 +613,11 @@ class CurveCsvE2ETest : DbTest() {
         )
 
     @Test
-    fun reimport_retroactivelyReconciles_afterCardRegistered() =
+    fun reimport_afterCardRegistered_isANoOp() =
         runTest {
-            // The realistic sequence: the card statement is imported (creating the funding leg), the Curve
-            // file is imported BEFORE any card is registered (so it lands as a plain, unreconciled spend),
-            // then the user registers the card and re-imports — which must retroactively reconcile it.
+            // The card statement is imported, then the Curve file BEFORE any card is registered: the card's
+            // movement into Curve reconciles the row anyway. Registering the card and re-importing changes
+            // nothing, however often it runs.
             val card =
                 stage(
                     "card_transactions_record_20231120_210200.csv",
@@ -559,40 +632,56 @@ class CurveCsvE2ETest : DbTest() {
                     listOf(curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93", fundingCard = "7721")),
                 )
             applyAll(listOf(curve))
-            assertTrue(
-                transfersBetween("Curve", "SAINSBURYS").single().attributes.none { it.attributeType.name == "excluded" },
-                "not reconciled before the card is registered",
-            )
+            assertTrue(transfersBetween("Curve card 7721", "Curve").single().isExcluded())
 
             registerCard("Crypto.com Card", "7721")
-            reimport(curve.id)
-            repositories.maintenanceService.refreshMaterializedViews()
-
-            val sainsburys = transfersBetween("Curve", "SAINSBURYS").single()
-            assertTrue(
-                sainsburys.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
-                "re-import reconciles the spend once the card is registered",
-            )
-            val fundingLeg = transfersBetween("Crypto.com Card", "Curve").single()
-            val link =
-                repositories.transferRelationshipRepository
-                    .getByTransfer(sainsburys.id)
-                    .first()
-                    .single { it.relationshipType.name == "reconciled" }
-            assertEquals(fundingLeg.id, link.id2, "linked to the funding leg")
-
-            // Re-running again is a no-op: already reconciled, so the plan doesn't reset it.
-            reimport(curve.id)
-            assertEquals(1, transfersBetween("Curve", "SAINSBURYS").size)
-            assertTrue(transfersBetween("Curve", "SAINSBURYS").single().attributes.any { it.attributeType.name == "excluded" })
+            repeat(2) {
+                reimport(curve.id)
+                repositories.maintenanceService.refreshMaterializedViews()
+                assertTrue(transfersBetween("Curve card 7721", "Curve").single().isExcluded())
+                assertTrue(!transfersBetween("Curve", "SAINSBURYS").single().isExcluded())
+                assertTrue(transfersBetween("Curve", "Sainsburys London").single().isExcluded())
+                assertCurveNetsToZero()
+            }
         }
 
     @Test
-    fun curveCsvSpend_withIdenticalMerchant_isDroppedAsDuplicate_notDoubleCounted() =
+    fun reimport_rewritesARowImportedAsAPlainSpend_intoAChain() =
         runTest {
-            // Same merchant text on both sides: the card's pass-through spend leg and the Curve row are
-            // byte-identical (Curve -> Amazon, "Amazon", £12.99), differing only in the date-only vs
-            // datetime stamp. The Curve row must be dropped as a fuzzy duplicate so the spend counts once.
+            // A database that imported Curve's export before it was a conduit holds plain rows that never
+            // pass through Curve. Re-importing with the conduit strategy rewrites them into chains.
+            val builtIn =
+                repositories.csvImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Curve CSV" }
+            repositories.importEngine.updateCsvStrategy(builtIn.copy(config = builtIn.config.copy(conduit = null)))
+            val curve =
+                stage(
+                    "Transaction History 2023-11-19.csv",
+                    curveHeaders,
+                    listOf(curveRow("1", "2023-11-19", "ALDI", "GBP", "31.25", fundingCard = "1142")),
+                )
+            applyAll(listOf(curve))
+            assertTrue(transfersBetween("Curve", "ALDI").isEmpty())
+            assertEquals(1, transfersBetween("Curve card 1142", "ALDI").size)
+
+            repositories.importEngine.updateCsvStrategy(builtIn)
+            reimport(curve.id)
+            repositories.maintenanceService.refreshMaterializedViews()
+            assertTrue(!transfersBetween("Curve card 1142", "Curve").single().isExcluded())
+            assertTrue(!transfersBetween("Curve", "ALDI").single().isExcluded())
+            assertTrue(transfersBetween("Curve card 1142", "ALDI").isEmpty())
+            assertCurveNetsToZero()
+            reimport(curve.id)
+            assertEquals(1, transfersBetween("Curve", "ALDI").size)
+        }
+
+    @Test
+    fun curveCsvRow_withIdenticalMerchant_countsTheSpendOnce() =
+        runTest {
+            // Same merchant text on both sides: the card's spend leg and the Curve row's merchant leg are
+            // both Curve -> Amazon, £12.99. The spend still counts once and Curve nets to zero.
             val card =
                 stage(
                     "card_transactions_record_20231120_210200.csv",
@@ -607,9 +696,11 @@ class CurveCsvE2ETest : DbTest() {
                     curveHeaders,
                     listOf(curveRow("1", "2023-11-19", "Amazon", "GBP", "12.99")),
                 )
-            val result = applyAll(listOf(curve))
-            assertEquals(0, result.transfersCreated, "the identical Curve spend is a duplicate, not imported")
-            assertEquals(1, transfersBetween("Curve", "Amazon").size, "spend counted once")
+            applyAll(listOf(curve))
+            repositories.maintenanceService.refreshMaterializedViews()
+            assertEquals(1, transfersBetween("Curve", "Amazon").count { !it.isExcluded() }, "spend counted once")
+            assertEquals(0, countedBalance("Amazon").compareTo(BigDecimal("12.99")))
+            assertCurveNetsToZero()
         }
 
     @Test

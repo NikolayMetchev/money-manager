@@ -197,6 +197,10 @@ internal class CsvStrategyEditorState(
     var fundingMatchAttributeTypeName by
         mutableStateOf(config?.fundingAttributeMatch?.attributeTypeName ?: WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME)
 
+    // Conduit every row runs through (e.g. Curve); saved only when an account name is given.
+    var conduitAccountName by mutableStateOf(config?.conduit?.accountName.orEmpty())
+    var conduitConditions by mutableStateOf(config?.conduit?.conditions.orEmpty())
+
     var contentMatchRules by mutableStateOf(config?.contentMatchRules.orEmpty())
     var crossSourceReconcileWindowSeconds by mutableStateOf(config?.crossSourceReconcileWindowSeconds)
 

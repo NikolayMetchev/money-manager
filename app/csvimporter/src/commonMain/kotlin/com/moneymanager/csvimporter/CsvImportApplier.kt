@@ -66,6 +66,7 @@ import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 private val logger = logging()
@@ -95,6 +96,57 @@ internal fun collapsePassThroughChain(
         }
     }
     return if (keptNodes.size < 2) null else keptNodes to keptDescriptions
+}
+
+/** The attribute a strategy maps to exclude a row (the `excluded` well-known type, by name). */
+private const val EXCLUDED_ATTRIBUTE_NAME = "excluded"
+
+/** Links each debit leg to the nearest credit leg of the same key within [window] (credits may be shared). */
+private fun pairDebitsToCredits(
+    legs: List<CsvTransferWithAttributes>,
+    window: Duration,
+    relationshipTypeName: String,
+): List<Pair<Long, BatchRelationship>> {
+    val credits = legs.filter { it.groupLeg!!.side == GroupLegSide.CREDIT }
+    return legs
+        .filter { it.groupLeg!!.side == GroupLegSide.DEBIT }
+        .mapNotNull { debit ->
+            val match =
+                credits
+                    .filter { it.groupLeg!!.key == debit.groupLeg!!.key }
+                    .minByOrNull { (it.transfer.timestamp - debit.transfer.timestamp).absoluteValue }
+                    ?.takeIf { (it.transfer.timestamp - debit.transfer.timestamp).absoluteValue <= window }
+                    ?: return@mapNotNull null
+            debit.rowIndex to BatchRelationship(ImportRowKey.CsvRow(match.rowIndex), relationshipTypeName)
+        }
+}
+
+/**
+ * Links each funding leg (from the funding leg) to the nearest unclaimed non-funding leg on the other side
+ * with the same key within [window], one to one. Legs the source excluded (a refused deposit) record no
+ * movement, so they pair with nothing.
+ */
+private fun pairFundingLegs(
+    legs: List<CsvTransferWithAttributes>,
+    window: Duration,
+    relationshipTypeName: String,
+): List<Pair<Long, BatchRelationship>> {
+    val counted = legs.filter { leg -> leg.attributes.none { (name, _) -> name == EXCLUDED_ATTRIBUTE_NAME } }
+    val (funding, others) = counted.partition { it.groupLeg!!.funding }
+    val claimed = mutableSetOf<Long>()
+    return funding.sortedBy { it.transfer.timestamp }.mapNotNull { leg ->
+        val match =
+            others
+                .filter {
+                    it.rowIndex !in claimed &&
+                        it.groupLeg!!.key == leg.groupLeg!!.key &&
+                        it.groupLeg.side != leg.groupLeg.side &&
+                        (it.transfer.timestamp - leg.transfer.timestamp).absoluteValue <= window
+                }.minByOrNull { (it.transfer.timestamp - leg.transfer.timestamp).absoluteValue }
+                ?: return@mapNotNull null
+        claimed += match.rowIndex
+        leg.rowIndex to BatchRelationship(ImportRowKey.CsvRow(match.rowIndex), relationshipTypeName)
+    }
 }
 
 /**
@@ -920,34 +972,22 @@ suspend fun runCsvImport(
             )
         }
 
-    // Asset-conversion linking: pair each debit leg to a credit leg (same pairing key, nearest
-    // timestamp within the configured window) so the engine links them with the conversion
-    // relationship. Handles both 1:1 swaps and N-debits -> 1-credit dust events (many debits share the
-    // one credit). Debits with no in-window credit are left unlinked (still valid, balance-correct).
+    // Leg-group linking for `ThroughAccount` rules. Without `fundingWhen`, pair each debit leg to a credit
+    // leg (same pairing key, nearest timestamp within the configured window) — both 1:1 swaps and
+    // N-debits -> 1-credit dust events (many debits share the one credit). With it, each funding leg pairs
+    // one to one with the nearest non-funding leg on the other side and is the link's first transfer.
+    // Legs with no in-window partner are left unlinked (still valid, balance-correct).
     val conversionLinkByRow: Map<Long, BatchRelationship> =
         strategy.config.legGroups
             .withIndex()
             .flatMap { (index, rule) ->
                 val assembly = rule.assembly as? LegAssembly.ThroughAccount ?: return@flatMap emptyList()
-                val window = rule.windowSeconds.seconds
                 val legs = finalPrep.validTransfers.filter { it.groupLeg?.ruleIndex == index }
-                val credits = legs.filter { it.groupLeg!!.side == GroupLegSide.CREDIT }
-                legs
-                    .filter { it.groupLeg!!.side == GroupLegSide.DEBIT }
-                    .mapNotNull { debit ->
-                        val key = debit.groupLeg!!.key
-                        val match =
-                            credits
-                                .filter { it.groupLeg!!.key == key }
-                                .minByOrNull { (it.transfer.timestamp - debit.transfer.timestamp).absoluteValue }
-                                ?.takeIf { (it.transfer.timestamp - debit.transfer.timestamp).absoluteValue <= window }
-                                ?: return@mapNotNull null
-                        debit.rowIndex to
-                            BatchRelationship(
-                                relatedRowKey = ImportRowKey.CsvRow(match.rowIndex),
-                                typeName = assembly.relationshipTypeName,
-                            )
-                    }
+                if (assembly.fundingWhen.isEmpty()) {
+                    pairDebitsToCredits(legs, rule.windowSeconds.seconds, assembly.relationshipTypeName)
+                } else {
+                    pairFundingLegs(legs, rule.windowSeconds.seconds, assembly.relationshipTypeName)
+                }
             }.toMap()
 
     val importTransfers =

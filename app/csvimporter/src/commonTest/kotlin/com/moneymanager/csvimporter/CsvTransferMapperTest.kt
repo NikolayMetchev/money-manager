@@ -25,11 +25,14 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.StrategyConduit
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.PassThroughRule
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.PassThroughDetector
@@ -39,6 +42,7 @@ import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -205,6 +209,68 @@ class CsvTransferMapperTest {
         // The conduit + cleaned merchant are created; the raw "Crv*Sainsburys" junk account is not.
         val newNames = result.newAccounts.map { it.name }.toSet()
         assertEquals(setOf("Curve", "Sainsburys"), newNames)
+    }
+
+    private fun conduitMapper(
+        conduit: StrategyConduit,
+        passThroughs: List<PassThroughAccount> = emptyList(),
+    ): CsvTransferMapper {
+        val strategy = createStrategy()
+        return CsvTransferMapper(
+            strategy = strategy.copy(config = strategy.config.copy(conduit = conduit)),
+            columns = columns,
+            existingAccounts = emptyMap(),
+            existingCurrencies = mapOf(testCurrencyId to testCurrency),
+            existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            passThroughDetector = passThroughs.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
+        )
+    }
+
+    @Test
+    fun `mapRow routes every row of a strategy with a conduit through it to the row's counterparty`() {
+        val result = conduitMapper(StrategyConduit("Curve")).mapRow(CsvRow(1, listOf("15/12/2024", "Tesco", "-10.00", "Tesco")))
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(testSourceAccountId, result.transfer.sourceAccountId, "the row's own account funds the chain")
+        assertEquals(listOf("Curve"), result.passThrough?.conduitNames)
+        assertEquals("Tesco", result.passThrough?.merchantName)
+        assertEquals(listOf("Tesco"), result.passThrough?.spendDescriptions)
+        assertEquals(setOf("Curve", "Tesco"), result.newAccounts.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `mapRow puts a strategy conduit ahead of the conduits the description names`() {
+        val payPal =
+            PassThroughAccount(
+                id = PassThroughAccountId(2),
+                name = "PayPal",
+                conduitAccountName = "PayPal",
+                rules =
+                    listOf(
+                        PassThroughRule(
+                            detectionPattern = "(?i)^PAYPAL\\s*\\*",
+                            merchantPattern = "(?i)^PAYPAL\\s*\\*\\s*(.+?)(?:\\s{2,}.*)?$",
+                        ),
+                    ),
+            )
+        val result =
+            conduitMapper(StrategyConduit("Curve"), listOf(payPal))
+                .mapRow(CsvRow(1, listOf("15/12/2024", "Paypal *Thepihut", "-10.00", "Paypal *Thepihut")))
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(listOf("Curve", "PayPal"), result.passThrough?.conduitNames)
+        assertEquals("Thepihut", result.passThrough?.merchantName)
+        assertEquals(listOf("Paypal *Thepihut", "Thepihut"), result.passThrough?.spendDescriptions)
+        assertEquals(setOf("Curve", "PayPal", "Thepihut"), result.newAccounts.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `mapRow leaves a row out of the strategy conduit when its conditions do not hold`() {
+        val conduit = StrategyConduit("Curve", listOf(Condition("Payee", ConditionOp.NOT_EQUALS, "Curve Cash")))
+        val result = conduitMapper(conduit).mapRow(CsvRow(1, listOf("15/12/2024", "Points", "-10.00", "Curve Cash")))
+
+        assertIs<MappingResult.Success>(result)
+        assertNull(result.passThrough)
     }
 
     @Test

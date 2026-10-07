@@ -316,6 +316,60 @@ class PayPalCsvE2ETest : DbTest() {
             assertBalance("-42.45", "PayPal Card Funding")
         }
 
+    /** Each `pass-through` link through PayPal, as (funding leg's other end, payment leg's other end), sorted. */
+    private suspend fun passThroughPairs(): List<Pair<String, String>> {
+        val accounts = repositories.accountRepository.getAllAccounts().first()
+        val payPal = accounts.single { it.name == "PayPal" }.id
+        val names = accounts.associate { it.id to it.name }
+        val transfers = repositories.transactionRepository.getTransactionsByAccount(payPal).first()
+        val byId = transfers.associateBy { it.id }
+
+        fun Transfer.otherEnd() = names.getValue(if (sourceAccountId == payPal) targetAccountId else sourceAccountId)
+        return transfers
+            .flatMap { t ->
+                repositories.transferRelationshipRepository
+                    .getByTransfer(t.id)
+                    .first()
+                    .filter { it.relationshipType.name == "pass-through" && it.id1 == t.id }
+                    .mapNotNull { link -> byId[link.id2]?.let { t.otherEnd() to it.otherEnd() } }
+            }.sortedWith(compareBy({ it.first }, { it.second }))
+    }
+
+    @Test
+    fun eachCardDeposit_isLinkedToThePaymentItFunded_asOneChainThroughPayPal() =
+        runTest {
+            val refund =
+                listOf(
+                    payPalRow("01/09/2025", "10:00:00", "Pret-a-Portrait Ltd", "Payment Refund", "GBP", "5.00", "r1", "BST"),
+                    payPalRow("01/09/2025", "10:00:00", "", "General Credit Card Withdrawal", "GBP", "-5.00", "r2", "BST"),
+                )
+            importPayPal(payPalFile + refund)
+            // Two card-funded payments and one refund back to the card, each linked funding -> payment. The USD
+            // Uber payment was funded in GBP through a conversion and the Mobile Payment was money received:
+            // neither has a same-currency, same-amount card movement, so neither is linked.
+            assertEquals(
+                listOf(
+                    "PayPal Card Funding" to "Pret-a-Portrait Ltd",
+                    "PayPal Card Funding" to "Pret-a-Portrait Ltd",
+                    "PayPal Card Funding" to "UBER PAYMENTS UK LIMITED",
+                ),
+                passThroughPairs(),
+            )
+            assertBalance("0", "PayPal")
+        }
+
+    @Test
+    fun cardStatementFirst_thenPayPalExport_stillLinksEachDepositToItsPayment() =
+        runTest {
+            importCard()
+            importPayPal()
+            assertEachPaymentCountedOnce()
+            assertEquals(
+                listOf("PayPal Card Funding" to "Pret-a-Portrait Ltd", "PayPal Card Funding" to "UBER PAYMENTS UK LIMITED"),
+                passThroughPairs().filter { it.first == "PayPal Card Funding" },
+            )
+        }
+
     @Test
     fun payPalTimes_areReadInTheZoneTheirAbbreviationNames() =
         runTest {

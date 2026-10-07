@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
+import com.moneymanager.domain.model.csvstrategy.StrategyConduit
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AssetCodeRules
@@ -200,6 +201,10 @@ internal fun buildStrategyFromEditorState(
                         ?.takeIf { it.isNotBlank() }
                         ?.let { AttributeAccountMatch(column = it, attributeTypeName = state.fundingMatchAttributeTypeName) },
                 legGroups = state.legGroups,
+                conduit =
+                    state.conduitAccountName.trim().takeIf { it.isNotEmpty() }?.let {
+                        StrategyConduit(accountName = it, conditions = state.conduitConditions)
+                    },
                 reconciliation =
                     state.reconciliationSourceName.trim().takeIf { it.isNotEmpty() }?.let { source ->
                         ReconciliationConfig(source, state.reconciliationLinkablePrefix.takeIf { it.isNotEmpty() })

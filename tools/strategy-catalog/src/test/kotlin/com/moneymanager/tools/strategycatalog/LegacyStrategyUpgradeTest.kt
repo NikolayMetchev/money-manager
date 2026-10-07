@@ -6,6 +6,8 @@ import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.database.json.CsvStrategyJsonCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.csvstrategy.AccountRule
+import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -37,8 +39,25 @@ class LegacyStrategyUpgradeTest {
      * Foreign amounts: a card payment abroad is booked in the currency the merchant was paid, with the
      * card's conversion as a trade. The Excel export also stopped reading its settled amount as being in
      * the requested currency.
+     *
+     * Curve: every row runs through the Curve conduit, funded by a placeholder per card, where it used to
+     * be a plain Curve -> merchant spend.
      */
     private fun CsvImportStrategy.asOfLegacySnapshot(): CsvImportStrategy {
+        if (name == "Curve CSV") {
+            val curveSource =
+                AccountRulesMapping(
+                    fieldType = TransferField.SOURCE_ACCOUNT,
+                    rules =
+                        listOf(
+                            AccountRule(value = ValueExpr(listOf("Merchant Name")), pattern = "^", name = "Curve"),
+                            AccountRule(value = ValueExpr(listOf("Merchant Name"))),
+                        ),
+                )
+            return copy(
+                config = config.copy(fieldMappings = config.fieldMappings + (TransferField.SOURCE_ACCOUNT to curveSource), conduit = null),
+            )
+        }
         if (name !in setOf("Crypto.com Card", "Crypto.com Card (Excel)", "Monzo CSV")) return this
         val amount = config.fieldMappings.getValue(TransferField.AMOUNT) as AmountParsingMapping
         val reverted = config.fieldMappings + (TransferField.AMOUNT to amount.copy(foreignAmount = null))

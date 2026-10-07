@@ -449,8 +449,11 @@ class ImportDeduper(
                     first.touches(leg.sourceAccountId) -> false
                     else -> return@mapNotNull null
                 }
+            // A chain funded by a placeholder is a conduit's own record of a payment (a Curve or PayPal
+            // export), not a card's inferred route through the conduit, so a placeholder never splits into it.
             val unusable =
                 id in ownSourceLegs ||
+                    id in existingUnidentifiedLegs ||
                     id in existingExcludedLegs ||
                     id in claimedReconcileTargets ||
                     id in consumedReconcileIds ||
@@ -474,7 +477,13 @@ class ImportDeduper(
         classified.withIndex().flatMap { (index, c) ->
             val passThrough = c.transfer.passThrough
             val timestamp = c.transfer.timestamp
-            if (passThrough == null || timestamp == null || !c.isUnmatchedImport(settings)) return@flatMap emptyList()
+            if (passThrough == null ||
+                timestamp == null ||
+                c.transfer.unidentifiedCounterpartyAccountId != null ||
+                !c.isUnmatchedImport(settings)
+            ) {
+                return@flatMap emptyList()
+            }
             passThrough.conduits.mapIndexed { conduitIndex, conduit ->
                 ChainMovement(
                     conduit = conduit.requireId(),
@@ -781,7 +790,9 @@ class ImportDeduper(
         // An excluded incoming leg counts nowhere, so it must never supersede — and exclude — a counted
         // one: that would leave the movement counted zero times.
         if (rule.keeps == Keeps.INCOMING && transfer.isExcluded(exclusionTypeId)) return null
-        val found = rule.find(transfer, window) ?: return null
+        val matched = rule.find(transfer, window) ?: return null
+        // An incoming leg the source itself excluded records nothing, so it supersedes nothing either.
+        val found = if (transfer.isExcluded(exclusionTypeId)) matched.copy(supersedes = emptyList()) else matched
         consumedReconcileIds += found.claims
         pairedInBatch += found.id
         supersede(found.supersedes)
@@ -836,19 +847,36 @@ class ImportDeduper(
         }
 
     /**
-     * A conduit spend (e.g. a Curve export row, `conduit -> merchant`) against the funding leg that put the
+     * A conduit's own record of a payment (e.g. a Curve export row) against the funding leg that put the
      * money into the conduit (`fundingAccount -> conduit`), when the row named its funding card and it
      * resolved to [ImportTransfer.reconcileFundingAccountId]. Matches on amount+currency and time, ignoring
-     * the merchant — so it links across the merchant-naming differences that defeat [sameAccounts]. The
-     * funding leg's own pass-through spend leg remains the merchant record.
+     * the merchant — so it links across the merchant-naming differences that defeat [sameAccounts].
+     *
+     * A row that is itself a chain (`placeholder -> conduit -> merchant`) moves the money into the conduit
+     * like the funding leg does (out of it, for a refund): the funding leg stays the record of that, and the
+     * conduit's own record of what happened next supersedes the funding chain's guessed onward legs. A
+     * plain `conduit -> merchant` row only links, and the funding leg's own spend leg stays the merchant record.
      */
     private val fundingLeg =
         ReconcileRule(Keeps.EXISTING) { transfer, window ->
             val fundingAccountId = transfer.reconcileFundingAccountId ?: return@ReconcileRule null
             val timestamp = transfer.timestamp ?: return@ReconcileRule null
-            // Funding leg is fundingAccount -> conduit; the incoming row's source IS the conduit.
-            val key = DirectedAmountKey(fundingAccountId, transfer.fromAccount.requireId(), transfer.amount)
-            reconcileCandidatesByDirectedAmount[key]?.let { nearestUnclaimed(it, timestamp, window) }
+            val passThrough = transfer.passThrough
+            if (passThrough == null) {
+                // Funding leg is fundingAccount -> conduit; the incoming row's source IS the conduit.
+                val key = DirectedAmountKey(fundingAccountId, transfer.fromAccount.requireId(), transfer.amount)
+                return@ReconcileRule reconcileCandidatesByDirectedAmount[key]?.let { nearestUnclaimed(it, timestamp, window) }
+            }
+            val conduit = passThrough.conduit.requireId()
+            val key =
+                if (passThrough.incoming) {
+                    DirectedAmountKey(conduit, fundingAccountId, transfer.amount)
+                } else {
+                    DirectedAmountKey(fundingAccountId, conduit, transfer.amount)
+                }
+            reconcileCandidatesByDirectedAmount[key]
+                ?.let { nearestUnclaimed(it, timestamp, window) }
+                ?.let { it.copy(supersedes = onwardLegsFrom(it.id, conduit)) }
         }
 
     /**
