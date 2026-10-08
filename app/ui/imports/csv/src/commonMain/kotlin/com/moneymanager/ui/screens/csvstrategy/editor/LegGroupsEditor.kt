@@ -161,6 +161,12 @@ private fun LegGroupRuleEditor(
                 enabled = enabled,
             )
         is LegAssembly.ThroughAccount -> {
+            Text(
+                "Intermediate account rules. With none, each leg keeps the counterparty its own row names " +
+                    "and the legs are only linked.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             AccountRulesEditor(
                 rules = assembly.accounts,
                 onRulesChanged = { onRuleChanged(rule.copy(assembly = assembly.copy(accounts = it))) },
@@ -179,6 +185,13 @@ private fun LegGroupRuleEditor(
                 enabled = enabled,
                 isError = assembly.relationshipTypeName.isBlank(),
                 supportingText = { Text("Links each debit leg to its credit leg (e.g. \"conversion\")") },
+            )
+            RowConditionsEditor(
+                conditions = assembly.fundingWhen,
+                onConditionsChanged = { onRuleChanged(rule.copy(assembly = assembly.copy(fundingWhen = it))) },
+                columns = columns,
+                enabled = enabled,
+                title = "Funding leg when all of these hold (optional; pairs one funding leg with one other leg)",
             )
         }
     }
@@ -263,7 +276,9 @@ internal fun LegGroupRule.isComplete(): Boolean =
         when (val assembly = assembly) {
             is LegAssembly.Trade -> true
             is LegAssembly.ThroughAccount ->
-                assembly.accounts.isNotEmpty() && assembly.accounts.all { it.isComplete() } && assembly.relationshipTypeName.isNotBlank()
+                assembly.accounts.all { it.isComplete() } &&
+                    assembly.fundingWhen.all { it.isComplete() } &&
+                    assembly.relationshipTypeName.isNotBlank()
         }
 
 private fun defaultLegGroupRule(): LegGroupRule =

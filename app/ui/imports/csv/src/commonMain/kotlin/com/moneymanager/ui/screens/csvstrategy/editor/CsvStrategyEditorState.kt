@@ -197,6 +197,10 @@ internal class CsvStrategyEditorState(
     var fundingMatchAttributeTypeName by
         mutableStateOf(config?.fundingAttributeMatch?.attributeTypeName ?: WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME)
 
+    // Conduit every row runs through (e.g. Curve); saved only when an account name is given.
+    var conduitAccountName by mutableStateOf(config?.conduit?.accountName.orEmpty())
+    var conduitConditions by mutableStateOf(config?.conduit?.conditions.orEmpty())
+
     var contentMatchRules by mutableStateOf(config?.contentMatchRules.orEmpty())
     var crossSourceReconcileWindowSeconds by mutableStateOf(config?.crossSourceReconcileWindowSeconds)
 
@@ -267,6 +271,10 @@ internal class CsvStrategyEditorState(
     private val legGroupsValid: Boolean
         get() = legGroups.all { it.isComplete() }
 
+    // Conditions only take effect (and are only saved) once a conduit account is named.
+    private val conduitValid: Boolean
+        get() = conduitAccountName.isBlank() || conduitConditions.all { it.isComplete() }
+
     private val currencyValid: Boolean
         get() =
             when (currencyMode) {
@@ -310,7 +318,8 @@ internal class CsvStrategyEditorState(
                 !companionRulesValid ||
                 !fundingMatchValid ||
                 !contentMatchValid ||
-                !legGroupsValid
+                !legGroupsValid ||
+                !conduitValid
 
     fun tabHasError(tab: EditorTab): Boolean =
         when (tab) {
@@ -338,6 +347,7 @@ internal class CsvStrategyEditorState(
                 fundingMatchValid &&
                 contentMatchValid &&
                 legGroupsValid &&
+                conduitValid &&
                 currencyValid &&
                 timezoneValid
 }

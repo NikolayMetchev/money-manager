@@ -69,6 +69,7 @@ private fun flattenConfig(config: CsvStrategyConfig<FieldMapping>): Map<String, 
         config.crossSourceReconcileWindowSeconds?.let { put("Cross-source reconcile window (seconds)", it.toString()) }
         putIfNotEmpty("Leg groups", config.legGroups)
         config.fundingAttributeMatch?.let { put("Funding attribute match", it.toString()) }
+        config.conduit?.let { put("Conduit", it.toString()) }
     }
 
 private fun MutableMap<String, String>.putIfNotEmpty(

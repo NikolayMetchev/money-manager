@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
@@ -183,6 +184,8 @@ data class GroupLeg(
     val ruleIndex: Int,
     val side: GroupLegSide,
     val key: String,
+    /** The leg matches its rule's `ThroughAccount.fundingWhen`: the funding side of its event. */
+    val funding: Boolean = false,
 )
 
 /**
@@ -561,6 +564,8 @@ class CsvTransferMapper(
             // The counterparty is the account the TARGET_ACCOUNT mapping resolved, on whichever side the
             // flip below puts it.
             val counterpartyAccountId = targetAccountId
+            // The row's own account (the SOURCE_ACCOUNT mapping's), whichever side the flip puts it on.
+            val ownAccountId = sourceAccountId
 
             if (flipAccounts) {
                 val temp = sourceAccountId
@@ -590,17 +595,23 @@ class CsvTransferMapper(
             // name, then historical name): resolving it any more narrowly would leave the conduit side
             // dangling at AccountId(-1) for a conduit that was never created because it already exists.
             val passThroughMatch = passThroughDetector?.detect(description)
-            val chainConduitIds =
-                passThroughMatch?.accounts?.mapNotNull { resolveExistingAccountId(it.conduitAccountName) }.orEmpty()
-            val conduitAccountId =
-                passThroughMatch?.let {
-                    resolveExistingAccountId(it.accounts.first().conduitAccountName) ?: UNRESOLVED_ACCOUNT_ID
+            // A strategy whose rows all run through one conduit (see StrategyConduit): the row's counterparty
+            // becomes the merchant at the end of the chain and the conduit takes its place on the transfer,
+            // ahead of any conduits the description itself names.
+            val strategyConduit =
+                strategy.config.conduit?.takeIf {
+                    tradeTo == null && legDetection == null && rules.all(it.conditions, ColumnRecord(values, columnIndexByName))
                 }
+            val conduitNames =
+                listOfNotNull(strategyConduit?.accountName) + passThroughMatch?.accounts?.map { it.conduitAccountName }.orEmpty()
+            val chainConduitIds = conduitNames.mapNotNull { resolveExistingAccountId(it) }
+            val conduitAccountId =
+                conduitNames.firstOrNull()?.let { resolveExistingAccountId(it) ?: UNRESOLVED_ACCOUNT_ID }
             // Persisted account mappings apply to the merchant AFTER the full chain of prefixes was
             // peeled (e.g. "Crv*Paypal *Amazoncouk 1234" → "Amazoncouk 1234" → mapping ".*Amazoncouk.*"
             // → Amazon). A mapping that targets any conduit of the chain (or a deleted account) is
             // ignored — the engine must never synthesise a conduit→conduit spend leg.
-            val passThrough =
+            val detectedPassThrough =
                 passThroughMatch?.let { match ->
                     val mapped = findPersistedMapping(match.merchantName)?.let { accountsById[it] }
                     val (merchantName, merchantAccountId) =
@@ -617,6 +628,28 @@ class CsvTransferMapper(
                         relationshipTypeId = match.accounts.first().relationshipTypeId,
                         incoming = flipAccounts,
                     )
+                }
+            val passThrough =
+                when {
+                    strategyConduit == null -> detectedPassThrough
+                    // The strategy conduit forwards to the conduit the description names; that chain goes on.
+                    detectedPassThrough != null ->
+                        detectedPassThrough.copy(
+                            conduitNames = conduitNames,
+                            spendDescriptions = listOf(description) + detectedPassThrough.spendDescriptions,
+                        )
+                    else ->
+                        CsvPassThrough(
+                            conduitNames = conduitNames,
+                            merchantName =
+                                accountsById[counterpartyAccountId]?.name
+                                    ?: discoverNewAccount(targetMapping, values)?.first?.name
+                                    ?: (targetMapping as? AccountRulesMapping)?.let { resolveAccount(it, values).accountName }.orEmpty(),
+                            merchantAccountId = counterpartyAccountId.takeIf { it != UNRESOLVED_ACCOUNT_ID },
+                            spendDescriptions = listOf(description),
+                            relationshipTypeId = WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID,
+                            incoming = flipAccounts,
+                        )
                 }
             val effectiveSourceAccountId =
                 if (conduitAccountId != null && flipAccounts) conduitAccountId else sourceAccountId
@@ -659,11 +692,18 @@ class CsvTransferMapper(
             // against a real record of the same movement instead of double-counting it. Pass-through
             // merchants, conversion legs and trades have counterparties of their own shape, so they are
             // out of scope.
+            // On a strategy-conduit row the placeholder is the funder (the row's own account), not the merchant.
+            val sourceMapping = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]
             val unidentifiedCounterpartyAccountId =
-                if (passThroughMatch != null || conversionDetection != null || tradeTo != null) {
-                    null
-                } else {
-                    counterpartyAccountId.takeIf { isUnidentifiedCounterparty(targetMapping, values, targetUsedPersistedMappings) }
+                when {
+                    strategyConduit != null ->
+                        ownAccountId.takeIf {
+                            sourceAccountOverride == null &&
+                                sourceMapping != null &&
+                                isUnidentifiedCounterparty(sourceMapping, values, sourceUsedPersistedMappings)
+                        }
+                    passThroughMatch != null || conversionDetection != null || tradeTo != null -> null
+                    else -> counterpartyAccountId.takeIf { isUnidentifiedCounterparty(targetMapping, values, targetUsedPersistedMappings) }
                 }
 
             // A fee is modelled as its own movement (linked to this transfer), not folded into the amount.
@@ -755,7 +795,10 @@ class CsvTransferMapper(
                         passThrough.conduitNames
                             .filterNot { accountExists(it) }
                             .forEach { add(NewAccount(it, targetCategoryId)) }
-                        if (passThrough.merchantAccountId == null) add(NewAccount(passThrough.merchantName, targetCategoryId))
+                        // A strategy-conduit merchant is the row's own target, discovered above.
+                        if (passThroughMatch != null && passThrough.merchantAccountId == null) {
+                            add(NewAccount(passThrough.merchantName, targetCategoryId))
+                        }
                     }
                 }
             val discoveredMappings = discoveries.mapNotNull { it?.second }
@@ -889,17 +932,26 @@ class CsvTransferMapper(
                 when (val assembly = rule.assembly) {
                     is LegAssembly.Trade -> null
                     is LegAssembly.ThroughAccount ->
-                        assembly.accounts
-                            .firstNotNullOfOrNull { applyAccountRule(it, record, values) }
-                            ?.accountName
-                            ?.takeIf { it.isNotBlank() }
-                            ?: return@firstNotNullOfOrNull null
+                        if (assembly.accounts.isEmpty()) {
+                            null
+                        } else {
+                            assembly.accounts
+                                .firstNotNullOfOrNull { applyAccountRule(it, record, values) }
+                                ?.accountName
+                                ?.takeIf { it.isNotBlank() }
+                                ?: return@firstNotNullOfOrNull null
+                        }
                 }
+            val funding =
+                (rule.assembly as? LegAssembly.ThroughAccount)
+                    ?.fundingWhen
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { rules.all(it, trimmed) } == true
             val key =
                 rule.key.joinToString(
                     PAIRING_KEY_SEPARATOR,
                 ) { part -> rules.resolve(part) { getColumnValueOrNull(it, values)?.trim() } }
-            LegDetection(GroupLeg(index, side, key), throughAccountName)
+            LegDetection(GroupLeg(index, side, key, funding), throughAccountName)
         }
     }
 

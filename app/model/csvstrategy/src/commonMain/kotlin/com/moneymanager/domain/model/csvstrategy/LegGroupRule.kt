@@ -106,15 +106,26 @@ sealed interface LegAssembly {
      * one-asset-out dust sweep, where no column says which credit came from which debit), so balances stay
      * exact without inventing a pairing.
      *
+     * With no [accounts], each leg keeps the counterparty its own row names and the assembly only links
+     * the legs — for a source that records one movement as two rows through the owner account, such as
+     * PayPal's card deposit and the payment it funded (a `pass-through` pair).
+     *
      * @property accounts Picks the intermediate account: the first applicable rule's name. A leg no rule
-     *   names is not a leg.
+     *   names is not a leg. Empty: legs keep their own counterparties.
      * @property relationshipTypeName Links each debit to its credit (resolved get-or-create).
+     * @property fundingWhen When set, an event is one leg matching these conditions (the funding: the
+     *   relationship's first transfer) and one leg that doesn't, paired one to one — the funding leg on
+     *   either side, so a refund's withdrawal links to its refund the same way a deposit links to its payment.
+     *   Empty: each debit links to its nearest credit.
      */
     @Serializable
     @SerialName("throughAccount")
     data class ThroughAccount(
         // First applicable rule wins - order is semantic, keeps insertion-order serialization.
-        val accounts: List<AccountRule>,
+        val accounts: List<AccountRule> = emptyList(),
         val relationshipTypeName: String,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        @Serializable(with = SortedConditionListSerializer::class)
+        val fundingWhen: List<Condition> = emptyList(),
     ) : LegAssembly
 }

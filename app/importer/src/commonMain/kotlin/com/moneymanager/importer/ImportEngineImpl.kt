@@ -1774,6 +1774,9 @@ class ImportEngineImpl(
             // Legs derived from an excluded movement (e.g. a cancelled/deleted row) are excluded with it,
             // or its fee and spend legs would still move balances.
             val exclusion = t.attributes.filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
+            // Except a chain whose movement into its conduit was reconciled away while it superseded another
+            // record's onward legs: this row is now the record of what the conduit did with the money.
+            val spendExclusion = exclusion.takeIf { classified.supersededLegs.isEmpty() }.orEmpty()
             // The fee is a real movement out of the main transfer's account; counts in balances.
             if (fee != null && feeTempId != null) {
                 addLeg(feeTempId, fee.description, fee.source, fee.target, fee.amount, fee.rowKey)
@@ -1797,8 +1800,8 @@ class ImportEngineImpl(
                         passThrough.rowKey,
                     )
                     val conduitStatement = classified.conduitStatement
-                    if (exclusion.isNotEmpty()) {
-                        newAttributes[spendTempId] = exclusion
+                    if (spendExclusion.isNotEmpty()) {
+                        newAttributes[spendTempId] = spendExclusion
                     } else if (conduitStatement != null && legIndex >= conduitStatement.conduitIndex) {
                         // Beyond a conduit whose own statement is imported: that statement is the record.
                         newAttributes[spendTempId] = listOf(NewAttribute(conduitStatement.exclusionTypeId, "reconciled"))

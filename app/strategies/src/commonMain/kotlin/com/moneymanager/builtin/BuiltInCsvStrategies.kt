@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.csvstrategy.LegGroupRule
 import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
+import com.moneymanager.domain.model.csvstrategy.StrategyConduit
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifColumns
@@ -130,11 +131,31 @@ object BuiltInCsvStrategies {
 
     /**
      * The Curve conduit account. Matches [com.moneymanager.builtin.BuiltInPassThroughs.curve]'s
-     * conduitAccountName, so a Curve CSV row's spend leg (Curve -> merchant) is the same shape as the
-     * spend leg the pass-through detector synthesises from an underlying card's "CRV*<merchant>" row,
-     * letting cross-source reconciliation link the two.
+     * conduitAccountName, so a Curve CSV row's chain (funding card -> Curve -> merchant) runs through the
+     * same account as the chain the pass-through detector builds from an underlying card's "CRV*<merchant>"
+     * row, letting cross-source reconciliation link the two. Every payment passes through, so it nets to zero.
      */
     private const val CURVE_CONDUIT_ACCOUNT = "Curve"
+
+    /**
+     * Names the placeholder that funds a Curve row: the card it names by its last four digits, which the
+     * export can't identify further. The engine reconciles it against that card's own statement where the
+     * card's import booked the same charge into Curve.
+     */
+    private fun curveFundingCardRules(lastFourColumn: String): List<AccountRule> =
+        listOf(
+            AccountRule(
+                value = ValueExpr(listOf(lastFourColumn)),
+                trim = true,
+                pattern = "^(\\S+)$",
+                name = "$CURVE_FUNDING_CARD_PREFIX $1",
+                counterpartyIsUnidentified = true,
+            ),
+            AccountRule(value = ValueExpr(listOf(lastFourColumn)), name = CURVE_FUNDING_CARD_PREFIX, counterpartyIsUnidentified = true),
+        )
+
+    /** Prefix of the per-card placeholder accounts funding Curve rows ("Curve card 7721"). */
+    private const val CURVE_FUNDING_CARD_PREFIX = "Curve card"
 
     /**
      * Cross-source reconciliation window for the Curve CSV strategy. Curve's export stamps only a
@@ -169,6 +190,14 @@ object BuiltInCsvStrategies {
      * already booked the same money into PayPal it reconciles away; see `AccountRule.counterpartyIsUnidentified`.
      */
     private const val PAYPAL_CARD_FUNDING_ACCOUNT = "PayPal Card Funding"
+
+    /** The rows that move money between a card and PayPal (a regex alternation over the `Type` column). */
+    private const val PAYPAL_CARD_FUNDING_TYPES = "General Credit Card Deposit|General Credit Card Withdrawal"
+
+    /** The payment and refund rows a card funding row can be paired with (a regex alternation over `Type`). */
+    private const val PAYPAL_CARD_FUNDED_TYPES =
+        "Pre-approved Payment Bill User Payment|Express Checkout Payment|Mobile Payment|eBay Auction Payment|" +
+            "Website Payment|General Payment|Donation Payment|Payment Refund|Payment Reversal"
 
     /** Same placeholder role as [PAYPAL_CARD_FUNDING_ACCOUNT], for withdrawals to and deposits from a bank account. */
     private const val PAYPAL_BANK_TRANSFERS_ACCOUNT = "PayPal Bank Transfers"
@@ -1007,20 +1036,15 @@ object BuiltInCsvStrategies {
      * aggregator: a Curve payment is forwarded to an underlying card, so each Curve row is the
      * merchant-facing side of a movement whose funding side lives on the underlying card's statement.
      *
-     * Every row is mapped to a spend leg [CURVE_CONDUIT_ACCOUNT] -> merchant, matching the spend leg the
-     * pass-through detector already synthesises from the underlying card's "CRV*<merchant>" row (see
-     * [com.moneymanager.builtin.BuiltInPassThroughs.curve]). Cross-source reconciliation
-     * (`com.moneymanager.importer.ImportDeduper.reconcileMatches`) then links the two whenever they
-     * resolve to the same merchant account, same amount and same currency within
-     * [CURVE_RECONCILE_WINDOW_SECONDS] — so the merchant spend is counted once. The funding leg
-     * (card -> Curve) is contributed by the underlying-card import, not this file.
-     *
-     * Reconciliation is exact on the merchant account, so it links only where both sources resolve the
-     * same account — the merchant text differs across sources (card "Crv*Amzn Mktplace" vs Curve
-     * "AMAZON"), so alignment relies on persisted account mappings, the same normalisation used for the
-     * card variants. Foreign-currency rows (Curve records the merchant-side amount/currency, not the GBP
-     * the card was billed) can never match the GBP funding side, so they import as standalone Curve
-     * spends in their own currency by design.
+     * Every row runs through [CURVE_CONDUIT_ACCOUNT] (the strategy's conduit) as the chain
+     * `Curve card <last 4> -> Curve -> merchant`, so Curve always nets to zero. The funding side is a
+     * placeholder per card. Where the card's own import booked the charge into Curve (its "CRV*<merchant>"
+     * pass-through, see [com.moneymanager.builtin.BuiltInPassThroughs.curve]), the two reconcile — by the
+     * card's `card-last4` attribute, or by the card's movement into Curve alone — and, in either import
+     * order, the card's record of the funding stays counted while this row's merchant leg, naming the real
+     * merchant, supersedes the card's guess at it. Foreign-currency rows (Curve records the merchant-side
+     * amount/currency, not what the card was billed) can't match the card's funding leg, so they stay
+     * funded by the placeholder, in their own currency.
      *
      * The export's first column has a BLANK header (a running row index); it is part of the
      * identification column set but is otherwise unused. Amounts are always positive spends out of
@@ -1029,20 +1053,13 @@ object BuiltInCsvStrategies {
     fun buildCurveCsvStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
-                // Fixed conduit source so every Curve row lands in the shared Curve account and lines up
-                // with the pass-through spend leg. The catch-all pattern always matches.
                 TransferField.SOURCE_ACCOUNT to
                     AccountRulesMapping(
                         fieldType = TransferField.SOURCE_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(value = ValueExpr(listOf("Merchant Name")), pattern = "^", name = CURVE_CONDUIT_ACCOUNT),
-                                AccountRule(value = ValueExpr(listOf("Merchant Name"))),
-                            ),
+                        rules = curveFundingCardRules("Funding Card Last 4 Digits"),
                     ),
                 // Merchant account, looked up/created from the clean Merchant Name; persisted account
-                // mappings apply, so a user can normalise Curve's name onto the same account the card's
-                // pass-through spend leg resolves to (which is what makes reconciliation link them).
+                // mappings apply, so a user can normalise Curve's names onto their own merchant accounts.
                 TransferField.TARGET_ACCOUNT to
                     AccountRulesMapping(
                         fieldType = TransferField.TARGET_ACCOUNT,
@@ -1104,6 +1121,7 @@ object BuiltInCsvStrategies {
                             column = "Funding Card Last 4 Digits",
                             attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
                         ),
+                    conduit = StrategyConduit(CURVE_CONDUIT_ACCOUNT),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -1112,14 +1130,15 @@ object BuiltInCsvStrategies {
 
     /**
      * Built-in strategy for Curve's newer "Transactions <dates>.csv" export, which replaced the
-     * [buildCurveCsvStrategy] layout. Real-card rows work the same way: each is a spend leg
-     * [CURVE_CONDUIT_ACCOUNT] -> merchant, reconciled against the underlying card's funding leg through the
-     * `Card Last 4 Digits` funding match. Unlike the old export, this one gives the amount the funding card
+     * [buildCurveCsvStrategy] layout. Real-card rows work the same way: each is the chain
+     * `Curve card <last 4> -> Curve -> merchant`, reconciled against the underlying card's funding leg
+     * through the `Card Last 4 Digits` funding match. Unlike the old export, this one gives the amount the funding card
      * was charged (`Txn Amount (Funding Card)`, which includes any Curve fee) alongside the merchant-side
      * foreign spend, so the spend is booked in what the card paid: that is what the card statement's funding
      * leg holds, foreign purchases included. The foreign spend and the fee are kept as attributes.
      *
-     * Curve Cash rows have no card. Their amounts are points (`CPT`, booked as [CURVE_CASH_ASSET]):
+     * Curve Cash rows have no card and don't pass through [CURVE_CONDUIT_ACCOUNT]. Their amounts are points
+     * (`CPT`, booked as [CURVE_CASH_ASSET]):
      *  - a row with no Type is points earned on a purchase: [CURVE_CASHBACK_ACCOUNT] -> [CURVE_CASH_ACCOUNT];
      *  - a row paid with the "Curve Cash" card spends points: [CURVE_CASH_ACCOUNT] -> merchant.
      */
@@ -1144,8 +1163,7 @@ object BuiltInCsvStrategies {
                                     pattern = "^",
                                     name = CURVE_CASH_ACCOUNT,
                                 ),
-                                AccountRule(value = ValueExpr(listOf("Merchant")), pattern = "^", name = CURVE_CONDUIT_ACCOUNT),
-                            ),
+                            ) + curveFundingCardRules("Card Last 4 Digits"),
                     ),
                 TransferField.TARGET_ACCOUNT to
                     AccountRulesMapping(
@@ -1223,6 +1241,11 @@ object BuiltInCsvStrategies {
                             attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
                         ),
                     assetCodes = AssetCodeRules(aliases = mapOf("CPT" to CURVE_CASH_ASSET)),
+                    conduit =
+                        StrategyConduit(
+                            accountName = CURVE_CONDUIT_ACCOUNT,
+                            conditions = listOf(Condition("Card Name", ConditionOp.NOT_EQUALS, "Curve Cash")),
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -1317,7 +1340,9 @@ object BuiltInCsvStrategies {
      *    names the card — stays counted. The card's pass-through spend leg (PayPal -> its guess at the
      *    merchant, from a truncated descriptor and in the card's currency) is then superseded by PayPal's own
      *    payment row, which names the real payee and the currency actually paid. Either import order works.
-     *    Refunds mirror this through "General Credit Card Withdrawal".
+     *    Refunds mirror this through "General Credit Card Withdrawal". PayPal is a conduit for these: the
+     *    deposit and the payment it funded (stamped the same second, same amount) are linked as one
+     *    `pass-through` chain, card funding -> PayPal -> payee, as is a refund and its withdrawal.
      *  - **Bank transfers** go to [PAYPAL_BANK_TRANSFERS_ACCOUNT], reconciling against the bank's own export.
      *  - **Currency conversions** arrive as a debit row and a credit row at the same second and become one
      *    trade on the PayPal account.
@@ -1434,6 +1459,20 @@ object BuiltInCsvStrategies {
                         legWhen = listOf(Condition("Type", ConditionOp.EQUALS, "General Currency Conversion")),
                         side = LegSide.Sign("Amount"),
                         assembly = LegAssembly.Trade(description = "Convert {from} to {to}"),
+                    ),
+                    LegGroupRule(
+                        legWhen =
+                            listOf(
+                                Condition("Type", ConditionOp.MATCHES, "^($PAYPAL_CARD_FUNDING_TYPES|$PAYPAL_CARD_FUNDED_TYPES)$"),
+                            ),
+                        side = LegSide.Sign("Amount"),
+                        // Same currency and the same amount, whichever way it moved.
+                        key = listOf(ValueExpr(listOf("Currency")), ValueExpr(listOf("Amount"), Extraction("^-?(.*)$", "$1"))),
+                        assembly =
+                            LegAssembly.ThroughAccount(
+                                relationshipTypeName = WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_NAME,
+                                fundingWhen = listOf(Condition("Type", ConditionOp.MATCHES, "^($PAYPAL_CARD_FUNDING_TYPES)$")),
+                            ),
                     ),
                 ),
         )

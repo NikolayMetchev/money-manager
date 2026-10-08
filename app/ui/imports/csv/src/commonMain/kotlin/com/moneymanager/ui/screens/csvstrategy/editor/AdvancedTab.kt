@@ -127,6 +127,34 @@ internal fun AdvancedTab(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        Text("Conduit (Optional)", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "An account every row passes through (e.g. Curve): a row source → target is imported as " +
+                "source → conduit → target, so the conduit nets to zero.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+            value = state.conduitAccountName,
+            onValueChange = { state.conduitAccountName = it },
+            label = { Text("Conduit account") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = enabled,
+        )
+        if (state.conduitAccountName.isNotBlank()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            RowConditionsEditor(
+                conditions = state.conduitConditions,
+                onConditionsChanged = { state.conduitConditions = it },
+                columns = csvColumns,
+                enabled = enabled,
+                title = "Only rows where (all must match; none = every row)",
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
         Text("Cross-source Reconciliation (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
             "Import rows that fuzzy-match an existing transfer from another source (same accounts and " +

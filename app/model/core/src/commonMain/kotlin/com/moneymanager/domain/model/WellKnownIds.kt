@@ -91,6 +91,9 @@ object WellKnownIds {
      */
     const val PASS_THROUGH_RELATIONSHIP_TYPE_ID: Long = 3
 
+    /** The name of the [PASS_THROUGH_RELATIONSHIP_TYPE_ID] type, for configs that link by name. */
+    const val PASS_THROUGH_RELATIONSHIP_TYPE_NAME: String = "pass-through"
+
     /**
      * "reversal" relationship type (seeded id 4): id1 is the reversing movement (a refund/cancellation)
      * and id2 the earlier movement it reverses — for pass-through rows, the two spend legs on the
