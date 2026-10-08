@@ -276,7 +276,9 @@ internal fun LegGroupRule.isComplete(): Boolean =
         when (val assembly = assembly) {
             is LegAssembly.Trade -> true
             is LegAssembly.ThroughAccount ->
-                assembly.accounts.all { it.isComplete() } && assembly.relationshipTypeName.isNotBlank()
+                assembly.accounts.all { it.isComplete() } &&
+                    assembly.fundingWhen.all { it.isComplete() } &&
+                    assembly.relationshipTypeName.isNotBlank()
         }
 
 private fun defaultLegGroupRule(): LegGroupRule =
