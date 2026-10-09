@@ -36,6 +36,21 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+    // The Kotlin plugins below must match the catalog's Kotlin version, or every project that applies
+    // libs.plugins.kotlin.* fails with "already on the classpath with a different version". Reading it
+    // here keeps libs.versions.toml the single place a Kotlin bump (manual or Renovate) has to touch.
+    val kotlinVersion = Regex("""\nkotlin\s*=\s*"([^"]+)"""")
+        .find(settings.layout.settingsDirectory.file("gradle/libs.versions.toml").asFile.readText())
+        ?.groupValues
+        ?.get(1)
+        ?: error("kotlin version not found in gradle/libs.versions.toml")
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == "org.jetbrains.kotlin.multiplatform" || requested.id.id == "org.jetbrains.kotlin.jvm") {
+                useVersion(kotlinVersion)
+            }
+        }
+    }
 }
 
 // Included at the top level (not inside pluginManagement) because the typesafe-conventions plugin
@@ -83,8 +98,8 @@ plugins {
     id("com.autonomousapps.build-health") version "3.19.2"
 
     // Kotlin plugins declared here for classloader compatibility with DAGP
-    id("org.jetbrains.kotlin.multiplatform") version "2.4.20" apply false
-    id("org.jetbrains.kotlin.jvm") version "2.4.20" apply false
+    id("org.jetbrains.kotlin.multiplatform") apply false
+    id("org.jetbrains.kotlin.jvm") apply false
 }
 
 develocity {

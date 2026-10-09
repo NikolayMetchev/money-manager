@@ -15,6 +15,11 @@
       "description": "kotlinx-datetime publishes '-0.6.x-compat' sibling releases; they are not upgrades",
       "matchPackageNames": ["org.jetbrains.kotlinx:kotlinx-datetime"],
       "allowedVersions": "!/-compat$/"
+    },
+    {
+      "description": "Kotlin's Gradle plugins all read the one catalog version; split groups open duplicate PRs that each fail alone",
+      "matchPackageNames": ["/^org\\.jetbrains\\.kotlin[.:]/"],
+      "groupName": "kotlin monorepo"
     }
   ]
 }
