@@ -1,10 +1,10 @@
 package com.moneymanager.android
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import co.touchlab.kermit.Logger
 import com.moneymanager.android.auth.AndroidGoogleAccessTokenSource
 import com.moneymanager.android.auth.GoogleAuthConsentLauncher
 import com.moneymanager.cryptodata.HttpCryptoCatalogRefresher
@@ -30,7 +30,7 @@ import com.moneymanager.ui.error.SchemaErrorDetector
 import com.moneymanager.ui.toAppServices
 import kotlinx.coroutines.runBlocking
 
-private const val TAG = "MainActivity"
+private val logger = Logger.withTag("MainActivity")
 
 class MainActivity : ComponentActivity() {
     private var remoteController: RemoteDatabaseController? = null
@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
                 // date from our side, so the local copy must be kept rather than deleted.
                 !controller.hasUnsyncedChanges(database) || controller.syncNow(database) == SyncResult.UPLOADED
             }
-        }.onFailure { Log.e(TAG, "Failed to sync database", it) }.getOrDefault(false)
+        }.onFailure { logger.e(it) { "Failed to sync database" } }.getOrDefault(false)
     }
 
     override fun onStop() {
@@ -85,10 +85,10 @@ class MainActivity : ComponentActivity() {
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             if (SchemaErrorDetector.isSchemaError(throwable)) {
-                Log.e(TAG, "Schema error detected: ${throwable.message}", throwable)
+                logger.e(throwable) { "Schema error detected: ${throwable.message}" }
                 GlobalSchemaErrorState.reportError(throwable)
             } else {
-                Log.e(TAG, "Uncaught exception on thread ${thread.name}: ${throwable.message}", throwable)
+                logger.e(throwable) { "Uncaught exception on thread ${thread.name}: ${throwable.message}" }
                 defaultHandler?.uncaughtException(thread, throwable)
             }
         }
@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
         runCatching {
             initializeCryptoCatalogStore(applicationContext.filesDir)
             installCryptoCatalog()
-        }.onFailure { Log.e(TAG, "Failed to install crypto catalog", it) }
+        }.onFailure { logger.e(it) { "Failed to install crypto catalog" } }
 
         googleAuthConsentLauncher.attach(this)
         val params =
@@ -134,8 +134,8 @@ class MainActivity : ComponentActivity() {
                         )
                     component.toApplication().toAppServices(importEngine)
                 },
-                onInfoLog = { message -> Log.i(TAG, message) },
-                onErrorLog = { message, error -> Log.e(TAG, message, error) },
+                onInfoLog = { message -> logger.i { message } },
+                onErrorLog = { message, error -> logger.e(error) { message } },
                 remoteController = controller,
                 strategySyncController = component.strategySyncController,
                 strategyCatalogController = component.strategyCatalogController,

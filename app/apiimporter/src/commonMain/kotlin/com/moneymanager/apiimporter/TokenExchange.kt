@@ -1,5 +1,6 @@
 package com.moneymanager.apiimporter
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.apistrategy.ApiTokenExchange
 import com.moneymanager.rest.ApiClient
 import io.ktor.http.formUrlEncode
@@ -7,10 +8,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import org.lighthousegames.logging.logging
 import kotlin.io.encoding.Base64
 
-private val logger = logging()
+private val logger = Logger.withTag("TokenExchange")
 
 /**
  * Trades [clientId] + [clientSecret] for a bearer token per [exchange] (OAuth2 client credentials).
@@ -28,7 +28,7 @@ internal suspend fun exchangeBearerToken(
     val basic = Base64.encode("$clientId:$clientSecret".encodeToByteArray())
     val url = baseUrl.trimEnd('/') + "/" + exchange.path.trimStart('/')
     // Never the credentials or the token: the request isn't recorded, so this log is its only trace.
-    logger.info { "Requesting an access token from $url" }
+    logger.i { "Requesting an access token from $url" }
     val response =
         apiClient.send(
             method = "POST",
@@ -45,15 +45,15 @@ internal suspend fun exchangeBearerToken(
         val reason =
             json?.resolveJsonPath("error_description") ?: json?.resolveJsonPath("error")
                 ?: "no error detail in the response (${response.body.length} chars)"
-        logger.warn { "Token request to $url failed with HTTP ${response.statusCode}: $reason" }
+        logger.w { "Token request to $url failed with HTTP ${response.statusCode}: $reason" }
         throw ApiDownloadNotPossibleException("Token request failed (HTTP ${response.statusCode}): $reason")
     }
     val token = (json?.resolveJsonPathElement(exchange.accessTokenField) as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
     if (token == null) {
-        logger.warn { "Token response from $url has no '${exchange.accessTokenField}' (fields: ${json?.keys.orEmpty()})" }
+        logger.w { "Token response from $url has no '${exchange.accessTokenField}' (fields: ${json?.keys.orEmpty()})" }
         throw ApiDownloadNotPossibleException("Token response has no '${exchange.accessTokenField}'.")
     }
-    logger.info { "Access token obtained from $url (expires_in=${json.resolveJsonPath("expires_in") ?: "?"}s)" }
+    logger.i { "Access token obtained from $url (expires_in=${json.resolveJsonPath("expires_in") ?: "?"}s)" }
     return token
 }
 

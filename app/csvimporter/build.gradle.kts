@@ -20,7 +20,7 @@ kotlin {
                 api(libs.kotlinx.coroutines.core)
 
                 implementation(libs.cryptography.core)
-                implementation(libs.kmlogging)
+                implementation(libs.kermit)
                 implementation(libs.kotlinx.datetime)
             }
         }
@@ -44,7 +44,7 @@ kotlin {
                 implementation(projects.utils.parsers.csv)
                 implementation(projects.utils.parsers.qif)
                 implementation(projects.utils.parsers.xlsx)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
 
                 // Provider is resolved at runtime via CryptographyProvider.Default (no compile usage).
                 runtimeOnly(libs.cryptography.provider.jdk)
@@ -61,7 +61,7 @@ kotlin {
                 implementation(projects.utils.parsers.csv)
                 implementation(projects.utils.parsers.qif)
                 implementation(projects.utils.parsers.xlsx)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
 
                 runtimeOnly(libs.cryptography.provider.jdk)
             }

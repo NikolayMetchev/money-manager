@@ -27,10 +27,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("AuditScreen")
 
 data class AuditScreenData<D>(
     val title: String,
@@ -58,7 +58,7 @@ fun <D : Any> AuditScreen(
         try {
             screenData = loadData()
         } catch (expected: Exception) {
-            logger.error(expected) { "Failed to load audit history: ${expected.message}" }
+            logger.e(expected) { "Failed to load audit history: ${expected.message}" }
             errorMessage = "Failed to load audit history: ${expected.message}"
         } finally {
             isLoading = false

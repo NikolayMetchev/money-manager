@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.apiimporter.ApiReimportPlan
 import com.moneymanager.apiimporter.ApiReimportResult
 import com.moneymanager.apiimporter.executeApiReimport
@@ -41,9 +42,8 @@ import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("ApiReimportDialog")
 
 /**
  * Re-imports an already-imported API session so a strategy config change (e.g. an internal-transfer
@@ -149,7 +149,7 @@ fun ApiReimportDialog(
                         } catch (expected: CancellationException) {
                             throw expected
                         } catch (expected: Exception) {
-                            logger.error(expected) { "Re-import failed: ${expected.message}" }
+                            logger.e(expected) { "Re-import failed: ${expected.message}" }
                             errorMessage = "Re-import failed: ${expected.message}"
                             isRunning = false
                         } finally {

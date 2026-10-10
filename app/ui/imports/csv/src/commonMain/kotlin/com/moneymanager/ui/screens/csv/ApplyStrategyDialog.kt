@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.CsvImportResult
 import com.moneymanager.csvimporter.CsvTransferMapper
@@ -59,9 +60,8 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("ApplyStrategyDialog")
 
 // QIF reuses the CSV import engine, so its apply dialog/applier mirror this one by design.
 @Suppress("DuplicatedCode")
@@ -400,7 +400,7 @@ fun ApplyStrategyDialog(
                                 )
                             onImportComplete(result)
                         } catch (expected: Exception) {
-                            logger.error(expected) { "Import failed: ${expected.message}" }
+                            logger.e(expected) { "Import failed: ${expected.message}" }
                             errorMessage = "Import failed: ${expected.message}"
                             isImporting = false
                         }

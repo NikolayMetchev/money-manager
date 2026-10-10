@@ -22,9 +22,6 @@
 # Ignore warnings for log4j classes that reference optional dependencies
 -dontwarn org.apache.logging.log4j.**
 
-# Ignore warnings for diamondedge logging optional dependency
--dontwarn kotlinx.datetime.**
-
 # Ignore warnings for platform-specific Compose/Skiko dependencies
 # These differ between macOS, Linux, and Windows
 -dontwarn org.jetbrains.skia.**

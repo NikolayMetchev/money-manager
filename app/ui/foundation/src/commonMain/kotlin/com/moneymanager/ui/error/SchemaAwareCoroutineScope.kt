@@ -5,14 +5,14 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.plus
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("SchemaAwareCoroutineScope")
 
 /**
  * A CoroutineExceptionHandler that catches schema errors and reports them to GlobalSchemaErrorState.
@@ -21,11 +21,11 @@ private val logger = logging()
 val SchemaAwareExceptionHandler: CoroutineExceptionHandler =
     CoroutineExceptionHandler { _, throwable ->
         if (SchemaErrorDetector.isSchemaError(throwable)) {
-            logger.error(throwable) { "Schema error caught by global handler: ${throwable.message}" }
+            logger.e(throwable) { "Schema error caught by global handler: ${throwable.message}" }
             GlobalSchemaErrorState.reportError(throwable)
         } else {
             // Log non-schema errors but let them propagate through normal channels
-            logger.error(throwable) { "Non-schema error in coroutine: ${throwable.message}" }
+            logger.e(throwable) { "Non-schema error in coroutine: ${throwable.message}" }
             // Re-throw to let it propagate to the thread's uncaught exception handler
             throw throwable
         }

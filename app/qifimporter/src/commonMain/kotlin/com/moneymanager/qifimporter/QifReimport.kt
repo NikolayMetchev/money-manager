@@ -1,5 +1,6 @@
 package com.moneymanager.qifimporter
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE
 import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.BulkReimportFileOutcome
@@ -41,9 +42,8 @@ import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.QifImportMutation
 import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import kotlinx.coroutines.flow.first
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("QifReimport")
 
 /**
  * Builds the read-only [ReimportPlan] for [qifImport] under [strategy]: which import-created accounts
@@ -212,7 +212,7 @@ suspend fun executeQifReimport(
             )
             merged += merge
         } catch (expected: Exception) {
-            logger.warn(expected) { "QIF re-import merge of '${merge.duplicateName}' into '${merge.targetName}' failed" }
+            logger.w(expected) { "QIF re-import merge of '${merge.duplicateName}' into '${merge.targetName}' failed" }
             skipped +=
                 ReimportSkippedAccount(
                     accountId = merge.duplicateId,

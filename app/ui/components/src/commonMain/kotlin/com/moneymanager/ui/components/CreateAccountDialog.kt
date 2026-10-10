@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
@@ -39,10 +40,9 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 
-private val logger = logging()
+private val logger = Logger.withTag("CreateAccountDialog")
 
 /**
  * A dialog for creating a new account with optional category and owner selection.
@@ -125,7 +125,7 @@ fun CreateAccountDialog(
                     onAccountCreated?.invoke(result.createdAccountIds.getValue(key))
                     onDismiss()
                 } catch (expected: Exception) {
-                    logger.error(expected) { "Failed to create account: ${expected.message}" }
+                    logger.e(expected) { "Failed to create account: ${expected.message}" }
                     accountState.errorMessage =
                         if (expected.message.isAccountNameUniqueViolation()) {
                             "An account named \"${accountState.name.trim()}\" already exists"

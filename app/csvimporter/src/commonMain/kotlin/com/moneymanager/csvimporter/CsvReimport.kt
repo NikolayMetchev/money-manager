@@ -1,5 +1,6 @@
 package com.moneymanager.csvimporter
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -45,11 +46,10 @@ import com.moneymanager.importengineapi.reconciledPartnerUnhideUpdates
 import com.moneymanager.importengineapi.reconciledPartnerUnhides
 import com.moneymanager.importengineapi.selectNearestUnconsumedLeg
 import kotlinx.coroutines.flow.first
-import org.lighthousegames.logging.logging
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-private val logger = logging()
+private val logger = Logger.withTag("CsvReimport")
 
 /** How often the per-row plan-phase scans report progress. */
 private const val PLAN_PROGRESS_EVERY_ROWS = 25
@@ -1286,7 +1286,7 @@ suspend fun executeCsvReimport(
             )
             merged += merge
         } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import merge of '${merge.duplicateName}' into '${merge.targetName}' failed" }
+            logger.w(expected) { "Re-import merge of '${merge.duplicateName}' into '${merge.targetName}' failed" }
             skipped +=
                 ReimportSkippedAccount(
                     accountId = merge.duplicateId,
@@ -1326,7 +1326,7 @@ suspend fun executeCsvReimport(
             )
             rewritten += rewrite
         } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import rewrite of row ${rewrite.rowIndex} ('${rewrite.description}') failed" }
+            logger.w(expected) { "Re-import rewrite of row ${rewrite.rowIndex} ('${rewrite.description}') failed" }
             skipped +=
                 ReimportSkippedAccount(
                     accountId = null,
@@ -1366,7 +1366,7 @@ suspend fun executeCsvReimport(
             )
             converted += conversion
         } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import trade conversion of row ${conversion.rowIndex} ('${conversion.description}') failed" }
+            logger.w(expected) { "Re-import trade conversion of row ${conversion.rowIndex} ('${conversion.description}') failed" }
             skipped +=
                 ReimportSkippedAccount(
                     accountId = null,
@@ -1385,7 +1385,7 @@ suspend fun executeCsvReimport(
         try {
             importEngine.import(ImportBatch(transfers = sharedUnhides.map { it.update }, dedupePolicy = DedupePolicy.None))
         } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import un-hide of ${sharedUnhides.size} shared reconciled transfer(s) failed" }
+            logger.w(expected) { "Re-import un-hide of ${sharedUnhides.size} shared reconciled transfer(s) failed" }
             skipped +=
                 ReimportSkippedAccount(
                     accountId = null,
@@ -1410,7 +1410,7 @@ suspend fun executeCsvReimport(
             )
             releasedDuplicates += plan.staleDuplicates
         } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import release of ${plan.staleDuplicates.size} stale duplicate row(s) failed" }
+            logger.w(expected) { "Re-import release of ${plan.staleDuplicates.size} stale duplicate row(s) failed" }
             skipped +=
                 ReimportSkippedAccount(
                     accountId = null,
@@ -1451,7 +1451,7 @@ suspend fun executeCsvReimport(
             )
             deduplicatedTrades += duplicate
         } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import duplicate-trade removal of row ${duplicate.rowIndex} failed" }
+            logger.w(expected) { "Re-import duplicate-trade removal of row ${duplicate.rowIndex} failed" }
             skipped +=
                 ReimportSkippedAccount(
                     accountId = null,
@@ -1491,7 +1491,7 @@ suspend fun executeCsvReimport(
             )
             counterpartyReconciled += reconcile
         } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import counterparty re-run of row ${reconcile.rowIndex} ('${reconcile.description}') failed" }
+            logger.w(expected) { "Re-import counterparty re-run of row ${reconcile.rowIndex} ('${reconcile.description}') failed" }
             skipped +=
                 ReimportSkippedAccount(
                     accountId = null,
@@ -1529,7 +1529,7 @@ suspend fun executeCsvReimport(
                 ),
             )
         } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import funding reconcile of row ${reconcile.rowIndex} ('${reconcile.description}') failed" }
+            logger.w(expected) { "Re-import funding reconcile of row ${reconcile.rowIndex} ('${reconcile.description}') failed" }
             skipped +=
                 ReimportSkippedAccount(
                     accountId = null,
@@ -1614,7 +1614,7 @@ suspend fun applyReimportReversals(
             importEngine.import(ImportBatch.manualEdits(accountUnmerges = listOf(reversal.mergeId)))
             reversed += reversal
         } catch (expected: Exception) {
-            logger.warn(expected) { "Re-import reversal of merge '${reversal.deletedAccountName}' failed" }
+            logger.w(expected) { "Re-import reversal of merge '${reversal.deletedAccountName}' failed" }
             skipped +=
                 ReimportSkippedAccount(
                     accountId = null,

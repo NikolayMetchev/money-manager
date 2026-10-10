@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.NewAttribute
@@ -43,9 +44,8 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("EditAccountDialog")
 
 /**
  * A dialog for editing an existing account with category, owner, and attribute selection.
@@ -221,7 +221,7 @@ fun EditAccountDialog(
 
                     onDismiss()
                 } catch (expected: Exception) {
-                    logger.error(expected) { "Failed to update account: ${expected.message}" }
+                    logger.e(expected) { "Failed to update account: ${expected.message}" }
                     accountState.errorMessage =
                         if (expected.message.isAccountNameUniqueViolation()) {
                             "An account named \"${accountState.name.trim()}\" already exists"

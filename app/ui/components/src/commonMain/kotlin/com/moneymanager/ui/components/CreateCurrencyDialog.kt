@@ -21,15 +21,15 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.importengineapi.createCurrency
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("CreateCurrencyDialog")
 
 /**
  * A dialog for creating a new currency.
@@ -85,7 +85,7 @@ fun CreateCurrencyDialog(
                         val currencyId = importEngine.createCurrency(code.trim(), name.trim())
                         onCurrencyCreated(currencyId)
                     } catch (expected: Exception) {
-                        logger.error(expected) { "Failed to create currency: ${expected.message}" }
+                        logger.e(expected) { "Failed to create currency: ${expected.message}" }
                         saveState.errorMessage = "Failed to create currency: ${expected.message}"
                         saveState.isSaving = false
                     }

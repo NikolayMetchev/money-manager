@@ -1,5 +1,6 @@
 package com.moneymanager.csvimporter
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
@@ -9,9 +10,8 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTransfer
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("BulkReimport")
 
 /**
  * Summary of a bulk re-import run across many already-imported files, shared by the CSV and QIF flows.
@@ -146,7 +146,7 @@ suspend fun <T, C> runBulkReimport(
                 }
             }
         } catch (expected: Exception) {
-            logger.error(expected) { "Bulk $logLabel re-import failed for $name: ${expected.message}" }
+            logger.e(expected) { "Bulk $logLabel re-import failed for $name: ${expected.message}" }
             failed++
         }
     }
@@ -223,13 +223,13 @@ suspend fun applyReimportValueUpdates(
             importEngine.import(batchOf(chunk))
             updated += chunk
         } catch (expected: Exception) {
-            logger.warn(expected) { "$logLabel value update chunk failed, falling back to per-$rowLabel updates" }
+            logger.w(expected) { "$logLabel value update chunk failed, falling back to per-$rowLabel updates" }
             for (update in chunk) {
                 try {
                     importEngine.import(batchOf(listOf(update)))
                     updated += update
                 } catch (expectedRowError: Exception) {
-                    logger.warn(expectedRowError) {
+                    logger.w(expectedRowError) {
                         "$logLabel value update of $rowLabel ${update.rowIndex} ('${update.description}') failed"
                     }
                     skipped +=

@@ -10,7 +10,7 @@ kotlin {
                 api(projects.app.model.core)
 
                 implementation(projects.utils.compose.scrollbar)
-                implementation(libs.kmlogging)
+                implementation(libs.kermit)
             }
         }
         getByName("androidMain") {
@@ -24,7 +24,7 @@ kotlin {
                 implementation(libs.androidx.compose.ui)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.androidx.compose.ui.unit)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.datetime)
             }
@@ -41,7 +41,7 @@ kotlin {
                 implementation(libs.compose.ui.desktop)
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.compose.ui.unit.desktop)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.datetime)
             }

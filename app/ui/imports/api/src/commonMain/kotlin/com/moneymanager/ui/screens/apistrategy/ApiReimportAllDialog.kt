@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.apiimporter.ApiBulkReimportResult
 import com.moneymanager.apiimporter.bulkReimportApiSessions
 import com.moneymanager.domain.Maintenance
@@ -30,9 +31,8 @@ import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("ApiReimportAllDialog")
 
 /**
  * Re-imports every already-imported session of a credential in one go, oldest first, so a strategy
@@ -94,7 +94,7 @@ fun ApiReimportAllDialog(
                 } catch (expected: CancellationException) {
                     throw expected
                 } catch (expected: Exception) {
-                    logger.error(expected) { "Bulk re-import failed: ${expected.message}" }
+                    logger.e(expected) { "Bulk re-import failed: ${expected.message}" }
                     errorMessage = "Re-import failed: ${expected.message}"
                 } finally {
                     isRunning = false

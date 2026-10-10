@@ -23,6 +23,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
@@ -43,9 +44,8 @@ import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("EditPersonDialog")
 
 @Composable
 fun EditPersonDialog(
@@ -198,7 +198,7 @@ fun EditPersonDialog(
                     onDismiss()
                 } catch (expected: Exception) {
                     val action = if (personToEdit != null) "update" else "create"
-                    logger.error(expected) { "Failed to $action person: ${expected.message}" }
+                    logger.e(expected) { "Failed to $action person: ${expected.message}" }
                     saveState.errorMessage = "Failed to $action person: ${expected.message}"
                     saveState.isSaving = false
                 }

@@ -21,6 +21,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.importengineapi.createCrypto
@@ -29,9 +30,8 @@ import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val cryptoDialogLogger = logging()
+private val cryptoDialogLogger = Logger.withTag("CreateCryptoDialog")
 
 /**
  * A dialog for manually creating a crypto asset. The ticker drives a [CryptoRegistry] lookup that
@@ -77,7 +77,7 @@ fun CreateCryptoDialog(
                 } catch (expected: CancellationException) {
                     throw expected
                 } catch (expected: Exception) {
-                    cryptoDialogLogger.error(expected) { "Failed to create crypto asset: ${expected.message}" }
+                    cryptoDialogLogger.e(expected) { "Failed to create crypto asset: ${expected.message}" }
                     saveState.errorMessage = "Failed to create crypto asset: ${expected.message}"
                     saveState.isSaving = false
                 }

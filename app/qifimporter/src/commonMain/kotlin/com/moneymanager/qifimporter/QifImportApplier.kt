@@ -1,5 +1,6 @@
 package com.moneymanager.qifimporter
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE
 import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.BulkImportResult
@@ -53,10 +54,9 @@ import com.moneymanager.importengineapi.createAccounts
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import com.moneymanager.importengineapi.normalizeNameKey
 import kotlinx.coroutines.flow.first
-import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 
-private val logger = logging()
+private val logger = Logger.withTag("QifImportApplier")
 
 /** Summary of a bulk QIF import run across many files. */
 data class QifBulkResult(
@@ -192,7 +192,7 @@ suspend fun bulkApplyQif(
             transfers += result.successCount
             duplicates += result.duplicateCount
         } catch (expected: Exception) {
-            logger.error(expected) { "Bulk QIF import failed for ${qifImport.originalFileName}: ${expected.message}" }
+            logger.e(expected) { "Bulk QIF import failed for ${qifImport.originalFileName}: ${expected.message}" }
             failed++
         }
     }
@@ -249,7 +249,7 @@ suspend fun recordApplication(
         importEngine.applyQifImportMutations(
             listOf(QifImportMutation.RecordApplication(qifImport.id, strategy.id, strategy.name, Clock.System.now())),
         )
-    }.onFailure { logger.warn { "Could not record QIF import application: ${it.message}" } }
+    }.onFailure { logger.w { "Could not record QIF import application: ${it.message}" } }
 }
 
 @Suppress("LongParameterList", "LongMethod")
@@ -279,7 +279,7 @@ suspend fun runImport(
         )
     if (selectedMappingsToPersist.isNotEmpty()) {
         runCatching { importEngine.createAccountMappings(selectedMappingsToPersist) }
-            .onFailure { logger.warn(it) { "Failed to persist account mappings" } }
+            .onFailure { logger.w(it) { "Failed to persist account mappings" } }
     }
 
     // Create any new accounts the user accepted.
@@ -298,7 +298,7 @@ suspend fun runImport(
             importEngine.createAccounts(newAccounts) { account ->
                 Source.Qif(qifImport.id, firstRecordByAccountName[account.name])
             }
-        }.onFailure { logger.warn(it) { "Failed to bulk-create accounts" } }
+        }.onFailure { logger.w(it) { "Failed to bulk-create accounts" } }
     }
 
     // Rebuild the mapper against the now-current accounts/mappings. Duplicate detection happens inside

@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
@@ -51,9 +52,8 @@ import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("AccountsScreen")
 
 @Composable
 fun AccountsScreen(
@@ -658,7 +658,7 @@ fun UnmergeAccountDialog(
                             maintenance.fullRefreshMaterializedViews()
                             onDismiss()
                         } catch (expected: Exception) {
-                            logger.error(expected) { "Failed to undo merge: ${expected.message}" }
+                            logger.e(expected) { "Failed to undo merge: ${expected.message}" }
                             errorMessage = "Failed to undo merge: ${expected.message}"
                             isUnmerging = false
                         }

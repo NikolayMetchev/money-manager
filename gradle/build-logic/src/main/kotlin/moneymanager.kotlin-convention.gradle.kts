@@ -52,7 +52,6 @@ configurations.matching {
             // Catalog libraries pinned to their catalog version.
             substitute(libs.androidx.activity.asProvider())
             substitute(libs.androidx.test.runner)
-            substitute(libs.diamondedge.logging)
             substitute(libs.slf4j.api)
             substitute(libs.kotlinx.coroutines.core)
             substitute(libs.kotlinx.serialization.core)

@@ -17,7 +17,7 @@ kotlin {
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
 
-                implementation(libs.kmlogging)
+                implementation(libs.kermit)
             }
         }
 
@@ -33,7 +33,7 @@ kotlin {
                 api(projects.app.model.repository.read)
 
                 implementation(projects.app.model.rules)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }
@@ -41,7 +41,7 @@ kotlin {
         getByName("androidMain") {
             dependencies {
                 implementation(projects.app.model.rules)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }

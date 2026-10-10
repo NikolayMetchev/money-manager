@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.ImportPreparation
 import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
 import com.moneymanager.csvimporter.buildPendingAccountMappings
@@ -59,9 +60,8 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("QifApplyStrategyDialog")
 
 /**
  * Applies a (shared) CSV import strategy to a QIF import. QIF records are presented to the CSV
@@ -326,13 +326,13 @@ fun QifApplyStrategyDialog(
                             } catch (cancellation: CancellationException) {
                                 throw cancellation
                             } catch (expected: Exception) {
-                                logger.error(expected) {
+                                logger.e(expected) {
                                     "QIF import completed, but failed to remember last QIF account: ${expected.message}"
                                 }
                             }
                             onImportComplete(result)
                         } catch (expected: Exception) {
-                            logger.error(expected) { "QIF import failed: ${expected.message}" }
+                            logger.e(expected) { "QIF import failed: ${expected.message}" }
                             errorMessage = "Import failed: ${expected.message}"
                             isImporting = false
                         }

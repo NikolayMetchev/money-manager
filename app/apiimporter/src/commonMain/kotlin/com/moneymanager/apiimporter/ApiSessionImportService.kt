@@ -1,5 +1,6 @@
 package com.moneymanager.apiimporter
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
@@ -94,14 +95,13 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import org.lighthousegames.logging.logging
 import kotlin.math.absoluteValue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-private val logger = logging()
+private val logger = Logger.withTag("ApiSessionImportService")
 
 private val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
 private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID)
@@ -536,7 +536,7 @@ suspend fun importApiSessionPeople(
         if (config.ownsAllAccounts) allSessionAccountIds.isEmpty() else ownedAccountsByProfile.isEmpty()
     if (config.accountOwnerAncestorExpr != null || config.ownsAllAccounts) {
         if (noLinkableAccounts) {
-            logger.warn { "Importing people with no imported accounts to link; ownerships will not be created. Import accounts first." }
+            logger.w { "Importing people with no imported accounts to link; ownerships will not be created. Import accounts first." }
         }
     }
 
@@ -1352,7 +1352,7 @@ private fun parseAccounts(
         }
             ?: emptyList()
     } catch (e: SerializationException) {
-        logger.error(e) { "Failed to parse accounts response for strategy '${strategy.name}'" }
+        logger.e(e) { "Failed to parse accounts response for strategy '${strategy.name}'" }
         emptyList()
     }
 
@@ -1440,7 +1440,7 @@ private fun parseJsonObjectOrNull(json: String): JsonObject? =
     try {
         Json.parseToJsonElement(json) as? JsonObject
     } catch (e: SerializationException) {
-        logger.error(e) { "Failed to parse API identifiers response as a JSON object" }
+        logger.e(e) { "Failed to parse API identifiers response as a JSON object" }
         null
     }
 
@@ -1855,7 +1855,7 @@ private suspend fun prepareTransactionItem(
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (expected: Exception) {
-        logger.error(expected) { "Error importing API transaction: ${expected.message}" }
+        logger.e(expected) { "Error importing API transaction: ${expected.message}" }
         ApiTransactionPreparation.Failed(
             record =
                 item.errorRecord(
@@ -2217,7 +2217,7 @@ private fun parseTransactionsWithPath(
                     feeDescription = feeDescription,
                 )
             } else {
-                logger.error {
+                logger.e {
                     "Skipping API transaction at index $index: missing required fields " +
                         "(created=$created, amount=$amount, currency=$currency)"
                 }
@@ -2226,7 +2226,7 @@ private fun parseTransactionsWithPath(
         }
             ?: emptyList()
     } catch (e: SerializationException) {
-        logger.error(e) { "Failed to parse transactions response for strategy '${strategy.name}'" }
+        logger.e(e) { "Failed to parse transactions response for strategy '${strategy.name}'" }
         emptyList()
     }
 
@@ -2303,7 +2303,7 @@ private fun resolveSign(
             } else {
                 when (val value = obj.resolveJsonPath(direction.path)) {
                     null -> {
-                        logger.warn { "Direction field '${direction.path}' missing from transaction; skipping item" }
+                        logger.w { "Direction field '${direction.path}' missing from transaction; skipping item" }
                         null
                     }
                     in direction.incomingValues -> 1
@@ -2401,7 +2401,7 @@ internal fun responseItemsWithKeys(
             (resolved as? JsonArray)?.map { null to it }
         }
     } catch (e: SerializationException) {
-        logger.error(e) { "Failed to parse API response array (key='$responseArrayKey')" }
+        logger.e(e) { "Failed to parse API response array (key='$responseArrayKey')" }
         null
     }
 

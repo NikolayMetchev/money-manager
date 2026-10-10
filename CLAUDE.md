@@ -43,7 +43,7 @@ nothing) and features that only built-ins could configure. Don't recreate that d
 - **Language**: Kotlin | **Build**: Gradle | **JVM**: 25
 - **Database**: SQLite via SQLDelight | **DI**: Metro 
 - **UI**: Compose Multiplatform with Material 3
-- **Object Mapping**: Mappie | **Code Quality**: Detekt, ktlint
+- **Object Mapping**: Mappie | **Code Quality**: Detekt, ktlint | **Logging**: Kermit
 
 ## Build Commands
 
@@ -368,6 +368,18 @@ To add a binding: put a `@ContributesTo(AppScope::class) @BindingContainer objec
 a module boundary the compiler can no longer police, and hide which module owns a type. When splitting a
 module, give the new one its own package (typically the old package plus a segment). Test source sets are
 exempt: they compile separately, so sharing a package there costs nothing.
+
+## Logging
+
+**Kermit is the only logger** (it covers JVM, Android, iOS and every native target). Declare
+`private val logger = Logger.withTag("<FileOrClassName>")` and log with `logger.i { }`, `logger.w(t) { }`,
+`logger.e(t) { }`. Don't add another logging library or call `android.util.Log`/`println` for diagnostics.
+
+Only **entry points** choose where logs go, through Kermit's global `Logger.setLogWriters(...)` and
+`Logger.setMinSeverity(...)`. The desktop app installs `Slf4jLogWriter` (`app/main/jvm`), so logs reach
+log4j's console and rolling-file appenders (`log4j2.xml`). Android keeps Kermit's default Logcat writer. A CLI
+must write to stderr, never stdout, so logs can't corrupt its JSON output, and `--quiet` should drop
+the writers or raise the minimum severity.
 
 ## UI
 

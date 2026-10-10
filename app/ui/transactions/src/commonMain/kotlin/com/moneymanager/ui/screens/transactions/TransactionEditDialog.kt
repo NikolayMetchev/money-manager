@@ -414,7 +414,7 @@ fun TransactionEditDialog(
                         onSaved()
                         onDismiss()
                     } catch (expected: Exception) {
-                        logger.error(expected) {
+                        logger.e(expected) {
                             "Failed to ${if (isEditMode) "update" else "create"} transaction: ${expected.message}"
                         }
                         errorMessage =

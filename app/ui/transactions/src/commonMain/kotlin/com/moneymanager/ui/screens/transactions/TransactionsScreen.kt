@@ -421,7 +421,7 @@ fun AccountTransactionsScreen(
                 // Cancellation is expected when user navigates away quickly
                 throw e
             } catch (expected: Exception) {
-                logger.error(expected) { "Failed to load transactions: ${expected.message}" }
+                logger.e(expected) { "Failed to load transactions: ${expected.message}" }
             } finally {
                 isLoadingPage = false
                 pageLoadGeneration++
@@ -448,7 +448,7 @@ fun AccountTransactionsScreen(
                 // Rethrow to let coroutine machinery handle it properly
                 throw e
             } catch (expected: Exception) {
-                logger.error(expected) { "Failed to load more transactions: ${expected.message}" }
+                logger.e(expected) { "Failed to load more transactions: ${expected.message}" }
             } finally {
                 isLoadingPage = false
             }
@@ -476,7 +476,7 @@ fun AccountTransactionsScreen(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (expected: Exception) {
-                logger.error(expected) { "Failed to load previous transactions: ${expected.message}" }
+                logger.e(expected) { "Failed to load previous transactions: ${expected.message}" }
             } finally {
                 isLoadingPreviousPage = false
             }

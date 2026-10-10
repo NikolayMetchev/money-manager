@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -44,9 +45,8 @@ import com.moneymanager.remotestorage.sync.SyncProgress
 import com.moneymanager.ui.components.SettingsSectionCard
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("StrategyCloudCard")
 
 /** How the user chose to resolve a conflicting artifact (changed on both sides since the last sync). */
 private enum class ConflictChoice {
@@ -102,7 +102,7 @@ fun StrategyCloudCard(
         prefix: String,
         cause: Throwable,
     ) {
-        logger.error(cause) { "Strategy cloud sync failed: $prefix ${cause.message}" }
+        logger.e(cause) { "Strategy cloud sync failed: $prefix ${cause.message}" }
         message = "$prefix ${cause.message}"
         needsReconnect = cause is RemoteAuthException
     }

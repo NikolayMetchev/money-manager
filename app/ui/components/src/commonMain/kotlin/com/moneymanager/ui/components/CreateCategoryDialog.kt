@@ -30,6 +30,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -41,9 +42,8 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("CreateCategoryDialog")
 
 @Composable
 fun CreateCategoryDialog(
@@ -99,7 +99,7 @@ fun CreateCategoryDialog(
                         )
                     onCategoryCreated(result.createdCategoryIds.getValue(key), name.trim())
                 } catch (expected: Exception) {
-                    logger.error(expected) { "Failed to create category: ${expected.message}" }
+                    logger.e(expected) { "Failed to create category: ${expected.message}" }
                     errorMessage = "Failed to create category: ${expected.message}"
                     isSaving = false
                 }

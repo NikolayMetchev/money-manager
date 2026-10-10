@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
@@ -33,10 +34,9 @@ import com.moneymanager.ui.components.AssetPicker
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 
-private val tradeEntryLogger = logging()
+private val tradeEntryLogger = Logger.withTag("TradeEntryDialog")
 
 /**
  * Dialog for manually entering a cross-asset [com.moneymanager.domain.model.Trade] — e.g. buying
@@ -103,7 +103,7 @@ fun TradeEntryDialog(
                         onSaved()
                         onDismiss()
                     } catch (expected: Exception) {
-                        tradeEntryLogger.error(expected) { "Failed to create trade: ${expected.message}" }
+                        tradeEntryLogger.e(expected) { "Failed to create trade: ${expected.message}" }
                         errorMessage = expected.message ?: "Failed to create trade"
                         isSaving = false
                     }
