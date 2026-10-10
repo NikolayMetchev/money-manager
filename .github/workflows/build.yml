@@ -81,9 +81,40 @@ jobs:
           # unit-coverage XMLs. db:core's tests run here too: the dedicated `db-core-test` job was
           # removed once parallel test forks + minimal test currency seeding cut its ~12 min
           # jvmTest down to ~1-2 min.
-          # `build` runs linuxX64Test natively; linkDebugTestLinuxArm64 cross-links the arm64 test
-          # binaries, which the native-linux-arm64 job runs on an arm64 runner.
-          command: build koverXmlReport linkDebugTestLinuxArm64 --stacktrace
+          # `build` also runs linuxX64Test natively.
+          command: build koverXmlReport --stacktrace
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          kotlin-native: 'true'
+
+      - name: Upload coverage and test results to Codecov
+        uses: ./.github/actions/codecov-upload
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unit
+
+  # Kotlin/Native: each target's common tests run natively on a host of that platform. Apple targets
+  # only link on macOS and mingwX64 only runs on Windows. There is no Kotlin/Native compiler for Linux
+  # arm64 hosts, so linuxArm64 test binaries are cross-linked on x64 and run on an arm64 runner.
+  native-linux-arm64-link:
+    name: Native Link (linuxArm64)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      (github.event_name == 'pull_request' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Cross-link linuxArm64 test binaries with Gradle
+        uses: ./.github/actions/gradle-run
+        with:
+          command: linkDebugTestLinuxArm64 --stacktrace
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
           kotlin-native: 'true'
@@ -96,18 +127,10 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      - name: Upload coverage and test results to Codecov
-        uses: ./.github/actions/codecov-upload
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: unit
-
-  # Kotlin/Native: each target's common tests run natively on a host of that platform. Apple targets
-  # only link on macOS and mingwX64 only runs on Windows; linuxArm64 is cross-linked by `build`.
   native-linux-arm64:
     name: Native Tests (linuxArm64)
     runs-on: ubuntu-24.04-arm
-    needs: build
+    needs: native-linux-arm64-link
 
     steps:
       - name: Download linuxArm64 test binaries
