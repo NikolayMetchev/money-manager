@@ -24,7 +24,7 @@ kotlin {
 
                 implementation(projects.utils.archive)
                 implementation(projects.utils.currency)
-                implementation(libs.kmlogging)
+                implementation(libs.kermit)
             }
         }
         getByName("commonTest") {
@@ -49,7 +49,7 @@ kotlin {
                 implementation(libs.androidx.compose.runtime.annotation)
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
             }
         }
         getByName("jvmMain") {
@@ -74,7 +74,7 @@ kotlin {
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.compose.ui.unit.desktop)
                 implementation(libs.compose.ui.util.desktop)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
             }
         }
         getByName("jvmTest") {

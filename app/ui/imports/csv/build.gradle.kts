@@ -26,7 +26,7 @@ kotlin {
                 implementation(projects.utils.humanreadable)
                 implementation(projects.utils.parsers.csv)
                 implementation(projects.utils.parsers.xlsx)
-                implementation(libs.kmlogging)
+                implementation(libs.kermit)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }
@@ -57,7 +57,7 @@ kotlin {
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.androidx.compose.ui.unit)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
                 implementation(libs.kotlinx.datetime)
             }
         }
@@ -90,7 +90,7 @@ kotlin {
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.compose.ui.unit.desktop)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
                 implementation(libs.kotlinx.datetime)
             }
         }

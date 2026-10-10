@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.CsvBulkUnimportPlan
 import com.moneymanager.csvimporter.CsvUnimportAffectedFile
 import com.moneymanager.csvimporter.CsvUnimportPlan
@@ -41,9 +42,8 @@ import com.moneymanager.ui.components.imports.ReimportProgressIndicator
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("UnimportDialog")
 
 /**
  * Confirms and runs an unimport of [csvImport]: previews what the file created (and which other files'
@@ -75,7 +75,7 @@ fun UnimportDialog(
         } catch (expected: CancellationException) {
             throw expected
         } catch (expected: Exception) {
-            logger.error(expected) { "Failed to prepare unimport: ${expected.message}" }
+            logger.e(expected) { "Failed to prepare unimport: ${expected.message}" }
             errorMessage = "Failed to prepare unimport: ${expected.message}"
         }
     }
@@ -141,7 +141,7 @@ fun UnimportDialog(
                         } catch (expected: CancellationException) {
                             throw expected
                         } catch (expected: Exception) {
-                            logger.error(expected) { "Unimport failed: ${expected.message}" }
+                            logger.e(expected) { "Unimport failed: ${expected.message}" }
                             errorMessage = "Unimport failed: ${expected.message}"
                             isRunning = false
                         } finally {
@@ -194,7 +194,7 @@ fun CsvUnimportAllDialog(
         } catch (expected: CancellationException) {
             throw expected
         } catch (expected: Exception) {
-            logger.error(expected) { "Failed to prepare unimport: ${expected.message}" }
+            logger.e(expected) { "Failed to prepare unimport: ${expected.message}" }
             errorMessage = "Failed to prepare unimport: ${expected.message}"
         }
     }
@@ -261,7 +261,7 @@ fun CsvUnimportAllDialog(
                         } catch (expected: CancellationException) {
                             throw expected
                         } catch (expected: Exception) {
-                            logger.error(expected) { "Unimport all failed: ${expected.message}" }
+                            logger.e(expected) { "Unimport all failed: ${expected.message}" }
                             errorMessage = "Unimport failed: ${expected.message}"
                             isRunning = false
                         } finally {

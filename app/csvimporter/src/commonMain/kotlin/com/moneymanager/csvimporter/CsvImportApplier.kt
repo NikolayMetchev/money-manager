@@ -1,5 +1,6 @@
 package com.moneymanager.csvimporter
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -64,12 +65,11 @@ import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.restageXlsxImport
 import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.flow.first
-import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-private val logger = logging()
+private val logger = Logger.withTag("CsvImportApplier")
 
 /**
  * Collapses consecutive duplicate accounts out of a pass-through spend-leg chain ([nodes] = the conduit
@@ -359,7 +359,7 @@ suspend fun bulkApplyCsv(
             transfers += result.successCount
             duplicates += result.duplicateCount
         } catch (expected: Exception) {
-            logger.error(expected) { "Bulk CSV import failed for ${csvImport.originalFileName}: ${expected.message}" }
+            logger.e(expected) { "Bulk CSV import failed for ${csvImport.originalFileName}: ${expected.message}" }
             failed++
         }
     }
@@ -503,7 +503,7 @@ suspend fun restageXlsxForStrategy(
 
     val parsed = createXlsxParser().parse(blob.fileBytes, targetSheet)
     importEngine.restageXlsxImport(csvImport.id, parsed.headers, parsed.rows, targetSheet)
-    logger.info { "Re-staged Excel import ${csvImport.id.id} from sheet '${blob.worksheetName}' to '$targetSheet'" }
+    logger.i { "Re-staged Excel import ${csvImport.id.id} from sheet '${blob.worksheetName}' to '$targetSheet'" }
     return csvImportRepository.getImport(csvImport.id).first() ?: csvImport
 }
 
@@ -529,7 +529,7 @@ private suspend fun recordCsvApplication(
             ),
         )
     }.onFailure { error ->
-        logger.warn { "Import application history could not be recorded for import $csvImportId: ${error.message}" }
+        logger.w { "Import application history could not be recorded for import $csvImportId: ${error.message}" }
     }
 }
 
@@ -589,10 +589,10 @@ private suspend fun persistMappingsWithFallback(
     if (mappings.isEmpty()) return
     try {
         importEngine.createAccountMappings(mappings)
-        logger.info { "Saved ${mappings.size} account mappings" }
+        logger.i { "Saved ${mappings.size} account mappings" }
     } catch (expected: Exception) {
         // Batch is atomic, nothing was committed — retry per mapping so one bad mapping doesn't block the rest
-        logger.warn(expected) { "Bulk mapping save failed, falling back to per-mapping save" }
+        logger.w(expected) { "Bulk mapping save failed, falling back to per-mapping save" }
         for (mapping in mappings) {
             try {
                 importEngine.createAccountMapping(
@@ -602,7 +602,7 @@ private suspend fun persistMappingsWithFallback(
                 )
             } catch (expectedMappingError: Exception) {
                 // Don't log the pattern itself — it's derived from bank-file payee/account values (PII).
-                logger.warn(expectedMappingError) { "Failed to save account mapping for account id ${mapping.accountId.id}" }
+                logger.w(expectedMappingError) { "Failed to save account mapping for account id ${mapping.accountId.id}" }
             }
         }
     }
@@ -639,17 +639,17 @@ private suspend fun createNewAccounts(
         // Bulk-create all accounts in a single engine batch
         importEngine.createAccounts(newAccounts, shadowSource = shadowSource, sourceFor = sourceFor)
         newAccounts.forEach { account -> createdAccountNames.add(account.name) }
-        logger.info { "Created ${accountsToCreate.size} new accounts" }
+        logger.i { "Created ${accountsToCreate.size} new accounts" }
     } catch (expected: Exception) {
         // Bulk create failed — fall back to per-account creation to skip only failing accounts
-        logger.warn(expected) { "Bulk account creation failed, falling back to per-account creation" }
+        logger.w(expected) { "Bulk account creation failed, falling back to per-account creation" }
         for (account in newAccounts) {
             try {
                 importEngine.createAccount(account, sourceFor(account), shadowSource)
                 createdAccountNames.add(account.name)
-                logger.info { "Created new account: ${account.name}" }
+                logger.i { "Created new account: ${account.name}" }
             } catch (expectedAccountError: Exception) {
-                logger.warn(expectedAccountError) { "Skipping account '${account.name}': ${expectedAccountError.message}" }
+                logger.w(expectedAccountError) { "Skipping account '${account.name}': ${expectedAccountError.message}" }
             }
         }
     }
@@ -703,7 +703,7 @@ private fun ImportPreparation.withUnresolvedAccountsAsErrors(): ImportPreparatio
             it.transfer.sourceAccountId == UNRESOLVED_ACCOUNT_ID || it.transfer.targetAccountId == UNRESOLVED_ACCOUNT_ID
         }
     if (unresolved.isEmpty()) return this
-    logger.warn { "Skipping ${unresolved.size} row(s) whose account could not be resolved after account creation" }
+    logger.w { "Skipping ${unresolved.size} row(s) whose account could not be resolved after account creation" }
     return copy(
         validTransfers = resolved,
         errorRows =
@@ -747,7 +747,7 @@ suspend fun runCsvImport(
     unprocessedRowIndexes: Set<Long> = rows.mapTo(mutableSetOf()) { it.rowIndex },
     tradeRepository: TradeReadRepository? = null,
 ): CsvImportResult {
-    logger.info { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
+    logger.i { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
 
     // A reconciliation source may only be pointed at its own shadow accounts; drop any "map to existing
     // account" choice that names a real one (the row then creates its shadow account as usual).
@@ -784,7 +784,7 @@ suspend fun runCsvImport(
     // "map to existing account" selections are persisted (above), since those are not re-derivable.
 
     // Re-map with new account IDs
-    logger.info { "Re-mapping transfers with updated account IDs" }
+    logger.i { "Re-mapping transfers with updated account IDs" }
     val updatedAccounts = accountRepository.accountsVisibleTo(strategy)
     val accountsByName = updatedAccounts.associateBy { it.name }
     val currenciesById = currencies.associateBy { it.id }
@@ -813,14 +813,14 @@ suspend fun runCsvImport(
 
     // Handle case when all rows are already processed (rows is already filtered by the caller)
     if (rows.isEmpty()) {
-        logger.info { "No rows to process - all rows already imported" }
+        logger.i { "No rows to process - all rows already imported" }
         return CsvImportResult(successCount = 0, failedRows = emptyList())
     }
 
     val finalPrep = mapper.prepareImport(rows).withUnresolvedAccountsAsErrors()
     val validCount = finalPrep.validTransfers.size
     val errorCount = finalPrep.errorRows.size
-    logger.info { "Prepared $validCount valid transfers, $errorCount error rows" }
+    logger.i { "Prepared $validCount valid transfers, $errorCount error rows" }
 
     // Mark mapping errors as ERROR status in database and save error messages
     importEngine.applyCsvImportMutations(
@@ -856,7 +856,7 @@ suspend fun runCsvImport(
                 typeId to (if (fixed.all { it != null }) fixed.filterNotNull().toSet() else null)
             }.toMap()
 
-    logger.info { "Starting to import $validCount transfers" }
+    logger.i { "Starting to import $validCount transfers" }
 
     // Convert attributes from (typeName, value) to NewAttribute
     fun attributesFor(attributes: List<Pair<String, String>>): List<NewAttribute> =
@@ -1255,13 +1255,13 @@ suspend fun runCsvImport(
     val successCount = importResult.transfersImported + importResult.updated + newTradeCount
     val duplicateCount = importResult.duplicates + dedupedTradeCount
 
-    logger.info {
+    logger.i {
         "Transfer import complete: $successCount imported/updated, $duplicateCount duplicate(s)"
     }
 
     // Refresh materialized views so transfers are visible (skipped in bulk; refreshed once at the end)
     if (refreshViews) {
-        logger.info { "Refreshing materialized views" }
+        logger.i { "Refreshing materialized views" }
         maintenance.refreshMaterializedViews()
     }
 
@@ -1269,7 +1269,7 @@ suspend fun runCsvImport(
         recordCsvApplication(importEngine, csvImport.id, strategy)
     }
 
-    logger.info { "Import completed successfully" }
+    logger.i { "Import completed successfully" }
 
     // The engine import is atomic: any engine failure throws to the caller. The only per-row failures
     // are mapping errors detected before the import, so surface those to the dialog.

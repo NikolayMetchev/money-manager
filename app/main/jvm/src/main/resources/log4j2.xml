@@ -37,12 +37,6 @@
     </Appenders>
 
     <Loggers>
-        <!-- Application loggers -->
-        <Logger name="com.moneymanager" level="debug" additivity="false">
-            <AppenderRef ref="Console"/>
-            <AppenderRef ref="RollingFile"/>
-        </Logger>
-
         <!-- SQLDelight query logging (set to debug to see SQL queries) -->
         <Logger name="app.cash.sqldelight" level="info" additivity="false">
             <AppenderRef ref="Console"/>

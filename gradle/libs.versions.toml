@@ -39,13 +39,12 @@ cryptography = "0.6.0"
 dependency-analysis = "3.19.2"
 detekt = "2.0.0-alpha.6"
 dokka = "2.2.0"
-diamondedge-logging = "2.1.2"
 gradle-doctor = "0.12.1"
 # JVM version sync: keep jvm-target and jvm-toolchain aligned with .github/actions/gradle-setup/action.yml,
 # .github/workflows/lint-format.yml, and CLAUDE.md.
 jvm-target = "25"
 jvm-toolchain = "25"
-kmlogging = "2.0.3"
+kermit = "2.2.0"
 kotlin = "2.4.21"
 kotlinx-coroutines = "1.11.0"
 kotlinx-datetime = "0.8.0"
@@ -155,9 +154,9 @@ cryptography-random = { module = "dev.whyoleg.cryptography:cryptography-random",
 dependency-analysis-gradle-plugin = { module = "com.autonomousapps:dependency-analysis-gradle-plugin", version.ref = "dependency-analysis" }
 detekt-gradle-plugin = { module = "dev.detekt:dev.detekt.gradle.plugin", version.ref = "detekt" }
 develocity-gradle-plugin = { module = "com.gradle:develocity-gradle-plugin", version.ref = "develocity" }
-diamondedge-logging = { module = "com.diamondedge:logging", version.ref = "diamondedge-logging" }
 junit = { module = "junit:junit", version.ref = "junit" }
-kmlogging = { module = "org.lighthousegames:logging", version.ref = "kmlogging" }
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
+kermit-core = { module = "co.touchlab:kermit-core", version.ref = "kermit" }
 kotlin-compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }

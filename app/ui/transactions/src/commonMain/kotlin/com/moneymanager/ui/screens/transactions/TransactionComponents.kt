@@ -1,11 +1,11 @@
 package com.moneymanager.ui.screens.transactions
 
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.humanreadable.HumanReadable
-import org.lighthousegames.logging.logging
 import kotlin.time.Instant
 
-internal val logger = logging()
+internal val logger = Logger.withTag("Transactions")
 
 internal val ACCOUNT_COLUMN_MIN_WIDTH = 100.dp
 

@@ -3,12 +3,12 @@ package com.moneymanager.ui.foundation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.localsettings.JvmLocalSettings
 import com.moneymanager.localsettings.KEY_LAST_DIRECTORY
 import com.moneymanager.localsettings.LocalSettings
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 import java.awt.FileDialog
 import java.awt.Frame
 import java.nio.file.Files
@@ -16,7 +16,7 @@ import java.nio.file.Paths
 
 private const val DATABASE_EXTENSION = ".db"
 
-private val logger = logging()
+private val logger = Logger.withTag("DatabaseLocationPickerLauncher")
 
 actual class DatabaseLocationPickerLauncher(
     private val onResult: (DbLocation?) -> Unit,
@@ -53,7 +53,7 @@ actual class DatabaseLocationPickerLauncher(
                 if (!isOpenOnly && !file.lowercase().endsWith(DATABASE_EXTENSION)) file + DATABASE_EXTENSION else file
             val resolved = Paths.get(directory, fileName)
             val parent = resolved.parent
-            logger.info {
+            logger.i {
                 "DB picker [$mode]: dialog.directory=[$directory] dialog.file=[$file] -> resolved=[$resolved] " +
                     "parent=[$parent] parentExists=${parent?.let { Files.exists(it) }} " +
                     "parentWritable=${parent?.let { Files.isWritable(it) }}"

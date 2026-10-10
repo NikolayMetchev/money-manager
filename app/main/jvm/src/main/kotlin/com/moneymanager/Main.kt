@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import co.touchlab.kermit.Logger
 import com.moneymanager.cryptodata.HttpCryptoCatalogRefresher
 import com.moneymanager.cryptodata.installCryptoCatalog
 import com.moneymanager.database.DatabaseInitializationProgress
@@ -34,9 +35,8 @@ import com.moneymanager.ui.toAppServices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.swing.Swing
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("Main")
 
 /** The defaults computed for the close dialog of a cloud-backed database. */
 private data class CloseDecision(
@@ -75,10 +75,10 @@ private suspend fun performClose(
                     remoteController.syncNow(database, rebuildViews = false) { progress ->
                         onProgress(DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100))
                     }
-                }.onFailure { logger.error(it) { "Failed to sync database on close" } }
+                }.onFailure { logger.e(it) { "Failed to sync database on close" } }
                     .getOrNull() == SyncResult.UPLOADED
             } else {
-                logger.warn { "Could not arm cloud session on close (wrong password?); keeping local copy" }
+                logger.w { "Could not arm cloud session on close (wrong password?); keeping local copy" }
                 false
             }
     } else if (!localChanged && !keepLocal) {
@@ -88,7 +88,7 @@ private suspend fun performClose(
         onProgress(DatabaseInitializationProgress("Checking cloud copy…", 0, 100))
         remoteCurrent =
             runCatching { remoteController.remoteArchiveSize() != null }
-                .onFailure { logger.error(it) { "Failed to verify remote copy on close; keeping local copy" } }
+                .onFailure { logger.e(it) { "Failed to verify remote copy on close; keeping local copy" } }
                 .getOrDefault(false)
     }
     onProgress(DatabaseInitializationProgress("Finishing…", 95, 100))
@@ -97,14 +97,15 @@ private suspend fun performClose(
         keepLocal -> Unit
         remoteCurrent ->
             runCatching { remoteController.deleteLocalCache() }
-                .onSuccess { logger.info { "Deleted local working copy; cloud copy is up to date" } }
-                .onFailure { logger.error(it) { "Failed to delete local database on close" } }
-        else -> logger.warn { "Kept local database despite delete request: cloud copy is not up to date or unverified" }
+                .onSuccess { logger.i { "Deleted local working copy; cloud copy is up to date" } }
+                .onFailure { logger.e(it) { "Failed to delete local database on close" } }
+        else -> logger.w { "Kept local database despite delete request: cloud copy is not up to date or unverified" }
     }
 }
 
 fun main() {
-    logger.info { "Starting Money Manager application" }
+    Logger.setLogWriters(Slf4jLogWriter())
+    logger.i { "Starting Money Manager application" }
 
     // On Linux, AWT's FileDialog uses an in-process GTK file chooser whose text rendering
     // breaks when the JDK's bundled libfreetype clashes with the system GTK's (blank labels,
@@ -122,11 +123,11 @@ fun main() {
     val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
         if (SchemaErrorDetector.isSchemaError(throwable)) {
-            logger.error(throwable) { "Schema error detected: ${throwable.message}" }
+            logger.e(throwable) { "Schema error detected: ${throwable.message}" }
             GlobalSchemaErrorState.reportError(throwable)
         } else {
             // Delegate to default handler for non-schema errors
-            logger.error(throwable) { "Uncaught exception on thread ${thread.name}: ${throwable.message}" }
+            logger.e(throwable) { "Uncaught exception on thread ${thread.name}: ${throwable.message}" }
             defaultHandler?.uncaughtException(thread, throwable)
         }
     }
@@ -134,7 +135,7 @@ fun main() {
     // Install the bundled crypto-asset name catalog (+ any network-refreshed layer) before imports run.
     // This auxiliary feature must not block startup, so a failure is logged rather than propagated.
     runCatching { installCryptoCatalog() }
-        .onFailure { logger.error(it) { "Failed to install crypto catalog" } }
+        .onFailure { logger.e(it) { "Failed to install crypto catalog" } }
 
     application {
         MainWindow(onExit = ::exitApplication)
@@ -149,7 +150,7 @@ private fun MainWindow(onExit: () -> Unit) {
     val component =
         remember {
             AppComponent.create(params).also {
-                logger.info { "DI component created successfully" }
+                logger.i { "DI component created successfully" }
             }
         }
 
@@ -171,7 +172,7 @@ private fun MainWindow(onExit: () -> Unit) {
         onCloseRequest = {
             val database = openDatabase[0]
             val cloudBacked = remoteController.activeBinding() != null
-            logger.info { "Window close: database=${database != null}, cloudBacked=$cloudBacked" }
+            logger.i { "Window close: database=${database != null}, cloudBacked=$cloudBacked" }
             when {
                 closeProgress != null -> Unit // a close sync is already in progress; ignore repeat clicks
                 closeDecision != null -> Unit // the close dialog is already open
@@ -239,8 +240,8 @@ private fun MainWindow(onExit: () -> Unit) {
                         )
                     component.toApplication().toAppServices(importEngine)
                 },
-                onInfoLog = { message -> logger.info { message } },
-                onErrorLog = { message, error -> logger.error(error) { message } },
+                onInfoLog = { message -> logger.i { message } },
+                onErrorLog = { message, error -> logger.e(error) { message } },
                 remoteController = remoteController,
                 strategySyncController = component.strategySyncController,
                 strategyCatalogController = component.strategyCatalogController,

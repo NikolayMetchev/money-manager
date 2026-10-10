@@ -26,18 +26,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 import kotlin.jvm.Synchronized
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-private val logger = logging()
+private val logger = Logger.withTag("BackgroundTasks")
 
 enum class BackgroundTaskStatus {
     RUNNING,
@@ -132,7 +132,7 @@ class BackgroundTaskManager(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (expected: Exception) {
-                logger.error(expected) { "Background task failed: ${expected.message}" }
+                logger.e(expected) { "Background task failed: ${expected.message}" }
                 val completedAt = System.currentTimeMillis()
                 scope.launch {
                     updateTask(taskId) { task ->

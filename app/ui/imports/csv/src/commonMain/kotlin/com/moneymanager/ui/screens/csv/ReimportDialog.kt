@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.CsvReimportResult
 import com.moneymanager.csvimporter.ReimportPlan
@@ -60,9 +61,8 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("ReimportDialog")
 
 /**
  * Re-imports an already-imported CSV so strategy/mapping changes take effect retroactively: shows a
@@ -163,7 +163,7 @@ fun ReimportDialog(
         } catch (expected: CancellationException) {
             throw expected
         } catch (expected: Exception) {
-            logger.error(expected) { "Re-import preview failed: ${expected.message}" }
+            logger.e(expected) { "Re-import preview failed: ${expected.message}" }
             errorMessage = "Failed to prepare re-import: ${expected.message}"
             plan = null
         } finally {
@@ -266,7 +266,7 @@ fun ReimportDialog(
                         } catch (expected: CancellationException) {
                             throw expected
                         } catch (expected: Exception) {
-                            logger.error(expected) { "Re-import failed: ${expected.message}" }
+                            logger.e(expected) { "Re-import failed: ${expected.message}" }
                             errorMessage = "Re-import failed: ${expected.message}"
                             isRunning = false
                         } finally {

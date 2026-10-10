@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
@@ -31,10 +32,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 
-private val logger = logging()
+private val logger = Logger.withTag("ApiCredentialVaultSupport")
 
 /**
  * Gives every installed strategy that has secrets in the unlocked credential vault a connection row in
@@ -67,7 +67,7 @@ internal fun EnsureApiConnectionRows(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (expected: Exception) {
-            logger.error(expected) { "Couldn't create API connection rows: ${expected.message}" }
+            logger.e(expected) { "Couldn't create API connection rows: ${expected.message}" }
         }
     }
 }

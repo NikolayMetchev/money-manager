@@ -1,5 +1,6 @@
 package com.moneymanager.apiimporter
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
@@ -62,7 +63,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
@@ -72,7 +72,7 @@ import kotlin.time.DurationUnit
 import kotlin.time.Instant
 import kotlin.time.toDuration
 
-private val logger = logging()
+private val logger = Logger.withTag("ExchangeApiImportService")
 
 /*
  * Generic download + import for signed exchange strategies — any ApiImportStrategy with a
@@ -219,12 +219,12 @@ suspend fun downloadApiSessionExchange(
                                 ?.toLongOrNull(),
                         ) { "no numeric '${sync.field}' in the ${strategy.name} time response" }
                     (serverMillis - Clock.System.now().toEpochMilliseconds()).also {
-                        logger.info { "Clock offset against '${strategy.name}': ${it}ms" }
+                        logger.i { "Clock offset against '${strategy.name}': ${it}ms" }
                     }
                 }.getOrElse {
                     // The provider's own clock is unreachable; fall back to the local one rather than
                     // failing the whole download, and say so, since it is a likely cause if signing fails.
-                    logger.warn { "Could not read '${strategy.name}' server time; signing with the local clock: ${it.message}" }
+                    logger.w { "Could not read '${strategy.name}' server time; signing with the local clock: ${it.message}" }
                     0L
                 }
             }
@@ -329,16 +329,16 @@ suspend fun downloadApiSessionExchange(
                         ?.any { error.contains(it, ignoreCase = true) } == true
                 if (windowOutOfRange) {
                     lastFetchWindowOutOfRange = true
-                    logger.warn { "Skipping one out-of-range date window of '${endpoint.path}': $error" }
+                    logger.w { "Skipping one out-of-range date window of '${endpoint.path}': $error" }
                 } else {
-                    logger.warn { "Skipping endpoint '${endpoint.path}' after error: $error" }
+                    logger.w { "Skipping endpoint '${endpoint.path}' after error: $error" }
                 }
                 return null
             }
             rateLimitRetries += 1
             val backoffMillis =
                 (strategy.config.rateLimitBackoffMillis * (1L shl (rateLimitRetries - 1))).coerceAtMost(MAX_RATE_LIMIT_BACKOFF_MILLIS)
-            logger.warn {
+            logger.w {
                 "Rate-limited on '${endpoint.path}' " +
                     "(attempt $rateLimitRetries/${strategy.config.maxRateLimitRetries}); retrying in ${backoffMillis}ms"
             }

@@ -17,7 +17,7 @@ kotlin {
                 implementation(projects.app.ui.components)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.compose.scrollbar)
-                implementation(libs.kmlogging)
+                implementation(libs.kermit)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }
@@ -44,7 +44,7 @@ kotlin {
                 implementation(libs.androidx.compose.material3)
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
             }
         }
         getByName("jvmMain") {
@@ -64,7 +64,7 @@ kotlin {
                 implementation(libs.compose.ui.desktop)
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
             }
         }
         getByName("jvmTest") {

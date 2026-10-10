@@ -1,5 +1,6 @@
 package com.moneymanager.csvimporter
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
@@ -26,12 +27,11 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.lighthousegames.logging.logging
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-private val scanLogger = logging()
+private val scanLogger = Logger.withTag("ImportDirectoryScanner")
 
 /** File types the scanner can stage. Others (e.g. .pdf) are skipped. */
 private enum class SupportedKind { CSV, QIF, XLSX }
@@ -222,7 +222,7 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (expected: Exception) {
-        scanLogger.error(expected) { "Scan failed for ${entry.name} in '${directory.name}': ${expected.message}" }
+        scanLogger.e(expected) { "Scan failed for ${entry.name} in '${directory.name}': ${expected.message}" }
         FileOutcome.Failed("${entry.name}: ${expected.message}")
     }
 }

@@ -16,7 +16,7 @@ kotlin {
                 api(projects.app.model.repository.read)
                 api(projects.utils.rest)
 
-                implementation(libs.kmlogging)
+                implementation(libs.kermit)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.ktor.http)
@@ -36,7 +36,7 @@ kotlin {
                 implementation(projects.app.model.csv)
                 implementation(projects.app.model.rules)
                 implementation(projects.utils.bigdecimal)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.http)
@@ -49,7 +49,7 @@ kotlin {
 
                 implementation(projects.app.model.rules)
                 implementation(projects.utils.bigdecimal)
-                implementation(libs.diamondedge.logging)
+                implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.http)

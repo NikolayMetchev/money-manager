@@ -1,5 +1,6 @@
 package com.moneymanager.apiimporter
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiCredentialId
@@ -33,10 +34,9 @@ import com.moneymanager.importengineapi.reconciledPartnerUnhideUpdates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
-import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 
-private val logger = logging()
+private val logger = Logger.withTag("ApiReimport")
 
 // Slices one session's re-import gets on the progress bar (see ScaledProgress). Deleting the
 // session's own rows and re-running the import both sweep their own 0..1; the tail steps are single
@@ -314,7 +314,7 @@ internal suspend fun reimportSessionsResiliently(
                 } catch (expected: CancellationException) {
                     throw expected
                 } catch (expected: Exception) {
-                    logger.error(expected) { "Bulk API re-import failed for session ${session.id}: ${expected.message}" }
+                    logger.e(expected) { "Bulk API re-import failed for session ${session.id}: ${expected.message}" }
                     failures += ApiSessionReimportFailure(session.id, expected.message ?: "Re-import failed")
                 }
             }
@@ -327,7 +327,7 @@ internal suspend fun reimportSessionsResiliently(
     // A refresh that fails while the run is already unwinding must not replace the exception that ended
     // it — the caller needs to see the cancellation or error that actually happened.
     if (runFailure != null && refreshFailure != null) {
-        logger.error(refreshFailure) { "Refreshing views after an aborted bulk API re-import failed" }
+        logger.e(refreshFailure) { "Refreshing views after an aborted bulk API re-import failed" }
     }
     (runFailure ?: refreshFailure)?.let { throw it }
     return ApiBulkReimportResult(sessionsReimported = reimported, failures = failures)

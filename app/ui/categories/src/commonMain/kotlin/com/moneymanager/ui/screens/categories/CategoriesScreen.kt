@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import co.touchlab.kermit.Logger
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Category
@@ -85,9 +86,8 @@ import com.moneymanager.ui.util.formatAmount
 import com.moneymanager.ui.util.getDescendantIds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("CategoriesScreen")
 
 private val BALANCE_COLUMN_WIDTH = 100.dp
 private val HIERARCHY_COLUMN_WIDTH = 250.dp
@@ -330,7 +330,7 @@ fun CategoriesScreen(
                                                         ),
                                                     )
                                                 } catch (expected: Exception) {
-                                                    logger.error(expected) {
+                                                    logger.e(expected) {
                                                         "Failed to update category hierarchy: ${expected.message}"
                                                     }
                                                 }
@@ -772,7 +772,7 @@ private fun saveCategoryWithValidation(
             saveAction(name.trim())
             onSuccess()
         } catch (expected: Exception) {
-            logger.error(expected) { "Failed to update category: ${expected.message}" }
+            logger.e(expected) { "Failed to update category: ${expected.message}" }
             setError("Failed to update category: ${expected.message}")
             setSaving(false)
         }

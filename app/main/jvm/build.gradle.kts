@@ -36,10 +36,11 @@ dependencies {
     implementation(projects.utils.localsettings)
     implementation(libs.compose.ui.graphics.desktop)
     implementation(libs.compose.ui.unit.desktop)
-    implementation(libs.diamondedge.logging)
-    implementation(libs.kmlogging)
+    implementation(libs.kermit)
+    implementation(libs.kermit.core)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.swing)
+    implementation(libs.slf4j.api)
 
     runtimeOnly(compose.desktop.currentOs)
     runtimeOnly(libs.log4j.core)

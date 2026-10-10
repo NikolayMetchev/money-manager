@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.apiimporter.API_ENGINE_BATCH_SIZE
 import com.moneymanager.apiimporter.ApiCounterpartySuggestion
 import com.moneymanager.apiimporter.ApiDownloadCredentials
@@ -138,12 +139,11 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
-private val logger = logging()
+private val logger = Logger.withTag("ApiSessionsScreen")
 
 @Composable
 fun ApiSessionsScreen(
@@ -463,7 +463,7 @@ fun ApiSessionsScreen(
                                 },
                             )
                         } catch (notPossible: ApiDownloadNotPossibleException) {
-                            logger.warn { "Download for '${strategy.name}' (session #$newSessionId) not possible: ${notPossible.message}" }
+                            logger.w { "Download for '${strategy.name}' (session #$newSessionId) not possible: ${notPossible.message}" }
                             return@startTask notPossible.message
                         }
                     downloadResultByCredential = downloadResultByCredential + (credential.id to result)
@@ -2153,7 +2153,7 @@ private suspend fun <T> isolatedBulkStep(
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (expected: Exception) {
-        logger.error(expected) { "$description failed: ${expected.message}" }
+        logger.e(expected) { "$description failed: ${expected.message}" }
         null
     }
 

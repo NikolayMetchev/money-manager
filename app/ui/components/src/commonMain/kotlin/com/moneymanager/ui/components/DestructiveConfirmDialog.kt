@@ -17,11 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import co.touchlab.kermit.Logger
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("DestructiveConfirmDialog")
 
 /**
  * Shared confirmation dialog for destructive actions.
@@ -85,7 +85,7 @@ fun DestructiveConfirmDialog(
                         try {
                             onConfirm()
                         } catch (expected: Exception) {
-                            logger.error(expected) { "$failureMessage: ${expected.message}" }
+                            logger.e(expected) { "$failureMessage: ${expected.message}" }
                             errorMessage = "$failureMessage: ${expected.message}"
                             isBusy = false
                         }

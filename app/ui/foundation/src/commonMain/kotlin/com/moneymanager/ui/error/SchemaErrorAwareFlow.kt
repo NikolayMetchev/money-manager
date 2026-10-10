@@ -4,11 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import co.touchlab.kermit.Logger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
-import org.lighthousegames.logging.logging
 
-private val logger = logging()
+private val logger = Logger.withTag("SchemaErrorAwareFlow")
 
 /**
  * Collects a Flow as Compose State while catching schema errors and reporting them globally.
@@ -22,7 +22,7 @@ fun <T> Flow<T>.collectAsStateWithSchemaErrorHandling(initial: T): State<T> =
     produceState(initial, this) {
         catch { e ->
             if (SchemaErrorDetector.isSchemaError(e)) {
-                logger.error(e) { "Schema error in Flow collection: ${e.message}" }
+                logger.e(e) { "Schema error in Flow collection: ${e.message}" }
                 GlobalSchemaErrorState.reportError(e)
             } else {
                 throw e

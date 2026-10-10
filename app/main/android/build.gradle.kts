@@ -74,6 +74,8 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.runtime)
+    implementation(libs.kermit)
+    implementation(libs.kermit.core)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.ktor.client.core)
     implementation(libs.play.services.auth)
