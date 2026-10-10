@@ -76,12 +76,6 @@ class BigDecimalTest {
     }
 
     @Test
-    fun toDouble_convertsToDouble() {
-        val value = BigDecimal("123.45")
-        assertEquals(123.45, value.toDouble())
-    }
-
-    @Test
     fun toLong_convertsToLong() {
         val value = BigDecimal("12345")
         assertEquals(12345L, value.toLong())

@@ -18,10 +18,6 @@ actual class BigDecimal : Comparable<BigDecimal> {
         this.value = java.math.BigDecimal(value)
     }
 
-    actual constructor(value: Double) {
-        this.value = java.math.BigDecimal(value)
-    }
-
     actual constructor(value: String) {
         this.value = java.math.BigDecimal(value)
     }
@@ -45,8 +41,6 @@ actual class BigDecimal : Comparable<BigDecimal> {
     actual fun abs(): BigDecimal = BigDecimal(value.abs())
 
     actual override operator fun compareTo(other: BigDecimal): Int = value.compareTo(other.value)
-
-    actual fun toDouble(): Double = value.toDouble()
 
     actual fun toLong(): Long = value.toLong()
 

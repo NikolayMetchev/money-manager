@@ -71,16 +71,6 @@ data class Money(
     operator fun times(multiplier: Int): Money = times(multiplier.toLong())
 
     /**
-     * Divides this Money amount by a scalar value (integer division, truncated toward zero).
-     */
-    operator fun div(divisor: Long): Money = Money(amount / BigInteger(divisor), asset)
-
-    /**
-     * Divides this Money amount by a scalar value (integer division, truncated toward zero).
-     */
-    operator fun div(divisor: Int): Money = div(divisor.toLong())
-
-    /**
      * Negates this Money amount.
      */
     operator fun unaryMinus(): Money = Money(-amount, asset)
