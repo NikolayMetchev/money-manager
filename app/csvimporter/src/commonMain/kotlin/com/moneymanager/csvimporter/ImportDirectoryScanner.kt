@@ -21,7 +21,6 @@ import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.qif.QifParser
 import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope

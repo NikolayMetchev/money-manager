@@ -151,6 +151,7 @@ exclude:
   # compile.
   - name: ReplaceGetOrSet
     paths:
+      - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/Sha256.kt
       - utils/archive/src/commonMain/kotlin/com/moneymanager/archive/ArchiveCodec.kt
       - utils/rest/src/commonMain/kotlin/com/moneymanager/rest/ApiRequestSigner.kt
 
