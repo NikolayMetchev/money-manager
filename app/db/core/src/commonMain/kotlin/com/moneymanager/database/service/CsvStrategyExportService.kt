@@ -54,7 +54,7 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
 import kotlinx.coroutines.flow.first
-import kotlin.time.Instant
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 private data class StrategyReferenceData(
@@ -245,7 +245,7 @@ class CsvStrategyExportService(
                                 source = source,
                                 match = AccountMatchKey.AlwaysCreate,
                                 name = resolution.name,
-                                openingDate = Instant.fromEpochMilliseconds(System.currentTimeMillis()),
+                                openingDate = Clock.System.now(),
                             )
                     CsvReferenceType.CATEGORY ->
                         categoryIntents[ref.name] =
@@ -324,7 +324,7 @@ class CsvStrategyExportService(
             }
         }
 
-        val now = Instant.fromEpochMilliseconds(System.currentTimeMillis())
+        val now = Clock.System.now()
 
         val strategy =
             CsvImportStrategy(

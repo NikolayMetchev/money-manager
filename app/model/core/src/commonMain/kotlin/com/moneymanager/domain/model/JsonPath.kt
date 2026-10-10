@@ -1,5 +1,7 @@
 package com.moneymanager.domain.model
 
+import kotlin.jvm.JvmInline
+
 @JvmInline
 value class JsonPath(
     val value: String,

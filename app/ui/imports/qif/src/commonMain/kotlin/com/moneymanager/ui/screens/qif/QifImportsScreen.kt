@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
+import com.moneymanager.csvimporter.sha256Hex
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.repository.AccountMappingReadRepository
@@ -47,7 +48,6 @@ import com.moneymanager.ui.components.imports.emptyImportTabMessage
 import com.moneymanager.ui.components.imports.importPickedFiles
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.util.sha256Hex
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock

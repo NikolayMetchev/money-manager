@@ -1,4 +1,4 @@
-package com.moneymanager.ui.util
+package com.moneymanager.csvimporter
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

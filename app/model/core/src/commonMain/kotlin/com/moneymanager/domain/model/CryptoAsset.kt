@@ -1,6 +1,7 @@
 package com.moneymanager.domain.model
 
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 /**
  * Represents a crypto asset (e.g. BTC, ETH, CRO, BNB) — one [Asset] class, sibling to [Currency].

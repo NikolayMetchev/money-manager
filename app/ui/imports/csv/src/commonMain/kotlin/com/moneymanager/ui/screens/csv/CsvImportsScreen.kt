@@ -43,6 +43,7 @@ import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.selectForCsv
+import com.moneymanager.csvimporter.sha256Hex
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -85,7 +86,6 @@ import com.moneymanager.ui.components.imports.importPickedFiles
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.util.sha256Hex
 import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
