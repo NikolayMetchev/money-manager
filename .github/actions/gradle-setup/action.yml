@@ -43,7 +43,9 @@ runs:
         cache-encryption-key: ${{ inputs.cache-encryption-key }}
 
     # Kotlin/Native downloads its compiler, LLVM and sysroots (~1 GB) into ~/.konan, outside the Gradle
-    # cache setup-gradle manages. Keyed on the Kotlin version alone: the toolchain changes with nothing else.
+    # cache setup-gradle manages. Keyed on the Kotlin version, since the toolchain changes with nothing else,
+    # plus the job: jobs on one OS download different parts of it (only the arm64 link needs the aarch64
+    # sysroot), and an exact-key cache is never updated after the first save.
     - name: Read Kotlin version
       id: kotlin-version
       if: inputs.kotlin-native == 'true'
@@ -55,11 +57,13 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: ~/.konan
-        key: konan-${{ runner.os }}-${{ runner.arch }}-${{ steps.kotlin-version.outputs.version }}
+        key: konan-${{ runner.os }}-${{ runner.arch }}-${{ steps.kotlin-version.outputs.version }}-${{ github.job }}
+        restore-keys: konan-${{ runner.os }}-${{ runner.arch }}-${{ steps.kotlin-version.outputs.version }}-
 
     - name: Cache Kotlin/Native toolchain
       if: inputs.kotlin-native == 'true' && inputs.cache-read-only != 'true'
       uses: actions/cache@v6
       with:
         path: ~/.konan
-        key: konan-${{ runner.os }}-${{ runner.arch }}-${{ steps.kotlin-version.outputs.version }}
+        key: konan-${{ runner.os }}-${{ runner.arch }}-${{ steps.kotlin-version.outputs.version }}-${{ github.job }}
+        restore-keys: konan-${{ runner.os }}-${{ runner.arch }}-${{ steps.kotlin-version.outputs.version }}-
