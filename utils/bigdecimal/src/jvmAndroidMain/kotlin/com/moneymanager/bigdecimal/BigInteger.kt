@@ -26,8 +26,6 @@ actual class BigInteger : Comparable<BigInteger> {
 
     actual operator fun times(multiplicand: BigInteger): BigInteger = BigInteger(value.multiply(multiplicand.value))
 
-    actual operator fun div(divisor: BigInteger): BigInteger = BigInteger(value.divide(divisor.value))
-
     actual operator fun unaryMinus(): BigInteger = BigInteger(value.negate())
 
     actual fun abs(): BigInteger = BigInteger(value.abs())

@@ -79,7 +79,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | Module | Purpose |
 |--------|---------|
 | `gradle/build-logic/` | Convention plugins (kotlin, android, compose, metro, mappie, `jvm-android-shared`, `native`, `pure-importer`) plus the `verifyNoDbDependency`/`verifyNoWriteRepositoryUsage` tasks, with TestKit tests that the root `check` runs |
-| `utils/bigdecimal/` | Arbitrary-precision decimal arithmetic (JVM/Android) |
+| `utils/bigdecimal/` | Arbitrary-precision decimal arithmetic: `java.math` on JVM/Android, a java.math-identical (unscaled, scale) pair over ionspin's `BigInteger` on native |
 | `utils/currency/` | Locale-aware currency formatting |
 | `utils/humanreadable/` | English file-size / duration / "time ago" formatting (replaces Human-Readable, whose localisation layer pulled ICU4J into the desktop build) |
 | `utils/archive/` | Compress + password-encrypt the DB archive (`ArchiveCodec`); shared by remote backends |

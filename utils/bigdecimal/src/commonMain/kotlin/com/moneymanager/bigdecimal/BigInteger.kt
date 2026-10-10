@@ -9,7 +9,7 @@ package com.moneymanager.bigdecimal
  * [Long], but crypto assets can use very large scale factors (e.g. ETH's 18 decimals), so amounts
  * and their sums must be arbitrary-precision to avoid silent overflow / precision loss.
  *
- * On JVM and Android platforms, this is implemented using java.math.BigInteger.
+ * On JVM and Android platforms, this is implemented using java.math.BigInteger; on native, ionspin's BigInteger.
  */
 expect class BigInteger : Comparable<BigInteger> {
     /**
@@ -36,11 +36,6 @@ expect class BigInteger : Comparable<BigInteger> {
      * Returns a BigInteger whose value is (this × multiplicand).
      */
     operator fun times(multiplicand: BigInteger): BigInteger
-
-    /**
-     * Returns a BigInteger whose value is (this / divisor), truncated toward zero.
-     */
-    operator fun div(divisor: BigInteger): BigInteger
 
     /**
      * Returns a BigInteger whose value is -this.

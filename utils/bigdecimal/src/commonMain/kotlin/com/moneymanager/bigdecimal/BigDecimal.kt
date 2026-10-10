@@ -7,7 +7,8 @@ package com.moneymanager.bigdecimal
  * This class provides precise decimal arithmetic without floating-point precision loss,
  * making it suitable for financial calculations.
  *
- * On JVM and Android platforms, this is implemented using java.math.BigDecimal.
+ * On JVM and Android platforms, this is implemented using java.math.BigDecimal. On native it is an
+ * (unscaled, scale) pair over ionspin's BigInteger that reproduces java.math's semantics exactly.
  */
 expect class BigDecimal : Comparable<BigDecimal> {
     /**
@@ -19,11 +20,6 @@ expect class BigDecimal : Comparable<BigDecimal> {
      * Translates an Int into a BigDecimal.
      */
     constructor(value: Int)
-
-    /**
-     * Translates a Double into a BigDecimal.
-     */
-    constructor(value: Double)
 
     /**
      * Translates a String representation of a BigDecimal into a BigDecimal.
@@ -70,11 +66,6 @@ expect class BigDecimal : Comparable<BigDecimal> {
      * Compares this BigDecimal with the specified BigDecimal.
      */
     override operator fun compareTo(other: BigDecimal): Int
-
-    /**
-     * Converts this BigDecimal to a Double.
-     */
-    fun toDouble(): Double
 
     /**
      * Converts this BigDecimal to a Long.

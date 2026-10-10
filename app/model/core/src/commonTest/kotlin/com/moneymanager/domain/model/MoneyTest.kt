@@ -123,24 +123,6 @@ class MoneyTest {
     }
 
     @Test
-    fun div_long_dividesAmount() {
-        val money = Money(10000, usd) // $100.00
-        val result = money / 4L
-
-        assertEquals(BigInteger(2500L), result.amount) // $25.00
-        assertEquals(usd.id, result.asset.id)
-    }
-
-    @Test
-    fun div_int_dividesAmount() {
-        val money = Money(10000, usd) // $100.00
-        val result = money / 2
-
-        assertEquals(BigInteger(5000L), result.amount) // $50.00
-        assertEquals(usd.id, result.asset.id)
-    }
-
-    @Test
     fun unaryMinus_negatesAmount() {
         val money = Money(10000, usd) // $100.00
         val result = -money
