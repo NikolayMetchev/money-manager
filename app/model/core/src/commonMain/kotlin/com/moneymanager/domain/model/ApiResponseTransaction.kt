@@ -1,5 +1,7 @@
 package com.moneymanager.domain.model
 
+import kotlin.jvm.JvmInline
+
 /**
  * Represents the import state of a single transaction entry found in an API response.
  * Allows the UI to display which transactions were imported, which were duplicates,

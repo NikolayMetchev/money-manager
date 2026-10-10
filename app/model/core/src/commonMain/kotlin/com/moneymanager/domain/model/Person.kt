@@ -1,6 +1,7 @@
 package com.moneymanager.domain.model
 
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 data class Person(
     val id: PersonId,

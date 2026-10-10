@@ -1,5 +1,7 @@
 package com.moneymanager.domain.model
 
+import kotlin.concurrent.Volatile
+
 /**
  * A source of crypto-asset definitions (ticker → display name).
  *

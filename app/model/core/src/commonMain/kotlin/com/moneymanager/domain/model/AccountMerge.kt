@@ -1,5 +1,7 @@
 package com.moneymanager.domain.model
 
+import kotlin.jvm.JvmInline
+
 /**
  * A reversible record of an account merge: the [deletedAccountId] account was merged into
  * [survivingAccountId], moving [transferCount] transactions, and can be undone (unmerge).
