@@ -11,7 +11,7 @@ configure<KotlinMultiplatformExtension> {
     // because dependency-analysis resolves ABI per platform. `matching` rather than `getByName` so the
     // android source set is picked up whenever the Android plugin creates it, however late.
     sourceSets
-        .matching { it.name in setOf("commonMain", "jvmMain", "androidMain") }
+        .matching { it.name in setOf("commonMain", "jvmMain", "androidMain", "nativeMain") }
         .configureEach {
             dependencies {
                 api(libs.metro.runtime)

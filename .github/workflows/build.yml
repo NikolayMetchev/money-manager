@@ -81,15 +81,122 @@ jobs:
           # unit-coverage XMLs. db:core's tests run here too: the dedicated `db-core-test` job was
           # removed once parallel test forks + minimal test currency seeding cut its ~12 min
           # jvmTest down to ~1-2 min.
+          # `build` also runs linuxX64Test natively.
           command: build koverXmlReport --stacktrace
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          kotlin-native: 'true'
 
       - name: Upload coverage and test results to Codecov
         uses: ./.github/actions/codecov-upload
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
+
+  # Kotlin/Native: each target's common tests run natively on a host of that platform. Apple targets
+  # only link on macOS and mingwX64 only runs on Windows. There is no Kotlin/Native compiler for Linux
+  # arm64 hosts, so linuxArm64 test binaries are cross-linked on x64 and run on an arm64 runner.
+  native-linux-arm64-link:
+    name: Native Link (linuxArm64)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      (github.event_name == 'pull_request' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Cross-link linuxArm64 test binaries with Gradle
+        uses: ./.github/actions/gradle-run
+        with:
+          command: linkDebugTestLinuxArm64 --stacktrace
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          kotlin-native: 'true'
+
+      - name: Upload linuxArm64 test binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-arm64-test-binaries
+          path: '**/build/bin/linuxArm64/debugTest/test.kexe'
+          if-no-files-found: error
+          retention-days: 1
+
+  native-linux-arm64:
+    name: Native Tests (linuxArm64)
+    runs-on: ubuntu-24.04-arm
+    needs: native-linux-arm64-link
+
+    steps:
+      - name: Download linuxArm64 test binaries
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-arm64-test-binaries
+
+      - name: Run test binaries
+        shell: bash
+        run: |
+          status=0
+          while IFS= read -r -d '' binary; do
+            echo "::group::$binary"
+            chmod +x "$binary"
+            "$binary" || status=1
+            echo "::endgroup::"
+          done < <(find . -name test.kexe -print0)
+          exit $status
+
+  native-macos:
+    name: Native Tests (macosArm64)
+    runs-on: macos-latest
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      (github.event_name == 'pull_request' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Run macosArm64 tests with Gradle
+        uses: ./.github/actions/gradle-run
+        with:
+          command: macosArm64Test --stacktrace
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          kotlin-native: 'true'
+
+  native-windows:
+    name: Native Tests (mingwX64)
+    runs-on: windows-latest
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      (github.event_name == 'pull_request' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Run mingwX64 tests with Gradle
+        uses: ./.github/actions/gradle-run
+        with:
+          # Selecting a task by name configures every project, and :app:main:jvm's Compose WiX setup
+          # breaks isolated projects on Windows (https://youtrack.jetbrains.com/issue/CMP-8375).
+          command: mingwX64Test -Dorg.gradle.isolated-projects=false --stacktrace
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          kotlin-native: 'true'
 
   android-test:
     name: Android Instrumented Tests

@@ -13,6 +13,10 @@ inputs:
     description: 'AES key for configuration-cache data; empty disables config-cache save/restore'
     required: false
     default: ''
+  kotlin-native:
+    description: 'Whether to restore (and, unless read-only, save) the Kotlin/Native toolchain in ~/.konan'
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -22,6 +26,7 @@ runs:
       with:
         cache-read-only: ${{ inputs.cache-read-only }}
         cache-encryption-key: ${{ inputs.cache-encryption-key }}
+        kotlin-native: ${{ inputs.kotlin-native }}
 
     - name: Run Gradle
       shell: bash

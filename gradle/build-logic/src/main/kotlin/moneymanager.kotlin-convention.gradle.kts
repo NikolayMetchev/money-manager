@@ -4,6 +4,9 @@ import org.gradle.api.artifacts.DependencySubstitutions
 import org.gradle.api.artifacts.MinimalExternalModuleDependency
 import org.gradle.api.provider.Provider
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.tasks.KotlinToolTask
 
 plugins {
     alias(libs.plugins.sort.dependencies)
@@ -106,11 +109,18 @@ group = project.path.removePrefix(":").replace(":", ".")
 tasks {
     val jvmTargetVersion = libs.versions.jvm.target.get()
 
-    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-        compilerOptions {
-            allWarningsAsErrors.set(true)
-            jvmTarget.set(JvmTarget.fromTarget(jvmTargetVersion))
-        }
+    // Every Kotlin compile (JVM, metadata, native), not just JVM ones...
+    withType<KotlinCompilationTask<*>>().configureEach {
+        compilerOptions.allWarningsAsErrors.set(true)
+    }
+
+    // ...and native links, which are tool tasks rather than compilations.
+    withType<KotlinToolTask<*>>().configureEach {
+        toolOptions.allWarningsAsErrors.set(true)
+    }
+
+    withType<KotlinCompile>().configureEach {
+        compilerOptions.jvmTarget.set(JvmTarget.fromTarget(jvmTargetVersion))
     }
 
     withType<Detekt>().configureEach {
