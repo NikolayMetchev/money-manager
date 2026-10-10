@@ -191,7 +191,9 @@ jobs:
       - name: Run mingwX64 tests with Gradle
         uses: ./.github/actions/gradle-run
         with:
-          command: mingwX64Test --stacktrace
+          # Selecting a task by name configures every project, and :app:main:jvm's Compose WiX setup
+          # breaks isolated projects on Windows (https://youtrack.jetbrains.com/issue/CMP-8375).
+          command: mingwX64Test -Dorg.gradle.isolated-projects=false --stacktrace
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
           kotlin-native: 'true'

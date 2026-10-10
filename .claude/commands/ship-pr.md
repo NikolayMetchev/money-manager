@@ -11,8 +11,8 @@ comment that asks for a product-level choice). PR title/context hint (optional):
 1. If on `main`, create a feature branch named after the change first.
 2. Run `./gradlew --console=plain build` locally and make sure it passes (pre-push rule from
    CLAUDE.md). If it fails, fix before continuing.
-3. Commit all pending work (end the message with the `Co-Authored-By: Claude Fable 5
-   <noreply@anthropic.com>` trailer) and push with `-u`.
+3. Commit all pending work (end the message with the attribution trailer Claude Code gives for this
+   session, which names the model actually in use) and push with `-u`.
 
 ## Phase 1 — Draft PR
 
