@@ -50,11 +50,16 @@ if (project.path !in writeRepositoryExemptModules) {
             projectPath.set(project.path)
             projectDirectory.set(layout.projectDirectory)
             allowedFilePaths.set(allowedWriteRepositoryPathsByModule[project.path].orEmpty())
-            // Scan only main source sets — test code may legitimately seed fixtures via write repositories.
-            listOf("commonMain", "jvmMain", "androidMain").forEach { sourceSet ->
-                sources.from(fileTree("src/$sourceSet") { include("**/*.kt") })
-            }
         }
+    // Scan every main source set, whatever the targets (jvmAndroidMain, nativeMain, ...). Test code may
+    // legitimately seed fixtures via write repositories, so test source sets are skipped.
+    configure<KotlinMultiplatformExtension> {
+        // Hand-written sources only (`src/<sourceSet>`), not the generated dirs a source set also carries.
+        sourceSets.matching { it.name.endsWith("Main") }.configureEach {
+            val handWritten = fileTree("src/$name") { include("**/*.kt") }
+            verifyNoWriteRepositoryUsage.configure { sources.from(handWritten) }
+        }
+    }
     tasks.matching { it.name == "check" }.configureEach {
         dependsOn(verifyNoWriteRepositoryUsage)
     }

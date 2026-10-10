@@ -78,7 +78,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 
 | Module | Purpose |
 |--------|---------|
-| `gradle/build-logic/` | Convention plugins (kotlin, android, compose, metro, mappie, `jvm-android-shared`, `pure-importer`) plus the `verifyNoDbDependency`/`verifyNoWriteRepositoryUsage` tasks, with TestKit tests that the root `check` runs |
+| `gradle/build-logic/` | Convention plugins (kotlin, android, compose, metro, mappie, `jvm-android-shared`, `native`, `pure-importer`) plus the `verifyNoDbDependency`/`verifyNoWriteRepositoryUsage` tasks, with TestKit tests that the root `check` runs |
 | `utils/bigdecimal/` | Arbitrary-precision decimal arithmetic (JVM/Android) |
 | `utils/currency/` | Locale-aware currency formatting |
 | `utils/humanreadable/` | English file-size / duration / "time ago" formatting (replaces Human-Readable, whose localisation layer pulled ICU4J into the desktop build) |
@@ -430,7 +430,13 @@ set of writes.
 
 ### Platform Support
 
-- **JVM** ✅ | **Android** ✅ | **iOS** ⚠️ planned | **Web** ⚠️ planned | **Native** ❌
+- **JVM** ✅ | **Android** ✅ | **iOS** ⚠️ planned | **Web** ⚠️ planned | **Native** ⚠️ in progress (CLI, #917)
+- **Kotlin/Native** (`linuxX64`, `linuxArm64`, `macosArm64`, `mingwX64`): a module joins by applying
+  `moneymanager.native-convention`. Only the CLI's dependency closure does, never `app/ui/*`. Once a module has
+  a native target, JVM-only APIs in its `commonMain` (`java.*`, `System.*`, implicit `kotlin.jvm` imports) fail the
+  build. Common tests run natively on CI, one runner per OS (`<target>Test`). The Apple target only links on macOS.
+- **Never write `/*` inside a block comment** (e.g. `app/ui/*` in KDoc): Kotlin nests block comments, so the
+  rest of the file silently becomes a comment.
 
 ### Common Issues
 

@@ -21,5 +21,6 @@ configure<KotlinMultiplatformExtension> {
                 runtimeOnly(libs.kotlinx.coroutines.android)
             }
         }
+        // nativeMain needs nothing: coroutines-core already provides native's dispatchers.
     }
 }
