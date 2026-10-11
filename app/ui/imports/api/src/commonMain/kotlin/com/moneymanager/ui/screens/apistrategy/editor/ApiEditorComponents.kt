@@ -491,16 +491,22 @@ internal fun StringMapEditor(
     }
 }
 
-/** Like [StringMapEditor], but the value is a [Long] (e.g. a per-currency divisor override). */
+/**
+ * Like [StringMapEditor], but the value is an [Int] of at least [minValue] (e.g. a per-currency
+ * decimal-places override). A row whose value doesn't parse or is below [minValue] is flagged and not saved.
+ */
 @Composable
-internal fun StringLongMapEditor(
+internal fun StringIntMapEditor(
     label: String,
-    entries: Map<String, Long>,
-    onChange: (Map<String, Long>) -> Unit,
+    entries: Map<String, Int>,
+    onChange: (Map<String, Int>) -> Unit,
     keyLabel: String = "Key",
     valueLabel: String = "Value",
+    minValue: Int = Int.MIN_VALUE,
     enabled: Boolean = true,
 ) {
+    fun parse(text: String): Int? = text.toIntOrNull()?.takeIf { it >= minValue }
+
     val rows = remember { entries.toList().toMutableStateList() }
     val valueText = remember { rows.map { (_, value) -> value.toString() }.toMutableStateList() }
 
@@ -509,7 +515,7 @@ internal fun StringLongMapEditor(
             rows.indices
                 .mapNotNull { index ->
                     val key = rows[index].first
-                    val value = valueText[index].toLongOrNull()
+                    val value = parse(valueText[index])
                     if (key.isBlank() || value == null) null else key to value
                 }.toMap(),
         )
@@ -548,7 +554,7 @@ internal fun StringLongMapEditor(
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 enabled = enabled,
-                isError = valueText[index].toLongOrNull() == null,
+                isError = parse(valueText[index]) == null,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
             IconButton(
@@ -565,7 +571,7 @@ internal fun StringLongMapEditor(
     }
     TextButton(
         onClick = {
-            rows.add("" to 0L)
+            rows.add("" to 0)
             valueText.add("")
         },
         enabled = enabled,

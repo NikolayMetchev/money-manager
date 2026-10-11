@@ -107,5 +107,5 @@ open class SortedMapSerializer<K : Comparable<K>, V>(
 /** A `Map<String, String>` that serializes (and deserializes) in ascending key order. */
 object SortedStringToStringMapSerializer : SortedMapSerializer<String, String>(String.serializer(), String.serializer())
 
-/** A `Map<String, Long>` that serializes (and deserializes) in ascending key order. */
-object SortedStringToLongMapSerializer : SortedMapSerializer<String, Long>(String.serializer(), Long.serializer())
+/** A `Map<String, Int>` that serializes (and deserializes) in ascending key order. */
+object SortedStringToIntMapSerializer : SortedMapSerializer<String, Int>(String.serializer(), Int.serializer())

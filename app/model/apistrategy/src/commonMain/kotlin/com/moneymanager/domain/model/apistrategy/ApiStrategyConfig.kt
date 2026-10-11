@@ -11,7 +11,7 @@ import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.serialization.SortedListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
-import com.moneymanager.domain.model.serialization.SortedStringToLongMapSerializer
+import com.moneymanager.domain.model.serialization.SortedStringToIntMapSerializer
 import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
@@ -1346,13 +1346,14 @@ data class ApiStrategyConfig(
     /** Maximum retries for a request repeatedly classified as rate-limited before giving up. */
     val maxRateLimitRetries: Int = 5,
     /**
-     * Overrides [com.moneymanager.domain.model.IsoMinorUnitDivisors]' per-currency divisor for
+     * Overrides [com.moneymanager.domain.model.IsoMinorUnitDecimals]' per-currency decimal places for
      * interpreting a [ApiAmountFormat.MINOR_UNITS_INTEGER] amount (a bank API's raw integer in its own
      * minor units). A provider whose minor-unit width doesn't follow the ISO 4217 standard for a given
-     * currency can be corrected here instead of the global table.
+     * currency can be corrected here instead of the global table. Decimal places rather than a divisor,
+     * so the conversion is an exact decimal-point shift.
      */
-    @Serializable(with = SortedStringToLongMapSerializer::class)
-    val minorUnitDivisorOverrides: Map<String, Long> = emptyMap(),
+    @Serializable(with = SortedStringToIntMapSerializer::class)
+    val minorUnitDecimalPlaces: Map<String, Int> = emptyMap(),
 ) {
     /** Whether requests are signed with an api key + secret rather than sent with a bearer token. */
     val isSigned: Boolean get() = requestSigning != null

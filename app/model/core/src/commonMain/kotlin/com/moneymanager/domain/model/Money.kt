@@ -33,8 +33,8 @@ data class Money(
     /**
      * Converts the stored amount to a display value using BigDecimal for precision.
      *
-     * Exact: shifts the decimal point by the asset's decimal count instead of dividing, because
-     * [BigDecimal.div] rounds to a fixed scale and would corrupt high-precision crypto amounts.
+     * Exact: shifts the decimal point by the asset's decimal count, so high-precision crypto amounts
+     * survive intact.
      *
      * @return The display value as BigDecimal (e.g., 12345 with scaleFactor=100 becomes 123.45)
      */
@@ -69,16 +69,6 @@ data class Money(
      * Multiplies this Money amount by a scalar value.
      */
     operator fun times(multiplier: Int): Money = times(multiplier.toLong())
-
-    /**
-     * Divides this Money amount by a scalar value (integer division, truncated toward zero).
-     */
-    operator fun div(divisor: Long): Money = Money(amount / BigInteger(divisor), asset)
-
-    /**
-     * Divides this Money amount by a scalar value (integer division, truncated toward zero).
-     */
-    operator fun div(divisor: Int): Money = div(divisor.toLong())
 
     /**
      * Negates this Money amount.

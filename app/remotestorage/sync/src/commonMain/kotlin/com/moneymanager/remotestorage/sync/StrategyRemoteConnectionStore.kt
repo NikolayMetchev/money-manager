@@ -80,7 +80,9 @@ class StrategyRemoteConnectionStore(
         // uploads. Old "strategySync.f."/"strategySync.g." keys linger harmlessly.
         // "i" since strategy configs carry a `configVersion` stamp and were reshaped onto shared
         // condition/value/account-rule vocabularies: every CSV and API strategy rehashed at once.
-        const val KEY_BASELINE_PREFIX = "strategySync.i."
+        // "j" since API configs' `minorUnitDivisorOverrides` became `minorUnitDecimalPlaces`: the key is
+        // encoded even when empty, so every API strategy rehashed at once.
+        const val KEY_BASELINE_PREFIX = "strategySync.j."
 
         // Must be a printable, XML-safe character: on JVM these values live in java.util.prefs' prefs.xml,
         // where an XML-illegal character (e.g. U+0001) makes the whole node fail to flush, silently

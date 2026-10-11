@@ -31,6 +31,7 @@ androidx-test-core = "1.7.0"
 androidx-test-monitor = "1.8.0"
 androidx-test-runner = "1.7.0"
 androidx-test-uiautomator = "2.4.0"
+bignum = "0.3.10"
 compose-charts = "1.0.0"
 compose-plugin = "1.12.1"
 compose-material-icons-desktop = "1.7.3"
@@ -122,6 +123,7 @@ androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-te
 androidx-test-monitor = { module = "androidx.test:monitor", version.ref = "androidx-test-monitor" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "androidx-test-uiautomator" }
+bignum = { module = "com.ionspin.kotlin:bignum", version.ref = "bignum" }
 compose-animation-core-desktop = { module = "org.jetbrains.compose.animation:animation-core-desktop", version.ref = "compose-plugin" }
 compose-charts = { module = "io.github.ehsannarmani:compose-charts", version.ref = "compose-charts" }
 compose-charts-desktop = { module = "io.github.ehsannarmani:compose-charts-desktop", version.ref = "compose-charts" }

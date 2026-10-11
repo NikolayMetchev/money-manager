@@ -3,6 +3,7 @@
 package com.moneymanager.database.api
 
 import com.moneymanager.apiimporter.importApiSessionExchange
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
@@ -315,11 +316,11 @@ class KrakenExchangeApiE2ETest : DbTest() {
                     .filter { it.amount.asset.code == "TRUMP" }
             assertEquals(2, transfers.size, "both ledger rows of the reversed withdrawal are recorded")
             val netTrump =
-                transfers.sumOf {
-                    val signed = if (it.targetAccountId == exchange.id) 1 else -1
-                    signed * it.amount.toDisplayValue().toDouble()
+                transfers.fold(BigDecimal.ZERO) { acc, transfer ->
+                    val value = transfer.amount.toDisplayValue()
+                    if (transfer.targetAccountId == exchange.id) acc + value else acc - value
                 }
-            assertEquals(0.0, netTrump, "a debit + its reversal must net to zero, not double-book as a withdrawal")
+            assertEquals(BigDecimal.ZERO, netTrump, "a debit + its reversal must net to zero, not double-book as a withdrawal")
         }
 
     // Ledgers is now requested with type=all (not just deposit/withdrawal/reward/staking), so any other
@@ -598,11 +599,11 @@ class KrakenExchangeApiE2ETest : DbTest() {
                     .filter { it.amount.asset.code == "ETH" }
             assertEquals(2, transfers.size, "both autoallocation legs must be booked, not fuzzy-deduped against each other")
             val net =
-                transfers.sumOf {
-                    val signed = if (it.targetAccountId == exchange.id) 1 else -1
-                    signed * it.amount.toDisplayValue().toDouble()
+                transfers.fold(BigDecimal.ZERO) { acc, transfer ->
+                    val value = transfer.amount.toDisplayValue()
+                    if (transfer.targetAccountId == exchange.id) acc + value else acc - value
                 }
-            assertEquals(0.0, net, "the spot debit and its Earn-side credit must net to zero on the exchange account")
+            assertEquals(BigDecimal.ZERO, net, "the spot debit and its Earn-side credit must net to zero on the exchange account")
         }
 
     // Kraken can split one order into several fills that, after ms-truncation, are byte-identical (same
@@ -681,10 +682,10 @@ class KrakenExchangeApiE2ETest : DbTest() {
                     }
             assertEquals(2, feeTransfers.size, "both the original fee charge and its refund are recorded")
             val netFee =
-                feeTransfers.sumOf {
-                    val signed = if (it.targetAccountId == fees.id) 1 else -1
-                    signed * it.amount.toDisplayValue().toDouble()
+                feeTransfers.fold(BigDecimal.ZERO) { acc, transfer ->
+                    val value = transfer.amount.toDisplayValue()
+                    if (transfer.targetAccountId == fees.id) acc + value else acc - value
                 }
-            assertEquals(0.0, netFee, "a fee charge and its refund must net to zero, not double-charge")
+            assertEquals(BigDecimal.ZERO, netFee, "a fee charge and its refund must net to zero, not double-charge")
         }
 }

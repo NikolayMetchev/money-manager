@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class JsonPrimitivesTest {
@@ -133,18 +134,32 @@ class JsonPrimitivesTest {
     }
 
     @Test
-    fun `minor-units integer is divided by the ISO standard divisor, not the storage scale`() {
+    fun `minor-units integer is shifted by the ISO standard decimal places and not the storage scale`() {
         val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = 1_000_000_000_000_000_000L)
         // 4194 pence == £41.94, regardless of GBP's much larger internal storage scale.
-        val money = minorUnitsToMoney(4194L, gbp, divisorOverrides = emptyMap())
+        val money = minorUnitsToMoney(4194L, gbp, decimalPlacesOverrides = emptyMap())
         assertEquals("41.94", money.toDisplayValue().toString())
     }
 
     @Test
-    fun `a strategy divisor override wins over the ISO standard`() {
+    fun `minor-units integer uses each currency ISO decimal places`() {
+        val jpy = Currency(id = CurrencyId(2), code = "JPY", name = "Japanese Yen", scaleFactor = 1_000_000_000_000_000_000L)
+        val bhd = Currency(id = CurrencyId(3), code = "BHD", name = "Bahraini Dinar", scaleFactor = 1_000_000_000_000_000_000L)
+        assertEquals("4194", minorUnitsToMoney(4194L, jpy, decimalPlacesOverrides = emptyMap()).toDisplayValue().toString())
+        assertEquals("4.194", minorUnitsToMoney(4194L, bhd, decimalPlacesOverrides = emptyMap()).toDisplayValue().toString())
+    }
+
+    @Test
+    fun `a strategy decimal places override wins over the ISO standard`() {
         val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = 1_000_000_000_000_000_000L)
-        val money = minorUnitsToMoney(4194L, gbp, divisorOverrides = mapOf("GBP" to 1000L))
+        val money = minorUnitsToMoney(4194L, gbp, decimalPlacesOverrides = mapOf("GBP" to 3))
         assertEquals("4.194", money.toDisplayValue().toString())
+    }
+
+    @Test
+    fun `a negative decimal places override is rejected`() {
+        val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = 1_000_000_000_000_000_000L)
+        assertFailsWith<IllegalArgumentException> { minorUnitsToMoney(4194L, gbp, decimalPlacesOverrides = mapOf("GBP" to -2)) }
     }
 
     @Test

@@ -57,7 +57,7 @@ class ApiStrategyAuditLabelTest {
     fun `user-named map keys are left exactly as typed`() {
         assertEquals("Account custom fields Monzo category", labelForPath("accounts.mappings.customFields.Monzo category"))
         assertEquals("Asset codes aliases XXBT", labelForPath("assetCodes.aliases.XXBT"))
-        assertEquals("Minor unit divisor overrides GBP", labelForPath("minorUnitDivisorOverrides.GBP"))
+        assertEquals("Minor unit decimal places GBP", labelForPath("minorUnitDecimalPlaces.GBP"))
     }
 
     @Test
