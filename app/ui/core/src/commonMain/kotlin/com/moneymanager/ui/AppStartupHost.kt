@@ -30,7 +30,6 @@ import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CryptoCatalogRefresher
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
@@ -171,8 +170,8 @@ private fun AppStartupContent(
         if (binding != null) {
             // If the working copy was kept on the previous close, open it directly: no password, no
             // download, no network. The remote is only touched at close, and only to upload changes.
-            val cacheLocation = runCatching { dbLocationFromString(binding.localCachePath) }.getOrNull()
-            if (cacheLocation != null && databaseManager.databaseExists(cacheLocation)) {
+            val cacheLocation = DbLocation(binding.localCachePath)
+            if (databaseManager.databaseExists(cacheLocation)) {
                 val error =
                     openAndLoad(
                         location = cacheLocation,
@@ -198,9 +197,8 @@ private fun AppStartupContent(
             remoteUnlock = RemoteUnlockState(prompt = "Unlock “${binding.remoteName}” from cloud storage")
             return@LaunchedEffect
         }
-        // A corrupted persisted value (e.g. an invalid path) must not crash startup; treat it as absent.
-        val stored =
-            localSettings.getString(KEY_LAST_DATABASE)?.let { runCatching { dbLocationFromString(it) }.getOrNull() }
+        // A corrupted persisted value (e.g. an invalid path) doesn't exist, so it's treated as absent.
+        val stored = localSettings.getString(KEY_LAST_DATABASE)?.let(::DbLocation)
         if (stored == null || !databaseManager.databaseExists(stored)) {
             // Fresh run: no valid remembered database and no remote binding → the user must choose one.
             databaseState = AppDatabaseState.ChoosingDatabase

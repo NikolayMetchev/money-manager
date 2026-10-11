@@ -13,5 +13,5 @@ actual fun createTestDatabaseLocation(): DbLocation {
 
 actual fun deleteTestDatabase(location: DbLocation) {
     val context = InstrumentationRegistry.getInstrumentation().targetContext
-    context.deleteDatabase(location.name)
+    context.deleteDatabase(location.path)
 }

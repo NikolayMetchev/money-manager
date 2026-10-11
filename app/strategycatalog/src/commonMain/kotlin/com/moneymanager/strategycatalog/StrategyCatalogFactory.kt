@@ -1,11 +1,15 @@
 package com.moneymanager.strategycatalog
 
 import com.moneymanager.localsettings.LocalSettings
+import io.ktor.client.HttpClient
 
 /**
- * Builds the production controller. The local-directory source needs `java.io.File`, which is only
- * visible from a platform source set, hence the expect/actual — the JVM and Android bodies are
- * otherwise identical (see `buildStrategyCatalogController` in `jvmAndroidMain`).
+ * Builds the production controller. The engine-less [HttpClient] resolves a platform engine from the
+ * runtime classpath (CIO on JVM and Android via this module's runtimeOnly dependency).
  */
-@Suppress("ktlint:standard:function-naming")
-expect fun createStrategyCatalogController(localSettings: LocalSettings): StrategyCatalogController
+fun createStrategyCatalogController(localSettings: LocalSettings): StrategyCatalogController =
+    StrategyCatalogController(
+        remoteSource = StrategyCatalogClient(HttpClient()),
+        localDirectorySourceFactory = ::LocalDirectoryStrategyCatalogSource,
+        localSettings = localSettings,
+    )

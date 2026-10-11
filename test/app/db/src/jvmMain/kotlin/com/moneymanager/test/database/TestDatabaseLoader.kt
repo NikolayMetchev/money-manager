@@ -25,5 +25,5 @@ actual fun copyDatabaseFromResources(resourcePath: String): DbLocation {
         Files.copy(input, dbPath, StandardCopyOption.REPLACE_EXISTING)
     }
 
-    return DbLocation(dbPath)
+    return DbLocation(dbPath.toString())
 }

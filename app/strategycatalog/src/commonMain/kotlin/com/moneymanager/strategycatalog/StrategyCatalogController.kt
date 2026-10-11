@@ -52,8 +52,7 @@ data class CatalogState(
  * The catalog [source] defaults to the published site ([remoteSource]) but can be pointed at a local
  * directory instead — a developer testing changes to built-in strategies doesn't need to publish them
  * first. The override is persisted in [localSettings] so it survives restarts, and
- * [localDirectorySourceFactory] builds the platform-specific local-directory source (plain
- * `java.io.File`, so JVM and Android both implement it identically).
+ * [localDirectorySourceFactory] builds the local-directory source for a path.
  */
 class StrategyCatalogController(
     private val remoteSource: StrategyCatalogSource,

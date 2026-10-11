@@ -2,7 +2,6 @@ package com.moneymanager.remotestorage.sync
 
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
@@ -381,7 +380,7 @@ class RemoteDatabaseController(
      */
     suspend fun deleteLocalCache() {
         val binding = syncService.activeBinding() ?: return
-        syncService.deleteLocal(dbLocationFromString(binding.localCachePath))
+        syncService.deleteLocal(DbLocation(binding.localCachePath))
     }
 
     /** Detaches the active database from remote storage (keeps the local working copy). */
