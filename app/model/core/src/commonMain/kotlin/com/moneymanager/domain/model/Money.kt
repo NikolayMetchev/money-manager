@@ -33,8 +33,8 @@ data class Money(
     /**
      * Converts the stored amount to a display value using BigDecimal for precision.
      *
-     * Exact: shifts the decimal point by the asset's decimal count instead of dividing, because
-     * [BigDecimal.div] rounds to a fixed scale and would corrupt high-precision crypto amounts.
+     * Exact: shifts the decimal point by the asset's decimal count, so high-precision crypto amounts
+     * survive intact.
      *
      * @return The display value as BigDecimal (e.g., 12345 with scaleFactor=100 becomes 123.45)
      */
