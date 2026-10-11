@@ -6,6 +6,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * Archives are stored on disk and on Drive, and the desktop app and the native CLI must read each
@@ -35,6 +36,14 @@ class ArchiveGoldenTest {
         assertEquals(0x78, compressed[0].toInt() and 0xFF)
         assertEquals(0, ((compressed[0].toInt() and 0xFF) * 256 + (compressed[1].toInt() and 0xFF)) % 31)
         assertContentEquals(payload, inflate(compressed))
+    }
+
+    @Test
+    fun `a truncated zlib stream is rejected and an empty one inflates to nothing`() {
+        val compressed = deflate(payload())
+
+        assertFailsWith<IllegalArgumentException> { inflate(compressed.copyOf(compressed.size / 2)) }
+        assertContentEquals(ByteArray(0), inflate(ByteArray(0)))
     }
 
     companion object {

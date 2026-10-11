@@ -68,8 +68,7 @@ private fun MemScope.zStream(): z_stream =
 /**
  * Feeds all of [input] to [stream] and drains its output in [BUFFER_SIZE] chunks until [step] reports
  * the end of the stream. Mirrors the JVM inflater's guards: a preset dictionary means a malformed stream,
- * and running out of input before the end is a normal stop (an empty payload, or a truncated one that
- * AES-GCM would already have rejected).
+ * and running out of input before the end is only a normal stop for an empty payload.
  */
 @OptIn(ExperimentalForeignApi::class)
 private inline fun pump(
@@ -96,9 +95,11 @@ private inline fun pump(
                         Z_STREAM_END -> true
                         Z_OK -> false
                         Z_NEED_DICT -> throw IllegalArgumentException("Compressed payload requires a preset dictionary")
-                        // No progress was possible. Every round offers a fresh output buffer, so the input ran out.
+                        // No progress was possible. Every round offers a fresh output buffer, so the input ran out
+                        // before the end of the stream: fine for an empty payload, a truncated stream otherwise.
                         Z_BUF_ERROR -> {
                             check(stream.avail_in.toInt() == 0) { "zlib made no progress" }
+                            require(input.isEmpty()) { "Compressed payload is truncated" }
                             true
                         }
                         else -> throw IllegalStateException("zlib failed with code $result")
