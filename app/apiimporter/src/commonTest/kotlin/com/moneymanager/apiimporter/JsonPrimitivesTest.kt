@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class JsonPrimitivesTest {
@@ -153,6 +154,12 @@ class JsonPrimitivesTest {
         val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = 1_000_000_000_000_000_000L)
         val money = minorUnitsToMoney(4194L, gbp, decimalPlacesOverrides = mapOf("GBP" to 3))
         assertEquals("4.194", money.toDisplayValue().toString())
+    }
+
+    @Test
+    fun `a negative decimal places override is rejected`() {
+        val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = 1_000_000_000_000_000_000L)
+        assertFailsWith<IllegalArgumentException> { minorUnitsToMoney(4194L, gbp, decimalPlacesOverrides = mapOf("GBP" to -2)) }
     }
 
     @Test

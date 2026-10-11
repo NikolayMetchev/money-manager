@@ -3206,6 +3206,9 @@ internal fun minorUnitsToMoney(
     decimalPlacesOverrides: Map<String, Int>,
 ): Money {
     val decimalPlaces = decimalPlacesOverrides[currency.code.uppercase()] ?: IsoMinorUnitDecimals.getDecimalPlaces(currency.code)
+    // The editor rejects negatives, but hand-edited or imported JSON can carry one, and a negative shift would
+    // silently scale the amount up instead of down.
+    require(decimalPlaces >= 0) { "Minor-unit decimal places for ${currency.code} must not be negative: $decimalPlaces" }
     return Money.fromDisplayValue(BigDecimal(rawMinorUnits).movePointLeft(decimalPlaces), currency)
 }
 

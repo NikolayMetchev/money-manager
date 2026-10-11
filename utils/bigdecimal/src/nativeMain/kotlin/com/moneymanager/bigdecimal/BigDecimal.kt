@@ -31,11 +31,19 @@ actual class BigDecimal internal constructor(
     }
 
     actual operator fun times(multiplicand: BigDecimal): BigDecimal =
-        BigDecimal(unscaled.multiply(multiplicand.unscaled), scale + multiplicand.scale)
+        unscaled.multiply(multiplicand.unscaled).let { product ->
+            BigDecimal(
+                product,
+                checkedScale(
+                    product,
+                    scale.toLong() + multiplicand.scale,
+                ),
+            )
+        }
 
     actual fun movePointLeft(n: Int): BigDecimal {
         if (n == 0) return this
-        val newScale = scale + n
+        val newScale = checkedScale(unscaled, scale.toLong() + n)
         return if (newScale < 0) BigDecimal(unscaled.multiply(powerOfTen(-newScale)), 0) else BigDecimal(unscaled, newScale)
     }
 
@@ -92,7 +100,8 @@ actual class BigDecimal internal constructor(
         return if (s == scale) this else BigDecimal(u, s)
     }
 
-    private fun unscaledAt(target: Int): IonBigInteger = if (target == scale) unscaled else unscaled.multiply(powerOfTen(target - scale))
+    private fun unscaledAt(target: Int): IonBigInteger =
+        if (target == scale) unscaled else unscaled.multiply(powerOfTen(checkedScale(unscaled, target.toLong() - scale)))
 
     actual companion object {
         actual val ZERO: BigDecimal = BigDecimal(IonBigInteger.ZERO, 0)
@@ -133,3 +142,18 @@ private fun parseExponent(
     val sign = if (raw.startsWith('-')) "-" else ""
     return (sign + asciiDigits(unsigned, text)).toIntOrNull() ?: throw NumberFormatException("Exponent overflow in \"$text\"")
 }
+
+/**
+ * java.math's `checkScale`: a scale outside the [Int] range throws [ArithmeticException], except for a
+ * zero value, which has no digits to lose and is clamped instead.
+ */
+private fun checkedScale(
+    unscaled: IonBigInteger,
+    scale: Long,
+): Int =
+    when {
+        scale in Int.MIN_VALUE..Int.MAX_VALUE -> scale.toInt()
+        unscaled.isZero() -> if (scale > 0) Int.MAX_VALUE else Int.MIN_VALUE
+        scale > 0 -> throw ArithmeticException("Underflow")
+        else -> throw ArithmeticException("Overflow")
+    }

@@ -131,6 +131,13 @@ class BigDecimalSemanticsTest {
     }
 
     @Test
+    fun scaleOverflow_throwsArithmeticException() {
+        assertFailsWith<ArithmeticException> { BigDecimal("1.00001").movePointLeft(Int.MAX_VALUE) }
+        assertFailsWith<ArithmeticException> { BigDecimal("1E+5").movePointLeft(Int.MIN_VALUE) }
+        assertFailsWith<ArithmeticException> { BigDecimal("1E-2147483647") * BigDecimal("1E-10") }
+    }
+
+    @Test
     fun toBigIntegerExact_throwsOnFraction() {
         assertFailsWith<ArithmeticException> { BigDecimal("1.5").toBigIntegerExact() }
         assertFailsWith<ArithmeticException> { BigDecimal("0.000000000000000001").toBigIntegerExact() }
