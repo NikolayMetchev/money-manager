@@ -6,9 +6,14 @@ inputs:
     description: 'The Gradle command to run (e.g., build, lintFormat)'
     required: true
   cache-read-only:
-    description: 'Whether the Gradle cache should be read-only'
+    description: >-
+      Whether the Gradle cache should be read-only. Defaults to 'true': only one job per runner OS
+      (build.yml's build, native-macos and native-windows) writes Gradle User Home entries, and only
+      from main, so the repo's 10 GB Actions cache isn't filled with near-duplicate dependency and
+      transform entries that evict the ones every job restores. Read-only jobs restore the latest
+      entry saved for their OS.
     required: false
-    default: 'false'
+    default: 'true'
   cache-encryption-key:
     description: 'AES key for configuration-cache data; empty disables config-cache save/restore'
     required: false
@@ -17,6 +22,13 @@ inputs:
     description: 'Whether to restore (and, unless read-only, save) the Kotlin/Native toolchain in ~/.konan'
     required: false
     default: 'false'
+  kotlin-native-cache-read-only:
+    description: >-
+      Whether the ~/.konan cache is read-only; empty follows cache-read-only. Lets a job that writes
+      no Gradle User Home entry still save its own toolchain (the linuxArm64 link needs a sysroot
+      the build job never downloads).
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -27,6 +39,7 @@ runs:
         cache-read-only: ${{ inputs.cache-read-only }}
         cache-encryption-key: ${{ inputs.cache-encryption-key }}
         kotlin-native: ${{ inputs.kotlin-native }}
+        kotlin-native-cache-read-only: ${{ inputs.kotlin-native-cache-read-only }}
 
     - name: Run Gradle
       shell: bash
