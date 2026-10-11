@@ -3,7 +3,6 @@ package com.moneymanager.currency
 import com.moneymanager.bigdecimal.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 class NativeCurrencyTest {
     @Test
@@ -14,7 +13,7 @@ class NativeCurrencyTest {
     }
 
     @Test
-    fun `rejects codes outside the bundled table`() {
-        assertFailsWith<IllegalArgumentException> { Currency("ZZZ") }
+    fun `formats a code outside the bundled table unpadded`() {
+        assertEquals("12.5 ZZZ", Currency("ZZZ").format(BigDecimal("12.5")))
     }
 }
