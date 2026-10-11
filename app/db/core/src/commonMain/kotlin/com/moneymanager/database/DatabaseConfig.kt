@@ -1,6 +1,7 @@
 package com.moneymanager.database
 
-import com.moneymanager.currency.Currency
+import com.moneymanager.currency.IsoCurrencies
+import com.moneymanager.currency.IsoCurrency
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.CurrencyScaleFactors
@@ -33,10 +34,11 @@ object DatabaseConfig {
         )
 
     /**
-     * All available ISO 4217 currencies from the platform.
+     * The ISO 4217 currencies a new database is seeded with: the table bundled into the app, the same on
+     * every platform. The strategy catalog publishes a newer copy that installs any codes added since.
      */
-    val allCurrencies: List<Currency>
-        get() = Currency.getAllCurrencies()
+    val allCurrencies: List<IsoCurrency>
+        get() = IsoCurrencies.all
 
     // GBP is seeded with a fixed id in :app:db:seed (StaticSeed.sq) so the build-time-generated QIF
     // strategies can reference it as a constant; runtime seeding below skips it to avoid a duplicate.
@@ -44,15 +46,14 @@ object DatabaseConfig {
 
     /**
      * Seeds [currencies] (every code except [GBP_CODE]) for a freshly created database, recording
-     * SYSTEM provenance for each. Defaults to the runtime platform currency list (java.util.Currency)
-     * so the seeded set matches the device — Android exposes more ISO 4217 codes than the JVM, so this
-     * cannot be frozen at build time. Tests pass a minimal list instead: seeding ~230 currencies
+     * SYSTEM provenance for each — the provenance that marks a currency as part of the catalog's
+     * currency list (see `StrategyLibraryService`). Tests pass a minimal list instead: seeding ~230 currencies
      * (with audit triggers) per test dominated DB-test setup time. Runs after Schema.create (which
      * already seeded the lookups, the system device, and GBP).
      */
     fun seedCurrencies(
         database: MoneyManagerDatabaseWrapper,
-        currencies: List<Currency> = allCurrencies,
+        currencies: List<IsoCurrency> = allCurrencies,
     ) {
         with(database) {
             currencies.forEach { currency ->
@@ -67,7 +68,7 @@ object DatabaseConfig {
                         assetWriteQueries.insert()
                         assetWriteQueries.lastInsertedId().executeAsOne()
                     }
-                currencyWriteQueries.insert(currencyId, currency.code, currency.displayName, scaleFactor)
+                currencyWriteQueries.insert(currencyId, currency.code, currency.name, scaleFactor)
                 recordSource(
                     DeviceId(WellKnownIds.SYSTEM_DEVICE_ID),
                     EntityType.CURRENCY,

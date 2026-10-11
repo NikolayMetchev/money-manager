@@ -7,7 +7,8 @@ import com.moneymanager.domain.model.AppVersion
  * CSV, QIF and XLSX are all `csv_import_strategy` rows (QIF and XLSX both ride the CSV engine); they
  * are separated here only so the filename suffix records which kind a file is. [GLOBAL_MAPPINGS] is
  * the single combined file holding all global account mappings. [PASS_THROUGH] is one pass-through
- * (conduit) account definition per file.
+ * (conduit) account definition per file. [CURRENCIES] is the reference list of currencies a database is
+ * seeded with (one file, [StrategyFileNaming.CURRENCIES_NAME]); applying it only adds missing codes.
  */
 enum class StrategyKind {
     CSV,
@@ -16,6 +17,7 @@ enum class StrategyKind {
     API,
     GLOBAL_MAPPINGS,
     PASS_THROUGH,
+    CURRENCIES,
 }
 
 /**
@@ -49,12 +51,16 @@ data class StrategyParseResult(
  */
 object StrategyFileNaming {
     const val GLOBAL_MAPPINGS_NAME: String = "global-account-mappings"
+
+    /** The name of the single [StrategyKind.CURRENCIES] artifact. */
+    const val CURRENCIES_NAME: String = "ISO 4217 currencies"
     private const val SUFFIX = ".json"
     private const val CSV_INFIX = ".csv"
     private const val QIF_INFIX = ".qif"
     private const val XLSX_INFIX = ".xlsx"
     private const val API_INFIX = ".api"
     private const val PASS_THROUGH_INFIX = ".passthrough"
+    private const val CURRENCIES_INFIX = ".currencies"
 
     fun fileName(key: StrategyKey): String =
         when (key.kind) {
@@ -64,6 +70,7 @@ object StrategyFileNaming {
             StrategyKind.API -> "${key.name}$API_INFIX$SUFFIX"
             StrategyKind.GLOBAL_MAPPINGS -> "$GLOBAL_MAPPINGS_NAME$SUFFIX"
             StrategyKind.PASS_THROUGH -> "${key.name}$PASS_THROUGH_INFIX$SUFFIX"
+            StrategyKind.CURRENCIES -> "${key.name}$CURRENCIES_INFIX$SUFFIX"
         }
 
     /** Parses a remote filename back into a [StrategyKey], or null if it isn't a library file. */
@@ -79,6 +86,7 @@ object StrategyFileNaming {
             stem.endsWith(QIF_INFIX) -> StrategyKey(StrategyKind.QIF, stem.removeSuffix(QIF_INFIX))
             stem.endsWith(API_INFIX) -> StrategyKey(StrategyKind.API, stem.removeSuffix(API_INFIX))
             stem.endsWith(PASS_THROUGH_INFIX) -> StrategyKey(StrategyKind.PASS_THROUGH, stem.removeSuffix(PASS_THROUGH_INFIX))
+            stem.endsWith(CURRENCIES_INFIX) -> StrategyKey(StrategyKind.CURRENCIES, stem.removeSuffix(CURRENCIES_INFIX))
             else -> null
         }?.takeIf { it.name.isNotBlank() }
     }

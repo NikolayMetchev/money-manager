@@ -5,6 +5,7 @@ import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.builtin.BuiltInPassThroughs
 import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
+import com.moneymanager.database.json.CurrencyListExportCodec
 import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.model.CurrencyId
@@ -34,13 +35,19 @@ private const val GBP_CURRENCY_CODE = "GBP"
 
 /**
  * Generates the strategy catalog for the GitHub Pages site: renders every Kotlin built-in definition
- * (app/strategies) to its portable JSON artifact and writes `<webpageDir>/strategy-library/` —
- * index.json plus one file per artifact. Nothing is checked in; CI runs this before uploading the
- * `webpage/` directory to Pages.
+ * (app/strategies) plus the ISO 4217 currency list to its portable JSON artifact and writes
+ * `<webpageDir>/strategy-library/` — index.json plus one file per artifact. Nothing is checked in; CI
+ * runs this before uploading the `webpage/` directory to Pages. `currencies <file>` instead regenerates
+ * the currency table bundled into the app from the same JDK list.
  */
 fun main(args: Array<String>) {
-    require(args.size == 2 && args[0] == "generate") { "usage: generate <webpageDir>" }
-    generateCatalogSite(File(args[1]))
+    val usage = "usage: generate <webpageDir> | currencies <IsoCurrencies.kt>"
+    require(args.size == 2) { usage }
+    when (args[0]) {
+        "generate" -> generateCatalogSite(File(args[1]))
+        "currencies" -> File(args[1]).writeText(renderIsoCurrenciesSource(jdkIsoCurrencies()))
+        else -> error(usage)
+    }
 }
 
 /**
@@ -77,6 +84,11 @@ internal fun builtInArtifacts(csvAsOf: (CsvImportStrategy) -> CsvImportStrategy 
     for (definition in BuiltInPassThroughs.builtInPassThroughs()) {
         artifacts[StrategyKey(StrategyKind.PASS_THROUGH, definition.name)] = PassThroughExportCodec.encode(definition.toExport())
     }
+
+    // Rendered from this JDK rather than the bundled table, so the site can carry codes newer than an
+    // installed app's bundle.
+    artifacts[StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)] =
+        CurrencyListExportCodec.encode(currencyListExport(jdkIsoCurrencies()))
 
     return artifacts
 }
