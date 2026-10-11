@@ -147,6 +147,14 @@ compose.desktop {
                         .get(),
                 )
                 configurationFiles.from(project.file("proguard-rules.pro"))
+                // -PproguardOptimize=false skips the optimizer, which is most of ProGuard's ~15 minutes.
+                // CI's ProGuard check passes it: shrinking alone shows whether the keep rules hold.
+                optimize.set(
+                    providers
+                        .gradleProperty("proguardOptimize")
+                        .map(String::toBoolean)
+                        .orElse(true),
+                )
             }
         }
 
