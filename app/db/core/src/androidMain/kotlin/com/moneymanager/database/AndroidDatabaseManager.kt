@@ -34,7 +34,7 @@ class AndroidDatabaseManager(
         withContext(Dispatchers.IO) {
             onProgress(DatabaseInitializationProgress("Checking for an existing database...", 1, 6))
             // Check if this is a new database before opening
-            val isNewDatabase = !context.getDatabasePath(location.name).exists()
+            val isNewDatabase = !context.getDatabasePath(location.path).exists()
 
             onProgress(DatabaseInitializationProgress("Opening the SQLite database...", 2, 6))
             // Use custom callback that handles existing databases gracefully
@@ -42,7 +42,7 @@ class AndroidDatabaseManager(
                 AndroidSqliteDriver(
                     schema = MoneyManagerDatabase.Schema,
                     context = context,
-                    name = location.name,
+                    name = location.path,
                     callback =
                         object : AndroidSqliteDriver.Callback(MoneyManagerDatabase.Schema) {
                             override fun onConfigure(db: SupportSQLiteDatabase) {
@@ -100,17 +100,17 @@ class AndroidDatabaseManager(
 
     override suspend fun databaseExists(location: DbLocation): Boolean {
         // On Android, we can check if the database file exists in the databases directory
-        return context.getDatabasePath(location.name).exists()
+        return context.getDatabasePath(location.path).exists()
     }
 
     override fun getDefaultLocation(): DbLocation = DEFAULT_DB_LOCATION
 
     override suspend fun backupDatabase(location: DbLocation): DbLocation =
         withContext(Dispatchers.IO) {
-            val dbFile = context.getDatabasePath(location.name)
-            require(dbFile.exists()) { "Database does not exist: ${location.name}" }
+            val dbFile = context.getDatabasePath(location.path)
+            require(dbFile.exists()) { "Database does not exist: ${location.path}" }
 
-            val backupName = "${location.name}.backup"
+            val backupName = "${location.path}.backup"
             val backupFile = context.getDatabasePath(backupName)
             val backupLocation = DbLocation(backupName)
 
@@ -123,7 +123,7 @@ class AndroidDatabaseManager(
             dbFile.copyTo(backupFile, overwrite = true)
 
             // Delete the original database so a fresh one can be created
-            context.deleteDatabase(location.name)
+            context.deleteDatabase(location.path)
 
             backupLocation
         }
@@ -131,12 +131,12 @@ class AndroidDatabaseManager(
     override suspend fun deleteDatabase(location: DbLocation): Unit =
         withContext(Dispatchers.IO) {
             // Use Android's deleteDatabase method for proper cleanup
-            context.deleteDatabase(location.name)
+            context.deleteDatabase(location.path)
         }
 
     override suspend fun databaseSizeBytes(location: DbLocation): Long? =
         withContext(Dispatchers.IO) {
-            val dbFile = context.getDatabasePath(location.name)
+            val dbFile = context.getDatabasePath(location.path)
             if (!dbFile.exists()) {
                 null
             } else {
@@ -163,7 +163,7 @@ class AndroidDatabaseManager(
         bytes: ByteArray,
     ): Unit =
         withContext(Dispatchers.IO) {
-            val dbFile = context.getDatabasePath(location.name)
+            val dbFile = context.getDatabasePath(location.path)
             dbFile.parentFile?.mkdirs()
             // Drop stale WAL/SHM sidecars so the restored file isn't shadowed by an old write-ahead log.
             // Fail if a surviving sidecar can't be removed (matches the JVM impl's deleteIfExists), since

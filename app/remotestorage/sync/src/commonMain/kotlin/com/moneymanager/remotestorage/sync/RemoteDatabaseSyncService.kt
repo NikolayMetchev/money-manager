@@ -6,7 +6,6 @@ import com.moneymanager.database.DatabaseMaintenanceServiceImpl
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
@@ -130,7 +129,7 @@ class RemoteDatabaseSyncService(
         onProgress(SyncProgress("Decrypting and decompressing…", 0.45f))
         val databaseBytes = ArchiveCodec.unpack(archive, password)
         onProgress(SyncProgress("Writing database…", 0.7f))
-        val location = dbLocationFromString(binding.localCachePath)
+        val location = DbLocation(binding.localCachePath)
         databaseManager.restore(location, databaseBytes)
         // The uploaded snapshot has its materialized views truncated; rebuild them so the working
         // copy is consistent before the app opens it.

@@ -1,16 +1,20 @@
 plugins {
+    id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
-    id("moneymanager.jvm-android-shared-convention")
 }
 
-// Local-folder backend for ImportFileSource: lists + reads files from a filesystem folder via
-// java.io.File. JVM and Android share one jvmAndroidMain source set (java.io is available on both for
-// real filesystem paths); androidMain adds the SAF document-tree variant on top. Database-free.
+// Local-folder backend for ImportFileSource: lists + reads files from a filesystem folder over
+// kotlinx-io (utils/files), one implementation for every platform; androidMain adds the SAF
+// document-tree variant on top. Database-free.
 kotlin {
     sourceSets {
-        getByName("jvmAndroidMain") {
+        commonMain {
             dependencies {
+                api(projects.app.importfilesource.core)
+
+                implementation(projects.utils.files)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.io.core)
             }
         }
 
@@ -26,7 +30,7 @@ kotlin {
             }
         }
 
-        getByName("jvmTest") {
+        commonTest {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)

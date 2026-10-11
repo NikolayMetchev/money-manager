@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.serialization)
+    id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
-    id("moneymanager.jvm-android-shared-convention")
 }
 
 // Client for the central strategy catalog published on GitHub Pages: fetches the index.json manifest
@@ -18,15 +18,9 @@ kotlin {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.ktor.client.core)
 
+                implementation(projects.utils.files)
+                implementation(libs.kotlinx.io.core)
                 implementation(libs.kotlinx.serialization.json)
-            }
-        }
-
-        // A local-directory catalog source is plain java.io.File, shared by JVM and Android (no SAF
-        // picker involved — it's a developer-entered path, not a user-picked folder).
-        getByName("jvmAndroidMain") {
-            dependencies {
-                implementation(libs.kotlinx.coroutines.core)
             }
         }
 

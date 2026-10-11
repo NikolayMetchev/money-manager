@@ -1,11 +1,11 @@
 plugins {
     alias(libs.plugins.kotlin.serialization)
+    id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
-    id("moneymanager.jvm-android-shared-convention")
 }
 
 // The encrypted local credential vault (API tokens, Google sign-ins). Encryption is utils/archive's
-// ArchiveCodec; file IO lives in jvmAndroidMain (java.nio on both platforms).
+// ArchiveCodec; file IO is utils/files (kotlinx-io), shared by every platform.
 kotlin {
     sourceSets {
         commonMain {
@@ -15,6 +15,8 @@ kotlin {
                 api(libs.kotlinx.serialization.core)
 
                 implementation(projects.utils.archive)
+                implementation(projects.utils.files)
+                implementation(libs.kotlinx.io.core)
                 implementation(libs.kotlinx.serialization.json)
             }
         }

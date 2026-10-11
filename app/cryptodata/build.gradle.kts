@@ -18,6 +18,9 @@ kotlin {
         commonMain {
             dependencies {
                 api(projects.app.model.core)
+
+                implementation(projects.utils.files)
+                implementation(libs.kotlinx.io.core)
             }
         }
 

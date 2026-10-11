@@ -58,7 +58,7 @@ actual class DatabaseLocationPickerLauncher(
                     "parent=[$parent] parentExists=${parent?.let { Files.exists(it) }} " +
                     "parentWritable=${parent?.let { Files.isWritable(it) }}"
             }
-            return DbLocation(resolved)
+            return DbLocation(resolved.toString())
         } finally {
             frame.dispose()
         }

@@ -2,8 +2,8 @@ package com.moneymanager.credentialvault.di
 
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.CredentialVaultImpl
+import com.moneymanager.credentialvault.FileVaultStorage
 import com.moneymanager.credentialvault.VaultPathResolver
-import com.moneymanager.credentialvault.fileVaultStorage
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.di.scope.AppScope
 import com.moneymanager.localsettings.LocalSettings
@@ -24,7 +24,7 @@ object CredentialVaultModule {
     fun provideCredentialVault(
         params: AppComponentParams,
         localSettings: LocalSettings,
-    ): CredentialVault = CredentialVaultImpl(fileVaultStorage(), createVaultPathResolver(params), localSettings)
+    ): CredentialVault = CredentialVaultImpl(FileVaultStorage(), createVaultPathResolver(params), localSettings)
 }
 
 /** The platform's default vault location: the directory holding the database. */

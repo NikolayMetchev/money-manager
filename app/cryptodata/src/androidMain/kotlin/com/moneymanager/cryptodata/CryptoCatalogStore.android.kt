@@ -1,5 +1,6 @@
 package com.moneymanager.cryptodata
 
+import kotlinx.io.files.Path
 import java.io.File
 
 /**
@@ -14,17 +15,4 @@ fun initializeCryptoCatalogStore(filesDir: File) {
     appFilesDir = filesDir
 }
 
-private fun storeFile(): File? = appFilesDir?.resolve("crypto")?.resolve("coins.tsv")
-
-actual fun readStoredCryptoCatalogText(): String? =
-    storeFile()?.takeIf { it.isFile }?.let {
-        runCatching { it.readText() }.getOrNull()
-    }
-
-actual fun writeStoredCryptoCatalogText(text: String): Boolean =
-    runCatching {
-        val file = storeFile() ?: return false
-        file.parentFile?.mkdirs()
-        file.writeText(text)
-        true
-    }.getOrDefault(false)
+internal actual fun cryptoCatalogStoreFile(): Path? = appFilesDir?.let { Path(it.path, "crypto", "coins.tsv") }

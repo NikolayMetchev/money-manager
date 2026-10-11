@@ -249,6 +249,3 @@ class CredentialVaultImpl(
         fun locationKey(databaseKey: String) = "credvault.path.${databaseKey.hashCode().toUInt().toString(MAX_RADIX)}"
     }
 }
-
-/** The platform's file-system [VaultStorage]. */
-expect fun fileVaultStorage(): VaultStorage
