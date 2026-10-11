@@ -113,7 +113,6 @@ exclude:
     paths:
       - app/importfilesource/di/src/androidMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.android.kt
       - app/importfilesource/di/src/jvmMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.jvm.kt
-      - app/model/core/src/androidMain/kotlin/com/moneymanager/domain/model/DbLocation.kt
       - app/remotestorage/core/src/commonMain/kotlin/com/moneymanager/remotestorage/RemoteStorageProvider.kt
       - app/ui/imports/timeline/src/commonTest/kotlin/com/moneymanager/ui/screens/timeline/ImportTimelineScreenTest.kt
       - test/app/db/src/androidMain/kotlin/com/moneymanager/test/database/TestDatabaseHelper.kt
@@ -159,8 +158,9 @@ exclude:
   # ([1]); expect/actual factories, platform impls and test fixtures consumed from other modules
   # ([2] — e.g. isDocumentTreeRef is called from app/importfilesource/di, getAuditableTables from
   # app/db/core tests, DbTest/TestProvenance from many modules' tests); interface-mandated override
-  # parameters of fakes and no-op actuals ([4]); FieldMapping's `override val id` and DbLocation's
-  # expect-fun parameter, both reported as "unused parameter".
+  # parameters of fakes and no-op actuals ([4]); FieldMapping's `override val id` and the expect-fun
+  # parameter of lastModifiedEpochMs (utils/files; every actual reads it), both reported as
+  # "unused parameter".
   - name: unused
     paths:
       # revisionId in toDomain is unused by design (positional match for the generated mapper —
@@ -189,7 +189,6 @@ exclude:
       - app/remotestorage/di/src/androidMain
       - app/remotestorage/di/src/jvmMain
       - app/remotestorage/googledrive/src/jvmAndroidMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
-      - app/strategycatalog/src/androidMain/kotlin/com/moneymanager/strategycatalog/StrategyCatalogFactory.android.kt
       - app/strategycatalog/src/commonTest/kotlin/com/moneymanager/strategycatalog/StrategyCatalogControllerTest.kt
       - app/ui/foundation/src/androidMain
       - app/ui/foundation/src/jvmMain
@@ -207,6 +206,7 @@ exclude:
       - test/app/db/src
       - utils/compose/scrollbar/src/androidMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
       - utils/compose/scrollbar/src/jvmMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
+      - utils/files/src/commonMain/kotlin/com/moneymanager/files/Files.kt
       - utils/localsettings/di/src/androidMain
       - utils/localsettings/di/src/jvmMain
       - utils/localsettings/src/androidMain/kotlin/com/moneymanager/localsettings/AndroidLocalSettings.kt
@@ -235,7 +235,6 @@ exclude:
       - app/importfilesource/localfolder/src/androidMain/kotlin/com/moneymanager/importfilesource/localfolder/SafFolderImportFileSource.kt
       - app/remotestorage/di/src/androidMain
       - app/remotestorage/googledrive/src/jvmAndroidMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
-      - app/strategycatalog/src/androidMain/kotlin/com/moneymanager/strategycatalog/StrategyCatalogFactory.android.kt
       - app/ui/foundation/src/androidMain
       - app/ui/foundation/src/jvmMain
       - test/app/db/src
