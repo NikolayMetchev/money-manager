@@ -1,5 +1,6 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     // Shared jvmAndroidMain source set: both platforms expose java.util.zip for Deflate/Inflate.
     id("moneymanager.jvm-android-shared-convention")
 }
@@ -23,6 +24,14 @@ kotlin {
         androidMain {
             dependencies {
                 runtimeOnly(libs.cryptography.provider.jdk)
+            }
+        }
+
+        nativeMain {
+            dependencies {
+                // openssl3 on every native target (Apple too): one provider covering PBKDF2, AES-GCM,
+                // HMAC, ECDSA and EdDSA, statically linked so the CLI needs no system OpenSSL.
+                implementation(libs.cryptography.provider.openssl3.prebuilt)
             }
         }
 

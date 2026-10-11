@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
 }
 
 // Read-only repository interfaces — the surface the UI and every read path talks to.

@@ -56,7 +56,7 @@ class CredentialVaultImplTest {
         }
 
     @Test
-    fun `the file is encrypted, never plain text`() =
+    fun `the file is encrypted and never plain text`() =
         runTest {
             val storage = InMemoryVaultStorage()
             val vault = inMemoryCredentialVault(storage)
@@ -99,7 +99,7 @@ class CredentialVaultImplTest {
         }
 
     @Test
-    fun `a custom location is remembered per database, the password is not`() =
+    fun `a custom location is remembered per database but the password is not`() =
         runTest {
             val storage = InMemoryVaultStorage()
             val settings = InMemoryLocalSettings()

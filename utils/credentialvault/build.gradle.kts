@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
 }
 
 // The encrypted local credential vault (API tokens, Google sign-ins). Encryption is utils/archive's

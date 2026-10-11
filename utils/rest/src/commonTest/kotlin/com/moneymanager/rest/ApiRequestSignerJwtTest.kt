@@ -83,14 +83,34 @@ class ApiRequestSignerJwtTest {
                 decode(claims),
             )
 
-            val decoder = checkNotNull(CryptographyProvider.Default.getOrNull(ECDSA)).publicKeyDecoder(EC.Curve.P256)
-            val verified =
-                decoder
-                    .decodeFromByteArray(EC.PublicKey.Format.PEM, PUBLIC_KEY.encodeToByteArray())
-                    .signatureVerifier(SHA256, ECDSA.SignatureFormat.RAW)
-                    .tryVerifySignature("$header.$claims".encodeToByteArray(), URL_SAFE.decode(signature))
-            assertTrue(verified, "signature does not verify against the public key")
+            assertTrue(verifiesEs256(header, claims, signature), "signature does not verify against the public key")
         }
+
+    @Test
+    fun `an ES256 token signed on the JVM verifies here`() =
+        runTest {
+            val (header, claims, signature) = JVM_ES256_TOKEN.split(".")
+            assertTrue(verifiesEs256(header, claims, signature), "the JVM's signature does not verify on this platform")
+        }
+
+    // ES256 signatures are randomised, but Ed25519 ones are not: the same key and message must give the
+    // same bytes on every platform and provider.
+    @Test
+    fun `Ed25519 signs a fixed message to the JVM's bytes`() =
+        runTest {
+            assertEquals(JVM_ED25519_SIGNATURE, ed25519SignFixedMessage().toHexString())
+        }
+
+    private suspend fun verifiesEs256(
+        header: String,
+        claims: String,
+        signature: String,
+    ): Boolean =
+        checkNotNull(CryptographyProvider.Default.getOrNull(ECDSA))
+            .publicKeyDecoder(EC.Curve.P256)
+            .decodeFromByteArray(EC.PublicKey.Format.PEM, PUBLIC_KEY.encodeToByteArray())
+            .signatureVerifier(SHA256, ECDSA.SignatureFormat.RAW)
+            .tryVerifySignature("$header.$claims".encodeToByteArray(), URL_SAFE.decode(signature))
 
     @Test
     fun `accepts a PEM key pasted with literal newline escapes or collapsed onto one line`() =
@@ -174,6 +194,31 @@ class ApiRequestSignerJwtTest {
             MCowBQYDK2VwAyEAb/f+mBWMGHaaAZT7SXkA/3rH92wuBSHKYGTazm7I3Fs=
             -----END PUBLIC KEY-----
             """.trimIndent()
+
+        // An ES256 token signed by the JVM (JDK provider) with PRIVATE_KEY.
+        val JVM_ES256_TOKEN =
+            """
+            eyJhbGciOiJFUzI1NiIsImtpZCI6Im9yZ2FuaXphdGlvbnMvb3JnLTEvYXBpS2V5cy9rZXktMSIsIm5vbmNlIjoiODkwNzg5MDlj
+            NzYyNTUwNjQxZjFjMTI4NDkwYjc0ZGIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJjZHAiLCJzdWIiOiJvcmdhbml6YXRpb25zL29yZ
+            y0xL2FwaUtleXMva2V5LTEiLCJuYmYiOjE3MDAwMDAwMDAsImV4cCI6MTcwMDAwMDEyMCwidXJpIjoiR0VUIGFwaS5jb2luYmFzZ
+            S5jb20vdjIvYWNjb3VudHMvYWJjL3RyYW5zYWN0aW9ucyJ9.0O70TLHYAu4UsFhyvJRjqk93GO7KfdSREzDmvLH9tKSfqzMSnkJ_
+            69FmTGEA8kSwG980AfsSQMFbrNW4FdMOfg
+            """.filterNot(Char::isWhitespace)
+
+        const val FIXED_MESSAGE = "Money Manager signs the same bytes on every platform"
+
+        // Ed25519 over FIXED_MESSAGE with ED25519_SECRET's seed, computed by the JVM (JDK provider).
+        const val JVM_ED25519_SIGNATURE =
+            "fbeb26b4e4213ac3649f1a8d9bc41ee7e6cb83a70f06cd1a1297b4ab417a0c4980d8f757742a76f61074e33c0cceec30412cf33ff4856238c6b003540aaf770d"
+
+        private suspend fun ed25519SignFixedMessage(): ByteArray =
+            checkNotNull(CryptographyProvider.Default.getOrNull(EdDSA))
+                .privateKeyDecoder(EdDSA.Curve.Ed25519)
+                .decodeFromByteArray(EdDSA.PrivateKey.Format.RAW, Base64.decode(ED25519_SECRET).copyOf(ED25519_SEED_SIZE))
+                .signatureGenerator()
+                .generateSignature(FIXED_MESSAGE.encodeToByteArray())
+
+        private const val ED25519_SEED_SIZE = 32
 
         // The same key in PKCS#8 form (`openssl pkcs8 -topk8 -nocrypt`).
         val PKCS8_KEY =

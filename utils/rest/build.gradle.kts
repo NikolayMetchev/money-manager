@@ -1,5 +1,6 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.android-convention")
 }
 
@@ -34,6 +35,12 @@ kotlin {
 
                 // Provider is resolved at runtime via CryptographyProvider.Default (no compile usage).
                 runtimeOnly(libs.cryptography.provider.jdk)
+            }
+        }
+
+        nativeMain {
+            dependencies {
+                implementation(libs.cryptography.provider.openssl3.prebuilt)
             }
         }
 

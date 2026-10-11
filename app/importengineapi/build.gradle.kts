@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.pure-importer-convention")
 }
 

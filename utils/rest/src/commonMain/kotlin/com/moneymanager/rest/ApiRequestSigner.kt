@@ -364,7 +364,8 @@ private fun base64Url(json: String): String = Base64.UrlSafe.withPadding(Base64.
 
 private fun hostOf(url: String): String = url.substringAfter("://", url).substringBefore('/')
 
-private val PEM_BLOCK = Regex("-----BEGIN ([A-Z ]+)-----(.*?)-----END \\1-----", RegexOption.DOT_MATCHES_ALL)
+// `[\s\S]` rather than DOT_MATCHES_ALL, which common code (and so native) lacks.
+private val PEM_BLOCK = Regex("-----BEGIN ([A-Z ]+)-----([\\s\\S]*?)-----END \\1-----")
 
 /**
  * Restores a PEM block's line structure. A key pasted into a single-line field, or copied out of a JSON
