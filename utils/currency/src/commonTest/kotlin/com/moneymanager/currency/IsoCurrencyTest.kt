@@ -7,7 +7,9 @@ import kotlin.test.assertNull
 class IsoCurrencyTest {
     @Test
     fun `looks up bundled currencies by code`() {
-        assertEquals(IsoCurrency("GBP", "British Pound", 2), IsoCurrency.forCode("GBP"))
+        val gbp = IsoCurrency.forCode("GBP")
+        assertEquals("British Pound", gbp?.name)
+        assertEquals(2, gbp?.fractionDigits)
         assertEquals(0, IsoCurrency.forCode("JPY")?.fractionDigits)
         assertNull(IsoCurrency.forCode("ZZZ"))
     }
