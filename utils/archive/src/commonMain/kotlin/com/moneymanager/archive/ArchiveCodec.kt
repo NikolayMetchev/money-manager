@@ -37,7 +37,7 @@ object ArchiveCodec {
     ): ByteArray {
         require(password.isNotEmpty()) { "Password must not be empty" }
         val compressed = deflate(plain)
-        val salt = CryptographyRandom.Default.nextBytes(SALT_LENGTH)
+        val salt = CryptographyRandom.nextBytes(SALT_LENGTH)
         val ciphertext = cipherFor(password, salt).encrypt(compressed)
         return MAGIC + byteArrayOf(VERSION) + salt + ciphertext
     }

@@ -149,7 +149,7 @@ class ApiRequestSigner(
             mapOf(
                 "{alg}" to key.algName,
                 "{apiKey}" to apiKey,
-                "{nonceHex}" to CryptographyRandom.Default.nextBytes(JWT_NONCE_BYTES).toHex(),
+                "{nonceHex}" to CryptographyRandom.nextBytes(JWT_NONCE_BYTES).toHex(),
                 "{now}" to nowEpochSeconds.toString(),
                 "{exp}" to (nowEpochSeconds + jwt.ttlSeconds).toString(),
                 "{method}" to httpMethod,

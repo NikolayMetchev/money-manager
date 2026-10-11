@@ -2,7 +2,6 @@ package com.moneymanager.archive
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
-import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
@@ -84,11 +83,11 @@ private inline fun pump(
     val buffer = ByteArray(BUFFER_SIZE)
     source.usePinned { pinnedInput ->
         buffer.usePinned { pinnedBuffer ->
-            stream.next_in = pinnedInput.addressOf(0).reinterpret<UByteVar>()
+            stream.next_in = pinnedInput.addressOf(0).reinterpret()
             stream.avail_in = input.size.convert()
             var finished = false
             while (!finished) {
-                stream.next_out = pinnedBuffer.addressOf(0).reinterpret<UByteVar>()
+                stream.next_out = pinnedBuffer.addressOf(0).reinterpret()
                 stream.avail_out = BUFFER_SIZE.convert()
                 val result = step()
                 output.append(buffer, BUFFER_SIZE - stream.avail_out.toInt())
