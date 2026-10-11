@@ -29,7 +29,7 @@ class RuleEvaluatorTest {
     }
 
     @Test
-    fun `an absent value is blank, unequal and outside every list`() {
+    fun `an absent value is blank and unequal and outside every list`() {
         assertTrue(holds(ConditionOp.BLANK, path = "Missing cell"))
         assertTrue(holds(ConditionOp.BLANK, path = "No such column"))
         assertFalse(holds(ConditionOp.EQUALS, path = "No such column", value = ""))
@@ -65,7 +65,7 @@ class RuleEvaluatorTest {
     }
 
     @Test
-    fun `asset codes strip a suffix then alias, case-insensitively`() {
+    fun `asset codes strip a suffix then alias case-insensitively`() {
         val codes = AssetCodeRules(aliases = mapOf("xxbt" to "btc"), stripSuffixes = setOf(".F"))
         assertEquals("BTC", codes.canonical(" xxbt.f "))
         assertEquals("ETH", codes.canonical("eth"))

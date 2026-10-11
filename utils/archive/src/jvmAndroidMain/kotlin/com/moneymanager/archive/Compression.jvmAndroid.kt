@@ -29,17 +29,19 @@ internal actual fun inflate(data: ByteArray): ByteArray {
     val output = ByteArrayOutputStream(maxOf(BUFFER_SIZE, data.size * 2))
     val buffer = ByteArray(BUFFER_SIZE)
     try {
+        // An empty payload's stream ends without producing a byte, so test finished() after each call too.
         while (!inflater.finished()) {
             val count = inflater.inflate(buffer)
-            when {
-                count > 0 -> output.write(buffer, 0, count)
+            output.write(buffer, 0, count)
+            if (count == 0 && !inflater.finished()) {
                 // We never deflate with a preset dictionary; needing one means a malformed stream — and
                 // without this guard the loop would spin forever (count stays 0, finished stays false).
-                inflater.needsDictionary() -> throw IllegalArgumentException("Compressed payload requires a preset dictionary")
-                // All input consumed: normal end (incl. an empty payload). Upstream AES-GCM already
-                // authenticates these compressed bytes, so a truncated archive fails before we get here.
-                inflater.needsInput() -> break
-                else -> throw IllegalStateException("Inflater made no progress")
+                require(!inflater.needsDictionary()) { "Compressed payload requires a preset dictionary" }
+                check(inflater.needsInput()) { "Inflater made no progress" }
+                // All input consumed before the end of the stream: fine for an empty payload, a truncated
+                // stream otherwise. The native inflater applies the same rule.
+                require(data.isEmpty()) { "Compressed payload is truncated" }
+                break
             }
         }
     } finally {
