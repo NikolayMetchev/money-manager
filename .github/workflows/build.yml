@@ -343,7 +343,9 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         with:
-          command: :app:main:jvm:verifyProguardServiceProviders --stacktrace
+          # Shrink only: the keep rules and ServiceLoader providers don't depend on the optimizer, which
+          # takes most of ProGuard's ~15 minutes. Release builds (and the Windows installer job) still optimize.
+          command: :app:main:jvm:verifyProguardServiceProviders -PproguardOptimize=false --stacktrace
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
@@ -435,8 +437,10 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/qodana/caches
-          key: qodana-2026.2-refs/heads/main
-          restore-keys: qodana-2026.2-
+          # qodana-action saves its cache as `native-false-qodana-<version>-<ref>-<sha>`; a key without
+          # that prefix never matched, so every PR scan started cold.
+          key: native-false-qodana-2026.2-refs/heads/main
+          restore-keys: native-false-qodana-2026.2-refs/heads/main-
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.2
         env:

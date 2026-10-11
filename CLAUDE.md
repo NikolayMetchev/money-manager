@@ -66,6 +66,8 @@ Build-speed flags (off by default): the Android release variant (R8/minified) on
 device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compiles them anyway).
 `-PtestMaxParallelForks=N` overrides the parallel test-fork default (e.g. `=1` to serialize), and
 `-PandroidCoverage=true` enables JaCoCo coverage for instrumented tests (main-branch CI passes it).
+`-PproguardOptimize=false` skips ProGuard's optimizer in desktop release builds (the CI "Desktop ProGuard"
+check passes it: shrinking alone checks the keep rules, and the optimizer is most of ProGuard's ~15 minutes).
 `-PreleaseSmokeTest=true` builds the release variant debug-signed and enables `app/main/android-smoketest`:
 `./gradlew :app:main:android-smoketest:pixel6api36ReleaseAndroidTest -PreleaseSmokeTest=true --console=plain` installs the
 minified APK and drives first run. CI runs it only via the manual "Android Release Smoke Test" workflow (dispatch it on main or a PR branch).
