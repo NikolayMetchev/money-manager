@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.strategy.StrategyFileNaming
+import com.moneymanager.domain.strategy.StrategyKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
@@ -70,6 +71,8 @@ class LegacyStrategyUpgradeTest {
         return copy(config = config.copy(fieldMappings = reverted + currency))
     }
 
+    private val unversionedKinds = setOf(StrategyKind.PASS_THROUGH, StrategyKind.CURRENCIES)
+
     private fun resource(path: String): String =
         requireNotNull(javaClass.classLoader.getResource("legacy-v0/$path")) { "missing fixture legacy-v0/$path" }.readText()
 
@@ -77,7 +80,8 @@ class LegacyStrategyUpgradeTest {
     fun `published legacy artifacts upgrade to the current built-ins`() {
         for ((key, current) in builtInArtifacts { it.asOfLegacySnapshot() }) {
             val fileName = StrategyFileNaming.fileName(key)
-            if (fileName.endsWith(".passthrough.json") || key.name in addedAfterVersioning) continue
+            // Pass-through definitions and the currency list aren't versioned, so have no legacy shape.
+            if (key.kind in unversionedKinds || key.name in addedAfterVersioning) continue
             val legacy = resource("export/$fileName")
             assertEquals(
                 StrategyArtifactCodec.canonicalHash(key.kind, current),

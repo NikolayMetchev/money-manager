@@ -6,3 +6,16 @@ SELECT * FROM currency WHERE id = ?;
 
 selectByCode:
 SELECT * FROM currency WHERE code = ?;
+
+-- Currencies first created by the system (entity type 3 = CURRENCY, source type 4 = SYSTEM): the ones
+-- seeded with a new database or installed from the catalog's currency list, as opposed to user-created.
+selectSystemCreated:
+SELECT currency.* FROM currency
+WHERE EXISTS (
+    SELECT 1 FROM entity_source
+    WHERE entity_source.entity_type_id = 3
+      AND entity_source.entity_id = currency.id
+      AND entity_source.revision_id = 1
+      AND entity_source.source_type_id = 4
+)
+ORDER BY code;

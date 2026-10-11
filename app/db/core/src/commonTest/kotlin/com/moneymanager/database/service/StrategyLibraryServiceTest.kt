@@ -2,11 +2,15 @@
 
 package com.moneymanager.database.service
 
+import com.moneymanager.currency.IsoCurrencies
+import com.moneymanager.database.json.CurrencyListExportCodec
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.CurrencyExportEntry
+import com.moneymanager.domain.model.CurrencyListExport
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
@@ -25,6 +29,7 @@ import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.createCsvStrategy
+import com.moneymanager.importengineapi.createCurrency
 import com.moneymanager.importengineapi.deleteCsvStrategy
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInPassThroughs
@@ -178,5 +183,61 @@ class StrategyLibraryServiceTest : DbTest() {
             // The artifact hash ignores the version stamp, and the filename round-trips.
             assertEquals(entry.contentHash, library.canonicalHash(key, entry.json))
             assertEquals(key, StrategyFileNaming.parse(StrategyFileNaming.fileName(key)))
+        }
+
+    @Test
+    fun `currency list lists seeded currencies, skips user-created ones, and installs only missing codes`() =
+        runTest {
+            val library = repositories.strategyLibrary
+            val engine = repositories.importEngine
+            val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
+            engine.createCurrency("ZZZ", "Hand-made", Source.Manual)
+
+            val entry = library.listLocal(version).first { it.key == key }
+            val listed = CurrencyListExportCodec.decode(entry.json).currencies.map { it.code }
+            // Seeded GBP + the minimal test seed (USD, EUR); the user's own currency isn't part of the list.
+            assertEquals(listOf("EUR", "GBP", "USD"), listed)
+
+            val published =
+                CurrencyListExport(
+                    name = StrategyFileNaming.CURRENCIES_NAME,
+                    currencies =
+                        listOf(
+                            CurrencyExportEntry("GBP", "Renamed Pound"),
+                            CurrencyExportEntry("JPY", "Japanese Yen"),
+                            CurrencyExportEntry("ZZZ", "Published name"),
+                        ),
+                )
+            library.applyIncoming(key, CurrencyListExportCodec.encode(published), emptyMap())
+            library.applyIncoming(key, CurrencyListExportCodec.encode(published), emptyMap())
+
+            val currencies =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .associate { it.code to it.name }
+            assertEquals("Japanese Yen", currencies["JPY"], "a missing code is added")
+            assertEquals("British Pound", currencies["GBP"], "an existing currency is never renamed")
+            assertEquals("Hand-made", currencies["ZZZ"], "a user-created currency is left alone")
+            assertEquals(
+                listOf("EUR", "GBP", "JPY", "USD"),
+                library.listLocal(version).first { it.key == key }.let {
+                    CurrencyListExportCodec.decode(it.json).currencies.map { c -> c.code }
+                },
+            )
+        }
+
+    @Test
+    fun `a database seeded from the bundled table matches the published list for the same table`() =
+        runTest {
+            val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
+            val seeded = IsoCurrencies.all.filter { it.code in setOf("EUR", "GBP", "USD") }
+            val published =
+                CurrencyListExport(
+                    name = StrategyFileNaming.CURRENCIES_NAME,
+                    currencies = seeded.map { CurrencyExportEntry(it.code, it.name) }.reversed(),
+                )
+            val local = repositories.strategyLibrary.listLocal(version).first { it.key == key }
+            assertEquals(local.contentHash, repositories.strategyLibrary.canonicalHash(key, CurrencyListExportCodec.encode(published)))
         }
 }

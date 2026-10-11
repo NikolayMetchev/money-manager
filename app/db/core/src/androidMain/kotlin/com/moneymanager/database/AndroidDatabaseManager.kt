@@ -3,7 +3,7 @@ package com.moneymanager.database
 import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
-import com.moneymanager.currency.Currency
+import com.moneymanager.currency.IsoCurrency
 import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
@@ -21,9 +21,9 @@ private val DEFAULT_DB_LOCATION = DbLocation(DEFAULT_DATABASE_NAME)
  */
 class AndroidDatabaseManager(
     private val context: Context,
-    // Deferred so the platform currency list is only computed when a fresh database is seeded;
+    // Deferred so the currency list is only built when a fresh database is seeded;
     // tests inject a minimal list (see :test:app:db's createTestDatabaseManager).
-    private val currenciesToSeed: () -> List<Currency> = { DatabaseConfig.allCurrencies },
+    private val currenciesToSeed: () -> List<IsoCurrency> = { DatabaseConfig.allCurrencies },
 ) : DatabaseManager {
     override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper = openDatabaseWithProgress(location) {}
 
@@ -85,9 +85,8 @@ class AndroidDatabaseManager(
             )
             val database = MoneyManagerDatabaseWrapper(driver)
 
-            // Lookups, the system device, GBP and the built-in strategies are seeded inside Schema.create
-            // (the :app:db:seed module). The remaining currencies are platform-dependent, so they are
-            // seeded here at runtime for a freshly created database.
+            // Lookups, the system device and GBP are seeded inside Schema.create (the :app:db:seed module);
+            // the rest of the bundled ISO 4217 list is seeded here for a freshly created database.
             onProgress(DatabaseInitializationProgress("Applying database settings...", 4, 6))
             if (isNewDatabase) {
                 onProgress(DatabaseInitializationProgress("Adding default currencies...", 5, 6))

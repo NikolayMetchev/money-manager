@@ -370,6 +370,7 @@ private val kindFilterChips =
         StrategyKind.XLSX to "Excel",
         StrategyKind.API to "API",
         StrategyKind.PASS_THROUGH to "Pass-through",
+        StrategyKind.CURRENCIES to "Currencies",
     )
 
 private fun StrategyKind.displayName(): String =
@@ -380,4 +381,5 @@ private fun StrategyKind.displayName(): String =
         StrategyKind.API -> "API import strategy"
         StrategyKind.PASS_THROUGH -> "Pass-through definition"
         StrategyKind.GLOBAL_MAPPINGS -> "Global account mappings"
+        StrategyKind.CURRENCIES -> "Currency list"
     }

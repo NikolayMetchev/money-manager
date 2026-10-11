@@ -19,7 +19,7 @@ open class DbTest {
     protected lateinit var repositories: DatabaseComponent
     protected lateinit var entitySourceQueries: EntitySourceWriteQueries
 
-    /** Override (= true) in tests that assert against the full platform currency list. */
+    /** Override (= true) in tests that assert against the full bundled currency list. */
     protected open val seedAllCurrencies: Boolean = false
 
     /**

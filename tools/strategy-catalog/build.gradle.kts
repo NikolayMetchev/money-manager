@@ -16,6 +16,7 @@ dependencies {
     implementation(projects.app.model.passthrough)
     implementation(projects.app.strategies)
     implementation(projects.app.strategycatalog)
+    implementation(projects.utils.currency)
 
     testImplementation(projects.app.model.rules)
     testImplementation(kotlin("test"))
@@ -29,4 +30,14 @@ tasks.register<JavaExec>("generateCatalogSite") {
     val webpagePath = rootDir.resolve("webpage").absolutePath
     outputs.dir(rootDir.resolve("webpage/strategy-library"))
     args("generate", webpagePath)
+}
+
+tasks.register<JavaExec>("generateBundledCurrencies") {
+    group = "build"
+    description = "Regenerates utils/currency's bundled ISO 4217 table (IsoCurrencies.kt) from java.util.Currency. Run by hand."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.moneymanager.tools.strategycatalog.StrategyCatalogToolKt")
+    val target = rootDir.resolve("utils/currency/src/commonMain/kotlin/com/moneymanager/currency/IsoCurrencies.kt")
+    outputs.file(target)
+    args("currencies", target.absolutePath)
 }

@@ -3,9 +3,12 @@ package com.moneymanager.database.service
 import com.moneymanager.database.json.AccountMappingExportCodec
 import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
+import com.moneymanager.database.json.CurrencyListExportCodec
 import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.CurrencyExportEntry
+import com.moneymanager.domain.model.CurrencyListExport
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.isQifStrategy
@@ -16,6 +19,7 @@ import com.moneymanager.domain.model.passthrough.export.PassThroughExport
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.strategy.CsvReferenceType
 import com.moneymanager.domain.strategy.CsvResolution
@@ -29,7 +33,9 @@ import com.moneymanager.domain.strategy.StrategyParseResult
 import com.moneymanager.importengineapi.AccountMappingMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportCurrencyIntent
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.LocalCurrencyKey
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.createPassThroughAccount
 import com.moneymanager.importengineapi.updateApiStrategy
@@ -46,6 +52,7 @@ class StrategyLibraryService(
     private val apiStrategyRepository: ApiImportStrategyReadRepository,
     private val accountMappingRepository: AccountMappingReadRepository,
     private val passThroughAccountRepository: PassThroughAccountReadRepository,
+    private val currencyRepository: CurrencyReadRepository,
     private val csvStrategyExportService: CsvStrategyExportService,
     private val apiStrategyExportService: ApiStrategyExportService,
     private val accountMappingExportService: AccountMappingExportService,
@@ -81,6 +88,18 @@ class StrategyLibraryService(
             entries += entry(StrategyKey(StrategyKind.GLOBAL_MAPPINGS, StrategyFileNaming.GLOBAL_MAPPINGS_NAME), json)
         }
 
+        val listCurrencies = currencyRepository.getSystemCreatedCurrencies().first()
+        if (listCurrencies.isNotEmpty()) {
+            val export =
+                CurrencyListExport(
+                    version = appVersion.value,
+                    name = StrategyFileNaming.CURRENCIES_NAME,
+                    currencies = listCurrencies.map { CurrencyExportEntry(it.code, it.name) },
+                )
+            entries +=
+                entry(StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME), CurrencyListExportCodec.encode(export))
+        }
+
         return entries
     }
 
@@ -94,8 +113,8 @@ class StrategyLibraryService(
                 val refs = csvStrategyExportService.parseExport(export).unresolvedReferences
                 StrategyParseResult(key, refs)
             }
-            // API strategies and pass-through definitions carry no entity references to resolve.
-            StrategyKind.API, StrategyKind.PASS_THROUGH -> StrategyParseResult(key, emptyList())
+            // API strategies, pass-through definitions and the currency list carry no entity references to resolve.
+            StrategyKind.API, StrategyKind.PASS_THROUGH, StrategyKind.CURRENCIES -> StrategyParseResult(key, emptyList())
             StrategyKind.GLOBAL_MAPPINGS -> {
                 val export = AccountMappingExportCodec.decode(json)
                 val refs =
@@ -116,7 +135,32 @@ class StrategyLibraryService(
             StrategyKind.API -> applyApi(key.name, json)
             StrategyKind.PASS_THROUGH -> applyPassThrough(key.name, json)
             StrategyKind.GLOBAL_MAPPINGS -> applyGlobalMappings(json, resolutions)
+            StrategyKind.CURRENCIES -> applyCurrencies(json)
         }
+    }
+
+    /**
+     * Union semantics: adds every listed code the database lacks, as SYSTEM so it joins the local list.
+     * Existing currencies are never renamed or removed (transfers reference them), so a code dropped
+     * from the published list keeps the local list differing until the user deletes it.
+     */
+    private suspend fun applyCurrencies(json: String) {
+        val existing =
+            currencyRepository
+                .getAllCurrencies()
+                .first()
+                .map { it.code }
+                .toSet()
+        val missing = CurrencyListExportCodec.decode(json).currencies.filter { it.code !in existing }
+        if (missing.isEmpty()) return
+        importEngine.import(
+            ImportBatch(
+                currencies =
+                    missing.map {
+                        ImportCurrencyIntent(key = LocalCurrencyKey(it.code), source = Source.System, code = it.code, name = it.name)
+                    },
+            ),
+        )
     }
 
     private suspend fun applyCsv(

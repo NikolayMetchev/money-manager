@@ -24,6 +24,13 @@ class CurrencyReadRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map(CurrencyMapper::mapList)
 
+    override fun getSystemCreatedCurrencies(): Flow<List<Currency>> =
+        selectQueries
+            .selectSystemCreated()
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map(CurrencyMapper::mapList)
+
     override fun getCurrencyById(id: CurrencyId): Flow<Currency?> =
         selectQueries
             .selectById(id.id)

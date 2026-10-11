@@ -48,7 +48,17 @@ class StrategyCatalogToolTest {
     @Test
     fun `the catalog covers all built-in kinds`() {
         val kinds = builtInArtifacts().keys.map { it.kind }.toSet()
-        assertEquals(setOf(StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX, StrategyKind.API, StrategyKind.PASS_THROUGH), kinds)
+        assertEquals(
+            setOf(
+                StrategyKind.CSV,
+                StrategyKind.QIF,
+                StrategyKind.XLSX,
+                StrategyKind.API,
+                StrategyKind.PASS_THROUGH,
+                StrategyKind.CURRENCIES,
+            ),
+            kinds,
+        )
     }
 
     @Test

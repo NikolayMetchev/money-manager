@@ -16,20 +16,11 @@ actual class Currency actual constructor(
             currency = javaCurrency
         }
 
-    actual val displayName: String
-        get() = javaCurrency.displayName
-
     actual fun format(amount: Number): String = formatter.format(amount)
 
     actual fun format(amount: BigDecimal): String = formatter.format(java.math.BigDecimal(amount.toString()))
 
     actual companion object {
-        actual fun getAllCurrencies(): List<Currency> =
-            JavaCurrency
-                .getAvailableCurrencies()
-                .map { Currency(it.currencyCode) }
-                .sortedBy { it.code }
-
         actual fun getDefaultCurrencyCode(): String? =
             try {
                 JavaCurrency.getInstance(Locale.getDefault()).currencyCode

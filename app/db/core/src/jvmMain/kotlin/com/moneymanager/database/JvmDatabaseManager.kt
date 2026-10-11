@@ -1,6 +1,6 @@
 package com.moneymanager.database
 
-import com.moneymanager.currency.Currency
+import com.moneymanager.currency.IsoCurrency
 import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DEFAULT_DATABASE_PATH
@@ -21,9 +21,9 @@ private val DbLocation.jdbcUrl: String
  * Stateless - does not track open databases.
  */
 class JvmDatabaseManager(
-    // Deferred so the platform currency list is only computed when a fresh database is seeded;
+    // Deferred so the currency list is only built when a fresh database is seeded;
     // tests inject a minimal list (see :test:app:db's createTestDatabaseManager).
-    private val currenciesToSeed: () -> List<Currency> = { DatabaseConfig.allCurrencies },
+    private val currenciesToSeed: () -> List<IsoCurrency> = { DatabaseConfig.allCurrencies },
 ) : DatabaseManager {
     override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper = openDatabaseWithProgress(location) {}
 
@@ -73,9 +73,8 @@ class JvmDatabaseManager(
                 onProgress(DatabaseInitializationProgress("Checking the database schema...", 5, 7))
             }
 
-            // Lookups, the system device, GBP and the built-in strategies are seeded inside Schema.create
-            // (the :app:db:seed module). The remaining currencies are platform-dependent (java.util.Currency
-            // differs JVM vs Android), so they are seeded here at runtime for a freshly created database.
+            // Lookups, the system device and GBP are seeded inside Schema.create (the :app:db:seed module);
+            // the rest of the bundled ISO 4217 list is seeded here for a freshly created database.
             val database = MoneyManagerDatabaseWrapper(driver)
 
             if (isNewDatabase) {

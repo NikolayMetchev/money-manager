@@ -31,6 +31,8 @@ object StrategyArtifactCodec {
                     AccountMappingExportCodec.encode(AccountMappingExportCodec.decode(json).copy(version = ""))
                 StrategyKind.PASS_THROUGH ->
                     PassThroughExportCodec.encode(PassThroughExportCodec.decode(json).copy(version = ""))
+                StrategyKind.CURRENCIES ->
+                    CurrencyListExportCodec.encode(CurrencyListExportCodec.decode(json).copy(version = ""))
             }
         return contentHash(canonical)
     }
@@ -48,6 +50,7 @@ object StrategyArtifactCodec {
             StrategyKind.API -> ApiStrategyExportCodec.decode(json).name
             StrategyKind.GLOBAL_MAPPINGS -> StrategyFileNaming.GLOBAL_MAPPINGS_NAME
             StrategyKind.PASS_THROUGH -> PassThroughExportCodec.decode(json).name
+            StrategyKind.CURRENCIES -> CurrencyListExportCodec.decode(json).name
         }
 
     fun canonicalHash(

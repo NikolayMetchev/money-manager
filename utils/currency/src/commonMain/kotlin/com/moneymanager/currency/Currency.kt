@@ -16,11 +16,6 @@ expect class Currency(
     val code: String
 
     /**
-     * The display name of the currency (e.g., "US Dollar" for USD).
-     */
-    val displayName: String
-
-    /**
      * Formats the given amount as a currency string.
      *
      * @param amount The numeric amount to format
@@ -37,13 +32,6 @@ expect class Currency(
     fun format(amount: BigDecimal): String
 
     companion object {
-        /**
-         * Returns all available ISO 4217 currencies.
-         *
-         * @return List of all available currencies sorted by code
-         */
-        fun getAllCurrencies(): List<Currency>
-
         /**
          * Returns the ISO 4217 currency code for the device's default locale,
          * or null if unavailable.

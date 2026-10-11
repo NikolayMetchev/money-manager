@@ -423,4 +423,5 @@ private fun StrategyKey.displayLabel(): String =
         StrategyKind.XLSX -> "$name (Excel)"
         StrategyKind.API -> "$name (API)"
         StrategyKind.PASS_THROUGH -> "$name (Pass-through)"
+        StrategyKind.CURRENCIES -> "$name (Currencies)"
     }

@@ -10,7 +10,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CurrencyRepositoryImplTest : DbTest() {
-    // These tests assert against the full platform currency list, so opt out of the
+    // These tests assert against the full bundled currency list, so opt out of the
     // minimal test seeding.
     override val seedAllCurrencies: Boolean = true
 
