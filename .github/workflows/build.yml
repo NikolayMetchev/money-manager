@@ -83,6 +83,9 @@ jobs:
           # jvmTest down to ~1-2 min.
           # `build` also runs linuxX64Test natively.
           command: build koverXmlReport --stacktrace
+          # The only Linux job that saves Gradle User Home (from main). Every other Linux job is
+          # read-only and restores this entry, so they don't each save their own dependency and
+          # transform entries and evict it from the 10 GB Actions cache.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
           kotlin-native: 'true'
@@ -115,7 +118,9 @@ jobs:
         uses: ./.github/actions/gradle-run
         with:
           command: linkDebugTestLinuxArm64 --stacktrace
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          # Gradle User Home stays read-only (restored from the build job), but ~/.konan is saved
+          # from main: this link needs the aarch64 sysroot, which the build job's toolchain lacks.
+          kotlin-native-cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
           kotlin-native: 'true'
 
@@ -169,6 +174,7 @@ jobs:
         uses: ./.github/actions/gradle-run
         with:
           command: macosArm64Test --stacktrace
+          # The only macOS job, so it saves Gradle User Home and ~/.konan (from main only).
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
           kotlin-native: 'true'
@@ -194,6 +200,8 @@ jobs:
           # Selecting a task by name configures every project, and :app:main:jvm's Compose WiX setup
           # breaks isolated projects on Windows (https://youtrack.jetbrains.com/issue/CMP-8375).
           command: mingwX64Test -Dorg.gradle.isolated-projects=false --stacktrace
+          # The Windows job that saves Gradle User Home and ~/.konan (from main only); the
+          # main-only installer job restores its entry read-only.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
           kotlin-native: 'true'
@@ -222,11 +230,13 @@ jobs:
       - name: Setup Gradle environment
         uses: ./.github/actions/gradle-setup
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          # Read-only (the action's default): restores the build job's Gradle User Home.
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
-      - name: AVD cache
-        uses: actions/cache@v6
+      # Restore on every ref, save only from main (below): a ~2 GB snapshot saved from a PR's merge
+      # ref can't be restored by main or any other PR, and only pushes the shared entries out.
+      - name: Restore AVD cache
+        uses: actions/cache/restore@v6
         id: avd-cache
         with:
           path: |
@@ -254,6 +264,17 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: echo "Generated AVD snapshot for caching."
+
+      - name: Save AVD cache
+        if: github.ref == 'refs/heads/main' && steps.avd-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          # Android emulator API level sync: update with the Gradle managed device,
+          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
+          key: ${{ steps.avd-cache.outputs.cache-primary-key }}
 
       - name: Run Android instrumented tests
         timeout-minutes: 20
@@ -316,7 +337,6 @@ jobs:
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         with:
           command: buildHealth --stacktrace
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
   desktop-proguard:
@@ -346,7 +366,6 @@ jobs:
           # Shrink only: the keep rules and ServiceLoader providers don't depend on the optimizer, which
           # takes most of ProGuard's ~15 minutes. Release builds (and the Windows installer job) still optimize.
           command: :app:main:jvm:verifyProguardServiceProviders -PproguardOptimize=false --stacktrace
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
   desktop-windows-installer:
@@ -399,7 +418,6 @@ jobs:
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         with:
           command: :app:main:android:assembleRelease -PbuildRelease=true --stacktrace
-          cache-read-only: false
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
   qodana:
@@ -430,7 +448,6 @@ jobs:
         uses: ./.github/actions/gradle-run
         with:
           command: jvmMainClasses
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
       - name: Restore Qodana cache (read-only on non-main branches)
         if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/releases/')

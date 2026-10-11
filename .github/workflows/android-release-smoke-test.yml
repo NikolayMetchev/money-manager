@@ -40,8 +40,9 @@ jobs:
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
       # Same key as build.yml's android-test job, so the snapshot it saves on main is reused here.
-      - name: AVD cache
-        uses: actions/cache@v6
+      # Saved only from main (below), since a dispatch on a PR branch saves a branch-scoped entry.
+      - name: Restore AVD cache
+        uses: actions/cache/restore@v6
         id: avd-cache
         with:
           path: |
@@ -67,6 +68,17 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: echo "Generated AVD snapshot for caching."
+
+      - name: Save AVD cache
+        if: github.ref == 'refs/heads/main' && steps.avd-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          # Android emulator API level sync: update with the Gradle managed device,
+          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
+          key: ${{ steps.avd-cache.outputs.cache-primary-key }}
 
       # Build before booting the emulator, so the R8 build's minutes aren't spent with it idling.
       - name: Build release APK and smoke test APK

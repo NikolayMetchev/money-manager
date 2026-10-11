@@ -3,9 +3,14 @@ description: 'Sets up JDK and Gradle for builds'
 
 inputs:
   cache-read-only:
-    description: 'Whether the Gradle cache should be read-only'
+    description: >-
+      Whether the Gradle cache should be read-only. Defaults to 'true': only one job per runner OS
+      (build.yml's build, native-macos and native-windows) writes Gradle User Home entries, and only
+      from main, so the repo's 10 GB Actions cache isn't filled with near-duplicate dependency and
+      transform entries that evict the ones every job restores. Read-only jobs restore the latest
+      entry saved for their OS.
     required: false
-    default: 'false'
+    default: 'true'
   cache-encryption-key:
     description: 'AES key for configuration-cache data; empty disables config-cache save/restore'
     required: false
@@ -14,6 +19,13 @@ inputs:
     description: 'Whether to restore (and, unless read-only, save) the Kotlin/Native toolchain in ~/.konan'
     required: false
     default: 'false'
+  kotlin-native-cache-read-only:
+    description: >-
+      Whether the ~/.konan cache is read-only; empty follows cache-read-only. Lets a job that writes
+      no Gradle User Home entry still save its own toolchain (the linuxArm64 link needs a sysroot
+      the build job never downloads).
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -53,7 +65,7 @@ runs:
       run: echo "version=$(sed -nE 's/^kotlin = "([^"]+)"/\1/p' gradle/libs.versions.toml)" >> "$GITHUB_OUTPUT"
 
     - name: Restore Kotlin/Native toolchain
-      if: inputs.kotlin-native == 'true' && inputs.cache-read-only == 'true'
+      if: inputs.kotlin-native == 'true' && (inputs.kotlin-native-cache-read-only || inputs.cache-read-only) == 'true'
       uses: actions/cache/restore@v6
       with:
         path: ~/.konan
@@ -61,7 +73,7 @@ runs:
         restore-keys: konan-${{ runner.os }}-${{ runner.arch }}-${{ steps.kotlin-version.outputs.version }}-
 
     - name: Cache Kotlin/Native toolchain
-      if: inputs.kotlin-native == 'true' && inputs.cache-read-only != 'true'
+      if: inputs.kotlin-native == 'true' && (inputs.kotlin-native-cache-read-only || inputs.cache-read-only) != 'true'
       uses: actions/cache@v6
       with:
         path: ~/.konan
