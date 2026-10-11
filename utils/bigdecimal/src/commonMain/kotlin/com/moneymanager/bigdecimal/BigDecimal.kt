@@ -42,13 +42,8 @@ expect class BigDecimal : Comparable<BigDecimal> {
     operator fun times(multiplicand: BigDecimal): BigDecimal
 
     /**
-     * Returns a BigDecimal whose value is (this / divisor).
-     */
-    operator fun div(divisor: BigDecimal): BigDecimal
-
-    /**
-     * Returns a BigDecimal whose value is this × 10^-n. Exact — unlike [div], which rounds to a
-     * fixed scale — so it is the right way to convert integer minor units to a display value.
+     * Returns a BigDecimal whose value is this × 10^-n. Exact, so it is the right way to convert
+     * integer minor units to a display value.
      */
     fun movePointLeft(n: Int): BigDecimal
 

@@ -148,9 +148,9 @@ class ApiStrategyEditorStateTest {
                                 ),
                             stripSuffixes = setOf(".F", ".S", ".M"),
                         ),
-                    minorUnitDivisorOverrides =
+                    minorUnitDecimalPlaces =
                         mapOf(
-                            "GBP" to 1000L,
+                            "GBP" to 3,
                         ),
                     requestSigning =
                         ApiRequestSigningConfig(

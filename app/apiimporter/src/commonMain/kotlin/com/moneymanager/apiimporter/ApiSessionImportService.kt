@@ -13,7 +13,7 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.IsoMinorUnitDivisors
+import com.moneymanager.domain.model.IsoMinorUnitDecimals
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -1883,7 +1883,7 @@ private suspend fun prepareValidTransactionItem(
             requestId = context.requestId,
             jsonPath = item.counterpartyJsonPath(setup.strategy.config.peopleMappings),
         )
-    val data = item.toTransferData(currency, setup.strategy.config.minorUnitDivisorOverrides)
+    val data = item.toTransferData(currency, setup.strategy.config.minorUnitDecimalPlaces)
     // A pass-through (conduit) charge such as Curve, detected from the description (e.g. "CRV*…"). An
     // outgoing spend becomes the funding leg own -> conduit and the engine adds the spend leg conduit ->
     // merchant; an incoming refund/cancellation ("Refund: CRV*…") runs both legs the other way. Detection
@@ -1979,7 +1979,7 @@ private suspend fun prepareValidTransactionItem(
                             minorUnitsToMoney(
                                 parsed.minorUnits.absoluteValue,
                                 foreignCurrency,
-                                setup.strategy.config.minorUnitDivisorOverrides,
+                                setup.strategy.config.minorUnitDecimalPlaces,
                             )
                         parsed.decimalMajor != null -> Money.fromDisplayValue(parsed.decimalMajor, foreignCurrency)
                         else -> null
@@ -2077,7 +2077,7 @@ private suspend fun buildImportFee(
     val feeMoney =
         when {
             item.feeAmountMinorUnits != null ->
-                minorUnitsToMoney(item.feeAmountMinorUnits.absoluteValue, feeCurrency, setup.strategy.config.minorUnitDivisorOverrides)
+                minorUnitsToMoney(item.feeAmountMinorUnits.absoluteValue, feeCurrency, setup.strategy.config.minorUnitDecimalPlaces)
             item.feeAmountDecimalMajor != null -> Money.fromDisplayValue(item.feeAmountDecimalMajor, feeCurrency)
             else -> return null
         }
@@ -3197,26 +3197,25 @@ private data class TransferData(
  * meaning £12.34) into [Money] at the app's storage precision. Constructing `Money` directly from
  * the raw integer would treat it as already being in the app's own (much higher) storage scale,
  * silently truncating every amount toward zero — the provider's minor-unit width and the app's
- * storage scale are unrelated (see [IsoMinorUnitDivisors]). [divisorOverrides] lets a strategy correct
- * a provider that doesn't follow the ISO standard for a given currency.
+ * storage scale are unrelated (see [IsoMinorUnitDecimals]). [decimalPlacesOverrides] lets a strategy
+ * correct a provider that doesn't follow the ISO standard for a given currency.
  */
 internal fun minorUnitsToMoney(
     rawMinorUnits: Long,
     currency: Currency,
-    divisorOverrides: Map<String, Long>,
+    decimalPlacesOverrides: Map<String, Int>,
 ): Money {
-    val divisor = divisorOverrides[currency.code.uppercase()] ?: IsoMinorUnitDivisors.getDivisor(currency.code)
-    val displayValue = BigDecimal(rawMinorUnits) / BigDecimal(divisor)
-    return Money.fromDisplayValue(displayValue, currency)
+    val decimalPlaces = decimalPlacesOverrides[currency.code.uppercase()] ?: IsoMinorUnitDecimals.getDecimalPlaces(currency.code)
+    return Money.fromDisplayValue(BigDecimal(rawMinorUnits).movePointLeft(decimalPlaces), currency)
 }
 
 private fun ApiTransactionPageItem.toTransferData(
     currency: Currency,
-    minorUnitDivisorOverrides: Map<String, Long>,
+    minorUnitDecimalPlaces: Map<String, Int>,
 ): TransferData {
     val money =
         when {
-            amountMinorUnits != null -> minorUnitsToMoney(amountMinorUnits.absoluteValue, currency, minorUnitDivisorOverrides)
+            amountMinorUnits != null -> minorUnitsToMoney(amountMinorUnits.absoluteValue, currency, minorUnitDecimalPlaces)
             amountDecimalMajor != null -> Money.fromDisplayValue(amountDecimalMajor, currency)
             else -> Money(0L, currency)
         }

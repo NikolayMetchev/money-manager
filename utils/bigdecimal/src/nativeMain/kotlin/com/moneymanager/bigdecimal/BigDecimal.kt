@@ -2,8 +2,6 @@ package com.moneymanager.bigdecimal
 
 import com.ionspin.kotlin.bignum.integer.BigInteger as IonBigInteger
 
-private const val DIVISION_SCALE = 10
-
 /**
  * Native implementation of BigDecimal, reproducing java.math.BigDecimal exactly.
  *
@@ -34,25 +32,6 @@ actual class BigDecimal internal constructor(
 
     actual operator fun times(multiplicand: BigDecimal): BigDecimal =
         BigDecimal(unscaled.multiply(multiplicand.unscaled), scale + multiplicand.scale)
-
-    /** java `divide(divisor, 10, RoundingMode.HALF_UP)`. */
-    actual operator fun div(divisor: BigDecimal): BigDecimal {
-        if (divisor.unscaled.isZero()) {
-            throw ArithmeticException(if (unscaled.isZero()) "Division undefined" else "Division by zero")
-        }
-        val exponent = DIVISION_SCALE + divisor.scale - scale
-        val numerator = if (exponent >= 0) unscaled.multiply(powerOfTen(exponent)) else unscaled
-        val denominator = if (exponent >= 0) divisor.unscaled else divisor.unscaled.multiply(powerOfTen(-exponent))
-        val (quotient, remainder) = numerator.divrem(denominator)
-        val roundAwayFromZero = remainder.abs().multiply(IonBigInteger.TWO) >= denominator.abs()
-        val rounded =
-            if (roundAwayFromZero) {
-                quotient.add(IonBigInteger.fromInt(numerator.signum() * denominator.signum()))
-            } else {
-                quotient
-            }
-        return BigDecimal(rounded, DIVISION_SCALE)
-    }
 
     actual fun movePointLeft(n: Int): BigDecimal {
         if (n == 0) return this

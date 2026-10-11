@@ -189,7 +189,7 @@ class ApiStrategyJsonCodecTest {
                 rateLimitBackoffMillis = 5_000L,
                 maxRateLimitRetries = 6,
                 assetCodes = AssetCodeRules(aliases = mapOf("XXBT" to "BTC", "ZUSD" to "USD"), stripSuffixes = setOf(".F", ".S", ".M")),
-                minorUnitDivisorOverrides = mapOf("GBP" to 1000L),
+                minorUnitDecimalPlaces = mapOf("GBP" to 3),
                 // dataEndpoints is decoded in canonical (sorted-by kind/path/responseArrayKey) order -
                 // see SortedDataEndpointListSerializer - so the entries are listed here in that same
                 // order: DEPOSITS "0/private/DepositStatus" < DEPOSITS "0/private/Ledgers" < TRADES.

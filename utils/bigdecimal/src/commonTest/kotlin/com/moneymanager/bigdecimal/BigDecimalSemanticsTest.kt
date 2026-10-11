@@ -12,45 +12,6 @@ import kotlin.test.assertNotEquals
  */
 class BigDecimalSemanticsTest {
     @Test
-    fun div_roundsHalfUpAtScaleTen() {
-        assertEquals("0.3333333333", (BigDecimal(1) / BigDecimal(3)).toString())
-        assertEquals("0.6666666667", (BigDecimal(2) / BigDecimal(3)).toString())
-        assertEquals("-0.6666666667", (BigDecimal(-2) / BigDecimal(3)).toString())
-        assertEquals("-0.6666666667", (BigDecimal(2) / BigDecimal(-3)).toString())
-        assertEquals("0.6666666667", (BigDecimal(-2) / BigDecimal(-3)).toString())
-    }
-
-    @Test
-    fun div_roundsExactHalvesAwayFromZero() {
-        // 0.00000000005 sits exactly on the half at scale 10.
-        assertEquals("0.0000000001", (BigDecimal("0.0000000001") / BigDecimal(2)).toString())
-        assertEquals("-0.0000000001", (BigDecimal("-0.0000000001") / BigDecimal(2)).toString())
-        assertEquals("0", (BigDecimal("0.00000000004") / BigDecimal(1)).toString())
-        assertEquals("0.0000000001", (BigDecimal("0.00000000005") / BigDecimal(1)).toString())
-        assertEquals("-0.0000000001", (BigDecimal("-0.00000000005") / BigDecimal(1)).toString())
-        assertEquals("0", (BigDecimal("-0.00000000004") / BigDecimal(1)).toString())
-    }
-
-    @Test
-    fun div_handlesDivisorWithLargerScaleThanDividend() {
-        assertEquals("40000", (BigDecimal(100) / BigDecimal("0.0025")).toString())
-        assertEquals("33.3333333333", (BigDecimal(1) / BigDecimal("0.03")).toString())
-        assertEquals("0.0000000123", (BigDecimal("0.000000012345") / BigDecimal("1.0000")).toString())
-    }
-
-    @Test
-    fun div_handlesNegativeScaleOperands() {
-        assertEquals("250", (BigDecimal("1E+3") / BigDecimal(4)).toString())
-        assertEquals("0.004", (BigDecimal(4) / BigDecimal("1E+3")).toString())
-    }
-
-    @Test
-    fun div_byZeroThrowsArithmeticException() {
-        assertFailsWith<ArithmeticException> { BigDecimal(1) / BigDecimal.ZERO }
-        assertFailsWith<ArithmeticException> { BigDecimal.ZERO / BigDecimal("0.00") }
-    }
-
-    @Test
     fun toString_stripsTrailingZerosInPlainNotation() {
         assertEquals("100.5", BigDecimal("100.500").toString())
         assertEquals("100", BigDecimal("100").toString())

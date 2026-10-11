@@ -48,14 +48,6 @@ class BigDecimalTest {
     }
 
     @Test
-    fun div_dividesTwoValues() {
-        val a = BigDecimal("100")
-        val b = BigDecimal("4")
-        val result = a / b
-        assertEquals("25", result.toString())
-    }
-
-    @Test
     fun unaryMinus_negatesValue() {
         val a = BigDecimal("100.50")
         val result = -a
@@ -89,15 +81,6 @@ class BigDecimalTest {
     }
 
     @Test
-    fun divisionByScaleFactor_maintainsPrecision() {
-        // Simulate converting 12345 pence to pounds (£123.45)
-        val pence = BigDecimal(12345L)
-        val scaleFactor = BigDecimal(100)
-        val pounds = pence / scaleFactor
-        assertEquals("123.45", pounds.toString())
-    }
-
-    @Test
     fun multiplicationByScaleFactor_maintainsPrecision() {
         // Simulate converting £123.45 to pence (12345)
         val pounds = BigDecimal("123.45")
@@ -108,7 +91,6 @@ class BigDecimalTest {
 
     @Test
     fun movePointLeft_isExactAtEighteenDecimals() {
-        // div rounds to a fixed scale of 10, so it cannot convert 18-decimal minor units; movePointLeft can.
         val wei = BigDecimal("123456789012345678901")
         assertEquals("123.456789012345678901", wei.movePointLeft(18).toString())
         assertEquals("0.000000000000000001", BigDecimal(1).movePointLeft(18).toString())

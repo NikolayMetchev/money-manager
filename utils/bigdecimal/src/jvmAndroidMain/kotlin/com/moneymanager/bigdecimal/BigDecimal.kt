@@ -2,8 +2,6 @@
 
 package com.moneymanager.bigdecimal
 
-import java.math.RoundingMode
-
 /**
  * JVM and Android implementation of BigDecimal using java.math.BigDecimal.
  */
@@ -31,8 +29,6 @@ actual class BigDecimal : Comparable<BigDecimal> {
     actual operator fun minus(subtrahend: BigDecimal): BigDecimal = BigDecimal(value.subtract(subtrahend.value))
 
     actual operator fun times(multiplicand: BigDecimal): BigDecimal = BigDecimal(value.multiply(multiplicand.value))
-
-    actual operator fun div(divisor: BigDecimal): BigDecimal = BigDecimal(value.divide(divisor.value, 10, RoundingMode.HALF_UP))
 
     actual fun movePointLeft(n: Int): BigDecimal = BigDecimal(value.movePointLeft(n))
 
