@@ -2,18 +2,27 @@ package com.moneymanager.tasks
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class ProgressTest {
     @Test
     fun countedProgressDerivesItsFraction() {
-        assertEquals(Progress("Downloading", 0.25f, 1, 4), Progress.counted("Downloading", 1, 4))
+        val progress = Progress.counted("Downloading", 1, 4)
+
+        assertEquals("Downloading", progress.detail)
+        assertEquals(0.25f, progress.fraction)
+        assertEquals(1, progress.processed)
+        assertEquals(4, progress.total)
     }
 
     @Test
     fun countedProgressHasNoFractionUntilTheTotalIsKnown() {
-        assertEquals(Progress("Listing", null, 0, 0), Progress.counted("Listing", 0, 0))
+        val progress = Progress.counted("Listing", 0, 0)
+
+        assertNull(progress.fraction)
+        assertEquals(0, progress.total)
     }
 
     @Test

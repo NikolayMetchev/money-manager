@@ -15,13 +15,12 @@ import kotlin.math.roundToLong
  * [Progress.processed]/[Progress.total], and a detail naming the item: `File 2 of 5 — b.csv: phase`.
  */
 class WeightedProgress(
-    weights: List<Int>,
+    private val weights: List<Int>,
     private val itemNoun: String = "File",
     private val onProgress: suspend (Progress) -> Unit,
 ) {
     private val itemCount = weights.size
     private val unitsBefore = weights.runningFold(0L) { acc, weight -> acc + weight }
-    private val weights = weights
     private val unitsTotal = unitsBefore.last()
     private var lastFraction = 0f
 

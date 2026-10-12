@@ -153,7 +153,7 @@ class TaskManager(
         finalDetail: (T) -> String?,
     ): T {
         try {
-            val result = supervisorScope { TaskScopeImpl(this, task.id).block() }
+            val result = supervisorScope { block(TaskScopeImpl(this, task.id)) }
             finish(task, TaskStatus.SUCCEEDED, finalDetail(result))
             return result
         } catch (cancelled: CancellationException) {
