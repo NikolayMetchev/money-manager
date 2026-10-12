@@ -2,9 +2,9 @@
 
 package com.moneymanager.compose.filepicker
 
-import com.moneymanager.localsettings.JvmLocalSettings
 import com.moneymanager.localsettings.KEY_LAST_DIRECTORY
 import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.localsettings.desktopLocalSettings
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -12,7 +12,7 @@ import java.io.FilenameFilter
 import kotlin.time.Instant
 
 /** Remembers the directory last used in a file dialog so subsequent dialogs reopen there. */
-internal val localSettings: LocalSettings = JvmLocalSettings()
+internal val localSettings: LocalSettings = desktopLocalSettings
 
 actual class FilePickerLauncher(
     private val mimeTypes: List<String>,
