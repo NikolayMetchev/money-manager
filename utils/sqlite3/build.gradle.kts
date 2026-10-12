@@ -13,6 +13,7 @@ val sqliteAmalgamation = libs.versions.sqlite.amalgamation
 val sqliteRelease = sqliteAmalgamation.release.get()
 val downloadSqliteAmalgamation =
     tasks.register<DownloadSqliteAmalgamationTask>("downloadSqliteAmalgamation") {
+        description = "Downloads the pinned SQLite amalgamation and verifies its SHA-256."
         url.set("https://www.sqlite.org/${sqliteAmalgamation.year.get()}/sqlite-amalgamation-$sqliteRelease.zip")
         sha256.set(sqliteAmalgamation.sha256)
         outputDirectory.set(layout.buildDirectory.dir("sqlite-amalgamation/$sqliteRelease"))
@@ -46,6 +47,7 @@ kotlin {
         val libraryDirectory = layout.buildDirectory.dir("sqlite/${target.name}")
         val compileSqlite =
             tasks.register<CompileBundledSqliteTask>("compileSqlite$targetName") {
+                description = "Compiles the SQLite amalgamation into a static library for ${target.name}."
                 amalgamationDirectory.set(downloadSqliteAmalgamation.flatMap { it.outputDirectory })
                 konanTarget.set(target.konanTarget.name)
                 kotlinVersion.set(getKotlinPluginVersion())
