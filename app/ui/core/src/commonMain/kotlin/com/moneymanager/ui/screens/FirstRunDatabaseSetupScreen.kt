@@ -31,8 +31,9 @@ import com.moneymanager.domain.model.remoteCacheLocation
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
+import com.moneymanager.session.DatabaseSession
+import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.tasks.Progress
-import com.moneymanager.ui.AppServices
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.settings.GoogleDriveSetupDialog
 import com.moneymanager.ui.screens.settings.GoogleDriveSetupMode
@@ -58,10 +59,10 @@ import kotlinx.coroutines.launch
 fun FirstRunDatabaseSetupScreen(
     databaseManager: DatabaseManager,
     remoteController: RemoteDatabaseController?,
-    createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
+    sessions: DatabaseSessions,
     onLocalReady: (DbLocation) -> Unit,
     onRemoteOpened: (DbLocation) -> Unit,
-    onRemoteCreated: (DbLocation, AppServices, MoneyManagerDatabaseWrapper) -> Unit,
+    onRemoteCreated: (DatabaseSession) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
@@ -91,17 +92,14 @@ fun FirstRunDatabaseSetupScreen(
             try {
                 progress = Progress.counted("Creating database...", 0, 1)
                 // A new remote database starts as a freshly seeded local working copy that we then upload.
-                val opened = databaseManager.openDatabaseWithProgress(cache) { progress = it }
-                database = opened
-                progress = Progress.counted("Preparing application services...", 1, 1)
-                val services = createAppServices(opened)
-                services.deviceId
-                remoteController!!.createRemote(type.id, config, name, cache, opened, password, overwriteFileId) {
+                val session = sessions.open(cache) { progress = it }
+                database = session.database
+                remoteController!!.createRemote(type.id, config, name, cache, session.database, password, overwriteFileId) {
                     progress = it
                 }
                 // createRemote persisted the binding, armed the session and captured the sync baseline,
                 // so the database is ready to use as-is — hand it straight to the host.
-                onRemoteCreated(cache, services, opened)
+                onRemoteCreated(session)
             } catch (expected: CancellationException) {
                 throw expected
             } catch (expected: Exception) {

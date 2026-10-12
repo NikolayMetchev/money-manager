@@ -13,17 +13,14 @@ import androidx.compose.ui.window.rememberWindowState
 import co.touchlab.kermit.Logger
 import com.moneymanager.cryptodata.HttpCryptoCatalogRefresher
 import com.moneymanager.cryptodata.installCryptoCatalog
-import com.moneymanager.database.di.DatabaseComponent
-import com.moneymanager.database.di.createImportEngine
-import com.moneymanager.database.di.toApplication
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.params.AppComponentParams
-import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.importfilesource.di.createDriveFolderBrowser
 import com.moneymanager.importfilesource.di.createImportFileSourceFactory
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncResult
+import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.CloseDatabaseDialog
@@ -31,7 +28,6 @@ import com.moneymanager.ui.components.DatabaseProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
 import com.moneymanager.ui.foundation.CredentialVaultPromptHost
-import com.moneymanager.ui.toAppServices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.swing.Swing
@@ -158,6 +154,8 @@ private fun MainWindow(onExit: () -> Unit) {
     val appVersion = component.appVersion
     val localSettings = component.localSettings
     val remoteController = component.remoteDatabaseController
+    val sessions =
+        remember { DatabaseSessions(databaseManager, localSettings, component.credentialVault, remoteController) }
     val importFileSourceFactory = createImportFileSourceFactory(params, component.credentialVault)
     val driveFolderBrowser = createDriveFolderBrowser(params, component.credentialVault)
     // The currently open database, tracked so we can push it and clean up on app close.
@@ -229,17 +227,7 @@ private fun MainWindow(onExit: () -> Unit) {
             AppStartupHost(
                 databaseManager = databaseManager,
                 appVersion = appVersion,
-                localSettings = localSettings,
-                createAppServices = { database ->
-                    val component = DatabaseComponent.create(database)
-                    val importEngine =
-                        component.createImportEngine(
-                            editGate = {
-                                if (remoteController.syncState.value.editingLocked) throw EditingLockedException()
-                            },
-                        )
-                    component.toApplication().toAppServices(importEngine)
-                },
+                sessions = sessions,
                 onInfoLog = { message -> logger.i { message } },
                 onErrorLog = { message, error -> logger.e(error) { message } },
                 remoteController = remoteController,

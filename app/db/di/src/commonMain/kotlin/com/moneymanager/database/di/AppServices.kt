@@ -1,6 +1,5 @@
-package com.moneymanager.ui
+package com.moneymanager.database.di
 
-import com.moneymanager.database.Application
 import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
@@ -36,10 +35,10 @@ import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.importengineapi.ImportEngine
 
 /**
- * The UI's view of the database. Every repository here is a **read** interface — the UI never mutates
- * the database through a repository. All writes go through [TransactionsDomain.importEngine] (the single
- * write seam, which carries the session's edit gate). The engine is built in di/core
- * (`com.moneymanager.database.di.createImportEngine`) so the write repositories never reach this layer.
+ * The read-only view of an open database that the UI and the CLI receive. Every repository here is a
+ * **read** interface, so nothing above this layer can mutate the database through a repository. All
+ * writes go through [TransactionsDomain.importEngine] (the single write seam, which carries the session's
+ * edit gate), built by [createImportEngine] so the write repositories never leave this module.
  */
 data class AppServices(
     val accounts: AccountsDomain,
@@ -102,57 +101,57 @@ data class AuditDomain(
 )
 
 /**
- * Narrows the db-layer [Application] (whose repositories are write interfaces) to the UI's read-only
+ * Narrows the database component (whose repositories are write interfaces) to the read-only
  * [AppServices], plugging in the already-constructed [importEngine] as the single write seam.
  */
-fun Application.toAppServices(importEngine: ImportEngine) =
+fun DatabaseComponent.toAppServices(importEngine: ImportEngine) =
     AppServices(
         accounts =
             AccountsDomain(
-                accountRepository = accounts.accountRepository,
-                accountAttributeRepository = accounts.accountAttributeRepository,
-                categoryRepository = accounts.categoryRepository,
-                currencyRepository = accounts.currencyRepository,
-                cryptoRepository = accounts.cryptoRepository,
+                accountRepository = accountRepository,
+                accountAttributeRepository = accountAttributeRepository,
+                categoryRepository = categoryRepository,
+                currencyRepository = currencyRepository,
+                cryptoRepository = cryptoRepository,
             ),
         imports =
             ImportsDomain(
-                apiImportStrategyRepository = imports.apiImportStrategyRepository,
-                apiSessionRepository = imports.apiSessionRepository,
-                accountMappingRepository = imports.accountMappingRepository,
-                csvImportRepository = imports.csvImportRepository,
-                csvImportStrategyRepository = imports.csvImportStrategyRepository,
-                csvStrategyImportExport = imports.csvStrategyImportExport,
-                accountMappingExportService = imports.accountMappingExportService,
-                strategyLibrary = imports.strategyLibrary,
-                qifImportRepository = imports.qifImportRepository,
-                importDirectoryRepository = imports.importDirectoryRepository,
-                importTimelineRepository = imports.importTimelineRepository,
-                reconciliationRepository = imports.reconciliationRepository,
-                passThroughAccountRepository = imports.passThroughAccountRepository,
-                maintenance = imports.maintenance,
+                apiImportStrategyRepository = apiImportStrategyRepository,
+                apiSessionRepository = apiSessionRepository,
+                accountMappingRepository = accountMappingRepository,
+                csvImportRepository = csvImportRepository,
+                csvImportStrategyRepository = csvImportStrategyRepository,
+                csvStrategyImportExport = csvStrategyExportService,
+                accountMappingExportService = accountMappingExportService,
+                strategyLibrary = strategyLibrary,
+                qifImportRepository = qifImportRepository,
+                importDirectoryRepository = importDirectoryRepository,
+                importTimelineRepository = importTimelineRepository,
+                reconciliationRepository = reconciliationLinkRepository,
+                passThroughAccountRepository = passThroughAccountRepository,
+                maintenance = maintenanceService,
             ),
         transactions =
             TransactionsDomain(
-                transactionRepository = transactions.transactionRepository,
-                transferSourceRepository = transactions.transferSourceRepository,
-                attributeTypeRepository = transactions.attributeTypeRepository,
-                transferRelationshipRepository = transactions.transferRelationshipRepository,
-                tradeRepository = transactions.tradeRepository,
-                exchangeOrderRepository = transactions.exchangeOrderRepository,
+                transactionRepository = transactionRepository,
+                transferSourceRepository = transferSourceRepository,
+                attributeTypeRepository = attributeTypeRepository,
+                transferRelationshipRepository = transferRelationshipRepository,
+                tradeRepository = tradeRepository,
+                exchangeOrderRepository = exchangeOrderRepository,
                 importEngine = importEngine,
             ),
         people =
             PeopleDomain(
-                personRepository = people.personRepository,
-                personAccountOwnershipRepository = people.personAccountOwnershipRepository,
-                personAttributeRepository = people.personAttributeRepository,
+                personRepository = personRepository,
+                personAccountOwnershipRepository = personAccountOwnershipRepository,
+                personAttributeRepository = personAttributeRepository,
             ),
         settings =
             SettingsDomain(
-                settingsRepository = settings.settingsRepository,
-                deviceRepository = settings.deviceRepository,
+                settingsRepository = settingsRepository,
+                deviceRepository = deviceRepository,
             ),
-        audit = AuditDomain(auditRepository = audit.auditRepository),
+        audit = AuditDomain(auditRepository = auditRepository),
         deviceId = deviceId,
     )

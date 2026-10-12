@@ -101,6 +101,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `app/db/seed/`, `app/db/schemaspy/` | Static seed SQL; SchemaSpy docs generator for the Pages site |
 | `app/cryptodata/` | Bundled crypto asset catalog plus its refresher/installer (built by `tools/crypto-dataset`) |
 | `app/tasks/` | The one progress type `Progress` (every import, download, DB open and cloud sync reports it), its `PhasedProgress`/`WeightedProgress` folding helpers, and `TaskManager`: background tasks as a `StateFlow`, deduped by key, with child tasks and cancellation. Pure coroutines, so the UI, CLI and TUI share it; the Compose `TaskPanel` (`app/ui/foundation`) only collects it |
+| `app/session/` | Headless database bootstrap shared by the desktop app, Android and the CLI: `DatabaseSessions` resolves what to open at startup (`StartupTarget`: explicit `--db`, a cloud binding's kept copy or password restore, the last database, or first run), opens it into a `DatabaseSession` (the database, `DatabaseComponent`, the edit-gated `ImportEngine`, read-only `AppServices`), binds the credential vault and captures the cloud sync baseline. `AppStartupHost` only adds the screens and prompts |
 | `app/importengineapi/` | `ImportEngine` interface + `ImportBatch`/`ImportResult` model + `ImportEngine.*` write helpers (DB-free) |
 | `app/importer/` | `ImportEngineImpl` — the **sole** DB writer (consumes write repositories) |
 | `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Parse/download sources and build an `ImportBatch` (DB-free, enforced) |
@@ -193,8 +194,9 @@ database is locked, and provenance/audit recording lives in a single place.
 
 **Read vs write interfaces:** repositories come in `*ReadRepository` + `*WriteRepository` pairs (write
 extends read). **Only `ImportEngineImpl` (`app/importer`) is injected with write repositories.** The UI
-gets a fully read-only `AppServices` (every field a `*ReadRepository`) plus the prebuilt `ImportEngine`;
-the engine is constructed in `app/db/di` via `DatabaseComponent.createImportEngine(editGate)`. In Compose,
+gets a fully read-only `AppServices` (every field a `*ReadRepository`) plus the prebuilt `ImportEngine`.
+Both are built in `app/db/di` (`DatabaseComponent.toAppServices`, `DatabaseComponent.createImportEngine(editGate)`),
+and `DatabaseSessions` (`app/session`) wires them up for every front end. In Compose,
 reach it through `LocalImportEngine.current`.
 
 The interfaces live in two modules — `:app:model:repository:read` and `:app:model:repository:write` — so a

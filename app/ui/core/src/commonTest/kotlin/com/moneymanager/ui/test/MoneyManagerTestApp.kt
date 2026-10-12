@@ -10,13 +10,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.di.DatabaseComponent
-import com.moneymanager.database.di.toApplication
+import com.moneymanager.database.di.toAppServices
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.ui.MoneyManagerApp
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.error.GlobalSchemaErrorState
-import com.moneymanager.ui.toAppServices
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -100,7 +99,7 @@ internal object MoneyManagerTestApp {
                 MoneyManagerApp(
                     appVersion = appVersion,
                     databaseLocation = state.location,
-                    services = dc.toApplication().toAppServices(dc.importEngine),
+                    services = dc.toAppServices(dc.importEngine),
                     onRequestSwitchDatabase = {},
                 )
             }
