@@ -8,11 +8,16 @@ class GenerateKotlinConstantsTaskTest {
     fun `short values render as const vals with escapes`() {
         val source = renderKotlinConstants("a.b", "Gen", ":m:gen", mapOf("V" to "x\t\"$\\\né"), emptyMap())
 
-        val expected = "const val V: String = \"x\\t\\\"\\$\\\\\\n\\u00e9\""
+        val expected = "const val V: String = \"x\\t\\\"$\\\\\\n\\u00e9\""
         assertTrue(expected in source, source)
         assertTrue("package a.b" in source, source)
         assertTrue("internal object Gen {" in source, source)
         assertFalse("decode" in source, source)
+    }
+
+    @Test
+    fun `dollar is escaped only where it would start a template`() {
+        assertEquals($$"\"a\\$b \\${c} $1 $\"", kotlinStringLiteral($$"a$b ${c} $1 $"))
     }
 
     @Test

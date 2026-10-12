@@ -177,7 +177,6 @@ exclude:
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/SourceTypeConversions.kt
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/MoneyManagerDatabaseWrapper.kt
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/VersionReader.android.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppComponent.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
       - app/importfilesource/core/src/commonMain/kotlin/com/moneymanager/importfilesource/ImportFileSource.kt
@@ -228,7 +227,6 @@ exclude:
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/SourceTypeConversions.kt
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/MoneyManagerDatabaseWrapper.kt
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/VersionReader.android.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppComponent.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
       - app/importfilesource/di/src/androidMain
@@ -264,6 +262,10 @@ exclude:
       - gradle/build-logic/build
       - app/db/core/build
       - app/ui/core/build
+      # GenerateKotlinConstantsTask output (build-time data: version, crypto catalog, OAuth client).
+      - app/cryptodata/build
+      - app/di/core/build
+      - app/remotestorage/googledrive/build
 
 include:
   - name: CheckDependencyLicenses

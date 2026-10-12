@@ -122,14 +122,17 @@ internal fun chunkLiteral(value: String): List<String> {
     return chunks
 }
 
+private fun Char?.startsTemplate(): Boolean = this != null && (isLetter() || this == '_' || this == '{' || this == '`')
+
 internal fun kotlinStringLiteral(value: String): String =
     buildString {
         append('"')
-        for (ch in value) {
+        for ((index, ch) in value.withIndex()) {
             when {
                 ch == '\\' -> append("\\\\")
                 ch == '"' -> append("\\\"")
-                ch == '$' -> append("\\$")
+                // Escaped only where it would otherwise start a template: Qodana fails on redundant escapes.
+                ch == '$' && value.getOrNull(index + 1).startsTemplate() -> append("\\$")
                 ch == '\n' -> append("\\n")
                 ch == '\t' -> append("\\t")
                 ch == '\r' -> append("\\r")
