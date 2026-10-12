@@ -167,7 +167,6 @@ class DatabaseSessionsTest {
     private fun binding(cache: DbLocation) =
         RemoteDatabaseBinding(
             providerId = OneFileProvider.ID,
-            providerConfig = null,
             remoteFileId = OneFileProvider.FILE_ID,
             remoteName = "db.mmdb",
             localCachePath = cache.toString(),
