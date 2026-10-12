@@ -24,6 +24,11 @@ import javax.inject.Inject
  *
  * `run_konan` treats every `-D` argument as a JVM system property, so [defines] are written into a wrapper
  * source file that `#include`s the amalgamation instead of being passed as flags.
+ *
+ * `run_konan clang` assumes the target's LLVM and sysroot are already in [konanDataDir]; only the compiler and
+ * cinterop download them. On a fresh machine (an IDE import, Qodana) nothing has compiled yet, so the task
+ * first runs cinterop on an empty def file, which provisions the target's dependencies and is a no-op once
+ * they are there.
  */
 @CacheableTask
 abstract class CompileBundledSqliteTask
@@ -65,6 +70,19 @@ abstract class CompileBundledSqliteTask
             val isWindows = System.getProperty("os.name").startsWith("Windows")
             val runKonan = home.resolve(if (isWindows) "bin/run_konan.bat" else "bin/run_konan")
             check(runKonan.isFile) { "Kotlin/Native distribution not found at $home (no ${runKonan.name})" }
+
+            val emptyDef = temporaryDir.resolve("provision.def")
+            emptyDef.writeText("package = provision\n")
+            runKonan(
+                runKonan,
+                "cinterop",
+                "-target",
+                konanTarget.get(),
+                "-def",
+                emptyDef.absolutePath,
+                "-o",
+                temporaryDir.resolve("provision").absolutePath,
+            )
 
             val outputDir = outputDirectory.get().asFile
             outputDir.deleteRecursively()
