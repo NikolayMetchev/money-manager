@@ -23,7 +23,7 @@ class LoopbackRedirectReceiverTest {
     @Test
     fun returnsTheUrlDecodedAuthorizationCode() =
         runTest {
-            val (code, page) = redirect("code=a%2Fb&state=s1&scope=x", expectedState = "s1")
+            val (code, page) = redirect("code=a%2Fb&state=$STATE&scope=x")
             assertEquals("a/b", code)
             assertTrue("Google Drive is connected" in page, page)
         }
@@ -31,14 +31,14 @@ class LoopbackRedirectReceiverTest {
     @Test
     fun rejectsAMismatchedState() =
         runTest {
-            val failure = assertFailsWith<RemoteAuthException> { redirect("code=c&state=forged", expectedState = "s1") }
+            val failure = assertFailsWith<RemoteAuthException> { redirect("code=c&state=forged") }
             assertTrue("unexpected state" in failure.message.orEmpty(), failure.message)
         }
 
     @Test
     fun reportsAnOAuthError() =
         runTest {
-            val failure = assertFailsWith<RemoteAuthException> { redirect("error=access_denied&state=s1", expectedState = "s1") }
+            val failure = assertFailsWith<RemoteAuthException> { redirect("error=access_denied&state=$STATE") }
             assertTrue("access_denied" in failure.message.orEmpty(), failure.message)
         }
 
@@ -48,23 +48,26 @@ class LoopbackRedirectReceiverTest {
             val failure =
                 assertFailsWith<RemoteAuthException> {
                     withContext(Dispatchers.Default) {
-                        LoopbackRedirectReceiver.bind().use { it.awaitCode("s1", timeout = 200.milliseconds) }
+                        LoopbackRedirectReceiver.bind().use { it.awaitCode(STATE, timeout = 200.milliseconds) }
                     }
                 }
             assertTrue("Timed out" in failure.message.orEmpty(), failure.message)
         }
 
-    private suspend fun redirect(
-        query: String,
-        expectedState: String,
-    ): Pair<String, String> =
+    private suspend fun redirect(query: String): Pair<String, String> =
         withContext(Dispatchers.Default) {
             LoopbackRedirectReceiver.bind().use { receiver ->
                 coroutineScope {
-                    val code = async { receiver.awaitCode(expectedState, timeout = 30.seconds) }
+                    // Held as a Result so a rejected callback doesn't cancel the request still reading the
+                    // response: Curl's cancellation handler throws on native.
+                    val code = async { runCatching { receiver.awaitCode(STATE, timeout = 30.seconds) } }
                     val page = platformHttpClient().use { it.get("${receiver.redirectUri}/?$query").bodyAsText() }
-                    code.await() to page
+                    code.await().getOrThrow() to page
                 }
             }
         }
+
+    private companion object {
+        const val STATE = "s1"
+    }
 }
