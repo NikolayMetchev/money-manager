@@ -63,6 +63,7 @@ kotlin {
 
 val generateBundledCryptoDataset =
     tasks.register<GenerateKotlinConstantsTask>("generateBundledCryptoDataset") {
+        description = "Compiles data/coins.tsv into the bundled crypto catalog constant."
         packageName.set("com.moneymanager.cryptodata")
         objectName.set("GeneratedCryptoDataset")
         constants.put("COINS_TSV", providers.fileContents(layout.projectDirectory.file("data/coins.tsv")).asText)

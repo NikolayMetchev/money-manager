@@ -133,7 +133,7 @@ internal fun kotlinStringLiteral(value: String): String =
                 ch == '\n' -> append("\\n")
                 ch == '\t' -> append("\\t")
                 ch == '\r' -> append("\\r")
-                ch.code < 0x20 || ch.code > 0x7E -> append("\\u%04x".format(ch.code))
+                ch.code !in 0x20..0x7E -> append("\\u%04x".format(ch.code))
                 else -> append(ch)
             }
         }

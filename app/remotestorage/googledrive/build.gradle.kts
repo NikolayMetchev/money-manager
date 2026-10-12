@@ -110,6 +110,7 @@ fun resolveOAuthValue(
 
 val generateGoogleOAuthDefaults =
     tasks.register<GenerateKotlinConstantsTask>("generateGoogleOAuthDefaults") {
+        description = "Generates the obfuscated shipped desktop Google OAuth client."
         packageName.set("com.moneymanager.remotestorage.googledrive")
         objectName.set("GeneratedGoogleOAuth")
         obfuscatedConstants.put(
