@@ -54,6 +54,7 @@ jobs:
         with:
           command: ':app:db:schemaspy:publishSchemaSpyDocs --stacktrace'
           cache-read-only: true
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
       - name: Generate module dependency graph
         # The module-graph plugin reads the whole project via `allprojects`, which is
         # incompatible with Isolated Projects / the configuration cache, so disable both
@@ -70,6 +71,7 @@ jobs:
         with:
           command: ':tools:strategy-catalog:generateCatalogSite --stacktrace'
           cache-read-only: true
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
       - name: Generate KDoc API documentation
         # Renders every module's KDoc into webpage/kdoc via Dokka's multi-module aggregation.
         # `-PenableDokka=true` opts the root build into wiring the aggregation; that aggregation

@@ -232,6 +232,7 @@ jobs:
         with:
           # Read-only (the action's default): restores the build job's Gradle User Home.
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          android-emulator: 'true'
 
       # Restore on every ref, save only from main (below): a ~2 GB snapshot saved from a PR's merge
       # ref can't be restored by main or any other PR, and only pushes the shared entries out.
@@ -500,18 +501,8 @@ jobs:
           # GITHUB_TOKEN doesn't trigger workflows to prevent infinite loops
           token: ${{ secrets.PAT_TOKEN }}
 
-      - name: Set up JDK 25
-        uses: actions/setup-java@v6
-        with:
-          # JVM version sync: keep this aligned with gradle/libs.versions.toml,
-          # .github/actions/gradle-setup/action.yml, and CLAUDE.md.
-          java-version: '25'
-          distribution: 'corretto'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6.4.0
-        # No gradle-version pin: ./gradlew uses the wrapper's version, so a pin here only
-        # downloads a second, unused distribution.
+      - name: Setup Gradle environment
+        uses: ./.github/actions/gradle-setup
 
       - name: Run lintFormat
         run: ./gradlew lintFormat --no-daemon -Dktlint.ignoreFailures=true --continue
