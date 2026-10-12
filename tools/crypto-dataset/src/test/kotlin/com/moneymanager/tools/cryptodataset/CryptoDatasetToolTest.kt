@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class CryptoDatasetToolTest {
     private val coinsTsv =
         generateSequence(File(".").absoluteFile) { it.parentFile }
-            .map { it.resolve("app/cryptodata/src/commonResources/crypto/coins.tsv") }
+            .map { it.resolve("app/cryptodata/data/coins.tsv") }
             .firstOrNull { it.isFile }
             ?: error("coins.tsv not found relative to the module directory")
 

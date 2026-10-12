@@ -55,3 +55,18 @@ kotlin {
         }
     }
 }
+
+// The app version, compiled in from the root VERSION file (no platform has to find it at runtime).
+val generateAppVersion =
+    tasks.register<GenerateKotlinConstantsTask>("generateAppVersion") {
+        packageName.set("com.moneymanager.di")
+        objectName.set("GeneratedAppVersion")
+        constants.put(
+            "VERSION",
+            providers.fileContents(layout.settingsDirectory.file("VERSION")).asText.map(String::trim),
+        )
+    }
+
+kotlin.sourceSets.named("commonMain") {
+    kotlin.srcDir(generateAppVersion)
+}

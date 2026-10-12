@@ -11,8 +11,6 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
 }
 
-val versionFile = rootDir.resolve("VERSION")
-
 dependencies {
     api(libs.androidx.compose.runtime.desktop)
     api(libs.compose.ui.desktop)
@@ -126,13 +124,6 @@ dependencies {
 // runtimeClasspath feeds `run`, the distributables and ProGuard, so all of them get the stripped jar
 configurations.named("runtimeClasspath") {
     attributes.attribute(sqliteNativesStripped, true)
-}
-
-// Copy VERSION file to resources
-tasks.named<ProcessResources>("processResources") {
-    from(versionFile) {
-        into(".")
-    }
 }
 
 compose.desktop {

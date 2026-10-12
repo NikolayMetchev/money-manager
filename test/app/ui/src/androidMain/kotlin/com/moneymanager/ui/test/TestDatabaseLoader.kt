@@ -1,4 +1,4 @@
-package com.moneymanager.test.database
+package com.moneymanager.ui.test
 
 import androidx.test.platform.app.InstrumentationRegistry
 import com.moneymanager.domain.model.DbLocation
