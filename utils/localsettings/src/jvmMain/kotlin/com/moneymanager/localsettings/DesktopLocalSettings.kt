@@ -19,26 +19,29 @@ val desktopLocalSettings: LocalSettings by lazy {
 }
 
 /**
- * Copies every value in the java.util.prefs node [nodePath] that [target] doesn't already hold, then deletes the
- * node so the import runs once. Each key is read on its own: a node holding a value XML can't represent fails to
- * flush, and one bad key mustn't cost the others.
+ * Moves every value in the java.util.prefs node [nodePath] that [target] doesn't already hold into it, then deletes
+ * the node so the import runs once. The node is kept unless the file write succeeded, so a failed import is retried
+ * next launch. Each key is read on its own: a node holding a value XML can't represent fails to flush, and one bad
+ * key mustn't cost the others.
  */
 internal fun importJavaPreferences(
-    target: LocalSettings,
+    target: FileLocalSettings,
     root: Preferences,
     nodePath: String,
 ) {
     try {
         if (!root.nodeExists(nodePath)) return
         val node = root.node(nodePath)
-        node.keys().forEach { key ->
-            try {
-                val value = node.get(key, null)
-                if (value != null && target.getString(key) == null) target.putString(key, value)
-            } catch (e: IllegalStateException) {
-                logger.w(e) { "Skipping unreadable preference $key" }
+        val values =
+            node.keys().mapNotNull { key ->
+                try {
+                    node.get(key, null)?.let { key to it }
+                } catch (e: IllegalStateException) {
+                    logger.w(e) { "Skipping unreadable preference $key" }
+                    null
+                }
             }
-        }
+        if (!target.putMissing(values.toMap())) return
         node.removeNode()
         root.flush()
         logger.i { "Moved settings from java.util.prefs to the settings file" }

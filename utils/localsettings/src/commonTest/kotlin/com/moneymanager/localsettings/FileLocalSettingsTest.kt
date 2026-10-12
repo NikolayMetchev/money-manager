@@ -88,6 +88,37 @@ class FileLocalSettingsTest {
     }
 
     @Test
+    fun nonStringValuesMakeTheFileReadAsEmpty() {
+        writeText(file, """{"lastDirectory":"/data","lastDatabase":null}""")
+
+        assertNull(FileLocalSettings(file).getString(KEY_LAST_DIRECTORY))
+    }
+
+    @Test
+    fun aSameSizeRewriteByAnotherInstanceIsSeen() {
+        val desktop = FileLocalSettings(file)
+        val cli = FileLocalSettings(file)
+        desktop.putString(KEY_LAST_DATABASE, "/data/a.db")
+        assertEquals("/data/a.db", cli.getString(KEY_LAST_DATABASE))
+
+        desktop.putString(KEY_LAST_DATABASE, "/data/b.db")
+
+        assertEquals("/data/b.db", cli.getString(KEY_LAST_DATABASE))
+    }
+
+    @Test
+    fun putMissingKeepsExistingValues() {
+        val settings = FileLocalSettings(file)
+        settings.putString(KEY_LAST_DIRECTORY, "/file")
+
+        assertTrue(settings.putMissing(mapOf(KEY_LAST_DIRECTORY to "/other", KEY_LAST_DATABASE to "/data/money.db")))
+
+        val reopened = FileLocalSettings(file)
+        assertEquals("/file", reopened.getString(KEY_LAST_DIRECTORY))
+        assertEquals("/data/money.db", reopened.getString(KEY_LAST_DATABASE))
+    }
+
+    @Test
     fun keysAreWrittenSorted() {
         val settings = FileLocalSettings(file)
         settings.putString("b", "2")

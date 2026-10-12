@@ -1,19 +1,27 @@
 package com.moneymanager.localsettings
 
+import com.moneymanager.files.writeText
+import java.nio.file.Files
 import java.util.prefs.Preferences
 import kotlin.random.Random
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlinx.io.files.Path as IoPath
 
 class JavaPreferencesImportTest {
     private val root = Preferences.userRoot()
     private val nodePath = "/moneymanager-import-test-${Random.nextLong().toULong()}"
+    private val dir = Files.createTempDirectory("prefs-import-test")
+    private val file = IoPath(dir.toString(), "settings.json")
 
     @AfterTest
     fun cleanUp() {
         if (root.nodeExists(nodePath)) root.node(nodePath).removeNode()
+        dir.toFile().deleteRecursively()
     }
 
     @Test
@@ -22,38 +30,33 @@ class JavaPreferencesImportTest {
             put(KEY_LAST_DATABASE, "/prefs/money.db")
             put(KEY_LAST_DIRECTORY, "/prefs")
         }
-        val target = InMemorySettings(mutableMapOf(KEY_LAST_DIRECTORY to "/file"))
+        val target = FileLocalSettings(file).apply { putString(KEY_LAST_DIRECTORY, "/file") }
 
         importJavaPreferences(target, root, nodePath)
 
-        assertEquals(mapOf(KEY_LAST_DATABASE to "/prefs/money.db", KEY_LAST_DIRECTORY to "/file"), target.values)
+        val reopened = FileLocalSettings(file)
+        assertEquals("/prefs/money.db", reopened.getString(KEY_LAST_DATABASE))
+        assertEquals("/file", reopened.getString(KEY_LAST_DIRECTORY))
         assertFalse(root.nodeExists(nodePath))
     }
 
     @Test
-    fun aMissingNodeIsANoOp() {
-        val target = InMemorySettings(mutableMapOf())
+    fun keepsTheNodeWhenTheFileCannotBeWritten() {
+        root.node(nodePath).put(KEY_LAST_DATABASE, "/prefs/money.db")
+        val blocker = IoPath(dir.toString(), "blocker")
+        writeText(blocker, "a file where the settings directory should be")
 
-        importJavaPreferences(target, root, nodePath)
+        importJavaPreferences(FileLocalSettings(IoPath(blocker, "settings.json")), root, nodePath)
 
-        assertEquals(emptyMap(), target.values)
-        assertFalse(root.nodeExists(nodePath))
+        assertTrue(root.nodeExists(nodePath))
+        assertEquals("/prefs/money.db", root.node(nodePath).get(KEY_LAST_DATABASE, null))
     }
 
-    private class InMemorySettings(
-        val values: MutableMap<String, String>,
-    ) : LocalSettings {
-        override fun getString(key: String): String? = values[key]
+    @Test
+    fun aMissingNodeIsANoOp() {
+        importJavaPreferences(FileLocalSettings(file), root, nodePath)
 
-        override fun putString(
-            key: String,
-            value: String,
-        ) {
-            values[key] = value
-        }
-
-        override fun remove(key: String) {
-            values.remove(key)
-        }
+        assertNull(FileLocalSettings(file).getString(KEY_LAST_DATABASE))
+        assertFalse(root.nodeExists(nodePath))
     }
 }
